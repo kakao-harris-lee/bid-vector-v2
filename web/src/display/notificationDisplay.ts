@@ -24,15 +24,19 @@ export const NOTIFICATION_KIND_DISPLAY = {
 } as const satisfies Record<NotificationKind, StateDisplay>;
 
 /**
- * 부가 사실 넷. **「1위가 아니다」와 「낙찰이 아니다」는 다른 사실이다** — 1위 ≠ 낙찰이고
+ * 부가 사실 다섯. **「1위가 아니다」와 「낙찰이 아니다」는 다른 사실이다** — 1위 ≠ 낙찰이고
  * (UX §2.4) 그 사이에 적격심사가 있다. 한 문면으로 적으면 개찰 단계의 소식과 확정 단계의
  * 소식이 같아 보인다.
+ *
+ * **「낙찰 아님」과 「유찰·재입찰」도 다른 사실이다**(D-M9-1): 앞은 「내가 졌다」이고 뒤는
+ * 「아무도 못 땄다」다. 운영자의 다음 할 일이 갈린다 — 유찰은 재입찰 공고를 기다리는 일이다.
  */
 export const NOTIFICATION_DETAIL_DISPLAY = {
   PROVISIONAL_FIRST: { label: '잠정 1위', tone: 'good' },
   NOT_PROVISIONAL_FIRST: { label: '잠정 1위 아님', tone: 'neutral' },
   AWARDED: { label: '낙찰', tone: 'good' },
   NOT_AWARDED: { label: '낙찰 아님', tone: 'neutral' },
+  FAILED_OR_REBID: { label: '유찰·재입찰', tone: 'neutral' },
 } as const satisfies Record<NotificationDetail, StateDisplay>;
 
 /**

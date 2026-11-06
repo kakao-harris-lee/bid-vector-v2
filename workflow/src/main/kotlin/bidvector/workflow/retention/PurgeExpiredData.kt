@@ -83,11 +83,11 @@ sealed interface RetentionOutcome {
 }
 
 /**
- * 보존 use case(M6/6B-3 P-3) — 「적재 시각 + 90일」이 지난 행을 지우거나(PURGE) PII 를
+ * 보존 use case(M6/6B-3 P-3) — 「적재 시각 + 보존 기간」이 지난 행을 지우거나(PURGE) PII 를
  * 지운다(MASK_PII).
  *
  * **기준 시각은 주입된 [Clock] 하나에서 나온다** — 표마다 `now()` 를 다시 묻지 않는다(한 run
- * 안에서 cutoff 가 표마다 다르면 「무엇이 90일인가」가 표마다 달라진다).
+ * 안에서 cutoff 가 표마다 다르면 「무엇이 기한을 넘었나」가 표마다 달라진다).
  *
  * **계획과 실행이 갈려 있다**([planOf] → [sweepUnderLease]): 거부 사유는 임대를 쥐기 전에
  * 결정되므로, 분류가 어긋난 run 은 자물쇠도 잡지 않고 한 행도 건드리지 않는다.

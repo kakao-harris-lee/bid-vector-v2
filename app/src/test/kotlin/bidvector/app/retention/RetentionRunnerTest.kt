@@ -23,9 +23,12 @@ import java.sql.SQLException
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
-private val NOW = Instant.parse("2026-10-14T00:00:00Z")
-private const val RETENTION_DAYS = 90
+private val NOW = Instant.parse("2026-11-05T00:00:00Z")
+
+/** 승인된 보존 기간 — 사용자 결정 2026-11-05(1년). 시작 줄이 이 수를 말해야 한다. */
+private const val RETENTION_DAYS = 365
 
 /** 예외 메시지에 심는 자리값 — 로그 줄에 이것이 나오면 원 예외가 로그 경로에 올라간 것이다. */
 private const val LEAKY_MESSAGE = "SECRET-ROW-VALUE-FIXTURE"
@@ -45,6 +48,8 @@ private class StubStore(
     private val thrownTable: String? = null,
 ) : RetentionStorePort,
     RetentionWriter {
+    /** 저장소가 **실제로 받은** 기준 시각 — 로그가 말한 보존 기간과 한 값인지 재는 쪽이 읽는다. */
+    val cutoffs = mutableListOf<Instant>()
     private var purgeServed = false
     private var maskServed = false
 
@@ -64,6 +69,7 @@ private class StubStore(
         cutoff: RetentionCutoff,
         batchSize: Int,
     ): Int {
+        cutoffs += cutoff.instant
         if (thrownTable == null || thrownTable == target.table) thrown?.let { throw it }
         if (purgeServed) return 0
         purgeServed = true
@@ -75,6 +81,7 @@ private class StubStore(
         cutoff: RetentionCutoff,
         batchSize: Int,
     ): MaskBatchCounts {
+        cutoffs += cutoff.instant
         if (maskServed) return MaskBatchCounts(0, 0)
         maskServed = true
         return maskBatch
@@ -92,7 +99,7 @@ class RetentionRunnerTest {
     private fun runWith(store: StubStore) {
         RetentionRunner(
             // 정책 값을 **만들지 않는다** — 생성자가 `workflow` 의 `internal` 이다(cr M-2 · vr F-1).
-            // 이 자리에서 90일을 흉내낼 수 없다는 것이 그 벽의 실측이기도 하다.
+            // 이 자리에서 보존 기간을 흉내낼 수 없다는 것이 그 벽의 실측이기도 하다.
             purge = PurgeExpiredData(store, { NOW }, productionPolicy()),
             log = CollectionLog { lines += it },
             termination = CollectionTermination { exitCodes += it },
@@ -209,4 +216,35 @@ class RetentionRunnerTest {
 
         lines.first() shouldContain "retentionDays=$RETENTION_DAYS"
     }
+
+    /**
+     * **값이 wire 에 닿는가**(P-5 의 app 층 몫) — 시작 줄이 말한 보존 기간과 저장소가 실제로 받은
+     * cutoff 가 **한 값**이다. 둘을 따로 조립할 수 있던 판에서는 로그가 한 수를 말하면서 다른
+     * cutoff 로 지우는 조합이 app test 전건을 초록으로 지났다(vr F-1). 여기서 함께 세는 것 둘:
+     * ⓐ 시작 줄의 수가 승인된 값이고 ⓑ 파기·마스킹 **두 경로**가 받은 cutoff 가 `시계 − 그 수`
+     * 하나뿐이다(표마다 `now()` 를 다시 묻지 않는다).
+     */
+    @Test
+    fun `시작 줄의 보존 기간과 저장소가 받은 cutoff 는 같은 한 값이다`() {
+        val store =
+            StubStore(
+                listOf(
+                    RetentionTarget("notice", RetentionTreatment.PURGE),
+                    RetentionTarget("raw_observation", RetentionTreatment.MASK_PII),
+                ),
+            )
+
+        runWith(store)
+
+        val declaredDays = declaredRetentionDays(lines.first())
+        declaredDays shouldBe RETENTION_DAYS
+        val expected = NOW.minus(declaredDays.toLong(), ChronoUnit.DAYS)
+        store.cutoffs.toSet() shouldBe setOf(expected)
+        lines.last() shouldContain "cutoff=$expected"
+    }
+
+    private fun declaredRetentionDays(startLine: String): Int =
+        checkNotNull(Regex("""retentionDays=(\d+)""").find(startLine)) {
+            "시작 줄이 보존 기간을 싣지 않았다: $startLine"
+        }.groupValues[1].toInt()
 }

@@ -165,7 +165,7 @@ class JdbcRetentionStore internal constructor(
  *
  * 문장마다 자기 트랜잭션이다(`autoCommit` 기본) — 한 일괄이 커밋되고 다음 일괄이 실패하면
  * **앞 일괄은 남는다**. 그것이 의도다: cutoff 가 시각으로 정해지므로 다음 run 이 이어받는 데
- * 상태가 필요 없고, 90일 치 백로그 전부를 한 트랜잭션에 넣으면 그 표의 쓰기가 그만큼 막힌다.
+ * 상태가 필요 없고, 보존 기간 치 백로그 전부를 한 트랜잭션에 넣으면 그 표의 쓰기가 그만큼 막힌다.
  */
 internal class JdbcRetentionWriter(
     private val connection: Connection,

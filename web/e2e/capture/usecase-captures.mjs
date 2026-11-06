@@ -64,9 +64,15 @@ const SECOND_NOTICE = 'SYN-7E2-BIDBOX';
  * 둘이 빈 얼굴에서도 서서(`onboarding-items` 는 0/8 에서도, `worksheet-title` 은 공고만 떠도)
  * 빈틈이 남았고, `positive` 를 `ready` 와 같은 값으로 두는 우회가 **exit 0** 이었다.
  *
- * 알림함만 `positive` 가 빈 얼굴이다 — 오늘 트리거가 발화하지 않으므로 「빈 얼굴이 섰다」가
- * 이 화면의 내용이고, 그래서 `faces` 에서 그것을 뺀다(`InboxScreen.test.tsx` 가 적재 중·오류에
- * 그 얼굴이 **서지 않음**을 단언하므로 표지로서 유효하다).
+ * **알림함의 표지를 고쳤다**(M9/screen-display D-6). 앞 판은 `positive` 가 **빈 얼굴**
+ * (`inbox-empty`)이었다 — 「오늘 트리거가 발화하지 않는다」를 전제했기 때문이다. 그 전제는
+ * 거짓이다: **이 스크립트의 씨앗이** 건 하나를 결과까지 밀어 알림을 만든다. 그래서 빈 얼굴이
+ * 서지 않고 캡처가 거기서 30s 타임아웃으로 죽었다(2026-11-05 실측 — base 에서도 같은 자리에서
+ * 재현되는 선행 결함이었다).
+ *
+ * 이제 표지는 **알림 행 하나**이고(`notification-<종류>-<공고번호>-<차수>` 꼴을 정규식으로
+ * 잡는다 — 종류를 열거하면 서버의 트리거 규칙을 캡처 스크립트가 한 벌 더 적는 것이 된다),
+ * 빈 얼굴·적재 중·오류 셋이 `faces` 로 간다. 빈 알림함은 활용사례로도 내용이 아니다.
  */
 const SCREENS = [
   {
@@ -113,9 +119,9 @@ const SCREENS = [
     id: 'inbox',
     path: '/inbox',
     ready: 'screen-inbox',
-    positive: () => ({ testId: 'inbox-empty' }),
-    // 빈 얼굴이 **내용**이라 `faces` 가 비었다 — 위 KDoc 의 사유.
-    faces: [],
+    // 알림 행 **하나라도** 섰는가. 종류를 열거하지 않는다(위 KDoc 의 사유).
+    positive: () => ({ testId: /^notification-/ }),
+    faces: ['inbox-empty', 'inbox-loading', 'inbox-error'],
   },
 ];
 
@@ -127,13 +133,18 @@ for (const screen of SCREENS) {
     throw new Error(`${screen.id}: positive 함수와 faces 목록이 둘 다 필요하다(r2 CR M-2).`);
   }
   const marker = screen.positive(PROBE_SEED).testId;
-  if (marker === screen.ready) {
+  // 표지는 글자이거나 **정규식**이다(M9 D-6 — 알림 행은 종류를 열거하지 않는다). 정규식이면
+  // 「같다」 대신 **그 표지가 화면 표지·빈 얼굴을 집어 가는가**를 묻는다 — 그러지 않으면
+  // `/^screen-inbox$/` 같은 표지가 이 검사를 그냥 지난다.
+  const hits = (candidate) => (typeof marker === 'string' ? marker === candidate : marker.test(candidate));
+  if (hits(screen.ready)) {
     throw new Error(
-      `${screen.id}: 양성 표지가 화면 표지(${screen.ready})와 같다 — 그것은 빈 얼굴에도 선다(v r1 L-1).`,
+      `${screen.id}: 양성 표지가 화면 표지(${screen.ready})를 집는다 — 그것은 빈 얼굴에도 선다(v r1 L-1).`,
     );
   }
-  if (screen.faces.includes(marker)) {
-    throw new Error(`${screen.id}: 양성 표지가 빈 얼굴(${marker})과 같다 — 내용을 재지 못한다.`);
+  const caught = screen.faces.find(hits);
+  if (caught !== undefined) {
+    throw new Error(`${screen.id}: 양성 표지가 빈 얼굴(${caught})을 집는다 — 내용을 재지 못한다.`);
   }
 }
 

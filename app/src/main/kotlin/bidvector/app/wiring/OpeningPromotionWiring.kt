@@ -58,7 +58,12 @@ open class OpeningPromotionWiring {
             attempts = runState.attempts,
             sampleList = runState.sampleList,
             policyFor = ::collectionPolicyAt,
-            // 승격 대상 원문의 적재 시각 하한 — 「90일」을 이 배선이 다시 적지 않는다(D-7C5P-3).
+            // 승격 대상 원문의 적재 시각 하한 — 보존 기간을 이 배선이 다시 적지 않는다(D-7C5P-3).
+            //
+            // **해소 기준일이 시계가 아니라 운영자 입력이다**(cr M-1). 그래서 보존 개정(1년)이 이 창을
+            // 넓히는 것은 **조건부**다 — `referenceDate` 가 개정일 이후일 때만이고, 과거 수집일을 주면
+            // 이 창은 90일로 선다(파기 러너는 같은 정책을 주입 시계의 KST 날짜로 해소한다 — D-8).
+            // 같은 한 자리 정책이 두 시대로 해소될 수 있다는 뜻이고, 그 비대칭은 runbook 알려진 제한 22 다.
             retention = resolvedOrFail(RETENTION_POLICY.resolve(properties.referenceDate), "보존 정책"),
             referenceDate = referenceDate,
             clock = clock,

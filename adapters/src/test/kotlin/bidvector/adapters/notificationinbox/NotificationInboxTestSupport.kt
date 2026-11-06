@@ -12,8 +12,10 @@ import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
+import bidvector.workflow.notificationinbox.NotificationKind
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 
@@ -149,8 +151,32 @@ internal abstract class NotificationInboxTestSupport : PersistenceTestSupport() 
             }
         }
 
+    /**
+     * 종류 하나의 **대표 사실** — 소진 `when` 이라 종류를 더하면 여기서 컴파일이 막힌다. 종류
+     * 전수를 도는 test 들의 모집단이 어휘와 함께 자라는 것은 그래서다(목록을 손으로 들면 자라지
+     * 않는다).
+     *
+     * **하네스에 둔 이유**: 전수 test 가 둘 이상이 됐다(읽음 유지·워터마크·bind 결정자). 두 벌로
+     * 두면 한쪽만 종류를 더해도 다른 쪽이 조용히 좁은 모집단을 돈다.
+     */
+    protected fun factOf(kind: NotificationKind): NotificationFact =
+        when (kind) {
+            NotificationKind.NEW_CANDIDATE -> NotificationFact.NewCandidate
+            NotificationKind.BID_DEADLINE_IMMINENT -> NotificationFact.BidDeadlineImminent
+            NotificationKind.BID_DEADLINE_TODAY -> NotificationFact.BidDeadlineToday
+            NotificationKind.DOCUMENT_DEADLINE_IMMINENT -> NotificationFact.DocumentDeadlineImminent
+            NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised
+            NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded
+            NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(provisionallyFirst = true)
+            NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(AwardResult.AWARDED)
+        }
+
     internal companion object {
         val OBSERVED_AT: Instant = Instant.parse("2026-10-23T00:00:00Z")
+
+        /** `OBSERVED_AT` 보다 **늦은** 사실 시각 — 전진의 자리. 세 test class 가 같은 값을 쓴다. */
+        val LATER: Instant = Instant.parse("2026-10-24T00:00:00Z")
+        val READ_AT: Instant = Instant.parse("2026-10-23T12:00:00Z")
     }
 }
 

@@ -72,8 +72,28 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
 
-    expect(within(card).getByTestId('notice-amount-provenance').textContent).toContain('BASE_AMOUNT');
-    expect(within(card).getByTestId('notice-amount-provenance').textContent).toContain('PUBLISHED');
+    const provenance = within(card).getByTestId('notice-amount-provenance').textContent ?? '';
+    // M9 D-3 — 세 축이 표의 문면으로 선다(앞 판은 `BASE_AMOUNT · … · PUBLISHED` 였다).
+    expect(provenance).toContain('기초금액');
+    expect(provenance).toContain('공고 게시값');
+    for (const token of ['BASE_AMOUNT', 'PUBLISHED']) {
+      expect(provenance, `${token} 이 화면에 남았다`).not.toContain(token);
+    }
+  });
+
+  /**
+   * **D-day 의 뜻을 말하는 문면**(PR #132 cr M-3). 숫자의 뜻이 「24시간 나눗셈의 내림」에서
+   * 「KST 달력일의 차」로 바뀌었는데, 운영자가 그 뜻을 읽는 **유일한 산출물 문면**이 아직
+   * 「내림」이라고 말하고 있었다. 모듈 주석·test·evidence 는 갱신됐고 화면 문면만 남았던 자리다.
+   */
+  it('D-day 의 설명 문면이 달력일 기준이라고 말한다 — 옛 「내림」이 아니다', async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const badge = within(card).getByTestId('notice-deadline');
+
+    expect(badge.getAttribute('title')).toBe('마감일까지의 KST 달력일 차');
+    expect(badge.getAttribute('title'), '옛 어림 문면이 남았다').not.toContain('내림');
   });
 
   it('금액이 없는 공고는 0 이 아니라 「값 없음」이다', async () => {

@@ -50,7 +50,7 @@ enum class NotificationKind {
     /** 개찰 완료. 잠정 1위 여부를 detail 로 싣는다 — 그 값은 **갱신되어야 한다**. */
     OPENING_COMPLETED,
 
-    /** 낙찰/패찰 확정. 낙찰 여부를 detail 로 싣는다. */
+    /** 낙찰·패찰·유찰 확정. 결과 셋([AwardResult])을 detail 로 싣는다. */
     AWARD_DECIDED,
 
     /** 공고 변경(정정공고). 원천 판정은 관련성이 서는 slice 몫이다(D-7C3-1 ②). */
@@ -61,7 +61,7 @@ enum class NotificationKind {
 }
 
 /**
- * detail 어휘 — **닫힌 넷**이다. 자유 문자열이 아니므로 이 축으로 PII 가 들어올 수 없다.
+ * detail 어휘 — **닫힌 다섯**이다. 자유 문자열이 아니므로 이 축으로 PII 가 들어올 수 없다.
  * 어느 종류가 어느 값을 갖는지는 [NotificationFact] 의 구성이 정하고, 저장 층의 짝 CHECK 가
  * 같은 규칙을 한 겹 더 진다(심층 방어).
  */
@@ -70,7 +70,95 @@ enum class NotificationDetail {
     NOT_PROVISIONAL_FIRST,
     AWARDED,
     NOT_AWARDED,
+    FAILED_OR_REBID,
 }
+
+/**
+ * 낙찰 확정의 **결과** — 닫힌 셋이고 각자 자기 detail 을 **생성자로** 든다(D-M9-1).
+ *
+ * **이름이 `AwardOutcome` 이 아닌 이유**: 그 이름은 `bidvector.settlement.AwardOutcome`(개찰
+ * 대사의 4-state 결말 — 미기록·판정 안 함·낙찰·패찰)이 쓰고 있고, 이 모듈은 그 타입을 실제로
+ * 들고 있다(`workflow.result.ReconciliationVerdict`). 같은 이름 둘이 한 모듈에서 import 로만
+ * 갈리면 읽는 사람이 어느 쪽인지 알 수 없다.
+ *
+ * **기존 어휘를 재활용하지 않은 이유**(조사 뒤 채택): `bidvector.bidding.BidOutcome` 이
+ * `WON`·`LOST`·`FAILED_OR_REBID` 로 **값이 같다**. 그래도 쓰지 않는다 — 알림함의 detail 어휘는
+ * 저장 층 CHECK 와 **집합 등식**을 이루는 이 패키지의 닫힌 어휘이고, 그것을 `bidding` 의 enum 에
+ * 묶으면 알림함이 입찰 모듈 없이는 서지 않는다(7C③ 이 이 패키지의 의존을 `procurement.NoticeId` ·
+ * `workflow.access.AccountId` 둘로 묶어 둔 사유와 같은 축). 그리고 둘은 앞으로 갈린다: 자동 대사가
+ * 들어오면 같은 종류의 원천이 `settlement` 쪽 4-state 가 되는데 그 집합에는 유찰이 **없다**. 즉
+ * 어느 기존 타입도 알림함의 어휘가 아니다. 두 벌이 갈리는 것은 `BidCaseNotifications` 의 상태
+ * 사상 등식이 막는다(상태 전수 ↔ 사실 전수).
+ *
+ * **`Boolean` 이 아닌 이유**: 결과는 셋이다. 유찰(아무도 못 땄다 · 재입찰)은 패찰(내가 졌다)과
+ * 다른 사실이고, 운영자의 다음 할 일도 다르다 — 유찰은 재입찰 공고를 기다리는 일이다. 앞 판은
+ * 어휘가 둘(`awarded: Boolean`)이어서 유찰이 **알림을 아예 남기지 못했다**(7C③-b 의 알려진 제한).
+ * `NOT_AWARDED` 로 접는 길은 거부됐다 — 「내가 졌다」와 「아무도 못 땄다」가 한 값이 된다.
+ *
+ * **짝이 생성자 인자인 이유**: 투영과 복원이 **한 표**를 읽는다. 양쪽에 `when` 을 두면 표가
+ * 둘이 되고 갈릴 자리가 생긴다. 겹침(두 결과가 한 detail 을 가리키는 접기)은 이 꼴에서
+ * 표현되기는 하지만 복원이 [notificationFactOf] 의 `single` 에서 어긋나 붉다.
+ */
+enum class AwardResult(
+    val detail: NotificationDetail,
+) {
+    AWARDED(NotificationDetail.AWARDED),
+    NOT_AWARDED(NotificationDetail.NOT_AWARDED),
+    FAILED_OR_REBID(NotificationDetail.FAILED_OR_REBID),
+}
+
+/**
+ * 같은 키의 **재기록이 읽음을 해제하는가** — 종류별 정책이다(D-M9-3).
+ *
+ * 왜 종류로 가르는가: 7C③ 은 한 규칙이었다(「detail 이 바뀔 때만 해제」). detail 을 **갖지 않는**
+ * 종류는 그 규칙 아래에서 재기록이 영영 읽음을 유지하고, `NOTICE_REVISED` 에서는 그것이 틀렸다 —
+ * 이미 본 공고가 **또** 바뀐 것은 새 소식이다(7C③-b 의 알려진 제한 13).
+ *
+ * 이 어휘는 **SQL 로 bind 하나로** 내려간다. 종류 문자열을 SQL 에 늘어놓으면 종류를 더할 때
+ * 컴파일이 막아 주지 않고, 그 부재를 `NotificationInboxSqlPolicyTest` 가 종류 전수로 잰다.
+ */
+enum class ReadResetPolicy {
+    /**
+     * detail 이 바뀔 때만 해제한다(D-7C3-1 ④) — 같은 사실의 재기록은 읽음을 유지한다. 그러지
+     * 않으면 운영자가 같은 것을 반복해 읽는다.
+     */
+    ON_DETAIL_CHANGE,
+
+    /**
+     * 사실의 시각이 **전진한** 재기록도 해제한다 — 그 종류에서는 전진이 「새 소식」과 동치다.
+     *
+     * **매 재기록이 아니다**: 같은 사실을 다시 적는 것만으로 해제하면, 그 사실을 주기로 다시
+     * 적는 원천 위에서 읽음 처리가 **영영 유지되지 않는다**(공고 개정 훑기가 그런 원천이다 —
+     * 조건이 유지되는 동안 매 run 마다 같은 개정을 다시 적는다). 전진을 보면 그 재기록은
+     * 지나가고 **새 개정만** 배지를 세운다.
+     */
+    ON_NEWER_FACT,
+}
+
+/**
+ * 종류 **전수 표**(`else` 없는 `when`) — 종류를 더하면 이 정책을 정하지 않고는 컴파일되지
+ * 않는다. 어느 종류가 어느 정책인지는 `NotificationFactTest` 가 파티션 등식으로 고정한다
+ * (그 등식이 없으면 정책을 뒤집어도 거동 test 둘이 각자 자기 파티션을 돌아 **둘 다** 초록이다).
+ *
+ * `NOTICE_REVISED` 만 [ReadResetPolicy.ON_NEWER_FACT] 인 이유: 그 종류의 사실 시각은 개정 시각
+ * (`notice.updated_at`)이고, V2 의 트리거가 `revision` 과 그 열을 **함께** 올리므로(그리고 내용이
+ * 같으면 UPDATE 자체가 돌지 않는다) 시각의 전진은 **새 개정과 동치**다. 시간 기반 종류들은
+ * 사실 시각이 달력일 시작이라 전진이 「같은 판정의 다음 날」을 뜻하고, 그것은 새 소식이 아니다.
+ */
+val NotificationKind.readResetPolicy: ReadResetPolicy
+    get() =
+        when (this) {
+            NotificationKind.NOTICE_REVISED -> ReadResetPolicy.ON_NEWER_FACT
+
+            NotificationKind.NEW_CANDIDATE,
+            NotificationKind.BID_DEADLINE_IMMINENT,
+            NotificationKind.BID_DEADLINE_TODAY,
+            NotificationKind.DOCUMENT_DEADLINE_IMMINENT,
+            NotificationKind.OPENING_COMPLETED,
+            NotificationKind.AWARD_DECIDED,
+            NotificationKind.BID_PRICE_REQUEST_RECORDED,
+            -> ReadResetPolicy.ON_DETAIL_CHANGE
+        }
 
 /**
  * 알림 하나가 나르는 **사실**. 자유 문자열 칸이 없다 — 표시 문구(공고명·기관·마감)는 저장하지
@@ -120,9 +208,9 @@ sealed interface NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.OPENING_COMPLETED
     }
 
-    /** 낙찰/패찰 확정 — 낙찰 여부. */
+    /** 낙찰·패찰·유찰 확정 — 결과를 [AwardResult] 으로 싣는다. 바뀌면 안읽음으로 돌아간다. */
     data class AwardDecided(
-        val awarded: Boolean,
+        val outcome: AwardResult,
     ) : NotificationFact {
         override val kind: NotificationKind get() = NotificationKind.AWARD_DECIDED
     }
@@ -147,7 +235,7 @@ sealed interface NotificationFact {
                 }
 
                 is AwardDecided -> {
-                    if (awarded) NotificationDetail.AWARDED else NotificationDetail.NOT_AWARDED
+                    outcome.detail
                 }
             }
 }
@@ -172,37 +260,41 @@ fun notificationFactOf(
         NotificationKind.NOTICE_REVISED -> NotificationFact.NoticeRevised.withoutDetail(detail)
         NotificationKind.BID_PRICE_REQUEST_RECORDED -> NotificationFact.BidPriceRequestRecorded.withoutDetail(detail)
         NotificationKind.OPENING_COMPLETED -> NotificationFact.OpeningCompleted(detail.isProvisionalFirst(kind))
-        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.isAwarded(kind))
+        NotificationKind.AWARD_DECIDED -> NotificationFact.AwardDecided(detail.asAwardResult(kind))
     }
 
 // detail 을 싣는 종류 **각각이 자기 어휘를 읽는 함수**를 갖는다. 어휘 쌍을 호출 자리에 펴 두면
-// 갈래 하나가 여러 줄이 되고, 그러면 `when` 전체가 함수 크기 한도를 넘는다(실측). 더 중요한
-// 것은 **소진 `when` 을 지키는 것**이다 — `else` 나 표 조회로 바꾸면 종류를 더할 때 컴파일이
-// 막아 주지 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
+// 갈래 하나가 여러 줄이 되고, 그러면 위 `when` 이 함수 크기 한도를 넘는다(실측). 더 중요한
+// 것은 **소진 `when` 을 지키는 것**이다 — `else` 로 바꾸면 종류를 더할 때 컴파일이 막아 주지
+// 않고 런타임까지 간다. 그래서 줄이는 쪽을 갈래가 아니라 **갈래의 본문**에서 했다.
+//
+// 두 본문의 꼴이 **다른 이유**: 개찰 축은 `Boolean` 이라 어휘 쌍이 여기 적히고, 낙찰 축은
+// [AwardResult] 이 짝을 이미 들고 있어 그 표를 **되읽는다**. 그쪽에 `when` 을 또 적으면 같은
+// 짝이 두 자리에 살고 갈릴 자리가 생긴다.
 
 private fun NotificationDetail?.isProvisionalFirst(kind: NotificationKind): Boolean =
-    asFlag(kind, whenTrue = NotificationDetail.PROVISIONAL_FIRST, whenFalse = NotificationDetail.NOT_PROVISIONAL_FIRST)
+    when (this) {
+        NotificationDetail.PROVISIONAL_FIRST -> true
+        NotificationDetail.NOT_PROVISIONAL_FIRST -> false
+        else -> throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
+    }
 
-private fun NotificationDetail?.isAwarded(kind: NotificationKind): Boolean =
-    asFlag(kind, whenTrue = NotificationDetail.AWARDED, whenFalse = NotificationDetail.NOT_AWARDED)
+/**
+ * 낙찰 확정의 detail → 결과. [AwardResult] 의 짝을 **역으로** 읽는다.
+ *
+ * `single` 이 아니라 `singleOrNull` + 던지기인 것은 「둘이 걸렸다」와 「없다」를 **같은 거부**로
+ * 접기 위해서다. 둘이 걸리는 경우는 두 결과가 한 detail 을 가리키는 접기이고, 그 상태는 복원할
+ * 수 있는 짝이 아니다 — 하나를 골라 주면 그 접기가 조용히 작동한다.
+ */
+private fun NotificationDetail?.asAwardResult(kind: NotificationKind): AwardResult =
+    AwardResult.entries.singleOrNull { it.detail == this }
+        ?: throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
 
 /** detail 을 갖지 않는 종류에 detail 이 실려 오면 그 짝은 복원 대상이 아니다. */
 private fun NotificationFact.WithoutDetail.withoutDetail(detail: NotificationDetail?): NotificationFact {
     require(detail == null) { "$kind 는 detail 을 싣지 않는다: $detail" }
     return this
 }
-
-/** 두 값 중 하나여야 한다 — 앞 값이면 `true`, 뒤 값이면 `false`, 그 밖은 복원 대상이 아니다. */
-private fun NotificationDetail?.asFlag(
-    kind: NotificationKind,
-    whenTrue: NotificationDetail,
-    whenFalse: NotificationDetail,
-): Boolean =
-    when (this) {
-        whenTrue -> true
-        whenFalse -> false
-        else -> throw IllegalArgumentException("$kind 의 detail 이 아니다: $this")
-    }
 
 /**
  * 쓰기 포트가 받는 한 건. **첫 필드가 주체**다 — 주체 없이 알림을 기록하는 호출이 시그니처상

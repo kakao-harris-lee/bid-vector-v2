@@ -1,5 +1,6 @@
 import type { components } from '../api/generated/operator-api';
 
+import { amountQualifierTextOf, amountTextOf } from './moneyDisplay';
 import type { StateDisplay } from './stateDisplay';
 
 type EditSessionResponse = components['schemas']['EditSessionResponse'];
@@ -68,6 +69,43 @@ export const FIELD_VALUE_SLOT = {
   MAX_ACTIVE_BIDS: 'count',
 } as const satisfies Record<StrategyField, ValueSlot>;
 
+/**
+ * 그 칸에 **`null` 을 명시적 비움으로 보내도 되는가**(M9 D-1) — 계약이 받는 집합과 같아야 한다.
+ *
+ * 왜 표인가: 계약은 「`amountWon` 일 때만 `null`」을 스키마 형태로 말할 수 없고(평탄 게이트가
+ * `oneOf` 를 막는다) 서버가 그 경계를 강제한다. 화면이 「비어 있으면 비움으로 보내자」를 칸마다
+ * 분기로 적으면 받지 않는 칸에 `null` 을 보내 400 을 받고, 운영자에게는 그것이 「값 보내기가
+ * 안 된다」로만 보인다. 그래서 **받는 집합을 화면 쪽에도 명시**하고, 계약이 칸을 늘리면
+ * `satisfies` 가 이 자리에서 멈춘다.
+ *
+ * 어휘 다섯은 **`false` 다**: 그쪽을 비우는 길은 `terms: []` 이고(`termsOf('')`), `null` 은 400 이다
+ * — 비우는 표기가 칸마다 다르다는 사실을 한 값으로 접지 않는다.
+ *
+ * `true` 는 **`amountWon` 칸을 읽는 필드에만** 둘 수 있다(아래 교집합 `satisfies`). 그래서
+ * [valueBodyOf] 가 비움을 그 칸 이름으로 싣는 것이 구성상 옳다 — 다른 칸의 필드를 `true` 로
+ * 돌리면 `tsc` 가 그 자리에서 멈춘다(엉뚱한 칸에 `null` 을 실어 400 을 받는 길이 없다).
+ */
+export const FIELD_ACCEPTS_NULL = {
+  FOCUS_CATEGORY: false,
+  FOCUS_REGION: false,
+  EXCLUDE_REGION: false,
+  REQUIRED_KEYWORD: false,
+  EXCLUDE_KEYWORD: false,
+  MIN_BUDGET: true,
+  MAX_BUDGET: true,
+  MINIMUM_MATCH_SCORE: false,
+  MINIMUM_PROBABILITY_SCORE: false,
+  BID_NOW_THRESHOLD: false,
+  REVIEW_THRESHOLD: false,
+  CANDIDATE_LIMIT: false,
+  MAX_ACTIVE_BIDS: false,
+} as const satisfies Record<StrategyField, boolean> & Record<Exclude<StrategyField, AmountWonField>, false>;
+
+/** `amountWon` 칸을 읽는 필드 — [FIELD_ACCEPTS_NULL] 이 `true` 를 둘 수 있는 유일한 자리다. */
+type AmountWonField = {
+  [K in StrategyField]: (typeof FIELD_VALUE_SLOT)[K] extends 'amountWon' ? K : never;
+}[StrategyField];
+
 /** 세션 상태 다섯 전수 — 종단 셋과 진행 둘이 어조로 갈린다. */
 export const EDIT_SESSION_STATE_DISPLAY = {
   WAITING_FOR_VALUE: { label: '값을 기다린다', tone: 'neutral' },
@@ -126,7 +164,13 @@ export const EDIT_SESSION_CONFLICT_DISPLAY: Readonly<Record<string, StateDisplay
  */
 export const SLOT_INPUT = {
   terms: { kind: 'TERMS', hint: '쉼표로 나눕니다. 비우면 그 조건을 지웁니다.', shape: null, accepts: '쉼표로 나눈 어휘' },
-  amountWon: { kind: 'INTEGER', hint: '원 단위 정수', shape: /^\d+$/u, accepts: '자리 구분 없는 원 단위 정수(예: 1200000000)' },
+  // 「비우면 지웁니다」가 **이 칸에도** 선다(M9 D-1) — 이 칸을 읽는 필드 둘이 모두 비움을 받는다.
+  amountWon: {
+    kind: 'INTEGER',
+    hint: '원 단위 정수. 비우면 그 금액대를 지웁니다.',
+    shape: /^\d+$/u,
+    accepts: '자리 구분 없는 원 단위 정수(예: 1200000000)',
+  },
   number: { kind: 'DECIMAL', hint: '0 과 1 사이의 소수', shape: /^-?\d+(\.\d+)?$/u, accepts: '소수(예: 0.42)' },
   count: { kind: 'INTEGER', hint: '건수', shape: /^\d+$/u, accepts: '정수 건수(예: 5)' },
 } as const satisfies Record<
@@ -170,6 +214,16 @@ export function valueBodyOf(field: StrategyField, commandId: string, raw: string
     return { commandId, field, terms: termsOf(raw) };
   }
   const normalized = raw.trim();
+  /**
+   * **빈 칸은 비움이다**(M9 D-1) — 어휘 칸과 같은 약속이고, 받는 칸에서만 그렇다. 받지 않는 칸은
+   * 아래 모양 검사로 떨어져 `null` 이고 화면이 「받는 모양」을 말한다(앞 판과 같은 거동).
+   *
+   * 운영자가 실수로 지우는 자리가 아니다: 이 본문은 **값 단계**에서 가고 적용은 확인 단계의
+   * 「적용」이 한다 — 그 사이에 확인 화면이 「비움 — 이 조건을 지웁니다」를 보인다.
+   */
+  if (normalized === '' && FIELD_ACCEPTS_NULL[field]) {
+    return { commandId, field, amountWon: null };
+  }
   const { shape } = SLOT_INPUT[slot];
   if (shape === null || !shape.test(normalized)) {
     return null;
@@ -215,7 +269,10 @@ export function sentValueView(field: StrategyField, body: ValueRequest): FieldVa
   if (slot === 'amountWon') {
     // **`0` 을 지어내지 않는다**(CR r2 L2R-4): 짝이 어긋나 그 칸이 비면 「0원」이 아니라 **값이
     // 없다**고 말한다. 확인 화면은 이 slice 가 지어낸 값을 가장 강하게 금하는 자리다.
-    return body.amountWon === undefined
+    //
+    // `null`(명시적 비움, M9 D-1)도 같은 자리로 간다 — 보낸 값이 「없음」인 것이 맞고, 패널이
+    // 그 `text: null` 을 「비움 — 이 조건을 지웁니다」로 그린다(어휘 칸의 `terms: []` 와 같다).
+    return body.amountWon === undefined || body.amountWon === null
       ? { text: null }
       : { text: `${body.amountWon.toLocaleString('ko-KR')}원` };
   }
@@ -251,10 +308,18 @@ function budgetView(
   if (won === null || won === undefined) {
     return { text: null };
   }
-  const parts = [currency, vat, provenance].filter((one): one is string => one !== null && one !== undefined);
+  // 부속 칸은 **표의 문면**이다(M9 D-3) — 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
+  //
+  // **통화는 넘기지 않는다**(r1 CR M-1): 아래 `text` 가 이미 단위를 들었으므로 부속 칸이
+  // 통화를 또 내면 `1,200,000,000원 / 원 · …` 이 된다. 같은 관례가 `noticeDisplay` 의
+  // `amountDisplayOf` 에도 있다 — 거기서는 처음부터 넘기지 않았는데 이 자리만 벗었다.
+  // 그래서 **통화만 있고 과세·출처가 없는 값**은 이제 아래 폴백으로 간다(그 쪽이 정직하다 —
+  // 통화는 금액 글자가 이미 말했고, 적히지 않은 것은 과세와 출처다).
+  const qualifier = amountQualifierTextOf({ vatTreatment: vat, provenance });
   return {
-    text: `${won.toLocaleString('ko-KR')}원`,
-    qualifier: parts.length === 0 ? '단위·과세·출처 미기재' : parts.join(' · '),
+    // 단위는 **통화 표가 낸다**(r1 cr M-1 · v L-2) — 앞 판은 통화와 무관하게 「원」을 박았다.
+    text: amountTextOf(won, currency),
+    qualifier: qualifier ?? '단위·과세·출처 미기재',
   };
 }
 

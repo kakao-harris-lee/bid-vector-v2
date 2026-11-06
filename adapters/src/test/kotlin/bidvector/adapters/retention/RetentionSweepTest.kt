@@ -52,6 +52,20 @@ class RetentionSweepTest : PersistenceTestSupport() {
         fixture.seedAll("new", JUST_NEWER)
     }
 
+    /**
+     * 경계 test 의 **전제**다 — test 앵커([RETENTION_ANCHOR])와 출하 정책의 보존 기간이 같은 날
+     * 수여야 ±1초가 경계로 선다. 갈리면 심은 한 쌍이 모두 사라지거나 모두 남고, 그 실패는
+     * 「cutoff 가 어긋났다」로 읽히지 않는다(정책 개정일보다 앞선 기준일로 해소하면 바로 그
+     * 모양이 된다).
+     *
+     * 앵커를 정책에서 **읽지는 않는다** — 읽으면 정책 변이가 앵커와 함께 움직여 어떤 변이도
+     * 초록이다(P-5). 그래서 독립인 두 값을 등식으로만 잰다.
+     */
+    @Test
+    fun `경계 전제 — test 앵커와 출하 정책의 보존 기간이 같은 날 수다`() {
+        productionPolicy().retentionDays.toLong() shouldBe RETENTION_ANCHOR.toDays()
+    }
+
     @Test
     fun `기한을 1초 넘긴 행은 사라지고 1초 안쪽 행은 남는다`() {
         val before = fixture.countsByTable()

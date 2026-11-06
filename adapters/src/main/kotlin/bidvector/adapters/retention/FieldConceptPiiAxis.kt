@@ -60,7 +60,7 @@ internal val NON_PII_CONCEPTS: Set<FieldConcept> =
         FieldConcept.DRAW_FLAG,
         FieldConcept.PARTICIPANT_COUNT,
         // 공공기관 식별자 — **기관**의 이름·코드이고 자연인도 사업자 상호도 아니다. 그 값이 사는
-        // `notice` 는 90일 파기 대상이고 `notice_audit` 스냅숏은 열 집합 등식이 따로 잠근다.
+        // `notice` 는 기한 파기 대상이고 `notice_audit` 스냅숏은 열 집합 등식이 따로 잠근다.
         FieldConcept.DEMAND_AGENCY_CODE,
         FieldConcept.DEMAND_AGENCY_NAME,
         FieldConcept.NOTICE_AGENCY_CODE,

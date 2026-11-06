@@ -9,7 +9,7 @@ import bidvector.workflow.retention.RetentionTreatment
  * 지우는가」가 표마다 적혀 있지 않으면 분류 누락과 의도된 제외가 구별되지 않는다.
  */
 internal enum class ExemptReason {
-    /** 싱글턴 설정 행(id=1) — 「90일 지난 행 삭제」가 현재 설정을 지운다. */
+    /** 싱글턴 설정 행(id=1) — 「기한 지난 행 삭제」가 현재 설정을 지운다. */
     SINGLETON_SETTING,
 
     /** 멱등 키 원장 — 지우면 중복 발송 방어가 열린다(relay 가 이 표로 접는다). */
@@ -38,14 +38,14 @@ internal enum class ExemptReason {
     AUDIT_WITHOUT_PII,
 
     /**
-     * 계정 그 자체(M7/7D) — 「90일 지난 행 삭제」가 **로그인을 불가능하게 만든다**. 계정의 수명은
+     * 계정 그 자체(M7/7D) — 「기한 지난 행 삭제」가 **로그인을 불가능하게 만든다**. 계정의 수명은
      * 시간이 아니라 운영자의 결정이 정하고, 그 결정 경로(탈퇴·파기)는 다수 사업자 마일스톤이
      * 연다(R-2 의 `후속`). 세션은 이 표와 달리 파기 대상이다 — 지워도 다시 로그인하면 된다.
      */
     ACCOUNT_IDENTITY,
 
     /**
-     * 운영자의 입찰 이력(M7/7B) — 「90일 지난 행 삭제」가 **정산·증빙의 근거를 지운다.**
+     * 운영자의 입찰 이력(M7/7B) — 「기한 지난 행 삭제」가 **정산·증빙의 근거를 지운다.**
      * 이 넷의 수명은 시간이 아니라 R-5(제출확인서 참조 보관 **3년**)와 운영자의 결정이
      * 정하고, 그 날짜는 `bid_record.evidence_retain_until` 이 행마다 들고 있다.
      *
@@ -56,7 +56,7 @@ internal enum class ExemptReason {
     OPERATOR_BID_HISTORY,
 
     /**
-     * 계정의 **현재 설정값**(M7/7C④ — 사업 정보 · 시평액). 「90일 지난 행 삭제」가 운영자가 신고한
+     * 계정의 **현재 설정값**(M7/7C④ — 사업 정보 · 시평액). 「기한 지난 행 삭제」가 운영자가 신고한
      * 현재 값을 지운다 — 상호가 사라지면 SET-01 대사가 「판정 안 함」으로 떨어진다.
      *
      * 보존 기간 값을 **두지 않는다**: 이 행의 수명은 시간이 아니라 **소유 계정의 수명**과 같다
@@ -170,7 +170,7 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
             keyColumn = "observation_key",
             rawColumn = "payload",
             projectionColumn = "payload_fields",
-            // 운영자 결정 2026-10-14 — 업체 식별은 90일 결정의 대상이다. 담당자 키와 달리 이
+            // 운영자 결정 2026-10-14 — 업체 식별은 보존 기한 지움 결정의 대상이다. 담당자 키와 달리 이
             // 개념들은 계약에 **등재되어** 투영에 실리므로, 개념 축으로 빼지 않으면 남김 집합에
             // 들어온다. **집합을 여기서 열거하지 않는다**(D-6B3-5 ①): 선언은
             // [COMPANY_IDENTITY_CONCEPTS] 한 자리이고 그것이 `FieldConcept` 전수와 분할 등식이다 —
@@ -207,11 +207,11 @@ internal val RETENTION_TABLE_RULES: List<RetentionRule> =
         RetentionRule.Purge("browser_session", "created_at", PurgeCondition.TimeOnly),
         // --- 파기(M7/7C③ 알림함) — [ExemptReason] 여덟 사유 어느 것도 맞지 않는다: 싱글턴
         //     설정도, 멱등 원장도(그쪽은 `inbox` 다 — 이름이 닮았을 뿐 다른 표다), 개정 이력도,
-        //     수집 회계도, 참조 데이터도, 계정 신원도 아니다. 90일 지난 알림을 지워 잃는 것은
+        //     수집 회계도, 참조 데이터도, 계정 신원도 아니다. 기한 지난 알림을 지워 잃는 것은
         //     「그 알림이 있었다」뿐이고, 그 사실의 원천(공고·개찰·입찰 건)은 각자의 표가 든다.
         //
         //     **읽음/안읽음은 파기 조건이 아니다**(운영자 결정 D-7C3-1 ⑥). 안읽음 항목을 영구
-        //     보존하면 「90일이 지나면 사라진다」가 이 표에서 거짓이 되고, 그 예외를 두면
+        //     보존하면 「기한이 지나면 사라진다」가 이 표에서 거짓이 되고, 그 예외를 두면
         //     `TerminalStates` 같은 상태 축이 하나 더 생긴다 — 안읽음이 쌓이는 문제는 보존
         //     분류가 아니라 화면이 푼다(알려진 제한에 등재).
         RetentionRule.Purge("notification_inbox", "created_at", PurgeCondition.TimeOnly),

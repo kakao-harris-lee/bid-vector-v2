@@ -4,6 +4,8 @@ import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
+import bidvector.workflow.notificationinbox.ReadResetPolicy
+import bidvector.workflow.notificationinbox.readResetPolicy
 import java.sql.Connection
 import java.sql.SQLException
 import java.sql.Timestamp
@@ -48,6 +50,7 @@ class JdbcNotificationInbox(
      */
     private fun Connection.upsert(record: NotificationInboxRecord): NotificationInboxOutcome {
         val occurredAt = Timestamp.from(record.occurredAt)
+        val readResetPolicy = record.fact.kind.readResetPolicy
         return prepareStatement(NotificationInboxSql.UPSERT_ITEM).use { statement ->
             var index = 1
             statement.setLong(index++, record.account.value)
@@ -55,7 +58,10 @@ class JdbcNotificationInbox(
             statement.setString(index++, record.notice.number.value)
             statement.setString(index++, record.notice.round.value)
             statement.setString(index++, record.fact.detail?.name)
-            statement.setTimestamp(index, occurredAt)
+            statement.setTimestamp(index++, occurredAt)
+            // 읽음 해제 정책 — **종류 전수 표가 정하고 여기로는 boolean 하나로 내려온다**
+            // (D-M9-3). 소진 `when` 이라 정책 어휘가 늘면 이 자리가 컴파일되지 않는다.
+            statement.setBoolean(index, readResetPolicy.resetsOnNewerFact())
             // `updated_at` 은 바인딩하지 않는다 — 문장이 `now()` 로 찍는다(SQL 주석의 사유).
             statement.executeQuery().use { rows ->
                 rows.next()
@@ -68,6 +74,16 @@ class JdbcNotificationInbox(
         }
     }
 }
+
+/**
+ * 정책 → upsert 의 시각 축 스위치. **소진 `when` 이다** — 정책 어휘가 늘면 여기서 컴파일이
+ * 막히고, 그때 할 일은 기본값으로 접는 것이 아니라 SQL 의 `CASE` 를 함께 정하는 것이다.
+ */
+private fun ReadResetPolicy.resetsOnNewerFact(): Boolean =
+    when (this) {
+        ReadResetPolicy.ON_DETAIL_CHANGE -> false
+        ReadResetPolicy.ON_NEWER_FACT -> true
+    }
 
 /**
  * 쓰기 경로의 트랜잭션 — 한 문장이어도 명시적으로 연다. autocommit 에 기대면 「이 경로는

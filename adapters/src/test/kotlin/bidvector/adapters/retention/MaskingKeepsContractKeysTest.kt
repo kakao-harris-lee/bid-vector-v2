@@ -87,7 +87,7 @@ class MaskingKeepsContractKeysTest : PersistenceTestSupport() {
 
     /**
      * 적재 시각은 `DEFAULT now()` 가 찍는다(production 경로의 계약) — 그 값을 고칠 수 없으므로
-     * (append-only) **시계를 미래로** 둬서 기한을 넘긴다. 90일은 `RETENTION_ANCHOR`(test 앵커)다.
+     * (append-only) **시계를 미래로** 둬서 기한을 넘긴다. 그 기한은 `RETENTION_ANCHOR`(test 앵커)다.
      */
     private fun sweepFarInTheFuture(): RetentionOutcome {
         val future = Instant.now() + RETENTION_ANCHOR + java.time.Duration.ofSeconds(1)

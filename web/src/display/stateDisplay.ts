@@ -33,7 +33,11 @@ export function displayOf<K extends string>(
   table: Readonly<Record<K, StateDisplay>>,
   value: K,
 ): StateDisplay | undefined {
-  return table[value];
+  // **자기 키만 본다**(PR #132 cr L-3). 맨 색인 읽기는 `toString`·`constructor`·`__proto__` 에서
+  // **프로토타입의 값**을 내고, 그 값이 아래 [displayOrUnknown] 의 폴백을 삼킨다 — `label`·`tone`
+  // 이 `undefined` 인 「상태」가 배지까지 가서 이 모듈이 금지하는 **조용한 빈 자리**가 된다.
+  // 계약이 `type: string` 으로 내는 칸(명령·공고 상태 등)이 자유 문자열이 닿는 자리다.
+  return Object.hasOwn(table, value) ? table[value] : undefined;
 }
 
 /**

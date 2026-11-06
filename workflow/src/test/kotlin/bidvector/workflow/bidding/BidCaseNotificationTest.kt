@@ -15,12 +15,14 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.Period
@@ -69,7 +71,7 @@ class BidCaseNotificationTest {
      * 컴파일을 막고, 사상을 넓히면 이 등식이 붉다 — 두 방향이 모두 닫힌다.
      */
     @Test
-    fun `되비추는 상태는 개찰 둘과 확정 둘뿐이다`() {
+    fun `되비추는 상태는 개찰 둘과 확정 셋뿐이다`() {
         val reflected =
             ALL_STATES
                 .filter { reflectedNotificationFact(it) != null }
@@ -82,6 +84,7 @@ class BidCaseNotificationTest {
                 BidStateTag.OPENED_OUT_OF_RANK,
                 BidStateTag.WON,
                 BidStateTag.LOST,
+                BidStateTag.FAILED_OR_REBID,
             )
     }
 
@@ -91,17 +94,23 @@ class BidCaseNotificationTest {
             NotificationFact.OpeningCompleted(provisionallyFirst = true)
         reflectedNotificationFact(BidState.OpenedOutOfRank) shouldBe
             NotificationFact.OpeningCompleted(provisionallyFirst = false)
-        reflectedNotificationFact(BidState.Won) shouldBe NotificationFact.AwardDecided(awarded = true)
-        reflectedNotificationFact(BidState.Lost) shouldBe NotificationFact.AwardDecided(awarded = false)
+        reflectedNotificationFact(BidState.Won) shouldBe NotificationFact.AwardDecided(AwardResult.AWARDED)
+        reflectedNotificationFact(BidState.Lost) shouldBe NotificationFact.AwardDecided(AwardResult.NOT_AWARDED)
     }
 
     /**
-     * **유찰은 기록하지 않는다**(D-7C3B-7 ⒝) — `NOT_AWARDED`(패찰)로 접으면 「내가 졌다」와
-     * 「아무도 못 땄다」가 한 값이 된다. 어휘 확장은 CHECK 마이그레이션이라 별도 결정이다.
+     * **유찰은 자기 detail 로 선다**(D-M9-1 — 7C③-b 의 알려진 제한이 닫힌 자리).
+     *
+     * 그때는 detail 어휘에 자리가 없어 둘 중 하나여야 했다: `NOT_AWARDED` 로 접거나(「내가
+     * 졌다」와 「아무도 못 땄다」가 한 값이 된다) 알림을 아예 남기지 않거나. V24 가 어휘를 넓혀
+     * 셋째 길이 열렸다 — **접지 않고** 적는다.
      */
     @Test
-    fun `유찰은 패찰로 접히지 않고 알림이 서지 않는다`() {
-        reflectedNotificationFact(BidState.FailedOrRebid) shouldBe null
+    fun `유찰은 패찰로 접히지 않고 자기 detail 로 선다`() {
+        val failed = reflectedNotificationFact(BidState.FailedOrRebid)
+
+        failed shouldBe NotificationFact.AwardDecided(AwardResult.FAILED_OR_REBID)
+        failed?.detail shouldNotBe reflectedNotificationFact(BidState.Lost)?.detail
     }
 
     // --- 전이 ↔ 기록 -----------------------------------------------------------
@@ -138,9 +147,9 @@ class BidCaseNotificationTest {
         )
 
         val record = inbox.records.single()
-        record.fact shouldBe NotificationFact.AwardDecided(awarded = false)
+        record.fact shouldBe NotificationFact.AwardDecided(AwardResult.NOT_AWARDED)
         // 같은 항목이라는 것은 키가 말한다 — 종류와 공고가 앞 기록과 같다.
-        record.fact.kind shouldBe NotificationFact.AwardDecided(awarded = true).kind
+        record.fact.kind shouldBe NotificationFact.AwardDecided(AwardResult.AWARDED).kind
     }
 
     /**

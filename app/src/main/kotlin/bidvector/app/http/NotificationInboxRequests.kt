@@ -116,7 +116,7 @@ private val NOTICE_TARGET_KEYS = setOf("noticeNumber", "noticeRound")
  * 없는 것」이라는 **추론을 클라이언트에 맡기지 않는다**(`status` 가 NOT NULL 이라 그 추론이
  * 오늘은 성립하지만, 그것은 우연이고 계약이 아니다).
  *
- * [noticeKnown] 이 `false` 인 이유 둘(**90일 파기** · **아직 수집되지 않음**)은 **가르지
+ * [noticeKnown] 이 `false` 인 이유 둘(**보존 기한 파기** · **아직 수집되지 않음**)은 **가르지
  * 않는다** — 저장소에 묘비가 없어 가를 근거가 없다. 있는 척하지 않는다.
  */
 data class NotificationItemResponse(

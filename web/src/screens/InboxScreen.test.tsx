@@ -73,7 +73,9 @@ describe('알림함 — 받은편지함 하나', () => {
 
     const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000');
     expect(row.textContent ?? '').toContain(NOTIFICATION_KIND_DISPLAY.OPENING_COMPLETED.label);
-    expect(row.textContent ?? '').toContain('2026-11-02T01:00:00Z');
+    // M9 D-1 — 보이는 글자는 KST 표기다(앞 판은 응답의 ISO 원문이었다).
+    expect(row.textContent ?? '').toContain('2026-11-02 10:00');
+    expect(row.textContent ?? '', 'ISO 원문이 화면에 남았다').not.toContain('2026-11-02T01:00:00Z');
   });
 
   it('부가 사실이 있으면 그 문면도 선다', async () => {

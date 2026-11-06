@@ -9,17 +9,18 @@ import {
 } from './shared';
 
 /**
- * 여정 ①(M7/7E-2b, D-7E2b-5·9) — 빈 계정 → 시작하기 → 마법사로 항목을 채움 → 되돌림.
+ * 여정 ①(M7/7E-2b, D-7E2b-5 · M9 D-2) — 빈 계정 → 시작하기 → 마법사로 항목을 채움 → 되돌림.
  *
- * **금액대만 적용하지 않는다**(D-7E2b-9): 계약에 전략 금액대를 비우는 편집 값이 없어
- * (`amountWon` 생략·`null`·`terms:[]` 모두 400, 착수 실측) 한 번 적용하면 되돌릴 수 없고,
- * 그러면 `GET /api/suggestions` 가 `WATCH_NOT_CONFIGURED` → `NO_MATCH` 로 **영구히** 바뀌어
- * 여정 ② 와 설정 여정의 출발 단언이 실행 순서에 따라 깨진다. 그래서 그 단계는 **값을 적고
- * 그만둔다** — 적용되지 않았다는 것 자체가 단언이다.
+ * **금액대도 적용하고 되돌린다**(M9 D-1 · D-2). D-7E2b-9 의 「값을 적고 그만둔다」는 계약에
+ * 비우는 편집 값이 없어서였고(`amountWon` 생략·`null`·`terms:[]` 모두 400), 그 자리가
+ * `amountWon: null` 로 열렸다 — 이제 적용하면 **되돌릴 길이 있다**. 되돌리는 것이 이 여정의
+ * 의무다: 금액대가 남으면 `GET /api/suggestions` 가 `WATCH_NOT_CONFIGURED` → `NO_MATCH` 로
+ * 바뀌어 여정 ② 와 설정 여정의 출발 단언이 실행 순서에 따라 깨진다. 그래서 되돌림을 **본문에서
+ * 단언하고** teardown 에 안전망을 둔다.
  *
- * `LICENSES` 도 되돌릴 operation 이 없다(V12 행을 지우는 길이 계약에 없다). 그 사실을 **숨기지
- * 않고 단언한다** — 되돌림 뒤에도 완료로 남는다. 여정 ②③ 의 단언에는 영향이 없다(착수 실측:
- * 면허 신고 여부와 무관하게 `licenseVerdict=UNCERTAIN`).
+ * `LICENSES` 는 아직 되돌릴 operation 이 없다(V12 행을 지우는 길이 계약에 없다). 그 사실을
+ * **숨기지 않고 단언한다** — 되돌림 뒤에도 완료로 남는다. 여정 ②③ 의 단언에는 영향이 없다(착수
+ * 실측: 면허 신고 여부와 무관하게 `licenseVerdict=UNCERTAIN`).
  */
 
 /** 계약의 항목 어휘 — **spec 이 자기 몫을 적는다**(화면의 표를 끌어오면 대조가 공허해진다). */
@@ -195,7 +196,91 @@ async function editStrategyField(page: Page, field: string, raw: string): Promis
   expect((await valued).status()).toBe(200);
 }
 
+/** 로그인 전에 죽은 실행 — 전역 상태를 바꿀 기회도 없었으므로 되돌릴 것이 없다. */
+const HTTP_UNAUTHORIZED = 401;
+
+/**
+ * 전략의 금액대 **두 한계** — 되돌림은 선 것만 비운다. 한쪽만 보면 뒤 라운드가 다른 쪽의 출구를
+ * 「적용」으로 바꿨을 때 **잔류가 생기는데 안전망도 단언도 그것을 못 본다**(cr L-2 · v L-3).
+ */
+const BUDGET_LIMITS = [
+  { field: 'MIN_BUDGET', won: 'minBudgetWon' },
+  { field: 'MAX_BUDGET', won: 'maxBudgetWon' },
+] as const;
+
+type StrategyBudget = Record<(typeof BUDGET_LIMITS)[number]['won'], number | null> & { readonly revision: number };
+
+/**
+ * 금액대 되돌림의 **안전망**(M9 D-2) — 본문이 되돌림까지 단언하지만 그 사이에서 터지면 적용된
+ * 금액대가 남아 **여정 ②·설정 여정의 출발 단언**이 남의 잔류로 깨진다. 그 실패가 가장 비싼 꼴이라
+ * teardown 에서 한 번 더 비운다(이미 비어 있으면 아무것도 보내지 않는다).
+ *
+ * `shared.ts` 의 어휘 되돌림(`clearStrategyTerms`)과 걸음은 같지만 **비우는 표기가 다르다**
+ * (`terms: []` ↔ `amountWon: null`). 둘을 한 함수로 합치는 것은 설정 여정 teardown 의 중복과 함께
+ * 뒤 slice 가 받는다(7E-2b 알려진 제한 ⑥ 과 같은 자리).
+ *
+ * 되돌리지 못한 사유를 **돌려준다** — 여기서 단언하면 뒤따르는 어휘 되돌림이 돌지 않는다.
+ * 한계마다 **전략을 다시 읽는다**: 앞 비움이 개정을 올려 `seenRevision` 이 낡는다.
+ */
+async function clearBudgetIfSet(page: Page): Promise<string | null> {
+  for (const limit of BUDGET_LIMITS) {
+    const why = await clearOneBudget(page, limit.field, limit.won);
+    if (why !== null) {
+      return why;
+    }
+  }
+  return null;
+}
+
+async function clearOneBudget(
+  page: Page,
+  field: string,
+  wonKey: (typeof BUDGET_LIMITS)[number]['won'],
+): Promise<string | null> {
+  const read = await page.request.get('/api/strategy');
+  if (read.status() === HTTP_UNAUTHORIZED) {
+    return null;
+  }
+  if (!read.ok()) {
+    return `전략을 읽지 못해 ${field} 를 되돌릴 수 없었다(GET /api/strategy ${read.status()})`;
+  }
+  const strategy = (await read.json()) as StrategyBudget;
+  if (strategy[wonKey] === null) {
+    return null;
+  }
+  const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
+  const headers = { 'X-Operator-Csrf': session.csrf };
+  const begin = await page.request.post('/api/strategy/edit-sessions', { headers, data: { field } });
+  if (!begin.ok()) {
+    return `편집 세션을 열지 못해 ${field} 를 되돌릴 수 없었다(POST edit-sessions ${begin.status()})`;
+  }
+  const { sessionId } = (await begin.json()) as { readonly sessionId?: string };
+  if (sessionId === undefined) {
+    return `편집 세션 응답에 sessionId 가 없어 ${field} 를 되돌릴 수 없었다`;
+  }
+  const stamp = Date.now();
+  const valued = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/value`, {
+    headers,
+    data: { commandId: `budget-teardown-value-${field}-${stamp}`, field, amountWon: null },
+  });
+  if (!valued.ok()) {
+    // 세션을 닫아 다음 실행의 `begin` 을 막지 않는다(어휘 되돌림과 같은 규율).
+    await page.request.post(`/api/strategy/edit-sessions/${sessionId}/cancel`, {
+      headers,
+      data: { commandId: `budget-teardown-cancel-${field}-${stamp}` },
+    });
+    return `${field} 되돌림 값이 거부됐다(value ${valued.status()})`;
+  }
+  const confirmed = await page.request.post(`/api/strategy/edit-sessions/${sessionId}/confirm`, {
+    headers,
+    data: { commandId: `budget-teardown-confirm-${field}-${stamp}`, seenRevision: strategy.revision },
+  });
+  return confirmed.ok() ? null : `${field} 되돌림 적용이 거부됐다(confirm ${confirmed.status()})`;
+}
+
 test.afterEach(async ({ page }) => {
+  // 금액대도 **전역 전략**이다 — 본문의 되돌림이 지나지 못한 실행에서 여기가 받는다.
+  const budgetLeft = await clearBudgetIfSet(page);
   // 감시 관심 업종은 **전역 전략**이고 제안 목록의 빈 얼굴을 바꾼다 — 남겨 두면 뒤 여정이
   // 남의 잔류로 깨진다(그 실패가 가장 비싼 꼴이다).
   const outcome = await clearStrategyTerms(
@@ -213,10 +298,19 @@ test.afterEach(async ({ page }) => {
     return;
   }
   expect(outcome.kind === 'blocked' ? outcome.why : null, '여정 ① 의 전역 감시 조건을 되돌릴 수 없었다').toBeNull();
-  const after = (await (await page.request.get('/api/strategy')).json()) as {
+  const after = (await (await page.request.get('/api/strategy')).json()) as StrategyBudget & {
     readonly focusCategories: readonly string[];
   };
   expect(after.focusCategories, '여정 ① 이 전역 감시 조건을 남겼다').toStrictEqual([]);
+  // **서버에서** 센다 — 안전망이 돌았는지가 아니라 남은 것이 0 인지가 뒤 여정의 전제다.
+  // **두 한계 모두** 본다: 본문은 오늘 MAX 를 「그만두기」로만 지나지만, 그 출구가 바뀌는 날
+  // 잔류를 보는 자리가 여기여야 한다(cr L-2 · v L-3).
+  for (const limit of BUDGET_LIMITS) {
+    expect(
+      after[limit.won],
+      `여정 ① 이 전역 금액대(${limit.field})를 남겼다${budgetLeft === null ? '' : ` — ${budgetLeft}`}`,
+    ).toBeNull();
+  }
 });
 
 /** D-7E-6 — 지금 화면에 비밀 문구도 사업자번호 꼴도 없다. 두 자리에서 부른다(채운 뒤·비운 뒤). */
@@ -386,21 +480,39 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   expect(afterWatch.completed).toContain('WATCH_CONDITIONS');
   await assertRowsMatch(page, afterWatch);
 
-  // ⑥ 금액대 — **값을 적되 적용하지 않는다**(D-7E2b-9). 적용하면 되돌릴 길이 계약에 없다.
+  // ⑥ 금액대 — **적용한다**(M9 D-1 · D-2). 아래 ⑦-b 가 같은 폼으로 되돌린다.
   await page.getByTestId('onboarding-step-BUDGET').click();
   await editStrategyField(page, 'MIN_BUDGET', '100000000');
   await expect(page.getByTestId('edit-sent-value')).toHaveText('100,000,000원');
-  await page.getByTestId('edit-session').getByRole('button', { name: '그만두기' }).click();
-  await expect(page.getByTestId('edit-session')).toHaveCount(0);
-  // 적용하지 않았으므로 **지금 값이 그대로**이고 항목도 미완 그대로다. 화면과 **서버** 둘 다 본다
-  // — 화면만 보면 「아직 다시 읽지 않아서 그대로」와 구분되지 않는다.
-  await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('값 없음');
-  const strategyAfterCancel = (await (await page.request.get('/api/strategy')).json()) as {
+  const budgetApplied = reads.afterWrite(STRATEGY_CONFIRM);
+  await page.getByTestId('edit-session').getByRole('button', { name: '적용' }).click();
+  const afterBudget = await budgetApplied;
+
+  expect(afterBudget.completed, '금액대를 적용하면 완료로 간다').toContain('BUDGET_RANGE');
+  await assertRowsMatch(page, afterBudget);
+  // **미완이 0 이 됐다** — 이 여정이 처음으로 그 얼굴에 닿는다(D-7E2b-4 의 「다음 행동 하나」는
+  // 금액대를 적용할 수 없던 동안 화면 test 로만 잠겨 있었다).
+  expect(afterBudget.pending, '여덟 항목이 전부 채워졌다').toStrictEqual([]);
+  await expect(page.getByTestId('onboarding-complete')).toBeVisible();
+  // 적용 뒤 **단계가 옮겨 간다**(쓰기 뒤 다음 미완으로 — 미완이 0 이면 첫 단계로). 그래서 값을
+  // 보려면 그 단계로 돌아온다 — 화면과 **서버** 둘 다 본다(화면만 보면 「다시 읽지 않아서 그렇게
+  // 보인다」와 구분되지 않는다).
+  await page.getByTestId('onboarding-step-BUDGET').click();
+  await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('100,000,000원');
+  const strategyWithBudget = (await (await page.request.get('/api/strategy')).json()) as {
     readonly minBudgetWon: number | null;
   };
-  expect(strategyAfterCancel.minBudgetWon, '그만둔 편집은 서버에 아무것도 쓰지 않는다').toBeNull();
-  const afterCancel = await reopenOnboarding(page);
-  expect(afterCancel.pending, '그래서 금액대는 미완 그대로다').toContain('BUDGET_RANGE');
+  expect(strategyWithBudget.minBudgetWon, '적용된 금액대는 서버에 있다').toBe(100_000_000);
+
+  // **그만두기는 아무것도 쓰지 않는다** — 적용 경로가 열린 뒤에도 그 축은 그대로다(같은 폼의
+  // 두 출구를 한 여정에서 함께 본다). 값을 적어 보내고 그만둔 뒤 서버 값이 위와 같아야 한다.
+  await editStrategyField(page, 'MAX_BUDGET', '900000000');
+  await page.getByTestId('edit-session').getByRole('button', { name: '그만두기' }).click();
+  await expect(page.getByTestId('edit-session')).toHaveCount(0);
+  const strategyAfterCancel = (await (await page.request.get('/api/strategy')).json()) as {
+    readonly maxBudgetWon: number | null;
+  };
+  expect(strategyAfterCancel.maxBudgetWon, '그만둔 편집은 서버에 아무것도 쓰지 않는다').toBeNull();
 
   // ⑦ 되돌림 — **화면으로** 되돌린다(같은 폼이 그 능력을 쥔다).
   await page.getByTestId('onboarding-step-CONSTRUCTION_CAPACITY').click();
@@ -453,6 +565,28 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await page.getByTestId('edit-session').getByRole('button', { name: '적용' }).click();
   const afterWatchCleared = await watchCleared;
   expect(afterWatchCleared.pending).toContain('WATCH_CONDITIONS');
+
+  // ⑦-b 금액대 되돌림(M9 D-1 · D-2) — **빈 칸이 비움이다**(어휘 칸과 같은 약속). 확인 화면이
+  // 보이는 것도 어휘 비움과 같은 문면이고, 그 뒤 「적용」이 실제로 지운다.
+  await page.getByTestId('onboarding-step-BUDGET').click();
+  await editStrategyField(page, 'MIN_BUDGET', '');
+  await expect(page.getByTestId('edit-sent-value')).toHaveText('비움 — 이 조건을 지웁니다');
+  const budgetCleared = reads.afterWrite(STRATEGY_CONFIRM);
+  await page.getByTestId('edit-session').getByRole('button', { name: '적용' }).click();
+  const afterBudgetCleared = await budgetCleared;
+
+  expect(afterBudgetCleared.pending, '비우면 금액대가 미완으로 돌아온다').toContain('BUDGET_RANGE');
+  // 적용 뒤 단계가 옮겨 가므로 다시 그 단계로 온다(위 ⑥ 과 같은 사유).
+  await page.getByTestId('onboarding-step-BUDGET').click();
+  await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('값 없음');
+  const strategyAfterClear = (await (await page.request.get('/api/strategy')).json()) as {
+    readonly minBudgetWon: number | null;
+  };
+  expect(strategyAfterClear.minBudgetWon, '비움은 서버에서도 비어 있다').toBeNull();
+  // **다시 물어도 같다** — 홈을 거쳐 들어와 서버에 새로 묻는다(화면이 쥐고 있는 값이 아니다).
+  const reopened = await reopenOnboarding(page);
+  expect(reopened.pending, '다시 물어도 금액대는 미완이다').toContain('BUDGET_RANGE');
+  await assertRowsMatch(page, reopened);
 
   // ⑧ D-7E-6 — 비운 뒤에도 같다. 콘솔은 이 여정 전체에서 모은 것을 ⑩ 에서 한 번 센다.
   await assertNoPrivateValues(page);

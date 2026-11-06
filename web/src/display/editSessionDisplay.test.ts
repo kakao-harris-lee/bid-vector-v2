@@ -4,6 +4,7 @@ import {
   sentValueView,
   EDIT_SESSION_CONFLICT_DISPLAY,
   EDIT_SESSION_STATE_DISPLAY,
+  FIELD_ACCEPTS_NULL,
   FIELD_VALUE_SLOT,
   SLOT_INPUT,
   STRATEGY_FIELD_DISPLAY,
@@ -227,6 +228,43 @@ describe('값 요청 본문 — field 가 이름하는 칸 하나만', () => {
     expect(valueBodyOf('REVIEW_THRESHOLD', 'c', '-0.5')?.number).toBe(-0.5);
     expect(valueBodyOf('CANDIDATE_LIMIT', 'c', '100')?.count).toBe(100);
   });
+
+  /**
+   * **빈 칸은 비움이다**(M9 D-1) — 금액대 둘에서만 그렇고, 그 본문은 `0` 이 아니라 `null` 이다.
+   * `0` 으로 보내면 「0 원 이상」이라는 **다른 감시 조건**이 서고 체크리스트도 완료로 남는다.
+   */
+  it('금액대의 빈 칸은 amountWon null 로 간다 — 0 원이 아니다', () => {
+    expect(valueBodyOf('MIN_BUDGET', 'c', '')).toStrictEqual({
+      commandId: 'c',
+      field: 'MIN_BUDGET',
+      amountWon: null,
+    });
+    expect(valueBodyOf('MAX_BUDGET', 'c', '   ')).toStrictEqual({
+      commandId: 'c',
+      field: 'MAX_BUDGET',
+      amountWon: null,
+    });
+  });
+
+  /**
+   * 비움을 **받지 않는 칸**의 빈 입력은 그대로 「보내지 않는다」다 — 계약이 그 `null` 을 400 으로
+   * 거부하므로, 보냈다면 운영자는 고칠 수 없는 실패만 본다. 표(`FIELD_ACCEPTS_NULL`)가 그 집합을
+   * 정하고 이 단언이 양쪽을 함께 센다.
+   */
+  it('비움을 받는 칸과 그렇지 않은 칸이 빈 입력에서 갈린다 — 표 전수', () => {
+    const cleared = CONTRACT_FIELDS.filter((field) => valueBodyOf(field, 'c', '')?.amountWon === null);
+    const accepts = CONTRACT_FIELDS.filter((field) => FIELD_ACCEPTS_NULL[field]);
+
+    expect(cleared).toStrictEqual(accepts);
+    expect(accepts).toStrictEqual(['MIN_BUDGET', 'MAX_BUDGET']);
+    for (const field of CONTRACT_FIELDS.filter((one) => !FIELD_ACCEPTS_NULL[one])) {
+      // 어휘 다섯은 `terms: []` 로 비우고(본문이 간다), 나머지 넷은 보내지 않는다.
+      const body = valueBodyOf(field, 'c', '');
+      expect(FIELD_VALUE_SLOT[field] === 'terms' ? body?.terms : body, field).toStrictEqual(
+        FIELD_VALUE_SLOT[field] === 'terms' ? [] : null,
+      );
+    }
+  });
 });
 
 /**
@@ -247,6 +285,11 @@ describe('보낸 값의 문면은 본문에서 나온다', () => {
   /** 짝이 어긋나 칸이 비면 **「0원」을 지어내지 않는다**(CR r2 L2R-4). */
   it('금액 칸이 비면 값이 없다고 말한다 — 0 원을 지어내지 않는다', () => {
     expect(sentValueView('MIN_BUDGET', { commandId: 'c', field: 'MIN_BUDGET' }).text).toBeNull();
+  });
+
+  /** 명시적 비움도 같은 자리 — 패널이 그 `null` 을 「비움」 얼굴로 그린다(M9 D-1). */
+  it('금액 칸의 명시적 null 은 값이 없다고 말한다', () => {
+    expect(sentValueView('MIN_BUDGET', valueBodyOf('MIN_BUDGET', 'c', '')!).text).toBeNull();
   });
 
   it('건수·소수는 본문 값 그대로', () => {
@@ -325,9 +368,19 @@ describe('지금 값을 읽는 표', () => {
     });
 
     expect(view.text).toBe('1,200,000,000원');
-    expect(view.qualifier).toContain('KRW');
-    expect(view.qualifier).toContain('INCLUSIVE');
-    expect(view.qualifier).toContain('OPERATOR_DECLARED');
+    // **문면이다 — 원문 토큰이 아니다**(M9 D-3). 설정의 예산 칸이 화면 B·C 와 같은 말을 쓴다.
+    expect(view.qualifier).toBe('부가세 포함 · 운영자 선언값');
+    for (const token of ['KRW', 'INCLUSIVE', 'OPERATOR_DECLARED']) {
+      expect(view.qualifier, `${token} 이 화면 문면에 남았다`).not.toContain(token);
+    }
+    /**
+     * **단위를 두 번 적지 않는다**(r1 CR M-1 — 이 slice 가 들인 회귀였다). 금액 글자가 이미
+     * 「원」을 들었는데 부속 칸이 통화를 또 내면 `1,200,000,000원 / 원 · …` 이 된다. 같은
+     * 관례가 `noticeDisplay.amountDisplayOf` 에 주석으로 적혀 있다.
+     */
+    expect(view.text).toContain('원');
+    expect(view.qualifier, '단위를 부속 칸이 되풀이했다').not.toContain('원 ·');
+    expect(view.qualifier?.startsWith('원')).toBe(false);
   });
 
   it('금액만 있고 단위·과세·출처가 없으면 그 사실을 적는다', () => {

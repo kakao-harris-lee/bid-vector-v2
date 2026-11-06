@@ -15,12 +15,27 @@ import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
  * `.spec.ts` 가 **아니다** — Playwright 의 `testMatch` 가 그 꼴만 수집하므로 이 파일은 test 로
  * 집히지 않는다.
  */
+/**
+ * 개찰 결과 갈래 하나의 설계(M9/opening-harness) — **하네스가 적고 spec 이 읽는다.** spec 에
+ * 베껴 적으면 설계와 기대가 사본 둘이 되고 한쪽만 고쳐진다(이 파일 머리 주석의 승인 목록 선례).
+ */
+export interface OpeningAxisDesign {
+  readonly noticeNumber: string;
+  readonly expectedOpeningState: string;
+  /** 잠정 1위 축의 기대(cr MEDIUM-1) — 그 축을 응답에서 읽어 되비추지 않으려는 자리다. */
+  readonly expectedProvisionalState: string;
+  /** 그 공고가 **왜** 그 갈래인가 — 붉어질 때 설계 의도를 읽는 사람에게 함께 준다. */
+  readonly why: string;
+}
+
 interface JourneyContext {
   readonly previewUrl: string;
   readonly loginName: string;
   readonly passphrase: string;
   /** 이 실행의 번들이 낸 자산 경로 전수 — 하네스가 빌드 직후 적는다(v r3 M-2). */
   readonly bundleAssets: readonly string[];
+  /** 개찰 결과 상태 아홉을 낳는 공고 설계표 — 하네스의 수집·승격 걸음이 그것을 세운다. */
+  readonly openingAxis: readonly OpeningAxisDesign[];
 }
 
 const CONTEXT_PATH = resolve(tmpdir(), 'bidvector-7e1-journey-context.json');
@@ -54,6 +69,22 @@ function parseContext(raw: string): JourneyContext {
       ['loginName', typeof candidate.loginName === 'string'],
       ['passphrase', typeof candidate.passphrase === 'string'],
       ['bundleAssets', Array.isArray(candidate.bundleAssets)],
+      // **빈 목록도 없는 것으로 본다**: 설계표가 비면 아홉 갈래 등식이 「전부 통과」와 「아무것도
+      // 재지 않았다」를 같은 값으로 낸다(여정 레인 판정의 ⓒ 축과 같은 사유).
+      ['openingAxis', Array.isArray(candidate.openingAxis) && candidate.openingAxis.length > 0],
+      // **원소 모양까지 본다**(cr LOW): 배열성만 보면 망가진 원소가 「설계: undefined」로 나타나고
+      // 그 붉음은 원인을 말하지 않는다.
+      [
+        'openingAxis 원소(noticeNumber·expectedOpeningState·expectedProvisionalState·why)',
+        Array.isArray(candidate.openingAxis) &&
+          candidate.openingAxis.every(
+            (one) =>
+              typeof one?.noticeNumber === 'string' &&
+              typeof one?.expectedOpeningState === 'string' &&
+              typeof one?.expectedProvisionalState === 'string' &&
+              typeof one?.why === 'string',
+          ),
+      ],
     ] as const
   )
     .filter(([, ok]) => !ok)
@@ -71,8 +102,39 @@ export function sameOrigin(): string {
   return new URL(journeyContext().previewUrl).origin;
 }
 
-/** 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. */
+/**
+ * 화면의 「값 없음」 문면 — null 인 축은 이 문면과 대조한다. **시각 칸도 같은 말이다**
+ * (M9/screen-display D-1 갱신 2026-11-05) — 그래서 이름이 둘이 아니다.
+ */
 export const ABSENT = '값 없음';
+
+/**
+ * 화면이 보일 **KST 표기의 독립 기댓값**(M9 D-1 — `YYYY-MM-DD HH:mm`, 초 이하 절삭).
+ *
+ * **산출물의 함수를 부르지 않는다**: 양쪽을 같은 자리에서 끌어오면 그 자리가 틀려도 대조가
+ * 초록이다(저장소 선례 — 7E-3b r2 CR L-1 의 「같은 문면을 손으로 적는 변이가 667 passed」).
+ * 그래서 여기서는 **다른 기계**를 쓴다: 산출물은 고정 오프셋 산술이고 이 oracle 은 시간대
+ * 자료(`Intl`)다. 둘이 같은 글자를 내는 것은 둘 다 맞을 때뿐이다.
+ */
+export function expectedKstText(iso: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const read = (type: Intl.DateTimeFormatPartTypes): string => {
+    const found = parts.find((one) => one.type === type);
+    if (found === undefined) {
+      throw new Error(`Intl 이 ${type} 칸을 내지 않았다 — 러너의 시간대 자료를 확인하십시오.`);
+    }
+    return found.value;
+  };
+  return `${read('year')}-${read('month')}-${read('day')} ${read('hour')}:${read('minute')}`;
+}
 
 export interface NoticeRow {
   readonly noticeNumber: string;
@@ -161,6 +223,32 @@ export const CHECKPOINT_LABEL: Readonly<Record<string, string>> = {
   DEADLINE: '투찰 마감',
   OPENING: '개찰',
   NONE: '없음',
+};
+
+/**
+ * 금액 부속 토큰의 문면(M9/screen-display D-3) — 앞 판은 여정이 **원문 토큰**을 카드에서
+ * 찾았다(`BASE_AMOUNT`·`PUBLISHED`). 다른 라벨 표와 같은 관례로 **축어로** 적는다: 산출물의
+ * 표에서 끌어오면 그 표가 틀려도 대조가 초록이다.
+ */
+export const AMOUNT_BASIS_LABEL: Readonly<Record<string, string>> = {
+  BASE_AMOUNT: '기초금액',
+  ESTIMATED: '추정가격',
+  YEGA: '예정가격',
+  BID: '투찰금액',
+  ALLOCATED_BUDGET: '배정예산',
+  AWARD: '낙찰금액',
+};
+/** 통화의 단위 문면 — 금액 글자에 붙는다(M9 D-3 · r1 H-1). */
+export const AMOUNT_CURRENCY_LABEL: Readonly<Record<string, string>> = {
+  KRW: '원',
+};
+export const AMOUNT_PROVENANCE_LABEL: Readonly<Record<string, string>> = {
+  PUBLISHED: '공고 게시값',
+  DERIVED_FROM_OPENING: '개찰 역산값',
+  FILLED_FROM_BUDGET_KEY: '예산 항목에서 채운 값',
+  COPIED_FROM_BASE_AMOUNT: '기초금액에서 복사한 값',
+  OPERATOR_DECLARED: '운영자 선언값',
+  UNDECLARED: '출처 미선언',
 };
 export const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
   QUAL_08_REGION: '지역',

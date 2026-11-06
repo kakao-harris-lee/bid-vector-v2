@@ -19,10 +19,12 @@ import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
-import { amountDisplayOf, daysUntil, noticeStatusDisplayOf } from '../display/noticeDisplay';
+import { amountDisplayOf, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
+import { dayCountText, daysUntil, instantDisplayOf, readClock } from '../display/timeDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
+import { InstantText } from './InstantText';
 import { WorksheetGrounds } from './WorksheetGrounds';
 import {
   ActiveBidsDeclaration,
@@ -59,7 +61,9 @@ export function WorksheetScreen() {
   const [price, setPrice] = useState<BidPriceRequestResponse | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [activeBidsBlocked, setActiveBidsBlocked] = useState<string | null>(null);
-  const [now] = useState(() => new Date());
+  // **한 번 읽고 내린다**(M9 D-1) — 렌더마다 다시 읽으면 같은 화면의 두 칸이 서로 다른
+  // 「지금」으로 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
+  const [now] = useState(readClock);
 
   const notices = useQuery({
     queryKey: ['notice', noticeNumber, noticeRound],
@@ -284,7 +288,7 @@ export function WorksheetScreen() {
       return;
     }
     if (kind === 'DRAFT_BID') {
-      makeDraft.mutate({ caseId, ...amount, at: new Date().toISOString(), fromVersion });
+      makeDraft.mutate({ caseId, ...amount, at: readClock().toISOString(), fromVersion });
       return;
     }
     const drawNumbers = parseDrawNumbers(form.drawNumbers);
@@ -297,7 +301,7 @@ export function WorksheetScreen() {
       ...amount,
       drawNumbers,
       memo: form.memo,
-      at: new Date().toISOString(),
+      at: readClock().toISOString(),
       fromVersion,
     });
   }
@@ -370,7 +374,10 @@ export function WorksheetScreen() {
         : null;
 
   const amount = amountDisplayOf(notice);
-  const days = daysUntil(notice.deadlineAt, now);
+  // 마감은 **절대 시각과 남은 날이 한 칸**이다 — 둘 다 `timeDisplay` 를 지난다(M9 D-1·D-2).
+  const deadline = instantDisplayOf(notice.deadlineAt);
+  const deadlineDays = dayCountText(daysUntil(notice.deadlineAt, now));
+  const checkpoint = bidCase === undefined ? null : instantDisplayOf(bidCase.nextCheckpointAt);
   const action = bidCase === undefined ? null : nextActionOf(bidCase.state, price !== null);
   const amountWon = parseWon(form.amount);
 
@@ -397,17 +404,17 @@ export function WorksheetScreen() {
           <Field
             label="투찰 마감"
             testId="worksheet-deadline"
-            value={notice.deadlineAt === null || notice.deadlineAt === undefined ? null : `${notice.deadlineAt}${days === null ? '' : ` (D${days >= 0 ? '-' : '+'}${Math.abs(days)})`}`}
+            value={deadline.kind === 'absent' ? null : `${deadline.text}${deadlineDays === null ? '' : ` (${deadlineDays})`}`}
           />
           {bidCase === undefined ? null : (
             <div className="flex flex-col gap-1">
               <dt className="text-xs text-ink-soft">다음 확인 시점</dt>
               <dd data-testid="worksheet-checkpoint" className="flex flex-wrap items-center gap-2 text-sm">
                 <StateBadge display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
-                {bidCase.nextCheckpointAt === null || bidCase.nextCheckpointAt === undefined ? null : (
-                  <time dateTime={bidCase.nextCheckpointAt} className="font-numeric text-xs">
-                    {bidCase.nextCheckpointAt}
-                  </time>
+                {/* 시점이 없으면 **자리도 없다** — 옆 배지가 「없음」을 말하므로 같은 사실을
+                    두 번 적지 않는다(M9 D-1 의 없음 표지는 배지가 없는 자리의 일이다). */}
+                {checkpoint === null || checkpoint.kind === 'absent' ? null : (
+                  <InstantText display={checkpoint} className="text-xs" />
                 )}
                 {bidCase.overdue ? <span className="text-xs text-bad-ink">지난 일정</span> : null}
               </dd>
