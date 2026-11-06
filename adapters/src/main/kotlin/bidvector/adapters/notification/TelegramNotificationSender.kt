@@ -25,10 +25,17 @@ import java.util.concurrent.ConcurrentHashMap
  * Telegram Bot API `sendMessage` 로 **한 방향** 발송하는 실 sender(`OPEN-STR-12` 발송 축).
  *
  * **멱등(D-5).** 같은 [DeliveryRequest.idempotencyKey] 재호출은 앞 결과를 그대로 돌려주고 네트워크를
- * 다시 때리지 않는다 — `computeIfAbsent` 가 키마다 계산을 한 번만 돌린다(동시 호출도 하나만 효과를
- * 낸다). 기억은 **프로세스 안**이고 영속이 아니다: 재기동을 건너는 재발송 창은 ADR 0005 §7.6 의
- * 알려진 B-2 창이고 이 slice 가 넓히지도 좁히지도 않는다(`TelegramSenderContractTest` 가 그 경계를
- * 명시로 잰다).
+ * 다시 때리지 않는다 — `computeIfAbsent` 가 키마다 계산을 한 번만 돌린다. 기억은 **프로세스 안**이고
+ * 영속이 아니다: 재기동을 건너는 재발송 창은 ADR 0005 §7.6 의 알려진 B-2 창이고 이 slice 가 넓히지도
+ * 좁히지도 않는다(`TelegramSenderContractTest` 가 그 경계를 명시로 잰다).
+ *
+ * **이 성질이 약속하는 범위는 「한 run 안의 순차 재호출」이다(cr L-1).** 동시 호출을 성질로 내걸지
+ * 않는다 — 매핑 함수가 최대 15초(연결 5s + 응답 10s)의 네트워크 호출을 돌고, `ConcurrentHashMap`
+ * 계약은 그 동안 같은 bin 의 **무관한 키**까지 막힐 수 있다고 못박는다. 오늘 relay 는 단일 스레드라
+ * 실해가 0 이고(`mode=once` 일회 러너), 동시 호출이 필요해지면 계산을 map 밖에서 돌고 `putIfAbsent`
+ * 로 들이는 쪽으로 바꾼다. 기억의 **상한도 그 전제에서 온다** — 한 프로세스가 claim 하는 수
+ * (`bidvector.relay.claim-limit`)만큼이고 프로세스가 끝나면 사라진다. 상주 조립에 들어가면
+ * (이 클래스는 싱글턴 빈에 쥐어진다) 키마다 영구히 쌓이므로 그때 run 당 비움이나 캡이 필요하다.
  *
  * **모르는 결과를 전달로 접지 않는다(D-4).** 모호(timeout·5xx·429·해독 불가·송신 뒤 끊김)는
  * [DeliveryResult.Unknown] 이고 relay 가 그것을 `ISOLATED` 로 보낸다 — 재시도 0, at-most-once.
@@ -91,7 +98,26 @@ class TelegramNotificationSender(
      * 파서를 깨거나 다른 뜻이 된다. 이스케이프 규칙을 손으로 짜는 대신 그 축을 아예 쓰지 않는다.
      */
     private fun formBody(content: RenderedContent): String =
-        "$CHAT_ID_FIELD=${encoded(settings.chatId.formValue())}&$TEXT_FIELD=${encoded(content.body)}"
+        "$CHAT_ID_FIELD=${encoded(settings.chatId.formValue())}&$TEXT_FIELD=${encoded(capped(content.body))}"
+
+    /**
+     * Bot API `sendMessage` 의 `text` 상한은 **4096 자**다(cr M-6) — 넘기면 `400` 이고 그것은
+     * 「확정 거부」로 분류되어 그 행이 `FAILED` 로 탄다. **내용이 길다는 이유로 알림을 잃지
+     * 않는다**: 자르고 **잘렸다는 표지**를 남긴다(조용히 자르면 운영자가 뒷부분을 못 봤다는
+     * 사실 자체를 모른다).
+     *
+     * 세는 단위는 `String.length`(UTF-16 코드 단위)이고 Bot API 가 재는 단위와 같다. 표지도
+     * 상한 **안에** 들어가야 하므로 본문은 `상한 − 표지 길이` 까지만 남긴다.
+     *
+     * 이 자리가 renderer 가 아니라 sender 인 이유: 4096 은 **Bot API 의 제약**이다. 렌더러는
+     * 채널 무관한 문장을 만들고 채널의 상한은 그 채널 어댑터가 안다.
+     */
+    private fun capped(body: String): String =
+        if (body.length <= MAX_TEXT_LENGTH) {
+            body
+        } else {
+            body.take(MAX_TEXT_LENGTH - TRUNCATION_MARK.length) + TRUNCATION_MARK
+        }
 
     private fun encoded(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 
@@ -100,12 +126,21 @@ class TelegramNotificationSender(
         const val FORM_CONTENT_TYPE = "application/x-www-form-urlencoded; charset=UTF-8"
         const val CHAT_ID_FIELD = "chat_id"
         const val TEXT_FIELD = "text"
+
+        /** Bot API `sendMessage` 의 `text` 상한 — 프로토콜 사실이고 정책 값이 아니다. */
+        const val MAX_TEXT_LENGTH = 4096
+        const val TRUNCATION_MARK = "\n…(이하 생략 — 알림함에서 확인하십시오)"
     }
 }
 
 /**
  * 발송 전용 HTTP 클라이언트 — 연결 timeout 은 설정이고(D-8) **리다이렉트를 따르지 않는다**: 따라가면
  * 자격을 담은 경로가 응답이 지정한 host 로 다시 나간다.
+ *
+ * **닫는 자리를 두지 않은 것은 일회 러너 전제다(cr L-3).** JDK 21 의 `HttpClient` 는 `AutoCloseable`
+ * 이지만 이 클라이언트는 `mode=once` 러너의 생애와 같아 프로세스 종료가 selector·worker 를 거둔다.
+ * 상주 조립에 들어가면 **조립 경계가 소유권을 지고 닫아야** 한다 — 그러지 않으면 그 자원이 GC 까지
+ * 남는다.
  */
 internal fun telegramHttpClient(connectTimeout: Duration): HttpClient =
     HttpClient

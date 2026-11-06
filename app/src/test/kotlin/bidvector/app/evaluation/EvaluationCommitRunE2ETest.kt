@@ -60,6 +60,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
@@ -450,7 +451,7 @@ class EvaluationCommitRunE2ETest {
             environment = RuntimeEnvironment.Production,
             policy = resolution.value,
             channels = relayChannelSettings(),
-            clock = java.time.Clock.systemUTC(),
+            clock = Clock.systemUTC(),
         )
     }
 }

@@ -4,6 +4,8 @@ import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.ContentRef
 import bidvector.workflow.notification.ContentRenderer
 import bidvector.workflow.notification.RenderedContent
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -68,8 +70,18 @@ class NoticeMessageRenderer(
             INBOX_FALLBACK_LINE,
         ).joinToString(separator = "\n")
 
+    /**
+     * 공고 상세 링크(v L-1) — **경로 조각을 인코딩한다.** 오늘 `NoticeNumber` 는 대문자 ASCII·숫자·
+     * 하이픈으로 정규화되므로 인코딩이 바꾸는 것이 없지만, 그 정규화는 **다른 모듈의 성질**이고
+     * 여기서 그것에 기대면 그쪽이 느슨해지는 날 깨진 링크(또는 경로 주입)가 조용히 나간다.
+     *
+     * `URLEncoder` 는 질의 문자열 규약이라 공백을 `+` 로 낸다 — 경로 조각에서는 `%20` 이어야
+     * 하므로 그 한 자리를 바꿔 쓴다(`/` 는 `%2F` 로 인코딩되는 것이 맞다: 조각 하나이므로).
+     */
     private fun linkTo(reference: NoticeReference): String =
-        "${settings.siteBaseUrl}/notices/${reference.number}/${reference.round}"
+        "${settings.siteBaseUrl}/notices/${pathSegment(reference.number)}/${pathSegment(reference.round)}"
+
+    private fun pathSegment(raw: String): String = URLEncoder.encode(raw, StandardCharsets.UTF_8).replace("+", "%20")
 
     private fun deadlineText(at: Instant?): String = at?.let { "${KST_FORMAT.format(it)} KST" } ?: ABSENT
 

@@ -9,6 +9,7 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldEndWith
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -123,6 +124,46 @@ class TelegramNotificationSenderTest {
     }
 
     /**
+     * cr M-6 — Bot API 의 `text` 상한은 **4096 자**다. 넘기면 `400`(확정 거부)이라 그 행이
+     * `FAILED` 로 탄다 — **내용이 길다는 이유로 알림을 잃지 않는다.** 자르고 표지를 남긴다.
+     */
+    @Test
+    fun `4096 자를 넘는 본문은 잘리고 표지가 남는다`() {
+        val long = "가".repeat(5_000)
+
+        val received =
+            FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+                dispatchThrough(telegramSender(telegramSettings(server.baseUrl)), renderer = FixedContentRenderer(long))
+                server.received()
+            }
+
+        val sent = received.single().form.getValue("text")
+        sent.length shouldBe MAX_TELEGRAM_TEXT
+        sent shouldContain "이하 생략"
+        // 앞부분은 보존된다 — 자르기가 본문을 통째로 버리지 않는다.
+        sent.startsWith("가".repeat(100)) shouldBe true
+    }
+
+    /** 상한 **경계**: 정확히 4096 자는 그대로 간다(표지 없음). 한 칸 밀면 붉어진다. */
+    @Test
+    fun `정확히 4096 자는 자르지 않는다 — 경계`() {
+        val exact = "나".repeat(MAX_TELEGRAM_TEXT)
+
+        val received =
+            FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+                dispatchThrough(
+                    telegramSender(telegramSettings(server.baseUrl)),
+                    renderer = FixedContentRenderer(exact),
+                )
+                server.received()
+            }
+
+        val sent = received.single().form.getValue("text")
+        sent shouldBe exact
+        sent shouldNotContain "이하 생략"
+    }
+
+    /**
      * 설정에 없는 route 는 **네트워크 호출 0** 에 `InvalidTarget` 이다 — 「기본 chat 으로 메운다」
      * 경로가 없다(설계 검토 우회 6).
      */
@@ -141,6 +182,9 @@ class TelegramNotificationSenderTest {
         const val FORBIDDEN = 403
         const val TOO_MANY_REQUESTS = 429
         const val SERVER_ERROR = 500
+
+        /** Bot API `text` 상한 — production 상수의 사본이 아니라 **test 가 기대하는 값**이다. */
+        const val MAX_TELEGRAM_TEXT = 4096
 
         const val CHAT_NOT_FOUND_BODY = """{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}"""
         const val BLOCKED_BODY = """{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked"}"""
