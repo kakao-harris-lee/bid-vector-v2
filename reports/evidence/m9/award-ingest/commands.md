@@ -59,7 +59,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 항목이 main 과 같은 **512** · main 의 새 주석 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T05:4xZ — 임시 clone 에서 22 경로를 `97ed49c4` 로 되돌림(①②③, 셋째 병합 뒤 재측정)
+## 2026-11-06T09:2xZ — 임시 clone 에서 22 경로를 `97ed49c4` 로 되돌림(①②③, 라운드 4 재측정)
 - cmd: 앞 라운드와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=97ed49c4 --staged --worktree --`)
 - exit: 0
 - 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
@@ -68,7 +68,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
 
-## 2026-11-06T05:5xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-06T09:3xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -271,6 +271,42 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 - exit: 0
 - 핵심 결과: FAILED 0 — workflow·adapters lint·detekt **실행** 초록(app 은 UP-TO-DATE — 그 모듈 소스가
   이 라운드에 바뀌지 않았다) · 세 test task 전부 실행, 실패 0 · 게이트 22 task
+
+## 수정 라운드 4 (cr r4 H-1·M-1·M-2 · L 셋 · v r4 M-1·L-1·L-2)
+
+## 2026-11-06T08:3xZ — runbook §3.1 SELECT 를 **축어로** 돌린다(팀장 지시)
+- cmd: 버릴 clone 의 probe test 가 `docs/runbook/m9-award-collection.md` 의 첫 `sql` 펜스를 **그대로 읽어**
+  날짜 자리만 넓혀 실행한다(mock 수집 한 판 — 한 행의 공고번호를 비워 드롭을 만든다)
+- exit: 0
+- 핵심 결과: **행 2(슬롯 둘)** — 각 행이 `received 3 · normalized 2 · duplicate 0 · dropped 1 ·
+  source_total 3 · pages_fetched 2 · truncation_cause null · drop_reasons {"CollectionMissingNoticeNumber": 1}`.
+  슬롯 등식 `received = normalized + duplicate + dropped` 가 두 행 다 성립하고(3 = 2+0+1), `dropped > 0`
+  이라 판독 3 이 서고 `received = source_total` 이라 판독 2 는 서지 않는다 — 문서가 적은 그대로다.
+  열 열 개가 전부 실재한다(질의가 행을 낸다). SQL 을 문서에서 읽으므로 문면이 바뀌면 이 probe 가 따라간다.
+
+## 2026-11-06T08:2xZ — cr M-2 처방만으로는 **한 방향이 열린다**(측정)
+- cmd: clone 에 13번째 사유를 심고 **기대 집합을 손대지 않은 채** 그 사유를 *계속 걷기* 쪽에 넣은 뒤 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: **0 (초록 — 변이가 잡히지 않았다)**
+- 핵심 결과: 모수를 `permittedSubclasses` 로 도출해도 **「멈춤 집합의 등식」은 그 판을 놓친다** — 새 사유가
+  멈춤 집합에 들어오지 않으므로 집합이 그대로다. 그런데 그 방향이 `else` 를 지운 이유(403 이 조용히 계속
+  걷는다) 바로 그 방향이다. 그래서 기대값을 **사유 → 멈추는가 전수 표**로 바꿨다(키가 하나 늘어 어느 쪽에
+  넣어도 붉다). cr 처방을 그대로 넣고 재 보지 않았으면 이 구멍은 초록으로 남았다.
+
+## 2026-11-06T09:1xZ — 표로 바꾼 뒤 같은 변이(계속 걷기 쪽)
+- cmd: 같은 변이, 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 9 중 1 실패이고 메시지가 그 자리를 그대로 가리킨다
+  (`Values differed at keys AccessBlockedProbe`). 집합이던 앞 판이 놓친 방향이 표에서는 잡힌다.
+
+## 2026-11-06T08:1xZ — 판정 트리 표적(workflow lint 강제 · 게이트 넷)
+- cmd: 라운드 3 과 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task(이 판은 표 수정 **앞** 트리다 — 아래 줄이 판정 트리의 재측정이다)
+
+## 2026-11-06T09:0xZ — 판정 트리 표적 재실행(표 수정 뒤)
+- cmd: 같은 표적 집합(workflow lint 강제 · 게이트 넷)
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · HEAD `cbd1eccc`(판정 SHA)
 
 ## acceptance — 전건 `check`
 

@@ -1,6 +1,6 @@
 # M9 / award-ingest — rollback
 
-실측 HEAD: `c0388ba8`
+실측 HEAD: `cbd1eccc`
 
 ## 끄는 법(되돌리지 않고)
 
