@@ -21,6 +21,13 @@ import bidvector.workflow.evaluation.WatchSubjectPort
  * 함수이고, 이 클래스가 그 결과를 [WatchSubjectOutcome.Found]로만 감싼다. 「부재 → `Unavailable`」로
  * 정하면(반대 선택) `notice_title` 실 데이터 0건인 지금 전건 탈락이 된다(D-6F4W-2) — 타입으로
  * 그 선택 자체를 없앤다.
+ *
+ * **`OPEN-6F4W-UNAVAILABLE-PRODUCER` 처분(M9)** — 그래서 `Unavailable` 은 production 생산자가
+ * 0 이다. 그 갈래를 **없애지 않는다**: 이것은 port 의 어휘이고 소비자 둘(`CandidateScreening`
+ * 의 탈락, `OpportunityAnalysis` 의 정지)은 실제 분기를 지고 있어, 조회가 실패할 수 있는
+ * 구현이 생기는 날 그 분기를 다시 세우는 비용을 지금 아낄 이유가 없다. 대신 위 문단의 주장을
+ * 산문이 아니라 구조로 잠근다 — `EvaluationAdapterDependencyTest` 의 **필드 축 허용 목록**이
+ * 이 두 class 의 `Fieldref` 전수를 고정해, `Unavailable` 반환은 그 집합을 벗어난다.
  */
 class NoticeWatchSubjectPort : WatchSubjectPort {
     override fun subjectFor(notice: Notice): WatchSubjectOutcome =
