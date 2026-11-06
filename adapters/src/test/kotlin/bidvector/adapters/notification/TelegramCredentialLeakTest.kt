@@ -61,15 +61,22 @@ class TelegramCredentialLeakTest {
         }
     }
 
-    /** 거부 메시지도 원문을 담지 않는다 — 길이만 남긴다(`RouteKey` 관례). */
+    /**
+     * 거부 메시지는 원문도 **길이도** 담지 않는다(v N-6). 앞 판은 길이를 남겼고 그것은 설정
+     * `toString` 의 「길이도 비밀 값의 단서다」와 어긋났다 — 두 자리를 한 문면으로 맞췄다.
+     * 남는 것은 **어느 칸이 어떤 모양을 어겼는지**이고 그것이 runbook §13.6 의 행 키다.
+     */
     @Test
-    fun `자격 모양 거부 메시지는 원문을 담지 않는다`() {
+    fun `자격 모양 거부 메시지는 원문도 길이도 담지 않는다`() {
         val malformed = "$FAKE_BOT_CREDENTIAL with space"
 
         val failure = shouldThrow<IllegalArgumentException> { TelegramBotCredential.of(malformed) }
+        val message = failure.message.orEmpty()
 
-        assertNoRaw("모양 거부 메시지", failure.message.orEmpty())
-        failure.message.orEmpty() shouldContain "length=${malformed.length}"
+        assertNoRaw("모양 거부 메시지", message)
+        message shouldNotContain malformed.length.toString()
+        message shouldNotContain "length"
+        message shouldContain "Bot API 모양"
     }
 
     /** 양성 대조 — 실제 Bot API 모양은 통과한다(술어가 전부 거부하는 회귀를 막는다). */

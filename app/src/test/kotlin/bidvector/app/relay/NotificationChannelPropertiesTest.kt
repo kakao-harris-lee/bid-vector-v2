@@ -71,15 +71,37 @@ class NotificationChannelPropertiesTest {
     }
 
     /**
-     * **마스킹이 길이도 담지 않는다** — 길이는 비밀 값의 단서다(`RouteKey`·자격 거부 메시지는
-     * 모양 위반을 알리려 길이를 남기지만, 평시 `toString` 은 그럴 이유가 없다).
+     * **마스킹된 칸이 원문도 길이도 나르지 않는다** — 길이는 비밀 값의 단서다.
+     *
+     * **줄 전체에서 「길이 문자열이 없다」를 재면 안 된다(cr L-4).** 앞 판이 그렇게 썼고, 그것은
+     * `routeKey=…, baseUrl=…, connectTimeout=PT5S, responseTimeout=PT10S` 까지 담은 줄에
+     * `"23"`·`"14"` 가 없다는 뜻이었다 — **fixture 길이와 timeout 기본값이 겹치지 않는 우연**에
+     * 기대는 술어다. 기본 응답 timeout 이 14s 가 되면 마스킹과 무관한 이유로 붉어지고, 반대로
+     * 구현이 **다른 숫자로** 길이를 새게 해도 잡지 못한다.
+     *
+     * 그래서 그 두 칸만 뽑아 **등식**으로 본다(부재 단언보다 등식이 세다 — 이 slice 가 `parse_mode`
+     * 키 집합에서 쓴 바로 그 패턴이다). 칸 값이 `<채워짐>` 과 같다면 원문도 길이도 들어갈 자리가 없다.
      */
     @Test
-    fun `마스킹은 길이도 담지 않는다`() {
+    fun `마스킹된 칸은 원문도 길이도 담지 않는다`() {
         val rendered = filled().telegram.toString()
 
-        rendered shouldNotContain FAKE_CREDENTIAL.length.toString()
-        rendered shouldNotContain FAKE_CHAT_ID.length.toString()
+        fieldOf(rendered, "botCredential") shouldBe "<채워짐>"
+        fieldOf(rendered, "chatId") shouldBe "<채워짐>"
+        fieldOf(NotificationChannelProperties().telegram.toString(), "botCredential") shouldBe "<비어 있음>"
+    }
+
+    /**
+     * `name=value` 한 칸을 뽑는다 — 다음 `,` 또는 닫는 괄호까지. 칸 자체가 없으면 **실패해야** 하므로
+     * `null` 을 조용히 돌려주지 않는다(칸 이름이 바뀌면 통과하지 않는다).
+     */
+    private fun fieldOf(
+        rendered: String,
+        name: String,
+    ): String {
+        val match = Regex("""\b${Regex.escape(name)}=([^,)]*)""").find(rendered)
+        withClue("'$name' 칸이 toString 에 없다") { (match != null) shouldBe true }
+        return match!!.groupValues[1]
     }
 
     @Test

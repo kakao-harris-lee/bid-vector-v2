@@ -40,13 +40,15 @@ class TelegramBotCredential private constructor(
         private val SHAPE = Regex("^[0-9]+:[A-Za-z0-9_-]+$")
 
         /**
-         * 거부 메시지는 **원문을 담지 않는다** — 길이만 남긴다(`RouteKey` 와 같은 관례: 모양
-         * 위반 사실을 알기엔 충분하고 원문 복원에는 쓸모없다).
+         * 거부 메시지는 **원문도 길이도 담지 않는다**(v N-6) — 앞 판은 길이를 남겼는데, 그것은
+         * 설정 `toString` 의 KDoc 이 「**길이도 비밀 값의 단서다**」라고 적는 것과 어긋났다. 두 자리의
+         * 문면을 하나로 맞춘다: 거부는 **어느 칸이 어떤 모양을 어겼는지**만 말한다. 운영자가 고치는 데
+         * 필요한 것은 그것이고(§13.6 의 행 키), 길이는 거기에 보탬이 없다.
          */
         fun of(raw: String): TelegramBotCredential {
             require(raw.isNotBlank()) { "봇 자격은 빈 문자열일 수 없다 — 값을 지어내지 않는다" }
             require(SHAPE.matches(raw)) {
-                "봇 자격이 Bot API 모양이 아니다(<봇 id>:<비밀 조각>) — 원문 대신 길이만: length=${raw.length}"
+                "봇 자격이 Bot API 모양이 아니다(<봇 id>:<비밀 조각>) — 원문도 길이도 담지 않는다"
             }
             return TelegramBotCredential(raw)
         }

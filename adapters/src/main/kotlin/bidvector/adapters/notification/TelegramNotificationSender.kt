@@ -109,6 +109,12 @@ class TelegramNotificationSender(
      * 세는 단위는 `String.length`(UTF-16 코드 단위)이고 Bot API 가 재는 단위와 같다. 표지도
      * 상한 **안에** 들어가야 하므로 본문은 `상한 − 표지 길이` 까지만 남긴다.
      *
+     * **서러게이트 쌍을 가르지 않는다**(v N-5 = cr L-2). 코드 **단위** 경계에서 자르면 BMP 밖
+     * 문자(이모지 등)가 그 자리에 걸릴 때 짝 없는 반쪽이 남고, `URLEncoder` 가 그 고아를 `?` 로
+     * 바꿔 보낸다(실측: 표지 앞 글자가 `0x3F`). 전달 실패는 아니지만 **운영자가 받는 메시지에
+     * 깨진 글자가 남는다.** 자르는 지점 직전이 high surrogate 면 한 단위 더 물러난다 — 그러면
+     * 본문이 한 글자 짧아질 뿐이고 상한은 그대로 지켜진다.
+     *
      * 이 자리가 renderer 가 아니라 sender 인 이유: 4096 은 **Bot API 의 제약**이다. 렌더러는
      * 채널 무관한 문장을 만들고 채널의 상한은 그 채널 어댑터가 안다.
      */
@@ -116,8 +122,14 @@ class TelegramNotificationSender(
         if (body.length <= MAX_TEXT_LENGTH) {
             body
         } else {
-            body.take(MAX_TEXT_LENGTH - TRUNCATION_MARK.length) + TRUNCATION_MARK
+            body.take(wholeCharBoundary(body, MAX_TEXT_LENGTH - TRUNCATION_MARK.length)) + TRUNCATION_MARK
         }
+
+    /** 짝 없는 서러게이트를 남기지 않는 절단 길이 — 직전이 high surrogate 면 한 단위 물러난다. */
+    private fun wholeCharBoundary(
+        body: String,
+        limit: Int,
+    ): Int = if (limit in 1..body.length && body[limit - 1].isHighSurrogate()) limit - 1 else limit
 
     private fun encoded(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8)
 

@@ -4,6 +4,7 @@ import bidvector.workflow.notification.DeliveryResult
 import bidvector.workflow.notification.MaskedTarget
 import bidvector.workflow.notification.RejectionReason
 import bidvector.workflow.notification.RouteKey
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -144,6 +145,57 @@ class TelegramNotificationSenderTest {
         sent.startsWith("가".repeat(100)) shouldBe true
     }
 
+    /**
+     * **v N-5 = cr L-2** — 절단 지점에 **서러게이트 쌍**(BMP 밖 문자, 이모지 등)이 걸리면 쌍을
+     * 가르지 않는다. 가르면 짝 없는 반쪽이 남고 `URLEncoder` 가 그것을 `?` 로 바꿔 보낸다 —
+     * 전달 실패는 아니지만 운영자가 받는 메시지에 **깨진 글자**가 남는다.
+     *
+     * 경계를 **정확히 그 자리에** 맞춘다: 본문 앞부분을 「남길 길이 − 1」까지 BMP 문자로 채우고 그
+     * 다음에 쌍 하나를 둔다. 그러면 코드 단위 절단이 바로 그 쌍의 가운데를 지난다.
+     */
+    @Test
+    fun `절단 지점에 걸친 서러게이트 쌍을 가르지 않는다`() {
+        val pair = "\uD83D\uDE80" // U+1F680, 코드 단위 둘
+        val keep = MAX_TELEGRAM_TEXT - TRUNCATION_MARK_LENGTH
+        val long = "가".repeat(keep - 1) + pair + "나".repeat(MAX_TELEGRAM_TEXT)
+
+        val received =
+            FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+                dispatchThrough(telegramSender(telegramSettings(server.baseUrl)), renderer = FixedContentRenderer(long))
+                server.received()
+            }
+
+        val sent = received.single().form.getValue("text")
+        val body = sent.removeSuffix(TRUNCATION_MARK_TEXT)
+
+        withClue("표지가 붙어야 한다: $sent") { sent.endsWith(TRUNCATION_MARK_TEXT) shouldBe true }
+        // 쌍을 통째로 버렸으므로 본문 끝은 BMP 문자이고 **고아 서러게이트가 없다**.
+        withClue("본문 끝에 짝 없는 서러게이트가 남았다") { body.last().isSurrogate() shouldBe false }
+        body.count { it.isSurrogate() } shouldBe 0
+        // 한 단위 물러났으므로 전체 길이는 상한보다 1 짧다 — 상한을 넘지는 않는다.
+        sent.length shouldBe MAX_TELEGRAM_TEXT - 1
+    }
+
+    /**
+     * **음성 대조** — 쌍이 절단 지점에 걸치지 **않으면** 물러나지 않는다(길이가 상한 그대로다).
+     * 이 칸이 없으면 위 test 가 「언제나 한 글자 버린다」는 구현으로도 통과한다.
+     */
+    @Test
+    fun `절단 지점에 걸치지 않은 서러게이트 쌍은 길이를 줄이지 않는다`() {
+        val pair = "\uD83D\uDE80"
+        val keep = MAX_TELEGRAM_TEXT - TRUNCATION_MARK_LENGTH
+        val long = pair + "가".repeat(keep) + "나".repeat(MAX_TELEGRAM_TEXT)
+
+        val received =
+            FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+                dispatchThrough(telegramSender(telegramSettings(server.baseUrl)), renderer = FixedContentRenderer(long))
+                server.received()
+            }
+
+        val sent = received.single().form.getValue("text")
+        sent.length shouldBe MAX_TELEGRAM_TEXT
+    }
+
     /** 상한 **경계**: 정확히 4096 자는 그대로 간다(표지 없음). 한 칸 밀면 붉어진다. */
     @Test
     fun `정확히 4096 자는 자르지 않는다 — 경계`() {
@@ -185,6 +237,10 @@ class TelegramNotificationSenderTest {
 
         /** Bot API `text` 상한 — production 상수의 사본이 아니라 **test 가 기대하는 값**이다. */
         const val MAX_TELEGRAM_TEXT = 4096
+
+        /** 잘렸다는 표지 — 같은 이유로 **test 가 기대하는 문면**이다(구현 상수를 읽지 않는다). */
+        const val TRUNCATION_MARK_TEXT = "\n…(이하 생략 — 알림함에서 확인하십시오)"
+        const val TRUNCATION_MARK_LENGTH = 24
 
         const val CHAT_NOT_FOUND_BODY = """{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}"""
         const val BLOCKED_BODY = """{"ok":false,"error_code":403,"description":"Forbidden: bot was blocked"}"""
