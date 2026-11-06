@@ -1,7 +1,13 @@
 # M9/paper-bid rollback
 
 착수 base **`df4976cc`** · **복원 원천 `3ad4f3f6`**(이 브랜치가 **마지막으로** 합친 main 의
-**고정 SHA** = 병합 커밋 `1f34e3fc` 의 둘째 부모) · **실측 HEAD `1f34e3fc`**(판정 SHA).
+**고정 SHA** = 병합 커밋 `1f34e3fc` 의 둘째 부모) · **실측 HEAD `b5da4a2d`**(판정 SHA =
+승인 전 일괄 라운드의 마지막 산출물 커밋).
+
+**그 라운드에서 다시 쟀다.** 복원 목록 안 경로 **넷**이 움직였기 때문이다 — §5 의 술어가 네 줄을
+냈다(`notificationDisplay.ts` · `results.spec.ts` · `NotificationInboxWiringTest.kt` ·
+`capability-map.md`). 앞 실측을 옮기지 않고 판정 SHA 에서 ①~③ 과 표지 계수를 **전부 다시** 냈다.
+**원천은 그대로다** — 그 라운드에 main 병합이 없었다.
 
 **원천이 착수 base 가 아니다.** 이 브랜치는 머지 직전에 `origin/main` 을 **두 번** 합쳤다
 (`e12c0485` = #130~#133 · `3ad4f3f6` = #135). base 에서 복원하면 **그 남의 변경까지 지운다**.
@@ -95,7 +101,8 @@ mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **49**(evidence 제외) = 복원 **45**(M) · 삭제 **4**(A) — 기계 목록과 같다 |
 | ③ 결과 트리 == `3ad4f3f6` 트리 | 작업 트리 **0 파일** · 색인 **0 파일** · 미추적 **0** |
-| ③′ main 의 남의 변경 보존 | **추가 파일 전수 존재**(이름으로 세지 않고 목록을 돌며 `-e` 로 물었다 — 없는 것 **0**) · `KonepsEndpointDefaultsTest` 7 · `MockKonepsAxis` 3 · `money-vocab-cross-lang` 2 · **#135**: `provisional-state-` 3 · `opening-axis` 8 |
+| ③′ main 의 남의 변경 보존 | **추가 파일 전수 존재**(이름으로 세지 않고 목록을 돌며 `-e` 로 물었다 — 없는 것 **0**) · `KonepsEndpointDefaultsTest` 7 · `NotificationInboxStore` 11 · `AwardResult` 8 · `RetentionPolicyData` 26 · `APPROVED_OPERATIONS` 4 · **#135**: `provisional-state-` 3 · `opening-axis` 8 |
+| ③″ 내 표지 **0** | 열 표지 전부 0(이 라운드가 더한 `NotificationTestIdParts` 까지) · V25 파일 0(마이그레이션 수 **22** 로 복귀) · capability map 다섯 열 문장 0 · §14.3 종결 취소선 0 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/paper-bid/**` **다섯**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 그 수는 evidence 커밋마다 자라고, 유효성은 §5 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
@@ -138,16 +145,26 @@ main(#135 머지 커밋)이고 CI 가 초록으로 통과한 자리다. 그래�
 내 표지를 고를 때 `bid_kind`·`PAPER`·`REAL` 은 쓸 수 없다 — V21 의 `bid_case` 와 `BidKind` 가 그
 어휘를 이미 들고 있어 **남의 줄까지 세게 된다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다.
 
+**세는 도구가 한 번 거짓 양성을 냈다.** 재측정의 첫 판은 내 표지가 0 이 아니라 다섯·셋 따위로
+나왔는데, `grep` 호출에서 `--exclude-dir` 을 `--` **뒤**에 둬서 그것들이 옵션이 아니라 **파일
+이름**으로 먹혔고 `.git` 과 `reports/`(내 evidence 가 자기 이름을 들고 있다)까지 훑은 탓이다.
+옵션을 `--` 앞으로 옮기고 패턴을 `-e` 로 줘 다시 셌다. 그리고 **0 이 공허하지 않다는 양성 대조**를
+붙였다 — 같은 계수기를 복원하지 않은 실 worktree 에 돌리면 같은 표지가 **26·14·…·V25 파일 1 ·
+마이그레이션 23** 으로 나온다. 앞 라운드의 `MockKonepsRoutes` 거짓 0 과 **같은 계열**이다(세는
+방법이 틀리면 되돌림의 성공·실패 양쪽이 조용하다).
+
 ## 4. 적용 DB 되돌림 리허설 — 실측
 
 버릴 clone 에 §2 의 네 걸음을 쏘는 임시 test 하나를 넣고 **버릴 클러스터**에서 돌렸다(공유
 컨테이너를 오염시키지 않는다). 그 test 는 **커밋하지 않았고** 측정 뒤 지웠다.
 
-**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `1f34e3fc` 다.** 그 사이 V25 가 바뀐 것은
+**이 실측은 `5ca4f561` 에서 돌았고 판정 SHA 는 `b5da4a2d` 다.** 그 사이 V25 가 바뀐 것은
 **주석뿐이고**(`5ca4f561..635f05a6` 의 비주석·비공백 줄 **0**), main 병합 **둘 다** V25 를 **아예
 만지지 않았다**(`635f05a6..HEAD` 의 그 파일 diff **0 줄** — main 은 두 범위 모두에서
-마이그레이션을 더하지 않았다). 그래서 그 파일이 만드는 스키마가 같고 §2 의 네 걸음이 쏘는 DDL 도
-같다. 그 밖에 이 리허설의 입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
+마이그레이션을 더하지 않았다). **승인 전 일괄 라운드도 마이그레이션 디렉터리를 만지지 않았다**
+(`1f34e3fc..b5da4a2d` 의 그 디렉터리 변경 **0 파일** — 그 라운드는 산문·타입·test 술어뿐이다).
+그래서 그 파일이 만드는 스키마가 같고 §2 의 네 걸음이 쏘는 DDL 도 같다. 그 밖에 이 리허설의
+입력(표 정의·제약 이름·GRANT)을 바꾼 커밋은 없다.
 
 | 단계 | 실측 |
 | --- | --- |
@@ -183,8 +200,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 갈릴 수 있다. 유효성�
 움직였는가**로 본다:
 
 ```
-git diff --name-only 1f34e3fc..<HEAD> -- \
-  $(git log --no-merges --format= --name-only 3ad4f3f6..1f34e3fc \
+git diff --name-only b5da4a2d..<HEAD> -- \
+  $(git log --no-merges --format= --name-only 3ad4f3f6..b5da4a2d \
       -- . ':(exclude)reports/evidence/m9/paper-bid' | sort -u)
 ```
 

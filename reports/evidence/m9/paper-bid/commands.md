@@ -40,14 +40,20 @@ base `df4976cc` · 브랜치 `feature/m9-paper-bid` · 계약 `scope.md`(D-M9P-1
 | web `lint` · `typecheck` · `test`(vitest) · `api:types:check` · `gate:tests` · `gate:src-tree` · `gate:boundary-canary` | 0 | 로컬 |
 | `./gradlew --no-daemon check` · `qualityBaseline` · web job 전문 · container · ml-engine | — | **PR CI 가 정본**(팀장 공지 — 호스트 빌드 큐) |
 
-판정 SHA 에서 돌린 계수. Kotlin 은 `--rerun-tasks` 로 **강제 실행**했다 — 둘째 병합이 Kotlin 트리를
-바꾸지 않아 같은 명령이 UP-TO-DATE 로 지나가고, **UP-TO-DATE 는 측정이 아니다**(결과 XML 의
-mtime 으로 실제 실행을 확인했다).
+**UP-TO-DATE 는 측정이 아니므로** Kotlin 은 강제 실행하고(`--rerun-tasks` · task `--rerun`) 결과
+XML 의 mtime 으로 실행을 확인했다.
 
-adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0 · web lint **0** ·
-typecheck **0** · vitest **40 파일 / 857 test** · `api:types:check` 바이트 등식(**191758 bytes**) ·
-`gate:tests` · `gate:src-tree` · `gate:boundary-canary`(#135 가 번들 그래프 하네스를 만졌다).
-web 계수에는 main 병합 둘이 더한 분이 들어 있고 **내 몫은 그 중 둘이 새 것**이다.
+- adapters **105** · workflow **132** · app **304** — 실패 0 · skip 0. 이 셋은 둘째 병합 커밋에서
+  쟀고, **승인 전 일괄 라운드는 그 뒤 두 모듈을 만지지 않았다**(실측: 그 범위에서
+  `adapters/`·`workflow/` 변경 **0 파일** — 바뀐 것은 app test 한 class · web 둘 · 문서다).
+- 그 바뀐 `NotificationInboxWiringTest` 는 **판정 SHA 에서 다시 돌렸다** — **3/3**, 실패 0.
+- 세 모듈 ktlint·detekt exit 0 · `leakPatternGate` 는 **evidence HEAD** 에서 exit 0 — 그 task 의
+  `scanRoot` 가 `reports/evidence` 를 **선언 입력**으로 들어 evidence 커밋마다 out-of-date 가
+  되고, 보고 파일 mtime 으로 실행을 확인했다.
+- web lint **0** · typecheck **0** · vitest **40 파일 / 857 test** · `api:types:check` 바이트
+  등식(**191758 bytes**) · `gate:tests` · `gate:src-tree` · `gate:boundary-canary`(#135 가 번들
+  그래프 하네스를 만졌다). 판정 SHA 의 web 내용에서 돌렸다(그 뒤 web 파일을 만지지 않았다).
+  web 계수에는 main 병합 둘이 더한 분이 들어 있고 **내 몫은 그 중 둘이 새 것**이다.
 
 **adapters·app 계수가 병합 전(117·314)보다 작은 것은 회귀가 아니라 표적 집합의 차이다** — 병합 뒤
 실행에서 `--tests "*RetentionSweepTest*"` 와 `--tests "*NotificationSweep*"`(app) 을 뺐다. 빠진
@@ -58,6 +64,16 @@ web 계수에는 main 병합 둘이 더한 분이 들어 있고 **내 몫은 그
 여정이 그 함수를 부른다. 그 꼴을 vitest 둘이 잠그고(네 칸이 다 들어가는가 · 축만 달라도 갈리는가),
 여정의 실행 판정은 CI 가 낸다.
 
+**`web/e2e/**` 는 어느 게이트도 타입 검사하지 않는다**(cr M-1 의 사실 축) — `tsconfig.json` 의
+`include` 가 `src` 뿐이고 `e2e/tsconfig*.json` 이 **없다**(실측). 그래서 이 slice 가 e2e 손 타입을
+`NotificationTestIdParts & { read }` 로 바꾼 것은 **표류를 줄이는 기록**이고 래칫이 아니다. 그
+변경이 성립하는지는 게이트가 아니라 **따로 쟀다**: 그 파일을 `tsc` 로 직접 돌려 **그 파일 오류 0**
+(남은 넷은 `shared.ts` 의 `node:*` 와 `client.ts` 의 `import.meta.env` — ad-hoc 플래그에
+`@types/node`·`vite/client` 가 없어서이고 이 변경과 무관하다). **양성 대조**: 같은 타입에서
+`bidKind` 칸을 뺀 변이는 **호출 자리에서 TS2345** 로 붉다 — 도구가 그 파일을 실제로 본다는
+증거이고, 그러므로 「오류 0」이 공허하지 않다. 재발 방지의 하중은 타입이 아니라 **함수가 응답
+객체에서 wire 칸 이름을 직접 읽는다**는 성질이 진다(그 KDoc 이 든다).
+
 **전건 `check` 를 로컬에서 돌리지 않았다**(레인 공통 규율 — 같은 명령이 CI 에 있다). 표적은 위
 세 줄이고, 아키텍처 게이트를 따로 든 것은 `config/quality/architecture-policy.properties` 의
 tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이다 — 더한 둘이 죽은 항목이면 그
@@ -65,7 +81,7 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 
 생성 타입은 `npm run api:types` 로 **재생**했다(손 편집 0). 바이트 등식이 그 사실을 잠근다.
 
-## §4 변이 아홉 — 바꿔치우기, 커밋 뒤
+## §4 변이 — 바꿔치우기, 커밋 뒤
 
 원복은 변이 파일만(`git checkout --`). 모든 변이는 산출물 커밋 뒤에 돌렸다.
 
@@ -83,6 +99,7 @@ tier2 허용 타입 목록이 **오늘 실제 참조와 등식**이기 때문이
 | ⑪ 단건 읽음의 축 고정 | 화면이 `bidKind: 'REAL'` 을 보낸다(verifier 변이 W3) | **1** — `PAPER` fixture 로 바꾼 뒤. 바꾸기 전에는 **초록 30/30**(§5) |
 | ⑫ 표지에서 축 제거 | `inboxWriteFailedLine` 의 `bidKind=` 칸 | **2** — 담는 칸 단언 · 두 축이 다른 줄 |
 | ⑬ 표지에 계정 싣기 | 같은 함수에 `account=` 추가 | **1** — 음성 대조만(담는 축 test 는 초록) |
+| ⑭ 표지에 **대문자** 계정 토큰 | 같은 함수에 `Account=redacted`(값은 싣지 않는다) | **1/3** — 음성 대조 하나만. **값 단언은 지나간다**(계정 수가 없다)·담는 축도 초록이라 갈리는 축이 **대소문자 술어 하나**로 고립된다. 축어 `"account"` 였던 앞 판은 이 변이에 **초록**이었다(cr L-3 의 요점) |
 
 **⑧ backfill 은 변이로 재지 못한다** — 깨끗한 스키마에서는 기존 행이 없어 그 UPDATE 가
 무연산이다. `rollback.md` §4 가 그 사실과 간접 측정을 적는다(알려진 제한 4).
