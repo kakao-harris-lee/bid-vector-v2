@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`eaa23fe8`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
+마지막 산출물 커밋 **`c11203ba`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · base `df4976cc` · 병합 0(이 브랜치는 main 을 합치지 않았다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -163,6 +163,24 @@ INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxSt
 | 통제군(원복 뒤 `--rerun`, 결과 XML 삭제 후 재생성 확인) | 위 셋 전부 | 초록 재확인(adapters 22 · app 26) |
 
 변이 파일만 원복했고(산출물은 변이 전에 커밋), `r2` 가 만든 파일은 지웠다 — 작업 트리 미커밋 0.
+
+## 라운드 5 — 승인 전 일괄(v N-1 medium · L-a low)
+
+| 명령 | 결과 |
+| --- | --- |
+| `:app:test --tests '…ReleaseWiringTest' --tests '…AppHttpDependencyGateTest' --rerun` | exit 0 · **26 tests · 0 실패** |
+| `:app:` `ktlint{Main,Test}SourceSetCheck` · `detekt` | exit 0 |
+| 호스트 env 대조: 같은 표적을 `BIDVECTOR_RELEASE_SHA` 를 둔 채 | exit 0 · **5/5 초록** — L-a 의 거짓 RED 가 사라졌다 |
+
+| 변이 | 표적 | 결과 |
+| --- | --- | --- |
+| `r3_dispatch_default`(출하 기동점의 default properties 에 `unversioned` 한 줄) | 위 두 클래스 | **RED 1** — 새 「출하 기동점의 어느 설정 원천에도」 test. **앞 판에서는 app 전건 1014 초록이었다** |
+| `r4_env_kept`(env 제거를 `remove("no-such-source")` 로 무력화 + 호스트 env) | `ReleaseWiringTest` | **RED 2** — 제거가 하중을 지는 줄임을 반대 방향으로 실측 |
+| 통제군(원복 뒤 `--rerun`, XML 삭제 후 재생성 확인) | 위 두 클래스 | 26 · 0 실패 |
+
+**왜 자리 하나를 겨누지 않는가**: 출하 기동점의 환경에는 default properties · ConfigData · 시스템
+속성 · 명령행이 **한 자리에** 쌓인다. 그래서 단언은 「이 환경에 그 키가 있는가」 하나이고, 어느
+층에 기본값을 되살려도 같은 줄이 붉어진다(r2 셋과 r3 가 같은 단언에 걸린다).
 
 ## 등재만 (cr L-5)
 

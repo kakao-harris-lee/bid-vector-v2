@@ -155,7 +155,10 @@ ML 출하 배선은 사용자 보류 결정이라 이 slice 가 열 수 없다. 
    `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`. 그 부재는 **두 번** 실현됐다: cr H-1(여정 하네스)과
    v H-1(6G runbook 의 스냅숏 추출 갈래 — 키가 갈래 둘에만 적혀 있었다). 손으로 고치는 방식이
    같은 함정을 반복한다는 뜻이라, 그 runbook 은 키를 **공통 인자 블록 한 자리**로 모아 갈래가
-   늘어도 함께 가게 했다. 음성 대조도 두 층으로 섰다 — 조립 층(`AnnotationConfigApplicationContext`)과
-   **출하 기동 층**(`SpringApplication` + classpath 설정 원천, v M-3). census 가 없으니 남은 자리는
-   문면이 든다: `tools/image-hygiene-check.sh` 의 jvm-app `PROBE_ENV` 하나(v L-4, 오늘 무해 —
-   capability map 의 그 OPEN 행이 적는다).
+   늘어도 함께 가게 했다. 음성 대조도 두 층으로 섰다 — **바인딩 층**(값이 없으면 조립이 뜨지
+   않는다)과 **설정 원천 층**(출하 기동점 `productionApplication()` 이 준비한 환경에 그 키가 없다).
+   둘째 층은 v M-3 이 세우고 **v N-1 이 고쳤다** — 자기 사본 `SpringApplication` 은 그 기동점이 거는
+   default properties 를 지나지 않아, 그 맵에 기본값 한 줄을 넣으면 app 전건이 초록이었다. 이제 그
+   기동점 호출 자체로 환경을 준비하므로 default properties·ConfigData·시스템 속성·명령행이 한
+   단언에 걸린다. census 가 없으니 남은 자리는 문면이 든다: `tools/image-hygiene-check.sh` 의
+   jvm-app `PROBE_ENV` 하나(v L-4, 오늘 무해 — capability map 의 그 OPEN 행이 적는다).
