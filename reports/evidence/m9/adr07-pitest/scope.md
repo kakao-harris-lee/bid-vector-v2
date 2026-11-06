@@ -1,0 +1,40 @@
+# M9 / adr07-pitest — mutation 도구 채택 (OPEN-ADR-07)
+- base: main `df4976cc` · 공통 규율: `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/b843a5c1-93ae-42d9-82cf-0a5222fc9820/scratchpad/m9-lane-rules.md`
+- 사용자 지시 2026-11-06: 「남은 묶음도 지금 같이 병렬로」(2026-11-05 「남은 항목이 없도록 전체 병렬」의 연속). 결정 지점은 추천안으로 진행(전역 규칙), 외부 비용·운영 결정이 필요한 축은 만들지 않고 등재.
+- rollback: 공통 규율대로(원천 `df4976cc`, 내 커밋만, 결과 트리 동일성). 하네스 레인 변경: 계약이 명시한 것 외 없음.
+- 근거: `docs/adr/0007-test-pyramid-and-ratchet.md` §5 「`OPEN-ADR-07` · mutation 도구」 · M6 종결 §3 ②(표적 변이 갈음은 승인됐고 도구 채택은 후속). 좌표는 `gradle/libs.versions.toml` 에 이미 있다(`pitest-plugin`·`pitest` — 적용 시 `pitestVersion` 명시 필수).
+
+## 결정
+- D-1 pitest 를 **순수 도메인 모듈 한정**(예: `domain`·`strategy`·`qualification`·`settlement`·`decision` 중 빌드 비용 실측으로 고름)으로 켠다. **`check` 에 결합하지 않는다** — 별도 task + **별도 CI job**(PR 마다 vs main 만 vs 수동은 비용 실측 뒤 추천안으로).
+- D-2 임계는 **절대값 래칫 파일**(`config/quality/` — baseline 이 아니라 모듈별 최소 mutation score; 첫 값은 실측에서, 지어내지 않는다).
+- D-3 첫 산출은 **비용 실측**(모듈별 시간·메모리 — 호스트 메모리 규율 준수, 한 모듈씩).
+- D-4 ADR 0007 §5 를 결정으로 갱신(OPEN 닫음).
+
+## in_scope
+`gradle/libs.versions.toml` · `build-logic/**`(새 convention) · 대상 모듈 `build.gradle.kts` · `.github/workflows/ci.yml`(새 job 만 — 기존 job 무편집) · `config/quality/**` · `docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md`(**계약 갱신 2026-11-06** — 아래) · evidence
+
+## 계약 갱신
+- **2026-11-06 · `docs/discovery/capability-map.md` 추가(팀장 승인).** **§14.2 「(B) M1 진행 중 필요」** 표의 `OPEN-ADR-07` **한 행만** `OPEN-ADR-08` 선례 꼴로 갱신한다(취소선 + 「닫혔다 — M9/adr07-pitest, 2026-11-06」 + 해소 전문은 ADR 0007 §5 가 갖는다는 포인터). 사유: ADR 에서 OPEN 을 닫고 registry 행을 그대로 두면 두 자리가 어긋나고, 그것이 ADR 0007 머리말이 스스로 지적하는 실패(「문면이 사실을 따라가지 않았다」)와 같은 형태다. 이 파일은 **공유 파일**이라 산출물 커밋을 따로 두고 rollback 목록 갱신 커밋과 나눈다.
+- **절 번호 정정(2026-11-06)** — 그 행이 든 절은 **§14.2** 다. 앞선 보고와 산출물 커밋
+  `41168ed9` 의 메시지는 그 자리를 **「§12」로 잘못 적었다**(§12 는 「결정 완료 항목」 계열이고 그
+  표에 이 행은 없다). **이력을 되쓰지 않고 여기에 사실로 선언한다** — 절 지목은 낡는 좌표를 피하려
+  쓰는 장치인데 잘못된 절을 가리키면 그 장치가 무력해지므로 evidence 문면을 정본으로 둔다.
+  머지된 PR #133 이 바꾼 자리는 **§12.3(신설)·§14.3** 이고 §14.2 가 아니다 — 그 추가분 전체에
+  `OPEN-ADR-07` 이 **0 건**이다(기계 계수). 세 절이 서로 다르므로 병합에서 이 행이 겹치지 않는다.
+- **2026-11-06(수정 라운드 1) · 두 경로 추가(팀장 승인).** ① `docs/discovery/capability-map.md` 의
+  **§12 G6** — 후속 OPEN 둘을 활성 registry 에 행으로 세우고 머리말에 자기 증감 **+2** 를 적는다
+  (「각 레인은 자기 증감만, 합산은 머지하는 쪽」 규약). 앞 라운드의 「한 행만」 승인은 §14.2 의
+  해소 행이었고 이것은 그 위의 확장이다. ② `tools/workflow-step-refs-check.sh` — **주석만**
+  (실측 baseline 의 job 수가 이 slice 의 새 job 으로 낡았다). `tools/one-command-check.sh` 는
+  **건드리지 않는다**(팀장 판단 — mutation job 은 직렬 11분 대라 로컬 한 방 검사 밖이 맞고, 그
+  제외 근거는 ADR 0007 §5 가 든다).
+- `reports/evidence/m6/closure/open-inventory.md` 는 **고치지 않는다** — 그 당시의 사실 기록이다(팀장 확인).
+
+## in_scope (갱신 반영)
+`gradle/libs.versions.toml` · `build-logic/**` · 대상 모듈 `build.gradle.kts`(도메인 일곱) ·
+`.github/workflows/ci.yml`(새 job 만) · `config/quality/**` ·
+`docs/adr/0007-test-pyramid-and-ratchet.md` · `docs/discovery/capability-map.md` ·
+`tools/workflow-step-refs-check.sh`(주석만) · evidence
+
+## acceptance
+pitest task 가 대상 모듈에서 돌아 리포트 산출 · 래칫 위반(임계 위로 올린 값) → 실패 양성 대조 · CI 새 job 이 PR 에서 돈다(PR CI 로 확인). 로컬 pitest 는 **한 모듈씩만**, 실행 전 메모리 확인.

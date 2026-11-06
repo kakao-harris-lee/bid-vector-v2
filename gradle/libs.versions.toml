@@ -63,9 +63,15 @@ pdfbox = "3.0.5"
 # `adapters/src/main/kotlin/bidvector/adapters/access/BcryptPassphraseHasher.kt` 의 KDoc 이 든다.
 bcrypt = "0.10.2"
 
-# OPEN-ADR-07 — mutation 도구는 미결이다. 좌표만 등재하고 어느 모듈에도 적용하지 않는다.
+# M9/adr07-pitest — `OPEN-ADR-07` 이 닫혔다(ADR 0007 §5). mutation 도구는 pitest 이고
+# `bidvector.mutation-conventions` 가 순수 도메인 모듈에만 적용한다. **세 버전이 서로 독립이다**
+# — gradle plugin · PIT 엔진 · JUnit Platform 어댑터.
 pitest-plugin = "1.19.0"
 pitest = "1.30.0"
+# `pitest-junit5-plugin` 은 JUnit 5 이름으로 배포되지만 JUnit 의존 전부를 `provided` 로 선언해
+# 런타임 classpath 의 판을 쓴다 — 이 저장소의 **JUnit 6**(ADR 0007 §1.1.1)에서 실제로 engine 을
+# 발견하고 test 를 돌리는 것을 실측했다(evidence 의 `commands.md`).
+pitest-junit5-plugin = "1.2.3"
 
 # M2/2A — gRPC/Protobuf 내부 계약(ADR 0003·0006 D-8). 버전 근거는
 # `_workspace/m2-prep/02_grpc_stack_compat.md`(curl 로 Maven Central/PyPI 메타데이터 직접 실측).
@@ -216,9 +222,12 @@ json-schema-validator = { module = "com.networknt:json-schema-validator", versio
 pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 bcrypt = { module = "at.favre.lib:bcrypt", version.ref = "bcrypt" }
 
-# OPEN-ADR-07 이 닫힐 때까지 좌표만 든다. gradle-pitest-plugin 의 기본 PIT 는 1.22.1 이라
-# 적용 slice 는 pitestVersion 을 반드시 명시해야 한다.
-pitest-engine = { module = "org.pitest:pitest", version.ref = "pitest" }
+# M9/adr07-pitest — precompiled script plugin 이 `plugins { id(...) }` 로 적용하려면 build-logic 의
+# **classpath**에 plugin 이 있어야 한다(detekt·ktlint·kover·cpd 와 같은 자리). 앞 판의
+# `pitest-engine` 좌표는 지웠다 — 엔진은 plugin 이 `pitestVersion`(위 `pitest` 버전)으로 직접
+# 해석하므로 library alias 가 쓰이지 않았다. **그 `pitestVersion` 명시는 선택이 아니다**:
+# gradle-pitest-plugin 1.19.0 의 기본 PIT 는 우리가 고정한 판보다 낮다.
+pitest-gradlePlugin = { module = "info.solidsoft.gradle.pitest:gradle-pitest-plugin", version.ref = "pitest-plugin" }
 
 # M2/2A — `ml-contract/` included build 전용 좌표. 기존 `grpc-api`·`protobuf-java`(버전 없음,
 # app 위반 fixture 전용)와 별개 alias 다 — 저 둘은 Boot BOM 이 관리하는 다른 자리라 여기서

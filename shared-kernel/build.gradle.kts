@@ -1,5 +1,6 @@
 plugins {
     id("bidvector.kotlin-conventions")
+    id("bidvector.mutation-conventions")
 }
 
 // kotest-property 의 checkAll/forAll 은 suspend 함수다 — 평범한 Jupiter @Test 안에서 부르려면
