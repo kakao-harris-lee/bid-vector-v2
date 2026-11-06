@@ -6,10 +6,10 @@
 | --- | --- | --- |
 | D-1 `OPEN-STR-12` 분할 | 충족 | capability map 의 `OPEN-STR-12` 행에 발송 축 닫음 · `OPEN-STR-12-INTERACTIVE` 신설 행(둘 다 §G3 OPEN 표와 「결정 주체」 표) |
 | D-2 경로는 설정에서 · chat id 는 `RouteKey` 에 없다 · 마이그레이션 0 | 충족 | `ConfiguredRouteDirectory`(owner·슬러그만) · 슬러그 → chat id 해소는 sender 설정 · Email `enabled=false` · 새 migration 0 |
-| D-3 비밀값 env 전용 · 원문 0 | 충족 | 값 타입 둘이 마스킹 `toString`·원문 출구 `internal` 하나 · **env 원문을 쥐는 app 설정 객체 둘도 `data class` 가 아니고 마스킹한다**(v H-1) · 누출 sweep 이 갈래마다 **결과와 설정 문자열을 함께** 본다 · 이 패키지 로거 0(바이트코드 단언) |
-| D-4 결과 어휘 대응 | 충족 | `telegramDeliveryResult`(순수) + `telegramStatusVerdict` + `telegramFailureOutcome`. 429 를 4xx 범위보다 **먼저** 본다. **자격 모양을 생성 시점에 막아** URI 불가 문자가 `Unknown` 으로 오분류되는 길을 닫았다(v M-1) |
+| D-3 비밀값 env 전용 · 원문 0 | 충족(전제 하나) | 값 타입 둘이 마스킹 `toString`·원문 출구 `internal` 하나 · **env 원문을 쥐는 app 설정 객체 둘도 `data class` 가 아니고 마스킹한다**(v H-1) · 누출 sweep 이 갈래마다 **결과와 설정 문자열을 함께** 본다 · 이 패키지 로거 0(바이트코드 단언) · 거부 메시지가 **길이도** 담지 않는다(v N-6). **전제**: JDK HttpClient 의 내부 로그 속성이 꺼져 있어야 한다 — 켜지면 JDK 가 요청 URL 을 찍고 그 URL 이 자격을 싣는다. 그 전제를 **기동 판정**이 진다(`RefusedHttpClientLogging`, v N-2) |
+| D-4 결과 어휘 대응 | 충족 | `telegramDeliveryResult`(순수) + `telegramStatusVerdict` + `telegramFailureOutcome`. 429 를 4xx 범위보다 **먼저** 본다. URI 불가 문자가 `Unknown` 으로 오분류되는 길을 **보간되는 값 둘 모두**에서 닫았다 — 자격 모양(v M-1)과 **base URL(v N-1 = cr M-2, URI 자신에게 묻는다)**. 앞 라운드의 「닫았다」는 자격 축에만 참이었다 |
 | D-5 sender 멱등 계약 | 충족 | `TelegramSenderContractTest` — `SenderContractTest` 와 같은 골격, 효과 계수를 가짜 서버 수신 수로 센다. 영속 기억 0(마지막 칸이 그 경계를 거동으로 적는다) |
-| D-6 렌더러 | 충족 | 한국어 평문, `parse_mode` 미사용(키 집합 등식), KST·원 단위 콤마, 링크 도메인은 설정, **경로 조각 인코딩**(v L-1). 본문은 Bot API 상한에서 자르고 표지를 남긴다(cr M-6) |
+| D-6 렌더러 | 충족 | 한국어 평문, `parse_mode` 미사용(키 집합 등식), KST·원 단위 콤마, 링크 도메인은 설정, **경로 조각 인코딩**(v L-1). 본문은 Bot API 상한에서 자르고 표지를 남기며 **서러게이트 쌍을 가르지 않는다**(cr M-6 · v N-5) |
 | D-7 기동 거부 해제 규칙 | 충족 | 자리지킴 셋 삭제 + `relayBootDecision(환경, 정책표, 존재 여부, 채널, 활성 route)`. 거부가 **셋**이다 — 설정 결손 · **활성 route 없음**(cr M-2) · 자격 모양. 셋 다 값이 아니라 칸 이름·채널 이름·길이만 나른다 |
 | D-8 JDK `HttpClient` · 유한 timeout | 충족 | 새 의존성 0. 연결 5s · 응답 10s 기본, 둘 다 설정 가능하고 `init` 이 유한 양수를 요구 |
 | D-9 실제 Telegram 호출 0 | 충족 | 전 test 가 가짜 서버 또는 닫힌 포트를 상대로 돈다. **이름 해소 실패 갈래만 거동이 아니라 타입으로** 쟀다 |
@@ -62,6 +62,9 @@ design-review.md 에 있다.
     15초의 블로킹 호출을 돌고, 멱등 기억에 명시 상한이 없고(한 프로세스의 claim 수가 사실상의 상한),
     `HttpClient` 를 닫지 않고, 억제 반환이 임대를 묻지 않아 `LeaseBusy` 와 갈린다. 넷 다 **일회 러너
     전제**에서 실해가 0 이고 KDoc 이 그 전제를 적는다 — **상주 조립으로 가는 slice 가 넷을 함께 본다.**
+14a. ~~`baseUrl` 오설정은 여전히 `Unknown` 으로 기록된다~~ → **해소**(v N-1 = cr M-2). 설정 `init` 이
+    base URL 을 `java.net.URI` 에게 물어 기동에서 거부한다(`host != null` · 포트 범위 포함). 변이 ⑨
+    RED 2.
 14. **`400` 의 사유 축을 가르지 않는다**(cr M-6 둘째 절). 본문 길이는 상한으로 닫았지만 400 은 여전히
     「대상 거부」 한 칸이다 — 사유 축 분해는 `workflow` 어휘 변경이라 out_scope 다. runbook §13.6 의
     `failed>0` 행에서 길이를 사유에서 뺐다(상한이 닫았으므로).
@@ -84,6 +87,22 @@ design-review.md 에 있다.
 20. **`AppHttpDependencyGateTest.kt` 가 계약 밖이었다.** 게이트 등재의 반쪽(면제 래칫 상수)이
     `config/quality/**` 가 아니라 그 test 파일에 산다. `scope.md` in_scope 에 사유와 함께 등재했고
     **팀장 확인 대상**이다.
+
+21. **JDK HttpClient 로그 속성은 「전제」다 — 기동 판정이 지지만 그 밖은 열려 있다**(v N-2).
+    러너는 그 두 속성이 켜진 채로는 **기동하지 않는다**. 그러나 ① 그 판정은 **이 러너의 JVM** 만
+    보고(다른 프로세스가 같은 host 에서 켜 둔 것은 모른다) ② `Live` 가 아닌 환경은 거부하지 않으며
+    ③ 속성 **어휘가 열거**라 JDK 가 새 로그 속성을 들이면 그것은 이 판정 밖이다. ③ 은 열거를 고쳐야
+    닫히는 자리이고, 그 사실을 어휘 등식 test 가 드러낸다(이름 둘을 못박는다).
+22. **자격 모양 위반이 「부재」와 다른 처분을 받는다**(cr L-6 의 처분). 모양 위반은 `Live` 에서만
+    기동 실패이고, 비-Live 는 **뜬다**(claim 0). 이것은 **정의된 거동**이고 test 둘이 양쪽을 잡는다 —
+    앞 판은 환경을 가리지 않고 실패했고 그 거동이 어디에도 적혀 있지 않았다.
+23. **승인 전 라운드도 RED 를 선행으로 재지 못했다 — 사유가 다르다.** v N-1 의 test 는 구현보다
+    **먼저 썼고** 그 상태로 표적 실행을 걸었으나, 호스트 빌드 큐가 35분 넘게 자리를 내주지 않아
+    취소하고 **역적용**(변이 ⑨)으로 쟀다. 같은 명제를 잠그지만 순서는 서지 않았다 —
+    `commands.md` §1 에 사실로 적었다.
+24. **리뷰 지적 둘을 택하지 않았다**(사유는 코드 주석과 이 문서에): cr L-6<r1>(판정 객체 보간)은
+    타입 이름이 runbook 행 키라서, cr L-8(전규정 이름)은 그 파일에 도메인 `Clock` 이 이미 import 되어
+    이름이 모호해지기 때문이다. 둘 다 **문면이 아니라 측정**이 근거다.
 
 ## 4. rollback · 되돌림
 

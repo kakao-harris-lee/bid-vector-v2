@@ -16,6 +16,8 @@
 | 10.9 GB | 5.1 GB | inbox-vocab `check` | 시작 |
 | 10.1 GB | 8.0 GB | ops-migrations clone · gates-build | 시작(자리 둘이 다 차 있어 **큐에서 대기**) |
 | 9.3 GB | 8.0 GB | 대기 큐 깊음(bv-build 대기 7) | 시작 |
+| 8.7 GB | 7.4 GB | 자리 둘이 다 차 있음(각 30분 경과) | **큐에서 35분 대기 뒤 취소** — 아래 §1 |
+| 8.6 GB | 7.3 GB | 대기 큐 8 | 시작 |
 
 ## 1. RED 선행
 
@@ -24,6 +26,17 @@
 | 발송·렌더·경로 어댑터 | `:adapters:compileTestKotlin` **exit 1** — 그 층의 production 타입 전부 미해소. **어떤 단언도 아직 서지 않는다** | `:adapters:test --tests 'bidvector.adapters.notification.*'` **exit 0** |
 | 기동 검사(app) | **미기록** — §1b | `:app:test` 표적 **exit 0** |
 | 실 sender 조립 E2E | 위 adapters 컴파일 RED 에 포함(같은 소스셋) | `PipelineTelegramDeliveryE2ETest` 1 test · fail 0 |
+
+**승인 전 라운드(셋째 판)의 RED 도 선행이 아니다 — 이유가 다르다.** v N-1(base URL) 의 회귀 test 는
+**구현보다 먼저 썼고**, 그 상태(test 있음 · 구현 없음)에서 표적 실행을 걸었다. 그런데 **호스트 빌드
+큐가 35분 넘게 자리를 내주지 않았다**(자리 둘을 다른 레인의 30분짜리 빌드 둘이 쥐고 있었다). 큐에
+남겨 두면 그 사이 다른 파일을 편집할 수 없어(걸리면 반쯤 편집된 트리를 컴파일한다) 그 실행을
+**취소하고** RED 를 **역적용**으로 쟀다 — 변이 ⑨ 가 그 측정이고 RED 2 다(§3).
+
+역적용은 verifier 가 r2 에서 「구판 production 위에서 새 test 로 잼」으로 쓴 것과 같은 방법이고
+같은 명제를 잠근다. 그러나 **「먼저 재고 그 다음 구현」의 순서는 서지 않았다** — 갈음으로 적지 않는다.
+보조 측정으로 JDK `URI` 의 거동을 직접 쟀다(열두 모양: 아홉은 `URI` 가 거부, 둘은 host·포트 검사가
+필요, 둘은 양성 대조로 통과) — **옛 술어가 그 아홉을 전부 통과시킨다**는 사실이 그 자리의 근거다.
 
 **수정 라운드(둘째 판)의 RED 는 선행이 아니다.** 그 라운드는 리뷰 지적을 받아 **코드를 먼저 고치고
 test 를 뒤에 썼다** — 「test 먼저」를 지키지 않았다. 그래서 그 라운드가 더한 방어 넷의 근거는 선행
@@ -45,6 +58,26 @@ production 을 되돌리면 그 되돌림이 배선 → 어댑터 조립으로 �
 | `:app:ktlintMainSourceSetCheck` · `:app:ktlintTestSourceSetCheck` · `:app:detekt` · `:app:sizeGate` | **0** | 네 task 전부 통과(`sizeGate` 500 줄 한도) |
 | `:adapters:test` 표적(`notification.*` + `relay.*` + 발송 E2E) | **0** | 13 클래스 · **83 test** · fail/err **0** |
 | `:adapters:ktlintMainSourceSetCheck` · `:adapters:ktlintTestSourceSetCheck` · `:adapters:detekt` | **0** | 세 task 전부 통과 |
+
+**승인 전 라운드 재실측 — 전부 `--rerun` 으로 돌렸다**(팀장 지시). `--rerun` 은 Gradle 9 에서
+**task 옵션**이라 task 이름 **뒤**에 와야 한다 — 전역 자리에 두면 `Unknown command-line option` 으로
+빌드가 서지 않는다(이 라운드에서 실측하고 고쳤다).
+
+| 명령 | exit | 핵심 결과 |
+| --- | ---: | --- |
+| `:app:test --rerun` 표적(아키텍처 게이트 전부 + relay + `RelayWiringTest` + 평가 커밋 E2E) | **0** | 19 클래스 · **244 test** · fail/err **0** |
+| `:app:ktlint{Main,Test}SourceSetCheck` · `:app:detekt` · `:app:sizeGate` (각 `--rerun`) | **0** | 네 task 전부 통과 |
+| `:adapters:test --rerun` 표적(`notification.*` + `relay.*` + 발송 E2E) | **0** | 14 클래스 · **89 test** · fail/err **0** |
+| `:adapters:ktlint{Main,Test}SourceSetCheck` · `:adapters:detekt` (각 `--rerun`) | **0** | 세 task 전부 통과 |
+
+그 전에 **두 번 붉었고 둘 다 이 라운드가 만든 결함**이다: ① 3층 게이트가 새 보유자의 숨은 송신 멤버
+등재를 요구했다(아래) ② `detekt` MaxLineLength·ktlint 인자 줄바꿈 여덟 — test 호출에 인자를 하나
+더하며 생긴 것이고 줄을 나눠 고쳤다.
+
+**게이트 등재가 다시 관측을 따라왔다.** `java.net.URI` 를 설정 `init` 이 쥐게 되자 전송 표면 쌍
+하나가 늘고, 등재하자 **3층**(숨은 송신 멤버)이 켜져 `TelegramSenderSettings$Companion#uriAccepts`
+하나를 더 요구했다 — 둘 다 **게이트 자신의 위반 출력에서 기계로 뽑아** 넣었다. 면제 래칫도 함께
+움직였다(86 → 87, 기계 재계산 38 + 11 + 38, 중복 0).
 
 **표적을 넓혔다 — 그것이 앞 라운드의 구멍이었다.** 앞 판 로컬 표적은 app 의 다섯 클래스뿐이어서
 `TransportSurfaceGateTest`·`AppHttpDependencyGateTest` 가 **표적 밖**이었고, CI `check` 가 그 둘로
@@ -75,6 +108,35 @@ production 을 되돌리면 그 되돌림이 배선 → 어댑터 조립으로 �
 | ⑥ | 자격 모양 술어를 항상 참으로 | 1 | **2** | CredentialLeak 모양 거부 둘 |
 | ⑦ | app 설정의 자격·chat id 칸이 **원문을 보간**한다 | 1 | **3** | NotificationChannelProperties 셋 |
 | ⑧ | 기동 판정의 **활성 route 갈래**를 항상 거짓으로 | 1 | **2** | BootDecision `route 없으면 거부` · RelayWiring 같은 축 |
+
+### 승인 전 라운드 — 변이 열, 전부 RED
+
+이 라운드가 더한 방어 다섯(⑨~⑬)과, 코드를 고쳐 **기구가 움직인** 다섯(③⑤④⑦⑧)을 다시 걸었다.
+
+| # | 무엇을 무엇으로 | exit | RED | 붉은 자리 |
+| --- | --- | ---: | ---: | --- |
+| ⑨ | base URL 의 URI 술어를 항상 참으로 (v N-1) | 1 | **2** | SenderSettings 거부 전수 · 거부 메시지 |
+| ⑩ | 절단 경계의 high surrogate 판정을 low 로 바꿔치움 (v N-5) | 1 | **1** | Sender `걸친 쌍을 가르지 않는다` |
+| ⑪ | 로그 속성 갈래를 항상 거짓으로 (v N-2) | 1 | **2** | BootDecision · RelayWiring 각 하나 |
+| ⑫ | 설정 조립의 Live 게이트 제거 (cr L-6) | 1 | **1** | RelayWiring `비-Live 는 모양이 틀려도 기동한다` |
+| ⑬ | 모양 거부 메시지에 길이를 되돌림 (v N-6) | 1 | **1** | CredentialLeak 거부 메시지 |
+| ③ | 자격 `toString` 마스킹에 원문을 덧붙임 | 1 | **3** | r2 와 같다 |
+| ④ | 기동 `require` 를 항상 참인 술어로 | 1 | **4** | r2 와 같다 |
+| ⑤ | 본문 상한 상수 4096 → 4,000,000 | 1 | **3** | **1 → 3 으로 늘었다** — 새 골든 둘이 같은 절단을 지난다 |
+| ⑦ | app 설정의 두 칸이 원문을 보간 | 1 | **3** | r2 와 같다(test 이름 하나가 바뀌었다) |
+| ⑧ | 활성 route 갈래를 항상 거짓으로 | 1 | **3** | **2 → 3 으로 늘었다** — 새 순서 test 가 같은 갈래를 지난다 |
+
+**음성 대조 — 이 라운드에서 새로 선 것 둘:**
+- ⑩ 이 붉히지 **않은** 하나: `절단 지점에 걸치지 않은 서러게이트 쌍은 길이를 줄이지 않는다`.
+  경계에 걸치지 않으면 물러나지 않는다 — 이 칸이 없으면 ⑩ 의 RED 가 「언제나 한 글자 버린다」는
+  구현으로도 만족된다.
+- ⑫ 가 붉히지 **않은** 넷: Live 축의 거부 test 넷이 초록이다. Live 게이트를 지워도 **Live 거동은
+  바뀌지 않는다** — 바뀌는 것은 비-Live 뿐이고, 그래서 RED 가 그 한 칸이다.
+- ④ 가 붉히지 **않은** 하나는 여전히 `배선은 판정 함수를 지난다`(바이트코드 단언)다 — 구조 단언과
+  거동 test 의 짝이 세 라운드째 같은 모양으로 선다.
+
+**⑤⑧ 의 RED 가 늘어난 것을 「방어가 세졌다」로 읽지 않는다.** 늘어난 것은 **같은 기구를 지나는
+골든 칸의 수**다(상한·갈래). 방어의 폭이 아니라 측정의 밀도가 늘었다.
 
 ### ③ 이 넓어졌는가 — **test 수는 1 → 3 이고, 「열한 자리」는 애초에 성립하지 않는다**
 
@@ -120,6 +182,9 @@ git diff <병합된 main> HEAD | command grep '^+' | command grep -ciE -f config
 - **게이트 범위**(`reports/evidence/**` — CI 의 `leakPatternGate` 가 재는 범위): **매치 0**(exit 1).
 - **diff 축(추가된 줄)**: **3**. 셋 다 KDoc·runbook 이 그 값의 **이름을 설명하는 산문**이고 값이 아니다
   (자격 값 타입 KDoc · 설정 KDoc · runbook §13.1 의 「그 값을 남기지 않는다」 문장). **실제 비밀값 0.**
+- 승인 전 라운드에서 한때 **5** 였다 — 새 test 의 잘못된 base URL fixture 가 스캔 어휘에 걸리는 단어를
+  담아 **거짓 양성 둘**을 보탰다. 이 slice 가 자격 값 타입 이름에서 이미 겪은 일이라 같은 처방(어휘 밖
+  이름)을 test fixture 에도 적용해 다시 3 이 됐다.
 - acceptance 문면이 「diff 에 0」이었던 것을 이 라운드에서 고쳤다(cr L-11) — 어휘를 **설명하는** 문서가
   diff 에 들어오므로 0 이 될 수 없는 기준이었다. 재는 것은 「어휘가 없다」가 아니라 「값이 없다」다.
 
@@ -129,7 +194,8 @@ git diff <병합된 main> HEAD | command grep '^+' | command grep -ciE -f config
 git log --no-merges --format= --name-only HEAD ^<병합된 main> | sort -u
 ```
 
-- 산출 **46 경로** / 커밋 17. 병합된 main 을 `^` 로 제외하므로 **제목 필터가 필요 없다** — 앞 라운드가
+- 산출 **47 경로** / 커밋 25(승인 전 라운드 뒤). 늘어난 한 경로는 새 test 클래스
+  `TelegramSenderSettingsTest.kt` 이고 in_scope 안이다. 병합된 main 을 `^` 로 제외하므로 **제목 필터가 필요 없다** — 앞 라운드가
   쓴 `grep -q m9-str12` 제목 필터를 이 라운드에서 버렸다(남의 커밋이 조상으로 들어오지 않는다).
   대조 실측: 그 17 개 중 제목이 `m9-str12` 가 아닌 것 **0**.
 - **in_scope 밖 한 자리**: `AppHttpDependencyGateTest.kt`. 게이트 등재의 반쪽(면제 래칫 상수)이
@@ -137,7 +203,14 @@ git log --no-merges --format= --name-only HEAD ^<병합된 main> | sort -u
   등재했고 **팀장 확인 대상**이다(계약 갱신은 팀장이 승인한다).
 - 앞 라운드가 등재한 두 자리(평가 커밋 E2E 와 그 형제 대역 파일)는 그대로 유효하다.
 
-## 6. CI 축의 현재 상태 — 이 라운드의 정본은 **아직 돌지 않았다**
+## 6. CI 축의 현재 상태 — 승인 전 라운드의 정본은 **아직 돌지 않았다**
+
+판정 SHA `eaa6fbff` 의 CI run `42143719228` 은 **네 job 전부 success** 였고 `check` step 안의
+`qualityBaseline` 과 S-20 `one-command-check.sh` 가 **이 브랜치에서 처음 초록**이었다(verifier 확인).
+그 뒤 승인 전 라운드가 코드·게이트 등재·runbook 을 더 고쳤으므로 **그 정본은 팀장이 push 할 때 도는
+다음 run** 이다. 로컬은 표적과 변이만 돌았다.
+
+### 앞 라운드의 기록 (판정 SHA `4e7d7093`)
 
 직전 run `42016726748`(판정 SHA `4e7d7093`): `web`·`container`·`ml-engine` **pass** ·
 `check` **fail**. 산출물 artifact 의 결과 XML 을 받아 **실패 전수를 셌다**: 전 모듈 중 app 만
