@@ -254,15 +254,35 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
     }
 
 /**
- * 멈출 사유인가 — 예산·쿼터만이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
+ * 멈출 사유인가 — 오늘은 예산·쿼터뿐이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
  * 원인으로 남고 실행은 다음 슬롯으로 간다. **짧은 걷기는 여기 오지 않는다** — 사유가 없으므로
  * 멈춤도 아니고, 미완 계수만 올린다([AwardCollectionReport.unfinishedSlots]).
+ *
+ * **`else` 를 두지 않는다**(ops-code 레인 교차 지적). `else -> null` 은 「모르는 사유는 계속 걷는다」를
+ * 뜻하고, 그 기본값은 틀린 쪽으로 안전하다: 계정·키 차단처럼 **남은 슬롯을 계속 부르면 사태를 키우는**
+ * 사유가 새로 생기면 조용히 그 길로 간다. 소진 `when` 이면 새 [TruncationCause] 가 생기는 순간 컴파일이
+ * 이 자리를 가리켜 결정을 강제한다 — 저장소의 `truncationCodeOf`·`failureOf` 와 같은 형태·같은 이유다.
+ *
+ * **다음에 이 자리를 깨우는 사유의 답은 정해져 있다**: 403 계열 차단(ops-code 가 들여올 `AccessBlocked`)은
+ * **멈춤**이다 — 쿼터와 같은 자리(`AwardCollectionHalt(null, cause)`)로 보낸다. 차단된 키로 남은 슬롯을
+ * 계속 부르면 승인 호출만 태우고 차단을 키운다. 오늘 이 브랜치에는 그 사유가 없어 그대로 컴파일된다.
  */
 private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
     when (cause) {
+        null -> null
         is TruncationCause.BudgetExhausted -> AwardCollectionHalt(cause.limit, null)
         TruncationCause.QuotaExhausted -> AwardCollectionHalt(null, cause)
-        else -> null
+        TruncationCause.MaxPages,
+        TruncationCause.RepeatedPage,
+        TruncationCause.Timeout,
+        TruncationCause.TransportFailure,
+        TruncationCause.ServerError,
+        TruncationCause.NotRetryable,
+        TruncationCause.InputError,
+        TruncationCause.Unclassified,
+        TruncationCause.StructureFailure,
+        TruncationCause.SelfThrottled,
+        -> null
     }
 
 /** 이어 읽을 쪽 — 쪽 상한으로 잘렸고 진전이 있을 때만(같은 커서를 다시 부르지 않는다). */
