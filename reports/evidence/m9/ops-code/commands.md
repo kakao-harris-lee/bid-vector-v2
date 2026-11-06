@@ -39,6 +39,8 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | `e7912022` | v r2 M-1 정정 — 벽시계 단언이 계수 축과 섞여 **MW1 을 통과했다**(실측), 두 축으로 가름 |
 | `cfcf315f` | evidence 4차(판정 SHA `e7912022`) |
 | `908b197a` | main `97ed49c4`(#134) 병합 — 겹침 둘, 충돌 해소 줄 0 |
+| `9286765d` | evidence 5차(판정 SHA `908b197a`) |
+| `3ad0d342` | v r3 M-1 — production 이 넘기는 기다림 함수의 두 고리(거동 · 상수 풀 형태) |
 
 ## 2. 표적 실행 — 핵심 결과 한 줄씩(판정 SHA 기준, 병합 뒤)
 
@@ -49,7 +51,7 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | `:procurement:test --rerun`(전건 — sealed 열거 축) | `tests=317 failures=0` |
 | `:workflow:test --rerun --tests 'bidvector.workflow.collection.*' --tests '…InboxRecordingNotificationsTest'` | `tests=116 failures=0` |
 | `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest' --tests '…EvaluationAdapterDependencyTest'` | `tests=135 failures=0` |
-| `:app:test --rerun --tests 'bidvector.app.architecture.*' --tests '…CollectionWiringTest' --tests '…NotificationAudienceMarkerTest'` | `tests=204 failures=0` |
+| `:app:test --rerun --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' --tests '…EvaluationCommitRunnerTest'` | `tests=303 failures=0` |
 | `gateRegistrationGate` — workflow · adapters · app · procurement | 전부 통과(새 test 클래스 넷 등재 포함) |
 | ktlint(main·test)·detekt — workflow · adapters · app · procurement | 전부 BUILD SUCCESSFUL |
 | `leakPatternGate` | BUILD SUCCESSFUL |
@@ -91,6 +93,8 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 | **출하** `minimumCallInterval = ZERO` | `KonepsShippedPolicyWireTest` 2/5 | `KonepsCallPacerTest` — 자기 값으로 돌아 출하 값을 재지 않는다(v H-1 이 지목한 빈 자리) |
 | **배선**이 pacer 에 `Duration.ZERO` 를 넘긴다 | `CollectionWiringTest` 1/21 | `KonepsShippedPolicyWireTest` 6/6 · `KonepsCallPacerTest` 8/8 — 표의 값과 관문의 기계는 그대로라 **운반 단계만** 붉어진다 |
 | 배선의 기다림이 잠들지 않는다(식으로 바꿈) | `CollectionWiringTest` 1/21 | 같은 class 의 「넘기는 값」 단언은 **초록** — 두 축을 따로 재기 때문이다 |
+| **기본값** 기다림 함수를 잠들지 않는 람다로 | `CollectionWiringTest` 1/23(공유 관문 거동) | 같은 class 의 「넘기는 값」·「함수가 잠근다」 단언 **초록** · `OpeningCollectionWiringTest` 11/11 · architecture 전건 실패 0 |
+| 호출 자리(`CollectionWiring`)가 **자기 sleeper 를 명시** | `CollectionWiringTest` 1/23(상수 풀 형태·전수) | 같은 class 의 거동 단언 셋 **초록** — 그 호출은 배선을 통하지 않는다 |
 | pacer 가 다음 하한을 기다리기 **전** 시각에서 센다 | `KonepsCallPacerTest` 1/8 | `KonepsCallGateTest` 3/3 · 같은 class 의 나머지 7 — 늦음이 **한 번뿐**인 판에서만 갈린다 |
 | 청중 장애를 빈 목록으로 접기 | `NotificationAudienceFailureTest` 2/2 | — |
 | 청중 실패에서 다시 던지기 | `InboxRecordingNotificationsTest` 2/9 | `CollectNoticesUseCaseTest` 17/17 |
@@ -123,7 +127,7 @@ container·여정은 PR CI 가 정본이고 명령이 같다. Gradle 은 전부 
 
 | 겹친 경로 | 내 변경 / main 변경 | 병합 결과 |
 | --- | --- | --- |
-| `config/quality/gate-tests.properties` | +8 / +8 −2(전부 주석) | 등재 **520 = 내 것 ∪ main**(누락 0 · 초과 0 · 중복 0). main 이 지운 등재는 **없다**(집합 차 빈 것으로 확인) |
+| `config/quality/gate-tests.properties` | +8 / +8 −2(전부 주석) | 등재 **530 = main 522 + 레인 8**, 즉 내 것 ∪ main(누락 0 · 초과 0 · 중복 0). main 이 지운 등재는 **없다**(집합 차 빈 것으로 확인) |
 | `adapters/…/evaluation/EvaluationAdapterDependencyTest.kt` | +13 / +105 | `git diff <원천>..HEAD` 가 **내 13 줄만** 낸다(삭제 0) — main 의 105 줄이 그대로 남았고 내 줄이 그 위에 얹혔다 |
 
 그 Kotlin 파일은 **전문을 읽었다**. main 이 더한 것은 `NoticeWatchSubjectPort` 축의 **필드 참조

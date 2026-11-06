@@ -1,8 +1,8 @@
 # M9/ops-code rollback
 
 착수 base `df4976cc` · **복원 원천 `97ed49c4`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
-앞서 `3ad4f3f6` 도 병합했고 그것은 이 SHA 의 조상이다) · **실측 HEAD `908b197a`**(마지막 산출물
-커밋 = 판정 SHA = 둘째 병합 커밋).
+앞서 `3ad4f3f6` 도 병합했고 그것은 이 SHA 의 조상이다) · **실측 HEAD `3ad0d342`**(마지막 산출물
+커밋 = 판정 SHA).
 
 **원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **두 번** 병합했으므로(`3ad4f3f6` → `97ed49c4`)
 공유 파일(§2)에는 다른 slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니라 마지막으로
@@ -47,7 +47,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 역적용하는 경로는 쓰지 않았다(병합 커밋의 해소 줄이 `--no-merges` 목록 밖이라 끝까지 완료되지
 않는다 — 그 실패가 2026-10-09 에 실측됐다).
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `908b197a` 체크아웃
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `3ad0d342` 체크아웃
 
 | 단계 | 실측 |
 | --- | --- |
@@ -95,6 +95,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 | `NotificationAudienceFailureTest` | **0** |
 | `NotificationAudienceMarkerTest` | **0** |
 | `audienceUnavailableLine` | **0** |
+| `TRANSPORT_FACTORY_DEFAULT` | **0** |
 | `EvaluationCommitInboxProductionTest` | **0** |
 
 표지를 고를 때 `NEW_CANDIDATE`·`NotificationInboxRecord`·`notification_inbox` 는 쓸 수 없다 —
@@ -130,7 +131,7 @@ test 클래스의 등재 한 줄도 그렇다.
 | 끄는 것 | 어떻게 |
 | --- | --- |
 | OPS-09 상태 축 | 전송 정책의 `statusRules = emptyList()` — 모든 수신 응답이 봉투 해석으로 가고 앞 판의 거동으로 돌아간다. 표 등식 test 와 **출하 정책을 읽는 test** 가 붉어진다(끔이 조용하지 않다 — 403 행 하나만 지우는 변이로 실측했다) |
-| OPS-08 간격 | 전송 정책의 `minimumCallInterval = Duration.ZERO` — 기다림이 0 회가 된다. **그 값을 끄면 출하 값을 읽는 test 와 배선 벽시계 단언이 함께 붉어진다**(변이로 실측 — 표의 값·배선이 넘기는 값·기다림 함수 셋이 각각 잠겼다). 계수 기반 상한은 그대로 남는다 |
+| OPS-08 간격 | 전송 정책의 `minimumCallInterval = Duration.ZERO` — 기다림이 0 회가 된다. **그 값을 끄면 출하 값을 읽는 test 가 붉어진다**(변이로 실측). 잠긴 자리는 넷이고 각자 **다른 변이**가 붉힌다 — 표의 값 · 배선이 pacer 에 넘기는 값 · 기다림 함수 자신 · production 이 그 함수를 넘기는 두 고리(기본값·호출 자리 형태). 계수 기반 상한은 그대로 남는다 |
 | NOTI-01 생산자 | **조용히 끄는 자리가 없다.** 청중 빈을 빼면 평가 커밋 배선이 서지 않는다(기동 실패) — 끄려면 청중 어댑터를 빈 목록 구현으로 갈아 꽂는 것이고(기록 0 건, 평가·채널은 정상) 그때 실 DB test 의 두 단언이 붉어진다 |
 
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
@@ -138,8 +139,8 @@ test 클래스의 등재 한 줄도 그렇다.
 evidence 커밋은 실측 뒤에 오므로 유효성은 **되돌림 대상이 그 사이에 움직였는가**로 본다:
 
 ```
-git diff --name-only 908b197a..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 97ed49c4..908b197a \
+git diff --name-only 3ad0d342..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 97ed49c4..3ad0d342 \
       -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
@@ -152,10 +153,10 @@ git diff --name-only 908b197a..<판정 SHA> -- \
 영원히 참이 되지 못한다. 제외는 evidence 가 **되돌림 대상이 아니라는** 사실의 표기이고, 되돌림
 대상(산출물 38 경로)은 그대로 술어 안에 있다.
 
-**앞 라운드 실측을 옮기지 않았다.** 4차 제출의 원천은 `3ad4f3f6`·실측 HEAD 는 `e7912022` 였고,
-둘째 병합이 **원천과 공유 파일 집합을 둘 다 바꿨다**(공유 파일 넷 → 다섯). 이 절의 수는 **다시 잰**
-것이다 — 복원 경로는 41 로 같지만 그것은 우연이 아니라 병합이 내 경로를 늘리지 않았기 때문이고,
-그 사실도 `commands.md` §4a 의 겹침 계수가 든다.
+**앞 라운드 실측을 옮기지 않았다.** 5차 제출의 실측 HEAD 는 `908b197a`(둘째 병합 커밋)였고 이
+라운드가 그 뒤에 test 하나를 더했다. 원천과 공유 파일 집합은 그대로이고 복원 경로도 41 이다 — 새
+커밋이 **이미 복원 목록에 있던** test 파일만 만졌기 때문이다. 그래도 수는 **다시 잰** 것이다
+(목록이 같다는 것도 측정이어야 한다).
 
 ## 하네스 레인 변경
 
