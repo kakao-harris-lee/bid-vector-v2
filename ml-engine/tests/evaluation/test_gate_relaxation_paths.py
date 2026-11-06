@@ -18,7 +18,7 @@ import copy
 import dataclasses
 import hashlib
 import importlib
-from pathlib import Path
+from pathlib import Path, PosixPath
 from types import SimpleNamespace
 from typing import Final
 
@@ -584,3 +584,179 @@ def test_mutating_the_callers_object_after_verification_does_not_reach_the_gate(
 
     assert caller_object.paired_t_threshold == 0.1
     assert checked.paired_t_threshold == 2.58
+
+
+# ── ⑩ 승인 판정이 **호출자 객체가 통제할 수 없는 자리**에서 나온다 (v r5 H-5) ──
+# ⑨ 는 게이트가 쓰는 객체를 로더 출력으로 바꿨다. 그런데 **어느 파일에서 재구성하는가**와
+# **무엇과 비교하는가**가 여전히 호출자 객체에서 왔고, 재검증이 그 셋을 **거동**으로 소비했다:
+#   N1 `source.digest` 를 거짓 `__eq__`/`__ne__` 를 가진 `str` 하위 클래스로 — 파이썬이 반사
+#      연산을 먼저 부르므로 승인 축·바이트 축 비교를 둘 다 이긴다. `source.path` 는 완화 파일.
+#   N2 `source.path` 를 `PosixPath` 하위 클래스로 — `read_text` 가 완화 텍스트를 돌려주는데
+#      그 텍스트의 `encode` 는 **승인 바이트**를 돌려준다(지문은 승인본, 값은 완화본).
+#   N6 `source` 를 **읽을 때마다 다른 값**을 주는 property 로(첫 읽기 승인·이후 완화).
+#      모든 칸이 **정확 타입**이라 「타입 정확성」만으로는 닫히지 않는다.
+# 처방은 안전 성질을 **호출자 객체에서 떼는 것**이다 — 재구성한 정책 **자신**의 `version` 과
+# `digest`(로더가 만든 진짜 `str`)로 승인을 한 번 더 묻는다.
+
+
+class _AlwaysEqual(str):
+    """비교를 **항상 같다**로 만드는 `str` 하위 클래스 — 반사 연산이 우선이라 왼쪽이 진짜
+    `str` 이어도 이 클래스의 `__eq__`/`__ne__` 가 이긴다."""
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
+
+
+class _LyingText(str):
+    """`encode` 가 **다른 바이트**를 돌려주는 `str` 하위 클래스."""
+
+    def __init__(self, _value: str) -> None:
+        self._encoded = b""
+
+    def with_encoded(self, encoded: bytes) -> _LyingText:
+        self._encoded = encoded
+        return self
+
+    def encode(self, *args: object, **kwargs: object) -> bytes:  # type: ignore[override]
+        return self._encoded
+
+
+class _LyingPath(PosixPath):
+    """`read_text` 가 **거짓말하는 텍스트**를 돌려주는 경로 하위 클래스."""
+
+    _text: _LyingText
+
+    def with_text(self, text: _LyingText) -> _LyingPath:
+        self._text = text
+        return self
+
+    def read_text(self, *args: object, **kwargs: object) -> str:  # type: ignore[override]
+        return self._text
+
+
+def _relaxed_file(directory: Path) -> Path:
+    text = _SHIPPED_POLICY.read_text(encoding="utf-8").replace(
+        "paired_t_threshold: 2.58", "paired_t_threshold: 0.1"
+    )
+    path = directory / "relaxed.yaml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+_RELAXED_THRESHOLD: Final[float] = 0.1
+
+
+def _with_source(policy: EvaluationPolicy, source: PolicySource) -> EvaluationPolicy:
+    """`source` 를 바꾸고 임계도 **완화 파일과 같게** 맞춘다.
+
+    값을 맞추는 것이 공격의 일부다: 그래야 값 축(`policy_checksum` 등식)이 재구성 대상
+    파일과 **일치해** 통과한다. 맞추지 않으면 값 축이 먼저 거부해, 이 test 들이 재려는
+    축(어느 파일에서 재구성하는가)에 닿지 못한다."""
+    forged = copy.copy(policy)
+    object.__setattr__(forged, "source", source)
+    object.__setattr__(forged, "paired_t_threshold", _RELAXED_THRESHOLD)
+    return forged
+
+
+def test_a_digest_that_always_compares_equal_cannot_pick_the_rebuild_file(
+    tmp_path: Path,
+) -> None:
+    """N1 — 주장 지문이 **모든 비교를 이기므로** 승인 축·바이트 축이 둘 다 통과한다. 그러면
+    재구성 대상 파일을 호출자가 고른 것이 된다. 승인을 **재구성 객체 자신**에게 물어야
+    닫힌다(그 비교의 양쪽이 로더가 만든 진짜 `str` 이다)."""
+    approved = _shipped_policy()
+    forged = _with_source(
+        approved,
+        PolicySource(
+            path=_relaxed_file(tmp_path),
+            digest=_AlwaysEqual(approved.source.digest),
+        ),
+    )
+    # 전제 — 그 지문은 무엇과 비교해도 같다고 답하고(승인·바이트 축), 값은 완화 파일과
+    # **같다**(값 축). 즉 세 축이 전부 통과하는 입력이다.
+    assert forged.source.digest == "아무 값"
+    rebuilt_from = load_evaluation_policy(Path(str(forged.source.path)))
+    assert isinstance(rebuilt_from, EvaluationPolicy), rebuilt_from
+    assert policy_checksum(rebuilt_from) == policy_checksum(forged)
+
+    checked = verify_policy_source(forged)
+    assert isinstance(checked, PolicySourceMismatch), checked
+
+
+def test_a_path_whose_text_lies_about_its_bytes_cannot_pick_the_rebuild_file(
+    tmp_path: Path,
+) -> None:
+    """N2 — 경로 하위 클래스가 **완화 텍스트**를 돌려주면서 그 텍스트의 `encode` 로 **승인
+    지문**을 만든다. 뿌리 로더는 「파싱한 그 텍스트」에서 지문을 내므로 파일 교체 창은 없지만,
+    **그 텍스트가 거짓말하면** 지문과 값이 갈린다."""
+    approved = _shipped_policy()
+    relaxed = _relaxed_file(tmp_path)
+    lying = _LyingPath(relaxed).with_text(
+        _LyingText(relaxed.read_text(encoding="utf-8")).with_encoded(
+            _SHIPPED_POLICY.read_text(encoding="utf-8").encode("utf-8")
+        )
+    )
+    forged = _with_source(
+        approved, PolicySource(path=lying, digest=approved.source.digest)
+    )
+
+    checked = verify_policy_source(forged)
+    assert isinstance(checked, PolicySourceMismatch), checked
+
+
+def test_a_source_that_changes_between_reads_cannot_pick_the_rebuild_file(
+    tmp_path: Path,
+) -> None:
+    """N6 — `source` 를 읽을 때마다 다른 값을 준다(첫 읽기 승인 출처·이후 완화 파일). 모든
+    칸이 **정확 타입**이라 타입 단언으로는 닫히지 않는다 — 안전 성질이 호출자 객체에 걸려
+    있는 것이 문제이기 때문이다."""
+    approved = _shipped_policy()
+    relaxed_policy = load_evaluation_policy(_relaxed_file(tmp_path))
+    assert isinstance(relaxed_policy, EvaluationPolicy), relaxed_policy
+    assert type(relaxed_policy.source.path) is PosixPath
+    assert type(relaxed_policy.source.digest) is str
+
+    reads: list[int] = []
+
+    class _Shifty(EvaluationPolicy):
+        @property
+        def source(self) -> PolicySource:
+            reads.append(1)
+            return approved.source if len(reads) == 1 else relaxed_policy.source
+
+    forged = copy.copy(approved)
+    object.__setattr__(forged, "paired_t_threshold", _RELAXED_THRESHOLD)
+    forged.__dict__.pop("source", None)
+    object.__setattr__(forged, "__class__", _Shifty)
+
+    checked = verify_policy_source(forged)
+    assert isinstance(checked, PolicySourceMismatch), checked
+
+
+def test_an_approved_copy_at_another_path_still_passes(tmp_path: Path) -> None:
+    """**음성 대조** — 막는 것은 「미승인 내용」이지 「사본」이 아니다. 무편집 사본은 경로가
+    달라도 통과하고, 돌려주는 객체는 그 사본에서 재구성된다."""
+    copied = tmp_path / "elsewhere.yaml"
+    copied.write_text(_SHIPPED_POLICY.read_text(encoding="utf-8"), encoding="utf-8")
+    loaded = load_evaluation_policy(copied)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+
+    checked = verify_policy_source(loaded)
+    assert isinstance(checked, EvaluationPolicy), checked
+    assert checked.paired_t_threshold == 2.58
+
+
+def test_the_rebuild_reads_through_exact_stdlib_types(tmp_path: Path) -> None:
+    """재구성의 **입력**이 정확 타입으로 정규화된다 — 경로 하위 클래스의 메서드가 읽기에
+    끼어들 자리가 없다. `str()` 과 `Path()` 가 각각 정확 타입을 낸다는 것도 함께 잰다."""
+    relaxed = _relaxed_file(tmp_path)
+    lying = _LyingPath(relaxed).with_text(_LyingText("x").with_encoded(b"x"))
+
+    assert type(str(lying)) is str
+    assert type(Path(str(lying))) is PosixPath
+    assert Path(str(lying)) == relaxed

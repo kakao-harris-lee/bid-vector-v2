@@ -78,20 +78,28 @@ class PolicySourceMismatch:
 def verify_policy_source(
     policy: EvaluationPolicy,
 ) -> EvaluationPolicy | PolicySourceMismatch:
-    """축 셋을 보고, 통과하면 **로더가 승인 파일에서 다시 만든 정책**을 돌려준다.
+    """**로더가 승인 파일에서 다시 만든 정책**을 돌려준다 — 그 재구성 객체 자신이 승인
+    산출물일 때만.
 
     부르는 자리는 그 **반환값**을 게이트에 넘겨야 한다 — 받은 객체를 다시 넘기면 직렬화와
     거동을 갈라 놓은 위조가 게이트에 닿는다(v r4 H-4).
 
-    축 셋의 역할 분담과 「왜 받은 객체를 그대로 돌려주지 않는가」는 **모듈 docstring** 에
-    있다(이 함수가 그 설계의 전부라 사유를 한 자리에만 둔다).
+    안전 성질은 **마지막 검사 하나**가 진다: 돌려주는 객체의 `version`·`digest` 가 승인
+    등록부에 있다. 그 비교의 양쪽은 로더가 만든 값이라 호출자가 손댈 자리가 없다. 앞의 세
+    축(승인 주장·파일 바이트·값)은 **진단**으로 남는다 — 어느 축이 어긋났는지 문면으로
+    가른다.
+
+    역할 분담과 각 축이 없을 때 열리는 것은 **모듈 docstring** 에 있다.
     """
     approval = policy_approval(version=policy.version, digest=policy.source.digest)
     if approval is not None:
         return PolicySourceMismatch(
             f"승인된 정책 산출물이 아니다({approval.reason.value}): {approval.detail}"
         )
-    reloaded = load_evaluation_policy(policy.source.path)
+    # 재구성의 **입력**을 정확 타입으로 정규화한다(v r5 H-5): 경로 하위 클래스의
+    # `read_text` 가 읽기에 끼어들 수 있었다(N2 — 완화 텍스트를 주면서 그 텍스트의 `encode`
+    # 로 승인 지문을 만든다). `str()` 과 `Path()` 가 각각 정확 타입을 낸다(실측, test 있음).
+    reloaded = load_evaluation_policy(Path(str(policy.source.path)))
     if isinstance(reloaded, PolicyRejected):
         return PolicySourceMismatch(
             f"정책 파일을 다시 읽을 수 없다({reloaded.reason.value}): {reloaded.detail}"
@@ -104,6 +112,16 @@ def verify_policy_source(
     if policy_checksum(reloaded) != policy_checksum(policy):
         return PolicySourceMismatch(
             "정책 값이 그 파일의 값과 다르다 — 로더를 거치지 않고 비튼 객체다"
+        )
+    # **돌려주는 그것**에게 승인을 묻는다(v r5 H-5). 위 세 축은 비교의 한쪽이 호출자 객체라
+    # 거동으로 이길 수 있었다 — 거짓 `__eq__` 를 가진 `str` 하위 클래스(N1) · 읽을 때마다
+    # 달라지는 `source` property(N6). 이 비교는 **양쪽이 로더가 만든 진짜 `str`** 이고
+    # (`hexdigest()` 와 파싱 결과) 호출자가 손댈 자리가 없다. 축을 더하는 것이 아니라 같은
+    # 질문을 **통제 가능한 피연산자가 없는 자리**에서 한 번 더 묻는 것이다.
+    rebuilt = policy_approval(version=reloaded.version, digest=reloaded.source.digest)
+    if rebuilt is not None:
+        return PolicySourceMismatch(
+            f"재구성한 정책이 승인 산출물이 아니다({rebuilt.reason.value}): {rebuilt.detail}"
         )
     return reloaded
 
