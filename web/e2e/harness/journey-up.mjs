@@ -325,8 +325,9 @@ async function main() {
     `operator.credential.value=${OPERATOR_CREDENTIAL}`,
     'bidvector.evaluation.candidate-cap=1000',
     // M9/OPS-10 — 기본값이 **없는** 필수 키다(`ReleaseWiring` 은 조건 없는 조립이라 어느 모드로
-    // 뜨든 요구한다). 이 하네스가 출하 jar 를 세 번 띄우고 그 가운데 수집 러너가
-    // `collection_run` 행을 쓰므로(V27 트리거의 대상) 이 한 줄이 셋을 덮는다.
+    // 뜨든 요구한다). 이 블록을 지나는 기동 **전부**가 이 한 줄을 받는다 — 기동 수를 여기 적지
+    // 않는 이유는 여정이 늘 때마다 그 수가 틀려지기 때문이다(개찰 하네스 병합이 실제로 둘을
+    // 더했다). 그 가운데 수집·개찰 러너가 `collection_run` 행을 쓴다(V27 트리거의 대상).
     `bidvector.release.sha=${process.env.BIDVECTOR_RELEASE_SHA ?? 'journey-e2e-release'}`,
   ];
 
