@@ -1,6 +1,7 @@
 package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -203,44 +204,92 @@ class JarContentPolicyTest {
     }
 
     @Test
-    fun `면제 접두에 걸리는 중첩 jar 는 위반이 아니다 — Boot 가 넣는 자기 도구 jar`() {
+    fun `면제된 정확 이름은 위반이 아니다 — Boot 가 넣는 자기 도구 jar`() {
         // 축을 켜자마자 실측으로 나온 자리다: Boot 플러그인이 `spring-boot-jarmode-tools-<버전>.jar` 를
         // BOOT-INF/lib 에 넣는데 그 jar 는 모듈의 runtime classpath 에 없다.
         assertEquals(
             emptyList<String>(),
-            nestedArchiveViolations(
-                "app",
-                mapOf("app.jar" to listOf("spring-boot-jarmode-tools-4.1.1.jar")),
-                emptySet(),
-                listOf("spring-boot-jarmode-tools"),
-            ),
+            nestedArchiveViolations("app", mapOf("app.jar" to listOf(EXEMPT)), emptySet(), listOf(EXEMPT)),
         )
     }
 
     @Test
-    fun `면제는 접두라 버전이 올라도 같은 jar 를 면제한다`() {
-        assertEquals(
-            emptyList<String>(),
-            nestedArchiveViolations(
-                "app",
-                mapOf("app.jar" to listOf("spring-boot-jarmode-tools-9.9.9.jar")),
-                emptySet(),
-                listOf("spring-boot-jarmode-tools"),
-            ),
-        )
-    }
-
-    @Test
-    fun `면제 접두가 다른 jar 를 덮지 않는다`() {
+    fun `면제 이름을 사칭한 접두는 위반이다 — 접두 면제가 열어 두던 자리`() {
+        // 앞 판은 접두 비교였고 `…-evil.jar` 가 통과했다(verifier H-2 실측). 이름은 **막으려는 쪽이
+        // 정하는 값**이라 접두로는 닫히지 않는다.
         val violations =
             nestedArchiveViolations(
                 "app",
-                mapOf("app.jar" to listOf("sneak.jar", "spring-boot-jarmode-tools-4.1.1.jar")),
+                mapOf("app.jar" to listOf("spring-boot-jarmode-tools-evil.jar")),
                 emptySet(),
-                listOf("spring-boot-jarmode-tools"),
+                listOf(EXEMPT),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("evil"), "$violations")
+    }
+
+    @Test
+    fun `면제가 다른 이름을 덮지 않는다`() {
+        val violations =
+            nestedArchiveViolations(
+                "app",
+                mapOf("app.jar" to listOf("sneak.jar", EXEMPT)),
+                emptySet(),
+                listOf(EXEMPT),
             )
 
         assertEquals(1, violations.size, "$violations")
         assertTrue(violations.single().contains("sneak.jar"), "$violations")
+    }
+
+    @Test
+    fun `확장자를 가리지 않는다 — zip 과 대문자 JAR 도 같은 판정을 받는다`() {
+        // 로더는 `BOOT-INF/lib/` 접두만 보고 확장자를 보지 않는다. 앞 판 술어는 `.jar` 로 끝나는
+        // 엔트리만 세어 이 둘이 **위반도 면제도 아닌 미계수**였다(verifier H-2).
+        val violations =
+            nestedArchiveViolations(
+                "app",
+                mapOf("app.jar" to listOf("sneak.zip", "sneak2.JAR")),
+                emptySet(),
+                listOf(EXEMPT),
+            )
+
+        assertEquals(2, violations.size, "$violations")
+    }
+
+    @Test
+    fun `면제 이름의 버전이 카탈로그의 Spring Boot 버전과 같다 — 상향하면 이 단언이 붉는다`() {
+        // 정확 이름 면제의 대가는 Boot 상향 때 어긋나는 것이고, 그 어긋남을 **여기서** 보이게 한다.
+        // 정책만 고치고 카탈로그를 안 올리는(또는 그 반대의) 표류를 이 등식이 받는다.
+        val catalogVersion = springBootVersionInCatalog()
+        val exemptInPolicy = exemptNamesInPolicy()
+        assertTrue(exemptInPolicy.isNotEmpty(), "면제 목록이 비었다 — 비-공허 단언")
+
+        assertEquals(
+            listOf("spring-boot-jarmode-tools-$catalogVersion.jar"),
+            exemptInPolicy,
+            "카탈로그 spring-boot=$catalogVersion",
+        )
+    }
+
+    private companion object {
+        const val EXEMPT = "spring-boot-jarmode-tools-4.1.1.jar"
+
+        fun policyFile(): File = File(System.getProperty("bidvector.architecture.policy"))
+
+        fun exemptNamesInPolicy(): List<String> = readPolicy(policyFile()).requireList("jar.external-nested-jars")
+
+        /** 카탈로그는 TOML 이지만 이 한 값은 `spring-boot = "x.y.z"` 한 줄이라 그 줄만 읽는다. */
+        fun springBootVersionInCatalog(): String =
+            policyFile()
+                .parentFile
+                .parentFile
+                .parentFile
+                .resolve("gradle/libs.versions.toml")
+                .readLines()
+                .first { it.trimStart().startsWith("spring-boot ") }
+                .substringAfter('"')
+                .substringBefore('"')
     }
 }

@@ -114,14 +114,19 @@ internal fun archiveEmptinessFailure(
  * jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 **런타임에 실리는데도** 리포트가 심기 전과 같았다
  * (verifier M-1). 이 저장소가 막으려던 `jar { from("prebuilt") }` 의 bootJar 판이다.
  *
- * 왜 이름으로 견주나 — 중첩 jar 는 아카이브 안에서 다시 압축돼 있어 바이트 대조에 원본 파일이 필요하다.
- * 반면 **선언하지 않은 jar 는 runtime classpath 해석 결과에 아예 없다**: 이름만으로도 「누가 선언했는가」
- * 가 갈린다. 경로가 아니라 **파일 이름**으로 견주는 것은 `BOOT-INF/lib/` 밑이든 다른 자리든 같은 판정을
- * 받게 하기 위해서다(오늘 실측: app 의 중첩 jar 102 개가 전부 그 접두 밑이고 plain jar 는 0 개다).
+ * **모집단은 소비자와 같은 술어로 잡는다**(수정 라운드 3 — verifier H-2). Boot 로더는 디렉터리가 아닌
+ * 엔트리에 대해 `BOOT-INF/lib/` 접두만 보고 **확장자를 보지 않는다**(로더 바이트코드 판독). 앞 판은
+ * `.jar` 로 끝나는 엔트리만 세어 `.zip`·`.JAR` 로 넣은 중첩 아카이브가 **위반도 면제도 아닌 미계수**가
+ * 됐다. 확장자는 넣는 쪽이 정하는 값이고 접두는 로더가 정하는 값이다.
  *
- * 면제는 **접두 집합** 하나다([exemptPrefixes]) — Boot 플러그인이 넣는 자기 도구 jar 는 이 저장소의
+ * 왜 이름으로 견주나 — 중첩 아카이브는 다시 압축돼 있어 바이트 대조에 원본 파일이 필요하다. 반면
+ * **선언하지 않은 것은 runtime classpath 해석 결과에 아예 없다**: 이름만으로도 「누가 선언했는가」가
+ * 갈린다.
+ *
+ * 면제는 **정확 이름 집합** 하나다([exemptNames]) — Boot 플러그인이 넣는 자기 도구 jar 는 이 저장소의
  * 소스가 아니라 대조 집합이 없다(`jar.external-class-roots` 가 launcher 클래스를 면제하는 것과 같은
- * 사유). 이름에 버전이 붙어 정확 이름으로는 Boot 상향에 어긋나므로 접두로 견준다.
+ * 사유). 앞 판은 접두였고, 그 이름이 **막으려는 쪽이 정하는 값**이라 접두 뒤를 바꾼 사칭이 통과했다
+ * (실측). 정확 이름은 Boot 상향에 어긋나 붉는데, 그 붉음이 조용히 넓어지는 면제보다 낫다.
  *
  * **비-공허 단언은 두지 않는다** — 중첩 jar 0 은 열 모듈 가운데 아홉에서 **정상 상태**다(배포물이
  * `bootJar` 인 모듈이 하나뿐이다). 그래서 0 을 위반으로 만들면 아홉이 상시로 붉는다. 대신 리포트가
@@ -131,13 +136,13 @@ internal fun nestedArchiveViolations(
     module: String,
     nested: Map<String, List<String>>,
     runtimeJarNames: Set<String>,
-    exemptPrefixes: List<String> = emptyList(),
+    exemptNames: List<String> = emptyList(),
 ): List<String> =
     nested.entries
         .sortedBy { it.key }
         .flatMap { (archive, jars) ->
             jars
-                .filterNot { it in runtimeJarNames || exemptPrefixes.any(it::startsWith) }
+                .filterNot { it in runtimeJarNames || it in exemptNames }
                 .sorted()
                 .map { jar ->
                     "모듈 '$module' 의 아카이브 '$archive' 가 **선언되지 않은 중첩 jar** 를 품는다 — " +

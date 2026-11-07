@@ -139,7 +139,11 @@ abstract class JarContentGateTask : DefaultTask() {
         values: Map<String, String>,
         archiveFiles: List<File>,
     ): NestedJarVerdict {
-        val nested = archiveFiles.associate { it.name to nestedJarNames(it) }
+        // 키는 **아카이브 경로**다(리뷰 L-1) — 서로 다른 디렉터리의 Jar task 가 같은 `archiveFileName`
+        // 을 내면 이름 키에서 하나가 조용히 사라지고 계수도 그만큼 줄어든다. 판정 문면도 그 경로를
+        // 그대로 들어 어느 아카이브인지가 모호하지 않다.
+        val roots = values.requireList(NESTED_LIB_ROOTS)
+        val nested = archiveFiles.associate { it.path to nestedArchiveNames(it, roots) }
         val runtimeJarNames =
             runtimeClasspath.files
                 .filter { it.extension == "jar" }
@@ -166,14 +170,21 @@ abstract class JarContentGateTask : DefaultTask() {
         )
     }
 
-    /** 아카이브가 품는 중첩 jar 의 **파일 이름**. 경로는 보지 않는다 — 자리를 옮기는 것이 우회가 되지 않게. */
-    private fun nestedJarNames(archive: File): List<String> =
+    /**
+     * 아카이브가 품는 **중첩 아카이브의 파일 이름**. 모집단은 **로더와 같은 술어**다 — [roots] 접두 밑의
+     * 비-디렉터리 엔트리 전수이고 **확장자를 보지 않는다**(verifier H-2: `.zip`·`.JAR` 이 미계수였다).
+     */
+    private fun nestedArchiveNames(
+        archive: File,
+        roots: List<String>,
+    ): List<String> =
         JarFile(archive).use { jar ->
             jar
                 .entries()
                 .asSequence()
+                .filterNot { it.isDirectory }
                 .map { it.name }
-                .filter { it.endsWith(".jar") }
+                .filter { name -> roots.any(name::startsWith) }
                 .map { it.substringAfterLast('/') }
                 .toList()
         }
@@ -201,6 +212,7 @@ private class NestedJarVerdict(
 private const val CLASS_ROOTS = "jar.class-roots"
 private const val EXTERNAL_CLASS_ROOTS = "jar.external-class-roots"
 private const val EXTERNAL_NESTED_JARS = "jar.external-nested-jars"
+private const val NESTED_LIB_ROOTS = "jar.nested-lib-roots"
 
 /** jar 엔트리는 항상 `/` 구분자다 — 플랫폼 구분자로 만든 상대 경로를 그 표기에 맞춘다. */
 private fun File.invariantPath(): String = path.replace(File.separatorChar, '/')
