@@ -198,12 +198,13 @@ ML 앱 배선과 수집 연장은 사용자 결정으로 보류 상태이고, �
    이 capability 가 이미 적은 사실(「승격 여부를 판정할 수 있는 창이 아직 없다」)과 같은 방향이고, 통과를
    만들려면 **정책을 새 effective date 로 다시 승인**하거나 그 뒤의 창이 성숙해야 한다.
 6. **ML-08 서명은 코드 축이 없다**(위 D-5). 등재만이다.
-7. **effective date 값의 지위**(v M-2 · **사용자 확인 항목**): `2026-09-16` 은
+7. **effective date 값의 지위 — 승인됨**(v M-2 **종결**, 2026-11-06 사용자 승인): `2026-09-16` 은
    `reports/evidence/m5/5c2/policy-values.md` 머리말·change_history 의 **그 표 승인 날짜**(운영자 「둘 다
-   승인」, M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ④)에서 읽었다. 그 기록은 **정책 표의
-   승인**이고 **effective date 로서의 별도 승인은 아니다** — 구현자의 해석이다. 장부 두 곳에 그 사실을
-   그대로 적었다(cr M-4). 같은 `evaluation-v1` version 을 유지한 채 칸이 늘어 **같은 version 의 checksum 과
-   승격 거동이 바뀐다**(이전 `Passed` 창 → `Superseded`) — 승인 시 함께 확인할 자리다.
+   승인」, M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ④)에서 읽은 값이고, 거기까지는
+   **구현자의 해석**이었다 — 그 해석에 **2026-11-06 사용자 승인이 붙었다**(팀장 전달). 함께 확인된 거동:
+   같은 `evaluation-v1` version 을 유지한 채 칸이 늘어 **같은 version 의 checksum 과 승격 거동이
+   바뀐다**(이전 `Passed` 창 → `Superseded`). **값과 파일 지문은 바뀌지 않았다** — 이 승인은 문면만
+   바꾼다. 어떻게 정해졌는지의 기록은 장부에 **덮지 않고** 남아 있다(cr M-4).
 8. **정책 파일의 YAML 중복 키**(범위 밖 기존 부채, v 참고): `yaml.safe_load` 가 중복 키를 마지막 값으로
    조용히 접는다 — 한 줄 추가로 `effective_date` 를 덮어쓸 수 있다. 값이 정책 checksum·report 에 들어가므로
    **산출물에는 드러난다**. 뿌리 처방(중복 감지 로더)은 네 로더 공통이라 이 slice 밖이다.
