@@ -60,13 +60,15 @@ BEGIN
     IF TG_OP = 'UPDATE'
         AND OLD.terminal_reason IS NOT NULL
         AND NEW.terminal_reason IS DISTINCT FROM OLD.terminal_reason THEN
-        RAISE EXCEPTION 'outbox 종단 사유는 한 번만 적는다: entry_id=%', NEW.entry_id;
+        RAISE EXCEPTION 'outbox 종단 사유는 한 번만 적는다: entry_id=%', NEW.entry_id
+            USING ERRCODE = 'P0001';
     END IF;
 
     IF NEW.state IN ('DELIVERED', 'FAILED', 'ISOLATED')
         AND NEW.terminal_reason IS NULL
         AND (TG_OP = 'INSERT' OR OLD.state NOT IN ('DELIVERED', 'FAILED', 'ISOLATED')) THEN
-        RAISE EXCEPTION 'outbox 종단 전이는 사유를 요구한다: entry_id=% state=%', NEW.entry_id, NEW.state;
+        RAISE EXCEPTION 'outbox 종단 전이는 사유를 요구한다: entry_id=% state=%', NEW.entry_id, NEW.state
+            USING ERRCODE = 'P0001';
     END IF;
 
     RETURN NEW;
