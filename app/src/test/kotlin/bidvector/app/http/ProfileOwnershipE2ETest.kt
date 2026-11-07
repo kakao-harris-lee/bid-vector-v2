@@ -22,6 +22,9 @@ import org.springframework.http.ResponseEntity
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "profile-ownership-e2e-release"
+
 /**
  * **두 계정의 소유 경계**(M7/7C④ 2b r2, v F2) — 출하 조립 · 실 DB · 실 세션으로 잰다.
  *
@@ -70,6 +73,9 @@ class ProfileOwnershipE2ETest {
                             "server.port" to "0",
                             "management.server.port" to "0",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,

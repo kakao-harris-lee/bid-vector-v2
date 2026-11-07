@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
 import bidvector.app.adminDataSource
@@ -41,6 +42,11 @@ import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값) — 속성과 저장소가 같은 값을 쓴다. */
+private const val TEST_RELEASE_LABEL = "evaluation-dry-run-e2e-release"
+
+private val TEST_RELEASE_ID = ReleaseIdentifier(TEST_RELEASE_LABEL)
+
 /**
  * acceptance ①~⑦(scope.md) — production 조립을 실제로 부팅해(`ProductionAssemblyAuthAuditTest`
  * 와 같은 기법) 평가 dry-run endpoint 를 E2E 로 잰다. 전략에 `maxActiveBids`를 설정하는 HTTP
@@ -78,6 +84,9 @@ class EvaluationDryRunE2ETest {
                             mapOf(
                                 "server.port" to "0",
                                 "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                                // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                                // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                                "bidvector.release.sha" to TEST_RELEASE_LABEL,
                                 "bidvector.persistence.username" to postgres.username,
                                 "bidvector.persistence.credential" to postgres.password,
                                 "operator.credential.value" to TEST_CREDENTIAL_VALUE,
@@ -197,7 +206,7 @@ class EvaluationDryRunE2ETest {
                 SourceEndpoint.NOTICE_LIST,
                 Instant.now(),
             )
-        val key = JdbcRawObservationStore(dataSource(), fieldContracts, "eval-e2e-test").append(observation)
+        val key = JdbcRawObservationStore(dataSource(), fieldContracts, TEST_RELEASE_ID).append(observation)
         val command =
             NoticeCollected(
                 id = id,
@@ -235,7 +244,7 @@ class EvaluationDryRunE2ETest {
                 SourceEndpoint.NOTICE_LIST,
                 Instant.now(),
             )
-        val key = JdbcRawObservationStore(dataSource(), fieldContracts, "eval-e2e-test-privacy").append(observation)
+        val key = JdbcRawObservationStore(dataSource(), fieldContracts, TEST_RELEASE_ID).append(observation)
         val agency = Agency(code = null, name = requireNotNull(AgencyName.of(agencyName)))
         val command =
             NoticeCollected(

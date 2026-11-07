@@ -197,6 +197,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("collection_run", "quota_exceeded", "integer", false, true),
             ColumnSpec("collection_run", "backoff_skipped", "integer", false, true),
             ColumnSpec("collection_run", "inserted_at", "timestamp with time zone", false, true),
+            // M9/ops-migrations(OPS-10, V27) — 이 회계 행을 만든 릴리스(outbox 와 같은 근거).
+            ColumnSpec("collection_run", "release_sha", "text", true),
         )
 
     // outbox·inbox(추가만, D-4C2-2). 어휘·필드는 V6__outbox_inbox.sql 그대로.
@@ -215,7 +217,13 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("outbox", "payload_type", "text", false),
             ColumnSpec("outbox", "payload", "text", false),
             ColumnSpec("outbox", "state", "text", false),
+            // M9/ops-migrations(OPS-05, V26) — 종단 사유. 비종단 행과 열 추가 전에 종단한 행은
+            // NULL 이다(지어낸 사유로 과거를 채우지 않는다) — NOT NULL 로 두지 못하는 근거.
+            ColumnSpec("outbox", "terminal_reason", "text", true),
             ColumnSpec("outbox", "inserted_at", "timestamp with time zone", false, true),
+            // M9/ops-migrations(OPS-10, V27) — 이 행을 등록한 릴리스. 열 추가 전 행은 NULL 이고
+            // 트리거가 **새** 행의 부재를 거부한다(NOT NULL 로 두지 못하는 근거).
+            ColumnSpec("outbox", "release_sha", "text", true),
         )
 
     private val inboxColumns =

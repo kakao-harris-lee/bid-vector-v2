@@ -1,6 +1,7 @@
 import bidvector.workflow.event.OutboxEntryId
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.event.OutboxTransition
 
 fun probe() {
-    OutboxTransition.ToDelivered(OutboxEntryId("e"))
+    OutboxTransition.ToDelivered(OutboxEntryId("e"), OutboxTerminalReason.DELIVERED)
 }

@@ -128,7 +128,7 @@ class ItemAtomicityTest : PersistenceTestSupport() {
                 finishedAt = Instant.parse("2026-09-07T00:01:00Z"),
             )
 
-        JdbcCollectionRunStore(dataSource()).record(accounting, meta)
+        JdbcCollectionRunStore(dataSource(), TEST_RELEASE).record(accounting, meta)
 
         val sql = "SELECT count(*) AS total, sum(dropped) AS dropped_sum FROM collection_run"
         dataSource().connection.use { connection ->

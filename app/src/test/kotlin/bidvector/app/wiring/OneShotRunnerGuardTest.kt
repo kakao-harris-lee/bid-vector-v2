@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.relay.NotificationRelayRunner
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -11,6 +12,9 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 /** relay 러너를 켜는 최소 설정 — 값 자체는 중요하지 않다(기동이 거부되지 않을 만큼만). */
 private val RELAY_ON =
@@ -47,6 +51,8 @@ class OneShotRunnerGuardTest {
         TestPropertyValues.of(*properties).applyTo(context)
         context.register(OneShotRunnerGuard::class.java, RelayWiring::class.java, EvaluationCommitWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         return try {
             context.refresh()
             null
@@ -91,6 +97,8 @@ class OneShotRunnerGuardTest {
         TestPropertyValues.of(*RELAY_ON).applyTo(context)
         context.register(OneShotRunnerGuard::class.java, RelayWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.registerBean(ApplicationRunner::class.java, Supplier { ApplicationRunner { } })
 
         val failure =
@@ -116,6 +124,8 @@ class OneShotRunnerGuardTest {
         TestPropertyValues.of(*RELAY_ON).applyTo(context)
         context.register(OneShotRunnerGuard::class.java, RelayWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.refresh()
 
         try {

@@ -401,6 +401,9 @@ jobs:
       BIDVECTOR_APP_MANAGEMENT_PORT: 18081
       BIDVECTOR_APP_JDBC_URL: jdbc:postgresql://postgres:5432/bidvector_ci
       BIDVECTOR_APP_CANDIDATE_CAP: 1000
+      # M9/OPS-10 — compose 의 app 서비스가 `BIDVECTOR_RELEASE_SHA` 로 받는 값(기본값 없음).
+      # 이 job 의 compose 는 `:local` 이미지를 쓰므로 이 값은 **행에 찍히는 식별자**로만 쓰인다.
+      BIDVECTOR_RELEASE_TAG: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v5
 
@@ -526,6 +529,7 @@ jobs:
             -e BIDVECTOR_PERSISTENCE_CREDENTIAL=refusal-smoke \
             -e OPERATOR_CREDENTIAL_VALUE=refusal-smoke-placeholder-not-an-operator-value \
             -e BIDVECTOR_EVALUATION_CANDIDATECAP=1 \
+            -e BIDVECTOR_RELEASE_SHA=refusal-smoke \
             -e SERVER_SERVLET_CONTEXTPARAMETERS_MANAGEMENT_ENDPOINT_HEALTH_GROUP_READINESS_SHOWDETAILS=always \
             bidvector/app:local 2>&1)" && rc=0 || rc=$?
           # r3(code-review r3 LOW-6) — 실패 분기에서 컨테이너 출력을 **버리지 않는다.** 이 step 이

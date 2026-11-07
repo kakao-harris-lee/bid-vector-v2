@@ -1,6 +1,7 @@
 package bidvector.adapters.event
 
 import bidvector.adapters.persistence.ConnectionSource
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.workflow.event.AggregateId
 import bidvector.workflow.event.AggregateVersion
 import bidvector.workflow.event.CausationId
@@ -33,6 +34,7 @@ import java.util.UUID
  */
 class JdbcOutboxPort(
     private val connections: ConnectionSource,
+    private val release: ReleaseIdentifier,
 ) : OutboxPort {
     override fun register(envelope: EventEnvelope<*>): OutboxEntryId {
         val entryId = OutboxEntryId(UUID.randomUUID().toString())
@@ -81,13 +83,12 @@ class JdbcOutboxPort(
         }
 
     override fun markDelivered(transition: OutboxTransition.ToDelivered) =
-        transitionState(transition.entryId, EventSql.MARK_DELIVERED)
+        transitionState(transition, EventSql.MARK_DELIVERED)
 
-    override fun markFailed(transition: OutboxTransition.ToFailed) =
-        transitionState(transition.entryId, EventSql.MARK_FAILED)
+    override fun markFailed(transition: OutboxTransition.ToFailed) = transitionState(transition, EventSql.MARK_FAILED)
 
     override fun markIsolated(transition: OutboxTransition.ToIsolated) =
-        transitionState(transition.entryId, EventSql.MARK_ISOLATED)
+        transitionState(transition, EventSql.MARK_ISOLATED)
 
     /**
      * **갱신 계수를 버리지 않는다**(D-6F10-2) — `WHERE state = 'CLAIMED'` 가 거부하면
@@ -102,12 +103,16 @@ class JdbcOutboxPort(
      * 받는다(발송은 한 번 있었고 상태는 모호하므로 `ISOLATED` 가 정직하다).
      */
     private fun transitionState(
-        entryId: OutboxEntryId,
+        transition: OutboxTransition.Terminal,
         sql: String,
     ) {
+        val entryId = transition.entryId
         connections.withConnection { connection ->
             connection.prepareStatement(sql).use { statement ->
-                statement.setString(1, entryId.value)
+                // 사유는 통로가 나른 값의 이름 그대로다 — 어댑터가 어휘를 짓지 않는다(SQL
+                // 리터럴 0, V26 CHECK 가 같은 집합을 저장 층에서 다시 선언한다).
+                statement.setString(1, transition.reason.name)
+                statement.setString(2, entryId.value)
                 val updated = statement.executeUpdate()
                 check(updated == 1) {
                     "outbox 전이가 행을 옮기지 못했다(영향 행 $updated) — entryId=${entryId.value}"
@@ -168,7 +173,10 @@ class JdbcOutboxPort(
         statement.setString(index++, ActorCodec.kindOf(envelope.actor))
         statement.setString(index++, ActorCodec.detailOf(envelope.actor))
         statement.setString(index++, OutboxPayloadCodec.payloadTypeOf(envelope.payload))
-        statement.setString(index, OutboxPayloadCodec.encode(envelope.payload))
+        statement.setString(index++, OutboxPayloadCodec.encode(envelope.payload))
+        // OPS-10 — 이 행을 등록한 릴리스. 봉투가 나르는 값이 아니라 **쓰는 프로세스**의
+        // 사실이라 어댑터가 싣는다(도메인 타입을 늘리지 않는다).
+        statement.setString(index, release.value)
     }
 }
 

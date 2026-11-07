@@ -2,6 +2,7 @@ package bidvector.adapters.relay
 
 import bidvector.adapters.event.outboxStateOf
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelayTarget
@@ -113,6 +114,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
                 target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
                 environment = RuntimeEnvironment.Production,
                 policy = relayNotificationPolicy(),
+                release = TEST_RELEASE,
             )
 
         // 행 처분 도중의 예외는 집계와 함께 올라온다(PR #63 finding 4) — 자리지킴의 사유는

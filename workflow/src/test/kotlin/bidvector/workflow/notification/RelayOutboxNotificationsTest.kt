@@ -5,6 +5,7 @@ import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntryId
 import bidvector.workflow.event.OutboxPort
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.event.OutboxTransition
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -31,6 +32,7 @@ class RelayOutboxNotificationsTest {
         report.claimed shouldBe 1
         report.delivered shouldBe 1
         outbox.delivered shouldBe listOf(OutboxEntryId("e1"))
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.DELIVERED)
         outbox.failed.shouldBeEmpty()
         outbox.isolated.shouldBeEmpty()
         inbox.recorded.map { it.value } shouldBe listOf("key-e1")
@@ -48,6 +50,7 @@ class RelayOutboxNotificationsTest {
         report.failed shouldBe 1
         report.delivered shouldBe 0
         outbox.failed shouldBe listOf(OutboxEntryId("e2"))
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.DELIVERY_REJECTED)
         // 선기록이면 여기 키가 남아 다음 run 이 그 entry 를 「중복」으로 읽는다(발송은 없었는데).
         inbox.recorded.shouldBeEmpty()
     }
@@ -63,6 +66,7 @@ class RelayOutboxNotificationsTest {
         report.isolated shouldBe 1
         report.unknownPayload shouldBe 0
         outbox.isolated shouldBe listOf(OutboxEntryId("e3"))
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.DELIVERY_OUTCOME_UNKNOWN)
         inbox.recorded.shouldBeEmpty()
     }
 
@@ -82,6 +86,8 @@ class RelayOutboxNotificationsTest {
         report.skippedDuplicates shouldBe 1
         report.delivered shouldBe 0
         outbox.delivered shouldBe listOf(OutboxEntryId("e4"))
+        // 상태는 발송과 같고 사유가 다르다 — DB 가 그 둘을 가른다(M9 OPS-05).
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.DUPLICATE_SKIPPED)
         sender.requests.shouldBeEmpty()
         inbox.recorded.shouldBeEmpty()
     }
@@ -104,6 +110,7 @@ class RelayOutboxNotificationsTest {
 
         report.failed shouldBe 1
         outbox.failed shouldBe listOf(OutboxEntryId("e5"))
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.DELIVERY_SUPPRESSED)
         sender.requests.shouldBeEmpty()
     }
 
@@ -123,6 +130,8 @@ class RelayOutboxNotificationsTest {
         report.isolated shouldBe 1
         report.unknownPayload shouldBe 1
         outbox.isolated shouldBe listOf(OutboxEntryId("e6"))
+        // 모호(DELIVERY_OUTCOME_UNKNOWN)와 **다른 사유**다 — 상태는 같고 사실이 다르다.
+        outbox.terminalReasons.map { it.second } shouldBe listOf(OutboxTerminalReason.UNKNOWN_PAYLOAD)
         sender.requests.shouldBeEmpty()
     }
 
@@ -146,6 +155,11 @@ class RelayOutboxNotificationsTest {
         report.delivered shouldBe 1
         outbox.isolated shouldBe listOf(OutboxEntryId("orphan"))
         outbox.delivered shouldBe listOf(OutboxEntryId("fresh"))
+        outbox.terminalReasons shouldBe
+            listOf(
+                OutboxEntryId("orphan") to OutboxTerminalReason.ORPHANED_CLAIM,
+                OutboxEntryId("fresh") to OutboxTerminalReason.DELIVERED,
+            )
     }
 
     @Test

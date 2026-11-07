@@ -196,14 +196,19 @@ export** 한다:
 set -eu
 # 자격이 **아닌** 두 값도 환경에서 읽는다 — `set -u` 아래에서 없는 변수를 참조하면 래퍼가 그
 # 줄에서 죽고 cron 로그에는 `unbound variable` 만 남는다(cr low).
-. /etc/bidvector/retention.env   # BIDVECTOR_JDBC_URL · BIDVECTOR_DB_OWNER (자격 값이 아니다)
+. /etc/bidvector/retention.env   # BIDVECTOR_JDBC_URL · BIDVECTOR_DB_OWNER · BIDVECTOR_RELEASE_SHA (자격 값이 아니다)
 BIDVECTOR_PERSISTENCE_CREDENTIAL="$(cat /etc/bidvector/owner.credential)"   # 0400, 운영자 소유
 export BIDVECTOR_PERSISTENCE_CREDENTIAL
 SPRING_MAIN_WEB_APPLICATION_TYPE=none exec java -jar /opt/bidvector/app.jar \
   --bidvector.retention.mode=once \
   --bidvector.persistence.jdbc-url="$BIDVECTOR_JDBC_URL" \
-  --bidvector.persistence.username="$BIDVECTOR_DB_OWNER"
+  --bidvector.persistence.username="$BIDVECTOR_DB_OWNER" \
+  --bidvector.release.sha="$BIDVECTOR_RELEASE_SHA"
 ```
+
+`bidvector.release.sha` 는 **기본값이 없다**(M9/OPS-10) — 주지 않으면 래퍼가 바인딩 실패로 죽고
+cron 로그에만 남아 **파기·마스킹이 조용히 멈춘다**. 그래서 `retention.env` 에 배포 SHA 를 함께
+둔다(자격 값이 아니라 식별자다 — 운영 compose 의 `BIDVECTOR_RELEASE_TAG` 와 같은 값을 쓴다).
 
 접속 사용자는 **표 소유자**여야 한다 — 파기는 런타임 풀을 지나지 않는다(A-1).
 

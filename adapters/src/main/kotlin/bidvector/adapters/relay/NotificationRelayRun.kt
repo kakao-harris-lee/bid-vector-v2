@@ -4,6 +4,7 @@ import bidvector.adapters.event.ConsumerTransactions
 import bidvector.adapters.event.JdbcInboxPort
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.event.PostgresAdvisoryLockLease
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.notification.DispatchNotification
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
@@ -37,12 +38,13 @@ class NotificationRelayRun(
     target: RelayTarget,
     environment: RuntimeEnvironment,
     policy: NotificationDeliveryPolicyData,
+    release: ReleaseIdentifier,
 ) {
     private val boundary = TransactionBoundary(dataSource)
 
     private val relay =
         RelayOutboxNotifications(
-            outbox = JdbcOutboxPort(boundary),
+            outbox = JdbcOutboxPort(boundary, release),
             inbox = JdbcInboxPort(boundary),
             dispatcher =
                 DispatchNotification(

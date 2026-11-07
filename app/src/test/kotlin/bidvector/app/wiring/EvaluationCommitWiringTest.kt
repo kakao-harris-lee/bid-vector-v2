@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.evaluation.EvaluationCommitRun
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.evaluation.EvaluationCommitRunner
 import bidvector.app.http.SequentialCorrelationIdFactory
 import bidvector.app.http.TestStrategyRepository
@@ -38,6 +39,9 @@ import java.time.LocalDate
 import java.util.function.Supplier
 import javax.sql.DataSource
 
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
+
 private val COMMIT_NOW: Instant = Instant.parse("2026-10-06T00:00:00Z")
 
 /**
@@ -62,6 +66,8 @@ class EvaluationCommitWiringTest {
         TestPropertyValues.of(*properties).applyTo(context)
         context.register(EvaluationCommitWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.registerBean(StrategyRepository::class.java, Supplier { strategyRepository })
         context.registerBean(CandidateSourcePort::class.java, Supplier { CandidateSourcePort { emptyList() } })
         context.registerBean(

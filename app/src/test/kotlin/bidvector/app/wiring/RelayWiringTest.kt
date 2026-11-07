@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.relay.NotificationRelayRunner
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -13,6 +14,9 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 /** 기동 거부 판정 함수의 파일 facade — 배선이 이것을 참조하지 않으면 함수를 지나지 않는다. */
 private const val BOOT_DECISION_FACADE = "bidvector.app.relay.RelayBootDecisionKt"
@@ -43,6 +47,8 @@ class RelayWiringTest {
         TestPropertyValues.of(*properties).applyTo(context)
         context.register(RelayWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         val failure =
             try {
                 context.refresh()

@@ -709,6 +709,30 @@ M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`Outb
 판정은 이 절이 아니라 `capability-map.md` §10의 그 행이 소유한다 — 이 절의 편집은 어휘·
 전이표에 한정된다.
 
+##### 2.2.5-b 실행 행의 릴리스 식별자 (M9/ops-migrations, OPS-10)
+
+> `collection_run.release_sha` · `outbox.release_sha` — **열 추가 전 행은 NULL**(모름)이고, 새 행은
+> 트리거가 요구한다. **지우는 것만 막는다**: 값 → 다른 값 갱신은 허용이다(canonical 행을 새 릴리스가
+> 다시 쓰는 축이 그 형태이고, 이 두 표는 애초에 INSERT 전용이라 그 창이 쓰이지 않는다).
+> 나머지 canonical 표는 칸을 두지 않고 `observation_key` 조인으로 답한다 — 그 조인이 주는 것은
+> 「그 **원문을 수집한** 릴리스」이고 **승격 러너가 쓰는 행에는 「쓴 릴리스」가 아니다**
+> (`capability-map.md` OPS-10 · `OPEN-M9-PROMOTED-ROW-RELEASE`).
+
+##### 2.2.5-a 종단 사유 — `OutboxTerminalReason` (M9/ops-migrations, OPS-05)
+
+상태 셋은 **왜**를 답하지 못했다 — 「전달 결과 모호」와 「payload 타입을 몰라 시도조차 못 함」이
+둘 다 `Isolated` 이고, 그 차이는 relay run 보고의 계수에만 있어 run 이 끝나면 사라졌다(V6 가
+「어휘에 칸이 없어」 접어 둔 자리). 사유 일곱이 그 자리를 채운다 — 어휘는 새 처분이 아니라
+D-6F10-12 해석표가 **이미 가른 갈래**를 값으로 올린 것이다:
+
+> `OutboxTerminalReason = { DELIVERED, DUPLICATE_SKIPPED | DELIVERY_REJECTED,
+> DELIVERY_SUPPRESSED | DELIVERY_OUTCOME_UNKNOWN, UNKNOWN_PAYLOAD, ORPHANED_CLAIM }` —
+> 묶음 셋이 각각 `Delivered`·`Failed`·`Isolated` 로 사상되고 **사유가 상태를 정한다**
+> (종단 명령이 사유만 받는다 — 상태와 사유를 따로 받으면 어긋난 조합이 성립한다).
+> 저장 층은 그 사상을 `(state, terminal_reason)` CHECK 로 다시 선언한다(V26).
+> **기존 종단 행의 사유는 NULL** 이다 — 로그에만 갔으므로 되짚을 원천이 없고 지어내지
+> 않는다(sentinel 금지, §4.1). 새 종단 전이가 사유를 요구하는 것은 CHECK 가 아니라 트리거다.
+
 #### 2.2.6 전략 — 어휘 자리만 둔다 (운영자 결정 2026-09-06, M1/1E 착수, decision 31)
 
 legacy 에 「전략 편집」 상태 기계는 없다(`updated_at` 갱신뿐). 감시 run 5값·lineage stage 5값·
@@ -1200,7 +1224,7 @@ source)`) 한 축으로 충분하다 — `corpusScope`가 나눌 모집단이 �
 | --- | --- | --- | --- | --- | --- |
 | **DEC-03** 법정 하한 해석 | 기관 유형 → 모델 매핑이 versioned policy이고 시행일 표가 기준일로 풀린다 | **율**(수치) | 예(구간 경계·율) | 예 — 「하한 여유」 계열 | **덮인다** |
 | **DEC-04** 하한 미달 빈도 | 결과가 `(…, 정책 version)` 묶음 | **빈도**(수치) | 예(최소 표본 수·밴드) | 예 — 「하한 여유」 | **덮인다** |
-| **DEC-08** 기초금액 provenance 분류 | 분류에 쓴 정책 version이 결과와 함께 저장 | **라벨**(수치 아님) | 예(허용 오차 다섯) | **아니다** | **기준절로만 덮인다** |
+| **DEC-08** 기초금액 provenance 분류 | 분류에 쓴 정책 version이 결과와 함께 저장 — **저장 자리 미정**(M9/ops-migrations 계약 갱신 2026-11-06: 분류가 출하에서 0 회 도는 축이라 표를 먼저 들이지 않는다. `OPEN-ML-ANALYSIS-WIRING` 이 받는다 — `capability-map.md` DEC-08 행이 근거) | **라벨**(수치 아님) | 예(허용 오차 다섯) | **아니다** | **기준절로만 덮인다** |
 | **SET-06** 정산 성숙도 | 시간축 값에 적용된 정책 version이 함께 남음 | **성숙도 비율**(수치) | 예(embargo 임계) | 예 — 「성숙도」 | **덮인다** |
 | **ML-07** 모델 승격 게이트 | 게이트 리포트가 자신이 쓴 정책 version을 싣는다 | **게이트 판정** | 예(MDE·임계) | 예 — 「ML 추론」 | **덮인다** |
 | **QUAL-03** 면허 그룹 AND/OR 판정 | **「결정 무관(무조건)」 항목 둘**이 판정 결과에 policy version을 요구 | **자격 판정**(수치 아님) | **아니다** | **아니다** | **덮이지 않는다 — 반례** |
