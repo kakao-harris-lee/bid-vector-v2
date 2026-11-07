@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  notificationItemTestId,
+  type NotificationTestIdParts,
+} from '../../src/display/notificationDisplay';
+
+import {
   ABSENT,
   AMOUNT_CURRENCY_LABEL,
   assertOnlyAllowedOperations,
@@ -514,12 +519,22 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
-type InboxItem = {
-  readonly kind: string;
-  readonly noticeNumber: string;
-  readonly noticeRound: string;
-  readonly read: boolean;
-};
+/**
+ * 응답 항목을 **손 타입으로** 읽는다 — 이 test 는 wire probe 이고 그 독립성이 요점이다(생성
+ * 타입을 쓰면 「문서가 그렇다고 하니 그렇다」가 된다).
+ *
+ * 신원 칸들은 행 조회가 부르는 함수의 인자 타입(`NotificationTestIdParts`)에서 받는다 — 두 벌이
+ * 갈리지 않게 하려는 것이고, **생성 타입을 끌어오지 않으므로** 손 타입의 독립성은 그대로다.
+ *
+ * **이 칸들은 기록이고 래칫이 아니다**(cr M-1 — 앞 판 문면이 그 반대를 주장했다). TS 타입은
+ * 지워지고 `web/e2e/**` 는 `tsconfig` 의 `include`(`src`) 밖이라 타입 검사를 받지 않는다. 칸을
+ * 지워도 오류를 낼 층이 없고 `undefined` 가 들어가지도 않는다 — 행 조회가 부르는 함수는 **응답
+ * 객체에서 wire 칸 이름을 직접 읽는다**.
+ *
+ * **남는 위험은 다음 축이 파생값일 때다** — wire 에 같은 이름으로 없는 값이 id 에 들어가면 e2e 가
+ * 조용히 아무 행도 못 찾는다(H-1 재발). 그 자리는 `notificationItemTestId` 의 KDoc 이 든다.
+ */
+type InboxItem = NotificationTestIdParts & { readonly read: boolean };
 
 test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그대로 보인다', async ({ page }) => {
   const watched = watchRequests(page);
@@ -573,10 +588,11 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
 
   // **개수는 응답에서 온다** — 화면이 센 수가 아니라 서버가 보낸 항목 수와 같아야 한다.
   await expect(rows).toHaveCount(items.length);
+  // **testId 를 이 파일이 짓지 않는다**(v H-1). 화면과 **같은 함수**를 부른다 —
+  // `getByTestId(string)` 은 정확 일치라, 사본을 두면 화면이 축을 더하는 날 이 조회가 조용히
+  // 아무 행도 못 찾는다(이 slice 가 실제로 그렇게 만들었다).
   for (const item of mine) {
-    await expect(
-      page.getByTestId(`notification-${item.kind}-${item.noticeNumber}-${item.noticeRound}`),
-    ).toBeVisible();
+    await expect(page.getByTestId(notificationItemTestId(item))).toBeVisible();
   }
 
   /**

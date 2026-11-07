@@ -1,16 +1,19 @@
 package bidvector.workflow.bidding
 
+import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -57,9 +60,11 @@ class NotificationSweepTest {
         noticeRevision: Long? = null,
         noticeUpdatedAt: Instant? = null,
         notice: NoticeKey = this.notice,
+        bidKind: BidKind = BidKind.REAL,
     ) = NotificationSweepCase(
         account = mine,
         notice = notice,
+        bidKind = bidKind,
         state = state,
         deadlineAt = deadlineAt,
         documentDueAt = documentDueAt,
@@ -292,6 +297,42 @@ class NotificationSweepTest {
     fun `건의 공고 키는 정규형으로 알림 키가 된다`() {
         val loose = NoticeKey("r00 sweep 1", NoticeRound.of("000"))
         loose.asNotificationNoticeId().number.value shouldBe "R00-SWEEP-1"
+    }
+
+    /**
+     * **훑기도 투찰 종류를 묶음 키에 싣는다**(M9/paper-bid · D-M9P-2). 앞 판은 질의가 서면 건을
+     * 거르고 있었고 이 축이 아예 없었다 — 거르기를 걷으면서 **같은 공고의 두 건이 다른 묶음**을
+     * 가리키는지를 여기서 잰다(같으면 저장 층에서 다시 덮어쓴다).
+     *
+     * 건 하나가 사실 **둘**을 낼 수 있으므로(시간 축 + 개정 축) 그 둘이 **같은 묶음**이라는 것도
+     * 함께 본다 — 축을 기록마다 따로 적으면 한 갈래에서만 빠뜨리는 꼴이 생긴다.
+     */
+    @Test
+    fun `훑기가 낸 기록의 묶음에 건의 투찰 종류가 든다`() {
+        val paper =
+            case(
+                deadlineAt = kst(2026, 11, 1, 10, 0),
+                openedAt = kst(2026, 10, 20, 0, 0),
+                noticeRevision = 2,
+                noticeUpdatedAt = kst(2026, 10, 22, 0, 0),
+                bidKind = BidKind.PAPER,
+            )
+        val real = paper.copy(bidKind = BidKind.REAL)
+
+        val paperRecords = sweepNotificationsFor(paper, now, policy)
+        val realRecords = sweepNotificationsFor(real, now, policy)
+        val paperGroups = paperRecords.map { it.group }
+        val realGroups = realRecords.map { it.group }
+
+        // 한 건이 사실 둘을 냈고 **둘 다 같은 묶음**이다.
+        paperRecords shouldHaveSize 2
+        paperGroups.distinct() shouldHaveSize 1
+        realGroups.distinct() shouldHaveSize 1
+        paperGroups.map { it.bidKind } shouldBe List(2) { NotificationBidKind.PAPER }
+        realGroups.map { it.bidKind } shouldBe List(2) { NotificationBidKind.REAL }
+        // 같은 공고·같은 사실인데 묶음이 갈린다 — 갈리는 것은 축 하나뿐이다.
+        paperRecords.map { it.fact } shouldBe realRecords.map { it.fact }
+        (paperGroups + realGroups).distinct() shouldHaveSize 2
     }
 
     // --- 훑기 한 번 -------------------------------------------------------------

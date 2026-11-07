@@ -400,9 +400,12 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         // 여기서 그 성질을 함께 쓴다(공고 행 없이도 알림 행이 선다).
         TableSeed("notification_inbox") { tag, at ->
             listOf(
+                // `bid_kind` 는 **기본값이 없다**(V25 가 backfill 뒤 떨어뜨린다) — 적지 않으면
+                // NOT NULL 로 거부된다. `NOTICE_REVISED` 는 건 축이라 `'REAL'` 이 짝 CHECK 를
+                // 지난다(`'NONE'` 은 그 종류에 금지다).
                 "INSERT INTO notification_inbox (account_id, kind, notice_number, notice_round, " +
-                    " occurred_at, created_at, updated_at) " +
-                    "SELECT id, 'NOTICE_REVISED', 'RET-$tag', '001', '$at', '$at', '$at' " +
+                    " bid_kind, occurred_at, created_at, updated_at) " +
+                    "SELECT id, 'NOTICE_REVISED', 'RET-$tag', '001', 'REAL', '$at', '$at', '$at' " +
                     "FROM account WHERE login_name = 'ret-$tag'",
             )
         },

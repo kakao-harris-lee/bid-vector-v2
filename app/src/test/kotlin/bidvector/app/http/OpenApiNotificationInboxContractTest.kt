@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationDetail
 import bidvector.workflow.notificationinbox.NotificationInboxLimits
 import bidvector.workflow.notificationinbox.NotificationKind
@@ -94,9 +95,13 @@ class OpenApiNotificationInboxContractTest {
     @Test
     fun `읽음 처리 요청·응답의 키 집합이 계약과 일치한다`() {
         spec.propertyKeys("MarkNotificationReadRequest") shouldBe
-            setOf("kind", "noticeNumber", "noticeRound")
+            setOf("kind", "noticeNumber", "noticeRound", "bidKind")
+        // **묶음 요청에도 투찰 종류가 있다**(M9/paper-bid) — 없으면 서면 묶음을 읽는 요청이
+        // 같은 공고의 실투찰 묶음까지 읽는다. 알림 종류 축만 빠진 모양이다.
         spec.propertyKeys("MarkNoticeNotificationsReadRequest") shouldBe
-            setOf("noticeNumber", "noticeRound")
+            setOf("noticeNumber", "noticeRound", "bidKind")
+        spec.requiredKeys("MarkNoticeNotificationsReadRequest") shouldBe
+            setOf("noticeNumber", "noticeRound", "bidKind")
         spec.propertyKeys("MarkNotificationReadResponse") shouldBe setOf("markedCount", "unreadCount")
     }
 
@@ -142,6 +147,20 @@ class OpenApiNotificationInboxContractTest {
     fun `detail 어휘가 Kotlin enum 전수와 같다`() {
         enumOf("NotificationItem", "detail") shouldContainExactlyInAnyOrder
             NotificationDetail.entries.map { it.name }
+    }
+
+    /**
+     * **투찰 종류 어휘가 세 자리에서 한 집합이다**(M9/paper-bid) — 항목과 요청 **둘** 모두.
+     * 한쪽만 늘리면 저장할 수 있는데 보낼 수 없는 값(또는 그 반대)이 생기고 둘 다 조용하다.
+     * DB CHECK 와의 등식은 어댑터 쪽 카탈로그 test 가 같은 축으로 잰다.
+     */
+    @Test
+    fun `투찰 종류 어휘가 Kotlin enum 전수와 같다 — 항목과 요청 둘 다`() {
+        val expected = NotificationBidKind.entries.map { it.name }
+
+        enumOf("NotificationItem", "bidKind") shouldContainExactlyInAnyOrder expected
+        enumOf("MarkNotificationReadRequest", "bidKind") shouldContainExactlyInAnyOrder expected
+        enumOf("MarkNoticeNotificationsReadRequest", "bidKind") shouldContainExactlyInAnyOrder expected
     }
 
     @Test
@@ -242,6 +261,7 @@ class OpenApiNotificationInboxContractTest {
                 "detail",
                 "noticeNumber",
                 "noticeRound",
+                "bidKind",
                 "occurredAt",
                 "read",
                 "readAt",

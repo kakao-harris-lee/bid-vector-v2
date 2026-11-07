@@ -156,9 +156,12 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "account_business_profile" to setOf("account_id"),
             "account_construction_capacity" to setOf("account_id", "license_name"),
             // M7/7C③ — **중복 억제 키가 PK 자체**다(파생 문자열 열을 두지 않는다, V23 주석 ①).
-            // 네 열 복합이라 「한 계정 · 한 공고 · 한 종류에 한 항목」이 표 층의 성질이고,
-            // 그래서 축5(PK 밖 UNIQUE)는 이 표 때문에 늘지 않는다. 시퀀스도 만들지 않는다.
-            "notification_inbox" to setOf("account_id", "kind", "notice_number", "notice_round"),
+            // **M9/paper-bid 가 다섯째 열을 더한다**(V25): 「한 계정 · 한 공고 · **한 투찰 종류** ·
+            // 한 알림 종류에 한 항목」이 표 층의 성질이다. 그 축이 없던 동안은 같은 공고의 서면
+            // 건과 실투찰 건이 한 항목을 덮어썼고, 그래서 원천 양쪽이 서면을 버렸다.
+            // 축5(PK 밖 UNIQUE)는 이 표 때문에 늘지 않는다. 시퀀스도 만들지 않는다.
+            "notification_inbox" to
+                setOf("account_id", "notice_number", "notice_round", "bid_kind", "kind"),
         )
 
     @Test

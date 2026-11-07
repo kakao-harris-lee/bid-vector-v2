@@ -25,7 +25,7 @@ class InMemoryNotificationInbox(
     override fun record(record: NotificationInboxRecord): NotificationInboxOutcome {
         if (failing) return NotificationInboxOutcome.Failed
         records += record
-        val key = record.account.value to NotificationItemKey(record.fact.kind, record.notice)
+        val key = record.account.value to NotificationItemKey(record.group, record.fact.kind)
         return if (seen.add(key)) NotificationInboxOutcome.Created else NotificationInboxOutcome.Updated
     }
 }
