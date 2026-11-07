@@ -175,6 +175,18 @@ def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
     seen.add(id(annotation))
     if isinstance(annotation, typing.TypeAliasType):
         return _flatten_with_guard(annotation.__value__, seen)
+    if isinstance(annotation, typing.TypeVar):
+        # v r7 M-1 — `def f[P: EvaluationPolicy](…) -> P` 는 `-> P` 가 `TypeVar` 로
+        # 해석된다. 잎으로 두면 `_is_policy_type` 이 거짓이라 그 입구가 모집단에서
+        # **조용히 빠진다**(두 인터프리터 모두 실측 GREEN). 경계(`__bound__`)와 제약
+        # (`__constraints__`)을 펴면 그 정책 타입이 잎으로 나온다. 구식
+        # `TypeVar("_P", bound=…)` 도 같은 가지로 닫힌다.
+        leaves: list[object] = []
+        if annotation.__bound__ is not None:
+            leaves.extend(_flatten_with_guard(annotation.__bound__, seen))
+        for constraint in annotation.__constraints__:
+            leaves.extend(_flatten_with_guard(constraint, seen))
+        return leaves or [annotation]
     args = typing.get_args(annotation)
     if not args:
         return [annotation]
@@ -214,6 +226,17 @@ import 하면(이 저장소는 전 모듈이 `from __future__ import annotations
 더해도 게이트가 초록이었다(cr 실측)."""
 
 
+def _resolution_localns(func: object) -> dict[str, object]:
+    """PEP 695 타입 파라미터를 이름으로 — 해석 namespace 로 넘길 몫.
+
+    **두 자리가 같은 namespace 를 써야 한다**(v r7 참고): 등식이 쓰는 `_resolved_hints` 와
+    사유를 재는 test 가 다른 namespace 로 부르면, 「PEP 695 제네릭이면서 stub 속성 부재」인
+    함수가 선언 목록에 들어오는 날 그 test 가 **다시 파이썬 버전에 따라 갈린다**(먼저 나는
+    예외가 `NameError` 냐 `AttributeError` 냐가 버전마다 다르다). 오늘 선언된 넷에는
+    해당하지 않지만, 한 줄로 그 자리를 없앤다."""
+    return {param.__name__: param for param in getattr(func, "__type_params__", ())}
+
+
 def _resolved_hints(func: object) -> dict[str, object] | None:
     """해석된 주석, 해석 불가면 `None`.
 
@@ -226,10 +249,10 @@ def _resolved_hints(func: object) -> dict[str, object] | None:
 
     `__type_params__` 를 `localns` 로 넘기면 **어느 파이썬에서도** 해석된다 — 등식에 남는
     실패는 환경과 무관한 것(생성 stub 의 모듈 속성 부재)뿐이다."""
-    type_params = getattr(func, "__type_params__", ())
-    localns = {param.__name__: param for param in type_params}
     try:
-        return typing.get_type_hints(func, localns=localns)  # type: ignore[arg-type]
+        return typing.get_type_hints(  # type: ignore[arg-type]
+            func, localns=_resolution_localns(func)
+        )
     except (NameError, TypeError, AttributeError):
         return None
 
@@ -334,7 +357,9 @@ def test_every_declared_resolution_failure_has_the_same_structural_cause() -> No
     for module_name, name in sorted(_UNRESOLVABLE_ANNOTATIONS):
         func = _resolve(module_name, name)
         try:
-            typing.get_type_hints(func)  # type: ignore[arg-type]
+            typing.get_type_hints(  # type: ignore[arg-type]
+                func, localns=_resolution_localns(func)
+            )
         except AttributeError:
             continue
         except Exception as exc:  # 사유 **종류**를 보고하려고 넓게 받는다
@@ -401,10 +426,11 @@ def test_policy_factories_split_into_file_entry_points_and_derivations() -> None
     **측정한 모양**에 대해 이 등식이 먼저 붉다: 모듈 수준 함수 · 클래스 멤버
     (`staticmethod`·`classmethod`) · 어느 모듈에 두든 · 반환 주석을 PEP 695 **별칭**으로
     가려도(해석이 풀고, 자기참조는 가드) · 인자를 **개명**해도 · 반환 타입을
-    `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다).
+    `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다) · **PEP 695 제네릭 반환**
+    (`def f[P: EvaluationPolicy](…) -> P`)이나 구식 `TypeVar(bound=…)` 반환으로 가려도
+    (경계·제약을 펴서 받는다 — v r7 M-1, 두 인터프리터에서 RED 실측).
 
-    **반례도 측정했다**(v r6 L-2): 구식 `TypeVar(bound=…)` 반환 + `# noqa: UP047` 은 이
-    등식을 지나간다(그 noqa 가 없으면 ruff UP047 이 먼저 붉다). 이 전수가 지는 것은
+    이 전수가 지는 것은
     **유입 층**이고 방어선이 아니다 — 그 잔여는 리뷰의 자리이고, 미승인 값이 판정에 닿는 것은
     `evaluation.policy_source` 의 재구성 승인 축이 막는다(파일 머리 참조)."""
     assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_ENTRY_EXCEPTIONS
