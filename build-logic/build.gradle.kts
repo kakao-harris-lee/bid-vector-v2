@@ -100,11 +100,15 @@ fun Test.declarePolicyInputs(repoRoot: File) {
     // `GateRegistrationCensusTest` 의 마지막 test 가 **등재 장부 전체**의 열 모양을 잰다(리뷰 LOW-7).
     inputs.file(repoRoot.resolve("config/quality/gate-tests.properties")).withPropertyName("gateTests")
 
+    // `JarContentPolicyTest` 가 중첩 jar 면제의 버전을 카탈로그와 견준다(verifier H-2 처방).
+    inputs.file(repoRoot.resolve("gradle/libs.versions.toml")).withPropertyName("versionCatalog")
+
     // `MigrationOrderTest` 의 뒤 둘이 실제 정책과 실제 디렉터리를 읽는다. 경로는 그 test 가
     // `bidvector.architecture.policy` 에서 유도하므로 system property 를 더 넘기지 않는다.
     val migrationPolicy = repoRoot.resolve("config/quality/migration-policy.properties")
     inputs.file(migrationPolicy).withPropertyName("migrationPolicy")
     val migrationValues = Properties().apply { migrationPolicy.reader(Charsets.UTF_8).use(::load) }
+
     // 키가 없으면 `null/null` 경로가 되어 **정책 오류가 모호한 `inputs.dir` 실패로** 나온다. 같은
     // 저장소의 `requireValue` 관례대로 읽는 자리에서 끊는다(리뷰 LOW-6).
     fun migrationValue(key: String): String =
