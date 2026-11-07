@@ -1,8 +1,12 @@
 # M9/adr07-pitest rollback
 
 착수 base **`df4976cc`** · **복원 원천 `56bd33ea`**(이 브랜치가 마지막으로 합친 main 의
-**고정 SHA** = 병합 커밋 `dccb87af` 의 둘째 부모) · **실측 HEAD `dccb87af`**(이 slice 의 마지막
+**고정 SHA** = 병합 커밋 `dccb87af` 의 둘째 부모) · **실측 HEAD `7f8761f2`**(이 slice 의 마지막
 산출물 커밋 = 현 판정 SHA).
+
+**문면 커밋이 복원 목록 안 파일을 건드려 다시 쟀다.** v r5 L-1 정정은 KDoc·test 이름뿐이지만 그
+둘이 `build-logic/**` 이라 §4 술어가 빈 출력이 아니게 됐다 — 종료 코드가 아니라 그 술어가 실측의
+유효 조건이므로 ①~③ 과 표지 계수를 `7f8761f2` 에서 다시 돌렸다(수는 같다).
 
 **원천은 이제 §1 블록이 파생한다** — 문면에 적은 SHA 가 한 병합 뒤처져 「남의 머지분을 되돌리는
 목록」을 만든 적이 있다(v r4 M-1). 아래 머리말·§2·§4 의 수는 **그 파생이 낸 값으로 실측한 기록**
@@ -76,7 +80,7 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `dccb87af`(넷째 병합 뒤)
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `7f8761f2`(문면 정정 뒤)
 
 | 단계 | 실측 |
 | --- | --- |
@@ -171,8 +175,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only dccb87af..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..dccb87af \
+git diff --name-only 7f8761f2..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 56bd33ea..7f8761f2 \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 
