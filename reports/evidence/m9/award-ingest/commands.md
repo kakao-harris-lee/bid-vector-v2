@@ -46,29 +46,23 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 
 ## rollback
 
-원천은 이 브랜치가 병합한 main 의 고정 SHA `3ad4f3f6` 이고, 라운드마다 목록을 다시 산출한다. 아래가
-현재 판이며 앞 판들(`df4976cc`·`79f3e5c4` 기준)은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
+원천은 이 브랜치가 병합한 main 의 **고정 SHA `56bd33ea`** 이고(움직이는 `origin/main` 이 아니다),
+라운드마다 목록을 다시 산출한다. 아래가 현재 판이며 앞 원천(`3ad4f3f6`·`97ed49c4`·`df4976cc`·
+`79f3e5c4`) 기준의 판들은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
 
-## 2026-11-06T01:5xZ — 임시 clone 에서 22 경로를 `3ad4f3f6` 으로 되돌림(①②③)
-- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`
+## 2026-11-07T13:3xZ — 임시 clone 에서 22 경로를 `56bd33ea` 로 되돌림(①②③, 마지막 재측정)
+- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=56bd33ea --staged --worktree --`
 - exit: 0
-- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로 — 수정 라운드 2 가 공유
-  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 56bd33ea -- <22 경로>` 0 줄 ·
-  **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의 내 test
-  클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
-  남의 표지 보존(gate-tests 항목이 main 과 같은 **515** · architecture-policy 항목이 main 과 같은 **752** · main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
-  되돌리지 않은 evidence 다섯 그대로
-
-## 2026-11-07T06:5xZ — 임시 clone 에서 22 경로를 `56bd33ea` 로 되돌림(①②③, 넷째 병합 뒤 재측정)
-- cmd: 앞 라운드와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=56bd33ea --staged --worktree --`)
-- exit: 0
-- 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
-  0 줄 · **evidence 를 뺀 전수 diff 빈 목록** · 내 표지 0(gate-tests 의 내 test 클래스 다섯 합 0 ·
-  incident runbook 의 `award-collection` 0 · capability map 의 `award-ingest` 0 · award 파일 전부 삭제) ·
-  남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
+- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로) · `git diff 56bd33ea -- <22 경로>`
+  **0 줄** · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의
+  내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
+  남의 표지 보존(gate-tests 항목이 main 과 같은 **515** · architecture-policy 항목이 main 과 같은 **752** ·
+  main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
+- 되돌린 트리에 남는 `Award` 토큰 하나는 **main 쪽**이다(`bidvector.workflow.result.AwardWinnerNamePort` —
+  base 에도 있다). 넓은 grep 이 잡은 것이라 확인해 적는다.
 
-## 2026-11-07T07:0xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-07T13:4xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -274,7 +268,7 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 
 ## 수정 라운드 4 (cr r4 H-1·M-1·M-2 · L 셋 · v r4 M-1·L-1·L-2)
 
-## 2026-11-06T08:3xZ — runbook §3.1 SELECT 를 **축어로** 돌린다(팀장 지시)
+## 2026-11-06T08:3xZ — runbook §3.1 SELECT 를 **축어로** 돌린다(팀장 지시 · 트리 `3b0951bf`)
 - cmd: 버릴 clone 의 probe test 가 `docs/runbook/m9-award-collection.md` 의 첫 `sql` 펜스를 **그대로 읽어**
   날짜 자리만 넓혀 실행한다(mock 수집 한 판 — 한 행의 공고번호를 비워 드롭을 만든다)
 - exit: 0
@@ -284,7 +278,7 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   이라 판독 3 이 서고 `received = source_total` 이라 판독 2 는 서지 않는다 — 문서가 적은 그대로다.
   열 열 개가 전부 실재한다(질의가 행을 낸다). SQL 을 문서에서 읽으므로 문면이 바뀌면 이 probe 가 따라간다.
 
-## 2026-11-06T08:2xZ — cr M-2 처방만으로는 **한 방향이 열린다**(측정)
+## 2026-11-06T08:2xZ — cr M-2 처방만으로는 **한 방향이 열린다**(측정 · 트리 `3b0951bf`)
 - cmd: clone 에 13번째 사유를 심고 **기대 집합을 손대지 않은 채** 그 사유를 *계속 걷기* 쪽에 넣은 뒤 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
 - exit: **0 (초록 — 변이가 잡히지 않았다)**
 - 핵심 결과: 모수를 `permittedSubclasses` 로 도출해도 **「멈춤 집합의 등식」은 그 판을 놓친다** — 새 사유가
@@ -292,18 +286,18 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   걷는다) 바로 그 방향이다. 그래서 기대값을 **사유 → 멈추는가 전수 표**로 바꿨다(키가 하나 늘어 어느 쪽에
   넣어도 붉다). cr 처방을 그대로 넣고 재 보지 않았으면 이 구멍은 초록으로 남았다.
 
-## 2026-11-06T09:1xZ — 표로 바꾼 뒤 같은 변이(계속 걷기 쪽)
+## 2026-11-06T09:1xZ — 표로 바꾼 뒤 같은 변이(계속 걷기 쪽 · 트리 `cbd1eccc`)
 - cmd: 같은 변이, 같은 명령
 - exit: 1
 - 핵심 결과: **RED** — 9 중 1 실패이고 메시지가 그 자리를 그대로 가리킨다
   (`Values differed at keys AccessBlockedProbe`). 집합이던 앞 판이 놓친 방향이 표에서는 잡힌다.
 
-## 2026-11-06T08:1xZ — 판정 트리 표적(workflow lint 강제 · 게이트 넷)
+## 2026-11-06T08:1xZ — 표적 전부(트리 `3b0951bf` — 표 수정 **앞**)
 - cmd: 라운드 3 과 같은 표적 집합
 - exit: 0
-- 핵심 결과: FAILED 0 · 게이트 22 task(이 판은 표 수정 **앞** 트리다 — 아래 줄이 판정 트리의 재측정이다)
+- 핵심 결과: FAILED 0 · 게이트 22 task
 
-## 2026-11-06T09:0xZ — 판정 트리 표적 재실행(표 수정 뒤)
+## 2026-11-06T09:0xZ — 표적 재실행(트리 `cbd1eccc` = 그 라운드의 판정 SHA)
 - cmd: 같은 표적 집합(workflow lint 강제 · 게이트 넷)
 - exit: 0
 - 핵심 결과: FAILED 0 · 게이트 22 task · HEAD `cbd1eccc`(판정 SHA)
@@ -326,6 +320,42 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 - 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈의 lint·detekt·test 가 **전부 실행**(병합이 입력을 바꿨다) ·
   **낙찰 E2E 6/0** — V25(`notification_inbox_bid_kind`)가 더해진 뒤에도 Flyway 가 깨끗이 지나고 낙찰 축
   거동이 그대로다(그 마이그레이션은 낙찰 축 표를 건드리지 않는다).
+
+## 마지막 라운드 (v r5 H-1·H-2·L 둘 · cr r5 H 둘·M 둘·L 둘 — 판정 SHA 1caaa25e)
+
+## 2026-11-07T13:1xZ — 변이: **값을 나르는** 13번째 사유를 계속 걷기 쪽에(검증자 스크립트 그대로)
+- cmd: `v-award-r5-mut.sh class` 로 `data class AccessBlockedProbe(val status: Int)` 를 심고 기대 표는 손대지 않은 채 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED 9/9** — 폴백 한정 뒤에는 모수 초기화가 `NoSuchFieldException: INSTANCE` 로 죽어
+  클래스 전체가 선다(`…TestKt.<clinit>`). **고치기 전 이 판은 초록이었다**(검증자 실측) — 폴백이 그
+  사유를 `BudgetExhausted` 로 바꿔치우고 `associateWith` 가 중복 키를 접었기 때문이다. cr 처방 ⓐ 의
+  「소리 내며 죽는다」가 그대로 나왔다.
+
+## 2026-11-07T13:1xZ — 같은 변이의 `data object` 판(통제)
+- cmd: `v-award-r5-mut.sh object`, 같은 명령
+- exit: 1
+- 핵심 결과: **RED 1/9** — 표 test 하나만 붉다(`Values differed at keys`). 두 판이 **다른 기제로** 붉은
+  것이 맞다: `object` 는 모수에 들어와 표가 잡고, `class` 는 모수가 서지 못해 초기화가 죽는다.
+
+## 2026-11-07T13:0xZ — 통제군(변이 없음)
+- cmd: 같은 명령, 변이 없이
+- exit: 0
+- 핵심 결과: 9/0 — 위 둘의 RED 가 변이에서 왔다.
+
+## 2026-11-07T13:2xZ — probe 재실행(새 §3.1 문면을 읽는다)
+- cmd: 검증자 probe(`VAwardRunbookProbeTest`)를 **출력 경로만 바꿔** 그대로. SQL 은 runbook 의 펜스를 축어로 읽는다
+- exit: 0
+- 핵심 결과: 다섯 판 모두 **슬롯 등식 성립**(`EQ true` 10 행). 새 판독 3(= `dup>0 || drp>0`)이 문면대로
+  선다 — `BLANK`(drp 1) ✓ · `DUP_SHIFT`(dup 1) ✓ · **`DUP_EXTRA`(rec 4 > tot 3 · dup 1) ✓**(구판 전제
+  `rec = tot` 에서는 서지 않던 바로 그 행이다) · `null`·`SHRINK` 는 서지 않는다 ✓. 신호 표도 맞는다 —
+  `SHRINK`(dup 0 · pages 2 ≤ 50) → 원인 ① · `DUP_EXTRA`(dup 1) → 원인 ②.
+- probe 의 `R3` 칸은 **구판 규칙**(`rec = tot` 전제 포함)이라 `DUP_EXTRA` 에서 false 다 — 측정 로직을
+  건드리지 않으려고 그대로 뒀고, 새 규칙은 같은 줄의 `(dup>0||drp>0)` 칸이다.
+
+## 2026-11-07T13:0xZ — 판정 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 앞 라운드와 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈 lint·detekt·test 전부 실행
 
 ## acceptance — 전건 `check`
 
