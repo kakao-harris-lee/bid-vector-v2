@@ -283,7 +283,7 @@ class MutationReportGateUpToDateTest {
     }
 
     @Test
-    fun `타임스탬프 리포트를 task 쪽에서 켜도 거부한다 — 읽는 값이 task 의 최종값이다`() {
+    fun `타임스탬프 리포트를 task 쪽에서 켜도 거부한다 — 게이트가 보는 값이 task 쪽이다`() {
         // extension 이 아니라 task 속성을 직접 켜는 축. 리포트를 쓰는 것은 task 이므로 게이트가
         // 보는 값도 task 의 것이어야 한다.
         writeMovedReportDirFixture(timestampedReportsOverride = TIMESTAMPED_VIA_TASK)
@@ -312,7 +312,7 @@ class MutationReportGateUpToDateTest {
         const val TIMESTAMPED_VIA_EXTENSION =
             "configure<info.solidsoft.gradle.pitest.PitestPluginExtension> { timestampedReports.set(true) }"
 
-        /** 같은 축, task 쪽. 리포트를 쓰는 것이 task 이므로 이쪽이 최종값이다. */
+        /** 같은 축, task 쪽. 리포트를 쓰는 것이 task 이므로 게이트가 보는 자리도 이쪽이다. */
         const val TIMESTAMPED_VIA_TASK =
             "tasks.named<info.solidsoft.gradle.pitest.PitestTask>(\"pitest\") { timestampedReports.set(true) }"
     }

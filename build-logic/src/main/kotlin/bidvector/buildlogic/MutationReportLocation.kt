@@ -37,9 +37,14 @@ fun Project.pitestMutationXmlReport(): Provider<RegularFile> {
  * (새 checkout 인 CI 는 「존재하지 않는다」로 붉다). 자리를 파생하는 것으로는 막을 수 없다:
  * 시각 이름을 우리가 알 수 없고, 알더라도 낡은 파일이 그대로 남는다.
  *
- * 읽는 값이 **task 의 것**인 이유는 리포트를 쓰는 것이 task 이기 때문이다(extension 을 거쳐 오든
- * task 에 직접 설정되든 최종값은 거기 있다). 이 함수가 게이트 배선 안에서 불리고 그 배선이 lazy
- * 하므로, 여기서 보는 값은 **모든 스크립트 평가가 끝난 뒤의 값**이다.
+ * 읽는 값이 **task 의 것**인 이유는 리포트를 쓰는 것이 task 이기 때문이다 — extension 을 거쳐
+ * 오든 task 에 직접 설정되든 그 자리에 모인다.
+ *
+ * **무엇을 보는지 정확히**: 게이트가 구성되는 시점에 그 task 에 설정돼 있는 값이다. 배선이 lazy
+ * 하므로 그 시점은 모듈 스크립트가 평가된 뒤이고, 그래서 extension 축과 task 축이 둘 다 잡힌다
+ * (실측: 회귀 test 둘). **그 뒤에 등록되는 설정은 보지 못한다** — 「최종값」이라고 적지 않는
+ * 이유다. 그 경로는 알려진 제한으로 등재돼 있고, CI 는 새 checkout 에서 convention 하나만이
+ * 이 값을 정하는 자리라 거기서는 생기지 않는다.
  */
 private fun refuseTimestampedReports(pitest: TaskProvider<PitestTask>) {
     if (pitest.get().timestampedReports.getOrElse(false)) {
