@@ -209,3 +209,83 @@ procurement `254/6519` · decision `178/4498`.
 | main 쪽 변경 보존 | main 의 변경은 **주석 문단 하나**였고 병합 트리에 한 번만 있다(접힘 0). 비슷한 옛 문면이 남은 것은 **다른 class 의 문단**이라 접힘이 아니다 |
 | 새 정렬 게이트 실행 | `gateRegistrationGate --rerun` 모듈 **열** 전부 실행 · 실패 0 |
 | 내 쪽 건드림 | `git diff --name-only <병합 전>..HEAD` == main 의 9 경로 |
+
+## 수정 라운드 3 — 두 축을 다시 닫고, main 셋째 병합
+
+### H-1 차등 — 같은 probe, 앞 판 술어와 지금 술어
+
+`app` main 에 여덟 형태를 한 파일로 심었다: callable reference(`System::getenv`) · 익명 object ·
+suspend 람다(`withContext`) · 하위 타입 수신자(`ConfigurableEnvironment.activeProfiles`) · 같은 능력의
+다른 이름 넷(`Boolean#getBoolean`·`Integer#getInteger`·`Long#getLong`·`RuntimeMXBean#getSystemProperties`).
+
+| 레그 | 결과 |
+| --- | --- |
+| **앞 판 재현**(익명 필터 + Spring 정확 좌표 + 등가 멤버 없음) | **BUILD SUCCESSFUL · `violations=0`** — 여덟 전부 통과. `types=267 anonymousTypes=0` |
+| **지금** | **FAILED · `violations=8`** — 여덟 전부 지목. `types=283 anonymousTypes=16 accesses=9643 denied=10` |
+
+**0/8 → 8/8** 이 필터 제거와 `*#멤버` 의 근거다. 익명 클래스 셋의 귀속은 감싼 쪽으로 올라가 문면이
+`EnvSniffProbe2 (안쪽 EnvSniffProbe2$callableRef$1)` 꼴로 **고칠 자리와 실제 자리를 둘 다** 든다.
+`anonymousTypes` 를 리포트에 세어 앞 판이 **빼고 있던 모집단**이 수로 보이게 했다.
+
+### H-2 · M-1 양성 대조
+
+| 심은 것 | 결과 |
+| --- | --- |
+| `.zip`·대문자 `.JAR`·면제 이름 사칭(`…-evil.jar`) | 술어가 로더 접두 기준이 되고 면제가 정확 이름이 되어 **전부 위반**(순수 test 넷이 그 셋을 각각 고정) |
+| `processResources { from("src/main/extra") { into("db/migration") } }` + `V30` | `:adapters:migrationOrderGate --rerun` **FAILED** — V26~V29 결번 지목(main 이 V25 를 들여온 뒤) |
+
+### B-1 — 스크립트 lint 를 표적에 넣었다
+
+PR CI 가 `:build-logic:ktlintKotlinScriptCheck` 에서 붉었다(앞 라운드 LOW-6 수정이 선언 앞 빈 줄을
+빼먹었다). **앞 라운드 B-1 과 같은 꼴**이다 — 고친 파일이 `.kts` 인데 표적 lint 열에 스크립트 lint 가
+없었다. 빈 줄 하나로 고치고 그 task 를 표적에 넣었다(이 라운드 실측 exit 0).
+
+### main 셋째 병합 (`56bd33ea`, PR #137 paper-bid)
+
+겹친 경로 일곱 가운데 **Kotlin 넷은 이 slice 의 import 정리가 만진 파일**이라, 병합 전에 **양쪽 본문을
+전수로 대조**했다 — 내가 지운 이름(`AccountId`·`Instant`·`NotificationSweepCase`·`FieldConcept`·
+`KONEPS_COLLECTION_POLICY`·`Resolution`·`tag`) 가운데 main 쪽 본문이 쓰는 것은 **0** 이다. 병합 뒤 그 네
+파일의 중복 import 도 0 이다.
+
+| 검산 | 결과 |
+| --- | --- |
+| `architecture-policy` 값쌍 | base 1278 · 내 쪽 1351 · main 1280 · 병합 1353 — 기대==실제, `lost 0 extra 0` |
+| `gate-tests` 값쌍 | base 522 · 내 쪽 526 · main 525 · 병합 529 — 기대==실제, `lost 0 extra 0` |
+| `capability-map` | 병합 == main + 내 32 줄, main 쪽 삭제 0 |
+| 마이그레이션 | **V25 가 들어왔다** — 정책 주석이 예고한 순서 그대로이고 집합은 `1..25 ∖ {10,11}` 로 결번 0 |
+| 새 정렬 게이트 | 병합된 장부에 `gateRegistrationGate --rerun` 모듈 열 실행 · 실패 0 |
+
+### 내 실수 하나를 기록한다
+
+`policy.version` 이 10 에 머물러 있었다 — **수정 라운드 2 의 bump 가 적용되지 않았다**(검사 없는 문자열
+치환이 앵커를 못 찾고 조용히 빠졌고 그 라운드 커밋 메시지는 bump 를 적었다). 라운드 3 의 첫 커밋 제목
+「정책 v12」도 그 전제 위에 서 있어 그 시점에 거짓이었다. 이력을 되쓰지 않고 한 번의 bump(→ 11)가 두
+라운드를 덮게 하고 버전 주석이 경위를 적는다. 이 라운드의 문면 교체는 **전부 앵커 단언**을 붙였다.
+
+### H-2 양성 대조 — 게이트 층(네 이름을 실제로 심어서)
+
+순수 test 는 **술어**를 고정하고 판독기(아카이브를 훑는 쪽)는 고정하지 않는다. 그래서 네 이름을 실제
+배포물에 심어 게이트를 돌렸다 — `bootJar { classpath(files(…)) }` 로 `sneak.jar` ·
+`spring-boot-jarmode-tools-evil.jar` · `sneak.zip` · `sneak2.JAR`.
+
+`:app:jarContentGate --rerun` → **FAILED, 넷 전부 지목**. `nestedJars` 는 102 → **106**(앞 판 판독기는
+`.jar` 로 끝나는 둘만 세어 104 였고 지목은 하나였다). 넷 모두 `BOOT-INF/lib/` 밑에 있고 로더는 거기서
+확장자를 보지 않는다.
+
+### 변이 — 바꿔치우기 셋, RED 3 (그리고 헛변이 하나를 기록한다)
+
+| 변이 | RED |
+| --- | --- |
+| `EnvironmentAccess.isDenied` 의 `*#멤버` 가지 제거 | 1 (Spring 하위 타입 수신자 test) |
+| 건너뛰기 목록을 test 에 넘기지 않음(선언 ↔ 판독 끊기) | 1 (죽은 면제 0 test 의 비-공허 단언) |
+| 중첩 면제를 **느슨한 접두 일치**로 대체 | 1 (사칭 test) |
+
+**첫 시도의 셋째 변이는 초록이었고 그것이 변이의 결함이었다.** 비교만 `in` → `startsWith` 로 바꾸면
+정책 값이 **정확 이름**이라 두 비교가 같은 답을 낸다(`"…-evil.jar".startsWith("…-4.1.1.jar")` 는 거짓).
+이 축의 방어는 **「정확한 값 + 동등 비교」 쌍**이고 한쪽만 흔드는 변이는 거동을 바꾸지 않는다 — 값이
+접두였던 앞 판 상태를 재현(`take(25)`)해서야 RED 가 났다. 라운드 2 의 형제 가지 헛변이와 같은 계열이고,
+같은 교훈을 두 번째로 현장에서 쓴 자리다.
+
+익명 클래스 필터 제거는 **task 층**이라 순수 test 로는 잡히지 않는다 — 그 축의 변이 실측은 위 H-1
+차등(앞 판 재현 레그 0/8)이 대신한다. 같은 이유로 중첩 판독기와 마이그레이션 입력 교체도 게이트 층
+양성 대조가 그 자리를 진다.

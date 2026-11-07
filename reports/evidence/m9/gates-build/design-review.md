@@ -40,6 +40,12 @@ plugin 을 하나 더 만들지 않은 이유는 `conventionCoverageGate` 가 **
   변경이므로 **하지 않는다** — 그 둘을 `migration.retired-versions` 로 **고정**한다. 효과는 「그 번호로
   새 파일이 들어오면 실패」(은퇴 번호 재사용 금지)이고, 그것이 Flyway 사각을 닫는 방향이다.
 
+**수정 라운드 3 — 우회 여덟째(처리된 리소스).** 이 절의 우회 목록은 「디렉터리를 옮긴다」와 「다른 모듈에
+둔다」를 다뤘지만 **`processResources { from(…) { into("db/migration") } }`** 는 다루지 않았다. 관례 소스
+디렉터리를 비워 둔 채 처리된 리소스에만 파일을 넣으면 앞 판 입력이 그것을 보지 못했다(실측 — verifier
+M-1). 판정 입력을 **Flyway 가 읽는 자리**(처리된 리소스의 `db/migration`)로 옮겨 관례 디렉터리·
+`resources.srcDir`·`from().into()` 세 경로를 한 입력으로 모았다. H-2 를 닫은 것과 같은 원리다.
+
 ## ② CPD 이름 치환 우회 (`OPEN-CPD-GATE-RENAME-BYPASS`)
 
 - ⓐ **경계**: 중복 판정이 **식별자·리터럴 글자에 의존하지 않는다**(PMD Type-2). 판정식 구조를 바꾼
@@ -201,5 +207,17 @@ plugin 을 하나 더 만들지 않은 이유는 `conventionCoverageGate` 가 **
   8. `ProcessBuilder().environment()` → 같은 자리. 거부 집합이 그 멤버를 든다.
   9. callable reference(`::getenv`)·정적 import → 소스 표기가 다르고 **컴파일된 참조는 하나**다.
      이것이 바이트코드 층을 정본으로 고른 이유다 — 우회하려면 게이트 자신을 고쳐야 한다.
+     **정정(수정 라운드 3 — verifier H-1 · 리뷰 H-1)**: 참조가 하나라는 것은 맞지만 **그 하나가
+     어느 클래스에 있는지**를 이 문장이 다루지 않았다. callable reference·suspend 람다·익명 object 는
+     그 참조를 이름 없는 내부 클래스로 옮기고, 앞 판 task 는 모집단에서 익명 클래스를 **빼고**
+     있었다(타입 모양 래칫의 관례를 접근 전수 조사에 복사한 자리). 같은 probe 의 차등:
+     **앞 판 0/8 · 지금 8/8**, `types` 267 → 283(익명 16 복귀). 필터를 뺐고 귀속만 감싼 최상위
+     클래스로 올렸다.
+  10. 하위 타입 수신자(`ConfigurableEnvironment.activeProfiles`) → Methodref owner 는 수신자의
+     **정적 타입**이라 상위 타입 좌표만 든 거부 키를 비껴갔다(실측). 거부 키에 `*#멤버`(어떤 수신자든)를
+     더해 닫았다 — 하위 타입 열거는 또 다른 열거다.
+  11. 같은 능력의 다른 이름(`Boolean#getBoolean`·`Integer#getInteger`·`Long#getLong`·
+     `*#getSystemProperties`) → 넷 다 JDK 안에서 `System.getProperty` 를 읽는다. 정책 값으로 더했다.
+     `Runtime#exec`·`ProcessHandle` 은 **이 축 밖**으로 선언한다(하위 프로세스 정책의 축).
 - **main 의 기존 상태**: 모듈 main 소스에서 0 건(측정). build-logic 은 production 모듈이 아니라
   대상 밖이다 — 그 트리의 JDK 판 단언은 빌드 도구의 정당한 질의다.

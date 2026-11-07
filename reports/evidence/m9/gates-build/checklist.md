@@ -13,7 +13,7 @@ base `df4976cc`. 계약 `scope.md`, 설계 검토 `design-review.md`, 실측 `co
 | ⑤ `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` | **닫음** | 새 `unusedImportGate`(모듈·included build·느슨한 스크립트 셋) + `UnusedImports` 순수 술어 |
 | ⑥ `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` | **닫음** | 소스 층 패키지 범위 축 + `source.scoped-*` 정책 키 |
 | ⑦ 완료 조건 2 「소스 축 상시 게이트 부재」 | **미구현 · 되돌려 보냄** | 없음 — 사유는 `design-review.md` ⑦ 와 아래 「판단이 필요한 것」 |
-| ⑧ OPS-13 「환경 스니핑 0」 | **닫음(임계 0) — 정본은 바이트코드 층**(수정 라운드 1) | 새 `environmentAccessGate` + `EnvironmentAccess` 순수 술어 + `bytecode.env-access.denied-members`. 소스 쌍 축은 1차 그물(`*.getenv` 추가) |
+| ⑧ OPS-13 「환경 스니핑 0」 | **닫음(임계 0) — 정본은 바이트코드 층 · 모집단은 익명 클래스 포함**(수정 라운드 3) | 새 `environmentAccessGate` + `EnvironmentAccess` 순수 술어 + `bytecode.env-access.denied-members`(`*#멤버` 형태 포함). 소스 쌍 축은 1차 그물(`*.getenv` 추가) |
 
 ## 새 게이트가 찾은 기존 위반과 그 시정
 
@@ -61,7 +61,9 @@ adapters 의 적용 이력·checksum 이 바뀌어 production 거동 변경이 �
    없다. 면제 수를 리포트가 센다(래칫은 아니고 관측).
 5. **⑤ wildcard import 는 대상이 아니다** — 도입 이름이 열거되지 않아 쓰임을 셀 수 없다.
 6. **⑤ 같은 짧은 이름을 그 파일이 스스로 선언하면** import 가 쓰인 것으로 보인다(미탐 방향).
-7. **⑤ 연산자·규약 면제는 이름 집합**이다. 그 이름의 import 는 쓰임을 세지 않는다.
+7. **⑤ 연산자·규약 면제는 FQN 집합**이다(수정 라운드 1 에서 짧은 이름에서 바뀌었다 — 앞 판 문면이
+   고쳐진 사각을 그대로 적고 있었다, verifier L-2). 그 FQN 의 import 는 쓰임을 세지 않고, 「면제 ∖
+   저장소 전수 도입 FQN == ∅」을 test 가 잠근다(죽은 면제 0).
 8. **⑥ 허용 뿌리 목록이 두 자리에 산다** — 정책 데이터 + adapters 네 test 의 `ALLOWED_ROOTS`. 어긋나면
    두 층의 범위가 갈린다. 정본화(test 가 정책을 읽게)는 adapters test 술어라 out_scope.
 9. **⑧ 리플렉션 경로는 닫지 못한다.** 그 축은 `collection.reflection.*` 가 따로 든다.
@@ -86,15 +88,23 @@ adapters 의 적용 이력·checksum 이 바뀌어 production 거동 변경이 �
 14. **② 낡은 리포트 축은 로컬에서 `cp -p` 로 비껴간다**(verifier L-2, 정적 판독). mtime 술어라
     원본 mtime 을 보존한 복제가 `check -x cpdCheck` 에서 지나간다. CI 는 깨끗한 checkout 에서 늘 새
     리포트를 내므로 **로컬 한정**이다.
-15. **③ `jarContentGate` 의 configuration-cache 문제 계수를 재지 않았다**(verifier/리뷰 LOW-4).
-    `gradle.properties` 가 `problems=warn` 이라 CC 문제가 생겨도 경고로 지나간다 — 즉 CC 재사용
-    퇴화가 초록 아래 숨을 수 있다. 이 라운드의 실측은 게이트가 돈 것(`archives=2`)까지다.
-16. **이 게이트들은 `UP-TO-DATE` 로 조용해질 수 있다.** 병합 트리의 첫 재실행에서 전수 소스 주행 게이트
+15. **③ `jarContentGate` 의 configuration-cache 문제 계수는 0 으로 쟀다**(수정 라운드 2·3).
+    해석된 configuration 을 입력으로 받는 변경이 CC 를 흔들지 않았다 — `Configuration cache entry
+    stored` 이고 문제 보고 줄 0 이다. `gradle.properties` 가 `problems=warn` 이라 **경고로 지나가는
+    구조 자체는 그대로**이므로(0 이 아닌 날이 오면 조용하다) 계수를 라운드마다 다시 본다.
+16. **⑧ 의 잔여는 리플렉션과 하위 프로세스 둘이다**(수정 라운드 3). 리플렉션은 전부터 선언돼 있고
+    (제한 9), `Runtime#exec("printenv")`·`ProcessHandle.current().info()` 는 **이 축 밖**으로 판단했다 —
+    환경 질의가 아니라 **프로세스 실행**이고 그 축은 하위 프로세스 정책이 받는다(오늘 0 건). 거부
+    목록은 본래 열거이므로 완전성을 주장하지 않는다. **이 판단은 팀장 확인이 필요한 자리로 보고했다.**
+17. **③ 중첩 축의 면제는 정확 이름 하나**다. Boot 를 올리면 그 줄이 어긋나 게이트가 **붉는다** — 조용히
+    넓어지는 면제보다 낫다는 판단이고, 카탈로그의 `spring-boot` 와의 등식을 test 가 잠근다. 면제 접두를
+    쓰던 앞 판은 `…-evil.jar` 사칭이 통과했다(실측).
+18. **이 게이트들은 `UP-TO-DATE` 로 조용해질 수 있다.** 병합 트리의 첫 재실행에서 전수 소스 주행 게이트
     넷이 UP-TO-DATE 로 돌아왔다. 선언 입력이 옳아도 그 상태의 초록은 **이번 트리의 측정이 아니다**.
     그래서 `--rerun` 으로 강제해 다시 쟀고, 「게이트가 병합분을 재판하는가」는 종료 코드가 아니라
     **움직인 수**(adapters `memberCalls` 4994 → 5042)로 봤다. 같은 함정이 다음 병합에서도 재현되므로
     **병합 뒤 재실측에는 `--rerun` 을 붙인다**.
-17. **복원 원천이 착수 base 가 아니다.** 병합 뒤 `df4976cc` 는 경계로 쓸 수 없다(남의 레인 커밋까지
+19. **복원 원천이 착수 base 가 아니다.** 병합 뒤 `df4976cc` 는 경계로 쓸 수 없다(남의 레인 커밋까지
     센다 — 162 경로 중 82 가 내 것이 아니다). 원천·경계는 실제로 병합한 main 의 고정 SHA `3ad4f3f6`
     이고 `rollback.md` 가 그것을 든다.
 
@@ -111,7 +121,11 @@ adapters 의 적용 이력·checksum 이 바뀌어 production 거동 변경이 �
 
 ## 비활성화·되돌림
 
-게이트마다 정책 데이터 한 줄로 끈다 — ① `migration.module` 을 없는 모듈로 ② `normalize.*=false`(오늘
-거동은 어느 쪽이든 같다) ③ `jar.class-roots`·`jar.external-class-roots` 를 비움(단, 비우면 배포물 판정이
-붉는다 — 그것이 의도다) ⑤ 정책 키의 면제 집합 ⑥ `source.scoped-packages` 를 비움 ⑧
-`source.env-sniff.member-pairs` 를 비움. 전면 되돌림은 `rollback.md`.
+게이트마다 정책 데이터 한 줄로 끈다. **① 은 이제 그 방법으로 꺼지지 않는다**(수정 라운드 3,
+verifier L-1): `migration.module` 을 없는 모듈로 바꾸면 이 라운드의 소유 단언이 「그 모듈에
+마이그레이션 22개가 있다」로 **빌드를 깬다**(실측). ① 을 끄려면 `migration.classpath-location` 을 비어
+있는 위치로 돌린다. 나머지 — ② `normalize.*=false`(오늘 거동은 어느 쪽이든 같다) ③
+`jar.class-roots`·`jar.external-class-roots` 를 비움(단, 비우면 배포물 판정이 붉는다 — 그것이 의도다)
+③ 중첩 축은 `jar.external-nested-jars` 를 넓힌다 ⑤ `source.import.syntax-fqns` 로 면제 확대 ⑥
+`source.scoped-packages` 를 비움 ⑧ **두 축을 따로** — 소스 1차 그물은 `source.env-sniff.member-pairs`,
+**임계 0 의 정본은 `bytecode.env-access.denied-members`**. 전면 되돌림은 `rollback.md`.
