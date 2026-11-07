@@ -109,18 +109,30 @@ private fun Project.registerDomainApiTypeGate(
 
 /**
  * 마이그레이션 번호 순서(`OPEN-MIGRATION-ORDER-GATE`) — 규율은 D-6F5-8 이고 그 규율에 자동 게이트가 없다는
- * 사실이 D-6F5-13 으로 등재됐다. 소유 모듈은 정책이 고르고(`migration.module`) 경로도 정책 값이다.
+ * 사실이 D-6F5-13 으로 등재됐다. 소유 모듈은 정책이 고르고(`migration.module`) 위치도 정책 값이다.
  * **비-소유 모듈도 읽는다** — Flyway 의 모집단이 classpath 라서다(verifier H-2).
+ *
+ * 판정 입력은 **처리된 리소스**다 — 관례 소스 디렉터리가 아니라 Flyway 가 읽는 그 자리이고, 그래서
+ * 관례 디렉터리·`resources.srcDir`·`processResources { into(…) }` 세 경로가 한 입력으로 모인다.
  */
 private fun Project.registerMigrationOrderGate(configDir: Directory): TaskProvider<MigrationOrderGateTask> {
     // 관례를 박지 않고 정책 데이터에서 읽는다 — 그 경로가 선언 입력이자 판정 대상의 유일한 자리다.
     val migrationPolicy = configDir.file("quality/migration-policy.properties")
-    val resourcePath = readPolicy(migrationPolicy.asFile).requireValue("migration.resource-path")
+    // **소비자가 읽는 자리**를 본다(verifier M-1): Flyway 는 `classpath:db/migration` 을 읽으므로
+    // 판정 입력도 **처리된 리소스** 밑의 그 위치다. 관례 소스 디렉터리만 보면
+    // `processResources { from(…) { into("db/migration") } }` 가 그 자리에 넣은 파일을 놓친다(실측).
+    val classpathLocation = readPolicy(migrationPolicy.asFile).requireValue("migration.classpath-location")
     return tasks.register<MigrationOrderGateTask>("migrationOrderGate") {
         description = "마이그레이션 version 집합이 결번·중복 없이 1..max 와 같은지 잰다(Flyway outOfOrder=false)"
         policyFile = migrationPolicy
         moduleName = project.name
-        migrationDirectory.from(layout.projectDirectory.dir(resourcePath))
+        migrationDirectory.from(
+            provider {
+                val main = sourceSets().getByName("main")
+                main.output.resourcesDir?.resolve(classpathLocation)
+            },
+        )
+        dependsOn(tasks.named("processResources"))
         report = layout.buildDirectory.file("reports/migration-order/violations.txt")
     }
 }

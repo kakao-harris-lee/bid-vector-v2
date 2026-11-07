@@ -9,6 +9,12 @@ import kotlin.test.assertTrue
  * `OPEN-MIGRATION-ORDER-GATE` 의 **순수 코어**. task 배선과 분리해 인라인 파일 이름으로 잰다
  * (`GateRegistrationCensusTest`·`TestShapesTest` 관례).
  *
+ * **이 test 와 게이트는 서로 다른 층을 본다**(수정 라운드 3). 게이트의 판정 입력은 **처리된 리소스**
+ * (`processResources` 산출)이고 Flyway 가 읽는 그 자리다. 이 test 가 읽는 것은 **사람이 파일을 두는
+ * 관례 디렉터리**다. 둘은 일부러 다르다 — 앞의 것은 「배포물이 무엇인가」, 뒤의 것은 「우리가 무엇을
+ * 적었는가」를 고정한다. cr M-6 이 잡은 어긋남(게이트 `walkTopDown` ↔ test `listFiles`)은 **같은 층을
+ * 다르게 읽던 것**이라 그것과는 다른 자리다. 열거 방식은 그 지적대로 둘이 같다(`walkTopDown`).
+ *
  * 마지막 두 test 는 **저장소의 실제 디렉터리와 실제 정책 파일**을 읽는다 — 등식이 오늘의 main 에서
  * 성립하는지는 인라인 입력으로 증명되지 않고, 그 둘이 갈리면 게이트가 재는 것과 test 가 재는 것이
  * 달라진다(`DomainSourceReferenceFixtureTest` 가 fixture 를 실제로 읽는 것과 같은 이유).
