@@ -50,19 +50,19 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 라운드마다 목록을 다시 산출한다. 아래가 현재 판이며 앞 원천(`3ad4f3f6`·`97ed49c4`·`df4976cc`·
 `79f3e5c4`) 기준의 판들은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
 
-## 2026-11-07T13:3xZ — 임시 clone 에서 22 경로를 `56bd33ea` 로 되돌림(①②③, 마지막 재측정)
-- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=56bd33ea --staged --worktree --`
+## 2026-11-07T14:2xZ — 임시 clone 에서 22 경로를 `bd2f450e` 로 되돌림(①②③, 다섯째 병합 뒤)
+- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=bd2f450e --staged --worktree --`
 - exit: 0
-- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로) · `git diff 56bd33ea -- <22 경로>`
+- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로) · `git diff bd2f450e -- <22 경로>`
   **0 줄** · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의
   내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
   남의 표지 보존(gate-tests 항목이 main 과 같은 **515** · architecture-policy 항목이 main 과 같은 **752** ·
-  main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
+  main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · #142 의 docker 변경이 되돌림 밖 0 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
 - 되돌린 트리에 남는 `Award` 토큰 하나는 **main 쪽**이다(`bidvector.workflow.result.AwardWinnerNamePort` —
   base 에도 있다). 넓은 grep 이 잡은 것이라 확인해 적는다.
 
-## 2026-11-07T13:4xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-07T14:3xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -356,6 +356,22 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   `SHRINK`(dup 0 · pages 2 ≤ 50) → 원인 ① · `DUP_EXTRA`(dup 1) → 원인 ②.
 - probe 의 `R3` 칸은 **구판 규칙**(`rec = tot` 전제 포함)이라 `DUP_EXTRA` 에서 false 다 — 측정 로직을
   건드리지 않으려고 그대로 뒀고, 새 규칙은 같은 줄의 `(dup>0||drp>0)` 칸이다.
+
+## 승인 전 문면 일괄 (다섯째 병합 bd2f450e · 판정 SHA e4e856f6)
+
+## 2026-11-07T14:0xZ — `git merge bd2f450e`(다섯째 병합) 와 **겹침 0** 계수
+- cmd: `git merge bd2f450e` 뒤 두 목록의 `comm -12` 와 22 경로 각각의 main Δ 줄 수 합
+- exit: 0 (충돌 0)
+- 핵심 결과: #142(CVE)가 들어왔고 main 이 바꾼 **8 경로** 중 내 복원 목록 22 와 겹치는 것이 **0** —
+  `comm -12` 빈 출력이고 22 경로의 main Δ 줄 수 합도 **0**. 병합 커밋의 `--cc` 에 이 slice 파일 0
+  (자동 병합이 해소한 자리가 없다). main 쪽은 이미지 Dockerfile 둘과 그 chore evidence 다섯이다.
+
+## 2026-11-07T14:1xZ — 닿은 모듈 둘의 lint·test 와 `leakPatternGate` 재실행
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlint{Test,Main}SourceSetCheck --rerun :workflow:detekt --rerun :app:ktlint{Test,Main}SourceSetCheck --rerun :app:detekt --rerun :workflow:test --tests 'bidvector.workflow.collection.*' --rerun :app:test --tests 'bidvector.app.collection.*' --rerun leakPatternGate --rerun sizeGate gateRegistrationGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — 이 배치가 고친 것은 **KDoc 둘과 문서뿐**이라 두 모듈만 표적으로 잡았고, 여덟
+  lint·detekt·test task 가 전부 **실행**됐다(실패 0) · `leakPatternGate` 도 `--rerun` 으로 실행 ·
+  크기·등재·멤버 게이트 동반 초록. 거동 변화 0(코드 문장 변경 0).
 
 ## acceptance — 전건 `check`
 
