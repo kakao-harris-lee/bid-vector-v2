@@ -323,6 +323,16 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 
 ## 마지막 라운드 (v r5 H-1·H-2·L 둘 · cr r5 H 둘·M 둘·L 둘 — 판정 SHA 1caaa25e)
 
+## 2026-11-07T13:0xZ — 통제군(변이 없음)
+- cmd: 같은 명령, 변이 없이
+- exit: 0
+- 핵심 결과: 9/0 — 위 둘의 RED 가 변이에서 왔다.
+
+## 2026-11-07T13:0xZ — 판정 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 앞 라운드와 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈 lint·detekt·test 전부 실행
+
 ## 2026-11-07T13:1xZ — 변이: **값을 나르는** 13번째 사유를 계속 걷기 쪽에(검증자 스크립트 그대로)
 - cmd: `v-award-r5-mut.sh class` 로 `data class AccessBlockedProbe(val status: Int)` 를 심고 기대 표는 손대지 않은 채 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
 - exit: 1
@@ -337,11 +347,6 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 - 핵심 결과: **RED 1/9** — 표 test 하나만 붉다(`Values differed at keys`). 두 판이 **다른 기제로** 붉은
   것이 맞다: `object` 는 모수에 들어와 표가 잡고, `class` 는 모수가 서지 못해 초기화가 죽는다.
 
-## 2026-11-07T13:0xZ — 통제군(변이 없음)
-- cmd: 같은 명령, 변이 없이
-- exit: 0
-- 핵심 결과: 9/0 — 위 둘의 RED 가 변이에서 왔다.
-
 ## 2026-11-07T13:2xZ — probe 재실행(새 §3.1 문면을 읽는다)
 - cmd: 검증자 probe(`VAwardRunbookProbeTest`)를 **출력 경로만 바꿔** 그대로. SQL 은 runbook 의 펜스를 축어로 읽는다
 - exit: 0
@@ -351,11 +356,6 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   `SHRINK`(dup 0 · pages 2 ≤ 50) → 원인 ① · `DUP_EXTRA`(dup 1) → 원인 ②.
 - probe 의 `R3` 칸은 **구판 규칙**(`rec = tot` 전제 포함)이라 `DUP_EXTRA` 에서 false 다 — 측정 로직을
   건드리지 않으려고 그대로 뒀고, 새 규칙은 같은 줄의 `(dup>0||drp>0)` 칸이다.
-
-## 2026-11-07T13:0xZ — 판정 트리 표적 전부(workflow lint 강제 · 게이트 넷)
-- cmd: 앞 라운드와 같은 표적 집합
-- exit: 0
-- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈 lint·detekt·test 전부 실행
 
 ## acceptance — 전건 `check`
 

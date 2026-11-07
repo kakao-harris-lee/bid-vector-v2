@@ -108,6 +108,9 @@ ORDER BY reference_date, started_at;
 (`QUOTA_EXHAUSTED`), 회계 행의 열은 타입 단순 이름(`QuotaExhausted`)이다 — 한쪽으로 찾으면 다른 쪽이
 0 건이므로 이 표로 옮겨 읽는다. 형제 개찰결과 갈래의 같은 `truncation=` 필드는 **타입 이름**을 적는다.
 
+**예산 멈춤은 그 필드에 없다** — `budgetLimit=DAILY|TOTAL` 칸이 그 자리를 들고 `truncation=none` 이다.
+표의 `BUDGET_EXHAUSTED_*` 행에서 멈춤 줄로 건너갈 때 `truncation=` 으로 찾으면 0 건이다.
+
 판독은 셋이다.
 
 1. `truncation_cause` 가 **있으면** 절단이다 — 위 표가 처방을 가른다. `Unclassified` 가 반복되면 그 응답
@@ -167,14 +170,22 @@ ORDER BY reference_date, started_at;
 
 | 원인 | 가리는 법 |
 | --- | --- |
-| ① 총수 줄임(위 둘째 글머리) | `duplicate = 0` 이고 그 슬롯에 쪽 상한 재개가 없다(`pages_fetched` 가 쪽 상한 50 이하) |
+| ① 총수 줄임(위 둘째 글머리) | **`source_total > 0`** 이고 `duplicate = 0` 이며 그 슬롯에 쪽 상한 재개가 없다(`pages_fetched` 가 쪽 상한 50 이하) |
 | ② 한 걷기 안의 밀림 | **`duplicate > 0`** — 판독 3 이 함께 선다 |
-| ③ 재개 경계를 건너는 밀림 | `duplicate = 0` 인데 **`pages_fetched` 가 50 을 넘는다**(배치가 둘 이상이었다). ① 과 계수로는 구별되지 않으므로 재개 여부로 가른다 |
+| ③ 재개 경계를 건너는 밀림 | `duplicate = 0` 인데 **`pages_fetched` 가 50 을 넘는다**(배치가 둘 이상이었다). 재개가 있으면 ③ 을 **먼저 의심**하되 **① 이 배제되지는 않는다** — 2 배치 안의 총수 줄임이 같은 얼굴이다. `duplicate > 0` 인 재개 슬롯이면 ② 와 ③ 이 함께 열려 있다 |
+
+**`source_total = 0` 인데 `received > 0`** 이면 ① 이 아니라 **ⓐ 의 변형**이다 — 원천이 총수를 말하지
+않은 채 빈 쪽이 0 을 심은 판이고(어댑터가 「없음」 응답에서 총수를 0 으로 채운다), 그 슬롯이 짧게
+끝났는지 아닌지 이 행으로는 알 수 없다. **ⓐ 는 행에 `NULL` 로도 `0` 으로도 나타난다.**
 
 ③ 은 **조용한 결측**이므로 `received > source_total` 을 ① 로 단정하고 닫지 않는다 — `duplicate` 와
-`pages_fetched` 를 함께 보고, 셋 다 원천 응답을 확인하는 것으로 끝낸다. 결측의 **방향**이 안전하지
-않으므로(조용히 0 이 나간다), 실 수집 캠페인에서 `received = source_total` 성립률과
-`dropped`·`duplicate` 분포를 함께 재는 것이 다음 과제다(알려진 제한).
+`pages_fetched` 를 함께 보고, **①②③ 셋 다**(그리고 총수 부재 ⓐ 도) 원천 응답을 확인하는 것으로
+끝낸다. 결측의 **방향**이 안전하지 않으므로(조용히 0 이 나간다), 실 수집 캠페인에서
+`received = source_total` 성립률과 `dropped`·`duplicate` 분포, 그리고 **`totalCount` 부재율**을 함께
+재는 것이 다음 과제다(알려진 제한).
+
+**③ 은 코드 추적으로만 선다** — mock E2E 가 쪽 상한 50 에 닿지 못해 이 slice 에서 **실측되지 않았다**.
+①②와 ⓐ 는 probe 로 실측했다.
 
 ## 4. 승격(낙찰 칸 채우기)
 

@@ -67,8 +67,9 @@ class AwardExitCodeTest {
      * 읽지 못한다. `haltOf` 가 **다음 사유를 이 칸으로 보내기로 사전 결정**했으므로 그 자리가 먼저
      * 맞아야 한다.
      *
-     * 회계 행(`truncation_cause` = 타입 단순 이름)과는 **일부러 다른 어휘**다(cr r5 M-2) — 두 자리를
-     * 옮겨 읽는 대응표는 runbook §3.1 에 있다.
+     * 회계 행(`truncation_cause` = 타입 단순 이름)과는 **오늘 다른 어휘다**(cr r6 M-2) — 일부러가 아니다.
+     * 그 열을 적는 자리(`JdbcCollectionRunStore`)가 이 slice 의 in_scope 밖이라 맞추지 못했고, 두 자리를
+     * 옮겨 읽는 대응표가 runbook §3.1 에 있다(알려진 제한에 등재).
      */
     @Test
     fun `멈춤 줄의 사유는 닫힌 어휘로 적는다`() {
