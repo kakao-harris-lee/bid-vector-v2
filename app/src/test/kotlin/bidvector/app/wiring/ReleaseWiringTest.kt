@@ -7,7 +7,7 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.Banner
-import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent
+import org.springframework.boot.context.event.ApplicationContextInitializedEvent
 import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.ApplicationListener
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
@@ -98,12 +98,16 @@ class ReleaseWiringTest {
      * 출하 기동점이 **실제로 준비한** 환경을 refresh 전에 집는다 — 컨텍스트를 띄우지 않으므로 DB·
      * 외부 자격 없이 돌고, 환경 층은 production `main()` 과 **같은 호출**이 쌓은 그대로다.
      *
-     * 멈추는 자리는 `ApplicationEnvironmentPreparedEvent` 다(환경이 다 쌓인 첫 지점이고 조립
-     * 초기화자·refresh 는 그 뒤다). 중단 표지를 **단언**하므로, 다른 사유로 먼저 죽으면 이 test 는
-     * 조용히 통과하지 않는다.
+     * 멈추는 자리는 `ApplicationContextInitializedEvent` 다 — **조립 초기화자가 다 돈 뒤**이고
+     * bean 정의 적재·refresh 는 그 뒤다. 한 층 앞(`ApplicationEnvironmentPreparedEvent`)에서 멈추면
+     * `productionApplication()` 이 거는 `ApplicationContextInitializer` 가 환경에 property source 를
+     * 더하는 형태가 모집단 **밖**으로 남는다(v L-1). 그 층은 `org.springframework.core.env` 안이라
+     * 패키지 게이트도 잡지 않는다.
+     *
+     * 중단 표지를 **단언**하므로, 다른 사유로 먼저 죽으면 이 test 는 조용히 통과하지 않는다.
      */
     private fun productionEnvironment(vararg args: String): ConfigurableEnvironment {
-        val stop = StopWhenEnvironmentPrepared()
+        val stop = StopWhenContextInitialized()
         val failure =
             runCatching {
                 productionApplication()
@@ -114,7 +118,7 @@ class ReleaseWiringTest {
                     .run(*args)
             }.exceptionOrNull()
 
-        generateSequence(failure) { it.cause }.any { it is EnvironmentPrepared } shouldBe true
+        generateSequence(failure) { it.cause }.any { it is ContextInitialized } shouldBe true
         return checkNotNull(stop.prepared) { "환경을 집지 못했다" }
     }
 
@@ -140,18 +144,18 @@ class ReleaseWiringTest {
 private const val RELEASE_SHA_KEY = "bidvector.release.sha"
 
 /** 중단 표지 — 「환경까지는 갔다」를 단언할 수 있게 사유를 타입으로 든다. */
-private class EnvironmentPrepared : RuntimeException("환경 준비 뒤 중단(test)")
+private class ContextInitialized : RuntimeException("초기화자까지 돈 뒤 중단(test)")
 
 /**
  * **타입 인자를 명시한 이름 있는 listener** 다(람다가 아니다) — 람다는 Spring 이 선언 event 타입을
  * 풀 수 없어 모든 event 를 받게 되고, 그러면 첫 event 에서 캐스트가 깨진다.
  * `ManagementSurfaceLateCheck` 가 `ContextRefreshedEvent` 로 같은 모양을 쓴다.
  */
-private class StopWhenEnvironmentPrepared : ApplicationListener<ApplicationEnvironmentPreparedEvent> {
+private class StopWhenContextInitialized : ApplicationListener<ApplicationContextInitializedEvent> {
     var prepared: ConfigurableEnvironment? = null
 
-    override fun onApplicationEvent(event: ApplicationEnvironmentPreparedEvent) {
-        prepared = event.environment
-        throw EnvironmentPrepared()
+    override fun onApplicationEvent(event: ApplicationContextInitializedEvent) {
+        prepared = event.applicationContext.environment
+        throw ContextInitialized()
     }
 }

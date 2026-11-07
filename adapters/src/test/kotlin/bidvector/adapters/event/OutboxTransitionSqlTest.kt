@@ -184,7 +184,15 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
         val definition = constraintDefinition("outbox_terminal_reason_state_check")
 
         val tokens = Regex("'([A-Z_]+)'::text").findAll(definition).map { it.groupValues[1] }.toList()
-        val pairs = tokens.chunked(2).map { (state, reason) -> state to reason }.toSet()
+        // 토큰이 홀수면 **그 사실로** 실패한다(cr L-1) — 구조 분해에 맡기면 `component2()` 의
+        // `IndexOutOfBoundsException` 이 되어 「CHECK 가 바뀌었다」가 아닌 사유로 붉어진다.
+        val pairs =
+            tokens
+                .chunked(2)
+                .map { pair ->
+                    require(pair.size == 2) { "쌍이 아닌 토큰이 남았다(제약 렌더링이 바뀌었다): $tokens" }
+                    pair[0] to pair[1]
+                }.toSet()
 
         pairs shouldBe OutboxTerminalReason.entries.map { it.terminalState.dbToken() to it.name }.toSet()
     }
