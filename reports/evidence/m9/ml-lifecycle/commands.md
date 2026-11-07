@@ -499,6 +499,61 @@ CPython 3.12 가 그 스코프를 보는 시점이 **패치 버전마다 다르�
 
 **건드린 것은 그 test 파일 하나뿐**이다 — src·정책·장부 무편집(`git diff` 계수로 확인).
 
+## §4j 병합 전 일괄 — v r7 M-1 (제네릭 반환 입구) · main `bd2f450e`
+
+재검증이 **ready-for-review @`fe46bd2f`** 로 통과했고(두 인터프리터에서 집합·hints 동일),
+비차단 M-1 하나를 병합 전에 닫았다.
+
+### M-1 — **앞 커밋이 우연한 방어 하나를 없앴다**
+
+`localns` 처방 뒤 `get_type_hints` 는 `-> P` 를 **`TypeVar`** 로 해석한다. 그런데
+`_flatten_with_guard` 는 `TypeVar` 를 잎으로 두고 `__bound__` 를 펴지 않아,
+`def f[P: EvaluationPolicy](path, kind: type[P]) -> P` 같은 입구가 `_is_policy_type` 에서
+거짓이 되어 **모집단에서 조용히 빠졌다**.
+
+앞 판에서는 이 모양이 3.12.3 의 `NameError` 로 **해석 실패 등식**에 걸려 RED 였다 — r6 가
+「PEP 695 입구는 RED」로 잰 근거가 그 **우연**이었다. CI(3.12.13) 기준으로는 **원래 열려 있던
+구멍**이고, 처방이 그 우연을 걷어내며 로컬에서도 드러났다.
+
+처방: `_flatten_with_guard` 에 `TypeVar` 가지(`__bound__`·`__constraints__` 를 편다). 같은
+가지로 **구식 `TypeVar("_P", bound=…)` + `# noqa: UP047`**(r6 L-2 가 반례로 등재했던 모양)도
+함께 닫힌다.
+
+| 변이 | 수정 전 | 수정 후 |
+| --- | --- | --- |
+| R1 PEP 695 제네릭 반환 입구 | 3.12.3 **GREEN** · 3.12.13 **GREEN** | 둘 다 **RED** |
+| R2 구식 `TypeVar(bound=…)` + noqa | 3.12.3 **GREEN** · 3.12.13 **GREEN** | 둘 다 **RED** |
+| C 통제군(주석 한 줄) | — | 둘 다 **GREEN** |
+
+집합도 두 버전에서 같다: 해석 실패 **4** · 정책 입구 전수 **12**(양쪽).
+
+### 변이 하네스가 거짓말을 했고 그것을 잡았다
+
+처음 측정은 `uv run --python X --no-sync` 로 두 버전을 돈다고 **적었지만** 그렇지 않았다 —
+`--no-sync` 가 `--python` 을 무시하고 기존 `.venv` 를 쓴다(실측: 3.12.3 을 달라고 해도
+**3.12.13** 이 나왔다). 「두 버전 GREEN」이 사실은 한 버전이었다.
+`UV_PROJECT_ENVIRONMENT` 로 venv 를 갈라 두고 **매 실행 전에 실제 버전을 단언**하게 고쳤다.
+이 저장소의 「초록인데 조용하다」 계열이고, **하네스 자신도 측정 대상**이라는 자리다.
+
+### v r7 참고(비 finding)도 닫았다
+
+사유를 재는 test 가 `get_type_hints` 를 **localns 없이** 불렀다 — 등식이 쓰는
+`_resolved_hints` 와 다른 namespace 다. 「PEP 695 제네릭이면서 stub 속성 부재」인 함수가
+선언 목록에 들어오는 날 **먼저 나는 예외가 버전마다 달라** 그 test 가 다시 갈린다. 두 자리가
+`_resolution_localns` 하나를 공유하게 했다(한 줄).
+
+### main 병합 · acceptance
+
+`bd2f450e`(PR #142 CVE) 병합 — `56bd33ea..bd2f450e` 8 파일에 `ml-engine/**` **0**,
+내 in_scope 겹침 **0**(계수 확인). 병합이 in_scope 에 가져온 변경 **빈 출력**.
+rollback 원천을 그 SHA 로 옮기고 다시 쟀다(목록 `M` 37 · `A` 11 불변, 복원 트리 해시
+`b520aebc…` 원천과 동일).
+
+**CI `ml-engine` job 열한 단계를 3.12.13 에서** 돌렸다(`uv sync --frozen --all-extras
+--python 3.12.13` — CI 의 `setup-python` 이 `3.12` 를 푸는 패치와 같다): **전부 exit 0**,
+S-5 **1751 passed**. 실행 뒤 인터프리터를 다시 물어 **3.12.13** 임을 확인했다(위 하네스
+거짓말 뒤라 버전은 매번 단언한다).
+
 ## §5 되돌림
 
 `rollback.md` **가 정본**이다 — 복원 원천·복원 목록·실측 HEAD·트리 동일성·표지 계수가 전부

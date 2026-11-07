@@ -2,33 +2,33 @@
 
 **전제**: 이 slice 는 아직 main 에 **없다**(머지 전). 머지 뒤의 되돌림은 이 문서가 아니라 그 PR 의 revert 다.
 
-**복원 원천은 `56bd33ea`** — 이 브랜치가 **마지막으로 병합한 main 커밋**(PR #137, 승인 전 일괄 라운드에서 병합)이다.
+**복원 원천은 `bd2f450e`** — 이 브랜치가 **마지막으로 병합한 main 커밋**(PR #142, 병합 전 일괄 라운드에서 병합)이다.
 고정 기재이고 움직이는 `origin/main` 을 쓰지 않는다. 착수 base `df4976cc` 는 더 이상 원천이 아니다 — 그
 사이 main 이 89 커밋 움직였고, `df4976cc` 에서 복원하면 **남의 줄을 떨어뜨린다**(`capability-map.md` 는 이
 range 에서 다른 레인 넷이 114 줄을 더했다).
 
-전제 둘을 단언했다 — ① `56bd33ea` 는 HEAD 의 **조상**이다(`git merge-base --is-ancestor` exit 0)
+전제 둘을 단언했다 — ① `bd2f450e` 는 HEAD 의 **조상**이다(`git merge-base --is-ancestor` exit 0)
 ② 이 slice 의 **첫 산출물 커밋이 그 SHA 에 없다**(`ffa93b5b` 에 대해 `--is-ancestor` 비-0). ② 가 성립하므로
 그 SHA 에서의 전체 복원이 남의 줄을 떨어뜨릴 수 없고 커밋 해시 hunk 격리가 필요 없다.
 
 **공유 파일에 hunk 격리가 필요 없는 근거**: 다른 slice 도 만지는 파일은 `docs/discovery/capability-map.md` 와
 **다른 slice 의 정책 값 장부 둘**(`reports/evidence/m5/5c2/policy-values.md` ·
 `reports/evidence/m5/5d/policy-values.md` — cr M-4 · v r2 L-2 로 in_scope 확장 승인, scope.md 「계약 갱신
-2026-11-06」)이다. `HEAD ^56bd33ea` 에서 그 셋을 만진 **비-머지** 커밋은 전부 이 slice 의 것이고
+2026-11-06」)이다. `HEAD ^bd2f450e` 에서 그 셋을 만진 **비-머지** 커밋은 전부 이 slice 의 것이고
 (capability-map 셋 · 장부 각 둘), 넷째 행은 **이 브랜치의 main 병합 커밋**이다. 편집은 **덧붙이기**이며,
 복원 원천이 main 측 내용을 그대로 담으므로 전체 복원이 남의 줄을 떨어뜨릴 수 없다.
 
 **하네스 경로**(`CLAUDE.md` · `.claude/**`)는 되돌리지 않는다 — 같은 range 의 비-머지 로그가 **빈 출력**
 (이 slice 에 하네스 레인 커밋 0).
 
-**fixture·6G 판정은 건드리지 않았다** — `git diff --name-only 56bd33ea..HEAD` 에 `fixtures/` ·
+**fixture·6G 판정은 건드리지 않았다** — `git diff --name-only bd2f450e..HEAD` 에 `fixtures/` ·
 `reports/evidence/m6/` · `evaluation/backtest/**` · `strategy-backtest-v2.yaml` 이 **0 건**이다(golden *test*
 파일 하나는 호출 형태만 따라갔고 기대값 JSON 은 무편집).
 
 ## 복원 명령 (in_scope 경로 한정 · 경로는 개별 인자)
 
 ```bash
-git restore --source=56bd33ea --staged --worktree -- \
+git restore --source=bd2f450e --staged --worktree -- \
   docs/discovery/capability-map.md \
   ml-engine/policy/evaluation-v1.yaml \
   ml-engine/policy/inference-v1.yaml \
@@ -68,7 +68,7 @@ git restore --source=56bd33ea --staged --worktree -- \
   reports/evidence/m5/5d/policy-values.md
 ```
 
-**신규 파일은 복원이 아니라 삭제다**(`56bd33ea` 에 없으므로 `restore` 가 받지 않는다) — **11** 이다.
+**신규 파일은 복원이 아니라 삭제다**(`bd2f450e` 에 없으므로 `restore` 가 받지 않는다) — **11** 이다.
 
 ```bash
 git rm -f \
@@ -88,7 +88,7 @@ git rm -f \
 evidence 디렉터리는 **목록 밖**이다(장부층 — 그래서 이 목록이 자기를 담은 커밋을 가리키지 않는다).
 함께 지우려면 `git rm -r reports/evidence/m9/ml-lifecycle`.
 
-목록은 **기계 산출**이다 — `git log --no-merges --format= --name-only HEAD ^56bd33ea | sort -u` 에서 이
+목록은 **기계 산출**이다 — `git log --no-merges --format= --name-only HEAD ^bd2f450e | sort -u` 에서 이
 slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`git cat-file -e`)로 `M`/`A` 를 갈랐다
 (`M` **37** · `A` **11**). 라운드가 늘면 다시 산출한다.
 
@@ -114,15 +114,18 @@ slice 의 evidence 디렉터리를 뺀 뒤, 각 경로가 원천에 있는지(`g
 
 예상 복구 시간: 명령 둘(초 단위).
 
-## 실측 (버릴 clone, **실측 HEAD `fe46bd2f`** — 이 slice 의 마지막 산출물 커밋)
+## 실측 (버릴 clone, **실측 HEAD `830e21a6`** — 이 slice 의 마지막 산출물 커밋)
 
-**앞 라운드의 실측을 옮기지 않았다 — 이 절은 열째 측정이다.** 아홉째 측정(`25164167`) 뒤
+**앞 라운드의 실측을 옮기지 않았다 — 이 절은 열한째 측정이다.** 병합 전 일괄이 **원천을 다시
+옮겼다**(`56bd33ea` → 이 라운드에 병합한 main `bd2f450e`). `56bd33ea..bd2f450e` 8 파일에
+`ml-engine/**` **0** 이고 내 in_scope 겹침도 **0** 이라(계수 확인) 목록은 `M` 37 · `A` 11 로
+불변이다. 아래 열째 측정의 사유도 그대로 둔다. 아홉째 측정(`25164167`) 뒤
 CI 전용 실패 수정이 **복원 목록 안 파일**(`ml-engine/tests/evaluation/test_public_signatures.py`)
 을 움직여 그 측정이 미검증이 됐다 — 그래서 다시 쟀다(목록은 `M` 37 · `A` 11 로 불변). 그 앞
 측정도 같은 사유였다(장부층 커밋이 `m5/5c2/policy-values.md` 를 건드렸다): **복원 목록 안이면
 장부층이든 test 든 재측정 대상**이다. 승인 전 일괄 라운드가 **원천을
-다시 옮겼다**(`97ed49c4` → 이 라운드에 병합한 main `56bd33ea`). 목록은 `M` 37 · `A` 11 로
-**그대로**다(r5 와 `diff` 빈 출력) — `97ed49c4..56bd33ea` 가 만진 54 파일에 `ml-engine/**` 이
+다시 옮겼다**(`97ed49c4` → 이 라운드에 병합한 main `bd2f450e`). 목록은 `M` 37 · `A` 11 로
+**그대로**다(r5 와 `diff` 빈 출력) — `97ed49c4..bd2f450e` 가 만진 54 파일에 `ml-engine/**` 이
 **0** 이고, 겹치는 in_scope 는 `docs/discovery/capability-map.md` **하나**다(계수로 확인).
 그 하나는 **합집합이 보존됐음을 계수로 확인했다**: 양쪽이 더한 줄(lane 51 · main 5) 전부 병합본에
 있고, 양쪽이 지운 줄 전부 없고, 중복 비빈줄 종류가 base 와 **같다**(24 — 병합이 만든 중복 0),
@@ -133,8 +136,8 @@ CI 전용 실패 수정이 **복원 목록 안 파일**(`ml-engine/tests/evaluat
 | — | 목록 등식 | 기계 산출 `M` **37** · `A` **11**(이 slice 의 evidence 제외) · 문서 목록 **37 + 11**, `comm -3` 빈 출력 |
 | ① | 복원 명령 셋 | `restore` exit **0** · `rm` exit **0** · `rm -r`(evidence) exit **0** |
 | ② | `git status --porcelain` 계수 | **`M` 37 · `D` 16**(= 신규 11 + 함께 지운 evidence 다섯) |
-| ③ | `git diff 56bd33ea -- .` | **빈 출력** |
-| ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**: 복원 뒤 `write-tree` == 원천 트리 해시(`00016987…` 양쪽) — 되돌린 트리는 `56bd33ea` 와 **같은 트리**이고 그것은 CI 가 통과한 main 이다 |
+| ③ | `git diff bd2f450e -- .` | **빈 출력** |
+| ④⑤ | 컴파일·test 축 | **트리 동일성으로 갈음한다**: 복원 뒤 `write-tree` == 원천 트리 해시(`b520aebc…` 양쪽) — 되돌린 트리는 `bd2f450e` 와 **같은 트리**이고 그것은 CI 가 통과한 main 이다 |
 | ⑥ | 이 slice 가 닿는 게이트 | 아래 「⑥ 게이트」 |
 
 ### 「내 표지 0 · 남의 표지 보존」 계수
@@ -181,14 +184,14 @@ CI 전용 실패 수정이 **복원 목록 안 파일**(`ml-engine/tests/evaluat
 ## 유효성 확인 (감사자용)
 
 ```bash
-git diff --name-only fe46bd2f..HEAD -- <위 복원 목록 37 + 신규 11>
+git diff --name-only 830e21a6..HEAD -- <위 복원 목록 37 + 신규 11>
 ```
 
 빈 출력이면 실측 뒤 되돌림 대상이 움직이지 않았다는 뜻이고 이 실측이 유효하다. 한 줄이라도
 나오면 미검증이다.
 
-**이 slice 의 자리**: 판정 SHA 는 **`fe46bd2f`**(CI 전용 실패 수정 — 산출물 커밋이다)이고
-실측 HEAD 도 **같은 SHA** 다. `fe46bd2f..HEAD` 로 같은 확인을 하면 **빈 출력**이다
+**이 slice 의 자리**: 판정 SHA 는 **`830e21a6`**(main `bd2f450e` 병합 커밋)이고 실측 HEAD 도
+**같은 SHA** 다. `fe46bd2f..HEAD` 로 같은 확인을 하면 **빈 출력**이다
 (rollback.md 는 복원 목록 **밖**이라 이 문서를 고치는 커밋은 그 술어를 깨지 않는다).
 
 **앞 두 측정이 왜 다시 필요했는지**를 남긴다 — 측정 뒤에 복원 목록 안 파일이 움직이면
