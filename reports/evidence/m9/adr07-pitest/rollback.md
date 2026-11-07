@@ -1,11 +1,15 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `97ed49c4`**(이 브랜치가 마지막으로 합친 main 의
-**고정 SHA** = 병합 커밋 `0b9ce7a0` 의 둘째 부모) · **실측 HEAD `0b9ce7a0`**(이 slice 의 마지막
+착수 base **`df4976cc`** · **복원 원천 `56bd33ea`**(이 브랜치가 마지막으로 합친 main 의
+**고정 SHA** = 병합 커밋 `dccb87af` 의 둘째 부모) · **실측 HEAD `dccb87af`**(이 slice 의 마지막
 산출물 커밋 = 현 판정 SHA).
 
-**원천을 두 번 더 옮겼다** — `3ad4f3f6`(둘째 병합) 다음 `97ed49c4`(셋째 병합). 매번 그 병합
-커밋의 둘째 부모로 고정하고 ①~③ 을 다시 쟀다.
+**원천은 이제 §1 블록이 파생한다** — 문면에 적은 SHA 가 한 병합 뒤처져 「남의 머지분을 되돌리는
+목록」을 만든 적이 있다(v r4 M-1). 아래 머리말·§2·§4 의 수는 **그 파생이 낸 값으로 실측한 기록**
+이다.
+
+**원천을 세 번 더 옮겼다** — `3ad4f3f6`(둘째) · `97ed49c4`(셋째) · `56bd33ea`(넷째). 매번 그
+병합 커밋의 둘째 부모로 고정하고 ①~③ 을 다시 쟀다.
 
 **수정 라운드 3 에서 복원 목록이 움직였다** — main 소스 하나(`MutationReportLocation.kt`)가
 늘어 **26 → 27** 경로가 됐다. 그래서 ①~③ 과 표지 계수를 그 커밋에서 **다시** 쟀다. 원천은
@@ -49,7 +53,14 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-MAIN=3ad4f3f6   # 마지막으로 합친 main 의 고정 SHA (= HEAD^2)
+# 원천을 **좌표로 적지 않고 파생한다.** 문면에 SHA 를 적었더니 한 병합 뒤처졌고, 그 상태로
+# 실행하면 목록이 부풀어 **남의 머지된 PR** 을 되돌린다(v r4 M-1 에서 실측 — 27 → 35 경로,
+# 결과 트리가 adapters 넷·등록부 주석·남의 evidence 넷만큼 어긋났다). 머지 **전**에만 유효하다 —
+# 머지 뒤 되돌림은 PR revert 다(하네스 규율).
+MAIN=$(git rev-parse "$(git rev-list --merges -1 HEAD)^2")   # 마지막 병합의 둘째 부모 = 합친 main
+git merge-base --is-ancestor "$MAIN" HEAD || { echo "원천이 이 브랜치의 조상이 아니다: $MAIN"; exit 1; }
+echo "복원 원천: $MAIN"
+
 EXCL=':(exclude)reports/evidence/m9/adr07-pitest'   # 자기 자신은 되돌릴 수 없다
 
 mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
@@ -65,19 +76,19 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `0b9ce7a0`(셋째 병합 뒤)
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `dccb87af`(넷째 병합 뒤)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **27**(evidence 제외) = 복원 **15**(M) · 삭제 **12**(A) — 기계 목록과 같다. 수정 라운드들이 셋을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh` · 리포트 자리 헬퍼) |
-| ③ 결과 트리 == `97ed49c4` 트리 | 복원 대상 27 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
+| ③ 결과 트리 == `56bd33ea` 트리 | 복원 대상 27 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`97ed49c4` 의 트리와 파일 단위로 같다**(③). 그 커밋은 병합된 main(PR #134 머지
+복원한 트리는 **`56bd33ea` 의 트리와 파일 단위로 같다**(③). 그 커밋은 병합된 main(PR #137 머지
 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시 돌리는 것은 같은
 트리를 다시 재는 일이다.
 
@@ -121,8 +132,9 @@ evidence 뿐이고 코드·설정에 남은 자리가 없다는 뜻이다 — �
 | **첫 병합분** — `### 12.3`(#133) · `OPEN-7E3B-TIME-DISPLAY` · `money-vocab-cross-lang`(#132) | 1 · 4 · 2 |
 | **main 머지분의 등록부 증분** — `gate-tests` `app` 블록 등재 | **124**(내 복원이 같은 파일을 만지는데도 그 셋이 남는다. 같은 파일의 `build-logic` 블록은 내 **+4** 가 빠져 원천의 **27** 로 돌아간다 — 「내 줄 사라짐 · 남의 줄 남음」이 한 파일 안에서 갈린다) |
 | `web/config/gate-tests.txt`(main 만 만지는 등록부) | 108 줄, 원천과 동일 |
-| **겹친 등록부의 main 쪽 줄**(#134 가 고친 주석 문단) | **1** — 내 `build-logic` +4 는 사라지고(27 로 복귀) 같은 파일의 그 문단은 남는다 |
-| #134 의 evidence 디렉터리 | 파일 **4** |
+| **겹친 등록부의 main 쪽 증분**(#137 이 더한 등재) | `adapters` **190** · `app` **125** 가 남고 내 `build-logic` +4 는 사라진다(27 로 복귀) — 한 파일 안에서 갈린다 |
+| **겹친 capability-map 의 main 쪽 줄**(#137 이 닫은 행) | 취소선 **1** · 내 증감 줄 **0** · 줄 수 **3972**(원천과 같다) |
+| #137 의 evidence · 마이그레이션 | 파일 **5** · `V25` **1** |
 | `pitest-engine`(이 slice 가 **지운** 카탈로그 alias — 되살아나야 한다) | 1 |
 | `conventionCoverageGate`(1A) · `cpdCheckObserved`(1C) · `leakPatternGate` | 1 · 4 · 10 |
 | `OPEN-ADR-16`(같은 ADR 의 다른 절) | 9 |
@@ -159,8 +171,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 0b9ce7a0..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 97ed49c4..0b9ce7a0 \
+git diff --name-only dccb87af..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 56bd33ea..dccb87af \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 

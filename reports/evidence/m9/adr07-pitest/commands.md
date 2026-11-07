@@ -1,6 +1,6 @@
 # M9/adr07-pitest commands
 
-base `df4976cc` · **판정 SHA `0b9ce7a0`**(둘째 병합 커밋 — 수정 라운드 3 + main `97ed49c4` 병합) · 전 실행
+base `df4976cc` · **판정 SHA `dccb87af`**(넷째 병합 커밋 — 수정 라운드 4 + main `56bd33ea` 병합) · 전 실행
 `~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(호스트 빌드 자리 둘 규율). 아래 「결과」는
 핵심 한 줄이고 출력 전문은 싣지 않는다.
 
@@ -8,7 +8,8 @@ base `df4976cc` · **판정 SHA `0b9ce7a0`**(둘째 병합 커밋 — 수정 라
 그 뒤로 산출물 커밋이 더 왔다(capability-map 행 하나 · 수정 라운드 다섯). §1~§7 은 **첫 라운드**의 실측,
 **§9 는 수정 라운드 1**(`eab07b5b`), **§10 은 첫 병합 뒤**(`d4b43248`), **§11 은 수정 라운드 2**
 (처방 `07ecf5e9` · 병합 `2fad9b99`), **§12 는 수정 라운드 3**(`9fbb1caf`), **§13 은 main `97ed49c4` 병합
-뒤**(`0b9ce7a0` = 현 판정 SHA)다 — 어느 수가 어느 SHA 의 것인지 절로 가른다.
+뒤**(`0b9ce7a0`), **§14 는 수정 라운드 4 + main `56bd33ea` 병합**(`dccb87af` = 현 판정 SHA)다 —
+어느 수가 어느 SHA 의 것인지 절로 가른다.
 
 ## 1. 도구가 이 저장소에서 서는가 — 채택의 전제
 
@@ -70,9 +71,14 @@ qualification 의 생존·미복제 25 개를 분류하니 절반 가까이가 �
 | # | 명령 | 결과 |
 | --- | --- | --- |
 | S-1 | `check --dry-run` | task **474** 중 pitest·mutation **0** |
-| S-2 | `mutationCheck --dry-run` | task **87** 중 pitest·mutation **16** |
+| S-2 | `mutationCheck --dry-run` | task **86** 중 pitest·mutation **16**(2026-11-07 재계수로 정정 — 아래) |
 
 S-1 만으로는 「명령이 아무것도 세지 않았다」와 구별되지 않는다 — S-2 가 그 통제군이다.
+
+**S-2 의 총수를 정정했다(v r4 참고 ⅱ).** 첫 라운드에 **87** 로 적었고 현 판정 SHA 에서 다시
+세니 **86** 이다. 판정 축인 pitest·mutation **16** 과 S-1(총 **474** · pitest·mutation **0**)은
+그대로다. 처방 전후의 task 집합이 같다는 것은 verifier 가 따로 쟀다 — 이 수는 그 뒤의 병합이
+움직인 것이고 이 slice 의 처방이 만든 차이가 아니다.
 
 ## 5. acceptance — 판정 SHA `f4a85991`
 
@@ -394,3 +400,53 @@ evidence 뿐이고 `build-logic/**`·카탈로그·ADR·대상 모듈 빌드 스
 
 원천을 `97ed49c4` 로 옮기고 다시 쟀다 — `rollback.md`. 겹친 등록부에서 **내 +4 는 사라지고
 main 의 주석 문단은 남는** 것이 그 파일 한 장에서 갈린다.
+
+## 14. 수정 라운드 4 + 넷째 병합 — 처방 `8cfd2715` · 병합 `dccb87af`
+
+지적 둘(v r4): 장부층 **M-1**(rollback 실행 블록의 원천 SHA 가 한 병합 뒤처졌다)과 **L-2**
+(`timestampedReports` 가 자리의 둘째 축인데 파생되지 않는다). 그리고 main `56bd33ea` 병합.
+
+### 14.1 M-1 — 실행 블록의 원천을 **파생**으로 바꿨다
+
+문면에 SHA 를 적는 한 같은 사고가 또 난다(병합마다 한 자리씩 뒤처진다). `rollback.md` §1 의
+블록은 이제 **마지막 병합의 둘째 부모**에서 원천을 파생하고, 그 값이 이 브랜치의 조상인지
+확인한 뒤 출력한다. 파생이 실제로 같은 값을 내는지 쟀다 — 병합 전 `97ed49c4`, 넷째 병합 뒤
+`56bd33ea` 로 복원 목록 **27** 경로가 그대로다. 「머지 뒤에는 PR revert」라는 전제도 블록에
+적었다(그때는 파생이 자기 자신을 가리키게 된다).
+
+### 14.2 L-2 — 타임스탬프 리포트를 구성 단계에서 거부한다
+
+| # | 명령 | 결과 |
+| --- | --- | --- |
+| R-16 | 플래그를 **extension 축**·**task 축**에서 각각 켠 fixture 둘, 구판에서 | **RED** — 둘 다 `UnexpectedBuildSuccess`(구성이 지나고 게이트가 낡은 리포트로 통과). 기존 다섯은 **통제군**으로 초록(7 중 2 실패) |
+| R-17 | 같은 fixture, 처방 뒤 | 일곱 전부 초록 |
+| R-18 | `-p build-logic test --tests 'bidvector.buildlogic.Mutation*' validatePlugins ktlint{Main,Test}SourceSetCheck detekt` | **exit 0.** mutation test **37**(14·10·7·6), 실패·건너뜀 0 |
+
+파생으로 막을 수 없는 축이라 **켜는 것 자체를 거부**한다 — 시각 이름을 우리가 알 수 없고,
+알더라도 Gradle 이 출력 디렉터리의 낡은 파일을 지우지 않아 좋은 낡은 리포트가 남는다. 읽는 값은
+**task 의 것**이다(리포트를 쓰는 것이 task 다). 검사가 lazy 한 게이트 배선 안에서 돌기 때문에
+모든 스크립트 평가가 끝난 뒤의 최종값을 본다 — 그래서 extension 축과 task 축이 **둘 다** 잡힌다.
+
+### 14.3 넷째 병합 — main `56bd33ea`(#137)
+
+겹친 파일이 **둘**이다(등록부 · capability-map). 손 해소 줄 **0**(`git show --cc` 빈 출력).
+
+| 축 | 결과 |
+| --- | --- |
+| 등록부 블록 열여섯 | 전부 **base + 양쪽 증분**과 일치(`adapters` 188→**190** · `app` 124→**125** 는 main 몫, `build-logic` 27→**31** 은 내 몫) · 중복 **0** · 사전순 아닌 블록은 세 판 모두 같은 셋 |
+| capability-map 줄 | 원천 3971 + 내 **+6** + main **+1** = **3978**(실측 일치) |
+| 내 표지(병합 뒤) | 증감 줄 1 · G6 두 행 2 · 취소선 `OPEN-ADR-07` 1 · 취소선 없는 그 행 **0** |
+| main 표지(병합 뒤) | 취소선 `OPEN-7C3B-PAPER-BID-NOTIFICATION` 1 · 취소선 없는 그 행 **0** · 그 PR 의 문장 1 |
+| 집합 등식 | `HEAD ↔ 56bd33ea` 차이 == 내 경로 31(양방향 차집합 0) · main 의 겹치지 않는 파일 52 차이 0 · 내 파일(겹침 둘 제외) 병합 전후 차이 0 |
+
+### 14.4 재실측 — 모든 task 에 `--rerun`
+
+| # | 명령 | 결과 |
+| --- | --- | --- |
+| R-19 | `-p build-logic test --rerun validatePlugins --rerun ktlint{Main,Test}SourceSetCheck detekt --rerun` | **exit 0** · 전부 실행. 결과 XML **31** · 실패 클래스 **0** · mutation **37**, 건너뜀 0 |
+| R-20 | 게이트 여섯에 각각 `--rerun` | **exit 0** · 여섯 전부 실행. **`:build-logic:test` 도 이번에는 실행**(앞 라운드의 FROM-CACHE 가 아니다) · `required` 31 == 결과 XML 31 · `population` 31 · `excluded` 0 |
+| R-21 | `mutationCheck --dry-run` · `check --dry-run` | **86**/pitest·mutation 16 · **474**/pitest·mutation **0** — §4 의 두 수를 현 SHA 에서 다시 세어 S-2 를 86 으로 정정했다 |
+| R-22 | evidence 를 담은 트리에서 `leakPatternGate --rerun` | **exit 0** · 실행. 그 뒤 이 표의 한 줄만 자란다(§11.5 의 같은 단서) |
+
+pitest 자체는 이 라운드에도 돌리지 않았다 — main 증분이 `build-logic/**`·카탈로그·ADR·대상 모듈
+빌드 스크립트를 건드리지 않는다(기계 확인). 변이 분석 축과 프로덕션 A/B/C 는 §12 가 든다.
