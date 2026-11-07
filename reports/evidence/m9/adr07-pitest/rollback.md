@@ -1,7 +1,7 @@
 # M9/adr07-pitest rollback
 
-착수 base **`df4976cc`** · **복원 원천 `56bd33ea`**(이 브랜치가 마지막으로 합친 main 의
-**고정 SHA** = 병합 커밋 `dccb87af` 의 둘째 부모) · **실측 HEAD `7f8761f2`**(이 slice 의 마지막
+착수 base **`df4976cc`** · **복원 원천 `bd2f450e`**(이 브랜치가 마지막으로 합친 main 의
+**고정 SHA** = 병합 커밋 `915ecdbf` 의 둘째 부모) · **실측 HEAD `915ecdbf`**(이 slice 의 마지막
 산출물 커밋 = 현 판정 SHA).
 
 **문면 커밋이 복원 목록 안 파일을 건드려 다시 쟀다.** v r5 L-1 정정은 KDoc·test 이름뿐이지만 그
@@ -12,8 +12,9 @@
 목록」을 만든 적이 있다(v r4 M-1). 아래 머리말·§2·§4 의 수는 **그 파생이 낸 값으로 실측한 기록**
 이다.
 
-**원천을 세 번 더 옮겼다** — `3ad4f3f6`(둘째) · `97ed49c4`(셋째) · `56bd33ea`(넷째). 매번 그
-병합 커밋의 둘째 부모로 고정하고 ①~③ 을 다시 쟀다.
+**원천을 네 번 더 옮겼다** — `3ad4f3f6`(둘째) · `97ed49c4`(셋째) · `56bd33ea`(넷째) ·
+`bd2f450e`(다섯째). 매번 그 병합 커밋의 둘째 부모로 고정하고 ①~③ 을 다시 쟀다. §1 블록은
+이제 그 값을 **파생**하므로 문면이 뒤처질 자리가 없다.
 
 **수정 라운드 3 에서 복원 목록이 움직였다** — main 소스 하나(`MutationReportLocation.kt`)가
 늘어 **26 → 27** 경로가 됐다. 그래서 ①~③ 과 표지 계수를 그 커밋에서 **다시** 쟀다. 원천은
@@ -80,19 +81,19 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `7f8761f2`(문면 정정 뒤)
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`), HEAD `915ecdbf`(다섯째 병합 뒤)
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
 | ② 계수 | 내 커밋 경로 **27**(evidence 제외) = 복원 **15**(M) · 삭제 **12**(A) — 기계 목록과 같다. 수정 라운드들이 셋을 더했다(회귀 test 하나 · `tools/workflow-step-refs-check.sh` · 리포트 자리 헬퍼) |
-| ③ 결과 트리 == `56bd33ea` 트리 | 복원 대상 27 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
+| ③ 결과 트리 == `bd2f450e` 트리 | 복원 대상 27 경로의 차이 **0**(작업 트리·색인 둘 다) · 미추적 **0**. 트리 전체로 보면 남는 차이는 ⑦ 의 내 evidence 넷뿐이다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `reports/evidence/m9/adr07-pitest/` **넷**뿐(의도된 제외 — `EXCL` 이 디렉터리 전체를 제외한다). 유효성은 §4 의 술어가 되돌림 대상에서 evidence 를 빼므로 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 **`56bd33ea` 의 트리와 파일 단위로 같다**(③). 그 커밋은 병합된 main(PR #137 머지
+복원한 트리는 **`bd2f450e` 의 트리와 파일 단위로 같다**(③). 그 커밋은 병합된 main(PR #142 머지
 커밋)이고 CI 가 초록으로 통과한 자리다. 그래서 복원 트리에서 `check` 를 다시 돌리는 것은 같은
 트리를 다시 재는 일이다.
 
@@ -139,6 +140,7 @@ evidence 뿐이고 코드·설정에 남은 자리가 없다는 뜻이다 — �
 | **겹친 등록부의 main 쪽 증분**(#137 이 더한 등재) | `adapters` **190** · `app` **125** 가 남고 내 `build-logic` +4 는 사라진다(27 로 복귀) — 한 파일 안에서 갈린다 |
 | **겹친 capability-map 의 main 쪽 줄**(#137 이 닫은 행) | 취소선 **1** · 내 증감 줄 **0** · 줄 수 **3972**(원천과 같다) |
 | #137 의 evidence · 마이그레이션 | 파일 **5** · `V25` **1** |
+| #142(CVE chore) — `vuln-allowlist` **48** 줄 · `docker/caddy/go.mod` · 자기 evidence | 보존(**3** 파일) |
 | `pitest-engine`(이 slice 가 **지운** 카탈로그 alias — 되살아나야 한다) | 1 |
 | `conventionCoverageGate`(1A) · `cpdCheckObserved`(1C) · `leakPatternGate` | 1 · 4 · 10 |
 | `OPEN-ADR-16`(같은 ADR 의 다른 절) | 9 |
@@ -175,8 +177,8 @@ evidence 커밋은 실측 뒤에 오므로 둘은 다르다. 유효성은 **되�
 본다:
 
 ```
-git diff --name-only 7f8761f2..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..7f8761f2 \
+git diff --name-only 915ecdbf..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only bd2f450e..915ecdbf \
       -- . ':(exclude)reports/evidence/m9/adr07-pitest' | sort -u)
 ```
 
