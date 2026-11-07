@@ -52,6 +52,18 @@
 - **적용 DB 되돌림 리허설: 로컬 Testcontainers 1회 허용**(버릴 Postgres · `bv-build` · 실행 전
   `free -m`). 두 갈래(새 V26·V27)의 실측은 `rollback.md` §5 가 적는다.
 
+## 계약 갱신 2026-11-07 (팀장 지시 — 마지막 라운드)
+
+- **사용자가 재작업 상한을 넘어 한 라운드를 승인했다**(2026-11-07). 다음 표적 재검증이 not-ready 면
+  머지하지 않고 사용자에게 돌아간다.
+- **잠금 상한을 migrate 연결에 건다**(v r6 V-1). `app/.../PersistenceWiring.kt` 는 in_scope 문면
+  「관련 … app 코드와 test」 안이고, 새 test `MigrationLockBoundTest` 와 그 게이트 등재도 같다.
+- **`docs/runbook/m6-6b3-retention.md` §4 ⑥ 한 줄은 팀장이 지시한 자리다**(cr r3 L-2). 그 파일은
+  이미 이 slice 의 경로다(라운드 1 이 보존 cron 래퍼에 릴리스 키를 넣었다). 다만 **이번 줄의 축은
+  릴리스 식별자 주입이 아니라 잠금 실패 처분**이라 in_scope 문면(「runbook(릴리스 식별자 주입 …)」)
+  보다 넓다 — cr 이 「범위를 넘는다고 보면 등재가 맞다」고 적은 자리이고, 팀장 지시로 고쳤으므로
+  여기 등재한다.
+
 ## 계약 갱신 2026-11-06 (verifier not-ready 반영)
 
 - **승격된 행의 릴리스는 조인이 다른 질문에 답한다**(v M-1). `observation_key` 조인이 주는 것은
