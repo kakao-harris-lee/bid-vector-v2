@@ -119,15 +119,42 @@ open class PersistenceWiring {
                 password = properties.credential
                 applicationName = MIGRATION_APPLICATION_NAME
             }
-        Flyway
-            .configure()
-            .dataSource(owner)
-            .locations("classpath:db/migration")
-            .load()
-            .migrate()
+        ownerMigration(owner).migrate()
     }
 
     companion object {
+        /**
+         * **마이그레이션 연결의 잠금 대기 상한**(M9/ops-migrations, verifier r6 V-1). 값은 V18 이
+         * 세운 파일 관례와 같다.
+         *
+         * **왜 연결에 거는가.** 기본 `lock_timeout` 은 0(무한)이고 migrate 는 기동의 부수효과라,
+         * 열린 트랜잭션 뒤에 선 DDL 은 **기동 정지**가 된다(그 큐 뒤로 그 표의 읽기까지 선다).
+         * 파일마다 `SET LOCAL` 을 적는 관례는 그 상한을 **저자의 기억**에 맡긴다 — 표기 하나
+         * (`ALTER TABLE IF EXISTS`·스키마 한정·동적 SQL·`DROP TRIGGER`)만 달라도 그것을 세는
+         * 술어가 빗나가고, 값이 `0` 이거나 DDL **뒤에** 적힌 선언도 선언으로 보인다. 연결에 한 번
+         * 걸면 **어떤 표기로 쓰였든, 선언을 잊었든** 모든 마이그레이션이 상한 아래에서 돈다.
+         *
+         * 파일의 `SET LOCAL` 은 그대로 둔다 — 같은 값이라 중복이 무해하고, 고치면 적용된 DB 의
+         * Flyway checksum 이 움직인다. 둘의 관계는 「연결이 바닥을 깔고 파일이 그 자리를 설명한다」다.
+         *
+         * Flyway 의 배타 제어는 `pg_try_advisory_xact_lock` 재시도라 이 상한의 대상이 아니다
+         * (relation 잠금이 아니다) — 그래서 이 값이 Flyway 자신의 잠금 획득을 깨지 않는다.
+         */
+        internal const val MIGRATION_LOCK_TIMEOUT = "5s"
+
+        /**
+         * **출하 마이그레이션 구성 하나** — `main()` 경로([migrateAsOwner])와 그 거동을 재는 test 가
+         * 이 함수를 **같이** 쓴다. test 가 자기 사본으로 Flyway 를 세우면 여기서 [initSql] 을 지워도
+         * 초록이다(D-6A1-27 의 교훈이 이 축에서도 같다).
+         */
+        internal fun ownerMigration(owner: DataSource): Flyway =
+            Flyway
+                .configure()
+                .dataSource(owner)
+                .locations("classpath:db/migration")
+                .initSql("SET lock_timeout = '$MIGRATION_LOCK_TIMEOUT'")
+                .load()
+
         /** `V2__provenance_guard.sql` 이 `NOLOGIN` 으로 만드는 최소 권한 역할. */
         internal const val APPLICATION_ROLE = "bidvector_app"
 
