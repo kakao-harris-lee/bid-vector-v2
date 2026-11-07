@@ -53,14 +53,14 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 - cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=3ad4f3f6 --staged --worktree --`
 - exit: 0
 - 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로 — 수정 라운드 2 가 공유
-  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 97ed49c4 -- <22 경로>` 0 줄 ·
+  incident runbook 을 in_scope 로 들여 하나 늘었다) · `git diff 56bd33ea -- <22 경로>` 0 줄 ·
   **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의 내 test
   클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
-  남의 표지 보존(gate-tests 항목이 main 과 같은 **512** · main 의 새 주석 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
+  남의 표지 보존(gate-tests 항목이 main 과 같은 **515** · architecture-policy 항목이 main 과 같은 **752** · main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로
 
-## 2026-11-06T09:2xZ — 임시 clone 에서 22 경로를 `97ed49c4` 로 되돌림(①②③, 라운드 4 재측정)
-- cmd: 앞 라운드와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=97ed49c4 --staged --worktree --`)
+## 2026-11-07T06:5xZ — 임시 clone 에서 22 경로를 `56bd33ea` 로 되돌림(①②③, 넷째 병합 뒤 재측정)
+- cmd: 앞 라운드와 같은 절차(`git clone --no-local` → `git checkout <실측 HEAD>` → `merge-base --is-ancestor` 둘 → `xargs git restore --source=56bd33ea --staged --worktree --`)
 - exit: 0
 - 핵심 결과: 전제 둘 참 · `D` 12 · `M` 10(= 기계 산출 22 경로, 라운드 2 와 같다) · `git diff 3ad4f3f6 --`
   0 줄 · **evidence 를 뺀 전수 diff 빈 목록** · 내 표지 0(gate-tests 의 내 test 클래스 다섯 합 0 ·
@@ -68,7 +68,7 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
   남의 표지 보존(gate-tests 의 main 쪽 셋 합 3 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
   되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
 
-## 2026-11-06T09:3xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-07T07:0xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
 - 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
@@ -307,6 +307,25 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
 - cmd: 같은 표적 집합(workflow lint 강제 · 게이트 넷)
 - exit: 0
 - 핵심 결과: FAILED 0 · 게이트 22 task · HEAD `cbd1eccc`(판정 SHA)
+
+## 넷째 병합 (main 56bd33ea · 판정 SHA ab9b41ef)
+
+## 2026-11-07T06:3xZ — `git merge 56bd33ea` 와 겹침 셋의 **합집합 계수 예측**
+- cmd: 병합 전 base(`97ed49c4`)·main·내쪽 계수를 각각 세어 합집합을 **예측**하고, 병합 뒤 실측과 맞춤. 키 단위 합집합 등식·키 안 중복·정렬 유지도 함께 계산
+- exit: 0 (충돌 0)
+- 핵심 결과: 예측 = 실측 셋 다 — architecture-policy 750+2+19=**771** · gate-tests 512+3+5=**520** ·
+  capability map OPEN 행 213+1=**214**. 키 안 중복 0 · 키 수 139/16 동일 · 내쪽이 정렬이던 키가 병합 뒤
+  깨진 것 0 · gate-tests 는 키마다 「병합 = 내쪽 ∪ main」 등식 성립 · capability map 은 id 별 등장 수를
+  늘린 것 0·사라진 것 0(main 이 `OPEN-7C3B-PAPER-BID-NOTIFICATION` 을 취소선으로 닫은 것 보존).
+- 한 자리의 「어긋남」은 **의도된 삭제**다: architecture-policy 의 `collection.usecase.type` 을 이 slice 가
+  `types` 로 rename 했고 main 은 그 줄을 건드리지 않았다(base 그대로) — 잃은 main 편집 0.
+
+## 2026-11-07T06:4xZ — 병합 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 라운드 4 와 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈의 lint·detekt·test 가 **전부 실행**(병합이 입력을 바꿨다) ·
+  **낙찰 E2E 6/0** — V25(`notification_inbox_bid_kind`)가 더해진 뒤에도 Flyway 가 깨끗이 지나고 낙찰 축
+  거동이 그대로다(그 마이그레이션은 낙찰 축 표를 건드리지 않는다).
 
 ## acceptance — 전건 `check`
 

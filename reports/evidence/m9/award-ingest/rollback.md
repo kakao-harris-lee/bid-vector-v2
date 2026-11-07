@@ -10,19 +10,21 @@
 
 ## 되돌리는 법(코드·문서)
 
-원천은 **이 브랜치에 병합한 main 커밋 `97ed49c4`** 다(움직이는 `origin/main` 이 아니다). 목록은 손으로
-쓰지 않고 `git log --no-merges --format= --name-only HEAD ^97ed49c4 | sort -u` 에서 내며
+원천은 **이 브랜치에 병합한 main 커밋 `56bd33ea`** 다(움직이는 `origin/main` 이 아니다). 목록은 손으로
+쓰지 않고 `git log --no-merges --format= --name-only HEAD ^56bd33ea | sort -u` 에서 내며
 (= 이 slice 의 커밋만), evidence 디렉터리를 뺀 **22 경로**다(복원 뒤 D 12 · M 10). **라운드마다 다시
 산출한다** — 원천이 움직이거나 라운드가 파일을 더하면 목록도 함께 움직인다: 둘째 병합이 원천을
 `df4976cc` 에서 옮겼고, 수정 라운드 1 이 회귀 test 하나를, 라운드 2 가 **공유 incident runbook**
-(`docs/runbook/m6-6e-operations.md` — 팀장 승인 in_scope 확장)을 들였다. **라운드 3·교차 지적·셋째 병합 어느 것도 새 파일을 만들지 않아 목록이 22 그대로다**(라운드마다 기계 재산출 — 앞 목록과 `comm` 차이 0). 셋째 병합이 원천을 `3ad4f3f6` 에서 `97ed49c4` 로 옮겼고, 겹치는 공유 파일은 등록부 하나뿐이다.
+(`docs/runbook/m6-6e-operations.md` — 팀장 승인 in_scope 확장)을 들였다. **라운드 3·4·교차 지적·병합 둘 어느 것도 새 파일을 만들지 않아 목록이 22 그대로다**(라운드마다 기계
+재산출 — 앞 목록과 `comm` 차이 0). 셋째 병합이 원천을 `3ad4f3f6` → `97ed49c4` 로, 넷째 병합이
+`97ed49c4` → `56bd33ea` 로 옮겼다. 겹치는 공유 파일은 셋째에서 등록부 하나, 넷째에서 **셋**(architecture-policy · gate-tests · capability map)이고 넷째는 합집합을 **계수 예측**으로 확인했다(`commands.md` 의 그 줄).
 
-그 공유 문서는 **다른 레인도 만지는 자리**다. 원천 `97ed49c4` 에 이 slice 의 문단이 없고 남의 §3.3 이
+그 공유 문서는 **다른 레인도 만지는 자리**다. 원천 `56bd33ea` 에 이 slice 의 문단이 없고 남의 §3.3 이
 있으므로 단일 복원이 남의 줄을 지우지 않는다 — 아래 ③c 가 양쪽을 센다. 이 파일이 main 에서 또 움직이면
 다음 병합 뒤 목록·계수를 다시 산출한다.
 
 ```
-git restore --source=97ed49c4 --staged --worktree -- \
+git restore --source=56bd33ea --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsOpeningResultSource.kt \
   adapters/src/test/kotlin/bidvector/adapters/koneps/KonepsAwardListSourceTest.kt \
   app/src/main/kotlin/bidvector/app/collection/AwardCollectionProperties.kt \
@@ -47,7 +49,7 @@ git restore --source=97ed49c4 --staged --worktree -- \
   workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTest.kt
 ```
 
-**hunk 격리가 필요하지 않다 — 전제 둘을 기계로 확인했다.** ⓐ `97ed49c4` 는 HEAD 의 조상이고
+**hunk 격리가 필요하지 않다 — 전제 둘을 기계로 확인했다.** ⓐ `56bd33ea` 는 HEAD 의 조상이고
 ⓑ 이 slice 의 첫 산출물 커밋을 담지 않는다(`git merge-base --is-ancestor` 둘). 그 커밋은 main 에서
 만든 트리라 공유 파일(`config/quality/**`·`docs/discovery/capability-map.md`)에 **다른 레인의 줄은
 이미 들어 있고 내 줄은 없다** — 그래서 단일 복원이 남의 줄을 지우지 않는다(아래 표지 계수가 그것을
@@ -64,7 +66,7 @@ evidence 디렉터리(`reports/evidence/m9/award-ingest/**`). evidence 를 남�
 | --- | --- |
 | ① `git restore …` 종료 코드 | 0 |
 | ② 상태 계수 | `D` 12 · `M` 10 — 기계 산출 22 경로와 같다 |
-| ③ `git diff 97ed49c4 -- <22 경로>` 줄 수 | 0 |
+| ③ `git diff 56bd33ea -- <22 경로>` 줄 수 | 0 |
 | ③b 결과 트리 == 그 main 트리 | evidence 를 뺀 **전수** diff 가 빈 목록 |
 | ③c 내 표지 0 · 남의 표지 보존 | 내 표지 0 — gate-tests 의 내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`. 남의 표지 보존 — gate-tests 의 main 쪽 셋이 각 1 · incident runbook §3.3 머리 1 · capability map §12.3 머리 1 |
 | ④ 세 모듈 `compileTestKotlin` | `commands.md` 의 rollback 줄 |
