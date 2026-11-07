@@ -5,25 +5,29 @@ public 함수(`__all__`에 등재된 callable)를 `inspect`로 전수해, 임계
 
 from __future__ import annotations
 
+import importlib
 import inspect
+import pkgutil
+import sys
+import typing
+from typing import Final
 
+import ml_engine
 import ml_engine.evaluation as evaluation_module
+from ml_engine.evaluation.policy import _INDEXED_LIST_PREFIXES, _SCALAR_KEYS
 
-_FORBIDDEN_PARAMETER_NAMES = frozenset(
-    {
-        "threshold",
-        "paired_t_threshold",
-        "maturity_threshold",
-        "min_evaluation_rows",
-        "max_origins",
-        "agency_baseline_min_count",
-        "stability_seeds",
-        "seeds",
-        "amount_band_edges",
-        "gate_stratum",
-        "stratum",
-    }
+_POLICY_ALIASES = frozenset({"threshold", "seeds", "stratum"})
+"""정책 키의 짧은 별칭 — 키 이름 그대로가 아니어도 같은 값을 낱개로 받는 자리들."""
+
+_FORBIDDEN_PARAMETER_NAMES = (
+    frozenset(_SCALAR_KEYS) | frozenset(_INDEXED_LIST_PREFIXES) | _POLICY_ALIASES
 )
+"""**열거가 아니라 생성이다**(cr M-3). 앞 판은 손 열거였고, 이 slice 가 `_SCALAR_KEYS` 에
+`effective_date` 를 더하면서 그 열거는 갱신되지 않았다 — `def f(*, effective_date: date, …)`
+를 `evaluation.__all__` 에 더하는 길이 이 게이트를 그대로 지나갔다(`gate_baseline`·
+`gate_model`·`segment_axes` 누락은 이 slice 전부터 있던 틈이다). 이제 정책 키를 더하면 이
+게이트의 감시 범위가 **같은 커밋에서** 자란다 — 같은 slice 가 새 게이트(완화 경로 넷)에
+적용한 규율을 옆자리에도 적용한 것이다."""
 
 # 순수 산식·구조 유틸리티 — 정책을 모른 채(policy 매개변수 없이) 값을 그대로 받는다.
 # 완화 표면이 아니다: 게이트 진입점(`gate_outcome`·`passes_gate`·
@@ -103,3 +107,285 @@ def test_load_evaluation_policy_is_the_only_way_to_construct_shipped_values() ->
     추가 매개변수가 없다(ML-07 acceptance ④)."""
     signature = inspect.signature(evaluation_module.load_evaluation_policy)
     assert list(signature.parameters) == ["path"]
+
+
+def test_forbidden_parameter_names_track_the_policy_schema() -> None:
+    """cr M-3 — 모집단이 스키마에서 나온다. 정책 키를 더하고 이 게이트를 잊는 길이 닫혔다."""
+    assert frozenset(_SCALAR_KEYS) <= _FORBIDDEN_PARAMETER_NAMES
+    assert frozenset(_INDEXED_LIST_PREFIXES) <= _FORBIDDEN_PARAMETER_NAMES
+    assert "effective_date" in _FORBIDDEN_PARAMETER_NAMES
+    assert _POLICY_ALIASES <= _FORBIDDEN_PARAMETER_NAMES
+
+
+# ── cr r4 M-2 · v r4 M-7 — 정책 입구 전수를 **해석된 타입**으로 모은다 ──────
+# 앞 판은 ⑴ 모듈 셋을 **손으로 적고** ⑵ `"Policy" in str(return_annotation)`(주석 문자열
+# 부분 일치)과 `"path" in parameters`(인자 이름)로 모집단을 만들었다. 둘 다 텍스트 술어라
+# 셋이 지나갔다(verifier 실측): 타입 **별칭**으로 반환 주석을 가리기 · 인자를 `source` 로
+# **개명** · 입구를 **넷째 모듈**에 두기. 셋 다 게이트를 바꾸지 않고 통과했다.
+#
+# 이제 모집단은 **src 전체**(`ml_engine.*` 전 모듈 순회)에서 `typing.get_type_hints` 로
+# **해석한** 반환 타입이 정책 클래스를 담는 함수 전수다 — 별칭은 해석되고, 모듈 위치는
+# 무관하고, 인자 이름은 모집단 선정에 쓰이지 않는다.
+#
+# 모집단은 평가·추론·serving·training·registry **축 전부**를 함께 센다(cr r4 L-5 — 파일이
+# `tests/evaluation/` 에 있지만 범위는 그 디렉터리가 아니다).
+#
+# **이 test 는 src 전 모듈을 in-process 로 import 한다**(cr r5 L-5). 지금 `sys.modules` 를
+# 보는 게이트는 `tests/gates/test_serving_purity.py` 하나이고 **서브프로세스 격리**라 영향이
+# 0 이다. in-process 로 `sys.modules` 를 보는 게이트를 새로 만들면 같은 격리를 쓸 것.
+#
+# **이 전수가 지는 것은 유입 층이다**(§0 — 리뷰의 자리). 방어선이 아니다: 미승인 값이 판정에
+# 닿는 것은 `evaluation.policy_source` 의 재구성 승인 축이 막는다.
+
+
+_POLICY_TYPE_NAMES: Final[tuple[tuple[str, str], ...]] = (
+    ("ml_engine.evaluation.policy", "EvaluationPolicy"),
+    ("ml_engine.inference.policy", "InferencePolicy"),
+    ("ml_engine.registry.policy", "Policy"),
+    ("ml_engine.serving.policy", "ServingPolicy"),
+    ("ml_engine.training.policy", "TrainingPolicy"),
+)
+"""정책 클래스는 **이름으로** 적고 타입 객체는 순회와 **같은 import 패스**에서 꺼낸다.
+
+모듈 수준에서 class 를 묶으면 `issubclass` 가 조용히 거짓이 된다 — `tests/training/
+conftest.py` 의 `pytest_collection_finish` 가 `ml_engine.training.*` 를 `sys.modules` 에서
+지우므로, 뒤에 재-import 된 모듈의 class 객체가 **다른 객체**다(이 저장소가 5C-1 에서 처음
+만난 함정이고 `tests/app/test_server.py` 머리말이 같은 것을 적는다). 표적 실행에서는 초록이고
+전건에서만 붉어, 모집단이 조용히 줄어드는 모양이었다 — 실측으로 드러났다."""
+
+
+def _flatten_annotation(annotation: object) -> list[object]:
+    """주석을 **끝까지 펴서** 잎 노드 목록으로.
+
+    `typing.get_type_hints` 는 `type X = …`(PEP 695) **별칭을 풀지 않는다** — 반환값이
+    `TypeAliasType` 이고 `get_args` 는 빈 tuple 이다(실측). 그래서 앞 판은 별칭으로 가린
+    입구를 모집단에서 놓쳤다(변이 O4 가 GREEN 으로 그것을 잡았다). 별칭은 `__value__` 로
+    한 겹 풀고, 합 타입은 `get_args` 로 풀고, **재귀**한다(별칭의 별칭도 풀린다)."""
+    return _flatten_with_guard(annotation, set())
+
+
+def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
+    """`_flatten_annotation` 의 본체 — **재귀 별칭 가드**가 있다.
+
+    이 저장소에는 자기를 참조하는 합 타입 별칭이 있어(실측: 가드 없이 `RecursionError`),
+    이미 지난 노드를 `id` 로 기억한다. 가드가 **잎을 버리지는 않는다**: 같은 노드를 두 번째로
+    만났을 때만 멈추므로 처음 만난 모든 잎이 결과에 들어간다."""
+    if id(annotation) in seen:
+        return []
+    seen.add(id(annotation))
+    if isinstance(annotation, typing.TypeAliasType):
+        return _flatten_with_guard(annotation.__value__, seen)
+    args = typing.get_args(annotation)
+    if not args:
+        return [annotation]
+    leaves: list[object] = []
+    for arg in args:
+        leaves.extend(_flatten_with_guard(arg, seen))
+    return leaves
+
+
+_UNRESOLVABLE_ANNOTATIONS: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("ml_engine.features.encoding", "_accumulate"),
+        ("ml_engine.features.schema", "require_declared"),
+        ("ml_engine.serving.prediction", "_validate_selector"),
+        ("ml_engine.training.jobs.servicer", "_fill_failure"),
+        ("ml_engine.training.jobs.servicer", "_fill_store_unavailable"),
+        (
+            "ml_engine.training.jobs.servicer",
+            "TrainingJobServicer._validate_get_or_cancel",
+        ),
+    }
+)
+"""`typing.get_type_hints` 가 해석하지 못하는 함수 전수 — **등식으로 잠근다**(cr r5 M-1).
+
+집합 등식은 **발견된 것**만 비교하므로, 모집단에서 빠지는 함수는 등식을 붉히지 않는다
+(없는 것과 같은 값이다). 그래서 해석 실패를 「모집단 밖」으로 조용히 흘리지 않고 **이 목록과
+같은지** 본다. 우회가 쓰는 길이 바로 그것이었다: 반환 타입을 `if TYPE_CHECKING:` 에서만
+import 하면(이 저장소는 전 모듈이 `from __future__ import annotations`) `NameError` 가 나고
+그 입구가 조용히 모집단에서 빠진다 — `paired_t_threshold` 를 낱개로 받는 public 입구를
+더해도 게이트가 초록이었다(cr 실측)."""
+
+
+def _resolved_hints(func: object) -> dict[str, object] | None:
+    """해석된 주석, 해석 불가면 `None`."""
+    try:
+        return typing.get_type_hints(func)  # type: ignore[arg-type]
+    except (NameError, TypeError, AttributeError):
+        return None
+
+
+def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
+    hints = _resolved_hints(func)
+    if hints is None:
+        return False
+    returned = hints.get("return")
+    if returned is None:
+        return False
+    return any(
+        _is_policy_type(part, policy_types) for part in _flatten_annotation(returned)
+    )
+
+
+def _is_policy_type(part: object, policy_types: tuple[type, ...]) -> bool:
+    """정책 타입 판정 — **동일성에 기대지 않는다**(cr r5 M-1 ⑶).
+
+    `issubclass` 는 class **객체 동일성**을 보므로, 모듈 캐시가 갈린 상태에서 해석된 주석이
+    **옛 class** 를 가리키면 거짓이 된다(`tests/training/conftest.py` 가 `ml_engine.training.*`
+    를 지운다). 그래서 `(모듈, 이름)` 좌표로도 함께 본다 — 캐시 상태와 무관해진다."""
+    if not isinstance(part, type):
+        return False
+    if issubclass(part, policy_types):
+        return True
+    return (part.__module__, part.__name__) in _POLICY_TYPE_NAMES
+
+
+def _src_functions() -> list[tuple[str, str, object]]:
+    """src 전체의 함수 전수 — 모듈 수준 함수 + **클래스 멤버**(함수·`staticmethod`·
+    `classmethod`).
+
+    앞 판은 `vars(module)` 의 `inspect.isfunction` 만 봤고(클래스 멤버 전부 밖), 그 다음 판은
+    클래스 멤버를 `inspect.isfunction` 으로 걸러 **`@classmethod` 를 놓쳤다** —
+    `getattr(cls, name)` 이 bound method 를 주기 때문이다(cr 실측: `@staticmethod` 는 RED,
+    `@classmethod` 는 GREEN). `inspect.isroutine` 은 둘을 함께 받고, `__module__` 비교와
+    `get_type_hints` 는 bound method 에도 그대로 돈다.
+
+    **덮지 못하는 모양**(등재): `property` getter(인자를 못 받아 주입 통로로 약하다) · 모듈
+    수준 `lambda` · 중첩 클래스의 멤버. 이 전수가 지는 것은 **유입 층**이라 그 잔여는 리뷰의
+    자리다(파일 머리 참조)."""
+    found: list[tuple[str, str, object]] = []
+    for info in pkgutil.walk_packages(ml_engine.__path__, "ml_engine."):
+        module = importlib.import_module(info.name)
+        for name, obj in vars(module).items():
+            if inspect.isroutine(obj) and (
+                getattr(obj, "__module__", None) == module.__name__
+            ):
+                found.append((module.__name__, name, obj))
+            elif inspect.isclass(obj) and obj.__module__ == module.__name__:
+                found.extend(
+                    (module.__name__, f"{name}.{member_name}", member)
+                    for member_name, member in inspect.getmembers(
+                        obj, inspect.isroutine
+                    )
+                    if getattr(member, "__module__", None) == module.__name__
+                    and not member_name.startswith("__")
+                )
+    return found
+
+
+def _policy_types_now() -> tuple[type, ...]:
+    return tuple(
+        getattr(importlib.import_module(module_name), type_name)
+        for module_name, type_name in _POLICY_TYPE_NAMES
+    )
+
+
+def _policy_factories() -> set[tuple[str, str]]:
+    """src 전체에서 「정책류를 돌려주는 함수」 전수 — `(모듈, 이름)`."""
+    functions = _src_functions()
+    policy_types = _policy_types_now()
+    return {
+        (module_name, name)
+        for module_name, name, func in functions
+        if _returns_a_policy(func, policy_types)
+    }
+
+
+def _unresolvable_annotations() -> set[tuple[str, str]]:
+    return {
+        (module_name, name)
+        for module_name, name, func in _src_functions()
+        if _resolved_hints(func) is None
+    }
+
+
+def test_annotation_resolution_failures_are_exactly_the_declared_ones() -> None:
+    """해석 실패가 **늘면 붉다**(cr r5 M-1 ⑴). 이것이 없으면 「반환 타입을 TYPE_CHECKING
+    에서만 import 한 입구」가 조용히 모집단에서 빠진다 — 집합 등식은 발견된 것만 비교한다."""
+    assert _unresolvable_annotations() == _UNRESOLVABLE_ANNOTATIONS
+
+
+_POLICY_FILE_ENTRY_POINTS = frozenset(
+    {
+        ("ml_engine.evaluation.policy", "load_evaluation_policy"),
+        ("ml_engine.evaluation.policy_source", "load_approved_evaluation_policy"),
+        ("ml_engine.inference.policy", "_read_policy_file"),
+        ("ml_engine.inference.policy", "load_approved_inference_policy"),
+        ("ml_engine.inference.policy", "load_inference_policy"),
+        ("ml_engine.serving.policy", "load_serving_policy"),
+        ("ml_engine.training.policy", "load_training_policy"),
+    }
+)
+"""정책을 **파일에서** 만드는 자리 전수 — `path` 하나만 받아야 한다. 그것이 「임계를 낱개
+인자로 받는 public 함수는 없다」(설계 검토 (1) 첫 행)의 기계적 표현이다. 모듈 private
+(`_read_policy_file`)도 넣는다: 거기에 매개변수가 생기면 public 래퍼 시그니처는 그대로여도
+주입 자리가 열린다."""
+
+_POLICY_ENTRY_EXCEPTIONS = frozenset(
+    {
+        # 경로를 **인자로** 받지 않는다 — 검사 대상 객체가 들고 온 경로에서 재구성한다
+        # (cr r5 L-1 — 「이미 로드된 것에서 파생한다」는 r4 뒤 거짓이 됐다).
+        ("ml_engine.evaluation.policy_source", "verify_policy_source"),
+        ("ml_engine.inference.policy", "_coerce_values"),
+        ("ml_engine.inference.policy", "_inference_policy_of"),
+        # 뿌리 로더 — `known_keys`(스키마 전수)를 받는다. 값이 아니라 **어떤 키를 아는가**이고,
+        # 소비 로더가 자기 스키마를 넘기는 자리다.
+        ("ml_engine.registry.policy", "load_policy"),
+        # backtest CLI 의 합성 로더 — 경로 **둘**(판정 정책 + 추론 정책)을 받는다. 오프라인
+        # 분석 경로이고 **승격 판정에 닿지 않는다**(verifier r4 실측: `evaluation/backtest/**`
+        # 와 `app/backtest_*.py` 에 `run_holdout`·`EvaluationPolicy`·promotion 참조 0).
+        # 그 축의 판정 정책 `strategy-backtest-v2` 는 일부러 미등록이다(6G 판정 입력 불간섭).
+        ("ml_engine.app.backtest_job", "_load_policies"),
+    }
+)
+"""`path` 하나만 받는 모양이 아닌 정책 자리 — **사유와 함께** 명시 예외로 둔다. 새 함수가
+파일 입구도 예외도 아니면 아래 등식이 붉다."""
+
+
+def _resolve(module_name: str, name: str) -> object:
+    """`(모듈, 이름)` 좌표를 객체로 — 이름이 `Class.member` 꼴이면 점으로 쪼갠다.
+
+    cr r6 L-5 — `_src_functions` 가 클래스 멤버를 그 꼴로 좌표화하므로, 입구·예외 집합에
+    클래스 멤버가 들어오는 날 `getattr(module, "Class.member")` 가 `AttributeError` 로
+    죽는다(단언이 아니라 사고다). 지금 열하나는 전부 모듈 수준이라 도달 불가지만, 그
+    도달 불가에 기대지 않는다."""
+    resolved: object = sys.modules[module_name]
+    for part in name.split("."):
+        resolved = getattr(resolved, part)
+    return resolved
+
+
+def test_policy_factories_split_into_file_entry_points_and_derivations() -> None:
+    """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외.
+
+    **측정한 모양**에 대해 이 등식이 먼저 붉다: 모듈 수준 함수 · 클래스 멤버
+    (`staticmethod`·`classmethod`) · 어느 모듈에 두든 · 반환 주석을 PEP 695 **별칭**으로
+    가려도(해석이 풀고, 자기참조는 가드) · 인자를 **개명**해도 · 반환 타입을
+    `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다).
+
+    **반례도 측정했다**(v r6 L-2): 구식 `TypeVar(bound=…)` 반환 + `# noqa: UP047` 은 이
+    등식을 지나간다(그 noqa 가 없으면 ruff UP047 이 먼저 붉다). 이 전수가 지는 것은
+    **유입 층**이고 방어선이 아니다 — 그 잔여는 리뷰의 자리이고, 미승인 값이 판정에 닿는 것은
+    `evaluation.policy_source` 의 재구성 승인 축이 막는다(파일 머리 참조)."""
+    assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_ENTRY_EXCEPTIONS
+    assert frozenset() == _POLICY_FILE_ENTRY_POINTS & _POLICY_ENTRY_EXCEPTIONS
+
+
+def test_every_policy_file_entry_point_takes_only_a_path() -> None:
+    """ML-07 acceptance 4 — CLI·env 로 값을 주입하는 추가 매개변수가 없다."""
+    for module_name, name in sorted(_POLICY_FILE_ENTRY_POINTS):
+        signature = inspect.signature(_resolve(module_name, name))
+        assert list(signature.parameters) == ["path"], (module_name, name)
+
+
+def test_no_policy_entry_exception_takes_a_threshold_shaped_parameter() -> None:
+    """명시 예외 쪽도 **임계 이름**은 받지 않는다 — 예외 선언이 주입 통로가 되지 않게."""
+    violations: list[str] = []
+    for module_name, name in sorted(_POLICY_ENTRY_EXCEPTIONS):
+        signature = inspect.signature(_resolve(module_name, name))
+        violations.extend(
+            f"{module_name}.{name}({parameter})"
+            for parameter in signature.parameters
+            if parameter in _FORBIDDEN_PARAMETER_NAMES
+        )
+    assert not violations, violations

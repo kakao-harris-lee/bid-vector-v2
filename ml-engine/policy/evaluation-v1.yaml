@@ -2,6 +2,13 @@ version: evaluation-v1
 # 값 근거·legacy 좌표는 reports/evidence/m5/5c2/policy-values.md §1 — 전부 legacy
 # 코드 상수(ed4b06c)의 무변경 이식(D-5C2-3). 이 파일만 편집해서 임계를 바꾸지 않는다 —
 # 정책 값 갱신 절차는 policy-values.md → 이 파일 → test 순(같은 문서 §0).
+# M9/ml-lifecycle — ML-07 acceptance ③ 의 effective date. 값은 이 정책 표의 **승인 날짜**
+# (KST)다: `reports/evidence/m5/5c2/policy-values.md` 머리말 「승인 2026-09-16」. 효력 시작
+# 전에 시작한 평가 창의 통과는 승격 근거로 인용되지 않는다 — 정책이 참고할 수 있었던 창이기
+# 때문이다(ML-07 「관측에서 역산한 상수가 그 데이터의 사후 산물이 된다」). **인용 필수** —
+# 비인용 ISO 날짜는 YAML 이 `date` 객체로 읽어 정책 값 축(문자열·수·bool) 밖이고, 로더가
+# 거부한다.
+effective_date: "2026-09-16"
 paired_t_threshold: 2.58
 gate_baseline: category_x_band
 gate_model: gbm_all_strata

@@ -518,7 +518,9 @@ def test_write_artifact_rejects_feature_name_mismatch() -> None:
 def test_write_artifact_release_derives_entirely_from_trained() -> None:
     """H-1 — 우회 (12) 폐쇄 확인. `write_artifact` 는 `trained` 하나만 받으므로
     호출자가 다른 `dataset_id`/`code_version`/`seed`를 실을 경로가 없다(시그니처 차원의
-    닫힘). `release_id`가 `trained` 자신의 다섯 값에서 재파생한 값과 같음도 확인한다."""
+    닫힘). `release_id`가 `trained` 자신의 **여섯** 값에서 재파생한 값과 같음도 확인한다
+    — 재파생 입력을 **manifest 가 공시한 값**으로만 읽으므로(`sample_scope` 포함,
+    M9/ml-lifecycle), 식별자와 공시가 갈리면 이 단언이 붉어진다."""
     import inspect
 
     signature = inspect.signature(write_artifact)
@@ -535,6 +537,7 @@ def test_write_artifact_release_derives_entirely_from_trained() -> None:
         training_spec_checksum=payload["training_spec_checksum"],
         seed=payload["reproducibility"]["seed"],
         code_version=payload["release"]["code_version"],
+        sample_scope=payload["sample_scope"],
     )
     assert payload["release"]["release_id"] == recomputed_release_id
 

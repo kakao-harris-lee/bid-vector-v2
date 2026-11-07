@@ -21,10 +21,15 @@ from typing import Final, NoReturn
 import grpc
 
 from ml_engine.app.pipeline import pipeline_factory
-from ml_engine.evaluation.policy import EvaluationPolicy, load_evaluation_policy
+from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.evaluation.policy import PolicyRejected as EvaluationPolicyRejected
+from ml_engine.evaluation.policy_source import load_approved_evaluation_policy
 from ml_engine.features import SUPPORTED_FEATURE_SCHEMAS
-from ml_engine.inference.policy import InferencePolicy, load_inference_policy
+from ml_engine.inference.policy import (
+    InferencePolicy,
+    load_approved_inference_policy,
+    time_axis_policy_of,
+)
 from ml_engine.inference.policy import PolicyRejected as InferencePolicyRejected
 from ml_engine.serving import (
     BidPredictionServicer,
@@ -127,11 +132,23 @@ def _preload(config: ServerConfig) -> _Preloaded:
     뿌리에서 `yaml.YAMLError`를 `PolicyError`로 정규화하므로(D-5E3-1), 호출부의
     별도 정규화가 더 필요 없다. 「호출부 한 곳 정규화」는 임시 방편이었다 —
     다른 호출자가 생기면 재발한다. 문법이 깨진 inference 정책은 여전히
-    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다."""
+    `NOT_READY`(다른 세 로더와 같은 결과 축)로 이어진다.
+
+    **평가·추론 정책은 승인 요구 로더로 읽는다**(M9/ml-lifecycle 수정 라운드 2 v H-2 ·
+    라운드 3 v H-3b) — `ML_ENGINE_EVALUATION_POLICY`·`ML_ENGINE_INFERENCE_POLICY` 가
+    가리킬 수 있는 것은 **승인 등록부에 있는 산출물**뿐이다. 그 둘이 등록부에 오른 축이고,
+    둘 다 승격 판정 입력을 들고 있다(평가는 임계, 추론은 `maturity.window_days` 가 평가 창
+    선택을 바꾼다). 거부는 다른 두 축과 같은 결과 타입으로 떨어지므로 `_preload_outcomes` ·
+    `_training_pipeline_factory` · `_prediction_runtime` 이 각자 다시 판정하지 않는다
+    (같은 기준을 두 곳에서 구현하지 않는다 — R-H1 과 같은 축).
+
+    **부팅 승인은 빨리 실패하기 위한 것이고 유일한 겹이 아니다**: 평가 축은 게이트 자리
+    (`evaluation.policy_source.verify_policy_source`)에서 다시 묻는다 — 부팅 뒤에 객체를
+    바꿔 끼우는 길이 있기 때문이다(v r3 H-3a). 사유는 그 모듈 docstring."""
     return _Preloaded(
-        inference=load_inference_policy(config.inference_policy_path),
+        inference=load_approved_inference_policy(config.inference_policy_path),
         training=load_training_policy(config.training_policy_path),
-        evaluation=load_evaluation_policy(config.evaluation_policy_path),
+        evaluation=load_approved_evaluation_policy(config.evaluation_policy_path),
         serving=load_serving_policy(config.serving_policy_path),
     )
 
@@ -196,6 +213,7 @@ def _training_pipeline_factory(
         training_policy=preloaded.training,
         evaluation_policy=preloaded.evaluation,
         maturity_window_days=preloaded.inference.maturity_window_days,
+        time_axis_policy=time_axis_policy_of(preloaded.inference),
         trainer=LightGbmTrainer(),
         code_version=CodeVersion(config.code_version),
         artifact_out_dir=config.artifact_out_dir,
