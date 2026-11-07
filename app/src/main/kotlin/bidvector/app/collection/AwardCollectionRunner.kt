@@ -67,9 +67,13 @@ internal fun awardStartLine(
 
 /**
  * 멈춤 줄 — 사유는 **닫힌 어휘**([truncationCodeOf])로 적는다(cr r4 L-2). 타입 `toString()` 을 쓰면 값을
- * 나르는 사유가 올 때 그 필드값이 줄에 실리고, 운영자가 회계 행·원장의 토큰과 맞춰 볼 수도 없다.
- * `haltOf` 가 **다음 사유(403 차단)를 이 칸으로 보내기로 사전 결정**했으므로 그때 이 자리가 먼저 맞아야
- * 한다.
+ * 나르는 사유가 올 때 **그 필드값이 로그 줄에 실리고**, 타입 이름을 바꾸면 앞 실행이 남긴 줄을 읽지
+ * 못한다 — 그 함수의 KDoc 이 「타입 이름을 영속 값으로 쓰지 않는다」를 적는 자리다. `haltOf` 가 **다음
+ * 사유(403 차단)를 이 칸으로 보내기로 사전 결정**했으므로 그때 이 자리가 먼저 맞아야 한다.
+ *
+ * **회계 행·시도 원장과 맞춰 보려는 것이 아니다**(cr r5 M-2) — 회계 행의 `truncation_cause` 는 타입 단순
+ * 이름이고, 이 갈래의 시도 원장에는 절단 코드가 아예 없다(전송층 결말뿐). 두 어휘가 갈린 사실은 runbook
+ * §3.1 의 대응표가 든다.
  */
 internal fun awardHaltLine(halt: AwardCollectionHalt): String =
     "award-collection halted budgetLimit=${halt.budgetLimit ?: "none"} " +

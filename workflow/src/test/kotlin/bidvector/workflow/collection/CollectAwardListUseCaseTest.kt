@@ -12,6 +12,7 @@ import bidvector.procurement.TruncationCause
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -270,6 +271,13 @@ class CollectAwardListUseCaseTest {
      */
     @Test
     fun `사유마다 멈추는지가 전수 표로 고정된다`() {
+        // 모수가 sealed 전수와 **같은지**를 먼저 잰다(`AxisLastObservedAtTest` 선례 · v r5 H-1).
+        // 폴백 한정만으로도 값을 나르는 새 사유는 예외로 죽지만, 이 두 줄은 그것을 **단언**으로 남긴다 —
+        // 모수가 한 벌이라도 접히거나 빠지면 표를 보기 전에 여기서 붉어진다.
+        val permitted = TruncationCause::class.java.permittedSubclasses.toSet()
+        ALL_TRUNCATION_CAUSES shouldHaveSize permitted.size - 1 + BudgetLimit.entries.size
+        ALL_TRUNCATION_CAUSES.map { it.javaClass }.toSet() shouldBe permitted
+
         val decision = ALL_TRUNCATION_CAUSES.associateWith { cause -> haltedBy(cause) }
 
         decision shouldBe
@@ -362,17 +370,23 @@ class CollectAwardListUseCaseTest {
  * `CollectNoticesUseCaseTest` 와 `AxisLastObservedAtTest` 의 선례).
  *
  * 손으로 적던 앞 판은 **새 사유에 조용히 초록**이었다 — 사유를 더하고 이 목록에 넣지 않으면 등식이 그
- * 선택을 아예 **측정하지 않는다**(D-6G2d-30 이 적은 그 실패 모양이다). 모수가 구조이면 그 길이 없다:
- * 컴파일이 `haltOf` 를 가리키고 이 목록이 **선택**을 가리킨다.
+ * 선택을 아예 **측정하지 않는다**(D-6G2d-30 이 적은 그 실패 모양이다).
  *
- * 값을 나르는 사유(`BudgetExhausted`)는 `INSTANCE` 가 없어 상한마다 한 인스턴스를 짓는다 — 그 축도
- * 열거가 아니라 `BudgetLimit.entries` 에서 온다.
+ * **폴백을 `BudgetExhausted` 하나로 한정한다**(v r5 H-1 · cr r5 H-2). 앞 판은 `INSTANCE` 가 없는 **모든**
+ * 하위 타입을 `runCatching` 으로 받아 `BudgetExhausted` 를 한 벌 더 냈다 — 값을 나르는 새 사유는 목록에
+ * 한 번도 나타나지 않고 `associateWith` 가 그 중복 키를 접어 표가 오늘과 똑같아졌다. 실측에서 그 판
+ * (`data class` 13번째 사유)이 **초록**이었다(`data object` 판만 붉었다). 이제 그런 사유는
+ * `NoSuchFieldException` 으로 **소리 내며 죽는다**.
  */
 private val ALL_TRUNCATION_CAUSES: List<TruncationCause> =
     requireNotNull(TruncationCause::class.java.permittedSubclasses) { "TruncationCause 는 sealed 여야 한다" }
         .flatMap { subclass ->
-            runCatching { listOf(subclass.getField("INSTANCE").get(null) as TruncationCause) }
-                .getOrElse { BudgetLimit.entries.map { limit -> TruncationCause.BudgetExhausted(limit) } }
+            if (subclass == TruncationCause.BudgetExhausted::class.java) {
+                // 값을 나르는 유일한 사유 — 상한마다 한 인스턴스이고 그 축도 `BudgetLimit.entries` 에서 온다.
+                BudgetLimit.entries.map { limit -> TruncationCause.BudgetExhausted(limit) }
+            } else {
+                listOf(subclass.getField("INSTANCE").get(null) as TruncationCause)
+            }
         }
 
 /** 낙찰 목록 항목 하나 — 계약이 등재한 키로 원문을 만든다(식별자 둘과 낙찰자 상호). */
