@@ -1,6 +1,6 @@
 # M9 / ops-migrations rollback
 
-착수 base **`df4976cc`** · **복원 원천 `56bd33ea`** · **실측 HEAD `b5e7eef0`**(라운드 7 의 마지막
+착수 base **`df4976cc`** · **복원 원천 `56bd33ea`** · **실측 HEAD `6199b39f`**(라운드 8 의 마지막
 산출물 커밋).
 
 **원천을 병합한 main 으로 다시 고정했다**(라운드 6) — 이 브랜치는 paper-bid(V25)가 들어간
@@ -89,12 +89,12 @@ ALTER TABLE outbox DROP CONSTRAINT outbox_terminal_reason_state_check, DROP COLU
 전이가 `terminal_reason` 을 싣는다). 설정 쪽도 같은 축이다 — `bidvector.release.sha` 를 지우는 것은
 옛 jar 로 돌아간 **뒤**라야 한다(새 jar 는 그 값 없이 못 뜬다).
 
-## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `b5e7eef0`)
+## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `6199b39f`)
 
 | 단계 | 실측 |
 | --- | --- |
-| ① 목록 산출 | 내 커밋 경로 **108**(원천 `56bd33ea`, evidence 제외) = 복원 **95**(M) · 삭제 **7**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 108 로 닫힌다. **목록 완전성**: 병합본이 main 과 다른 경로 91 전부가 이 목록 안에 있고(차집합 빈 출력), 병합 커밋이 목록 밖 경로를 만들지 않았다 |
-| ①′ **재측정한 이유** | 라운드 7 이 복원 목록에 경로 **하나**를 더했다(`MigrationLockTimeoutTest` — cr H-1 의 census·거동). 그 뒤 형식 수정이 같은 목록 안의 파일 둘을 또 고쳤으므로 **마지막 산출물 커밋 `b5e7eef0` 에서** ①~③ 을 다시 쟀다(앞 실측 `a14f07f1` 을 옮기지 않았다) |
+| ① 목록 산출 | 내 커밋 경로 **110**(원천 `56bd33ea`, evidence 제외) = 복원 **96**(M) · 삭제 **8**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 110 으로 닫힌다. **목록 완전성**: 병합본이 main 과 다른 경로 91 전부가 이 목록 안에 있고(차집합 빈 출력), 병합 커밋이 목록 밖 경로를 만들지 않았다 |
+| ①′ **재측정한 이유** | 라운드 8 이 복원 목록에 경로 **둘**을 더했다(`PersistenceWiring` · 새 `MigrationLockBoundTest`). 새 파일이 하나라 삭제 갈래가 7 → **8** 이다. **마지막 산출물 커밋 `6199b39f` 에서** ①~③ 을 다시 쟀다(앞 실측 `b5e7eef0` 을 옮기지 않았다) |
 | ② 명령 종료 코드 | `restore` **0** · `git rm -f` **0** — 이 라운드는 **둘 다 실행했다**(앞 라운드는 이 환경의 안전 검사가 스크립트 안의 `git rm` 을 막아 끝 상태로만 쟀다. 경로를 명령행 인자로 넘기면 돈다) |
 | ③ 결과 트리 == `56bd33ea` 트리 | 복원·삭제만으로 `git diff --name-only 56bd33ea -- . :(exclude)<evidence>` **0 파일** · 미추적 **0** · 남은 V25+ 마이그레이션은 **V25 하나**(paper-bid 것이고 내 둘은 사라졌다) |
 | ③′ 남의 변경 보존 | **이제 실재하는 축이다**(병합 1) — 아래 표지 계수가 main 이 들여온 것을 센다 |
@@ -119,6 +119,7 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 | `journey-e2e-release`(여정 하네스에 더한 줄) | **0** |
 | `OutboxGateValues`(라운드 4 가 더한 test 지원 타입) | **0** |
 | `VERSIONS_TOUCHING_EXISTING_TABLES` · `ContextInitialized`(라운드 7 이 더한 census·중단 표지) | **0** |
+| `MIGRATION_LOCK_TIMEOUT` · `ownerMigration` · `MigrationLockBoundTest`(라운드 8 의 연결 상한과 그 test) | **0** |
 | V26·V27 마이그레이션 파일 | **0** |
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
@@ -136,7 +137,8 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 | **`BidPublicInfoService02`**(portal-02 전환) | 6 |
 | **`KonepsRollbackArgumentsTest`**·**`koneps-portal-02-rollback-args`**(main 의 새 test 와 그 정본 리소스) | 7 · 4 |
 | **`SET LOCAL lock_timeout`**(V18 이 세운 관례 — 내 둘이 빠지고 남의 열둘이 남는다) | 12 |
-| **`MigrationLockTimeoutTest`**(그 test 는 main 것이다 — 내 census·V26 거동 둘만 빠져 **@Test 가 4 → 2**) | 9 |
+| **`MigrationLockTimeoutTest`**(그 test 는 main 것이다 — 내 lint·V26 거동 둘만 빠져 **@Test 가 4 → 2**) | 9 |
+| **`V18/V19`**(보존 runbook 의 옛 문면 — 내 일반화가 걷히고 원판이 돌아온다) | 5 |
 | 래칫 셋 | `EXPECTED_EXEMPT_COUNT = 81` · `collection_run` **13** · `outbox` **11**(내 증분이 사라졌다)이고 `notification_inbox` **7** 은 **남는다**(V25 의 증분) |
 
 `OutboxEntryState` 가 앞 라운드 표의 **18** 과 다른 이유는 술어다 — 위 문단대로 evidence
@@ -148,8 +150,8 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only b5e7eef0..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..b5e7eef0 \
+git diff --name-only 6199b39f..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 56bd33ea..6199b39f \
       -- . ':(exclude)reports/evidence/m9/ops-migrations' | sort -u)
 ```
 

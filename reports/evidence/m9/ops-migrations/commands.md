@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`b5e7eef0`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 이고, 그 구간에서 센 값이다. 착수 base 부터 세면 21 이고 20 은 main 자신의 PR 병합이다).
+마지막 산출물 커밋 **`6199b39f`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 이고, 그 구간에서 센 값이다. 착수 base 부터 세면 21 이고 20 은 main 자신의 PR 병합이다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -270,6 +270,53 @@ V10·V11 · V25·V26·V27 존재). 그 게이트는 다른 레인의 일이다.
   가진 역할이 생기는 날에 이론적 표면이 되고, 오늘 그 역할은 없다(앱 역할은 NOLOGIN·최소 권한).
 - **cr L-2 — `USING ERRCODE`**: 거동이 같아 cr 은 등재만 권했으나, 같은 라운드가 V27 의 두 RAISE 에
   그 줄을 쓰게 되어 V26 만 다르면 **이 slice 안에서 새 비대칭**이 된다. 네 자리 모두 명시했다.
+
+## 라운드 8 — v r6 V-1(차단) · cr r3 M-1·L-1~L-3 · v r6 L-1
+
+### 무엇이 틀렸던가
+
+앞 라운드는 상한을 **파일마다** 적고 그 선언을 정규식 census 로 세면서 그것을 「구조로 — 모집단을
+집합으로 닫는다」라고 적었다. 그 술어는 SQL 을 파싱하지 않으므로 평범한 표기에 빗나간다 —
+verifier 가 심은 15 변이 가운데 **10 이 초록**이었다(`ALTER TABLE IF EXISTS` · `public.outbox` ·
+따옴표 이름 · `EXECUTE format(...)` · `LOCK TABLE` · `DROP TRIGGER` · 블록 주석 · 값 `0` · DDL
+뒤에 적은 선언 · 문자열 리터럴). **구조로 지켜지던 것은 거동 test 가 있는 V26 하나였다.**
+
+### 처방 — 바닥을 연결로 내린다
+
+`PersistenceWiring.ownerMigration` 이 출하 마이그레이션 구성 하나를 들고
+`initSql("SET lock_timeout = '5s'")` 를 건다. **표기·선언과 무관하게** 모든 마이그레이션이 상한
+아래에서 돈다. census 가 설계상 제외한 FK 축(참조 표의 `SHARE ROW EXCLUSIVE`)도 함께 덮인다.
+파일의 `SET LOCAL` 은 **그대로 둔다** — 같은 값이라 중복이 무해하고 고치면 checksum 이 움직인다
+(cr r3 는 SQL 지적 0 으로 approve 했다).
+
+census 는 **관례 lint 로 격하**했다 — 「파일도 관례대로 선언하는가」. KDoc·evidence·설계 검토의
+「구조로/안전망」 문면을 그 범위로 고쳤고, 빗나가는 표기 목록을 KDoc 에 그대로 적었다.
+
+### 결과
+
+| 명령 | 결과 |
+| --- | --- |
+| `:adapters:test --rerun`(전체) | exit 0 · **1327 tests · 0 실패** · skip 4(192 클래스) |
+| `:app:test --rerun`(전체) | exit 0 · **1030 tests · 0 실패**(127 클래스 — 새 클래스 하나) |
+| `:adapters:`·`:app:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | exit 0(새 test 의 형식 위반 셋을 **커밋 전에** 고쳤다 — 라운드 7 의 교훈을 적용) |
+| `leakPatternGate` | exit 0 |
+| `MigrationLockBoundTest`(새 — 출하 구성 그대로) | 1 test · 0 실패(12.9s) |
+| `MigrationLockTimeoutTest`(lint + 거동 셋) | 4 tests · 0 실패 |
+
+### 변이
+
+| 변이 | 표적 | 결과 |
+| --- | --- | --- |
+| `ownerMigration` 에서 `initSql` 제거 | `MigrationLockBoundTest` | **RED** · **41.7s**(초록 12.9s) — 상한이 없으면 **기다린다**. 이 한 줄이 안전망임을 그 차이가 센다 |
+| V27 의 `SET LOCAL` 선언 제거 | 둘 다 | census **RED**(관례 lint 가 운다) · **`MigrationLockBoundTest` 는 초록** · V18·V19·V26 거동도 초록 — **선언이 없어도 연결 상한이 막는다** |
+| V27 선언의 값을 `'0'` 으로 | census | **RED**(앞 판에서는 초록이었다 — cr r3 M-1) |
+| V27 선언을 ALTER **뒤**로 옮김 | census | **RED**(앞 판에서는 초록이었다 — cr r3 M-1) |
+| 통제군(원복 뒤 전건) | 전부 | 아래 결과표 |
+
+**새 test 가 고른 자리**: V14 는 기존 표(`notice`)를 `ALTER` 하면서 상한을 **선언하지 않는** 관례
+이전 파일이다. 파일 census 로는 영원히 닿지 않고 파일 선언으로도 막히지 않으므로, 거기서 `55P03`
+이 나오면 상한을 세운 것은 **연결 하나**다 — 그래서 이 단언이 현재·미래의 모든 마이그레이션을
+덮는다. 출하 구성을 test 가 **같이** 쓴다(자기 사본이면 `initSql` 을 지워도 초록이다).
 
 ## 등재만 (cr L-5)
 
