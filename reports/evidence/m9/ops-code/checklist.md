@@ -1,6 +1,6 @@
 # M9/ops-code checklist
 
-판정 SHA **`0817df3b`**(병합한 main `56bd33ea`). 계약의 acceptance 넷에 대한 대조표다.
+판정 SHA **`f577e69d`**(병합한 main `56bd33ea`). 계약의 acceptance 넷에 대한 대조표다.
 
 ## 1. acceptance 대조
 
@@ -49,7 +49,7 @@
 | 청중 질의 실패로 평가 run 을 멈춰 그 판정의 outbox 흔적까지 지운다 | 어댑터가 좁은 예외를 `Unavailable` 값으로 접고 생산자는 그 값에서 **기록 0 건으로 끝낸 뒤 채널 요청을 낸다**. 둘 다 test 가 든다(연결 장애 → `Unavailable` · `Unavailable` → 채널 1회) |
 | 배선이 출하 간격 대신 다른 값을 넘긴다 | 배선이 pacer 에 넘기는 **요청된 기다림**을 기록기로 보고 출하 간격과 대조한다 — 벽시계로 재면 계수 축이 같은 지연을 만들어 이 우회가 **초록으로 지나간다**(실측) |
 | 기다림 함수 자신이 잠들지 않는다 | 그 함수를 직접 짧게 불러 벽시계 하한을 본다 |
-| production 이 **다른** 기다림 함수를 넘긴다(기본값을 비우거나 호출 자리가 자기 것을 명시) | 두 자리로 닫는다 — ① 한 관문을 **공유하는 두 소스**로 재는 거동(둘째 소스의 계수 축이 비어 있어 간격 축만 남는다) ② 컴파일된 상수 풀에서 `konepsTransportFor` 참조자 **전수와 그 형태**(다섯 인자 호출의 `$default` 항목 계수 등식). 변이 둘이 각각 **한 자리만** 붉힌다 |
+| production 이 **다른** 기다림 함수를 넘긴다(기본값을 비우거나 · 호출 자리가 자기 것을 명시하거나 · 5인자 호출을 **버리고** 다른 전송을 쓰거나) | **쓰이는 인스턴스로** 닫는다 — 조립 메서드가 낸 소스 둘로 재므로 어느 경로로 바꿔도 그 단언이 붉어진다(변이 셋 전부 RED). 참조 **형태**를 세던 앞 판은 마지막 경로를 통과했다(v r4 L-1). 자리의 **수**는 상수 풀 census 가 따로 든다 — 셋째 자리가 생기면 거동 단언이 그 자리를 못 보기 때문이다 |
 | 걷기 처분 표가 맞는데 소비 자리의 캐스트가 깨진다 | 처분이 **값을 나르므로** 꺼내는 캐스트가 없다 — 깨지는 날의 모양이 컴파일 실패다 |
 | 사유 전수 목록이 새 `data class` 사유를 조용히 놓친다 | 쓰는 자리가 **클래스 집합 등식**을 먼저 재므로 모집단이 어긋나면 붉어진다 |
 | 청중 장애의 사유를 알 수 없게 둔다 | 값이 **예외 클래스 이름**을 나르고 표지 줄에 그것이 실린다(메시지·SQLState 는 계속 버린다). 그 줄과 토큰을 배선 test 가 단언한다 |
@@ -110,7 +110,7 @@
 
 ## 5. 새 파일 ↔ in_scope 대조
 
-evidence 넷을 뺀 새 파일 **열둘** — 전부 in_scope 안이다. 목록은 손으로 세지 않는다:
+evidence 넷을 뺀 새 파일 **열셋** — 전부 in_scope 안이다. 목록은 손으로 세지 않는다:
 `git log --no-merges --diff-filter=A --format= --name-only <복원 원천>..HEAD | sort -u`.
 
 | 새 파일 | in_scope 항목 |
@@ -126,6 +126,7 @@ evidence 넷을 뺀 새 파일 **열둘** — 전부 in_scope 안이다. 목록�
 | `adapters/…/notificationinbox/NotificationAudienceFailureTest.kt` | 같음 — 그 어댑터의 장애 접힘(cr MEDIUM · v M-2) |
 | `adapters/…/evaluation/EvaluationCommitInboxProductionTest.kt` | 계약 갱신 — `adapters/src/test/…/evaluation/**` |
 | `app/…/wiring/NotificationAudienceMarkerTest.kt` | 「각 test」 — 잃은 알림 표지가 실제로 남는지(v r2 L-1) |
+| `app/…/wiring/CollectionWiringSleeperTest.kt` | 「각 test」 — 간격 축 넷을 갈라 담는다(v r4 B-1: 원래 파일이 500 줄 한도를 넘겼다) |
 
 **컴파일이 강제한 app 경로 넷은 계약 갱신 2차가 사후 등재했다**(팀장 승인) — 셋은 커밋 조립의
 생성자·배선 메서드를 부르는 test(`EvaluationCommitRunE2ETest`·`EvaluationCommitRunnerTest`·

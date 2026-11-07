@@ -1,8 +1,8 @@
 # M9/ops-code rollback
 
 착수 base `df4976cc` · **복원 원천 `56bd33ea`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
-앞서 `3ad4f3f6`·`97ed49c4` 도 병합했고 둘 다 이 SHA 의 조상이다) · **실측 HEAD `0817df3b`**(마지막
-산출물 커밋 = 판정 SHA = 셋째 병합 커밋).
+앞서 `3ad4f3f6`·`97ed49c4` 도 병합했고 둘 다 이 SHA 의 조상이다) · **실측 HEAD `f577e69d`**(마지막
+산출물 커밋 = 판정 SHA).
 
 **원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **두 번** 병합했으므로(`3ad4f3f6` → `97ed49c4`)
 공유 파일(§2)에는 다른 slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니라 마지막으로
@@ -47,12 +47,12 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 역적용하는 경로는 쓰지 않았다(병합 커밋의 해소 줄이 `--no-merges` 목록 밖이라 끝까지 완료되지
 않는다 — 그 실패가 2026-10-09 에 실측됐다).
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `0817df3b` 체크아웃
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `f577e69d` 체크아웃
 
 | 단계 | 실측 |
 | --- | --- |
 | ① 명령 종료 코드 | `restore` **0** · `git rm` **0** |
-| ② 계수 | 내 커밋 경로 **41**(evidence 제외) = 복원 **29**(M) · 삭제 **12**(A) — 기계 목록과 같다 |
+| ② 계수 | 내 커밋 경로 **42**(evidence 제외) = 복원 **29**(M) · 삭제 **13**(A) — 기계 목록과 같다(새 test 클래스 하나가 늘었다) |
 | ③ 원천과의 diff | 복원 경로 전부에서 **빈 출력** |
 | ③′ 작업 트리·색인·미추적 | 원천과 다른 파일이 `reports/evidence/m9/ops-code/**` **넷**뿐 · 미추적 **0** |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
@@ -96,7 +96,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 | `NotificationAudienceFailureTest` | **0** |
 | `NotificationAudienceMarkerTest` | **0** |
 | `audienceUnavailableLine` | **0** |
-| `TRANSPORT_FACTORY_DEFAULT` | **0** |
+| `CollectionWiringSleeperTest` | **0** |
 | `EvaluationCommitInboxProductionTest` | **0** |
 
 표지를 고를 때 `NEW_CANDIDATE`·`NotificationInboxRecord`·`notification_inbox` 는 쓸 수 없다 —
@@ -140,8 +140,8 @@ test 클래스의 등재 한 줄도 그렇다.
 evidence 커밋은 실측 뒤에 오므로 유효성은 **되돌림 대상이 그 사이에 움직였는가**로 본다:
 
 ```
-git diff --name-only 0817df3b..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..0817df3b \
+git diff --name-only f577e69d..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 56bd33ea..f577e69d \
       -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
@@ -154,10 +154,9 @@ git diff --name-only 0817df3b..<판정 SHA> -- \
 영원히 참이 되지 못한다. 제외는 evidence 가 **되돌림 대상이 아니라는** 사실의 표기이고, 되돌림
 대상(산출물 38 경로)은 그대로 술어 안에 있다.
 
-**앞 라운드 실측을 옮기지 않았다.** 6차 제출의 원천은 `97ed49c4`·실측 HEAD 는 `3ad0d342` 였고
-셋째 병합이 **원천을 옮겼다**. 공유 파일은 다섯에서 **여섯**이 됐다(#137 과 겹친 알림함 배선·포트
-둘이 합류하고, 앞 라운드의 겹침 하나가 그대로 남는다). 복원 경로는 41 로 같다 — 병합이 내 경로를
-늘리지 않았고 의미 축 수정이 **이미 목록에 있던** 생산자 한 줄이었기 때문이다. 수는 다시 쟀다.
+**앞 라운드 실측을 옮기지 않았다.** 7차 제출의 실측 HEAD 는 `0817df3b`(셋째 병합 커밋)였고 이
+라운드가 그 뒤에 test 클래스 하나를 더했다(sizeGate 차단의 처분). 원천과 공유 파일 집합은 그대로
+이고 복원 경로가 41 → **42** 로 하나 늘었다. 이 절의 수는 **다시 잰** 것이다.
 
 ## 하네스 레인 변경
 
