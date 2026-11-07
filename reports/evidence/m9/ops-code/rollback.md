@@ -1,16 +1,16 @@
 # M9/ops-code rollback
 
-착수 base `df4976cc` · **복원 원천 `56bd33ea`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
-앞서 `3ad4f3f6`·`97ed49c4` 도 병합했고 둘 다 이 SHA 의 조상이다) · **실측 HEAD `f577e69d`**(마지막
-산출물 커밋 = 판정 SHA).
+착수 base `df4976cc` · **복원 원천 `bd2f450e`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
+앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea` 도 병합했고 셋 다 이 SHA 의 조상이다) · **실측 HEAD
+`6b5b52bc`**(마지막 산출물 커밋 = 판정 SHA = 넷째 병합 커밋).
 
 **원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **두 번** 병합했으므로(`3ad4f3f6` → `97ed49c4`)
 공유 파일(§2)에는 다른 slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니라 마지막으로
 병합한 그 고정 SHA** 에서 한다 — 앞 병합 SHA 를 쓰면 그 사이 main 의 줄을 되돌린다. 실행 전 단언
 둘을 명령으로 실측했다:
 
-- `git merge-base --is-ancestor 56bd33ea HEAD` — **참**(원천이 HEAD 의 조상이다).
-- `git merge-base --is-ancestor c724e1ee 56bd33ea` — **거짓**(원천이 이 slice 의 **첫 산출물
+- `git merge-base --is-ancestor bd2f450e HEAD` — **참**(원천이 HEAD 의 조상이다).
+- `git merge-base --is-ancestor c724e1ee bd2f450e` — **거짓**(원천이 이 slice 의 **첫 산출물
   커밋**을 담지 않는다). 그래서 main 으로부터 만든 트리가 남의 줄을 떨어뜨릴 수 없고, 커밋 해시
   목록이 필요 없다.
 
@@ -25,7 +25,7 @@
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-BASE=56bd33ea                                    # **마지막으로** 병합한 main 의 고정 SHA
+BASE=bd2f450e                                    # **마지막으로** 병합한 main 의 고정 SHA
 EXCL=':(exclude)reports/evidence/m9/ops-code'    # 자기 자신은 되돌릴 수 없다
 
 # 목록은 **내 커밋만** — 병합 커밋의 해소 줄은 들지 않는다
@@ -47,7 +47,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 역적용하는 경로는 쓰지 않았다(병합 커밋의 해소 줄이 `--no-merges` 목록 밖이라 끝까지 완료되지
 않는다 — 그 실패가 2026-10-09 에 실측됐다).
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `f577e69d` 체크아웃
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `6b5b52bc` 체크아웃
 
 | 단계 | 실측 |
 | --- | --- |
@@ -68,9 +68,9 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-**evidence 를 포함해** 복원하면 작업 트리의 트리 객체 해시가 원천 `56bd33ea` 의 트리 해시와
-**같다**(둘 다 `000169875aea0947975b2b8bcbc0392b1fe52c0c` — 같은 clone 에서 경로 45 로 실측).
-파일 단위 비교가 아니라 트리 객체의 동일성이므로 「빠뜨린 파일」이 있을 수 없다. `56bd33ea` 는
+**evidence 를 포함해** 복원하면 작업 트리의 트리 객체 해시가 원천 `bd2f450e` 의 트리 해시와
+**같다**(둘 다 `b520aebcf949877ad79ce1d6ad91ea388b1ebeb2` — 같은 clone 에서 경로 46 으로 실측).
+파일 단위 비교가 아니라 트리 객체의 동일성이므로 「빠뜨린 파일」이 있을 수 없다. `bd2f450e` 는
 병합된 main 이고 CI 가 초록으로 통과한 자리라, 그 트리에서 `check` 를 다시 돌리는 것은 같은
 트리를 다시 재는 일이다.
 
@@ -97,6 +97,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 | `NotificationAudienceMarkerTest` | **0** |
 | `audienceUnavailableLine` | **0** |
 | `CollectionWiringSleeperTest` | **0** |
+| `CALL_SITE_PROBES` | **0** |
 | `EvaluationCommitInboxProductionTest` | **0** |
 
 표지를 고를 때 `NEW_CANDIDATE`·`NotificationInboxRecord`·`notification_inbox` 는 쓸 수 없다 —
@@ -112,6 +113,7 @@ main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄�
 | `app/…/wiring/NotificationInboxWiring.kt` 줄 수 | **79 / 79** |
 | `workflow/…/notificationinbox/NotificationInboxPorts.kt` 줄 수 | **189 / 189** |
 | `NotificationBidKind`(#137 의 축) | **31 / 31** |
+| `golang.org/x/net`(#142 의 축) | **10 / 10** |
 | `NotificationInboxBidKindTest`(같음) | **3 / 3** |
 | `NotificationInboxStore`(7C③) | **18 / 18** |
 | `MockKonepsRoutingTest`(#134) | **5 / 5** |
@@ -140,8 +142,8 @@ test 클래스의 등재 한 줄도 그렇다.
 evidence 커밋은 실측 뒤에 오므로 유효성은 **되돌림 대상이 그 사이에 움직였는가**로 본다:
 
 ```
-git diff --name-only f577e69d..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..f577e69d \
+git diff --name-only 6b5b52bc..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only bd2f450e..6b5b52bc \
       -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
@@ -154,9 +156,9 @@ git diff --name-only f577e69d..<판정 SHA> -- \
 영원히 참이 되지 못한다. 제외는 evidence 가 **되돌림 대상이 아니라는** 사실의 표기이고, 되돌림
 대상(산출물 38 경로)은 그대로 술어 안에 있다.
 
-**앞 라운드 실측을 옮기지 않았다.** 7차 제출의 실측 HEAD 는 `0817df3b`(셋째 병합 커밋)였고 이
-라운드가 그 뒤에 test 클래스 하나를 더했다(sizeGate 차단의 처분). 원천과 공유 파일 집합은 그대로
-이고 복원 경로가 41 → **42** 로 하나 늘었다. 이 절의 수는 **다시 잰** 것이다.
+**앞 라운드 실측을 옮기지 않았다.** 8차 제출의 원천은 `56bd33ea`·실측 HEAD 는 `f577e69d` 였고
+넷째 병합이 **원천을 옮겼다**(#142 는 내 경로와 겹치지 않아 공유 파일 집합은 여섯 그대로다).
+복원 경로는 42 로 같고 이 절의 수는 **다시 잰** 것이다.
 
 ## 하네스 레인 변경
 

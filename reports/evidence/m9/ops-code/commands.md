@@ -1,9 +1,9 @@
 # M9/ops-code commands
 
-base `df4976cc` · **병합한 main `56bd33ea`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4` 도 병합했다) ·
-판정 SHA **`f577e69d`**(마지막 산출물 커밋). 레인 규율대로 push 하지 않았다.
+base `df4976cc` · **병합한 main `bd2f450e`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea` 도
+병합했다) · 판정 SHA **`6b5b52bc`**(마지막 산출물 커밋 = 넷째 병합 커밋). 레인 규율대로 push 하지 않았다.
 
-로컬에서 돌린 것은 **`:app:check` 전건**(31m 26s · exit 0 — 그 모듈의 게이트·test 전부, container
+로컬에서 돌린 것은 **`:app:check` 전건**(30m 33s · exit 0 — 그 모듈의 게이트·test 전부, container
 여정 포함) + 나머지 세 모듈의 표적 `--tests`·lint·등재 게이트 + 변이다. `qualityBaseline` 과 다른
 모듈의 전건 `check` 는 PR CI 가 정본이고 명령이 같다. **앞 판의 「그 모듈 게이트」 문면은 거짓이었다**
 (v r4 L-3) — 그때 `:app:sizeGate` 가 붉었고 표적 세트가 그것을 안 돌렸다. Gradle 은 전부 `~/.local/bin/bv-build.sh ./gradlew
@@ -47,6 +47,9 @@ base `df4976cc` · **병합한 main `56bd33ea`**(복원 원천 — 앞서 `3ad4f
 | `0817df3b` | main `56bd33ea`(#137 paper-bid V25) 병합 — 투찰 종류 축을 `NONE` 으로 싣는다(컴파일이 강제) |
 | `702b7346` | evidence 7차(판정 SHA `0817df3b`) |
 | `f577e69d` | v r4 B-1 — 간격 축을 `CollectionWiringSleeperTest` 로 가르고(sizeGate) · L-1 — **쓰이는 전송**으로 잰다 |
+| `2294beb7` | evidence 8차(판정 SHA `f577e69d`) |
+| `704554b4` | v r5 H-1 — 자리 전수를 상수 풀에서 도출해 **자리마다** 간격을 잰다(개찰 자리가 측정 밖이었다) |
+| `6b5b52bc` | main `bd2f450e`(#142 CVE) 병합 — 겹침 **0**(계수로 확인) |
 
 ## 2. 표적 실행 — 핵심 결과 한 줄씩(판정 SHA 기준, 병합 뒤)
 
@@ -57,7 +60,7 @@ base `df4976cc` · **병합한 main `56bd33ea`**(복원 원천 — 앞서 `3ad4f
 | `:procurement:test --rerun`(전건 — sealed 열거 축) | `tests=317 failures=0` |
 | `:workflow:test --rerun --tests 'bidvector.workflow.collection.*' --tests '…InboxRecordingNotificationsTest'` | `tests=116 failures=0` |
 | `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest' --tests '…EvaluationAdapterDependencyTest'` | `tests=135 failures=0` |
-| **`:app:check`**(전건 — 그 모듈의 게이트·test 전부, container 여정 포함) | BUILD SUCCESSFUL · 31m 26s · exit 0. `sizeGate` 포함(앞 판에서 붉던 자리) |
+| **`:app:check`**(전건 — 그 모듈의 게이트·test 전부, container 여정 포함) | BUILD SUCCESSFUL · 30m 33s · exit 0 · **127 클래스 1028 test 실패 0**. `sizeGate`·`gateRegistrationGate` 포함 |
 | `:adapters:test --rerun --tests 'bidvector.adapters.notificationinbox.*' --tests 'bidvector.adapters.evaluation.*'`(**실 DB** — 팀장 지시) | `tests=241 failures=0`(koneps 포함 합) · `EvaluationCommitInboxProductionTest` 3/0 · `NotificationInboxBidKindTest` 4/0 · `NotificationInboxPairConstraintTest` 5/0 |
 | `gateRegistrationGate` — workflow · adapters · app · procurement | 전부 통과(새 test 클래스 넷 등재 포함) |
 | ktlint(main·test)·detekt — workflow · adapters · app · procurement | 전부 BUILD SUCCESSFUL |
@@ -100,10 +103,11 @@ base `df4976cc` · **병합한 main `56bd33ea`**(복원 원천 — 앞서 `3ad4f
 | **출하** `minimumCallInterval = ZERO` | `KonepsShippedPolicyWireTest` 2/5 | `KonepsCallPacerTest` — 자기 값으로 돌아 출하 값을 재지 않는다(v H-1 이 지목한 빈 자리) |
 | **배선**이 pacer 에 `Duration.ZERO` 를 넘긴다 | `CollectionWiringTest` 1/21 | `KonepsShippedPolicyWireTest` 6/6 · `KonepsCallPacerTest` 8/8 — 표의 값과 관문의 기계는 그대로라 **운반 단계만** 붉어진다 |
 | 배선의 기다림이 잠들지 않는다(식으로 바꿈) | `CollectionWiringTest` 1/21 | 같은 class 의 「넘기는 값」 단언은 **초록** — 두 축을 따로 재기 때문이다 |
-| **기본값** 기다림 함수를 잠들지 않는 람다로(MW3) | `CollectionWiringSleeperTest` 1/4 — 「배선이 세운 소스 둘은…」 | 같은 class 의 값·잠듦·자리 단언 셋 **초록** · `CollectionWiringTest` 19/19 |
-| 호출 자리가 **자기 sleeper 를 명시**(MW4) | 같은 단언 1/4 | 같은 class 셋 초록 · `CollectionWiringTest` 19/19 |
-| 선언 파일 **밖**에 호출자를 하나 더(MW4c) | 「전송을 만드는 production 자리는 둘뿐이다」 1/4 | 거동 단언 초록(그 자리는 쓰이지 않는다). 같은 run 에서 기존 게이트 둘(`AppHttpDependencyGateTest`·`CollectionArchitectureGateTest`)도 그 fixture 의 자격 타입 참조를 잡는다 |
-| 5인자 호출을 **버리고** 선언 파일 안 헬퍼의 잠들지 않는 전송을 쓴다(MW4d) | 거동 단언 1/4 | **앞 판에서 이 변이가 초록이었다**(v r4 L-1) — 참조 형태를 세던 술어를 **쓰이는 인스턴스**로 바꾼 것이 이 RED 다 |
+| **기본값** 기다림 함수를 잠들지 않는 람다로(MW3) | `CollectionWiringSleeperTest` 1/3 — 자리 전수 거동 단언 | 같은 class 의 값·잠듦 단언 **초록** · `CollectionWiringTest` 19/19 |
+| 공고 호출 자리가 **자기 sleeper 를 명시**(MW4) | 같은 단언 1/3 | 같은 class 의 나머지 둘 초록 · `CollectionWiringTest` 19/19 |
+| 선언 파일 **밖**에 호출자를 하나 더(MW4c) | 자리 전수 대조 1/3 | 같은 run 에서 기존 게이트 둘(`AppHttpDependencyGateTest`·`CollectionArchitectureGateTest`)도 그 fixture 의 자격 타입 참조를 잡는다 |
+| 5인자 호출을 **버리고** 선언 파일 안 헬퍼의 잠들지 않는 전송을 쓴다(MW4d) | 거동 단언 1/3 | **앞 판에서 이 변이가 초록이었다**(v r4 L-1) — 참조 형태를 세던 술어를 **쓰이는 인스턴스**로 바꾼 것이 이 RED 다 |
+| **개찰** 호출 자리가 자기 sleeper 를 넘긴다(MWO) | 거동 단언 1/3 — 실패 문면이 그 자리를 짚는다(`wiring/OpeningCollectionWiring · 출하 간격 PT1S · 63ms`) | `CollectionWiringTest` 19/19 · `OpeningCollectionWiringTest` 11/11 · 같은 class 의 값·잠듦 단언 초록. **앞 판에서 이 변이가 초록이었다**(v r5 H-1) — 거동을 한 자리에서만 재던 틈이다 |
 | pacer 가 다음 하한을 기다리기 **전** 시각에서 센다 | `KonepsCallPacerTest` 1/8 | `KonepsCallGateTest` 3/3 · 같은 class 의 나머지 7 — 늦음이 **한 번뿐**인 판에서만 갈린다 |
 | 청중 장애를 빈 목록으로 접기 | `NotificationAudienceFailureTest` 2/2 | — |
 | 청중 실패에서 다시 던지기 | `InboxRecordingNotificationsTest` 2/9 | `CollectNoticesUseCaseTest` 17/17 |
@@ -169,6 +173,13 @@ record 생성 한 줄(「actual type is NoticeId」). 새 후보는 건이 생�
 (단위 6/9 · 실 DB 2/3) — 통제군으로 #137 자신의 `NotificationInboxBidKindTest` 4/4 가 초록이다
 (그 test 는 이 생산자를 지나지 않는다). 저장 층 짝 CHECK 축은 #137 의
 `NotificationInboxPairConstraintTest` 5/5 가 든다.
+
+## 4c. 넷째 병합(main `bd2f450e`, #142 CVE) — 겹침 0
+
+`git diff --name-only 56bd33ea bd2f450e` 는 **8 경로**(의존 고정·docker·그 slice 의 evidence)이고
+내 산출물 경로와의 교집합이 **0** 이다. 자동 병합이고 충돌 0 이다. 병합 뒤
+`git diff --name-only bd2f450e HEAD -- config/quality/vuln-allowlist.properties docker` 가 **빈
+출력**이라 그 slice 의 줄이 그대로 남아 있다(내 쪽 diff 는 내 산출물 46 경로뿐이다).
 
 ## 5. clean-tree 게이트
 
