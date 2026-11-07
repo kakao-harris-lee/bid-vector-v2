@@ -97,7 +97,12 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
     @Test
     fun `적힌 릴리스는 바꿔치울 수도 없다 — 두 표 전수`() {
         JdbcCollectionRunStore(dataSource(), TEST_RELEASE).record(accounting(), meta())
-        insertOutboxRowDirectly(dataSource(), entryId = "x-swap", idempotencyKey = "x-swap-key", gate = OutboxGateValues())
+        insertOutboxRowDirectly(
+            dataSource(),
+            entryId = "x-swap",
+            idempotencyKey = "x-swap-key",
+            gate = OutboxGateValues(),
+        )
 
         listOf("collection_run", "outbox").forEach { table ->
             shouldThrow<SQLException> {
@@ -114,7 +119,12 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
      */
     @Test
     fun `적힌 릴리스는 지울 수 없다 — outbox 행`() {
-        insertOutboxRowDirectly(dataSource(), entryId = "x-erase", idempotencyKey = "x-erase-key", gate = OutboxGateValues())
+        insertOutboxRowDirectly(
+            dataSource(),
+            entryId = "x-erase",
+            idempotencyKey = "x-erase-key",
+            gate = OutboxGateValues(),
+        )
 
         val failure =
             shouldThrow<SQLException> { execute("UPDATE outbox SET release_sha = NULL") }

@@ -303,6 +303,9 @@ class MigrationLockTimeoutTest {
         declaring.filterNot(inConvention) shouldBe emptyList()
     }
 
+    /** `V26__…sql` 의 번호 — 파일 이름이 정본이고 Flyway 가 읽는 규칙과 같다. */
+    private fun versionOf(fileName: String): Int = fileName.substringBefore("__").removePrefix("V").toInt()
+
     /** 출하되는 마이그레이션 자원 전수 — 번호 순. 본문은 주석을 걷은 것이다. */
     private fun migrationSources(): List<MigrationSource> {
         val root = checkNotNull(javaClass.classLoader.getResource("db/migration")) { "마이그레이션 자원을 찾지 못했다" }
@@ -315,7 +318,7 @@ class MigrationLockTimeoutTest {
             files
                 .map { file ->
                     MigrationSource(
-                        version = file.name.substringBefore("__").removePrefix("V").toInt(),
+                        version = versionOf(file.name),
                         statements = SQL_LINE_COMMENT.replace(file.readText(), ""),
                     )
                 }.sortedBy { it.version }
