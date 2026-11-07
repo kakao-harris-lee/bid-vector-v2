@@ -13,9 +13,14 @@ import bidvector.procurement.SourceEndpoint
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.AwardResult
+import bidvector.workflow.notificationinbox.BidKindAxis
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
+import bidvector.workflow.notificationinbox.NotificationItemKey
 import bidvector.workflow.notificationinbox.NotificationKind
+import bidvector.workflow.notificationinbox.bidKindAxis
 import io.kotest.matchers.shouldBe
 import java.time.Instant
 
@@ -91,45 +96,81 @@ internal abstract class NotificationInboxTestSupport : PersistenceTestSupport() 
     /** 알림함에 심지 **않은** 공고 키 — FK 가 없으므로 이 키로도 항목이 선다(V23 주석 ③). */
     protected fun unknownNotice(number: String): NoticeId = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
 
+    /**
+     * 기록 하나. [bidKind] 를 주지 않으면 **그 종류의 축에 맞는 값**이 선다 — 기본값이
+     * `REAL` 이면 공고 축 종류(투찰가 요청 · 새 후보)를 쓰는 호출마다 `init` 가 던진다.
+     * 「축에 맞는 값」은 지어내는 것이 아니라 축 표가 정하는 것이다.
+     */
     protected fun record(
         account: AccountId,
         notice: NoticeId,
         fact: NotificationFact,
         occurredAt: Instant = OBSERVED_AT,
+        bidKind: NotificationBidKind = defaultBidKindFor(fact.kind),
     ): NotificationInboxRecord =
         NotificationInboxRecord(
             account = account,
-            notice = notice,
+            group = NotificationGroupKey(notice, bidKind),
             fact = fact,
             occurredAt = occurredAt,
         )
 
     /**
+     * 항목 하나의 신원. [bidKind] 의 기본은 [record] 와 **같은 규칙**이다 — 심은 행과 읽음
+     * 처리가 다른 축을 가리키면 영향 행이 0 이 되어 단언이 조용히 공허해진다.
+     */
+    protected fun itemKey(
+        kind: NotificationKind,
+        notice: NoticeId,
+        bidKind: NotificationBidKind = defaultBidKindFor(kind),
+    ): NotificationItemKey = NotificationItemKey(NotificationGroupKey(notice, bidKind), kind)
+
+    /**
+     * 묶음 하나의 신원 — **기본값이 없다.** 묶음에는 축을 도출할 알림 종류가 없고, 기본을 두면
+     * 「어느 연습의 묶음을 읽는가」라는 이 slice 의 요점이 하네스에서 숨는다.
+     */
+    protected fun groupKey(
+        notice: NoticeId,
+        bidKind: NotificationBidKind,
+    ): NotificationGroupKey = NotificationGroupKey(notice, bidKind)
+
+    /** 그 종류의 축에 맞는 **대표** 투찰 종류 — 소진 `when` 이라 축 어휘가 늘면 컴파일이 막힌다. */
+    protected fun defaultBidKindFor(kind: NotificationKind): NotificationBidKind =
+        when (kind.bidKindAxis) {
+            BidKindAxis.PER_BID_CASE -> NotificationBidKind.REAL
+            BidKindAxis.PER_NOTICE -> NotificationBidKind.NONE
+        }
+
+    /**
      * 행 하나의 시각·읽음 상태를 날것으로 읽는다 — 포트가 노출하지 않는 `created_at` 을 본다.
      *
-     * **차수까지 술어에 넣는다**(r1 검토 CR LOW-6). 중복 억제 키는 네 열이고 차수는 그 하나다 —
-     * 술어에서 빠지면 같은 번호의 다른 차수 행이 생기는 순간 이 도우미가 **아무 행이나** 집어
-     * 단언이 조용히 다른 행을 재게 된다.
+     * **차수와 투찰 종류까지 술어에 넣는다**(r1 검토 CR LOW-6 · M9/paper-bid). 중복 억제 키는
+     * 이제 **다섯 열**이다 — 술어에서 빠진 열의 다른 값을 가진 행이 생기는 순간 이 도우미가
+     * **아무 행이나** 집어 단언이 조용히 다른 행을 재게 된다. 투찰 종류는 이 slice 가 만드는
+     * 바로 그 자리라 특히 그렇다: 서면·실투찰 두 행을 심는 test 가 읽는 도우미다.
      */
     protected fun rawRow(
         account: AccountId,
         kind: String,
         noticeNumber: String,
         noticeRound: String = "000",
+        bidKind: NotificationBidKind = defaultBidKindFor(NotificationKind.valueOf(kind)),
     ): RawInboxRow =
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
                     "SELECT occurred_at, created_at, updated_at, read_at, detail_code " +
                         "FROM notification_inbox " +
-                        "WHERE account_id = ? AND kind = ? AND notice_number = ? AND notice_round = ?",
+                        "WHERE account_id = ? AND kind = ? AND notice_number = ? AND notice_round = ? " +
+                        "  AND bid_kind = ?",
                 ).use { statement ->
                     statement.setLong(1, account.value)
                     statement.setString(2, kind)
                     statement.setString(3, noticeNumber)
                     statement.setString(4, noticeRound)
+                    statement.setString(5, bidKind.name)
                     statement.executeQuery().use { rows ->
-                        check(rows.next()) { "행이 없다: $kind $noticeNumber" }
+                        check(rows.next()) { "행이 없다: $kind $noticeNumber $bidKind" }
                         RawInboxRow(
                             occurredAt = rows.getTimestamp("occurred_at").toInstant(),
                             createdAt = rows.getTimestamp("created_at").toInstant(),

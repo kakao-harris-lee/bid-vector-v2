@@ -19,6 +19,7 @@ import bidvector.bidding.isReconciliationCandidate
 import bidvector.bidding.nextCheckpoint
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
@@ -233,10 +234,11 @@ class BidCaseWorkflow(
      * **마감 판정은 이 자리를 지나지 않는다.** 시스템 판정은 [DeadlineSettlement] 가 저장 함수를
      * 직접 부르므로, 되비추는 것은 **운영자 명령의 결과**뿐이다.
      *
-     * **실투찰만 되비춘다**([asReal]). 알림함의 중복 억제 키에 투찰 종류 축이 없어서(7C③ 의
-     * `(계정, 종류, 공고)` PK), 같은 공고에 페이퍼와 실투찰 건이 함께 있으면 둘의 결과가 **한
-     * 항목을 덮어쓴다** — 페이퍼는 가상 연습이므로 실제 결과를 가릴 수 없게 한다. 페이퍼 건의
-     * 결과가 알림함에 서지 않는 것은 그 선택의 대가이고 알려진 제한이다.
+     * **서면(페이퍼) 건도 되비춘다**(M9/paper-bid · D-M9P-2). 앞 판은 `asReal()` 로 걸러
+     * **버렸다**: 알림함의 중복 억제 키에 투찰 종류 축이 없어(7C③ 의 `(계정, 종류, 공고)` PK)
+     * 같은 공고의 두 건의 결과가 한 항목을 덮어썼고, 가상 연습이 실제 결과를 가리는 것보다
+     * 서면 운영자가 알림을 못 받는 쪽을 골랐기 때문이다. V25 가 그 축을 키에 넣어 **덮어쓸
+     * 자리가 없어졌으므로** 거를 이유도 없어졌다 — 건의 종류가 그 항목의 묶음을 정한다.
      */
     private fun reflect(
         account: AccountId,
@@ -244,9 +246,10 @@ class BidCaseWorkflow(
         next: BidState,
         now: Instant,
     ) {
-        case.asReal() ?: return
         val fact = reflectedNotificationFact(next) ?: return
-        notifications.record(NotificationInboxRecord(account, case.notice.asNotificationNoticeId(), fact, now))
+        val group =
+            NotificationGroupKey(case.notice.asNotificationNoticeId(), case.kind.asNotificationBidKind())
+        notifications.record(NotificationInboxRecord(account, group, fact, now))
     }
 
     /**

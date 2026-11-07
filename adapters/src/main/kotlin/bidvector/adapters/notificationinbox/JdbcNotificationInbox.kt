@@ -52,9 +52,12 @@ class JdbcNotificationInbox(
         return prepareStatement(NotificationInboxSql.UPSERT_ITEM).use { statement ->
             var index = 1
             statement.setLong(index++, record.account.value)
-            statement.setString(index++, record.fact.kind.name)
             statement.setString(index++, record.notice.number.value)
             statement.setString(index++, record.notice.round.value)
+            // 투찰 종류 축 — 키의 한 열이다(V25). 어긋난 짝은 `record` 의 `init` 와 표의 짝
+            // CHECK 가 이미 막았으므로 여기서 다시 묻지 않는다.
+            statement.setString(index++, record.group.bidKind.name)
+            statement.setString(index++, record.fact.kind.name)
             statement.setString(index++, record.fact.detail?.name)
             statement.setTimestamp(index++, occurredAt)
             // 읽음 해제 정책 — **종류 전수 표가 정하고 여기로는 boolean 하나로 내려온다**

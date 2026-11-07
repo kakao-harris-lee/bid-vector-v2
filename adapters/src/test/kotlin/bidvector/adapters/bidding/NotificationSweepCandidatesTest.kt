@@ -11,11 +11,13 @@ import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.NOTIFICATION_WINDOW_POLICY
 import bidvector.workflow.bidding.NotificationWindowPolicyData
 import bidvector.workflow.bidding.SweepNotifications
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationKind
 import bidvector.workflow.notificationinbox.NotificationPageRequest
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.Duration
@@ -42,6 +44,20 @@ internal class NotificationSweepCandidatesTest : BidCaseDbFixture() {
     private fun candidates(horizon: Instant = now.plus(Duration.ofDays(policy.horizonDays + 1))) =
         JdbcNotificationSweepCandidates(dataSource()).candidates(now, horizon)
 
+    /**
+     * 같은 공고에 **서면 건과 실투찰 건을 각각** 담는다 — 공고는 한 번만 심는다([seedNotice] 가
+     * 원문 관측도 함께 넣으므로 같은 키로 두 번 부르면 그 표의 PK 에서 걸린다).
+     */
+    private fun openTwoKindsOn(
+        account: AccountId,
+        key: NoticeKey,
+    ) {
+        seedNotice(key, tomorrow)
+        val flow = workflow()
+        flow.open(account, key, BidKind.PAPER)
+        flow.open(account, key, BidKind.REAL)
+    }
+
     /** 건 하나를 담는다 — 공고를 먼저 심어 유효 마감이 **공고 행의 값**이 되게 한다. */
     private fun openCase(
         account: AccountId,
@@ -67,15 +83,30 @@ internal class NotificationSweepCandidatesTest : BidCaseDbFixture() {
     }
 
     /**
-     * **페이퍼는 모집단 밖이다** — 알림 키에 투찰 종류 축이 없어 같은 공고의 페이퍼 건이
-     * 실투찰 건의 항목을 덮어쓴다.
+     * **페이퍼도 모집단이고 종류가 실려 나온다**(M9/paper-bid · D-M9P-2).
+     *
+     * 앞 판은 질의가 `bid_kind = 'REAL'` 로 서면 건을 **버렸고** 이 자리의 test 가 「후보가
+     * 아니다」를 잠그고 있었다. V25 가 축을 알림함 키에 넣어 덮어쓸 자리가 없어졌으므로 그
+     * 주장이 뒤집힌 것이지 자리가 없어진 것이 아니다 — **같은 자리에서 반대 주장을 잰다**.
+     *
+     * 재는 것 둘: ⓐ 같은 공고의 두 건이 **둘 다** 후보다 ⓑ 각 행이 **자기 종류**를 싣고 온다
+     * (한 값으로 접히면 순수 함수가 두 건을 같은 묶음에 적는다 — 그러면 저장 층에서 다시
+     * 덮어쓴다). 종류를 세는 것이 아니라 **짝**으로 본다.
      */
     @Test
-    fun `페이퍼 건은 후보가 아니다`() {
+    fun `페이퍼 건도 후보이고 행이 자기 투찰 종류를 싣고 온다`() {
         val account = account("sweep-paper")
-        openCase(account, notice("SWEEP-P"), tomorrow, kind = BidKind.PAPER)
+        val shared = notice("SWEEP-P")
+        // 공고는 **한 번만** 심는다(`openCase` 는 공고를 함께 심으므로 같은 키로 두 번 부를 수
+        // 없다) — 두 건은 같은 공고에 서고, 그것이 이 test 가 재려는 모양이다.
+        openTwoKindsOn(account, shared)
 
-        candidates().shouldBeEmpty()
+        val found = candidates()
+
+        found.size shouldBe 2
+        found.map { it.bidKind } shouldContainExactlyInAnyOrder listOf(BidKind.PAPER, BidKind.REAL)
+        // 같은 공고다 — 갈리는 것은 종류 하나뿐이고, 그 하나가 묶음을 가른다.
+        found.map { it.notice.noticeNumber }.distinct().size shouldBe 1
     }
 
     @Test
@@ -167,12 +198,41 @@ internal class NotificationSweepCandidatesTest : BidCaseDbFixture() {
         first.created shouldBe 1
         first.failed shouldBe 0
         itemsOf(account).map { it.fact.kind } shouldContainExactly listOf(NotificationKind.BID_DEADLINE_IMMINENT)
+        itemsOf(account).map { it.group.bidKind } shouldContainExactly listOf(NotificationBidKind.REAL)
 
         // **멱등하다** — 두 번째 실행은 같은 키를 갱신할 뿐 항목을 늘리지 않는다(NOTI-10 의 PK).
         val second = sweep.run()
         second.created shouldBe 0
         second.updated shouldBe 1
         itemsOf(account).size shouldBe 1
+    }
+
+    /**
+     * **출하 경로 전체에서 두 연습이 두 항목이 된다**(M9/paper-bid 의 acceptance 를 러너 축에서).
+     * 질의 → 순수 판정 → 알림함 쓰기까지 어댑터만으로 돌려, 같은 공고의 서면·실투찰 건이 각자의
+     * 항목을 얻고 **묶음 계수가 섞이지 않는지**를 본다.
+     */
+    @Test
+    fun `훑기 한 번이 같은 공고의 서면과 실투찰에 각각 항목을 세운다`() {
+        val account = account("sweep-both")
+        val shared = notice("SWEEP-B2")
+        openTwoKindsOn(account, shared)
+
+        val report =
+            SweepNotifications(
+                JdbcNotificationSweepCandidates(dataSource()),
+                JdbcNotificationInbox(dataSource()),
+                { now },
+                policy,
+            ).run()
+
+        report.casesRead shouldBe 2
+        report.created shouldBe 2
+        val items = itemsOf(account)
+        items.map { it.group.bidKind } shouldContainExactlyInAnyOrder
+            listOf(NotificationBidKind.PAPER, NotificationBidKind.REAL)
+        // 묶음 계수가 두 축을 합치지 않는다 — 합치면 둘 다 2 다.
+        items.forEach { it.groupCounts.itemCount shouldBe 1 }
     }
 
     private fun itemsOf(account: AccountId): List<NotificationInboxItem> =

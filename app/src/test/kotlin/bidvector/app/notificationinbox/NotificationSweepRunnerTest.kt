@@ -2,6 +2,7 @@ package bidvector.app.notificationinbox
 
 import bidvector.app.collection.CollectionLog
 import bidvector.app.wiring.RecordedExitCodes
+import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
@@ -128,6 +129,7 @@ private fun sweepCaseDueTomorrow(now: Instant): NotificationSweepCase =
     NotificationSweepCase(
         account = AccountId(1L),
         notice = NoticeKey("R7C3B-RUNNER-1", NoticeRound.of("000")),
+        bidKind = BidKind.REAL,
         state = BidStateTag.WATCHING,
         deadlineAt = now.plusSeconds(86_400),
         documentDueAt = null,
