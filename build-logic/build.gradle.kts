@@ -134,11 +134,16 @@ fun Test.declareSourceInputs(repoRoot: File) {
     inputs.dir(allowedFixtures).withPropertyName("allowedFixtures")
     systemProperty("bidvector.archfixture.allowed", allowedFixtures.absolutePath)
 
+    // 건너뛰는 디렉터리의 **단일 출처는 이 선언**이고, 판독하는 test 는 그것을 시스템 속성으로 받는다
+    // (리뷰 LOW-4). 두 자리에 따로 적으면 재는 것과 선언한 것이 조용히 갈린다 — 같은 라운드가 게이트
+    // `walkTopDown` ↔ test `listFiles` 어긋남으로 한 번 물린 축이다.
+    val scanSkipped = listOf("build", ".gradle", ".gradle-home", "node_modules", ".git")
+    systemProperty("bidvector.scan.skipped", scanSkipped.joinToString(","))
     inputs
         .files(
             fileTree(repoRoot) {
                 include("**/*.kt", "**/*.kts")
-                exclude("**/build/**", "**/.gradle/**", "**/.gradle-home/**", "**/node_modules/**", "**/.git/**")
+                scanSkipped.forEach { exclude("**/$it/**") }
             },
         ).withPropertyName("repositoryKotlinSources")
         .withPathSensitivity(PathSensitivity.RELATIVE)

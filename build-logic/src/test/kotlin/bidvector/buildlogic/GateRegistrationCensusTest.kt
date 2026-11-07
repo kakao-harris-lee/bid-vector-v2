@@ -344,6 +344,7 @@ class GateRegistrationCensusTest {
 
     private companion object {
         const val LEDGER = "gate-tests.properties"
+        const val LIST_KEY_FLOOR = 13
         const val KEY = "gate.tests.sample"
         const val TEST = "org.junit.jupiter.api.Test"
         const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
@@ -388,7 +389,9 @@ class GateRegistrationCensusTest {
         // 읽는 이 자리**가 전수를 진다(`UnusedImportsTest` 의 죽은 면제 단언과 같은 꼴).
         val policy = readPolicy(ledgerFile())
         val listKeys = policy.keys.filter { it.startsWith("gate.tests.") && ',' in policy.getValue(it) }
-        assertTrue(listKeys.isNotEmpty(), "열 형태 키가 0 이다 — 비-공허 단언")
+        // 바닥값을 **숫자로** 적는다(리뷰 LOW-5) — `isNotEmpty()` 는 판독이 깨져 키가 하나만 남아도
+        // 초록이다. 오늘 열 형태 키는 열셋이고, 줄어들면 그 퇴화가 이 단언에 보인다.
+        assertTrue(listKeys.size >= LIST_KEY_FLOOR, "열 형태 키 ${listKeys.size} < $LIST_KEY_FLOOR")
 
         val violations =
             listKeys.sorted().flatMap { key ->

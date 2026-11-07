@@ -113,6 +113,9 @@ class UnusedImportsTest {
     fun `정책의 면제 FQN 은 저장소에서 전부 실제로 도입된다 — 죽은 면제 0`() {
         // 모듈마다 도입 집합이 달라 모듈 task 로는 이 단언을 걸 수 없다(어느 모듈에선 늘 죽어 보인다).
         // 저장소 전수를 읽는 자리는 이 test 다 — `MigrationOrderTest` 의 뒤 두 test 와 같은 꼴.
+        // 건너뛰기 목록이 비면 `build/` 밑 생성 소스까지 모집단에 들어온다 — 선언을 못 받은 것이고
+        // 그 상태의 초록은 다른 집합을 잰 초록이다.
+        assertTrue(SKIPPED_DIRECTORIES.isNotEmpty(), "건너뛰기 목록을 선언 쪽에서 받지 못했다")
         val introduced = introducedFqnsInRepository()
         assertTrue(introduced.isNotEmpty(), "도입 FQN 이 0 이다 — 비-공허 단언")
 
@@ -162,7 +165,18 @@ class UnusedImportsTest {
             return parseKotlinFiles(sources) { ktFile, _ -> UnusedImports.introducedFqns(ktFile).toList() }.toSet()
         }
 
-        val SKIPPED_DIRECTORIES = setOf("build", ".git", "node_modules", ".gradle", ".gradle-home")
+        /**
+         * 건너뛰는 디렉터리는 **선언 쪽**(`build-logic/build.gradle.kts` 의 입력 제외)이 단일 출처이고
+         * 여기는 그것을 받는다(리뷰 LOW-4) — 두 자리에 적으면 모집단과 선언 입력이 갈린다.
+         */
+        val SKIPPED_DIRECTORIES: Set<String> =
+            System
+                .getProperty("bidvector.scan.skipped")
+                .orEmpty()
+                .split(',')
+                .map(String::trim)
+                .filter(String::isNotEmpty)
+                .toSet()
 
         fun architecturePolicyFile(): File = File(System.getProperty("bidvector.architecture.policy"))
 

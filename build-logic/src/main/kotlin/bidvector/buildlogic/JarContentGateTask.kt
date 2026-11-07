@@ -5,6 +5,7 @@ import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
@@ -51,11 +52,13 @@ abstract class JarContentGateTask : DefaultTask() {
     abstract val classDirectories: ConfigurableFileCollection
 
     /**
-     * 모듈이 **선언한** runtime 의존이 해석된 결과. 중첩 jar 축의 기준 집합이고 이름으로만 쓴다
+     * 모듈이 **선언한** runtime 의존이 해석된 결과. 중첩 아카이브 축의 기준 집합이고 이름으로만 쓴다
      * ([nestedArchiveViolations]). 해석 자체는 Gradle 이 실행 시점에 하므로 설정 단계에서 강제하지 않는다.
+     *
+     * `@Classpath` 다 — 해석된 classpath 의 관례이고(리뷰 LOW-3) 순서 민감·무관 엔트리 무시로
+     * up-to-date 판정이 `@InputFiles` 보다 정확하고 싸다. 거동은 같다(이름만 쓴다).
      */
-    @get:InputFiles
-    @get:PathSensitive(PathSensitivity.NONE)
+    @get:Classpath
     abstract val runtimeClasspath: ConfigurableFileCollection
 
     /** 형식·크기·언어 도구가 검사한 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
