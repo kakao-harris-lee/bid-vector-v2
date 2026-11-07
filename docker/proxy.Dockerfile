@@ -13,10 +13,18 @@
 #
 # 무엇을 빌드하는가는 `docker/caddy/` 세 파일이 정한다: `main.go` 는 caddy v2.11.7 의 `cmd/caddy/main.go`
 # 그대로(표준 모듈만, 플러그인 0), `go.mod` 는 caddy v2.11.7 의 의존 그래프에서 **go-jose/v4 → v4.1.6 ·
-# golang.org/x/net → v0.60.0 두 줄만** 올린 것, `go.sum` 이 모듈 체크섬을 고정한다(`-mod=readonly` 라
-# 어긋나면 빌드가 멈춘다). 빌드 방식·플래그는 caddy v2.11.7 의 `.goreleaser.yml` 과 같다(`go mod init caddy` 한
+# golang.org/x/net → v0.62.0 둘을 지목해** 올린 것이다 — x/net 의 최소 판 요구로 x/* 다섯이 **따라**
+# 움직이므로 공식 바이너리와의 차이는 **일곱**이다(dep 147 = 147 · 실측은 아래 chore 주석이 가리키는 팩).
+# `go.sum` 이 모듈 체크섬을 고정한다(`-mod=readonly` 라 어긋나면 빌드가 멈춘다). 빌드 방식·플래그는 caddy v2.11.7 의 `.goreleaser.yml` 과 같다(`go mod init caddy` 한
 # 모듈에 `cmd/caddy/main.go`, `-trimpath`·`-ldflags='-s -w'`·CGO 끔·`-tags=nobadger,nomysql,nopgx`). `GOTOOLCHAIN=local` — go.mod 의 `go 1.26.10` 보다 낮은 toolchain 이면
 # 다른 toolchain 을 내려받지 않고 실패한다.
+#
+# chore(2026-11-07) — x/net 을 v0.60.0 → **v0.62.0** 으로 올렸다(CVE-2026-78661 HIGH, 취약점 게이트의 차단
+# 후보였다 — 등재가 아니라 상향으로 닫는다). 그 한 줄이 x/net 의 최소 판 요구로 **x/crypto v0.58.0 ·
+# x/sync v0.24.0 · x/sys v0.49.0 · x/term v0.47.0 · x/text v0.43.0** 다섯을 함께 올린다. 모듈 **집합**은
+# 그대로다 — 바이너리의 dep 은 147 로 같고 판만 움직인다. 절차는 runbook §8.3 의 셋째 갈래 그대로
+# (위 빌더 이미지 안에서 `go get golang.org/x/net@v0.62.0 && go mod tidy`, caddy 판은 그대로 v2.11.7).
+# 실측은 `reports/evidence/chore/cve-xnet-78661/`.
 #
 # **이 stage 는 `docker/web.Dockerfile` 과 `docker/proxy.Dockerfile` 에 같은 글자로 있다.** 두 이미지의
 # 바이너리가 같은지는 글자가 아니라 산출물로 잠근다 — `tools/local-tls-build.sh` 가 두 이미지의
