@@ -197,7 +197,7 @@ INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxSt
 | 마이그레이션 번호 V1..V27 | 파일 25 · 중복 0 · 결번 V10·V11(기존) · V25(paper-bid)·V26·V27 존재 |
 | 등록부·정책 중복 | `gate-tests.properties` 중복 넷은 세 ref 공통(기존) · 조립 tier 36+11+35=**82** = 면제 래칫 |
 | capability map | 줄 수 3858+114+26=**3998** 로 닫힘 · OPEN 행 중복은 세 ref 공통 16 종 |
-| `journey-up.mjs` | main 판(+179/−6, main 자신의 계수와 같다) + 내 네 줄. `COMMON_PROPERTIES` 정의 하나 · `node --check` 통과 · **main 의 새 기동 셋도 `writeSecrets` 를 지나 키를 받는다** |
+| `journey-up.mjs` | main 판(+179/−6, main 자신의 계수와 같다) + 내 네 줄. `COMMON_PROPERTIES` 정의 하나 · `node --check` 통과 · **main 의 새 기동 셋도 같은 헬퍼를 지나 키를 받는다** — 기동마다 0600 설정 파일 하나를 쓰고 `--spring.config.import` 로 넘기는 그 자리다 |
 | `:adapters:test --rerun`(전체) | exit 0 · **1323 tests · 0 실패** · skip 4(192 클래스). 병합 커밋에서 쟀고 그 뒤 두 커밋은 adapters 를 **건드리지 않는다**(경로 차 0) |
 | `:app:test --rerun`(전체) | exit 0 · **1029 tests · 0 실패**(126 클래스) |
 | `:app:`·`:adapters:`·`:workflow:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | exit 0 |
