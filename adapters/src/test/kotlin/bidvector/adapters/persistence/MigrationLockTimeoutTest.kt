@@ -57,6 +57,64 @@ private const val BEFORE_INDEX_MIGRATION = "18"
 
 private const val INDEX_MIGRATION = "19"
 
+/** V26 직전까지 적용한다(V25 포함) — 그 다음 파일이 종단 사유 축이다. */
+private const val BEFORE_TERMINAL_REASON_MIGRATION = "25"
+
+/** 마지막 마이그레이션 — 재시도가 끝까지 선다는 것을 그 번호로 확인한다. */
+private const val LAST_MIGRATION = "27"
+
+/** V26 이 만나는 상대 — relay·보존이 `outbox` 에 쥐는 평범한 읽기(`ACCESS SHARE`). */
+private const val LOCK_OUTBOX_READ_SQL = "SELECT 1 FROM outbox LIMIT 1"
+
+/** 관례가 선 자리 — V18 이 첫 선언이고 그 아래는 관례 이전 구간이다. */
+private const val CONVENTION_FROM_VERSION = 18
+
+/**
+ * **기존 표를 건드리는 마이그레이션 전수**(관례 구간). 새 마이그레이션이 기존 표를 `ALTER` 하거나
+ * 그 표 위에 인덱스·트리거를 만들면 이 집합이 늘고, 그때 이 줄을 고치게 된다 — 상한 선언을
+ * **사람이 보는 자리**에 둔다(면제 계수 래칫과 같은 관용구).
+ */
+private val VERSIONS_TOUCHING_EXISTING_TABLES = setOf(18, 19, 24, 25, 26, 27)
+
+/**
+ * 건드리지 않는데 **상한을 선언한** 자리 — V23 하나다. 그 파일은 새 표를 만들면서 `account` 에 FK
+ * 검증 잠금을 쥐고 그 창을 같은 사유로 막았다(파일 주석이 그렇게 적는다). 과잉 선언은 안전한
+ * 쪽이라 거부하지 않고 **이름을 적어 둔다** — 그래야 선언이 조용히 사라지는 것도 보인다.
+ * 같은 모양의 V21·V22(새 표 + `account` FK)는 선언하지 않았다. 즉 **FK 축은 관례가 아니다.**
+ */
+private val VERSIONS_DECLARING_WITHOUT_TOUCHING = setOf(23)
+
+private val SQL_LINE_COMMENT = Regex("--[^\n]*")
+private val CREATE_TABLE_TARGET =
+    Regex("""CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)""", RegexOption.IGNORE_CASE)
+private val ALTER_TABLE_TARGET =
+    Regex("""ALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)""", RegexOption.IGNORE_CASE)
+private val CREATE_INDEX_TARGET =
+    Regex(
+        """CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?\S+\s+ON\s+([a-z_][a-z0-9_]*)""",
+        RegexOption.IGNORE_CASE,
+    )
+private val CREATE_TRIGGER_TARGET =
+    Regex("""CREATE\s+TRIGGER\s+[\s\S]*?\sON\s+([a-z_][a-z0-9_]*)""", RegexOption.IGNORE_CASE)
+private val LOCK_TIMEOUT_STATEMENT = Regex("""SET\s+LOCAL\s+lock_timeout""", RegexOption.IGNORE_CASE)
+
+/** 한 마이그레이션 파일 — **주석을 걷은 본문**만 본다(주석 속 `ALTER TABLE` 인용이 대상을 늘리지 않게). */
+private class MigrationSource(
+    val version: Int,
+    val statements: String,
+) {
+    fun tablesCreated(): Set<String> = targetsOf(CREATE_TABLE_TARGET)
+
+    /** 이 파일이 **DDL 대상으로 삼는** 표 — `ALTER` 와 그 표 위의 인덱스·트리거다. */
+    fun tablesTargeted(): Set<String> =
+        targetsOf(ALTER_TABLE_TARGET) + targetsOf(CREATE_INDEX_TARGET) + targetsOf(CREATE_TRIGGER_TARGET)
+
+    fun declaresLockBound(): Boolean = LOCK_TIMEOUT_STATEMENT.containsMatchIn(statements)
+
+    private fun targetsOf(pattern: Regex): Set<String> =
+        pattern.findAll(statements).map { it.groupValues[1].lowercase() }.toSet()
+}
+
 /**
  * V18 이 만나는 상대 — 평범한 **읽기**가 쥐는 `ACCESS SHARE`. `ALTER TABLE` 의 `ACCESS EXCLUSIVE` 는
  * 그것과도 부딪힌다(그래서 그 창에서는 읽기까지 큐에 선다).
@@ -159,6 +217,111 @@ class MigrationLockTimeoutTest {
             migrate(probe)
             appliedVersions(probe) shouldContain INDEX_MIGRATION
         }
+    }
+
+    /**
+     * **V26 — 이 slice 가 더한 자리의 거동**(cr H-1 · v 독립 재확인). verifier 는 상한 줄이 없을 때
+     * 열린 읽기 뒤에서 V26 migrate 가 **25 s 뒤에도 대기 중**이라고 쟀다(홀더를 커밋해야 적용됐다).
+     * 그 측정을 test 로 고정한다 — 상한이 있으면 같은 상황이 **상한 안의 실패**다.
+     *
+     * 상대가 평범한 읽기인 이유는 V18 과 같다(`ALTER TABLE` 의 `ACCESS EXCLUSIVE` 는 `ACCESS SHARE`
+     * 와도 부딪힌다). 이 표에서는 그 상대가 상시 있다 — relay 소비자가 연결을 본문 내내 쥔다.
+     *
+     * **V27 은 거동을 따로 재지 않는다**: 첫 문장이 같은 모양(`ALTER TABLE … ADD COLUMN`)이고 같은
+     * 잠금 모드라 이 test 가 재는 성질이 같으며, **전수는 아래 census 가 집합으로 닫는다**. 클러스터
+     * 하나가 test 메서드마다 서는 비용(이 파일 KDoc 의 호스트 규율)을 같은 술어에 두 번 쓰지 않는다.
+     */
+    @Test
+    @Timeout(value = 4, unit = TimeUnit.MINUTES)
+    fun `읽기 잠금이 있으면 V26 은 기다리지 않고 실패하고, 풀린 뒤 재시도가 선다`() {
+        requireSelfTerminating()
+        withOwnCluster { probe ->
+            migrate(probe, upTo = BEFORE_TERMINAL_REASON_MIGRATION)
+            appliedVersions(probe) shouldContain BEFORE_TERMINAL_REASON_MIGRATION
+
+            val holder = LockHolder(probe, LOCK_OUTBOX_READ_SQL)
+            val failure =
+                try {
+                    holder.acquire()
+
+                    var thrown: FlywayException? = null
+                    val elapsed = measureTimeMillis { thrown = shouldThrow<FlywayException> { migrate(probe) } }
+
+                    (elapsed < ELAPSED_BOUND_MS) shouldBe true
+                    thrown
+                } finally {
+                    holder.release()
+                }
+
+            sqlStateOf(failure) shouldBe LOCK_NOT_AVAILABLE
+
+            migrate(probe)
+            appliedVersions(probe) shouldContain LAST_MIGRATION
+        }
+    }
+
+    /**
+     * **모집단을 둘로 닫는다**(cr H-1 처방의 구조 쪽). 위 셋은 **고른 세 자리**의 거동을 재므로,
+     * 네 번째 마이그레이션이 상한 없이 들어와도 초록이다 — 그것이 이 결함이 리뷰까지 온 경로다.
+     * 그래서 파일 전수에서 모집단을 **계산**하고 집합으로 대조한다.
+     *
+     * 술어는 「기존 표를 DDL 대상으로 삼는가」다 — `ALTER TABLE`, 그 표 위의 `CREATE INDEX`·
+     * `CREATE TRIGGER`. 「기존」은 **더 낮은 번호의 파일이 만든 표**이고, 파일마다 자기가 만든 표를
+     * 더해 가며 센다. 주석은 걷고 본다.
+     *
+     * **FK 참조는 넣지 않았다 — 관례가 아니기 때문이다.** V21·V22 는 새 표에서 `account` 를
+     * 참조하면서 선언하지 않았고 V23 은 같은 모양에서 선언했다. 참조를 모집단에 넣으면 이 등식이
+     * **기존 두 파일 때문에** 붉어지고, 그러면 이 slice 가 남의 마이그레이션을 고치게 된다. 그 비대칭은
+     * 숨기지 않고 [VERSIONS_DECLARING_WITHOUT_TOUCHING] 이 이름으로 든다.
+     *
+     * **관례 이전 구간(V17 이하)은 모집단 밖이다.** 그 경계가 가정이 아니라 사실이 되도록 아래가
+     * 두 가지를 함께 센다 — 그 구간에도 기존 표를 건드린 파일이 **있고**(여덟), 그 가운데 선언은
+     * **0** 이다. 경계를 뒤로 미루면 이 줄이 먼저 붉어진다.
+     */
+    @Test
+    fun `기존 표를 건드리는 마이그레이션 전수가 잠금 상한을 선언한다 — 집합 등식`() {
+        val sources = migrationSources()
+        val created = mutableMapOf<String, Int>()
+        val touching = mutableSetOf<Int>()
+        sources.forEach { source ->
+            if (source.tablesTargeted().any { table -> created[table]?.let { it < source.version } == true }) {
+                touching += source.version
+            }
+            source.tablesCreated().forEach { table -> created.putIfAbsent(table, source.version) }
+        }
+        val declaring = sources.filter { it.declaresLockBound() }.map { it.version }.toSet()
+        val inConvention = { version: Int -> version >= CONVENTION_FROM_VERSION }
+
+        // ① 안전 성질 — 기존 표를 건드리는데 상한이 없는 마이그레이션은 **없다**(새 파일에도 선다).
+        touching.filter(inConvention).toSet() - declaring shouldBe emptySet()
+        // ② 비공허성·래칫 — 술어가 조용히 대상을 놓치면(또는 새 파일이 들어오면) 이 줄이 붉다.
+        touching.filter(inConvention).toSet() shouldBe VERSIONS_TOUCHING_EXISTING_TABLES
+        // ③ 반대 방향 — 과잉 선언은 V23 하나이고, 선언이 사라지면 이 줄이 붉다.
+        declaring.filter(inConvention).toSet() - touching shouldBe VERSIONS_DECLARING_WITHOUT_TOUCHING
+        // ④ 관례 경계가 사실인가 — 그 아래에도 건드린 파일이 있고(여덟), 선언은 0 이다.
+        touching.filterNot(inConvention).size shouldBe 8
+        declaring.filterNot(inConvention) shouldBe emptyList()
+    }
+
+    /** 출하되는 마이그레이션 자원 전수 — 번호 순. 본문은 주석을 걷은 것이다. */
+    private fun migrationSources(): List<MigrationSource> {
+        val root = checkNotNull(javaClass.classLoader.getResource("db/migration")) { "마이그레이션 자원을 찾지 못했다" }
+        check(root.protocol == "file") { "마이그레이션 자원이 디렉터리가 아니다: $root" }
+        val files =
+            checkNotNull(java.io.File(root.toURI()).listFiles { file -> file.name.endsWith(".sql") }) {
+                "마이그레이션 자원 디렉터리를 읽지 못했다"
+            }
+        val sources =
+            files
+                .map { file ->
+                    MigrationSource(
+                        version = file.name.substringBefore("__").removePrefix("V").toInt(),
+                        statements = SQL_LINE_COMMENT.replace(file.readText(), ""),
+                    )
+                }.sortedBy { it.version }
+        // 모집단이 비면 위 단언들이 공허해진다 — 자원 읽기 자체를 먼저 센다.
+        check(sources.size >= VERSIONS_TOUCHING_EXISTING_TABLES.size) { "마이그레이션을 너무 적게 읽었다: ${sources.size}" }
+        return sources
     }
 
     /**

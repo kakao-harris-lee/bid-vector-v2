@@ -22,6 +22,14 @@
 -- 이 마이그레이션이 피하는 바로 그 일이다(sentinel 금지).
 --
 -- 열·PK·GRANT·인덱스 변경은 **CHECK 하나와 트리거 하나 외에 0** 이다.
+
+-- 잠금 대기의 상한(V18·V19 가 세운 관례, V23·V24·V25 와 같은 사유) — 이 파일이 쥐는 것은 한 표의
+-- ACCESS EXCLUSIVE 뿐이고 창이 짧지만, 기본 `lock_timeout` 은 0 이고 migrate 가 기동의
+-- 부수효과라 그 대기는 곧 **기동 정지**다. 상한을 두면 「정지」가 아니라 「실패」가 된다.
+-- **이 표에서 특히 현실적이다**: relay 소비자가 `FOR UPDATE SKIP LOCKED` 로 연결을 본문 내내
+-- 쥐고, 반입은 compose 교체라 구판 컨테이너가 연결을 쥔 채 신판이 migrate 를 시작할 수 있다.
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE outbox ADD COLUMN terminal_reason TEXT;
 
 -- ① 사유 어휘 + 사유→상태 사상을 한 제약으로 닫는다. 행 값 비교(`IN ((...), ...)`)라

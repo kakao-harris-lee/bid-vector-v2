@@ -20,6 +20,15 @@
 -- `data-dictionary.md` §4.1) — 이 두 표에는 릴리스를 되짚을 원천이 아예 없다. 대신 **앞으로**
 -- 들어오는 행은 트리거가 요구한다(V26 의 종단 사유와 같은 모양: CHECK 로는 기존 행 때문에
 -- NOT NULL 을 적을 수 없다).
+
+-- 잠금 대기의 상한(V18·V19 가 세운 관례, V23·V24·V25·V26 과 같은 사유) — 기본 `lock_timeout` 은
+-- 0 이고 migrate 가 기동의 부수효과라 그 대기는 곧 **기동 정지**다. 상한을 두면 「정지」가 아니라
+-- 「실패」가 된다. **이 파일은 표 둘의 ACCESS EXCLUSIVE 를 차례로 쥔다** — 수집 cron 이
+-- `collection_run` 에 쓰고 relay 가 `outbox` 연결을 쥐므로 둘 다 경합 상대가 상시 있다.
+-- `SET LOCAL` 은 트랜잭션 범위이고 Flyway 는 마이그레이션마다 자기 트랜잭션이라, V26 의 같은
+-- 줄이 이 파일을 덮어 주지 않는다(그래서 두 파일이 각자 적는다).
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE collection_run ADD COLUMN release_sha TEXT;
 ALTER TABLE outbox ADD COLUMN release_sha TEXT;
 
