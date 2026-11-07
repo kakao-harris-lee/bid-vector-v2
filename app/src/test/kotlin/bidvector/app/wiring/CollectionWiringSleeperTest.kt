@@ -6,15 +6,20 @@ import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionProperties
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
+import bidvector.app.collection.KonepsOpeningEndpointProperties
 import bidvector.app.collection.MockKonepsHttp
+import bidvector.app.collection.OpeningCollectionProperties
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CallSpend
 import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
+import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.CollectionRange
+import bidvector.workflow.collection.CollectionRangePolicyData
+import bidvector.workflow.collection.OPENING_COLLECTION_RANGE_POLICY
 import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
@@ -48,10 +53,11 @@ private const val TRANSPORT_FACTORY = "konepsTransportFor"
  * 1. 표의 값 — `KonepsShippedPolicyWireTest`(adapters).
  * 2. 배선이 pacer 에 넘기는 값 — [배선은 출하 간격을 관문의 기다림으로 넘긴다].
  * 3. 그 기다림 함수가 실제로 잠그는가 — [배선의 기다림은 실제로 잠든다].
- * 4. **production 이 넘기는 것이 그 함수인가** — [배선이 세운 소스 둘은 출하 간격만큼 벌어진다].
- *    production 메서드(`CollectionWiring.collectionSources`)가 **실제로 쓰는 전송 인스턴스**로 재므로,
- *    기본값을 비우든 호출 자리가 자기 sleeper 를 넘기든 **어느 경로로 바꿔도** 이 단언이 붉어진다
- *    (참조 형태를 세던 앞 판은 「5인자 호출을 버리고 다른 전송을 쓰는」 변이를 통과했다).
+ * 4. **production 이 넘기는 것이 그 함수인가** — [전송을 만드는 production 자리 전수가 출하 간격을 지킨다].
+ *    두 조립 메서드(`CollectionWiring.collectionSources`·`OpeningCollectionWiring.openingCollectionSources`)
+ *    가 **실제로 쓰는 전송 인스턴스**로 재고, 그 **자리 전수**는 상수 풀에서 도출해 탐침표와 대조한다.
+ *    그래서 **그 두 자리에서는** 기본값을 비우든 자기 sleeper 를 넘기든 붉어지고, 셋째 자리가 생기면
+ *    거동을 재지 않은 채 지나갈 수 없다(집합 대조가 먼저 붉어진다).
  */
 class CollectionWiringSleeperTest {
     /**
@@ -92,49 +98,23 @@ class CollectionWiringSleeperTest {
     }
 
     /**
-     * **production 이 실제로 쓰는 전송으로 잰다**(v r4 L-1).
+     * **전송을 만드는 production 자리 전수가 출하 간격을 지킨다**(v r4 L-1 · v r5 H-1).
      *
-     * 앞 판은 「기본값 형태의 참조가 있다」를 상수 풀에서 셌다 — 그 술어는 **버려지는 5인자 호출**을
-     * 남겨 두고 선언 파일 안 헬퍼로 만든 다른 전송을 쓰는 변이를 통과했다(MW4d). 참조의 모양이
-     * 아니라 **쓰이는 인스턴스**를 봐야 닫힌다.
+     * 두 측정을 **한 자리에서 잇는다**.
+     * ① 자리의 전수는 컴파일된 상수 풀에서 도출한다 — `konepsTransportFor` 를 참조하는 production
+     *    클래스 집합이 아래 탐침표의 키와 **같아야** 한다. 셋째 자리가 생기면 거동을 재지 않은 채
+     *    지나갈 수 없다(그 자리가 자기 sleeper 를 넘길 수 있다).
+     * ② 각 자리의 거동은 **그 자리의 조립 메서드가 낸 소스**로 잰다. 두 소스가 관문 하나를
+     *    공유하고 계수 축(rate limiter)은 소스마다 자기 몫이 비어 있으므로, 둘째 호출이 기다린
+     *    시간은 간격 축의 것이다.
      *
-     * 그래서 조립 메서드(`CollectionWiring.collectionSources`)를 **그대로 불러** 그것이 낸 소스 둘로
-     * 잰다(Spring 컨텍스트가 필요 없다 — 인자를 받는 `open fun` 이다). 두 소스는 관문 **하나**를
-     * 공유하고 계수 축은 각자 자기 몫이 비어 있으므로, 둘째 소스의 호출이 기다린 시간은 **간격
-     * 축의 것**이다. 기본값을 비우든(MW3) 호출 자리가 자기 sleeper 를 넘기든(MW4·MW4d) 이 단언이
-     * 붉어진다 — 어느 경로로 바꿔도 「쓰인 전송」이 잠그지 않게 되기 때문이다.
+     * 앞 판은 ②를 `CollectionWiring` 한 자리에서만 쟀고, 그래서 `OpeningCollectionWiring` 의 호출에
+     * `sleeper = { }` 를 붙이는 변이가 **모든 게이트를 통과했다**(v r5 H-1). 자리의 수를 세면서 거동을
+     * 하나만 재던 그 틈을 ①↔② 의 연결이 닫는다.
      */
     @Test
-    fun `배선이 세운 소스 둘은 출하 간격만큼 벌어진다`() {
+    fun `전송을 만드는 production 자리 전수가 출하 간격을 지킨다`() {
         val shipped = shippedMinimumCallInterval()
-        MockKonepsHttp { _, _ -> listOf(noticeRow("SYN-M9-W-2")) }.use { mock ->
-            val sources = productionSources(mock.baseUrl)
-            val day = CollectionReferenceDate(PROBE_DAY)
-            // 두 소스가 관문 하나를 공유하는 판이어야 간격 축이 계수 축에서 떼어진다.
-            withClue("배선이 낸 소스") { sources.all.size shouldBe 2 }
-
-            val first = sources.all.first().port
-            val second = sources.all.last().port
-
-            first.fetchNotices(day, null)
-            val elapsedMillis = measureTimeMillis { second.fetchNotices(day, null) }
-
-            withClue("출하 간격 $shipped · 둘째 소스의 호출 ${elapsedMillis}ms") {
-                (elapsedMillis >= shipped.toMillis()) shouldBe true
-            }
-        }
-    }
-
-    /**
-     * **전송을 만드는 production 자리는 둘뿐이다** — 셋째 자리가 생기면 위 거동 단언이 그 자리를
-     * 보지 못한다(그 자리가 자기 sleeper 를 넘길 수 있다). 컴파일된 상수 풀로 **호출자 전수**를
-     * 잰다(소스 문법이 아니라 컴파일러가 만든 항목이라 스타일로 비껴갈 수 없다).
-     *
-     * 형태(`$default` 유무)는 **세지 않는다**(v r4 L-1): 그 계수는 「쓰이는 전송」을 말하지 못했고,
-     * 그 축은 위 거동 단언이 진다. 여기서 재는 것은 **자리의 수**다.
-     */
-    @Test
-    fun `전송을 만드는 production 자리는 둘뿐이다`() {
         val callers =
             appProductionConstantPools()
                 .filterValues { it.contains(TRANSPORT_FACTORY) }
@@ -142,7 +122,21 @@ class CollectionWiringSleeperTest {
                 // 선언한 파일 자신의 산출물(합성 람다 포함)은 호출 자리가 아니다.
                 .filterNot { it.substringAfterLast('/').startsWith("CollectionWiringSupportKt") }
 
-        callers shouldContainExactlyInAnyOrder listOf("wiring/CollectionWiring", "wiring/OpeningCollectionWiring")
+        callers shouldContainExactlyInAnyOrder CALL_SITE_PROBES.keys
+
+        MockKonepsHttp { _, _ -> listOf(noticeRow("SYN-M9-W-2")) }.use { mock ->
+            CALL_SITE_PROBES.forEach { (caller, probeFor) ->
+                val calls = probeFor(mock.baseUrl)
+                withClue("$caller — 관문을 공유하는 소스 둘") { calls.size shouldBe 2 }
+
+                calls.first().invoke()
+                val elapsedMillis = measureTimeMillis { calls.last().invoke() }
+
+                withClue("$caller · 출하 간격 $shipped · 둘째 소스의 호출 ${elapsedMillis}ms") {
+                    (elapsedMillis >= shipped.toMillis()) shouldBe true
+                }
+            }
+        }
     }
 }
 
@@ -168,6 +162,29 @@ private fun pacedTransport(sleeper: (Duration) -> Unit): KonepsTransport =
         clock = Clock { PROBE_NOW },
         sleeper = sleeper,
     )
+
+/**
+ * **자리 → 그 자리의 조립이 낸 호출 둘**(v r5 H-1). 키는 상수 풀 census 가 내는 이름이고, 값은 그
+ * 자리의 **production 조립 메서드**로 만든 소스 둘의 호출이다. 두 집합을 test 가 대조하므로 자리가
+ * 늘면 탐침도 늘려야 하고, 늘리지 않으면 붉어진다.
+ */
+private val CALL_SITE_PROBES: Map<String, (String) -> List<() -> Unit>> =
+    mapOf(
+        "wiring/CollectionWiring" to ::noticeCalls,
+        "wiring/OpeningCollectionWiring" to ::openingCalls,
+    )
+
+/** 공고 수집 자리 — 업종 둘의 소스가 관문 하나를 공유한다. */
+private fun noticeCalls(baseUrl: String): List<() -> Unit> {
+    val day = CollectionReferenceDate(PROBE_DAY)
+    return productionSources(baseUrl).all.map { source -> { source.port.fetchNotices(day, null) } }
+}
+
+/** 개찰 수집 자리 — 같은 관문, 다른 조립이다. 이 자리가 앞 판에서 측정 밖이었다(v r5 H-1). */
+private fun openingCalls(baseUrl: String): List<() -> Unit> {
+    val day = CollectionReferenceDate(PROBE_DAY)
+    return productionOpeningSources(baseUrl).all.map { source -> { source.port.fetchOpeningResults(day, null) } }
+}
 
 /**
  * **production 조립 메서드가 낸 소스들** — 이 slice 가 재려는 「실제로 쓰이는 전송」이 그 안에 있다.
@@ -196,13 +213,39 @@ private fun productionSources(baseUrl: String): CollectionSources =
  * 창도 **production 과 같은 자리**로 짓는다 — `CollectionRange` 의 생성자가 `internal` 이라 test 가
  * 상한을 지어낼 수 없고(그 금지가 옳다), 배선이 쓰는 해소 함수를 그대로 부른다.
  */
-private fun probeRange(): CollectionRange =
+private fun probeRange(
+    rangePolicy: EffectiveDatedPolicy<CollectionRangePolicyData> = COLLECTION_RANGE_POLICY,
+    label: String = "공고 창",
+): CollectionRange =
     resolveCollectionRange(
         from = PROBE_DAY,
         to = PROBE_DAY,
         clock = Clock { PROBE_NOW },
-        label = "표본 창",
-        rangePolicy = COLLECTION_RANGE_POLICY,
+        label = label,
+        rangePolicy = rangePolicy,
+    )
+
+/** 개찰 갈래의 production 조립 — 같은 `konepsTransportFor` 자리를 쓰는 **둘째** 호출자다. */
+private fun productionOpeningSources(baseUrl: String): OpeningCollectionSources =
+    OpeningCollectionWiring().openingCollectionSources(
+        properties =
+            OpeningCollectionProperties(
+                from = PROBE_DAY,
+                to = PROBE_DAY,
+                categories = listOf("construction", "service"),
+                samplingSeed = "m9-ops-code-probe",
+                sampleSize = 2,
+                callsPerDay = 10,
+                callsTotal = 10,
+                runStateDir = Files.createTempDirectory("m9-opening-probe-run-state").toString(),
+            ),
+        endpoint = KonepsEndpointProperties(baseUrl = baseUrl),
+        opening = KonepsOpeningEndpointProperties(scsbidBaseUrl = baseUrl),
+        credential = KonepsCredentialProperties("TRANSPORT-PROBE-KEY"),
+        range = probeRange(OPENING_COLLECTION_RANGE_POLICY, "개찰 창"),
+        runState = probeRunState("m9-opening-probe-gate"),
+        budget = probeBudget(),
+        clock = Clock { PROBE_NOW },
     )
 
 /** `CollectionWiring.sourceFor` 와 같은 인자 여섯 — 전송만 밖에서 받는다. */
