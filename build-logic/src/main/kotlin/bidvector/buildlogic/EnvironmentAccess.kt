@@ -4,13 +4,25 @@ package bidvector.buildlogic
  * 바이트코드 한 자리에서 본 **멤버 접근** — 호출하는 클래스, 호출 대상의 선언 클래스, 멤버 이름.
  *
  * 소스 표기가 아니라 산출물의 참조다. 그래서 정적 import(`import java.lang.System.getenv`)·
- * 별칭(`import java.lang.System as Sys`)·수식 호출·callable reference 가 **같은 하나**로 모인다 —
- * 그 넷을 가르는 것은 소스의 글자뿐이고 컴파일된 참조는 하나다.
+ * 별칭(`import java.lang.System as Sys`)·수식 호출이 **같은 하나**로 모인다 — 그 셋을 가르는 것은
+ * 소스의 글자뿐이고 컴파일된 참조는 하나다.
+ *
+ * **다만 「참조가 하나」가 「한 클래스에 있다」는 뜻은 아니다**(수정 라운드 3 정정 — verifier H-1 ·
+ * 리뷰 H-1). callable reference(`System::getenv`)·suspend 람다·익명 object 는 그 참조를 **이름 없는
+ * 내부 클래스**로 옮긴다. 앞 판은 모집단에서 익명 클래스를 빼고 있었고(타입 모양 래칫의 관례를 접근
+ * 전수 조사에 그대로 옮긴 자리) 그래서 그 셋이 통과했다 — 실측 59 클래스 · 718 접근이 조용히 빠졌다.
+ * 지금 모집단은 **읽은 클래스 전수**이고, 귀속만 감싼 쪽으로 올린다([ClassMemberAccess.enclosingClass]).
  */
 internal data class ClassMemberAccess(
     val sourceClass: String,
     val ownerFqn: String,
     val member: String,
+    /**
+     * [sourceClass] 를 품은 **최상위 클래스**. Kotlin 의 callable reference·suspend 람다·익명 object 는
+     * 바이트코드에서 이름 없는 내부 클래스(`Outer$f$1`)가 되는데, 고칠 자리는 그 내부 클래스가 아니라
+     * 감싼 쪽이다. 둘이 다르면 판정 문면이 **둘 다** 든다.
+     */
+    val enclosingClass: String = sourceClass,
 )
 
 /**
@@ -42,13 +54,33 @@ internal object EnvironmentAccess {
             )
         } else {
             accesses
-                .filter { key(it) in denied }
-                .sortedBy { "${it.sourceClass} ${key(it)}" }
+                .filter { isDenied(it, denied) }
+                .sortedBy { "${it.enclosingClass} ${it.sourceClass} ${key(it)}" }
                 .map {
-                    "${it.sourceClass} → ${key(it)} — production 코드가 실행 환경을 스니핑한다 " +
+                    val where =
+                        if (it.sourceClass == it.enclosingClass) {
+                            it.enclosingClass
+                        } else {
+                            "${it.enclosingClass} (안쪽 ${it.sourceClass})"
+                        }
+                    "$where → ${key(it)} — production 코드가 실행 환경을 스니핑한다 " +
                         "(OPS-13 임계 0; 억제는 명시적 정책 값으로, OPS-07 (a))"
                 }
         }
+
+    /**
+     * 거부 키는 `선언클래스#멤버` 이고 **`*#멤버` 는 「어떤 수신자든」**이다.
+     *
+     * 별표가 필요한 이유: 바이트코드의 Methodref owner 는 수신자의 **정적 타입**이다. 그래서
+     * `Environment#getActiveProfiles` 만 들면 `ConfigurableEnvironment`·`StandardEnvironment` 로
+     * 받은 같은 호출이 비껴간다(실측 — 리뷰 M-2). 하위 타입을 열거하는 것은 또 다른 열거라
+     * 수신자를 **묻지 않는** 쪽으로 닫는다 — 소스 층의 `*.getActiveProfiles` 와 같은 모양이다.
+     * `java.lang.System`·`ProcessBuilder` 는 `final` 이라 그쪽은 정확 좌표로 둔다(과잉 방지).
+     */
+    private fun isDenied(
+        access: ClassMemberAccess,
+        denied: Set<String>,
+    ): Boolean = key(access) in denied || "*#${access.member}" in denied
 
     private fun key(access: ClassMemberAccess): String = "${access.ownerFqn}#${access.member}"
 }

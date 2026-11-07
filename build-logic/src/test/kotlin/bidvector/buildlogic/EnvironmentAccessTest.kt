@@ -1,6 +1,7 @@
 package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -105,15 +106,36 @@ class EnvironmentAccessTest {
     private fun violations(accesses: List<ClassMemberAccess>): List<String> =
         EnvironmentAccess.violations(accesses, DENIED)
 
-    private companion object {
-        val DENIED =
+    @Test
+    fun `정책의 거부 집합이 비어 있지 않다 — 비-공허 단언`() {
+        // 앞 판은 거부 집합을 이 test 의 companion 에 **하드코딩**했다(리뷰 M-3). 그래서 정책의 그 한
+        // 줄을 비워도 test 열 전부 초록이고 리포트는 `denied=0 violations=0` 으로 평소와 같은 모양을
+        // 냈다 — 축소가 아무 자리에서도 보이지 않았다. 같은 라운드가 ⑤ 에서는 반대로 하고 있었다.
+        assertTrue(DENIED.isNotEmpty(), "정책 키가 비었다")
+    }
+
+    @Test
+    fun `이 test 가 잠그는 좌표가 전부 정책에 있다 — 한 줄을 지우면 여기가 붉는다`() {
+        val exercised =
             setOf(
                 "java.lang.System#getenv",
                 "java.lang.System#getProperty",
                 "java.lang.System#getProperties",
                 "java.lang.ProcessBuilder#environment",
-                "org.springframework.core.env.Environment#getActiveProfiles",
-                "org.springframework.core.env.Environment#acceptsProfiles",
+                "*#getActiveProfiles",
             )
+
+        assertEquals(emptySet<String>(), exercised - DENIED, "정책에서 사라진 좌표")
+    }
+
+    private companion object {
+        /**
+         * **실제 정책을 읽는다** — 사본을 쓰면 정책 축소가 어느 test 도 깨뜨리지 않는다(리뷰 M-3).
+         * 경로는 `:build-logic:test` 가 선언 입력으로 넘기는 것이고, 그 파일은 이미 입력 목록에 있다.
+         */
+        val DENIED: Set<String> =
+            readPolicy(File(System.getProperty("bidvector.architecture.policy")))
+                .requireList("bytecode.env-access.denied-members")
+                .toSet()
     }
 }

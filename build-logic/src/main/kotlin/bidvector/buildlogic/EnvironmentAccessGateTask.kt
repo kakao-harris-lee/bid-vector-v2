@@ -1,5 +1,6 @@
 package bidvector.buildlogic
 
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
@@ -25,6 +26,9 @@ import org.gradle.api.tasks.TaskAction
  * ⓑ 범위 축은 자기 저장소 좌표만 보므로, 환경 스니핑이 실제로 쓰일 자리(`app`·`adapters`·`workflow`
  * 의 배선)를 받는 축이 **없었다**.
  *
+ * 모집단은 **읽은 클래스 전수**다 — 익명 클래스를 빼면 callable reference·suspend 람다·익명 object 가
+ * 통째로 판정 밖이 된다(수정 라운드 3 실측). 귀속만 감싼 최상위 클래스로 올려 「고칠 자리」를 남긴다.
+ *
  * 판정은 [EnvironmentAccess] 가 한다(순수). 이 task 는 읽기와 배선만 맡는다.
  */
 abstract class EnvironmentAccessGateTask : DefaultTask() {
@@ -43,20 +47,27 @@ abstract class EnvironmentAccessGateTask : DefaultTask() {
     fun gate() {
         val denied = readPolicy(policyFile.get().asFile).requireList(DENIED_MEMBERS).toSet()
         val roots = classes.files.filter { it.isDirectory }.map { it.toPath() }
-        val imported =
-            if (roots.isEmpty()) {
-                emptyList()
-            } else {
-                ClassFileImporter().importPaths(roots).filterNot { it.isAnonymousClass }
-            }
+        // **익명 클래스를 빼지 않는다**(수정 라운드 3 — verifier H-1 · 리뷰 H-1). 앞 판은
+        // `filterNot { it.isAnonymousClass }` 로 모집단을 좁혔는데, 그 필터는 타입 **모양 래칫**
+        // (`TypeShapeGateTask`)의 관례이고 거기서는 「이름 없는 타입은 선언된 모양이 아니다」가 근거다.
+        // 접근 **전수 조사**에는 그 근거가 없다 — Kotlin 은 callable reference·suspend 람다·익명
+        // object 를 이름 없는 내부 클래스로 내보내고 그 접근은 그 클래스에 귀속되므로, 필터가 곧
+        // 사각이었다(실측 59 클래스 · 718 접근이 조용히 빠졌다).
+        val imported = if (roots.isEmpty()) emptyList() else ClassFileImporter().importPaths(roots).toList()
         val accesses =
             imported.flatMap { type ->
-                type.accessesFromSelf.map { ClassMemberAccess(type.name, it.targetOwner.name, it.target.name) }
+                val enclosing = type.topLevelName()
+                type.accessesFromSelf.map {
+                    ClassMemberAccess(type.name, it.targetOwner.name, it.target.name, enclosing)
+                }
             }
         val violations = EnvironmentAccess.violations(accesses, denied)
 
         report.get().asFile.apply { parentFile.mkdirs() }.writeText(
             "types=${imported.size}\n" +
+                // 앞 판이 **빼고 있던** 모집단을 수로 남긴다 — 그 수가 0 이 아니라는 것이 필터 제거의
+                // 효과이고, 다시 필터가 생기면 이 줄이 떨어진다.
+                "anonymousTypes=${imported.count { it.isAnonymousClass }}\n" +
                 "accesses=${accesses.size}\n" +
                 "denied=${denied.size}\n" +
                 "violations=${violations.size}\n",
@@ -69,6 +80,18 @@ abstract class EnvironmentAccessGateTask : DefaultTask() {
                 separator = "\n  ",
             ),
         )
+    }
+
+    /**
+     * 이 클래스를 품은 **최상위 클래스** 이름. 이름 없는 내부 클래스(`Outer$f$1`)의 접근을 「고칠 자리」
+     * 로 올린다 — `getEnclosingClass` 를 더 올라갈 수 없을 때까지 따라간다.
+     */
+    private fun JavaClass.topLevelName(): String {
+        var current = this
+        while (true) {
+            val outer = current.enclosingClass.orElse(null) ?: return current.name
+            current = outer
+        }
     }
 
     private companion object {
