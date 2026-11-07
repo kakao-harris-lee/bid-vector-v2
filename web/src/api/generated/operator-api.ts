@@ -810,6 +810,13 @@ export interface components {
             /** @description 공고 차수(제로패딩 세 자리). */
             noticeRound: string;
             /**
+             * @description **투찰 종류 축**(M9 — 중복 억제 키의 한 열). 「한 계정 · 한 공고 · **한 투찰 종류** · 한 알림 종류」에 항목이 하나다. 같은 공고에 서면(페이퍼) 건과 실투찰 건이 함께 있으면 **항목이 둘**이고 서로를 덮지 않는다 — 가상 연습의 소식이 실제 소식을 가리지 않는다.
+             *     `NONE` 은 **건이 아니라 공고에 붙은 소식**이다(`BID_PRICE_REQUEST_RECORDED` · `NEW_CANDIDATE` — 후자는 건이 생기기 전의 소식이다). 어느 종류가 어느 값을 갖는지는 저장 층의 짝 CHECK 가 함께 진다: 그 둘은 **반드시** `NONE` 이고 나머지 여섯은 **반드시** `REAL` 또는 `PAPER` 다.
+             *     **묶음의 키 절반이다** — `noticeNumber`+`noticeRound`+`bidKind` 가 한 묶음이고 `noticeItemCount`·`noticeUnreadCount` 가 그 묶음의 계수다. 정렬이 묶음을 연속시킨다.
+             * @enum {string}
+             */
+            bidKind: "REAL" | "PAPER" | "NONE";
+            /**
              * Format: date-time
              * @description **사실의 시각**이다(알림함에 적재된 시각이 아니다). 같은 사실이 다시 기록되면 최신 관측 시각으로 이동한다.
              */
@@ -823,12 +830,12 @@ export interface components {
             readAt: string | null;
             /**
              * Format: int32
-             * @description 이 공고 묶음의 **전체** 항목 수 — 페이지와 안읽음 필터에 무관하다(묶음이 페이지 경계에 걸쳐도 「더 있다」를 알 수 있다).
+             * @description 이 묶음(공고 쌍 + `bidKind`)의 **전체** 항목 수 — 페이지와 안읽음 필터에 무관하다 (묶음이 페이지 경계에 걸쳐도 「더 있다」를 알 수 있다). **투찰 종류를 합쳐 세지 않는다**: 서면과 실투찰은 각자의 묶음이고 각자의 계수를 갖는다.
              */
             noticeItemCount: number;
             /**
              * Format: int32
-             * @description 이 공고 묶음의 안읽음 항목 수.
+             * @description 이 묶음의 안읽음 항목 수(같은 축 — 투찰 종류를 합치지 않는다).
              */
             noticeUnreadCount: number;
             /** @description 그 키의 공고 행이 저장소에 있는가. `false` 면 아래 세 칸이 전부 `null` 이다 — 보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고 **둘을 구분하지 않는다** (묘비를 남기지 않으므로 가를 근거가 없다). 항목 자체는 남는다. `true` 인데 `noticeTitle` 이 `null` 인 것은 **다른 사실**이다(행은 있고 제목 칸이 비었다). */
@@ -851,10 +858,20 @@ export interface components {
             kind: "NEW_CANDIDATE" | "BID_DEADLINE_IMMINENT" | "BID_DEADLINE_TODAY" | "DOCUMENT_DEADLINE_IMMINENT" | "OPENING_COMPLETED" | "AWARD_DECIDED" | "NOTICE_REVISED" | "BID_PRICE_REQUEST_RECORDED";
             noticeNumber: string;
             noticeRound: string;
+            /**
+             * @description **투찰 종류 축** — 항목(묶음)의 키 한 열이다. 어휘 밖이면 400 이다. 종류와 맞지 않는 값(예: `BID_PRICE_REQUEST_RECORDED` 에 `REAL`)이면 그 키의 항목이 없으므로 `markedCount` 가 0 이다 — 거부가 아니라 **계수가** 답한다(남의 항목·없는 항목과 같은 0).
+             * @enum {string}
+             */
+            bidKind: "REAL" | "PAPER" | "NONE";
         };
         MarkNoticeNotificationsReadRequest: {
             noticeNumber: string;
             noticeRound: string;
+            /**
+             * @description **투찰 종류 축** — 항목(묶음)의 키 한 열이다. 어휘 밖이면 400 이다. 종류와 맞지 않는 값(예: `BID_PRICE_REQUEST_RECORDED` 에 `REAL`)이면 그 키의 항목이 없으므로 `markedCount` 가 0 이다 — 거부가 아니라 **계수가** 답한다(남의 항목·없는 항목과 같은 0).
+             * @enum {string}
+             */
+            bidKind: "REAL" | "PAPER" | "NONE";
         };
         MarkNotificationReadResponse: {
             /** Format: int32 */

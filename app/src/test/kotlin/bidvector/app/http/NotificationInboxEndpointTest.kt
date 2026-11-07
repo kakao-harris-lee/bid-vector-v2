@@ -6,7 +6,9 @@ import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.notificationinbox.MarkReadOutcome
 import bidvector.workflow.notificationinbox.NoticeDisplay
 import bidvector.workflow.notificationinbox.NoticeGroupCounts
+import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact
+import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxItem
 import bidvector.workflow.notificationinbox.NotificationInboxPage
 import bidvector.workflow.notificationinbox.NotificationItemKey
@@ -70,27 +72,64 @@ internal class NotificationInboxEndpointTest : HttpIntegrationTestBase() {
     /**
      * **판독한 대상이 포트까지 그대로 간다.** 400 들은 「거부가 된다」를 재지만, 통과한 요청이
      * 어떤 값으로 포트에 닿는지는 그 test 들이 말하지 않는다 — 종류 토큰과 공고 쌍이 뒤바뀌어도
-     * 상태 코드는 같다. 두 경로를 각각 잰다(단건은 종류 축을 싣고, 묶음은 싣지 않는다).
+     * 상태 코드는 같다. 두 경로를 각각 잰다(단건은 알림 종류 축을 싣고, 묶음은 싣지 않는다).
+     *
+     * **투찰 종류는 두 경로 모두 싣는다**(M9/paper-bid). 묶음 경로에서 그 값이 빠지거나 다른
+     * 값으로 닿으면 서면 묶음을 읽는 요청이 **실투찰 묶음**을 읽는다 — 상태 코드는 200 이고
+     * 응답 계수도 그럴듯하다. 그래서 「포트에 닿은 값」을 축까지 단언한다.
      */
     @Test
     fun `판독한 읽음 처리 대상이 포트에 그대로 전달된다`() {
         session.post(AccountScopedRoutes.NOTIFICATIONS + "/read", itemBody()).statusCode.value() shouldBe 200
         store.lastItem shouldBe
             NotificationItemKey(
+                NotificationGroupKey(
+                    NoticeId(NoticeNumber.of("N-1"), NoticeRound.of("000")),
+                    NotificationBidKind.NONE,
+                ),
                 NotificationKind.NEW_CANDIDATE,
-                NoticeId(NoticeNumber.of("N-1"), NoticeRound.of("000")),
             )
         store.lastNotice shouldBe null
 
         val grouped =
             session.post(
                 AccountScopedRoutes.NOTIFICATIONS + "/read-notice",
-                """{"noticeNumber":"N-2","noticeRound":"007"}""",
+                """{"noticeNumber":"N-2","noticeRound":"007","bidKind":"PAPER"}""",
             )
 
         grouped.statusCode.value() shouldBe 200
-        store.lastNotice shouldBe NoticeId(NoticeNumber.of("N-2"), NoticeRound.of("007"))
+        store.lastNotice shouldBe
+            NotificationGroupKey(
+                NoticeId(NoticeNumber.of("N-2"), NoticeRound.of("007")),
+                NotificationBidKind.PAPER,
+            )
     }
+
+    /**
+     * **투찰 종류 어휘 밖은 400, 빠진 칸도 400 이다** — 알림 종류 축과 같은 술어(`valueOf` 가
+     * 아니라 어휘 전수 조회)이고, 축은 허용 키가 아니라 **필수**다.
+     *
+     * **두 꼴을 두 경로 **각각**에 쏜다**(cr LOW). 앞 판은 어휘 밖을 `/read` 에서만, 빠진 칸을
+     * `/read-notice` 에서만 쟀다 — 그러면 `/read` 의 축 판독을 **선택적**(기본값 `REAL`)으로
+     * 바꾸는 회귀가 이 test 를 지나고, 그 회귀는 조용하다(200 이고 계수도 그럴듯한데 서버가
+     * 실투찰 항목을 읽는다).
+     */
+    @Test
+    fun `읽음 처리 본문의 투찰 종류가 어휘 밖이거나 없으면 400 이다 — 두 경로 각각`() {
+        val item = AccountScopedRoutes.NOTIFICATIONS + "/read"
+        val notice = AccountScopedRoutes.NOTIFICATIONS + "/read-notice"
+
+        rejects(item, """{"kind":"NEW_CANDIDATE","noticeNumber":"N-1","noticeRound":"000","bidKind":"REEL"}""")
+        rejects(item, """{"kind":"NEW_CANDIDATE","noticeNumber":"N-1","noticeRound":"000"}""")
+        rejects(notice, """{"noticeNumber":"N-1","noticeRound":"000","bidKind":"REEL"}""")
+        rejects(notice, """{"noticeNumber":"N-1","noticeRound":"000"}""")
+    }
+
+    /** 그 본문이 **그 경로에서** 400 인가 — 네 칸을 한 줄씩 읽게 한다. */
+    private fun rejects(
+        path: String,
+        body: String,
+    ) = withClue("$path $body") { session.post(path, body).statusCode.value() shouldBe 400 }
 
     /**
      * ⓐ **wire 의 키 집합 == 문서의 키 집합.** 항목을 하나 꽂아 `NotificationItemResponse.from`
@@ -215,11 +254,15 @@ internal class NotificationInboxEndpointTest : HttpIntegrationTestBase() {
 
     private fun sampleItem(): NotificationInboxItem =
         NotificationInboxItem(
-            notice = NoticeId(NoticeNumber.of("ntc endpoint 1"), NoticeRound.of("000")),
+            group =
+                NotificationGroupKey(
+                    NoticeId(NoticeNumber.of("ntc endpoint 1"), NoticeRound.of("000")),
+                    NotificationBidKind.PAPER,
+                ),
             fact = NotificationFact.OpeningCompleted(provisionallyFirst = true),
             occurredAt = Instant.parse("2026-10-20T01:00:00Z"),
             readAt = null,
-            group = NoticeGroupCounts(itemCount = 2, unreadCount = 1),
+            groupCounts = NoticeGroupCounts(itemCount = 2, unreadCount = 1),
             display =
                 NoticeDisplay(
                     title = "표시 제목",
@@ -229,7 +272,8 @@ internal class NotificationInboxEndpointTest : HttpIntegrationTestBase() {
         )
 
     private fun itemBody(): String =
-        """{"kind":"${NotificationKind.NEW_CANDIDATE.name}","noticeNumber":"N-1","noticeRound":"000"}"""
+        """{"kind":"${NotificationKind.NEW_CANDIDATE.name}","noticeNumber":"N-1","noticeRound":"000",""" +
+            """"bidKind":"${NotificationBidKind.NONE.name}"}"""
 
     /** 문서 쪽 키는 **공유 로더**로 읽는다(중복 키 거부판 — `OpenApiSpecSupport`). */
     private fun documentedItemKeys(): Set<String> = documentedKeys("NotificationItem")
