@@ -1,7 +1,10 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.notificationinbox.JdbcNotificationInboxStore
+import bidvector.workflow.notificationinbox.NotificationAudience
+import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord
@@ -58,6 +61,32 @@ open class NotificationInboxWiring {
         }
     }
 
+    /**
+     * 청중 — 체계의 알림이 갈 계정 전수(M9/ops-code · NOTI-01). **읽기 전용이고 알림함 표를
+     * 건드리지 않는다**(`account.id` 만 읽는다).
+     *
+     * 쓰기 빈과 **같은 조립에 둔 이유**: 둘은 한 짝으로만 쓰인다(기록할 사실 + 기록할 대상).
+     * 원천 slice 마다 따로 꽂게 하면 같은 어댑터가 여러 조립에서 생기고, 쓰기 빈을 한 자리로
+     * 모은 판단이 청중에서 무너진다.
+     *
+     * **비활성화 경로**: 이 빈을 빼면 평가 커밋 배선이 서지 않는다(그 조립이 이 타입을 요구한다) —
+     * 알림함 읽기 경로와 다른 트리거들은 그대로 남는다.
+     */
+    @Bean
+    open fun notificationAudiencePort(dataSource: DataSource): NotificationAudiencePort {
+        val adapter = JdbcNotificationAudience(dataSource)
+        val logger = LoggerFactory.getLogger(NotificationInboxWiring::class.java)
+        return NotificationAudiencePort {
+            adapter.accounts().also { resolved ->
+                // 청중을 못 읽은 실행은 알림함 기록이 0 건으로 끝난다 — 그 0 이 **사실의 0 이
+                // 아니라는** 표지를 여기서 적는다(쓰기 실패 표지와 같은 자리·같은 사유, D-7C3B-9).
+                if (resolved is NotificationAudience.Unavailable) {
+                    logger.warn(audienceUnavailableLine(resolved.exceptionType))
+                }
+            }
+        }
+    }
+
     @Bean
     open fun notificationInboxQuery(
         notificationInboxStore: NotificationInboxStore,
@@ -77,3 +106,12 @@ internal fun inboxWriteFailedLine(record: NotificationInboxRecord): String =
     "notification-inbox write failed kind=${record.fact.kind.name} " +
         "notice=${record.notice.number.value}/${record.notice.round.value} " +
         "bidKind=${record.group.bidKind.name}"
+
+/**
+ * 청중을 못 읽은 실행의 표지 — **예외 클래스 이름만** 싣는다(cr r2 MEDIUM). 계수도 주체도 메시지도
+ * 없다: 읽은 것이 없으니 셀 것이 없고, 저장소 예외 메시지에는 행 값이 실릴 수 있다. 그 한 토큰이
+ * 「연결 고갈」과 「권한 회수」와 「표 부재」를 가르므로 「이 실행의 알림함 기록 0 건은 사실이 아니다」에
+ * **왜**가 붙는다(전송 축의 `TransportFailed(exceptionType)` 와 같은 타협).
+ */
+internal fun audienceUnavailableLine(exceptionType: String): String =
+    "notification-inbox audience unavailable — recorded 0 items cause=$exceptionType"

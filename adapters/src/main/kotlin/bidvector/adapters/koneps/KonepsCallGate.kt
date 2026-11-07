@@ -52,7 +52,18 @@ class KonepsCallGate(
     private val attempts: AttemptLedger,
     /** 시각의 출처 — 함수 하나다. 시계 타입을 받으면 어느 모듈의 시계인지가 경계 문제가 된다. */
     private val now: () -> Instant,
+    /**
+     * 연속 호출 사이의 최소 간격(OPS-08) — **기본값이 없다.** 관문이 모든 호출의 단일 통로라
+     * 이 자리가 비면 간격 보장이 통째로 사라지고, 그 부재는 조용하다.
+     */
+    private val pacer: KonepsCallPacer,
 ) {
+    /**
+     * **간격은 상한 뒤, 전송 앞이다.** 상한이 막은 호출은 나가지 않으므로 기다릴 이유가 없다
+     * (「예산 소모는 실제 부작용 발생에만」의 짝 — 거부가 벽시계를 태우지 않는다). 반대로 나가는
+     * 호출은 재시도든 쪽 넘김이든 전부 이 자리를 지나므로 간격을 비껴가는 경로는 관문을 비껴가는
+     * 경로와 같고, 관문은 `HttpClient` 를 쥔 유일한 자리다(D-6G-47).
+     */
     internal fun send(
         context: KonepsCallContext,
         uri: URI,
@@ -60,8 +71,14 @@ class KonepsCallGate(
     ): KonepsGateOutcome {
         val today = LocalDate.ofInstant(now(), COLLECTION_BUDGET_ZONE)
         return when (val permit = budget.consume(today, 1)) {
-            is BudgetOutcome.Exhausted -> KonepsGateOutcome.Denied(permit.limit)
-            BudgetOutcome.Allowed -> KonepsGateOutcome.Sent(sendAndRecord(context, uri, timeout))
+            is BudgetOutcome.Exhausted -> {
+                KonepsGateOutcome.Denied(permit.limit)
+            }
+
+            BudgetOutcome.Allowed -> {
+                pacer.awaitTurn()
+                KonepsGateOutcome.Sent(sendAndRecord(context, uri, timeout))
+            }
         }
     }
 

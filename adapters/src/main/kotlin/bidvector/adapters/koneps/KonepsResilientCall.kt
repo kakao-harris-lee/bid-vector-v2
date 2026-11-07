@@ -12,8 +12,6 @@ import io.github.resilience4j.retry.Retry
 import io.github.resilience4j.retry.RetryConfig
 import java.net.URI
 
-private const val HTTP_TOO_MANY_REQUESTS = 429
-
 /** 한 페이지 호출의 최종(재시도·rate limiter 를 다 거친 뒤) 판정(②③). */
 internal sealed interface KonepsCallOutcome {
     data class Success(
@@ -71,8 +69,29 @@ internal sealed interface KonepsRawStep {
         val outcome: KonepsEnvelopeOutcome,
     ) : KonepsRawStep
 
+    /**
+     * **응답을 받지 못한** 전송 결말 — timeout·전송 실패. 응답을 받은 경우는 상태 처분 표가
+     * 가르므로([KonepsHttpPolicyData.dispositionFor]) 이 자리에 `Received` 가 **올 수 없다** —
+     * 그 불변식을 인자 타입이 든다([KonepsTransportOutcome.NoResponse]).
+     */
     data class TransportStep(
-        val outcome: KonepsTransportOutcome,
+        val outcome: KonepsTransportOutcome.NoResponse,
+    ) : KonepsRawStep
+
+    /**
+     * 상태 코드 축이 **속도 한도**로 판정했다(OPS-09) — 재시도(백오프)가 답이다. 본문을 읽지
+     * 않는다: 원인이 본문이 아니라 속도이고, 429 응답에는 봉투가 없는 것이 보통이다.
+     */
+    data class RateLimitedStep(
+        val status: Int,
+    ) : KonepsRawStep
+
+    /**
+     * 상태 코드 축이 **차단**으로 판정했다(OPS-09) — 봉투를 읽지 않고 재시도하지 않는다.
+     * 본문에 재시도 가능 코드가 실려 있어도 그 호출은 나갈 자격이 없다.
+     */
+    data class BlockedStep(
+        val status: Int,
     ) : KonepsRawStep
 
     /**
@@ -96,32 +115,60 @@ private fun rawStep(
             is KonepsGateOutcome.Denied -> return KonepsRawStep.BudgetStep(gated.limit)
             is KonepsGateOutcome.Sent -> gated
         }
-    val transport = sent.transport
-    return when {
-        transport is KonepsTransportOutcome.Received && transport.status != HTTP_TOO_MANY_REQUESTS -> {
+    return when (val transport = sent.transport) {
+        is KonepsTransportOutcome.Received -> receivedStep(transport, httpPolicy, collectionPolicy)
+        is KonepsTransportOutcome.NoResponse -> KonepsRawStep.TransportStep(transport)
+    }
+}
+
+/**
+ * 받은 응답 하나를 **상태 처분 표로** 가른다(OPS-09) — 봉투를 읽는 것은 표가 그렇게 선언할
+ * 때뿐이다. 앞 판은 429 하나만 예외로 두고 나머지 전부를 봉투로 보냈고, 그래서 차단 응답의
+ * 재시도 여부를 **봉투 분류가** 정했다(403 본문이 재시도 가능 코드면 재시도됐다).
+ */
+private fun receivedStep(
+    transport: KonepsTransportOutcome.Received,
+    httpPolicy: KonepsHttpPolicyData,
+    collectionPolicy: KonepsCollectionPolicyData,
+): KonepsRawStep =
+    when (httpPolicy.dispositionFor(transport.status)) {
+        KonepsStatusDisposition.INTERPRET_ENVELOPE -> {
             KonepsRawStep.EnvelopeStep(parseKonepsEnvelope(transport.body, collectionPolicy, httpPolicy.maxJsonDepth))
         }
 
-        else -> {
-            KonepsRawStep.TransportStep(transport)
+        KonepsStatusDisposition.RATE_LIMITED -> {
+            KonepsRawStep.RateLimitedStep(transport.status)
+        }
+
+        KonepsStatusDisposition.ACCESS_BLOCKED -> {
+            KonepsRawStep.BlockedStep(transport.status)
         }
     }
-}
 
 private fun isRetryableStep(step: KonepsRawStep): Boolean =
     when (step) {
         is KonepsRawStep.TransportStep -> {
-            when (val outcome = step.outcome) {
+            when (step.outcome) {
                 KonepsTransportOutcome.TimedOut -> true
                 is KonepsTransportOutcome.TransportFailed -> true
-                is KonepsTransportOutcome.Received -> outcome.status == HTTP_TOO_MANY_REQUESTS
             }
+        }
+
+        // 속도 한도는 백오프로 회복된다(조사 a-4 「~2분 안에 회복, 원인은 동시성」).
+        is KonepsRawStep.RateLimitedStep -> {
+            true
+        }
+
+        // 차단은 백오프로 회복되지 않는다 — 자격·등록이 바뀌어야 한다(OPS-09).
+        is KonepsRawStep.BlockedStep -> {
+            false
         }
 
         // M6/6G D-6G-11 — 봉투가 나르는 quota 초과는 **일 트래픽 한도**다. 백오프 몇 십 ms 로
         // 회복되지 않으므로 재시도는 거부될 호출을 더 낼 뿐이다(한도가 풀리는 것은 날이 바뀔
-        // 때다). 속도 한도(HTTP 429)는 위 TransportStep 분기가 그대로 재시도한다 — legacy
-        // 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고 두 축은 다른 것이다.
+        // 때다). 속도 한도(HTTP 429)는 **상태 처분 표가 먼저 갈라** 위 RateLimitedStep 분기가
+        // 재시도한다(OPS-09) — legacy 실측이 「~2분 안에 회복, 원인은 동시성」으로 가른 그 축이고
+        // 두 축은 다른 것이다. 봉투가 나르는 quota 초과는 그 표를 지나지 않는다(HTTP 200 이다).
         is KonepsRawStep.EnvelopeStep -> {
             (step.outcome as? KonepsEnvelopeOutcome.Classified)?.category == ResultCodeCategory.RETRYABLE
         }
@@ -143,6 +190,14 @@ private fun foldFinal(step: KonepsRawStep): KonepsCallOutcome =
                 KonepsEnvelopeOutcome.NoData -> KonepsCallOutcome.NoData
                 else -> KonepsCallOutcome.Failed(causeFor(step), describeEnvelope(envelope))
             }
+        }
+
+        is KonepsRawStep.RateLimitedStep -> {
+            KonepsCallOutcome.Failed(causeFor(step), describeStatus(step.status))
+        }
+
+        is KonepsRawStep.BlockedStep -> {
+            KonepsCallOutcome.Failed(causeFor(step), describeStatus(step.status))
         }
 
         is KonepsRawStep.BudgetStep -> {
