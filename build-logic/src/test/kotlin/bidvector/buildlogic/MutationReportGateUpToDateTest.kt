@@ -182,7 +182,7 @@ class MutationReportGateUpToDateTest {
      * 게이트의 배선은 **프로덕션과 같은 한 줄**(`pitestMutationXmlReport()`)이다. 그 자리를
      * 고정 경로로 바꿔치우면 게이트는 옛 자리를 읽고 아래 둘이 RED 가 된다.
      */
-    private fun writeMovedReportDirFixture() {
+    private fun writeMovedReportDirFixture(timestampedReportsOverride: String = "") {
         File(projectDir, "settings.gradle.kts").writeText("rootProject.name = \"fixture\"\n")
         File(projectDir, "policy.properties").writeText(
             """
@@ -211,6 +211,8 @@ class MutationReportGateUpToDateTest {
             configure<info.solidsoft.gradle.pitest.PitestPluginExtension> {
                 reportDir.set(layout.projectDirectory.dir("$MOVED_REPORT_DIR"))
             }
+
+            $timestampedReportsOverride
 
             tasks.register<bidvector.buildlogic.MutationReportGateTask>("mutationReportGate") {
                 moduleName.set("fixture")
@@ -262,6 +264,40 @@ class MutationReportGateUpToDateTest {
         )
     }
 
+    @Test
+    fun `타임스탬프 리포트를 켜면 구성 단계에서 거부한다 — extension 축`() {
+        // 자리의 둘째 축(v r4 L-2). `timestampedReports=true` 면 pitest 가 시각 이름의 하위
+        // 디렉터리에 리포트를 쓰는데 Gradle 은 출력 디렉터리의 낡은 파일을 지우지 않는다 —
+        // 게이트는 좋은 낡은 리포트를 읽고 로컬에서 초록이 된다(verifier 재현). 그 자리는 파생으로
+        // 따라갈 수 없으므로 **켜는 것 자체를 거부**한다.
+        writeMovedReportDirFixture(timestampedReportsOverride = TIMESTAMPED_VIA_EXTENSION)
+        writeReport(MOVED_REPORT_DIR, detected = TOTAL_MUTATIONS)
+
+        val result = run(expectFailure = true, excludePitest = true)
+
+        assertTrue(
+            result.output.contains("timestampedReports"),
+            "거부 사유가 그 플래그를 가리키지 않는다:\n${result.output}",
+        )
+        assertEquals(null, result.task(":mutationReportGate")?.outcome, "게이트가 돌아버렸다")
+    }
+
+    @Test
+    fun `타임스탬프 리포트를 task 쪽에서 켜도 거부한다 — 읽는 값이 task 의 최종값이다`() {
+        // extension 이 아니라 task 속성을 직접 켜는 축. 리포트를 쓰는 것은 task 이므로 게이트가
+        // 보는 값도 task 의 것이어야 한다.
+        writeMovedReportDirFixture(timestampedReportsOverride = TIMESTAMPED_VIA_TASK)
+        writeReport(MOVED_REPORT_DIR, detected = TOTAL_MUTATIONS)
+
+        val result = run(expectFailure = true, excludePitest = true)
+
+        assertTrue(
+            result.output.contains("timestampedReports"),
+            "거부 사유가 그 플래그를 가리키지 않는다:\n${result.output}",
+        )
+        assertEquals(null, result.task(":mutationReportGate")?.outcome, "게이트가 돌아버렸다")
+    }
+
     private companion object {
         /** fixture 의 변이 수. 래칫 `mutations.min` 과 같은 값이라 그 축은 늘 만족한다 — 재는 것은 점수 축이다. */
         const val TOTAL_MUTATIONS = 4
@@ -271,5 +307,13 @@ class MutationReportGateUpToDateTest {
 
         /** 옛 자리 — 좋은 수를 담은 낡은 리포트가 남아 있는 쪽. */
         const val STALE_REPORT_DIR = "pitest-stale"
+
+        /** 자리의 둘째 축을 켜는 fixture 한 줄 — extension 축. */
+        const val TIMESTAMPED_VIA_EXTENSION =
+            "configure<info.solidsoft.gradle.pitest.PitestPluginExtension> { timestampedReports.set(true) }"
+
+        /** 같은 축, task 쪽. 리포트를 쓰는 것이 task 이므로 이쪽이 최종값이다. */
+        const val TIMESTAMPED_VIA_TASK =
+            "tasks.named<info.solidsoft.gradle.pitest.PitestTask>(\"pitest\") { timestampedReports.set(true) }"
     }
 }

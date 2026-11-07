@@ -1,9 +1,11 @@
 package bidvector.buildlogic
 
 import info.solidsoft.gradle.pitest.PitestTask
+import org.gradle.api.GradleException
 import org.gradle.api.Project
 import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.TaskProvider
 import org.gradle.kotlin.dsl.named
 
 /**
@@ -19,10 +21,35 @@ import org.gradle.kotlin.dsl.named
  * it.출력속성 }`)이고 따라오는 것이 둘 있다 — 게이트가 pitest 산출물의 **소비자로 선언**되어
  * 순서가 배선에서 나오고, 자리를 옮기면 양쪽이 **함께** 움직인다.
  *
- * 파일 이름은 도구가 정한 것이다. 자리까지 고정되는 것은 `timestampedReports=false` 와 짝이다.
+ * 파일 이름은 도구가 정한 것이다. 자리의 **둘째 축**인 `timestampedReports` 는 파생할 수 없어
+ * [refuseTimestampedReports] 가 거부한다.
  */
-fun Project.pitestMutationXmlReport(): Provider<RegularFile> =
-    tasks.named<PitestTask>(PITEST_TASK_NAME).flatMap { it.reportDir.file(MUTATIONS_XML_FILE_NAME) }
+fun Project.pitestMutationXmlReport(): Provider<RegularFile> {
+    val pitest = tasks.named<PitestTask>(PITEST_TASK_NAME)
+    refuseTimestampedReports(pitest)
+    return pitest.flatMap { it.reportDir.file(MUTATIONS_XML_FILE_NAME) }
+}
+
+/**
+ * `timestampedReports=true` 를 **구성 단계에서 거부한다.** 그쪽을 켜면 pitest 가 리포트를 시각
+ * 이름의 하위 디렉터리에 쓰는데, Gradle 은 출력 디렉터리의 낡은 파일을 지우지 않는다 — 그래서
+ * 전 실행의 좋은 리포트가 `reportDir` 에 남고 게이트는 그것을 읽어 **로컬에서 초록**이 된다
+ * (새 checkout 인 CI 는 「존재하지 않는다」로 붉다). 자리를 파생하는 것으로는 막을 수 없다:
+ * 시각 이름을 우리가 알 수 없고, 알더라도 낡은 파일이 그대로 남는다.
+ *
+ * 읽는 값이 **task 의 것**인 이유는 리포트를 쓰는 것이 task 이기 때문이다(extension 을 거쳐 오든
+ * task 에 직접 설정되든 최종값은 거기 있다). 이 함수가 게이트 배선 안에서 불리고 그 배선이 lazy
+ * 하므로, 여기서 보는 값은 **모든 스크립트 평가가 끝난 뒤의 값**이다.
+ */
+private fun refuseTimestampedReports(pitest: TaskProvider<PitestTask>) {
+    if (pitest.get().timestampedReports.getOrElse(false)) {
+        throw GradleException(
+            "mutation 리포트 자리가 실행마다 바뀌면 래칫이 그 자리를 가리킬 수 없다 — " +
+                "pitest `timestampedReports` 는 false 여야 한다(ADR 0007 OPEN-ADR-07). " +
+                "켜면 낡은 리포트가 `reportDir` 에 남아 게이트가 그것으로 통과한다.",
+        )
+    }
+}
 
 /** pitest plugin 이 만드는 task 이름. */
 private const val PITEST_TASK_NAME = "pitest"
