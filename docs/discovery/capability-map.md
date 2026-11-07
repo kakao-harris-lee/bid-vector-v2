@@ -3621,6 +3621,38 @@ build-logic·등록부·evidence 문면뿐), task 의 정책 파일 `@InputFile`
 | 10 | 6G-2d D-53 `AxisConclusion.settled` 죽은 코드 | **그대로** — 그 파생 속성의 Kotlin 호출자가 **0** 이다 |
 | 11 | 6G-2d D-53 두 판독기 한 술어 | 재지 않았다 — 원 등재 그대로. 그 등재 자신이 「오늘 그 경로가 **없다**」를 적는다 |
 
+**하네스 레인 묶음 열둘 가운데 여섯 — M9/gates-build (2026-11-06).** 그 slice 가 build-logic·정책으로
+닫히는 축을 가져갔다. 정본은 `reports/evidence/m9/gates-build/{scope,design-review,commands,checklist,rollback}.md`
+이고 `reports/evidence/m6/closure/open-inventory.md` §9 가 같은 처분을 그 장부 쪽에 적는다. **이 절은 다시
+판정하지 않는다** — 적는 것은 어디서 닫혔는가와 무엇이 남는가다.
+
+| ID | 처분 | 무엇이 그것을 닫는가 |
+| --- | --- | --- |
+| `OPEN-MIGRATION-ORDER-GATE` | **닫힘(구조)** | 새 build-logic task 가 `version 다중집합 == (1..max ∖ 은퇴)` 를 잰다. 결번·중복·판독 불가·대상 없는 은퇴 항목이 같은 등식에 걸린다. 디렉터리가 선언 입력(RELATIVE)이고 소유 모듈에서 비면 실패한다. main 의 기존 결번 둘은 번호를 다시 매기지 않고 은퇴 목록으로 고정했다 — 다시 매기면 적용 이력·checksum 이 바뀐다 |
+| `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` | **닫힘(사각 셋)** — 수정 라운드 2 | 아카이브 입력이 이름(`jar`)에서 **Jar 타입 전수** provider 로 바뀌어 배포물 `bootJar` 가 들어왔고(`BOOT-INF/classes/` 접두는 정책 값으로 벗긴다), 빈 입력이 비-공허 단언에 걸린다. app 의 판정 엔트리 **279 → 558**. **사각 셋째도 닫혔다**(수정 라운드 2): 술어가 최상위 `.class` 엔트리에만 걸려 `bootJar { classpath(files(…)) }` 로 넣은 중첩 jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 실리면서 판정되지 않았다 — 재현 확인 뒤 **`중첩 jar 이름 ⊆ runtimeClasspath 해석 결과`** 로 닫았다(app `nestedJars=102 runtimeJars=109`, 나머지 아홉 `0`). 축을 켜자 실측으로 나온 Boot 자신의 도구 jar 는 `jar.external-nested-jars` 로 접두 면제(launcher 클래스 면제와 같은 사유). 남는 한계는 **이름 바꿔치우기**다 — 그 축은 의존 검증·서명이 받는다 |
+| `OPEN-HARNESS-GATE-TESTS-ORDER` | **닫힘(구조)** | 등재 등식에 「블록 안 행 == 정렬판 · 중복 0」이 붙었다. 집합 등식이 보지 못하던 축이고 세 라운드 연속 사람이 잡던 자리다. 어긋나 있던 블록 셋을 같은 커밋에서 정렬했다 |
+| `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` | **닫힘(자체 게이트)** | ktlint 의 `no-unused-imports` 가 켜져 있는데도 조용했던 축을 PSI 식별자 토큰 등식으로 바꿔 세 트리(모듈·included build·모듈 밖 스크립트)에 건다. 그 게이트가 찾은 **169 줄 / 40 파일**을 같은 slice 가 제거했고, 그 과정에서 자기 리팩터가 남긴 셋도 잡았다(같은 줄에 ktlint 는 침묵) |
+| `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` | **닫힘(차등 실측) · 형제 축 넷 포함**(수정 라운드 1) | adapters **여덟** 축의 허용 뿌리를 **이름 쪽에서** 한 번 더 잰다(첫 판은 OPEN 문면대로 넷이었고, 같은 `javap` 술어·같은 `ALLOWED_ROOTS` 모양을 쓰는 형제 넷(`notice`·`opening`·`relay`·`strategy`)이 같은 사각을 그대로 갖고 있었다 — 값 복사, 새 술어 종류 0)(새 술어 종류 0, 정책 키만). `const val` 로 끌어온 금지 좌표에 바이트코드 test 는 **초록**(상수 풀 흔적 0, `javap`)이고 새 소스 축은 **붉다** |
+| `OPEN-CPD-GATE-RENAME-BYPASS` | **절반 — OPEN 유지**(팀장 승인 2026-11-06 ⓐ) | 낡은 리포트 축은 닫았다(프레즌스 게이트가 리포트 mtime 을 잴 소스와 견준다 — `check -x cpdCheck` 가 직전 XML 로 통과하던 자리). **이름 치환 축은 도구 한계로 열린 채다**: 값이 `CPDConfiguration` 까지 흐르는데도 PMD 7.7.0 의 `KotlinLanguageModule` 이 `createCpdLexer` 에서 property bundle 을 쓰지 않아 익명화 속성이 Kotlin 토크나이저에 닿지 않는다(바이트코드 확인 · 구조 동일·식별자 전부 다른 블록 둘이 미탐, 축어 동일 통제군은 탐지). **재개 조건**: PMD 가 Kotlin lexer 에 익명화 속성을 잇는 판이 나오면 그 판 상향만으로 이 정책 키가 효과를 내므로, 상향 시 **양성 대조를 재측정**한다(이름만 바꾼 복사판이 붉는지) |
+| 완료 조건 2 「소스 축 상시 게이트 부재」(`…/closure/checklist.md` §3 ④) | **미구현 — 처분 후보**(팀장 승인 2026-11-06 · OPEN 행 유지) | 처방의 입력이 없다는 것이 실측 셋이다 — ⓐ Kotlin 이 import 할 수 있는 legacy 좌표가 **0**(legacy 는 Python 저장소이고 그 소스 축은 ml-engine 레인 몫) ⓑ 경로 리터럴 거부는 V2 의 **출처 인용 여섯**(KDoc 다섯 + 정책 provenance 문자열 하나)을 지우게 만드는 과잉이다 ⓒ legacy `bid-vector` symlink 가 이 환경에 **더 이상 없어** 거부 목록을 전수로 열거할 근거가 없다. **입력 없는 정책 키를 남기지 않았다** — 아무것도 막지 않는 키는 「닫혔다」로 읽힌다. **Kotlin 축은 기존 게이트 셋이 상시로 든다**(`group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate`) |
+
+**함께 닫은 OPS 축**: OPS-13 의 「프로덕션 코드가 실행 환경을 스니핑해 부작용을 바꾸는 비교가 0 건」을
+**바이트코드 층의 상시 게이트**로 만들었다(`environmentAccessGate` — 전 모듈 production 클래스의 멤버
+참조). 수정 라운드 1 의 정정이다: 첫 판은 소스의 `수신자.멤버` **글자 쌍**이었고 별칭·정적 import 로
+열려 있었다(차등 실측 — 같은 probe 에 소스 축 2/6 · 바이트코드 축 6/6). 임계가 0 이라 승인 대상이
+아니고 오늘 전 모듈에서 **0 건**이다(`accesses` 합 ≈ 5 만). 이 항목은 `OPEN-M6-RESIDUAL-OPS` 의
+`OPS-13` 행을 처분하지 않는다 — 그 행의 나머지 축(결합도 예산·순환 의존 등)은 그대로다.
+
+**이 slice 가 손대지 않은 여섯**(기계 산출 — §2 열둘 ∖ 위 여섯): `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` ·
+`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` · `OPEN-CODEX-RECORD-COORDINATES` ·
+`OPEN-GATE-REGISTRATION-STALE-INPUT` · `OPEN-HARNESS-ROLLBACK-VALIDITY-BY-KIND` ·
+`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`. 그 여섯 가운데 둘(`CODEX-RECORD-COORDINATES` ·
+`HARNESS-ROLLBACK-VALIDITY-BY-KIND`)은 evidence·심판 규율 축이고 하나(`PERSISTENCE-GATE-PREDICATE-TYPE`)는
+adapters test 술어라 build-logic 밖이다. `GATE-REGISTRATION-STALE-INPUT` 은 **6G-2g 가 이미 구조적으로
+닫았고**(open-inventory §9 가 그 근거를 든다) 여기서는 「이 slice 가 손대지 않았다」로만 센다 — **두
+문서의 잔여 집합을 같은 여섯으로 맞춘다**(앞 판은 이 절이 다섯, 장부가 여섯이어서 집합이 갈려 있었다,
+수정 라운드 1 verifier L-3). 수는 둘 다 기계로 셌다(§2 열둘의 식별자 집합에서 뺐다 — 눈으로 세면 또 틀린다).
+
 #### (e) M6 범위 `OPEN-` 204 전수 재고 — 하지 않는다(결정 유지)
 
 M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 표로 갈음했다. 그 근거는 추측이 아니라 보정 대조

@@ -1,12 +1,10 @@
 package bidvector.workflow.strategy
 
 import bidvector.sharedkernel.BaseAmount
-import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.VatTreatment
 import bidvector.sharedkernel.export
 import bidvector.strategy.StrategyDraft
-import bidvector.strategy.StrategyRevision
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.WatchRuleId
 import java.math.BigDecimal

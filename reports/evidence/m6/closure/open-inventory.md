@@ -217,3 +217,31 @@ D-6G2g-12). **§2 가 이 묶음을 「열둘 전부 어느 문서에도 종결 
 
 **M9 가 신설한 OPEN 일곱**(화면 표시 다섯 · CVE apt 둘)은 이 문서가 아니라 capability map §12.3 (b) 가
 받는다 — 이 문서는 M6 종결의 기록이고 M9 잔여의 registry 가 아니다.
+
+## §9 하네스 레인 묶음의 처분 — M9/gates-build (2026-11-06, 덧붙임)
+
+§2 「하네스 레인」 행의 열둘 가운데 **build-logic·정책으로 닫히는 축**을 그 slice 가 가져갔다. 같은 처분을
+`docs/discovery/capability-map.md` §12.3 (d) 가 장부 쪽에 적는다. 정본은
+`reports/evidence/m9/gates-build/{scope,design-review,commands,checklist}.md` 이고 여기는 처분만 적는다.
+
+| OPEN | 처분 | 무엇이 닫혔나 |
+| --- | --- | --- |
+| `OPEN-MIGRATION-ORDER-GATE` | **닫음** | 새 `migrationOrderGate` — `version 다중집합 == (1..max ∖ 은퇴)`. 결번·중복·판독 불가·죽은 은퇴 항목을 한 등식이 센다. main 의 기존 결번 둘은 번호를 다시 매기지 않고 은퇴 목록으로 고정했다(다시 매기면 적용 이력·checksum 이 바뀐다) |
+| `OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT` | **닫음(사각 셋)** | 아카이브 입력이 Jar **타입 전수** provider 가 됐고(배포물 `bootJar` 포함, `BOOT-INF/classes/` 접두를 정책 값으로 벗긴다), 빈 입력은 비-공허 단언이 거부한다. app 의 판정 엔트리 279 → 558. **사각 셋째**(verifier M-1)도 수정 라운드 2 에서 닫았다: 최상위 `.class` 엔트리만 보던 술어 아래에서 `bootJar` 의 중첩 jar 가 런타임에 실리면서 판정되지 않았다 — 재현 뒤 「중첩 jar 이름 ⊆ `runtimeClasspath` 해석 결과」로 닫고 Boot 자신의 도구 jar 는 접두로 면제했다. 남는 한계는 이름 바꿔치우기(의존 검증·서명의 축) |
+| `OPEN-HARNESS-GATE-TESTS-ORDER` | **닫음** | `gateRegistrationGate` 에 「블록 안 행 == 정렬판 · 중복 0」 단언. main 에 이미 어긋나 있던 블록 셋을 같은 커밋에서 정렬 |
+| `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` | **닫음** | 새 `unusedImportGate`(세 트리: 모듈·included build·느슨한 스크립트). 그 게이트가 찾은 **169 줄**을 같은 slice 가 제거했다 |
+| `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` | **닫음 · 형제 축 넷 포함** | 소스 층에 패키지 범위 축 추가. **차등 실측**: `const val` 로 끌어온 금지 좌표에 바이트코드 test 는 초록(상수 풀 흔적 0)이고 새 소스 축은 붉다. 수정 라운드 1(리뷰 M-5)에서 **여덟 축**으로 — 같은 `javap` 술어·같은 `ALLOWED_ROOTS` 모양을 쓰는 형제 넷(`notice`·`opening`·`relay`·`strategy`)이 같은 사각을 그대로 갖고 있었다(값 복사, 새 술어 종류 0) |
+| `OPEN-CPD-GATE-RENAME-BYPASS` | **절반** | 낡은 리포트 축은 닫았다(리포트 mtime ↔ 잴 소스). **이름 치환 축은 열린 채다** — PMD 7.7.0 의 Kotlin CPD lexer 가 anonymize 속성을 받지 못한다(`createCpdLexer` 가 property bundle 을 쓰지 않는다, 바이트코드 확인). 배선·정책 키는 남기고 정책 주석이 그 사실을 든다. **재개 조건**(팀장 지시 2026-11-06 ⓐ): PMD 가 Kotlin lexer 에 익명화 속성을 잇는 판이 나오면 그 판 상향만으로 이 키가 효과를 내므로, 상향 시 **양성 대조를 재측정**한다(이름만 바꾼 복사판이 붉는지) |
+| 완료 조건 2 「소스 축 상시 게이트 부재」(checklist §3 ④) | **미구현 · 되돌려 보냄** | 처방의 입력이 없다 — Kotlin 이 import 할 수 있는 legacy 좌표가 0(legacy 는 Python), 경로 리터럴 거부는 V2 의 **출처 인용 여섯**(KDoc 다섯 + 정책 provenance 하나)을 지우게 만드는 과잉, legacy symlink 가 이 환경에 더 이상 없어 거부 목록을 전수로 열거할 근거가 없다. **Kotlin 축은 기존 게이트 셋이 상시로 든다**(`group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate`) · Python 소스 축은 ml-engine 레인이 받는다. **처분 후보로 등재하고 OPEN 행은 유지한다**(팀장 승인 2026-11-06) — 입력 없는 정책 키를 남기지 않는 쪽을 골랐다 |
+| OPS-13 「실행 환경 스니핑 0」 | **닫음(임계 0) — 정본은 바이트코드 층** | 첫 판은 소스의 `수신자.멤버` **글자 쌍**이었고 별칭·정적 import 로 열려 있었다(수정 라운드 1, verifier H-1 · 리뷰 HIGH). 지금은 전 모듈 production 클래스의 **멤버 참조**를 재는 `environmentAccessGate` 가 임계 0 을 지고, 소스 쌍 축은 줄 좌표를 지목하는 1차 그물이다. 같은 probe 의 차등: 소스 축 2/6 · 바이트코드 축 6/6. 오늘 전 모듈 0 건 |
+
+**남는 여섯**(기계 산출 — §2 열둘 ∖ 위 표): `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` ·
+`OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` · `OPEN-CODEX-RECORD-COORDINATES` ·
+`OPEN-GATE-REGISTRATION-STALE-INPUT` · `OPEN-HARNESS-ROLLBACK-VALIDITY-BY-KIND` ·
+`OPEN-VERDICT-CONSTRUCTION-VISIBILITY`. 그 여섯 가운데 둘(`CODEX-RECORD-COORDINATES` ·
+`HARNESS-ROLLBACK-VALIDITY-BY-KIND`)은 evidence·심판 규율 축이고 하나(`PERSISTENCE-GATE-PREDICATE-TYPE`)는
+adapters test 술어라 build-logic 밖이다. `GATE-REGISTRATION-STALE-INPUT` 은 이 문서 §9 머리가 적은 대로
+**6G-2g 가 이미 구조적으로 닫았다** — 여기서는 「이 slice 가 손대지 않았다」로만 센다. `capability-map.md`
+§12.3 (d) 가 **같은 여섯**을 적는다(수정 라운드 1 verifier L-3 정정 — 앞 판은 그 절이 다섯, 이 절이
+여섯으로 집합이 갈려 있었다). §2 의 「열둘」 계수는 그대로이고 이 절이 그 가운데 **여섯의 처분**을
+적는다 — 처분과 잔여의 수는 둘 다 기계로 셌다(§7 의 교훈).

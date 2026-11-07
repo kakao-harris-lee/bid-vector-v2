@@ -1,7 +1,5 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
-import bidvector.adapters.koneps.KonepsHttpPolicyData
 import bidvector.adapters.koneps.KonepsOpenApiNoticeSource
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.persistence.JdbcCollectionRunStore
@@ -18,16 +16,11 @@ import bidvector.app.collection.requireOutsideRepository
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CallBudgetLedger
 import bidvector.procurement.CollectionReferenceDate
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.KonepsCollectionPolicyData
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.CollectNoticesUseCase
 import bidvector.workflow.collection.CollectionRange
-import bidvector.workflow.collection.CollectionRangeOutcome
 import bidvector.workflow.collection.CollectionSource
 import bidvector.workflow.collection.CollectionSourceName
-import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -37,7 +30,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
 import java.net.URI
 import java.nio.file.Path
-import java.time.LocalDate
 import javax.sql.DataSource
 
 /** 조립된 업종 소스 목록 — `List` 빈은 Spring 의 컬렉션 주입과 섞이므로 한 겹 감싼다. */

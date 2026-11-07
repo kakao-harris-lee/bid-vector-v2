@@ -1,6 +1,5 @@
 package bidvector.workflow.evaluation
 
-import bidvector.decision.BidNowReason
 import bidvector.decision.LadderInput
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.UnitScore

@@ -50,6 +50,14 @@ abstract class JarContentGateTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val classDirectories: ConfigurableFileCollection
 
+    /**
+     * 모듈이 **선언한** runtime 의존이 해석된 결과. 중첩 jar 축의 기준 집합이고 이름으로만 쓴다
+     * ([nestedArchiveViolations]). 해석 자체는 Gradle 이 실행 시점에 하므로 설정 단계에서 강제하지 않는다.
+     */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val runtimeClasspath: ConfigurableFileCollection
+
     /** 형식·크기·언어 도구가 검사한 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -63,31 +71,46 @@ abstract class JarContentGateTask : DefaultTask() {
 
     @TaskAction
     fun gate() {
-        val packageRoot = readPolicy(policyFile.get().asFile).requireValue("package.root")
+        val values = readPolicy(policyFile.get().asFile)
         val module = moduleName.get()
-        val owned = PackageOwnershipPolicy(packageRoot).ownedPackage(module).replace('.', '/')
+        val owned = PackageOwnershipPolicy(values.requireValue("package.root")).ownedPackage(module).replace('.', '/')
         val verified = verifiedClasses()
-        val entries = archives.files.filter(File::isFile).flatMap(::classEntries)
+        val archiveFiles = archives.files.filter(File::isFile)
+        val entries = archiveFiles.flatMap(::classEntries)
 
-        val policy = JarContentPolicy(owned, verifiedSourceNames(verifiedSources.files))
-        val violations = policy.violations(entries, verified)
+        val policy =
+            JarContentPolicy(
+                owned,
+                verifiedSourceNames(verifiedSources.files),
+                classRoots = values.requireList(CLASS_ROOTS),
+                externalClassRoots = values.requireList(EXTERNAL_CLASS_ROOTS),
+            )
+        val verdict = policy.judge(entries, verified)
+        val nested = nestedVerdict(module, values, archiveFiles)
 
         val header =
             listOf(
                 "module=$module",
                 "owned=$owned/",
                 "verified=${verified.size}",
+                "archives=${archiveFiles.size}",
                 "entries=${entries.size}",
+                "judged=${verdict.judged}",
+                "exempt=${verdict.exempt}",
+                "nestedJars=${nested.nestedCount}",
+                "runtimeJars=${nested.runtimeCount}",
             )
         report
             .get()
             .asFile
             .apply { parentFile.mkdirs() }
-            .writeText((header + violations).joinToString(separator = "\n", postfix = "\n"))
+            .writeText((header + verdict.violations + nested.violations).joinToString(separator = "\n", postfix = "\n"))
 
-        if (violations.isNotEmpty()) {
+        archiveEmptinessFailure(module, archiveFiles.size, verdict.judged)?.let { throw GradleException(it) }
+        failOnNestedJars(module, nested.violations)
+        if (verdict.violations.isNotEmpty()) {
             throw GradleException(
-                violations.joinToString(
+                verdict.violations.joinToString(
                     prefix = "아카이브 내용이 게이트를 통과한 산출물이 아니다 (모듈 '$module'):\n  ",
                     separator = "\n  ",
                 ),
@@ -107,6 +130,54 @@ abstract class JarContentGateTask : DefaultTask() {
                     .toList()
             }.toMap()
 
+    /**
+     * 중첩 jar 축(verifier M-1) — 최상위 class 엔트리만 보던 술어가 `BOOT-INF/lib` 에 실린 jar 를 놓쳤다.
+     * 경로가 아니라 **파일 이름**으로 견주므로 어느 자리에 넣어도 같은 판정을 받는다.
+     */
+    private fun nestedVerdict(
+        module: String,
+        values: Map<String, String>,
+        archiveFiles: List<File>,
+    ): NestedJarVerdict {
+        val nested = archiveFiles.associate { it.name to nestedJarNames(it) }
+        val runtimeJarNames =
+            runtimeClasspath.files
+                .filter { it.extension == "jar" }
+                .map(File::getName)
+                .toSet()
+        val exempt = values.requireList(EXTERNAL_NESTED_JARS)
+        return NestedJarVerdict(
+            violations = nestedArchiveViolations(module, nested, runtimeJarNames, exempt),
+            nestedCount = nested.values.sumOf { it.size },
+            runtimeCount = runtimeJarNames.size,
+        )
+    }
+
+    private fun failOnNestedJars(
+        module: String,
+        violations: List<String>,
+    ) {
+        if (violations.isEmpty()) return
+        throw GradleException(
+            violations.joinToString(
+                prefix = "아카이브가 선언되지 않은 중첩 jar 를 품는다 (모듈 '$module'):\n  ",
+                separator = "\n  ",
+            ),
+        )
+    }
+
+    /** 아카이브가 품는 중첩 jar 의 **파일 이름**. 경로는 보지 않는다 — 자리를 옮기는 것이 우회가 되지 않게. */
+    private fun nestedJarNames(archive: File): List<String> =
+        JarFile(archive).use { jar ->
+            jar
+                .entries()
+                .asSequence()
+                .map { it.name }
+                .filter { it.endsWith(".jar") }
+                .map { it.substringAfterLast('/') }
+                .toList()
+        }
+
     private fun classEntries(archive: File): List<JarClassEntry> =
         JarFile(archive).use { jar ->
             jar
@@ -119,6 +190,17 @@ abstract class JarContentGateTask : DefaultTask() {
                 }.toList()
         }
 }
+
+/** 중첩 jar 축의 판정과 그 축이 **실제로 센 수** — 수가 0 으로 내려가면 리포트에서 보인다. */
+private class NestedJarVerdict(
+    val violations: List<String>,
+    val nestedCount: Int,
+    val runtimeCount: Int,
+)
+
+private const val CLASS_ROOTS = "jar.class-roots"
+private const val EXTERNAL_CLASS_ROOTS = "jar.external-class-roots"
+private const val EXTERNAL_NESTED_JARS = "jar.external-nested-jars"
 
 /** jar 엔트리는 항상 `/` 구분자다 — 플랫폼 구분자로 만든 상대 경로를 그 표기에 맞춘다. */
 private fun File.invariantPath(): String = path.replace(File.separatorChar, '/')

@@ -1,32 +1,10 @@
 package bidvector.adapters.snapshot
 
-import bidvector.adapters.persistence.JdbcNoticeRepository
-import bidvector.adapters.persistence.PersistenceTestSupport
-import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.AxisConclusion
-import bidvector.procurement.BusinessDivision
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.KonepsCollectionPolicyData
-import bidvector.procurement.NoticeCollected
-import bidvector.procurement.NoticeId
-import bidvector.procurement.NoticeNumber
-import bidvector.procurement.RawKey
-import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
-import bidvector.sharedkernel.NoticeRound
-import bidvector.sharedkernel.Resolution
-import bidvector.workflow.collection.NoticeKeyHash
-import bidvector.workflow.collection.SampleList
-import bidvector.workflow.collection.SampleScope
-import bidvector.workflow.collection.SampleStratum
-import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.sql.Timestamp
-import java.time.Instant
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 /** A 가 적용되는 공고 — 기초금액 축의 술어다(공사 전용 칸이지만 술어 자체는 축에 실린다). */
 private val A_APPLIES = mapOf("bidPrceCalclAYn" to "Y")

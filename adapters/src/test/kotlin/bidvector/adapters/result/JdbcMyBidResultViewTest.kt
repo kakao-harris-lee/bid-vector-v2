@@ -1,25 +1,18 @@
 package bidvector.adapters.result
 
-import bidvector.adapters.bidding.BidCaseDbFixture
 import bidvector.adapters.notice.ReadOnlyWitness
 import bidvector.adapters.notice.witnessedDataSource
-import bidvector.adapters.snapshot.jsonbKeyOf
 import bidvector.bidding.BidAmountOrigin
-import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidMemo
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
-import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
-import bidvector.procurement.NOTICE_ROUND_RAW_KEY
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.sharedkernel.Currency
-import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.opening.NoticeOpeningFacts
 import io.kotest.assertions.withClue
@@ -30,7 +23,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
-import java.sql.Timestamp
 import javax.sql.DataSource
 
 /** 표지 상호 — 개찰 사실 경로 어디에도 이 글자가 나오면 안 된다(D-7C5B-5, 값 수준 단언). */

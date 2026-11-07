@@ -1,8 +1,6 @@
 package bidvector.adapters.snapshot
 
 import bidvector.workflow.collection.sha256Hex
-import java.math.BigDecimal
-import java.time.Instant
 import java.time.LocalDate
 
 /**

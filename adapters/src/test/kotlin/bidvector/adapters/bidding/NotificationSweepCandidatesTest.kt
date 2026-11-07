@@ -9,7 +9,6 @@ import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.NOTIFICATION_WINDOW_POLICY
-import bidvector.workflow.bidding.NotificationSweepCase
 import bidvector.workflow.bidding.NotificationWindowPolicyData
 import bidvector.workflow.bidding.SweepNotifications
 import bidvector.workflow.notificationinbox.NotificationBidKind

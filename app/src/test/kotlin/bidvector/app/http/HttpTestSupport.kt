@@ -1,6 +1,5 @@
 package bidvector.app.http
 
-import bidvector.adapters.evaluation.NoticeWatchSubjectPort
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.UncertainReason
@@ -13,20 +12,16 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
 import bidvector.workflow.evaluation.CandidateSourcePort
-import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
-import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notice.NoticeSearchCriteria
 import bidvector.workflow.notice.NoticeSearchPage
 import bidvector.workflow.notice.NoticeSearchPort
 import bidvector.workflow.notice.NoticeSearchState
 import bidvector.workflow.strategy.AppliedStrategy
-import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
 import java.net.Socket
-import java.time.Instant
 import java.time.LocalDate
 import java.util.Collections
 

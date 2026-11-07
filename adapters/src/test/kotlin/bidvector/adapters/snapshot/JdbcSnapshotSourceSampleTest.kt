@@ -1,24 +1,11 @@
 package bidvector.adapters.snapshot
 
-import bidvector.adapters.persistence.JdbcNoticeRepository
-import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.AxisConclusion
 import bidvector.procurement.BusinessDivision
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.KonepsCollectionPolicyData
-import bidvector.procurement.NoticeCollected
-import bidvector.procurement.NoticeId
-import bidvector.procurement.NoticeNumber
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
-import bidvector.sharedkernel.NoticeRound
-import bidvector.sharedkernel.Resolution
-import bidvector.workflow.collection.NoticeKeyHash
-import bidvector.workflow.collection.SampleList
-import bidvector.workflow.collection.SampleScope
-import bidvector.workflow.collection.SampleStratum
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe

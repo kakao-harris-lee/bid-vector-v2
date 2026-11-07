@@ -1,8 +1,5 @@
 package bidvector.adapters.retention
 
-import bidvector.procurement.FieldConcept
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.sharedkernel.Resolution
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate

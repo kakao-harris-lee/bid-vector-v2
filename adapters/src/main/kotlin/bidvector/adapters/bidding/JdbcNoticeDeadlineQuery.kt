@@ -6,7 +6,6 @@ import bidvector.bidding.NoticeKey
 import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.bidding.NoticeDeadline
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
-import java.time.Instant
 import javax.sql.DataSource
 
 /**

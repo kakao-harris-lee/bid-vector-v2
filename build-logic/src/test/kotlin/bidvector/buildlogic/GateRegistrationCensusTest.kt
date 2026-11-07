@@ -1,6 +1,7 @@
 package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -308,7 +309,42 @@ class GateRegistrationCensusTest {
         assertTrue(violations.single().contains("p.GhostTest"), "$violations")
     }
 
+    // ---- 장부 모양 — 블록 안 행 순서와 중복(`OPEN-HARNESS-GATE-TESTS-ORDER`) ----
+
+    @Test
+    fun `사전순 등재 행은 장부 모양 위반이 없다`() {
+        val violations = GateRegistration.ledgerOrderViolations(KEY, listOf("p.AaaTest", "p.BbbTest", "p.CccTest"))
+
+        assertEquals(emptyList<String>(), violations)
+    }
+
+    @Test
+    fun `새 이름을 블록 끝에 붙이면 붉는다 — 집합 등식이 못 보는 축`() {
+        val rows = listOf("p.AaaTest", "p.CccTest", "p.BbbTest")
+
+        val violations = GateRegistration.ledgerOrderViolations(KEY, rows)
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("사전순"), "$violations")
+        assertEquals(rows.toSet(), rows.sorted().toSet(), "집합으로는 같다 — 그래서 등식이 이 축을 못 본다")
+    }
+
+    @Test
+    fun `같은 이름을 두 번 등재하면 붉는다 — 집합이 접어 버리는 축`() {
+        val violations = GateRegistration.ledgerOrderViolations(KEY, listOf("p.AaaTest", "p.AaaTest", "p.BbbTest"))
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("p.AaaTest"), "$violations")
+    }
+
+    @Test
+    fun `빈 열은 장부 모양 단언 대상이 없다 — test 가 없는 모듈`() {
+        assertEquals(emptyList<String>(), GateRegistration.ledgerOrderViolations(KEY, emptyList()))
+    }
+
     private companion object {
+        const val LEDGER = "gate-tests.properties"
+        const val KEY = "gate.tests.sample"
         const val TEST = "org.junit.jupiter.api.Test"
         const val TEMPLATE = "org.junit.jupiter.api.TestTemplate"
         const val ENABLED_IF = "org.junit.jupiter.api.condition.EnabledIfSystemProperty"
@@ -344,4 +380,23 @@ class GateRegistrationCensusTest {
             superFacts = { name -> classes.firstOrNull { it.binaryName == name } },
         )
     }
+
+    @Test
+    fun `장부의 모든 열이 정렬돼 있고 중복이 없다 — 모듈 블록 밖의 열까지`() {
+        // 게이트의 모양 단언은 `gate.tests.<module>`·`.excluded` 둘만 본다(리뷰 LOW-7). 같은 파일의
+        // `gate.tests.discovery.*` 는 열 형태인데 그 축이 없었다. 모듈마다 다시 재지 않도록 **저장소를
+        // 읽는 이 자리**가 전수를 진다(`UnusedImportsTest` 의 죽은 면제 단언과 같은 꼴).
+        val policy = readPolicy(ledgerFile())
+        val listKeys = policy.keys.filter { it.startsWith("gate.tests.") && ',' in policy.getValue(it) }
+        assertTrue(listKeys.isNotEmpty(), "열 형태 키가 0 이다 — 비-공허 단언")
+
+        val violations =
+            listKeys.sorted().flatMap { key ->
+                GateRegistration.ledgerOrderViolations(key, GateRegistration.coordinateRows(policy[key]))
+            }
+
+        assertEquals(emptyList<String>(), violations, "장부 열 ${listKeys.size}개를 쟀다")
+    }
+
+    private fun ledgerFile(): File = File(System.getProperty("bidvector.architecture.policy")).resolveSibling(LEDGER)
 }

@@ -1,6 +1,5 @@
 package bidvector.adapters.koneps
 
-import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.QualificationFetchDecision

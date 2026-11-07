@@ -33,7 +33,6 @@ import org.springframework.http.ResponseEntity
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.math.BigDecimal
-import java.sql.Types
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
