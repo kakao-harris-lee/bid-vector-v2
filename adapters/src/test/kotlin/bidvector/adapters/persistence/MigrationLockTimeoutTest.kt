@@ -60,8 +60,11 @@ private const val INDEX_MIGRATION = "19"
 /** V26 직전까지 적용한다(V25 포함) — 그 다음 파일이 종단 사유 축이다. */
 private const val BEFORE_TERMINAL_REASON_MIGRATION = "25"
 
-/** 마지막 마이그레이션 — 재시도가 끝까지 선다는 것을 그 번호로 확인한다. */
-private const val LAST_MIGRATION = "27"
+/**
+ * 이 slice 가 더한 마지막 마이그레이션 — 재시도가 **여기까지 왔는가**를 포함으로 확인한다.
+ * 앞 이름(`LAST_MIGRATION`)은 V28 이 들어오는 날 거짓이 된다(cr r3 L-3).
+ */
+private const val RELEASE_AXIS_MIGRATION = "27"
 
 /** V26 이 만나는 상대 — relay·보존이 `outbox` 에 쥐는 평범한 읽기(`ACCESS SHARE`). */
 private const val LOCK_OUTBOX_READ_SQL = "SELECT 1 FROM outbox LIMIT 1"
@@ -96,7 +99,13 @@ private val CREATE_INDEX_TARGET =
     )
 private val CREATE_TRIGGER_TARGET =
     Regex("""CREATE\s+TRIGGER\s+[\s\S]*?\sON\s+([a-z_][a-z0-9_]*)""", RegexOption.IGNORE_CASE)
-private val LOCK_TIMEOUT_STATEMENT = Regex("""SET\s+LOCAL\s+lock_timeout""", RegexOption.IGNORE_CASE)
+
+/**
+ * 선언은 **값까지** 본다(cr r3 M-1) — `'0'` 은 무한 대기이고, 이 관례가 막으려는 바로 그 실패
+ * 모양이 선언을 달고 지나간다. 첫 자리가 `1`..`9` 인 값만 선언으로 센다.
+ */
+private val LOCK_TIMEOUT_STATEMENT =
+    Regex("""SET\s+LOCAL\s+lock_timeout\s*=\s*'[1-9]""", RegexOption.IGNORE_CASE)
 
 /** 한 마이그레이션 파일 — **주석을 걷은 본문**만 본다(주석 속 `ALTER TABLE` 인용이 대상을 늘리지 않게). */
 private class MigrationSource(
@@ -109,7 +118,18 @@ private class MigrationSource(
     fun tablesTargeted(): Set<String> =
         targetsOf(ALTER_TABLE_TARGET) + targetsOf(CREATE_INDEX_TARGET) + targetsOf(CREATE_TRIGGER_TARGET)
 
-    fun declaresLockBound(): Boolean = LOCK_TIMEOUT_STATEMENT.containsMatchIn(statements)
+    /**
+     * 선언이 **첫 잠금 DDL 보다 앞에** 있어야 한다(cr r3 M-1) — 뒤에 적힌 상한은 이미 그 DDL 이
+     * 잠금을 요구한 뒤라 아무것도 하지 않는다.
+     */
+    fun declaresLockBound(): Boolean {
+        val bound = LOCK_TIMEOUT_STATEMENT.find(statements)?.range?.first ?: return false
+        val firstLockingDdl =
+            listOf(ALTER_TABLE_TARGET, CREATE_INDEX_TARGET, CREATE_TRIGGER_TARGET)
+                .mapNotNull { pattern -> pattern.find(statements)?.range?.first }
+                .minOrNull()
+        return firstLockingDdl == null || bound < firstLockingDdl
+    }
 
     private fun targetsOf(pattern: Regex): Set<String> =
         pattern.findAll(statements).map { it.groupValues[1].lowercase() }.toSet()
@@ -256,30 +276,42 @@ class MigrationLockTimeoutTest {
             sqlStateOf(failure) shouldBe LOCK_NOT_AVAILABLE
 
             migrate(probe)
-            appliedVersions(probe) shouldContain LAST_MIGRATION
+            appliedVersions(probe) shouldContain RELEASE_AXIS_MIGRATION
         }
     }
 
     /**
-     * **모집단을 둘로 닫는다**(cr H-1 처방의 구조 쪽). 위 셋은 **고른 세 자리**의 거동을 재므로,
-     * 네 번째 마이그레이션이 상한 없이 들어와도 초록이다 — 그것이 이 결함이 리뷰까지 온 경로다.
-     * 그래서 파일 전수에서 모집단을 **계산**하고 집합으로 대조한다.
+     * **이것은 관례 lint 이지 안전망이 아니다**(verifier r6 V-1 정정). 상한의 안전망은
+     * `PersistenceWiring.ownerMigration` 의 `initSql` — **migrate 연결 자체**에 걸려 표기·선언과
+     * 무관하게 모든 마이그레이션을 덮고, 그 거동은 app 의 `MigrationLockBoundTest` 가 **상한을
+     * 선언하지 않은 파일**(V14)에서 잰다. 이 test 가 재는 것은 그 아래 한 층 — 「파일도 관례대로
+     * 선언하는가」다.
      *
-     * 술어는 「기존 표를 DDL 대상으로 삼는가」다 — `ALTER TABLE`, 그 표 위의 `CREATE INDEX`·
-     * `CREATE TRIGGER`. 「기존」은 **더 낮은 번호의 파일이 만든 표**이고, 파일마다 자기가 만든 표를
-     * 더해 가며 센다. 주석은 걷고 본다.
+     * **왜 이것만으로는 안 되는가**(그 정정의 근거): 술어가 SQL 을 파싱하지 않는 정규식이라
+     * 평범한 표기에 빗나간다 — `ALTER TABLE IF EXISTS`·스키마 한정(`public.x`)·따옴표 이름·
+     * `EXECUTE format(...)`·`LOCK TABLE`·`DROP TRIGGER`·`DROP INDEX`·블록 주석(`/* */`)·DML
+     * backfill. verifier 가 심은 15 변이 가운데 **10 이 초록**이었다. 정규식을 늘리는 처방은 같은
+     * 부류(열거)이므로 늘리지 않고, 대신 **문면을 실제 범위로 좁혔다**.
+     *
+     * 술어는 「기존 표를 `ALTER`·`CREATE INDEX`·`CREATE TRIGGER` **세 모양**으로 삼는가」다
+     * (cr r3 L-1 — `DROP TABLE`·`TRUNCATE`·`DROP INDEX`·`REINDEX`·`CLUSTER` 도 기존 표에
+     * ACCESS EXCLUSIVE 를 요구하지만 이 세 모양 밖이고, 오늘 그런 마이그레이션은 0 이다.
+     * 보존·파기 계열이 그 모양을 쓰면 이 lint 는 조용하고 **연결 상한이 든다**). 「기존」은
+     * **더 낮은 번호의 파일이 만든 표**이고, 파일마다 자기가 만든 표를 더해 가며 센다. 줄 주석은
+     * 걷고 본다(블록 주석은 걷지 않는다 — 저장소에 0 이다).
      *
      * **FK 참조는 넣지 않았다 — 관례가 아니기 때문이다.** V21·V22 는 새 표에서 `account` 를
      * 참조하면서 선언하지 않았고 V23 은 같은 모양에서 선언했다. 참조를 모집단에 넣으면 이 등식이
      * **기존 두 파일 때문에** 붉어지고, 그러면 이 slice 가 남의 마이그레이션을 고치게 된다. 그 비대칭은
-     * 숨기지 않고 [VERSIONS_DECLARING_WITHOUT_TOUCHING] 이 이름으로 든다.
+     * 숨기지 않고 [VERSIONS_DECLARING_WITHOUT_TOUCHING] 이 이름으로 든다. 그 축의 **위험**(참조되는
+     * 표에 `SHARE ROW EXCLUSIVE`)은 사라지지 않지만 연결 상한이 덮는다(v r6 ①).
      *
      * **관례 이전 구간(V17 이하)은 모집단 밖이다.** 그 경계가 가정이 아니라 사실이 되도록 아래가
      * 두 가지를 함께 센다 — 그 구간에도 기존 표를 건드린 파일이 **있고**(여덟), 그 가운데 선언은
      * **0** 이다. 경계를 뒤로 미루면 이 줄이 먼저 붉어진다.
      */
     @Test
-    fun `기존 표를 건드리는 마이그레이션 전수가 잠금 상한을 선언한다 — 집합 등식`() {
+    fun `기존 표를 건드리는 마이그레이션 전수가 잠금 상한을 선언한다 — 관례 lint`() {
         val sources = migrationSources()
         val created = mutableMapOf<String, Int>()
         val touching = mutableSetOf<Int>()

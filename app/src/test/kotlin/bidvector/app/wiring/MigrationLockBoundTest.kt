@@ -117,13 +117,15 @@ class MigrationLockBoundTest {
             connection.createStatement().use { statement ->
                 statement
                     .executeQuery("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank")
-                    .use { rows ->
-                        val versions = mutableListOf<String>()
-                        while (rows.next()) rows.getString(1)?.let { versions += it }
-                        versions
-                    }
+                    .use(::readVersions)
             }
         }
+
+    private fun readVersions(rows: java.sql.ResultSet): List<String> {
+        val versions = mutableListOf<String>()
+        while (rows.next()) rows.getString(1)?.let { versions += it }
+        return versions
+    }
 
     /** 다른 연결이 **열린 트랜잭션**에서 `ACCESS SHARE` 를 쥔다 — 조회 하나로 충분하다. */
     private class LockHolder(

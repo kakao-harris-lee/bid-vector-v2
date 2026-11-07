@@ -104,6 +104,11 @@ class ReleaseWiringTest {
      * 더하는 형태가 모집단 **밖**으로 남는다(v L-1). 그 층은 `org.springframework.core.env` 안이라
      * 패키지 게이트도 잡지 않는다.
      *
+     * **refresh 층은 여전히 이 test 밖이다**(v r6 L-1): `BidVectorApplication` 에 `@PropertySource`
+     * 를 다는 형태는 bean 정의를 읽을 때 환경에 붙으므로 중단 지점보다 뒤다. 그 형태는
+     * `TransportSurfaceGateTest` 가 **패키지 허용 집합 밖 참조**로 잡는다(실측 RED 2) — 다만 그것은
+     * 이 축을 겨눈 게이트가 아니라 **우연히** 닫는 자리다.
+     *
      * 중단 표지를 **단언**하므로, 다른 사유로 먼저 죽으면 이 test 는 조용히 통과하지 않는다.
      */
     private fun productionEnvironment(vararg args: String): ConfigurableEnvironment {
