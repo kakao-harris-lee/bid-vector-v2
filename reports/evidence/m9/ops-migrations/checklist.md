@@ -1,17 +1,17 @@
 # M9 / ops-migrations — 계약 대조
 
-마지막 산출물 커밋 **`a14f07f1`** · 착수 base `df4976cc` · **내 병합 1**(main `56bd33ea` — `56bd33ea..HEAD` 구간에서 센 값) · 계약 갱신 2026-11-06 반영(DEC-08 제외 · 번호 V26·V27 ·
+마지막 산출물 커밋 **`b5e7eef0`** · 착수 base `df4976cc` · **내 병합 1**(main `56bd33ea` — `56bd33ea..HEAD` 구간에서 센 값) · 계약 갱신 2026-11-06 반영(DEC-08 제외 · 번호 V26·V27 ·
 in_scope 밖 다섯 승인).
 
 ## acceptance 줄별 대조
 
 | 계약 문면 | 상태 | 어디서 |
 | --- | --- | --- |
-| 각 마이그레이션 clean-migrate | **병합 뒤 전건 실측** — `:adapters:test` 전체 1323 tests · 0 실패(V25 → V26 → V27 적용 순서를 포함한 clean-migrate 전수). 전건 `check` 는 PR CI | `commands.md` 라운드 6 표 |
+| 각 마이그레이션 clean-migrate | **전건 실측** — `:adapters:test` 전체 **1327 tests · 0 실패**(V25 → V26 → V27 적용 순서 포함). 적용 **순간**의 축도 섰다 — 잠금 대기 상한(cr H-1). 전건 `check` 는 PR CI | `commands.md` 라운드 6·7 표 |
 | CHECK·GRANT 등식 | 래칫 갱신 완료 — CHECK 개수(`collection_run` 13+1 · `outbox` 11+1+1, **증분 주석**) · 열 셋 · 트리거 셋. **GRANT 변경 0**(두 축이 열·제약·트리거만 더한다) | `CleanMigration{Check,Column,Trigger}Test` |
 | 되돌림 리허설 두 갈래 | **둘 다 실측** — 미적용(목록 산출 + 트리 동일성) · 적용(버릴 Postgres 에서 forward-fix 를 **Flyway 로** 적용, 장부 기입·음성 대조 포함, 팀장 허용 1회) | `rollback.md` §3 / §5 |
 | 기본값 제거로 깨지는 배선 전수 갱신 | **기동점 전수를 다시 셌다**(v H-1) — 6G runbook 의 스냅숏 추출 갈래가 빠져 있었고, 키를 공통 인자 **한 자리**로 모아 갈래가 늘어도 함께 가게 했다. 배선 test·출하 조립 속성 자리는 로컬 exit 0. **아직 키가 없는 기동점 하나**(`tools/image-hygiene-check.sh` jvm-app `PROBE_ENV`, 오늘 무해)는 `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS` 문면이 든다 | `commands.md` 「in_scope 밖」 표 · capability map 그 OPEN 행 |
-| 변이 RED | **여덟** 로컬 실측(병합 전 라운드들) — 사유 바꿔치우기(OPS-05) · 릴리스 결속 상수화(OPS-10) · 생성자 기본값 복귀 + 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) + 라운드 5 의 둘(출하 기동점 default properties 기본값 · env 제거 무력화) + 통제군 | `commands.md` 변이 절 |
+| 변이 RED | **열둘** 로컬 실측(라운드 7 의 넷 포함 — 잠금 상한 삭제 · 릴리스 바꿔치기 허용 · outbox 트리거 `BEFORE INSERT` · 출하 초기화자 기본값) — 사유 바꿔치우기(OPS-05) · 릴리스 결속 상수화(OPS-10) · 생성자 기본값 복귀 + 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) + 라운드 5 의 둘(출하 기동점 default properties 기본값 · env 제거 무력화) + 통제군 | `commands.md` 변이 절 |
 | 전건 PR CI | **미실행** — push 는 팀장 몫(공통 규율) | — |
 
 ## 설계 검토가 지목한 우회 ↔ 무엇이 막는가
@@ -30,6 +30,8 @@ in_scope 밖 다섯 승인).
 | OPS-10 ④ 키 셋 | 키 하나(수집 둘 제거) |
 | OPS-10 ⑤ compose·runbook 미갱신 | 기동 실패 + 전수 갱신(열거표) |
 | OPS-10 ⑥ test 배선이 기본값에 기댄다 | 배선 test 일곱·출하 조립 19 자리 갱신, 로컬 exit 0 |
+| OPS-10 ⑦ 적힌 릴리스를 나중에 **덮는다** | 트리거가 「한 번만 적는다」로 지우기·바꿔치기를 함께 거부(cr M-1). 앱 역할이 UPDATE 권한을 가진 표가 `outbox` 하나라 그 길이 실제로 열려 있었다 |
+| 두 축 공통 ⑧ 마이그레이션이 **기동을 멈춘다** | `SET LOCAL lock_timeout = '5s'`(cr H-1). 모집단은 거동 test 셋 + **파일 전수 census 집합 등식**이 함께 든다 — 네 번째 마이그레이션이 상한 없이 들어오면 census 가 붉다 |
 
 ## 설계 검토의 「과잉·미달」 대조
 
@@ -43,11 +45,13 @@ in_scope 밖 다섯 승인).
 
 이 slice 가 만든 새 파일 **일곱**(V26·V27 · `ReleaseIdentifier` · `ReleaseWiring` · 사유 enum ·
 `ExecutionRowReleaseTest` · `ReleaseWiringTest`) 전부 계약의 in_scope 안이고, test 둘은 만드는
-커밋에서 게이트 등록부에 함께 등재했다. **라운드 4·5 가 만든 새 파일은 0 이다** — 라운드 4 는 기존
-파일 아홉, 라운드 5 는 `ReleaseWiringTest` 하나를 고쳤고, 새 test 클래스가 없어 게이트 등록부
-편집도 0 이다(새 test 는 등재된 클래스 둘에 메서드로 들어갔다). 라운드 4 가 새로 건드린 in_scope
-경로 둘은 `config/quality/architecture-policy.properties` 와 `AppHttpDependencyGateTest`(둘 다 계약
-문면 「`config/quality/**`」·「관련 app 코드와 test」 안)이고, 라운드 5 는 새 경로를 더하지 않았다.
+커밋에서 게이트 등록부에 함께 등재했다. **수정 라운드 4·5·7 이 만든 새 파일은 0 이다** — 라운드 4 는
+기존 파일 아홉, 라운드 5 는 `ReleaseWiringTest` 하나, 라운드 7 은 기존 파일 아홉을 고쳤다. 세 라운드
+모두 **새 test 클래스가 없어** 게이트 등록부 편집도 0 이고, 새 test 들(라운드 7 의 넷 포함)은 이미
+등재된 클래스에 메서드로 들어갔다. 새로 건드린 in_scope 경로는 라운드 4 의 둘
+(`config/quality/architecture-policy.properties` · `AppHttpDependencyGateTest` — 둘 다 계약 문면
+「`config/quality/**`」·「관련 app 코드와 test」 안)과 라운드 7 의 하나(`MigrationLockTimeoutTest`)이고,
+라운드 5 는 더하지 않았다.
 
 **라운드 6(병합)이 만든 새 파일도 0 이다** — main 이 들여온 새 파일은 많지만 내 커밋이 만든 것은
 없고, 내가 고친 것은 병합 결과 둘(`CleanMigrationCheckTest` 의 본문 집합 · 남의 새 배선 test 에

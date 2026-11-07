@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`a14f07f1`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 이고, 그 구간에서 센 값이다. 착수 base 부터 세면 21 이고 20 은 main 자신의 PR 병합이다).
+마지막 산출물 커밋 **`b5e7eef0`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 이고, 그 구간에서 센 값이다. 착수 base 부터 세면 21 이고 20 은 main 자신의 PR 병합이다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -199,7 +199,7 @@ INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxSt
 | capability map | 줄 수 3858+114+26=**3998** 로 닫힘 · OPEN 행 중복은 세 ref 공통 16 종 |
 | `journey-up.mjs` | main 판(+179/−6, main 자신의 계수와 같다) + 내 네 줄. `COMMON_PROPERTIES` 정의 하나 · `node --check` 통과 · **main 의 새 기동 셋도 같은 헬퍼를 지나 키를 받는다** — 기동마다 0600 설정 파일 하나를 쓰고 `--spring.config.import` 로 넘기는 그 자리다 |
 | `:adapters:test --rerun`(전체) | exit 0 · **1323 tests · 0 실패** · skip 4(192 클래스). 병합 커밋에서 쟀고 그 뒤 두 커밋은 adapters 를 **건드리지 않는다**(경로 차 0) |
-| `:app:test --rerun`(전체) | exit 0 · **1029 tests · 0 실패**(126 클래스) |
+| `:app:test --rerun`(전체) | exit 0 · **1029 tests · 0 실패**(126 클래스). **`a14f07f1` 에서 쟀다**(그 커밋이 배선 test 를 고쳤고, 그 뒤 산출물 커밋은 없다 — cr L-3) |
 | `:app:`·`:adapters:`·`:workflow:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | exit 0 |
 | `tools/prod-env-keys-check.sh` | exit 0 — 키 18(병합 뒤에도 등식 불변) |
 | 전건 `check` · web npm | **미실행** — PR CI 가 정본(이 worktree 에 `node_modules` 가 없다) |
@@ -219,6 +219,57 @@ INSERT(상태에서 유도한 사유+릴리스) · `RelayDbSupport.forceOutboxSt
 **내가 더한 문면 하나가 병합으로 거짓이 됐다**(스스로 찾아 고쳤다): 여정 하네스 주석의 「출하
 jar 를 **세 번** 띄운다」 — 개찰 하네스 병합으로 기동이 늘었다. 계수를 지우고 「이 블록을 지나는
 기동 전부」로 구조로 적었다.
+
+## 라운드 7 — v V-1 · cr H-1·M-1·M-2·L-1~L-3·OQ-1~2
+
+### 적용된 DB 가 있는가 — **없다**(cr OQ-1, 수정 **전에** 확인)
+
+V26·V27 은 이 **미머지 브랜치에만** 있으므로 그 파일을 고쳐도 굳은 checksum 을 깨지 않는다. 근거
+넷: ① 브랜치가 머지된 적이 없어 그 둘을 담은 이미지가 없다 ② 이 레인의 DB 실행은 전부
+Testcontainers(버릴 것)와 §5 의 버릴 클러스터다 — evidence 에 상시 dev 포트가 **0 회** 나온다
+③ 여정 하네스는 자기 `docker run` 으로 **자기 postgres**(`bidvector_journey`)를 띄운다 ④ 상시 dev
+컨테이너는 **멈춰 있고**(2026-11-06 00:02 정지) runbook 이 적는 그 DB 의 기대 상태는 **V17** 이다.
+만에 하나 적용돼 있으면 다음 migrate 가 checksum mismatch 로 서고, 처방은 `repair` 또는 볼륨 폐기다.
+
+### 결과
+
+| 명령 | 결과 |
+| --- | --- |
+| `leakPatternGate --rerun`(v V-1 수정 뒤) | exit 0 · 참조형 히트 **1 → 0** |
+| `:adapters:test --rerun`(전체) | exit 0 · **1327 tests · 0 실패** · skip 4(192 클래스). **마지막 산출물 커밋 `b5e7eef0` 에서 다시 쟀다** — 형식 수정이 adapters test 를 건드렸기 때문이다 |
+| `:app:test --rerun`(전체) | exit 0 · **1029 tests · 0 실패**(126 클래스). `a53e7d25` 에서 쟀고 그 뒤 커밋은 **adapters test 한 파일씩**이라 app 경로 차 0 |
+| `:adapters:`·`:app:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | **처음에 붉었다** — 새 test 두 파일의 줄 형식(ktlint 11 · detekt MaxLineLength 2). 고친 뒤 exit 0 |
+| `MigrationLockTimeoutTest`(census + 거동 셋) | 4 tests · 0 실패(census 0.5s · V18 12.2s · **V26 8.2s** · V19 8.3s) |
+| 표적 여덟 클래스(`CleanMigration*`·`OutboxTransitionSqlTest`·`ExecutionRowReleaseTest`) | 50 tests · 0 실패 |
+
+**`migrationOrderGate` 는 이 브랜치에 없다** — 그 이름의 Gradle task 도, 마이그레이션 번호를 세는
+게이트도 없다(번호 전수는 라운드 6 이 손으로 쟀고 여기서도 다시 쟀다: 파일 25 · 중복 0 · 결번
+V10·V11 · V25·V26·V27 존재). 그 게이트는 다른 레인의 일이다.
+
+### 변이 — 이 라운드가 세운 관문마다 하나
+
+| 변이 | 표적 | 결과 |
+| --- | --- | --- |
+| V26 에서 `SET LOCAL lock_timeout` 줄 삭제 | `MigrationLockTimeoutTest` | **RED 2** — census 집합 등식 + V26 거동. 거동 쪽은 **37.9 s**(초록일 때 8.2 s)로, 상한이 없으면 **기다린다**는 verifier 의 25 s 측정이 그대로 재현된다 |
+| `require_release_sha()` 의 UPDATE 갈래를 **고치기 전** 상태로 | `ExecutionRowReleaseTest` | **RED 1** — 「바꿔치울 수도 없다」(RED 선행 실측) |
+| outbox 릴리스 트리거를 `BEFORE INSERT` 로 좁힘 | `ExecutionRowReleaseTest` | **RED 2** — 「지울 수 없다 — outbox 행」·「바꿔치울 수도 없다」. **앞 라운드에는 이 변이가 아무것도 붉히지 않았다**(cr M-2) |
+| 출하 **초기화자**가 환경에 기본값을 더한다 | `ReleaseWiringTest` | **RED 1** — v L-1 의 층이 모집단 안으로 들어왔다는 실측(앞 판에서는 초록이었을 자리) |
+| 통제군(원복 뒤 `--rerun`) | 위 표적 전부 | 초록 재확인 |
+
+### 순서가 만든 비용 하나
+
+표적 test 를 돌린 뒤 **lint 를 미루고 커밋**해서 전건에서야 형식 위반이 드러났고, 산출물 커밋이
+하나 늘었다(그래서 adapters 전건을 다시 쟀다). 공통 규율의 「표적 `--tests` + **그 모듈** lint」는
+한 라운드로 묶으라는 뜻이다.
+
+### 등재만
+
+- **cr OQ-2 — `search_path`**: 관례는 「`SECURITY DEFINER` 에만 고정한다」다. V2 의 감사 트리거는
+  `SECURITY DEFINER SET search_path = public, pg_temp` 이고, V3·V18 의 **invoker** 트리거 함수는
+  두지 않는다. 새 함수 둘도 invoker 이므로 **관례와 일치**한다 — 그대로 둔다. 스키마 CREATE 권한을
+  가진 역할이 생기는 날에 이론적 표면이 되고, 오늘 그 역할은 없다(앱 역할은 NOLOGIN·최소 권한).
+- **cr L-2 — `USING ERRCODE`**: 거동이 같아 cr 은 등재만 권했으나, 같은 라운드가 V27 의 두 RAISE 에
+  그 줄을 쓰게 되어 V26 만 다르면 **이 slice 안에서 새 비대칭**이 된다. 네 자리 모두 명시했다.
 
 ## 등재만 (cr L-5)
 
