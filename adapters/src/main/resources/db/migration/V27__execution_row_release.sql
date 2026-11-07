@@ -42,17 +42,28 @@ ALTER TABLE outbox
     ADD CONSTRAINT outbox_release_sha_check
     CHECK (release_sha IS NULL OR release_sha <> '');
 
--- 새 행은 식별자를 요구하고, 적힌 식별자는 지울 수 없다. **갱신에서 요구하지는 않는다** —
--- outbox 의 상태 전이 UPDATE 는 이 열을 손대지 않고, 열 추가 전에 들어온 행(release_sha
--- NULL)도 전이가 계속 돌아야 한다. 「지우지 않는다」만 지면 그 둘이 함께 선다.
+-- 새 행은 식별자를 요구하고, **적힌 식별자는 한 번만 적는다**(V26 의 종단 사유와 같은 모양) —
+-- 지우기와 바꿔치기를 함께 거부한다. 「어느 릴리스가 이 행을 만들었는가」가 OPS-10 의 전부인데
+-- 지우기만 막으면 값 A → 값 B 가 두 검사를 모두 지나, 그 답이 나중에 덮인다. 그 길은 `outbox`
+-- 에서 실제로 열려 있다 — V6 의 `GRANT SELECT, INSERT, UPDATE ON outbox TO bidvector_app` 가 앱
+-- 역할에 UPDATE 를 준다(`collection_run` 은 V2 가 SELECT·INSERT 만 준다).
+--
+-- **갱신에서 값을 요구하지는 않는다**(NULL → NULL 은 통과) — outbox 의 상태 전이 UPDATE 는 이
+-- 열을 손대지 않고, 열 추가 전에 들어온 행(`release_sha` NULL)도 전이가 계속 돌아야 한다.
+-- `OLD.release_sha IS NOT NULL` 전제가 그 둘을 함께 세운다: 적힌 적 없는 행은 이 검사를 지나고,
+-- 한 번 적힌 값은 움직이지 않는다.
 CREATE FUNCTION require_release_sha() RETURNS trigger
     LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'INSERT' AND NEW.release_sha IS NULL THEN
-        RAISE EXCEPTION '% 의 새 행은 릴리스 식별자를 요구한다', TG_TABLE_NAME;
+        RAISE EXCEPTION '% 의 새 행은 릴리스 식별자를 요구한다', TG_TABLE_NAME
+            USING ERRCODE = 'P0001';
     END IF;
-    IF TG_OP = 'UPDATE' AND OLD.release_sha IS NOT NULL AND NEW.release_sha IS NULL THEN
-        RAISE EXCEPTION '% 의 릴리스 식별자를 지울 수 없다', TG_TABLE_NAME;
+    IF TG_OP = 'UPDATE'
+        AND OLD.release_sha IS NOT NULL
+        AND NEW.release_sha IS DISTINCT FROM OLD.release_sha THEN
+        RAISE EXCEPTION '% 의 릴리스 식별자는 한 번만 적는다: %', TG_TABLE_NAME, OLD.release_sha
+            USING ERRCODE = 'P0001';
     END IF;
     RETURN NEW;
 END;

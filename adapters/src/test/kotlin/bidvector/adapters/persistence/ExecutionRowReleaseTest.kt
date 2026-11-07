@@ -81,8 +81,46 @@ class ExecutionRowReleaseTest : PersistenceTestSupport() {
         val failure =
             shouldThrow<SQLException> { execute("UPDATE collection_run SET release_sha = NULL") }
 
-        failure.message.orEmpty() shouldContain "지울 수 없다"
+        failure.message.orEmpty() shouldContain "한 번만 적는다"
         selectOne("SELECT release_sha FROM collection_run") shouldBe TEST_RELEASE_SHA
+    }
+
+    /**
+     * **바꿔치기도 막는다**(cr M-1). 앞 판은 지우기만 막아 값 A → 값 B 가 두 검사를 모두 지났다 —
+     * 「어느 릴리스가 이 행을 만들었는가」가 OPS-10 의 전부인데 그 값을 나중에 다른 값으로 덮는
+     * 길이 저장 층에 열려 있었다. 같은 slice 가 같은 표의 종단 사유에는 그 길을 닫아 두었으므로
+     * (V26 의 「한 번만 적는다」) 비대칭을 없애는 쪽으로 닫는다.
+     *
+     * **`outbox` 가 특히 그렇다** — 앱 역할이 UPDATE 권한을 **실제로 가진** 유일한 표다
+     * (`collection_run` 은 V2 가 SELECT·INSERT 만 준다).
+     */
+    @Test
+    fun `적힌 릴리스는 바꿔치울 수도 없다 — 두 표 전수`() {
+        JdbcCollectionRunStore(dataSource(), TEST_RELEASE).record(accounting(), meta())
+        insertOutboxRowDirectly(dataSource(), entryId = "x-swap", idempotencyKey = "x-swap-key", gate = OutboxGateValues())
+
+        listOf("collection_run", "outbox").forEach { table ->
+            shouldThrow<SQLException> {
+                execute("UPDATE $table SET release_sha = 'swapped-release'")
+            }.message.orEmpty() shouldContain "한 번만 적는다"
+            selectOne("SELECT release_sha FROM $table") shouldBe TEST_RELEASE_SHA
+        }
+    }
+
+    /**
+     * **`outbox` 의 UPDATE 갈래**(cr M-2). 함수 본문의 UPDATE 갈래는 `collection_run` test 가 덮지만
+     * **트리거 이벤트는 표마다 따로**다 — `BEFORE INSERT OR UPDATE` 를 `BEFORE INSERT` 로 좁히는
+     * 변이는 이 test 가 없으면 아무것도 붉히지 않는다(v r3 가 찾은 반대 방향 변이의 거울이다).
+     */
+    @Test
+    fun `적힌 릴리스는 지울 수 없다 — outbox 행`() {
+        insertOutboxRowDirectly(dataSource(), entryId = "x-erase", idempotencyKey = "x-erase-key", gate = OutboxGateValues())
+
+        val failure =
+            shouldThrow<SQLException> { execute("UPDATE outbox SET release_sha = NULL") }
+
+        failure.message.orEmpty() shouldContain "한 번만 적는다"
+        selectOne("SELECT release_sha FROM outbox") shouldBe TEST_RELEASE_SHA
     }
 
     @Test

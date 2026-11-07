@@ -63,7 +63,8 @@ class CleanMigrationTriggerTest : PersistenceTestSupport() {
             // 종단 행 때문에 「종단이면 사유가 있다」를 적을 수 없다 — V26 머리말).
             TriggerSpec("outbox", "outbox_terminal_reason_required"),
             // M9/ops-migrations(OPS-10, V27) — 릴리스 관문 둘. 「새 행은 식별자를 요구하고 적힌
-            // 식별자는 지울 수 없다」가 여기 산다(CHECK 로는 기존 행 때문에 NOT NULL 을 못 적는다).
+            // 식별자는 **한 번만 적는다**(지우기·바꿔치기 둘 다 거부)」가 여기 산다(CHECK 로는 기존
+            // 행 때문에 NOT NULL 을 못 적는다).
             TriggerSpec("outbox", "outbox_release_sha_required"),
             TriggerSpec("collection_run", "collection_run_release_sha_required"),
             // (D-6B1-8, 등재) — `edit_session`(V8__edit_session.sql)은 트리거가

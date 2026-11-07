@@ -712,8 +712,10 @@ M4/4C-1이 세운 것은 이 어휘·전이표와 그것을 감싸는 port(`Outb
 ##### 2.2.5-b 실행 행의 릴리스 식별자 (M9/ops-migrations, OPS-10)
 
 > `collection_run.release_sha` · `outbox.release_sha` — **열 추가 전 행은 NULL**(모름)이고, 새 행은
-> 트리거가 요구한다. **지우는 것만 막는다**: 값 → 다른 값 갱신은 허용이다(canonical 행을 새 릴리스가
-> 다시 쓰는 축이 그 형태이고, 이 두 표는 애초에 INSERT 전용이라 그 창이 쓰이지 않는다).
+> 트리거가 요구한다. **한 번 적힌 값은 움직이지 않는다** — 지우기와 바꿔치기를 함께 거부한다(V26 의
+> 종단 사유와 같은 모양). `NULL → NULL` 은 통과하므로 열 추가 전 행의 상태 전이는 계속 돈다.
+> 지우기만 막던 앞 판은 값 A → 값 B 를 허용했고, 그 길은 `outbox` 에서 실제로 열려 있었다 —
+> 앱 역할이 **그 표에만** UPDATE 권한을 갖는다(code-reviewer M-1).
 > 나머지 canonical 표는 칸을 두지 않고 `observation_key` 조인으로 답한다 — 그 조인이 주는 것은
 > 「그 **원문을 수집한** 릴리스」이고 **승격 러너가 쓰는 행에는 「쓴 릴리스」가 아니다**
 > (`capability-map.md` OPS-10 · `OPEN-M9-PROMOTED-ROW-RELEASE`).

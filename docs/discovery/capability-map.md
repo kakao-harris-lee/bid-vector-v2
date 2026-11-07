@@ -2783,7 +2783,7 @@ capability가 아니라 **다른 항목들이 공유하는 근거**다. 하나�
 - **Acceptance scenario**
   - 모든 수집·실행 행이 자기를 만든 릴리스 식별자를 갖는다.
     **구현 (M9/ops-migrations, 2026-11-06)**: 두 갈래다 — ① `collection_run`·`outbox` 는
-    자기 칸(V27, 새 행은 트리거가 요구하고 적힌 값은 지울 수 없다) ② `notice`·
+    자기 칸(V27, 새 행은 트리거가 요구하고 적힌 값은 한 번만 적는다 — 지우기·바꿔치기 둘 다 거부) ② `notice`·
     `opening_result`·`qualification_text`·`opening_reserve_price` 는 `observation_key`
     (NOT NULL FK) → `raw_observation.release_sha`(NOT NULL) **조인**으로 답한다(열을 베끼면
     같은 사실이 두 자리에 산다 — 그 도달성의 전제 셋을 `ExecutionRowReleaseTest` 가 고정).
