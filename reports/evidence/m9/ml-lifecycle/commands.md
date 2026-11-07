@@ -452,6 +452,53 @@ v M-2 가 올린 **사용자 확인 항목**이 종결됐다 — 사용자가 `e
 effective date 를 담지 않는다(`command grep "effective"` **0건**). 팀장 지시가 두 장부를 함께
 가리켰지만, 없는 문면을 만들지 않고 이 사실을 보고했다.
 
+## §4i CI 전용 실패 — 해석 실패 등식의 **파이썬 패치 의존** (PR #139)
+
+승인 전 일괄 뒤 PR 을 열었더니 CI `ml-engine`(과 `check` 의 S-20 pytest)이 **test 하나**로
+붉었다 — `test_annotation_resolution_failures_are_exactly_the_declared_ones`
+(1 failed, 1749 passed). **로컬은 초록이었다.**
+
+### 뿌리 — 「환경이 다르다」가 아니라 **게이트가 환경에 의존했다**
+
+선언 목록의 둘이 CI 에서는 **해석돼** 실제 집합에서 빠졌다. 그 둘은 **PEP 695 제네릭 함수**다
+(`features.schema.require_declared[T]` · `features.encoding._accumulate[KeyT]`). 이 저장소는
+전 모듈이 `from __future__ import annotations` 라 주석이 문자열이고, `get_type_hints` 는 그것을
+모듈 전역에서 찾는데 `T` 는 **함수의 타입 파라미터 스코프**에 있다.
+
+| 인터프리터 | `get_type_hints(f)` | `localns=__type_params__` 로 넘기면 |
+| --- | --- | --- |
+| **3.12.3**(로컬) | **`NameError: name 'T' is not defined`** | 해석됨 |
+| **3.12.13**(CI 의 `setup-python` 이 `3.12` 를 푸는 최신 패치) | **해석됨** | 해석됨 |
+
+CPython 3.12 가 그 스코프를 보는 시점이 **패치 버전마다 다르다**(실측). `.python-version` 이
+`3.12` 라 CI 는 최신 패치를 쓰고, 그 차이가 그대로 등식에 들어왔다.
+
+### 처방 — 환경 분기를 넣지 않고 **의존 자체를 없앤다**
+
+`_resolved_hints` 가 `func.__type_params__` 를 `localns` 로 넘긴다. 그러면 **어느 파이썬에서도**
+해석되고(두 인터프리터에서 같은 결과 실측), 선언 목록은 **환경과 무관한 넷**만 남는다 — 전부
+`AttributeError` 이고, 그것은 파이썬이 아니라 **생성 stub 의 모양**이 정한다(주석이 생성 stub 의
+없는 모듈 속성을 이름으로 가리킨다).
+
+**그 「같은 사유」를 test 로 잠갔다**(새 test 하나): 선언된 넷의 실패가 전부 `AttributeError`
+여야 한다. 다른 종류(예: PEP 695 `NameError`)가 섞이면 그 순간 붉다 — **등식만 있으면 그런
+실패가 「선언했으니 괜찮다」로 조용히 묻힌다**. 이번에 묻혔던 모양이 정확히 그것이다.
+
+### CI 와 같은 환경에서 수정 전/후를 쟀다
+
+버릴 clone + `uv sync --frozen --all-extras --python 3.12.13`(CI 의 lockfile 설치와 같은 명령,
+같은 패치 버전) + 생성 stub 복사.
+
+| 측정 | 결과 |
+| --- | --- |
+| **수정 전** @`1b89cba3` · 3.12.13 | **1 failed** — CI 실패를 그대로 재현(빠진 둘도 같다) |
+| **수정 후** · 3.12.13 | 표적 **12 passed** · 전건 **1751 passed** |
+| **수정 후** · 로컬 3.12.3 | 전건 **1751 passed** — 양방향으로 환경 무관 |
+
+(1750 → 1751 은 위의 **새 test 하나**다.)
+
+**건드린 것은 그 test 파일 하나뿐**이다 — src·정책·장부 무편집(`git diff` 계수로 확인).
+
 ## §5 되돌림
 
 `rollback.md` **가 정본**이다 — 복원 원천·복원 목록·실측 HEAD·트리 동일성·표지 계수가 전부
