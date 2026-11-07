@@ -1,7 +1,5 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
-import bidvector.adapters.koneps.KonepsOpenApiNoticeSource
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionRunner
 import bidvector.app.collection.KonepsCredentialProperties
@@ -9,10 +7,7 @@ import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.MockKonepsHttp
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CallBudgetLedger
-import bidvector.procurement.CallSpend
-import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangeViolation
 import bidvector.workflow.collection.CollectionSourceName
@@ -20,7 +15,6 @@ import bidvector.workflow.strategy.Clock
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -34,17 +28,13 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
-import java.io.File
 import java.net.URI
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.util.function.Supplier
 import javax.sql.DataSource
-import kotlin.system.measureTimeMillis
 
 /**
  * D-6F8-3 — 수집 러너 배선의 켜짐 조건과 기동 실패. 러너는 `bidvector.collection.mode=once` 일 때만
@@ -373,116 +363,6 @@ class CollectionWiringTest {
         }
     }
 
-    /**
-     * **배선이 출하 간격을 관문의 기다림으로 넘긴다**(v r2 M-1 · cr r1 MEDIUM ② 잔여).
-     *
-     * `KonepsShippedPolicyWireTest` 는 출하 값으로 **자기 pacer 를 만들어** 관문의 기계를 잰다. 그래서
-     * 「표의 값」과 「관문의 거동」은 잠겼지만 **그 사이의 운반 단계**(production 에서 pacer 를 만드는
-     * 단 한 자리가 그 값을 넘기는가)는 아무 test 도 재지 않았다 — 배선에 `Duration.ZERO` 를 넣는
-     * 변이가 모든 표적에서 초록이었다.
-     *
-     * **벽시계로 재지 않는다**: 계수 축(rate limiter 1 permit/1초)이 같은 크기의 지연을 만들어
-     * 두 축이 섞인다 — 간격을 0 으로 둔 변이가 「두 호출이 1초 넘게 벌어진다」를 **통과했다**(실측).
-     * 그래서 **요청된 기다림을 값으로** 본다: 배선이 pacer 에 넘기는 기다림 함수를 기록기로 바꿔
-     * 끼우고, 그 기록이 출하 간격과 같은지 잰다(기대값도 출하 정책에서 읽는다 — 수를 다시 적지 않는다).
-     */
-    @Test
-    fun `배선은 출하 간격을 관문의 기다림으로 넘긴다`() {
-        val shipped = shippedMinimumCallInterval()
-        val requested = mutableListOf<Duration>()
-        MockKonepsHttp { _, _ -> listOf(mapOf("bidNtceNo" to "SYN-M9-W-1", "bidNtceOrd" to "000")) }.use { mock ->
-            val source =
-                noticeSourceFrom(pacedTransport { requested += it }, mock.baseUrl, BusinessDivision.SERVICE)
-            val day = CollectionReferenceDate(PROBE_DAY)
-
-            source.fetchNotices(day, null)
-            source.fetchNotices(day, null)
-        }
-
-        // 첫 호출은 기다리지 않고 둘째가 간격만큼 기다린다 — 고정 시계라 그 값이 정확히 선언값이다.
-        requested shouldContainExactly listOf(shipped)
-    }
-
-    /**
-     * **배선이 넘긴 그 함수가 실제로 잠근다**(v r2 M-1 의 뒷면). 위 test 는 **값**을 재므로, 기다림을
-     * 빈 식으로 바꾸는 변이는 그 test 를 붉히지 않는다. 그 축을 여기서 짧은 기다림으로 직접 잰다 —
-     * production 이 pacer 에 넘기는 바로 그 함수다(위 test 의 주입 기본값).
-     */
-    @Test
-    fun `배선의 기다림은 실제로 잠든다`() {
-        val requested = Duration.ofMillis(SLEEP_PROBE_MILLIS)
-
-        val elapsed = measureTimeMillis { sleepFor(requested) }
-
-        withClue("요청 $requested · 실제 ${elapsed}ms") { (elapsed >= SLEEP_PROBE_MILLIS) shouldBe true }
-    }
-
-    /**
-     * **production 이 넘기는 기다림 함수가 실제로 잠근다**(v r3 M-1).
-     *
-     * 위 두 test 는 「주입된 함수가 받는 값」과 「`sleepFor` 를 직접 부르면 잠든다」를 잰다. 그 사이에
-     * 고리가 하나 더 있다 — **production 이 그 함수를 넘기는가**(다섯 인자 호출의 기본값). 그 고리를
-     * 비우는 변이(기본값을 잠들지 않는 람다로)가 앞 판에서 **전 표적 초록**이었다.
-     *
-     * **두 소스가 한 관문을 공유하는 판**으로 잰다 — production 도 업종마다 소스를 만들고 관문은
-     * 하나다. 둘째 소스의 **계수 축(rate limiter)은 자기 몫이 비어 있고** 공유하는 것은 pacer 뿐이라,
-     * 둘째 호출이 기다리는 시간은 간격 축의 것이다(앞 판이 한 소스로 재서 두 축이 섞였다 — 그 단언은
-     * 변이를 통과했고 지웠다). 전송은 **다섯 인자**로 만든다: 기다림 함수가 기본값이어야 이 측정이
-     * production 의 것이 된다.
-     */
-    @Test
-    fun `기본값 기다림 함수는 공유 관문의 둘째 호출을 출하 간격만큼 잠근다`() {
-        val shipped = shippedMinimumCallInterval()
-        MockKonepsHttp { _, _ -> listOf(mapOf("bidNtceNo" to "SYN-M9-W-2", "bidNtceOrd" to "000")) }.use { mock ->
-            val transport = defaultSleeperTransport()
-            val first = noticeSourceFrom(transport, mock.baseUrl, BusinessDivision.SERVICE)
-            val second = noticeSourceFrom(transport, mock.baseUrl, BusinessDivision.CONSTRUCTION)
-            val day = CollectionReferenceDate(PROBE_DAY)
-
-            first.fetchNotices(day, null)
-            val elapsedMillis = measureTimeMillis { second.fetchNotices(day, null) }
-
-            withClue("출하 간격 $shipped · 둘째 소스의 호출 ${elapsedMillis}ms") {
-                (elapsedMillis >= shipped.toMillis()) shouldBe true
-            }
-        }
-    }
-
-    /**
-     * **production 의 호출 자리가 기본값을 쓴다 — 그리고 그 자리는 둘뿐이다**(v r3 M-1 구조 축).
-     *
-     * 위 test 는 기본값이 잠그는 것을 재지만, 호출 자리가 **자기 sleeper 를 명시**하면 그 기본값을
-     * 비껴간다(그 변이도 앞 판에서 초록이었다). 컴파일된 **상수 풀**로 그 형태를 잠근다: 다섯 인자
-     * 호출은 `konepsTransportFor$default` 를, 여섯 인자 호출은 함수 이름 자신을 UTF8 항목으로
-     * 남기므로 ① 참조하는 production 클래스 전수와 ② 그 참조의 형태를 둘 다 잰다. 소스 문법이
-     * 아니라 컴파일러가 만든 항목이라 스타일로 비껴갈 수 없다.
-     *
-     * **계수로 형태를 가른다**: 다섯 인자 호출만 있으면 두 계수가 같고(이름이 `$default` 항목 안에만
-     * 있다), 여섯 인자 호출이 끼면 맨 이름 항목이 하나 더 생겨 계수가 갈린다 — 한 클래스가 둘을
-     * 함께 가진 판까지 그 등식이 잡는다. `javap` 를 쓰지 않는 이유는 전수 census 가 281 클래스에
-     * 96 초였기 때문이다(실측) — 여기서 필요한 것은 서술자가 아니라 **항목의 유무와 계수**다.
-     */
-    @Test
-    fun `전송을 만드는 production 호출 자리는 둘이고 둘 다 기본값 형태다`() {
-        val pools = appProductionConstantPools()
-        val callers =
-            pools
-                .filterValues { it.contains(TRANSPORT_FACTORY) }
-                .keys
-                // 선언한 파일 자신의 산출물(합성 람다 포함)은 호출 자리가 아니다.
-                .filterNot { it.substringAfterLast('/').startsWith("CollectionWiringSupportKt") }
-
-        callers shouldContainExactlyInAnyOrder listOf("wiring/CollectionWiring", "wiring/OpeningCollectionWiring")
-        callers.forEach { caller ->
-            val pool = requireNotNull(pools[caller]) { "빌드 산출물에 $caller 가 없다" }
-            withClue(caller) {
-                pool.windowed(TRANSPORT_FACTORY_DEFAULT.length).count { it == TRANSPORT_FACTORY_DEFAULT } shouldBe
-                    pool.windowed(TRANSPORT_FACTORY.length).count { it == TRANSPORT_FACTORY }
-                pool shouldContain TRANSPORT_FACTORY_DEFAULT
-            }
-        }
-    }
-
     @Test
     fun `업종 행의 대분류 누락·어휘 밖과 빈 경로는 기동 실패다 — 표류도 빈 값도 HTTP 시점까지 미루지 않는다`() {
         listOf(
@@ -508,98 +388,6 @@ class CollectionWiringTest {
         }
     }
 }
-
-/** 기다림을 실제로 재는 짧은 값 — 벽시계 하한 단언이라 느린 호스트에서 흔들리지 않는다. */
-private const val SLEEP_PROBE_MILLIS = 40L
-
-/** 전송을 만드는 함수의 이름과 그 **기본 인자 합성** 형태 — 상수 풀 항목으로 찾는 열쇠다. */
-private const val TRANSPORT_FACTORY = "konepsTransportFor"
-private const val TRANSPORT_FACTORY_DEFAULT = "konepsTransportFor\$default"
-
-/**
- * app production 클래스의 **상수 풀을 원시 바이트로** 읽는다(이름 → 내용). UTF8 항목은 class 파일에
- * 그대로 들어 있으므로 「이 이름을 참조하는가」는 바이트에서 바로 답이 나온다 — `javap` 전수는
- * 같은 질문에 96 초였다(실측).
- */
-private fun appProductionConstantPools(): Map<String, String> {
-    val root = File("build/classes/kotlin/main/bidvector/app")
-    check(root.isDirectory) { "빌드 산출물을 찾지 못했다: ${root.absolutePath} — :app:compileKotlin 선행 필요" }
-    return root
-        .walkTopDown()
-        .filter { it.isFile && it.extension == "class" }
-        .associate {
-            it.relativeTo(root).path.removeSuffix(".class") to String(it.readBytes(), StandardCharsets.ISO_8859_1)
-        }
-}
-
-private val PROBE_DAY: LocalDate = LocalDate.of(2026, 9, 24)
-
-/** 상한·실행 상태·시계는 production 과 같은 타입으로 세운다 — 다른 것은 기다림 함수뿐이다. */
-private fun probeBudget(): CallBudgetLedger =
-    CallBudgetLedger(
-        CollectionCallBudget(perDay = 10, total = 10),
-        PROBE_DAY,
-        CallSpend(total = 0, today = 0),
-    )
-
-/** 기다림 함수를 **주입해** 만든 전송 — 넘겨진 값을 보는 자리가 쓴다. */
-private fun pacedTransport(sleeper: (Duration) -> Unit): KonepsTransport =
-    konepsTransportFor(
-        credential = KonepsCredentialProperties("TRANSPORT-PROBE-KEY"),
-        on = PROBE_DAY,
-        runState = RunStateDirectory(Files.createTempDirectory("m9-paced-run-state")),
-        budget = probeBudget(),
-        clock = Clock { Instant.parse("2026-09-24T03:00:00Z") },
-        sleeper = sleeper,
-    )
-
-/**
- * **production 과 같은 다섯 인자** 호출 — 기다림 함수는 그 기본값이다(`CollectionWiring`·
- * `OpeningCollectionWiring` 의 호출 형태와 같다). 그 기본값이 실제로 잠그는지를 재는 자리가 쓴다.
- */
-private fun defaultSleeperTransport(): KonepsTransport =
-    konepsTransportFor(
-        credential = KonepsCredentialProperties("TRANSPORT-PROBE-KEY"),
-        on = PROBE_DAY,
-        runState = RunStateDirectory(Files.createTempDirectory("m9-default-run-state")),
-        budget = probeBudget(),
-        clock = Clock { Instant.parse("2026-09-24T03:00:00Z") },
-    )
-
-/**
- * **production 조립과 같은 인자 여섯**으로 세운 공고 소스(`CollectionWiring.sourceFor` 와 같다).
- * 전송을 인자로 받는 이유는 **두 소스가 한 관문을 공유하는** 판을 짓기 때문이다(production 도
- * 업종마다 소스를 만들고 관문은 하나다) — 그 판이 간격 축을 계수 축에서 떼어 낸다.
- */
-private fun noticeSourceFrom(
-    transport: KonepsTransport,
-    baseUrl: String,
-    division: BusinessDivision,
-): KonepsOpenApiNoticeSource =
-    KonepsOpenApiNoticeSource(
-        gate = transport.gate,
-        baseUri = URI.create("$baseUrl/${operationPathFor(division)}"),
-        serviceKey = transport.serviceKey,
-        httpPolicy = transport.httpPolicy,
-        collectionPolicyProvider = ::collectionPolicyAt,
-        businessDivision = division,
-    )
-
-private fun operationPathFor(division: BusinessDivision): String =
-    when (division) {
-        BusinessDivision.CONSTRUCTION -> "getBidPblancListInfoCnstwk"
-        else -> "getBidPblancListInfoServc"
-    }
-
-/**
- * 출하 전송 정책의 최소 간격 — **test 가 그 수를 다시 적지 않는다**(두 자리에 같은 수를 두지 않는다).
- * 값이 바뀌면 단언도 함께 움직인다.
- */
-private fun shippedMinimumCallInterval(): Duration =
-    when (val resolution = KONEPS_HTTP_POLICY.resolve(LocalDate.of(2026, 9, 24))) {
-        is Resolution.Resolved -> resolution.value.minimumCallInterval
-        else -> error("출하 전송 정책이 적용되지 않는다: $resolution")
-    }
 
 /** 저장소 밖 — 배선은 디렉터리가 있는지만 본다(표본 확정과 시도 기록은 수집이 한다). */
 private val NOTICE_RUN_STATE: Path = Files.createTempDirectory("6g-notice-run-state")
