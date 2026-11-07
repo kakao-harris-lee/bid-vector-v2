@@ -186,8 +186,9 @@ def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
 
 _UNRESOLVABLE_ANNOTATIONS: Final[frozenset[tuple[str, str]]] = frozenset(
     {
-        ("ml_engine.features.encoding", "_accumulate"),
-        ("ml_engine.features.schema", "require_declared"),
+        # 넷 다 **같은 구조적 사유**다: 주석이 생성 stub 의 모듈 속성을 이름으로 가리키는데
+        # 그 이름이 모듈 속성으로 존재하지 않는다(중첩 메시지). `AttributeError` 이고,
+        # 파이썬 버전이 아니라 **생성 stub 의 모양**이 정한다 — 아래 test 가 그 사유까지 잰다.
         ("ml_engine.serving.prediction", "_validate_selector"),
         ("ml_engine.training.jobs.servicer", "_fill_failure"),
         ("ml_engine.training.jobs.servicer", "_fill_store_unavailable"),
@@ -199,6 +200,12 @@ _UNRESOLVABLE_ANNOTATIONS: Final[frozenset[tuple[str, str]]] = frozenset(
 )
 """`typing.get_type_hints` 가 해석하지 못하는 함수 전수 — **등식으로 잠근다**(cr r5 M-1).
 
+**앞 판은 여기에 PEP 695 제네릭 둘**(`features.schema.require_declared` ·
+`features.encoding._accumulate`)**이 더 있었고, 그래서 이 등식이 환경 의존이었다** —
+로컬(3.12.3)에서는 `NameError` 로 실패하고 CI(더 뒤 3.12 패치)에서는 해석돼 **CI 만
+붉었다**(PR #139 실측). `_resolved_hints` 가 타입 파라미터를 직접 넘겨 둘 다 **어느
+파이썬에서도** 해석되게 했고, 그래서 이 집합은 환경과 무관한 넷만 남는다.
+
 집합 등식은 **발견된 것**만 비교하므로, 모집단에서 빠지는 함수는 등식을 붉히지 않는다
 (없는 것과 같은 값이다). 그래서 해석 실패를 「모집단 밖」으로 조용히 흘리지 않고 **이 목록과
 같은지** 본다. 우회가 쓰는 길이 바로 그것이었다: 반환 타입을 `if TYPE_CHECKING:` 에서만
@@ -208,9 +215,21 @@ import 하면(이 저장소는 전 모듈이 `from __future__ import annotations
 
 
 def _resolved_hints(func: object) -> dict[str, object] | None:
-    """해석된 주석, 해석 불가면 `None`."""
+    """해석된 주석, 해석 불가면 `None`.
+
+    **PEP 695 타입 파라미터를 직접 넣어 준다**(`def f[T](...)`). 이 저장소는 전 모듈이
+    `from __future__ import annotations` 이라 주석이 문자열이고, `get_type_hints` 는 그것을
+    모듈 전역에서 찾는데 `T` 는 **함수의 타입 파라미터 스코프**에 있다. CPython 3.12 는 그
+    스코프를 보는 시점이 패치 버전에 따라 **다르다** — 3.12.3 에서는 `NameError`, 더 뒤
+    패치에서는 해석된다(실측: 로컬 3.12.3 실패 ↔ CI 성공). 그 차이가 아래 해석 실패 등식을
+    **환경 의존**으로 만들었다(CI 만 붉었다).
+
+    `__type_params__` 를 `localns` 로 넘기면 **어느 파이썬에서도** 해석된다 — 등식에 남는
+    실패는 환경과 무관한 것(생성 stub 의 모듈 속성 부재)뿐이다."""
+    type_params = getattr(func, "__type_params__", ())
+    localns = {param.__name__: param for param in type_params}
     try:
-        return typing.get_type_hints(func)  # type: ignore[arg-type]
+        return typing.get_type_hints(func, localns=localns)  # type: ignore[arg-type]
     except (NameError, TypeError, AttributeError):
         return None
 
@@ -303,6 +322,27 @@ def test_annotation_resolution_failures_are_exactly_the_declared_ones() -> None:
     """해석 실패가 **늘면 붉다**(cr r5 M-1 ⑴). 이것이 없으면 「반환 타입을 TYPE_CHECKING
     에서만 import 한 입구」가 조용히 모집단에서 빠진다 — 집합 등식은 발견된 것만 비교한다."""
     assert _unresolvable_annotations() == _UNRESOLVABLE_ANNOTATIONS
+
+
+def test_every_declared_resolution_failure_has_the_same_structural_cause() -> None:
+    """**등식이 환경에 흔들리지 않는 이유**를 함께 잰다(PR #139).
+
+    넷 다 `AttributeError` 여야 한다 — 주석이 생성 stub 의 없는 모듈 속성을 가리키는 모양이고,
+    그것은 파이썬 패치 버전이 아니라 **생성 stub 의 모양**이 정한다. 다른 종류의 실패
+    (예: PEP 695 타입 파라미터의 `NameError`)가 섞이면 그 순간 **이 test 가 붉다** — 위
+    등식만 있으면 그런 실패는 「선언했으니 괜찮다」로 조용히 묻힌다."""
+    for module_name, name in sorted(_UNRESOLVABLE_ANNOTATIONS):
+        func = _resolve(module_name, name)
+        try:
+            typing.get_type_hints(func)  # type: ignore[arg-type]
+        except AttributeError:
+            continue
+        except Exception as exc:  # 사유 **종류**를 보고하려고 넓게 받는다
+            raise AssertionError(
+                f"{module_name}.{name} 의 해석 실패 사유가 AttributeError 가 아니다: "
+                f"{type(exc).__name__}"
+            ) from exc
+        raise AssertionError(f"{module_name}.{name} 이 이제 해석된다 — 목록에서 빼라")
 
 
 _POLICY_FILE_ENTRY_POINTS = frozenset(
