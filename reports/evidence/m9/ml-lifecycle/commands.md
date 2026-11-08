@@ -637,7 +637,7 @@ PEP 695 경계는 `__bound__` 를 읽는 순간 `NameError` 가 포획 없이 �
 | B24 `[P: tuple["EvaluationPolicy", int]]` | 둘 다 **GREEN** | 둘 다 **RED** | 모집단 등식 |
 | B18 구식 `TypeVar(bound=Optional["…"])` | 둘 다 **GREEN** | 둘 다 **RED** | 모집단 등식 |
 | B20 별칭 `type Pol = "EvaluationPolicy"` | 둘 다 **GREEN** | 둘 다 **RED** | 모집단 등식 |
-| B23 `[P: Annotated["EvaluationPolicy", "x"]]` | 둘 다 **GREEN** | 둘 다 **RED** | 해석 실패 등식 |
+| B23 `[P: Annotated["EvaluationPolicy", "x"]]` | 둘 다 **GREEN** | 둘 다 **RED** | 해석 실패 등식 — **사유는 메타데이터**(표 주) |
 | B28 `TYPE_CHECKING` 전용 경계(따옴표 **없음**) | 둘 다 **크래시**(`NameError`, test 둘) | 둘 다 **RED** | 해석 실패 등식 |
 | B29 `TYPE_CHECKING` 전용 **별칭**(`__value__`) | 둘 다 **크래시**(위와 같음) | 둘 다 **RED** | 해석 실패 등식 |
 | B30 B28 을 **선언 목록에 등재**해 피하기 | — | 둘 다 **RED** | 사유 test |
@@ -650,6 +650,11 @@ PEP 695 경계는 `__bound__` 를 읽는 순간 `NameError` 가 포획 없이 �
 표지다(두 버전). 좁은 열거가 받지 못하는 종류가 실제로 있었다.
 표 주: C2 만 `mypy --strict` 가 거부한다(unbound TypeVar) — 재귀 가드 회귀를 보는 runtime
 통제군이라 그대로 둔다. C7 은 src 에 실재하는 모양(`str | int | list["Rec"]`)으로 적었다.
+**B23 이 「해석 실패 등식」으로 붉은 사유를 정정한다**(v r10, §4m M-A): 정책 문자열
+`"EvaluationPolicy"` 가 안 풀려서가 아니라 **메타데이터 `"x"`** 가 잎 자리로 가서 안 풀리기
+때문이다 — `get_args(Annotated[X, "x"])` 가 `(X, "x")` 를 내므로 메타데이터도 잎이 된다. 즉
+B23 은 「문자열 경계를 닫았다」의 증거가 아니라 **메타데이터 경로의 증거**이고, 같은 기제가
+비정책 코드를 붉히는 쪽이 §4m 의 M-A 다. 문자열 경계 쪽 증거는 B19·B24·B18·B20 넷이다.
 
 **집합 불변** — 해석 실패 **4** · 정책 입구 전수 **12** · 정렬 목록 내용 해시 **`60f92e88f7ee`**,
 3.12.3·3.12.13 두 버전 모두 수정 전후 같다(v r9 가 여섯 칸에서 잰 해시와 같은 값).
@@ -662,6 +667,8 @@ PEP 695 경계는 `__bound__` 를 읽는 순간 `NameError` 가 포획 없이 �
 클래스 스코프 이름을 문자열 경계로 쓴 비정책 함수는 통과도 등재도 아닌 **해석 실패**로 붉다
 (탈출구는 따옴표 제거이고, src 에 그 모양이 0 이라는 근거가 위 집합 불변이다). §4k 의 기제
 문장도 그 커밋의 범위(「경계·제약 자체」)로 좁혔다(v r9 L-1).
+**이 절의 「오탐 쪽 대가」는 하나가 아니었다** — §4m M-A 가 셋으로 정정한다(그 하나만 적은
+문면이 이 라운드의 커밋에서 잰 범위를 넘었다).
 
 ### low 둘
 
@@ -678,6 +685,81 @@ python 을 직접 불렀으며 매 실행 전 버전과 `ml_engine` import 경�
 rollback 은 복원 원천 `3101035f` **그대로** 다시 쟀다(rollback.md — 실측 HEAD `5a4c3098`,
 목록 `M` 37 · `A` 11 불변, 트리 동일성 `c0913842…`). 이 slice 가 만진 파일은 in_scope
 (`ml-engine/**` · evidence) 안이고 **새 파일 0** 이다.
+
+## §4m 마지막 병합 전 일괄 — v r10 medium 둘 **등재** · main `70406318`
+
+v r10 은 **ready-for-review @`5a4c3098`** 이고 blocker/high 0 이다. 남은 medium 둘은 사용자 결정에
+따라 **고치지 않고 등재만** 한다. 이 라운드는 **문면과 장부만** 바꾼다 — 편집한 test 파일에서
+docstring 을 제거한 AST 가 앞 커밋과 **동일**하다(실측). 게이트 술어는 한 글자도 움직이지 않았다.
+
+### M-A — 「오탐 쪽 대가는 하나」가 잰 범위를 넘었다 (이 계열이 만든 회귀, 등재)
+
+`_UNRESOLVED_BOUND` docstring 은 fail-closed 의 대가를 **클래스 스코프 이름 하나**로 적었다.
+실측된 대가는 **최소 셋**이다 — 둘은 §4l 커밋이 「문자열을 잎 자리에서 푼다」로 옮기며 생긴
+**회귀**이고(앞 커밋 `c916b51e` 에서 GREEN), 비정책 코드를 해석 실패로 붉힌다.
+
+| 모양 | 기제 | `c916b51e` | `5a4c3098` |
+| --- | --- | --- | --- |
+| `type Meters = Annotated[int, "meters"]` → `-> Meters` | `get_args` 가 메타데이터를 **잎**으로 낸다 | GREEN | **RED** |
+| `def f[T: Annotated[int, "positive"]](…) -> T` | 같음(경계 안) | GREEN | **RED** |
+| `type Box[T] = list["T"]` → `-> Box` | 푸는 namespace 가 함수 쪽이라 `"T"` 가 없다 | GREEN | **RED** |
+
+터지는 자리는 `get_type_hints` 가 **들어가지 않는 구멍**(별칭 `__value__` · `TypeVar` 경계)뿐이다 —
+매개변수·반환에 **직접** 적은 `Annotated[int, "설명"]` 은 최상위가 벗겨져 통과한다(v r10 F1·F2
+GREEN). 셋 다 `mypy --strict` 를 통과하는 모양이고, **src 에 0** 이라 오늘 붉지 않는다(집합 불변).
+탈출구는 따옴표 제거 · 메타데이터를 비문자열로 · 첨자 적기 셋이다. **후속 처방**(이 slice 밖):
+`get_origin` 이 `Annotated` 면 첫 인자만 펴고 `__metadata__` 는 버린다.
+
+**같은 기제가 B23 의 사유다** — §4l 변이표의 표 주에 정정을 달았다. B23 이 붉은 것은 정책 문자열이
+아니라 메타데이터 `"x"` 때문이고, 그래서 B23 은 문자열 **경계**를 닫았다는 증거가 아니다
+(그 증거는 B19·B24·B18·B20 넷이다).
+
+### M-B — 별칭 주장은 **무첨자** 별칭에만 잰 것이었다 (기존 잔여, 등재)
+
+모집단 등식 docstring 의 「PEP 695 **별칭**으로 가려도」는 첨자 없는 별칭만 쟀다. 두 모양이
+**두 버전 GREEN** 이고 `c916b51e` 에서도 GREEN 이라 이 라운드의 회귀가 아니다 — 처음부터 있던
+틈이고 잔여 목록(`-> Self`·`NewType`·무경계)에 빠져 있었다.
+
+| 모양 | 기제 |
+| --- | --- |
+| `type Pol[T] = EvaluationPolicy` → `-> Pol[int]` · `type Pol[T] = T \| EvaluationPolicy` | `get_type_hints` 가 내는 것이 `TypeAliasType` 이 아니라 그것을 origin 으로 한 **첨자 꼴**이라 별칭 가지가 받지 못하고 `get_args` 가 첨자 인자만 낸다 |
+| `typing_extensions.TypeAliasType("Pol", EvaluationPolicy)` | 3.12 에서 이 타입은 `typing.TypeAliasType` 이 **아니다** |
+
+둘 다 `paired_t_threshold` 를 받는 정책 반환 함수를 모집단 **밖**에 둔다(v r10 X8·X9·X2 실측).
+문면을 두 자리에 고쳤다 — 주장 쪽은 「**무첨자** 별칭」으로 좁히고, 잔여 목록에 두 모양을 더했다.
+이 전수가 지는 것은 **유입 층**이고 방어선이 아니다(미승인 값이 판정에 닿는 것은
+`evaluation.policy_source` 의 재구성 승인 축이 막는다) — 등급이 medium 인 근거가 그것이다.
+
+### main 병합 (원천 교체) — 겹침 하나를 계수로 검증
+
+`70406318`(PR #128 award-ingest)을 병합했다. `ml-engine/**` 겹침 **0** 이고, main 측 27 파일 중
+in_scope 와 겹치는 것은 `docs/discovery/capability-map.md` **하나**다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 충돌 표지(추적 파일 전체) | **0** |
+| lane 추가 51 줄 중 병합본에 없는 것 | **0** |
+| main 추가 3 줄 중 없는 것 · main 삭제 2 줄 중 남은 것 | **0** · **0** |
+| 비빈줄 등식 | 3501 + 51 + 3 − 2 = **3553** == 실측 |
+| 중복 비빈줄 **종류** (병합이 만든 중복) | **24** — 원천 base 와 같다(증가 0) |
+| **손 해소 줄** — 양쪽 증분 diff 본문(겹침 파일 제외)이 병합 전후 바이트 동일 | **0** (네 방향: lane 7875 줄 · main 3832 줄, 양쪽 `cmp` 동일) |
+
+### acceptance
+
+**CI `ml-engine` job 열한 단계를 3.12.13 에서** 판정 SHA `b776ccee`(병합 커밋)에 대해 그대로 돌렸다 —
+**전부 exit 0**. 시작·끝에 인터프리터를 물어 둘 다 **3.12.13**. 핵심 결과: ruff check 통과 ·
+`ruff format --check` **241 파일** 무변경 · `mypy --strict` **103 소스 파일** 이슈 0 · import-linter
+**계약 8 kept, 0 broken** · pytest **1751 passed**(앞 판정 SHA 와 같은 수 — 이 라운드는 test 를 더하지도
+지우지도 않았다) · 설계 래칫·재활용 두 자리 대조(양성 대조 포함)·버전 두 자리 대조 통과 ·
+wheel 빌드 + 설치본 재수출 **1 passed**. 변이는 다시 돌리지 않았다 — 이 라운드의 유일한 코드 트리
+편집이 **docstring** 이고, 그것을 제거한 AST 가 앞 커밋과 동일함을 실측했으므로 변이 결과가 바뀔
+입력이 없다.
+
+### rollback
+
+복원 **원천을 `70406318` 로 옮기고 다시 쟀다** — 이 라운드가 복원 목록 안 파일 둘을 움직였기
+때문이다(등재 커밋이 `tests/evaluation/test_public_signatures.py` 를, 병합이
+`docs/discovery/capability-map.md` 를). 수·트리 해시·표지 계수는 `rollback.md` 가 정본이다.
 
 ## §5 되돌림
 
