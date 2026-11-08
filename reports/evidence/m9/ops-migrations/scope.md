@@ -64,6 +64,21 @@
   보다 넓다 — cr 이 「범위를 넘는다고 보면 등재가 맞다」고 적은 자리이고, 팀장 지시로 고쳤으므로
   여기 등재한다.
 
+## 계약 갱신 2026-11-08 (팀장 지시 — 승인 전 일괄)
+
+- **`docs/runbook/m6-6b2-backup-restore.md` 한 줄은 in_scope 문면보다 넓다.** 그 줄의 축은 릴리스
+  식별자 주입이 아니라 **Flyway 구성 전제**(「`PersistenceWiring.migrate()` 가 전부 기본값으로
+  부른다」)이고, 이 slice 의 `initSql` 이 그 문장을 거짓으로 만들었다 — cr r4 가 「이 변경이 거짓으로
+  만든 유일한 문장」으로 지목했고 팀장 지시로 고쳤으므로 여기 등재한다(`m6-6b3-retention.md` §4 ⑥
+  과 같은 처분).
+- **main `3101035f` 병합**(팀장 지시, #142 CVE · #127 STR12 telegram · #136 pitest). **내 병합은
+  둘**이 된다. 충돌 일곱은 전부 합집합으로 해소했고(relay 조립의 `release` ↔ `channels`·`clock`),
+  `EXPECTED_EXEMPT_COUNT` 는 양쪽 수를 버리고 tier 목록에서 기계로 다시 셌다. **충돌 0 으로 들어와
+  접힌 자리 셋**(main 의 새 `NotificationRelayRun(` 호출이 `release` 없이 조립)도 함께 고쳤다 —
+  그 셋은 표지가 서지 않아 컴파일만이 잡는다.
+- **lint 술어는 바꾸지 않았다**(팀장 지시). cr r4 M-1 의 「값 등식」 처방은 게이트 술어 변경이라
+  재검증을 부르므로 `commands.md` 알려진 제한으로 등재했다.
+
 ## 계약 갱신 2026-11-06 (verifier not-ready 반영)
 
 - **승격된 행의 릴리스는 조인이 다른 질문에 답한다**(v M-1). `observation_key` 조인이 주는 것은
