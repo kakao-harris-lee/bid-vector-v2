@@ -15,6 +15,7 @@ import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
 import java.security.MessageDigest
+import java.util.jar.JarEntry
 import java.util.jar.JarFile
 
 /**
@@ -89,7 +90,8 @@ abstract class JarContentGateTask : DefaultTask() {
                 externalClassRoots = values.requireList(EXTERNAL_CLASS_ROOTS),
             )
         val verdict = policy.judge(entries, verified)
-        val nested = nestedVerdict(module, values, archiveFiles)
+        val runtimeJarNames = runtimeClasspath.files.map(File::getName).toSet()
+        val nested = nestedVerdict(module, values, archiveFiles, runtimeJarNames)
 
         val header =
             listOf(
@@ -101,7 +103,8 @@ abstract class JarContentGateTask : DefaultTask() {
                 "judged=${verdict.judged}",
                 "exempt=${verdict.exempt}",
                 "nestedJars=${nested.nestedCount}",
-                "runtimeJars=${nested.runtimeCount}",
+                "nestedOutside=${nested.outsideCount}",
+                "runtimeJars=${runtimeJarNames.size}",
             )
         report
             .get()
@@ -134,31 +137,25 @@ abstract class JarContentGateTask : DefaultTask() {
             }.toMap()
 
     /**
-     * 중첩 jar 축(verifier M-1) — 최상위 class 엔트리만 보던 술어가 `BOOT-INF/lib` 에 실린 jar 를 놓쳤다.
-     * 경로가 아니라 **파일 이름**으로 견주므로 어느 자리에 넣어도 같은 판정을 받는다.
+     * 중첩 아카이브 축(verifier M-1) — 최상위 class 엔트리만 보던 술어가 `BOOT-INF/lib` 에 실린 jar 를
+     * 놓쳤다. 판정은 [NestedArchivePolicy] 가 하고 이 자리는 **읽기와 정책 값 전달**만 맡는다.
+     *
+     * 기준 집합은 **해석된 runtime classpath 의 파일 이름 전수**다. 확장자를 묻지 않는 것이 판정 쪽과
+     * 대칭이다(리뷰 LOW-1) — 선언된 의존에 `.jar` 아닌 파일이 있고 Boot 가 그것을 뿌리에 넣으면,
+     * 묻는 쪽만 확장자를 보면 **선언된 것이 위반으로** 지목된다.
      */
     private fun nestedVerdict(
         module: String,
         values: Map<String, String>,
         archiveFiles: List<File>,
-    ): NestedJarVerdict {
-        // 키는 **아카이브 경로**다(리뷰 L-1) — 서로 다른 디렉터리의 Jar task 가 같은 `archiveFileName`
-        // 을 내면 이름 키에서 하나가 조용히 사라지고 계수도 그만큼 줄어든다. 판정 문면도 그 경로를
-        // 그대로 들어 어느 아카이브인지가 모호하지 않다.
-        val roots = values.requireList(NESTED_LIB_ROOTS)
-        val nested = archiveFiles.associate { it.path to nestedArchiveNames(it, roots) }
-        val runtimeJarNames =
-            runtimeClasspath.files
-                .filter { it.extension == "jar" }
-                .map(File::getName)
-                .toSet()
-        val exempt = values.requireList(EXTERNAL_NESTED_JARS)
-        return NestedJarVerdict(
-            violations = nestedArchiveViolations(module, nested, runtimeJarNames, exempt),
-            nestedCount = nested.values.sumOf { it.size },
-            runtimeCount = runtimeJarNames.size,
-        )
-    }
+        runtimeJarNames: Set<String>,
+    ): NestedArchiveVerdict =
+        NestedArchivePolicy(
+            roots = values.requireNonEmptyList(NESTED_LIB_ROOTS),
+            runtimeJarNames = runtimeJarNames,
+            exemptNames = values.requireList(EXTERNAL_NESTED_JARS),
+            launcherMainClass = values.requireValue(BOOT_LAUNCHER_MAIN_CLASS),
+        ).judge(module, archiveFiles.map(::readNestedArchive))
 
     private fun failOnNestedJars(
         module: String,
@@ -167,30 +164,11 @@ abstract class JarContentGateTask : DefaultTask() {
         if (violations.isEmpty()) return
         throw GradleException(
             violations.joinToString(
-                prefix = "아카이브가 선언되지 않은 중첩 jar 를 품는다 (모듈 '$module'):\n  ",
+                prefix = "아카이브의 중첩 아카이브 축이 붉다 (모듈 '$module'):\n  ",
                 separator = "\n  ",
             ),
         )
     }
-
-    /**
-     * 아카이브가 품는 **중첩 아카이브의 파일 이름**. 모집단은 **로더와 같은 술어**다 — [roots] 접두 밑의
-     * 비-디렉터리 엔트리 전수이고 **확장자를 보지 않는다**(verifier H-2: `.zip`·`.JAR` 이 미계수였다).
-     */
-    private fun nestedArchiveNames(
-        archive: File,
-        roots: List<String>,
-    ): List<String> =
-        JarFile(archive).use { jar ->
-            jar
-                .entries()
-                .asSequence()
-                .filterNot { it.isDirectory }
-                .map { it.name }
-                .filter { name -> roots.any(name::startsWith) }
-                .map { it.substringAfterLast('/') }
-                .toList()
-        }
 
     private fun classEntries(archive: File): List<JarClassEntry> =
         JarFile(archive).use { jar ->
@@ -205,17 +183,55 @@ abstract class JarContentGateTask : DefaultTask() {
         }
 }
 
-/** 중첩 jar 축의 판정과 그 축이 **실제로 센 수** — 수가 0 으로 내려가면 리포트에서 보인다. */
-private class NestedJarVerdict(
-    val violations: List<String>,
-    val nestedCount: Int,
-    val runtimeCount: Int,
-)
+/**
+ * **판독기 층** — 아카이브를 [NestedArchive] 로 읽는다. 판정은 [NestedArchivePolicy] 가 한다.
+ *
+ * 최상위 함수인 것은 그래야 **test 가 진짜 아카이브를 하나 만들어 이 층을 잴 수 있기** 때문이다
+ * (리뷰 M-1): 판정만 순수 test 로 잠그면 판독이 경로를 버리는 변이가 아무 test 도 깨뜨리지 않는다 —
+ * 실제로 그렇게 한 라운드가 열렸다.
+ *
+ * 엔트리 전수를 읽고 각 엔트리의 **앞 네 바이트**를 본다. 이름(확장자)을 믿지 않기 위해서다.
+ */
+internal fun readNestedArchive(archive: File): NestedArchive =
+    JarFile(archive).use { jar ->
+        NestedArchive(
+            path = archive.path,
+            displayName = archive.name,
+            entries =
+                jar
+                    .entries()
+                    .asSequence()
+                    .filterNot { it.isDirectory }
+                    .map { ArchiveEntry(it.name, jar.startsWithArchiveSignature(it)) }
+                    .toList(),
+            mainClass = jar.manifest?.mainAttributes?.getValue("Main-Class"),
+        )
+    }
+
+/**
+ * zip 의 네 바이트 서명 — local file header · 중앙 디렉터리만 있는 빈 아카이브 · 분할 아카이브.
+ * 세 가지 모두 **읽는 쪽이 정한 값**이고, 이름과 달리 넣는 쪽이 고를 수 없다.
+ */
+private val ARCHIVE_SIGNATURES =
+    listOf(
+        byteArrayOf(0x50, 0x4B, 0x03, 0x04),
+        byteArrayOf(0x50, 0x4B, 0x05, 0x06),
+        byteArrayOf(0x50, 0x4B, 0x07, 0x08),
+    )
+
+private fun JarFile.startsWithArchiveSignature(entry: JarEntry): Boolean {
+    val head = ByteArray(ARCHIVE_SIGNATURE_LENGTH)
+    val read = getInputStream(entry).use { stream -> stream.readNBytes(head, 0, head.size) }
+    return read == head.size && ARCHIVE_SIGNATURES.any(head::contentEquals)
+}
+
+private const val ARCHIVE_SIGNATURE_LENGTH = 4
 
 private const val CLASS_ROOTS = "jar.class-roots"
 private const val EXTERNAL_CLASS_ROOTS = "jar.external-class-roots"
 private const val EXTERNAL_NESTED_JARS = "jar.external-nested-jars"
 private const val NESTED_LIB_ROOTS = "jar.nested-lib-roots"
+private const val BOOT_LAUNCHER_MAIN_CLASS = "jar.boot-launcher-main-class"
 
 /** jar 엔트리는 항상 `/` 구분자다 — 플랫폼 구분자로 만든 상대 경로를 그 표기에 맞춘다. */
 private fun File.invariantPath(): String = path.replace(File.separatorChar, '/')

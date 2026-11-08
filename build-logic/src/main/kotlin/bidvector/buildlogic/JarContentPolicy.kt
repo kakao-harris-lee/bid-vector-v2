@@ -107,46 +107,217 @@ internal fun archiveEmptinessFailure(
     }
 
 /**
- * **중첩 아카이브 축** — 아카이브가 품는 `.jar` 엔트리는 그 모듈의 runtime classpath 가 해석한 jar 여야
- * 한다(`nested ⊆ runtime`, 이름 기준).
+ * 아카이브 한 엔트리의 판정 입력 — **엔트리 전체 경로**와, 그 바이트가 zip 아카이브로 **시작하는가**.
+ *
+ * 뒤의 것이 이름이 아니라 내용인 이유: 확장자는 넣는 쪽이 정하는 값이라 `.zip`·`.JAR`·무확장으로
+ * 비껴간다(실측). zip local/central 헤더 서명은 **읽는 쪽이 정하는 값**이다.
+ */
+internal data class ArchiveEntry(
+    val path: String,
+    val archiveMagic: Boolean,
+)
+
+/**
+ * 중첩 축이 보는 아카이브 한 채.
+ *
+ * [path] 가 키다 — 서로 다른 디렉터리의 Jar task 가 같은 `archiveFileName` 을 내면 이름 키에서 하나가
+ * 조용히 사라진다. [displayName] 만 판정 문면에 들어간다 — 절대 경로는 기계마다 다른 글자이고, 그
+ * 문면을 인용하면 낡는 좌표가 된다(리뷰 LOW-2).
+ */
+internal data class NestedArchive(
+    val path: String,
+    val displayName: String,
+    val entries: List<ArchiveEntry>,
+    val mainClass: String?,
+)
+
+/** 중첩 축의 판정과 그 축이 **실제로 센 수** — 수가 0 으로 내려가면 리포트에서 보인다. */
+internal data class NestedArchiveVerdict(
+    val violations: List<String>,
+    val nestedCount: Int,
+    val outsideCount: Int,
+)
+
+/**
+ * **중첩 아카이브 축** — 배포물 안에 들어간 아카이브가 그 모듈이 **선언한** 의존인지 본다.
  *
  * 실측된 사각이다: 최상위 `.class` 엔트리만 보던 술어 아래에서 `bootJar { classpath(files(…)) }` 로 넣은
  * jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 **런타임에 실리는데도** 리포트가 심기 전과 같았다
  * (verifier M-1). 이 저장소가 막으려던 `jar { from("prebuilt") }` 의 bootJar 판이다.
  *
- * **모집단은 소비자와 같은 술어로 잡는다**(수정 라운드 3 — verifier H-2). Boot 로더는 디렉터리가 아닌
- * 엔트리에 대해 `BOOT-INF/lib/` 접두만 보고 **확장자를 보지 않는다**(로더 바이트코드 판독). 앞 판은
- * `.jar` 로 끝나는 엔트리만 세어 `.zip`·`.JAR` 로 넣은 중첩 아카이브가 **위반도 면제도 아닌 미계수**가
- * 됐다. 확장자는 넣는 쪽이 정하는 값이고 접두는 로더가 정하는 값이다.
+ * 왜 바이트가 아니라 이름으로 견주나 — 중첩 아카이브는 다시 압축돼 있어 바이트 대조에 원본 파일이
+ * 필요하다. 반면 **선언하지 않은 것은 runtime classpath 해석 결과에 아예 없다**. 다만 이름만으로는
+ * 모자랐다(수정 라운드 4 — verifier H-1): 이름 **집합 소속**만 보면 같은 이름의 둘째 아카이브를 하위
+ * 디렉터리에 더하는 것으로 통과했고, 로더는 그 둘을 **모두** 싣는다. 그래서 축이 셋이다.
  *
- * 왜 이름으로 견주나 — 중첩 아카이브는 다시 압축돼 있어 바이트 대조에 원본 파일이 필요하다. 반면
- * **선언하지 않은 것은 runtime classpath 해석 결과에 아예 없다**: 이름만으로도 「누가 선언했는가」가
- * 갈린다.
+ * - **경로 축**: 뿌리 밑의 엔트리는 전체 경로가 정확히 `<뿌리><이름>` 이어야 한다. 하위 디렉터리는 위반.
+ * - **다중도 축**: 한 아카이브에서 같은 이름은 **정확히 한 번**. 「선언된 이름이 둘」은 더하기 우회다.
+ * - **선언 축**: 그 이름이 runtime classpath 해석 결과 또는 면제 집합에 있어야 한다.
+ *
+ * 뿌리 밖은 **미계수가 아니다**(수정 라운드 4 — verifier M-1, 리뷰 H-1). 앞 판은 모집단을 뿌리 접두로
+ * 좁히면서 뿌리 밖의 중첩 아카이브를 「위반도 면제도 아닌」 자리에 두었고, `PropertiesLauncher` +
+ * `Loader-Path` 조합이 그 자리를 실어 날랐다. 지금은 뿌리 밖의 엔트리도 **zip 서명으로** 전수 판정하고
+ * ([ArchiveEntry.archiveMagic]), 그 조합 자체는 [launcherMainClass] 단언이 받는다.
  *
  * 면제는 **정확 이름 집합** 하나다([exemptNames]) — Boot 플러그인이 넣는 자기 도구 jar 는 이 저장소의
  * 소스가 아니라 대조 집합이 없다(`jar.external-class-roots` 가 launcher 클래스를 면제하는 것과 같은
  * 사유). 앞 판은 접두였고, 그 이름이 **막으려는 쪽이 정하는 값**이라 접두 뒤를 바꾼 사칭이 통과했다
- * (실측). 정확 이름은 Boot 상향에 어긋나 붉는데, 그 붉음이 조용히 넓어지는 면제보다 낫다.
+ * (실측). 정확 이름은 Boot 상향에 어긋나 붉는데, 그 붉음이 조용히 넓어지는 면제보다 낫다. 그리고
+ * 면제한 이름이 **대상 없이 남으면** 그것도 위반이다 — 죽은 면제는 그 이름의 자리를 비워 둔다.
  *
- * **비-공허 단언은 두지 않는다** — 중첩 jar 0 은 열 모듈 가운데 아홉에서 **정상 상태**다(배포물이
- * `bootJar` 인 모듈이 하나뿐이다). 그래서 0 을 위반으로 만들면 아홉이 상시로 붉는다. 대신 리포트가
- * 중첩 수와 runtime 수를 함께 세어 그 축이 조용해지면 수로 보인다.
+ * **비-공허 단언은 두지 않는다** — 중첩 0 은 열 모듈 가운데 아홉에서 **정상 상태**다(배포물이 `bootJar`
+ * 인 모듈이 하나뿐이다). 그래서 0 을 위반으로 만들면 아홉이 상시로 붉는다. 대신 리포트가 중첩 수와
+ * runtime 수를 함께 세어 그 축이 조용해지면 수로 보인다. 뿌리 목록 자체는 비면 **거부한다**(init) —
+ * 그것은 「정상 0」이 아니라 모집단을 통째로 없애는 값이다(리뷰 M-2).
  */
-internal fun nestedArchiveViolations(
-    module: String,
-    nested: Map<String, List<String>>,
-    runtimeJarNames: Set<String>,
-    exemptNames: List<String> = emptyList(),
-): List<String> =
-    nested.entries
-        .sortedBy { it.key }
-        .flatMap { (archive, jars) ->
-            jars
-                .filterNot { it in runtimeJarNames || it in exemptNames }
-                .sorted()
-                .map { jar ->
-                    "모듈 '$module' 의 아카이브 '$archive' 가 **선언되지 않은 중첩 jar** 를 품는다 — " +
-                        "runtime classpath 가 해석한 jar 가 아니므로 이 바이트는 어느 게이트도 거치지 않았다. " +
-                        "그런데 배포물 안에 있어 런타임에 실린다: $jar"
-                }
+internal class NestedArchivePolicy(
+    private val roots: List<String>,
+    private val runtimeJarNames: Set<String>,
+    private val exemptNames: List<String>,
+    private val launcherMainClass: String,
+) {
+    init {
+        require(roots.isNotEmpty()) {
+            "중첩 축의 뿌리 목록이 비었다 — 빈 목록은 모집단을 0 으로 만들어 그 축을 **경고 없이** 끈다"
         }
+    }
+
+    fun judge(
+        module: String,
+        archives: List<NestedArchive>,
+    ): NestedArchiveVerdict {
+        val judged = archives.sortedBy { it.path }.map(::split)
+        return NestedArchiveVerdict(
+            violations = judged.flatMap { violations(module, it) },
+            nestedCount = judged.sumOf { it.under.size },
+            outsideCount = judged.sumOf { it.outside.size },
+        )
+    }
+
+    private fun split(archive: NestedArchive): SplitArchive =
+        SplitArchive(
+            archive = archive,
+            under = archive.entries.mapNotNull { entry -> rootOf(entry)?.let { NestedEntry(entry.path, it) } },
+            outside = archive.entries.filter { it.archiveMagic && rootOf(it) == null }.map(ArchiveEntry::path),
+        )
+
+    private fun rootOf(entry: ArchiveEntry): String? = roots.firstOrNull { entry.path.startsWith(it) }
+
+    private fun violations(
+        module: String,
+        split: SplitArchive,
+    ): List<String> {
+        val where = "모듈 '$module' 의 아카이브 '${split.archive.displayName}'"
+        val nested =
+            if (split.under.isEmpty()) {
+                emptyList()
+            } else {
+                pathViolations(where, split.under) +
+                    multiplicityViolations(where, split.under) +
+                    undeclaredViolations(where, split.under) +
+                    deadExemptViolations(where, split.under) +
+                    launcherViolations(where, split.archive)
+            }
+        return nested + split.outside.sorted().map { outsideViolation(where, it) }
+    }
+
+    /** **경로 축** — 뿌리 **바로 밑**이 아닌 자리. 로더는 그것도 싣지만 이름 비교는 둘을 구별하지 못한다. */
+    private fun pathViolations(
+        where: String,
+        under: List<NestedEntry>,
+    ): List<String> =
+        under
+            .filterNot(NestedEntry::directlyUnderRoot)
+            .map(NestedEntry::path)
+            .sorted()
+            .map {
+                "$where 가 로더 뿌리의 **하위 경로**에 중첩 아카이브를 품는다 — 로더는 뿌리 밑을 평탄하게 " +
+                    "훑어 이 엔트리도 classpath 에 싣는데, 이름만 견주면 같은 이름의 선언된 jar 가 이것을 " +
+                    "덮어 준다(그 둘이 **모두** 실린다): $it"
+            }
+
+    /** **다중도 축** — 같은 이름이 두 번이면 하나는 선언 밖이다. 「더하기」 우회는 이 축이 받는다. */
+    private fun multiplicityViolations(
+        where: String,
+        under: List<NestedEntry>,
+    ): List<String> =
+        under
+            .groupingBy(NestedEntry::name)
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+            .sorted()
+            .map {
+                "$where 가 같은 이름의 중첩 아카이브를 ${under.count { e -> e.name == it }}번 품는다 — " +
+                    "선언된 이름은 해석 결과에 **한 번** 나오므로 둘째부터는 누가 넣었는지가 없다: $it"
+            }
+
+    private fun undeclaredViolations(
+        where: String,
+        under: List<NestedEntry>,
+    ): List<String> =
+        under
+            .map(NestedEntry::name)
+            .distinct()
+            .filterNot { it in runtimeJarNames || it in exemptNames }
+            .sorted()
+            .map {
+                "$where 가 **선언되지 않은 중첩 아카이브** 를 품는다 — runtime classpath 가 해석한 것이 " +
+                    "아니므로 이 바이트는 어느 게이트도 거치지 않았다. 그런데 배포물 안에 있어 런타임에 " +
+                    "실린다: $it"
+            }
+
+    /** 죽은 면제는 범위를 조용히 넓힌다 — 그 이름의 자리를 비워 두기 때문이다(verifier L-1). */
+    private fun deadExemptViolations(
+        where: String,
+        under: List<NestedEntry>,
+    ): List<String> =
+        exemptNames
+            .filterNot { name -> under.any { it.name == name } }
+            .sorted()
+            .map {
+                "$where 에 면제된 이름이 **없다** — 대상 없는 면제는 그 이름의 자리를 비워 두어, 누가 그 " +
+                    "이름으로 넣어도 통과시킨다: $it"
+            }
+
+    /**
+     * 뿌리 접두 술어의 **전제**를 게이트로 만든다(verifier M-1) — `PropertiesLauncher` 는 `Loader-Path`
+     * 의 중첩 경로를 싣고, 그러면 모집단의 전제가 바뀐다. 런처를 바꾸는 것은 manifest 한 줄이다.
+     */
+    private fun launcherViolations(
+        where: String,
+        archive: NestedArchive,
+    ): List<String> =
+        if (archive.mainClass == launcherMainClass) {
+            emptyList()
+        } else {
+            listOf(
+                "$where 의 Main-Class 가 '$launcherMainClass' 가 아니다 — 중첩 축의 뿌리 술어는 그 런처의 " +
+                    "적재 규칙이고, 런처가 바뀌면 뿌리 밖도 실린다: ${archive.mainClass}",
+            )
+        }
+
+    private fun outsideViolation(
+        where: String,
+        path: String,
+    ): String =
+        "$where 가 로더 뿌리 **밖에** 중첩 아카이브를 품는다(zip 서명으로 판독) — 기본 런처는 싣지 않지만 " +
+            "그 바이트는 어느 게이트도 거치지 않았고, 런처 설정 한 줄이면 실린다: $path"
+
+    private class SplitArchive(
+        val archive: NestedArchive,
+        val under: List<NestedEntry>,
+        val outside: List<String>,
+    )
+
+    private class NestedEntry(
+        val path: String,
+        root: String,
+    ) {
+        private val tail = path.removePrefix(root)
+
+        val name: String = tail.substringAfterLast('/')
+
+        val directlyUnderRoot: Boolean = !tail.contains('/')
+    }
+}

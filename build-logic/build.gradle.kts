@@ -101,8 +101,12 @@ fun Test.declarePolicyInputs(repoRoot: File) {
     // `GateRegistrationCensusTest` 의 마지막 test 가 **등재 장부 전체**의 열 모양을 잰다(리뷰 LOW-7).
     inputs.file(repoRoot.resolve("config/quality/gate-tests.properties")).withPropertyName("gateTests")
 
-    // `JarContentPolicyTest` 가 중첩 jar 면제의 버전을 카탈로그와 견준다(verifier H-2 처방).
-    inputs.file(repoRoot.resolve("gradle/libs.versions.toml")).withPropertyName("versionCatalog")
+    // `JarContentPolicyTest` 가 중첩 jar 면제의 버전을 카탈로그와 견준다(verifier H-2 처방). 경로는
+    // 속성으로 넘긴다 — 앞 판은 정책 파일에서 `parentFile` 세 겹으로 유도했고, 그 좌표는 config
+    // 디렉터리 깊이가 바뀌면 조용히 다른 파일을 가리킨다(리뷰 LOW-3).
+    val versionCatalog = repoRoot.resolve("gradle/libs.versions.toml")
+    inputs.file(versionCatalog).withPropertyName("versionCatalog")
+    systemProperty("bidvector.version.catalog", versionCatalog.absolutePath)
 
     // `MigrationOrderTest` 의 뒤 둘이 실제 정책과 실제 디렉터리를 읽는다. 경로는 그 test 가
     // `bidvector.architecture.policy` 에서 유도하므로 system property 를 더 넘기지 않는다.

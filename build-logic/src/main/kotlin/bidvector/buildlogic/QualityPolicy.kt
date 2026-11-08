@@ -36,4 +36,12 @@ internal fun Map<String, String>.requireList(key: String): List<String> =
         .map(String::trim)
         .filter(String::isNotEmpty)
 
+/**
+ * **빈 값은 「끈 것」이 아니라 정책 오류다.** [requireList] 는 빈 값에 빈 목록을 내므로, 모집단을 그
+ * 목록에서 얻는 축은 키를 **지우면** 죽고 **비우면** 조용히 공허해진다(리뷰 M-2 — 그 공허가 다수
+ * 모듈의 정상 상태와 같은 리포트를 낸다). 그 비대칭을 값을 쓰는 자리에서 끊는다.
+ */
+internal fun Map<String, String>.requireNonEmptyList(key: String): List<String> =
+    requireList(key).ifEmpty { error("정책 키 '$key' 의 값이 비어 있다 — 이 축은 빈 목록으로 꺼지지 않는다") }
+
 internal fun Map<String, String>.requireValue(key: String): String = this[key] ?: error("정책 키 '$key' 가 없다")
