@@ -1,5 +1,6 @@
 plugins {
     id("bidvector.kotlin-conventions")
+    id("bidvector.mutation-conventions")
 }
 
 // bidding 은 domain 층이라 shared-kernel 하나만 참조할 수 있다(ADR 0006 D-4,
