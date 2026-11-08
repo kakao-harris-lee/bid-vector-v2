@@ -1,0 +1,438 @@
+# M9 / award-ingest — 실행 명령과 종료 코드
+
+base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 worktree
+`bid-vector-v2-m9-award-ingest` 에서, Gradle 은 호스트 빌드 자리 래퍼(`bv-build.sh`)를 지난다.
+
+## 표적 실행
+
+## 2026-11-05T09:01Z
+- cmd: `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' :adapters:test --tests '…koneps.KonepsAwardListSourceTest' --tests '…KonepsOpeningResultSourceTest' --tests '…KonepsOpeningCompleteSourceTest' --tests '…KonepsBidPriceFormulaASourceTest' :app:test --tests '…AwardCollectionWiringTest' --tests '…OneShotRunnerGuardTest' --tests '…AwardCollectionE2ETest' --tests '…architecture.CollectionArchitectureGateTest' --tests '…architecture.CollectionDepthGateTest' --tests '…architecture.CollectionArchitectureGateCatchesViolationsTest' --tests '…architecture.TransportSurfaceGateTest'`
+- exit: 1
+- 핵심 결과: adapters 29 통과(기존 개찰 소스 test 포함 — 걷기 공유가 기존 거동을 바꾸지 않았다) ·
+  app 93 중 5 실패(전송 표면 등재 미달 넷 · 상한 둘이 어긋난 E2E 설정 하나) · workflow test 는 컴파일
+  실패(`PageCursor` 토큰 타입)
+
+## 2026-11-05T09:03Z
+- cmd: `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' :app:test --tests '…AwardCollectionE2ETest' --tests '…TransportSurfaceGateTest' --tests '…TransportSurfaceGateCatchesViolationsTest' --tests '…CollectionDepthGateTest'`
+- exit: 0
+- 핵심 결과: use case 4 · E2E 3(스윕·승격·상한 정지 전부) · 전송 표면 게이트 19+8 · 깊이 게이트 3, 실패 0
+
+## 변이
+
+## 2026-11-05T09:07Z (무효 — 측정이 아니었다)
+- cmd: `./gradlew … --rerun :adapters:test --tests … :app:test --tests …`(전역 자리의 `--rerun`)
+- exit: 1
+- 핵심 결과: **아무 test 도 돌지 않았다** — Gradle 이 `--rerun` 을 전역 옵션으로 거부했고, 리포트의
+  `failures=0` 은 앞 실행의 낡은 XML 이었다. 변이 측정은 종료 코드만으로 판독할 수 없다(task 옵션
+  자리로 옮겨 다시 쟀다 — 아래 두 줄).
+
+## 2026-11-05T09:09Z — 변이 ① 적재 endpoint 토큰을 개찰결과 목록으로 바꿔치기
+- cmd: `./gradlew --no-daemon --continue :adapters:test --tests '…KonepsAwardListSourceTest' --rerun :app:test --tests '…AwardCollectionE2ETest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — adapters 2/2 실패(관측 endpoint · 계약 등재 키 둘 다: `presentIn` 대조가 낙찰 축
+  키를 전부 떨어뜨린다) · E2E 3 중 2 실패(적재 행 6 → 0 · 승격된 낙찰 칸 미달)
+
+## 2026-11-05T09:10Z — 변이 ② 개인정보 경로(계약 미등재 키 제외) 우회
+- cmd: 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — adapters 1 실패(미등재 식별자가 관측에 담긴다) · E2E 1 실패(적재된 원문 전수에
+  미등재 식별자가 나타난다). 양성 대조(상호는 담긴다)는 두 판 모두 통과라 부재 단언이 빈 관측을 보고
+  초록이 된 것이 아니다.
+
+## 2026-11-05T09:11Z — 변이 원복
+- cmd: `git status --porcelain -- <변이 파일 둘>`
+- exit: 0
+- 핵심 결과: 빈 출력(변이는 cp 백업으로 되돌렸고 그 두 파일만 만졌다)
+
+## rollback
+
+원천은 이 브랜치가 병합한 main 의 **고정 SHA `3101035f`** 이고(움직이는 `origin/main` 이 아니다),
+라운드마다 목록을 다시 산출한다. 아래가 현재 판이며 앞 원천(`bd2f450e`·`56bd33ea`·`3ad4f3f6`·
+`97ed49c4`·`df4976cc`·`79f3e5c4`) 기준의 판들은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
+
+## 2026-11-08T05:2xZ — 임시 clone 에서 22 경로를 `3101035f` 로 되돌림(①②③, 여섯째 병합 뒤)
+- cmd: `git clone <worktree>` → `git merge-base --is-ancestor` 둘 → `git restore --source=3101035f --staged --worktree -- <22 경로>`
+- exit: 0
+- 핵심 결과: 전제 둘 참(ⓐ 조상 exit 0 · ⓑ 첫 산출물 커밋 `a6e51b70` 미포함 exit 1) · 상태 계수 `D` 12 ·
+  `M` 10(= 기계 산출 22 경로, 앞 목록과 `comm` **양방향 빈 출력**) · `git diff 3101035f -- <22 경로>`
+  **0 줄** · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 되돌리지 않은
+  evidence 다섯 그대로
+- **표지를 어휘에서 항목으로 바꿨다.** 바른 `Award` grep 은 복원 뒤에도 gate-tests 7 · architecture-policy 1
+  을 낸다 — 전부 **상류 것**이다(settlement 의 `AwardMatching*`·`AwardOutcome*` test 와
+  `bidvector.workflow.result.AwardWinnerNamePort`). 그래서 등록부 둘은 continuation 을 접어 **항목 집합**
+  으로 쟀다: 내가 더한 gate-tests **5** · architecture-policy **23** 이 복원 뒤 **전부 0** 이고, 상류 항목은
+  **전수 보존**(`src ⊆ restored` 참, 사라진 항목 0). 문서 표지도 축어로 0 — `M9/award-ingest` ·
+  `EXPECTED_EXEMPT_COUNT = 94` · `OPENING_AWARD_LIST` · `bidvector.award-collection`.
+- 남의 표지 보존(축어 계수): `M9/STR12` 8 · `EXPECTED_EXEMPT_COUNT = 87` 1 · `OPEN-STR-12-INTERACTIVE` 7 ·
+  `OPEN-ADR07-KOTLIN-JUNK` 3 · `OPEN-ADR07-MUTATION-BUDGET` 3 · incident runbook §3.3 머리 1 ·
+  capability map §12.3 머리 1 — 즉 #127·#136 이 넣은 줄이 되돌림 뒤에도 그대로다.
+
+## 2026-11-08T05:4xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+- cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 0 과 0
+- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 이 빌드 뒤에도 유지) 이 slice 가
+  닿은 게이트까지 초록이다. 세 모듈 test 는 **실행**(workflow 10 클래스 101 · adapters 13/100 ·
+  app 33/306, 실패·오류 0), 나머지 일곱 모듈은 FROM-CACHE — 되돌린 입력이 그 main 트리의 통과 실행과
+  바이트 동일이라는 뜻이고, 이 확인이 노리는 트리 동일성과 같은 말이다.
+
+## 병합과 그 뒤
+
+## 2026-11-05T10:1xZ — PR CI run 42008427198(판정 전 첫 실행)
+- cmd: CI Kotlin check job 의 `./gradlew --no-daemon check`
+- exit: 실패 — `:app:ktlintTestSourceSetCheck` 한 건(`function-expression-body`), 나머지 job 셋(container ·
+  ml-engine · web)은 pass
+- 핵심 결과: 위반 좌표는 CI 의 `reports` 산출물에서 읽었다(로컬 전건을 다시 돌리지 않았다). 그 뒤
+  Kotlin 을 만지는 실행에는 모듈 `ktlint`·`detekt` 를 항상 함께 걸었다.
+
+## 2026-11-05T15:2xZ — `git merge origin/main`(df4976cc) 과 겹침 보존 계수
+- cmd: `git merge origin/main` 후 등록부 둘의 양쪽 표지 계수
+- exit: 0 (충돌 0)
+- 핵심 결과: 겹치는 경로는 둘(`config/quality/gate-tests.properties` · `docs/discovery/capability-map.md`).
+  gate-tests 는 내 넷과 main 의 둘이 모두 1 · capability map 은 내 표지 2 와 main 표지 셋이 모두 1 이상 ·
+  충돌 표지 0. `OneShotRunnerGuard` 는 main 이 건드리지 않았고 이 slice 도 고치지 않는다(guard 가 러너를
+  등재 없이 센다는 것은 배선 test 가 잰다).
+
+## 2026-11-05T15:30Z — 병합 트리 표적 실행(모듈 lint 포함)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintCheck :workflow:detekt :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt :workflow:test --tests 'bidvector.workflow.collection.*' --rerun :adapters:test --tests 'bidvector.adapters.koneps.*' --rerun :app:test --tests '…AwardCollectionE2ETest' --tests '…AwardCollectionWiringTest' --tests '…OneShotRunnerGuardTest' --tests '…OpeningPromotionRunnerTest' --tests 'bidvector.app.architecture.*' --rerun`
+- exit: 1 → 등재 뒤 0
+- 핵심 결과: 203 중 3 실패는 **app 층 허용 목록 미등재**(`AppHttpDependencyGateTest`) 하나의 축이었다 —
+  새 러너·배선·설정 타입을 형제 레인과 같은 자리(tier1 조립 · tier3 수집 러너)에 등재해 해소. 그 밖에는
+  전부 초록: E2E 3 · 배선 10 · guard 5 · 승격 러너 3 · use case 4 · 어댑터 2 · **koneps 어댑터 의존 게이트 1**.
+- 판단이 갈린 지점: 첫 판은 수집 포트를 `workflow` 에 새로 선언했고 그 게이트가 거부했다(「domain 이
+  의존하는 port 는 domain 안에 선다」). 도메인에 이미 **메서드 하나짜리** `NoticeSourcePort` 가 있어 그것을
+  재사용했다 — `procurement/**` 변경은 여전히 0 이고, 포트를 새로 지을 자리가 domain 뿐이라는 규약과
+  「상세 축을 꽂을 수 없다」는 성질을 동시에 만족한다(대가는 알려진 제한 6).
+
+## 수정 라운드 (cr H-1 · M-1·M-2 · L-1~L-5·L-7)
+
+## 2026-11-06T00:48Z — H-1 회귀가 **구판에서 RED** 인가(둘째 병합 트리)
+- cmd: 종료 코드 술어만 옛 문면(`halted` 만 본다)으로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :app:test --tests '…AwardExitCodeTest' --tests '…AwardCollectionE2ETest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 8 중 2 실패이고 그 둘이 절단 단언이다(`AwardExitCodeTest` 「잘린 슬롯이 있으면
+  멈추지 않았어도 미완이다」 · E2E 「슬롯이 잘리면 멈추지 않고도 미완으로 끝낸다」). 나머지 여섯(쪽
+  걷기 포함)은 구판에서도 초록 — 절단 축만 잡는다는 음성 대조다. 원복은 그 파일 하나만(porcelain
+  빈 출력).
+
+## 2026-11-06T00:50Z — 둘째 병합 트리 표적 실행(모듈 lint · 닿은 게이트 포함)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintCheck :workflow:detekt :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt :workflow:test --tests 'bidvector.workflow.collection.*' --rerun :adapters:test --tests 'bidvector.adapters.koneps.*' --rerun :app:test --tests 'bidvector.app.collection.*' --tests 'bidvector.app.wiring.*' --tests 'bidvector.app.architecture.*' --rerun gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — test class 73(workflow 105 · adapters 102 · app 386, 실패 0이고 XML 전수가 이
+  실행 것이다) · 세 test task 전부 실행(UP-TO-DATE·FROM-CACHE 아님) · `gateRegistrationGate`·`sizeGate`
+  11 모듈 · `leakPatternGate` · `memberEffectGate` 실행
+- **앞 라운드의 이 자리는 측정이 아니었다** — 호스트 재부팅(2026-11-06 09:00 KST) 전에 빌드 자리를
+  못 잡은 실행의 결과 줄이 미리 적혀 있었다. 위 줄이 그 자리를 실측으로 바꿔치웠다.
+
+## 2026-11-06T01:01Z — workflow ktlint 는 위 실행에서 UP-TO-DATE 였다(강제 실행으로 갈음)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:ktlintKotlinScriptCheck --rerun`
+- exit: 0
+- 핵심 결과: 세 task 모두 **실행**되고 위반 0. 앞 실행에서 이 셋만 UP-TO-DATE 였고 리포트 mtime 이
+  H-1 의 workflow 편집보다 앞서 「그 판정이 현재 소스를 본 것인가」가 열려 있었다 — 강제 실행이 그
+  구멍을 닫는다(CI 전건 `check` 는 깨끗한 checkout 이라 애초에 이 틈이 없다).
+
+## 2026-11-06T00:12Z — `git merge 3ad4f3f6`(둘째 병합) 과 겹침 보존 계수
+- cmd: `git merge 3ad4f3f6` 뒤 등록부 둘의 양쪽 표지 계수 · 중복 행 훑기
+- exit: 0 (충돌 0)
+- 핵심 결과: main 의 다섯 PR(#131 cve · #133 ledger · #130 portal-02 · #132 web-followups ·
+  #135 opening-harness)이 들어왔고 겹치는 경로는 **둘**(`config/quality/gate-tests.properties` ·
+  `docs/discovery/capability-map.md`). gate-tests 는 내 test 클래스 다섯과 main 의 셋이 모두 1 ·
+  capability map 은 main 이 더한 줄이 전부 1 이고 `OPEN-` 행 중복 0 · 충돌 표지 0. capability map §12.3
+  (ledger 레인)이 「PR #128 은 새 식별자를 만들지 않고 `OPEN-SET01-AWARD-NAME-INGEST` 를 수령한다」로
+  적었으므로 이 slice 가 등재를 더할 자리는 없다.
+
+## 수정 라운드 2 (cr r2 H-1·H-2 · M-1·M-2 · L 다섯 · v r2 M-1·M-2·L-1·L-2)
+
+## 2026-11-06T01:44Z — H-2 회귀가 **구판 술어에서 RED** 인가(통제군 포함)
+- cmd: 「다 받았는가」를 구판(`accounting.truncationCause == null`)으로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun :app:test --tests '…AwardExitCodeTest' --tests '…AwardCollectionE2ETest' --rerun`
+- exit: 1
+- 핵심 결과: **RED 둘** — use case 6 중 1(「총수를 말한 원천에서 덜 받고 끝난 슬롯은 사유가 없어도
+  미완이다」) · app 9 중 1(E2E 「총수에 못 미치고 곱게 멈춘 슬롯도 미완으로 끝낸다」). **통제군 13 은
+  전부 초록** — 절단 E2E · 종료 코드 test 셋 · 「낙찰이 없는 날의 빈 응답은 끝낸 것이다」가 구판에서도
+  통과해, 새 단언이 **짧은 걷기 축만** 잡고 빈 응답을 미완으로 돌리는 과잉이 아님을 함께 보인다.
+  원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T01:50Z — 수정 라운드 2 표적 실행(모듈 lint · 닿은 게이트 포함)
+- cmd: 라운드 1 과 같은 표적 집합(세 모듈 `ktlintCheck`·`detekt` + 표적 test `--rerun` + `gateRegistrationGate leakPatternGate sizeGate memberEffectGate`)
+- exit: 0
+- 핵심 결과: FAILED 0 — test class 73(workflow 107 · adapters 102 · app 387, 실패 0이고 XML 전수가 이
+  실행 것이다) · 세 test task 전부 실행 · 게이트 22 task 실행
+- **측정 주의**: `:workflow:ktlint*` 가 이 실행에서 UP-TO-DATE 로 건너뛰었다 — 이 라운드가 그 모듈의
+  main·test 소스를 고쳤는데도다(리포트 mtime 이 그 편집보다 앞선다). 그래서 그 모듈의 로컬 ktlint 초록은
+  근거로 쓰지 않고 아래 줄의 강제 실행으로 갈음한다. 깨끗한 checkout 에서 도는 CI 전건 `check` 에는 이
+  틈이 없다(라운드 1 에서도 같은 자리였다).
+
+## 2026-11-06T01:56Z — workflow lint 강제 실행(위 UP-TO-DATE 갈음)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:ktlintKotlinScriptCheck --rerun :workflow:detekt --rerun`
+- exit: 0
+- 핵심 결과: 네 task 모두 **실행**되고 위반 0
+
+## 수정 라운드 3 (cr r3 H-1 · M-1·M-2·M-3 · L 넷 · v r3 M-1·L-1·L-2)
+
+이 라운드는 **새 파일을 만들지 않았다** — 복원 목록은 22 경로 그대로다(라운드 2 가 들인 공유 incident
+runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」으로 적은 셈은 어긋났다(목록에 선 것은
+둘이고 셋째는 §1 「쪽 걷기(wire)」 행의 문면으로 갔다 — cr r3 L-2). 이력은 되쓰지 않고 여기 한 줄로
+정정한다. workflow lint 는 이 라운드에서도 **강제 실행**으로 돌렸다(위 측정 주의와 같은 자리).
+
+## 2026-11-06T03:37Z — 변이 A: 총수 최댓값을 구판(마지막 배치 총수)으로 되돌림
+- cmd: `tally.toSourceAccounting().copy(sourceTotal = claimedTotal)` → `tally.toSourceAccounting()` 로 **바꿔치운** 뒤 `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 8 중 1 실패이고 그 하나가 「쪽 상한 재개 뒤 총수를 말하지 않는 배치가 와도 앞
+  배치의 총수를 잃지 않는다」다. 나머지 7(짧은 걷기·빈 응답·예산·쿼터·커서·회계 축)은 구판에서도 초록 —
+  이 단언이 **총수 덮어쓰기 축만** 잡는다.
+
+## 2026-11-06T03:38Z — 변이 B: 적재 결측 계수를 구판(싣지 않음)으로 되돌림
+- cmd: 보고 생성의 `duplicates, dropped` → `0, 0` 으로 바꿔치운 뒤 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 8 중 1 실패이고 그 하나가 「받았지만 적재되지 않은 항목은 계수로 서고 미완으로
+  세지 않는다」다. 나머지 7 초록(계수를 0 으로 눌러도 종료 코드 축은 움직이지 않는다 — 그 분리가
+  팀장 결정의 실물이다). 원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T03:4xZ — 수정 라운드 3 표적 실행 ①(workflow lint 강제 · 닿은 게이트 포함)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:detekt --rerun :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt` + 세 모듈 표적 test `--rerun` + `gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 1
+- 핵심 결과: FAILED task **하나** — `:workflow:ktlintTestSourceSetCheck`(`standard:chain-method-continuation`
+  둘, 새 회계 단언의 한 줄 사슬). test·게이트는 전부 초록(게이트 22 task). **강제 실행이 실제로 숨어
+  있던 위반을 잡았다** — 그 모듈의 UP-TO-DATE 가 거짓 초록이라는 두 라운드의 기록이 값을 냈다.
+  구조 분해로 사슬을 끊어 고쳤다(별도 `style` 커밋, 거동 변화 0).
+
+## 2026-11-06T03:54Z — 표적 실행 ②(lint 수정이 닿는 workflow task 강제 재실행)
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlintMainSourceSetCheck --rerun :workflow:ktlintTestSourceSetCheck --rerun :workflow:detekt --rerun :workflow:test --tests 'bidvector.workflow.collection.*' --rerun`
+- exit: 0
+- 핵심 결과: 네 task 모두 **실행**되고 위반 0 · use case test class 8/0
+
+## 2026-11-06T04:0xZ — 표적 실행 ③(판정 트리에서 adapters·app lint·test 와 게이트 넷)
+- cmd: `./gradlew --no-daemon --continue :adapters:ktlintCheck :adapters:detekt :app:ktlintCheck :app:detekt :adapters:test --tests 'bidvector.adapters.koneps.*' --rerun :app:test --tests 'bidvector.app.collection.*' --tests 'bidvector.app.wiring.*' --tests 'bidvector.app.architecture.*' --rerun gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — `:adapters:test`·`:app:test` 실행(102 · 388, 실패 0) · 게이트 22 task 실행 ·
+  adapters·app lint 은 UP-TO-DATE(실행 ① 에서 **같은 소스로 실행돼** 초록이었고 `style` 커밋이 그 두
+  모듈을 만지지 않았다)
+- 왜 한 번 더 돌렸는가: 실행 ① 은 `style` 커밋 **앞** 트리의 측정이다. 그 커밋이 workflow test 소스
+  2 줄을 바꿨으므로 「입력이 같으니 앞 결과가 덮는다」로 갈음하지 않고 판정 트리에서 다시 쟀다. 크기 축의
+  여유는 함께 실측했다(그 파일 380 줄 / 한도 500 · 가장 긴 함수 43 줄 / 한도 50 · 타입 멤버 축은 `main`
+  전용이라 test 파일을 재지 않는다).
+
+## 교차 지적 (ops-code 레인 — `haltOf` 소진 `when`)
+
+거동 변화가 **오늘은 0** 인 변경이라(이 브랜치에 `AccessBlocked` 가 없다) 값으로 잴 RED 가 없다.
+그래서 **게이트가 무는지**를 직접 쟀다 — 버릴 clone 에 13번째 `TruncationCause` 를 심는다.
+
+## 2026-11-06T04:3xZ — 프로브 1판(무효 — 내 자리를 재지 못했다)
+- cmd: clone 에 사유만 심고 `./gradlew --no-daemon :workflow:compileKotlin`
+- exit: 1
+- 핵심 결과: 컴파일이 멈춘 자리가 **procurement 의 소진 `when` 둘**(`truncationCodeOf`·`failureOf`)이었다
+  — 그 모듈이 먼저 컴파일되므로 workflow 는 시작도 못 했다. 저장소 전체가 같은 형태로 닫혀 있다는
+  증거이지만 **이 slice 의 자리를 잰 것이 아니다**. 프로브를 고쳐 다시 쟀다(아래).
+
+## 2026-11-06T04:5xZ — 프로브 2판: 사유 + procurement 의 소진 `when` 둘을 채움
+- cmd: 같은 clone 에서 사유를 심고 `truncationCodeOf`·`failureOf` 에 분기를 더한 뒤 `:procurement:compileKotlin` → `:workflow:compileKotlin`
+- exit: 0 과 **1**
+- 핵심 결과: **게이트가 내 자리에서 물었다** — procurement 는 컴파일되고(0) workflow 가 멈추며 지목한
+  자리가 `CollectAwardListUseCase.kt` 의 `haltOf` 다(「'when' expression must be exhaustive. Add the
+  'AccessBlockedProbe' branch or an 'else' branch.」). **음성 대조**: 사유를 심지 않은 같은 clone 의
+  `:workflow:compileKotlin` 은 0 이다.
+- 함께 드러난 사실(교차 보고): 같은 프로브가 **형제 공고 목록 갈래의 `CollectNoticesUseCase` 도** 지목한다
+  — ops-code 의 새 사유는 이 갈래와 그 갈래 **둘**에서 결정을 강제한다(그 자리는 내 범위 밖이다).
+
+## 2026-11-06T05:0xZ — 판정 트리 표적 전부(라운드 3 마지막)
+- cmd: 라운드 3 과 같은 표적 집합(workflow lint 강제 · 세 모듈 표적 test `--rerun` · 게이트 넷)
+- exit: 0
+- 핵심 결과: FAILED 0 — workflow lint·detekt **강제 실행** 초록 · 세 test task 전부 실행 · 게이트 22 task
+- 이 라운드에 ktlint 가 **두 번** 붉었다: 회계 단언의 한 줄 사슬(`chain-method-continuation`)과 소진
+  `when` 의 분기 간 빈 줄(`blank-line-between-when-conditions`). 둘 다 **강제 실행이 잡았고** 각자
+  `style` 커밋으로 고쳤다 — 그 모듈의 UP-TO-DATE 가 거짓 초록이라는 기록이 두 라운드 연속 값을 냈다.
+
+## 교차 지적 라운드 2 — 멈춤 집합 등식 · 셋째 병합 (판정 SHA 6aa8dc46)
+
+팀장 지적 ①(「`haltOf` 가 아직 `else` 로 끝난다」)은 **그 시점 기준으로는 이미 반영돼 있었다** —
+`a1f4b80c`(보고한 판정 SHA) 다음의 `4d4d1712`·`c0388ba8` 가 그것이다. 이 라운드가 더한 것은 그
+지적의 **나머지 절반**, 즉 사유마다 선택을 잠그는 등식 test 와 그 변이다.
+
+## 2026-11-06T05:1xZ — `git merge 97ed49c4`(셋째 병합)과 합집합 계수
+- cmd: `git merge 97ed49c4` 뒤 등록부 항목·주석 양쪽 계수
+- exit: 0 (충돌 0)
+- 핵심 결과: #134(gates-tests)가 들어왔고 겹치는 경로는 `config/quality/gate-tests.properties` **하나**다.
+  그 파일에서 main 이 더한 것은 **주석 여덟 줄**이고 등재 항목은 0 — 합집합 계수가 **512 + 5 = 517**,
+  중복 항목 0, 내 다섯이 각 1, main 의 주석 여덟 줄이 각 1, 앞 병합의 main 셋도 각 1, 충돌 표지 0.
+
+## 2026-11-06T05:2xZ — 변이 A: `TransportFailure` 를 멈춤 쪽으로 **옮김**
+- cmd: 계속 걷기 목록에서 빼고 멈춤 분기로 옮긴 뒤(바꿔치우기 — 더하기만 하면 소진 `when` 이 컴파일을 거부한다) `./gradlew --no-daemon --continue :workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED** — 9 중 2 실패(등식 test 와 「쿼터 거절도 멈추지만 전송 실패는 다음 슬롯으로 간다」).
+  등식이 한 사유의 이동을 잡는다.
+
+## 2026-11-06T05:2xZ — 변이 B: `QuotaExhausted` 를 계속 걷기 쪽으로 **옮김**
+- cmd: 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 9 중 2 실패(같은 둘). 반대 방향의 이동도 잡힌다 — 등식이 한쪽으로만 기울지
+  않았다는 증거다. 원복은 그 파일 하나만(porcelain 빈 출력).
+
+## 2026-11-06T05:3xZ — 병합 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 라운드 3 과 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 — workflow·adapters lint·detekt **실행** 초록(app 은 UP-TO-DATE — 그 모듈 소스가
+  이 라운드에 바뀌지 않았다) · 세 test task 전부 실행, 실패 0 · 게이트 22 task
+
+## 수정 라운드 4 (cr r4 H-1·M-1·M-2 · L 셋 · v r4 M-1·L-1·L-2)
+
+## 2026-11-06T08:3xZ — runbook §3.1 SELECT 를 **축어로** 돌린다(팀장 지시 · 트리 `3b0951bf`)
+- cmd: 버릴 clone 의 probe test 가 `docs/runbook/m9-award-collection.md` 의 첫 `sql` 펜스를 **그대로 읽어**
+  날짜 자리만 넓혀 실행한다(mock 수집 한 판 — 한 행의 공고번호를 비워 드롭을 만든다)
+- exit: 0
+- 핵심 결과: **행 2(슬롯 둘)** — 각 행이 `received 3 · normalized 2 · duplicate 0 · dropped 1 ·
+  source_total 3 · pages_fetched 2 · truncation_cause null · drop_reasons {"CollectionMissingNoticeNumber": 1}`.
+  슬롯 등식 `received = normalized + duplicate + dropped` 가 두 행 다 성립하고(3 = 2+0+1), `dropped > 0`
+  이라 판독 3 이 서고 `received = source_total` 이라 판독 2 는 서지 않는다 — 문서가 적은 그대로다.
+  열 열 개가 전부 실재한다(질의가 행을 낸다). SQL 을 문서에서 읽으므로 문면이 바뀌면 이 probe 가 따라간다.
+
+## 2026-11-06T08:2xZ — cr M-2 처방만으로는 **한 방향이 열린다**(측정 · 트리 `3b0951bf`)
+- cmd: clone 에 13번째 사유를 심고 **기대 집합을 손대지 않은 채** 그 사유를 *계속 걷기* 쪽에 넣은 뒤 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: **0 (초록 — 변이가 잡히지 않았다)**
+- 핵심 결과: 모수를 `permittedSubclasses` 로 도출해도 **「멈춤 집합의 등식」은 그 판을 놓친다** — 새 사유가
+  멈춤 집합에 들어오지 않으므로 집합이 그대로다. 그런데 그 방향이 `else` 를 지운 이유(403 이 조용히 계속
+  걷는다) 바로 그 방향이다. 그래서 기대값을 **사유 → 멈추는가 전수 표**로 바꿨다(키가 하나 늘어 어느 쪽에
+  넣어도 붉다). cr 처방을 그대로 넣고 재 보지 않았으면 이 구멍은 초록으로 남았다.
+
+## 2026-11-06T09:1xZ — 표로 바꾼 뒤 같은 변이(계속 걷기 쪽 · 트리 `cbd1eccc`)
+- cmd: 같은 변이, 같은 명령
+- exit: 1
+- 핵심 결과: **RED** — 9 중 1 실패이고 메시지가 그 자리를 그대로 가리킨다
+  (`Values differed at keys AccessBlockedProbe`). 집합이던 앞 판이 놓친 방향이 표에서는 잡힌다.
+
+## 2026-11-06T08:1xZ — 표적 전부(트리 `3b0951bf` — 표 수정 **앞**)
+- cmd: 라운드 3 과 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task
+
+## 2026-11-06T09:0xZ — 표적 재실행(트리 `cbd1eccc` = 그 라운드의 판정 SHA)
+- cmd: 같은 표적 집합(workflow lint 강제 · 게이트 넷)
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · HEAD `cbd1eccc`(판정 SHA)
+
+## 넷째 병합 (main 56bd33ea · 판정 SHA ab9b41ef)
+
+## 2026-11-07T06:3xZ — `git merge 56bd33ea` 와 겹침 셋의 **합집합 계수 예측**
+- cmd: 병합 전 base(`97ed49c4`)·main·내쪽 계수를 각각 세어 합집합을 **예측**하고, 병합 뒤 실측과 맞춤. 키 단위 합집합 등식·키 안 중복·정렬 유지도 함께 계산
+- exit: 0 (충돌 0)
+- 핵심 결과: 예측 = 실측 셋 다 — architecture-policy 750+2+19=**771** · gate-tests 512+3+5=**520** ·
+  capability map OPEN 행 213+1=**214**. 키 안 중복 0 · 키 수 139/16 동일 · 내쪽이 정렬이던 키가 병합 뒤
+  깨진 것 0 · gate-tests 는 키마다 「병합 = 내쪽 ∪ main」 등식 성립 · capability map 은 id 별 등장 수를
+  늘린 것 0·사라진 것 0(main 이 `OPEN-7C3B-PAPER-BID-NOTIFICATION` 을 취소선으로 닫은 것 보존).
+- 한 자리의 「어긋남」은 **의도된 삭제**다: architecture-policy 의 `collection.usecase.type` 을 이 slice 가
+  `types` 로 rename 했고 main 은 그 줄을 건드리지 않았다(base 그대로) — 잃은 main 편집 0.
+
+## 2026-11-07T06:4xZ — 병합 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 라운드 4 와 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈의 lint·detekt·test 가 **전부 실행**(병합이 입력을 바꿨다) ·
+  **낙찰 E2E 6/0** — V25(`notification_inbox_bid_kind`)가 더해진 뒤에도 Flyway 가 깨끗이 지나고 낙찰 축
+  거동이 그대로다(그 마이그레이션은 낙찰 축 표를 건드리지 않는다).
+
+## 마지막 라운드 (v r5 H-1·H-2·L 둘 · cr r5 H 둘·M 둘·L 둘 — 판정 SHA 1caaa25e)
+
+## 2026-11-07T13:0xZ — 통제군(변이 없음)
+- cmd: 같은 명령, 변이 없이
+- exit: 0
+- 핵심 결과: 9/0 — 위 둘의 RED 가 변이에서 왔다.
+
+## 2026-11-07T13:0xZ — 판정 트리 표적 전부(workflow lint 강제 · 게이트 넷)
+- cmd: 앞 라운드와 같은 표적 집합
+- exit: 0
+- 핵심 결과: FAILED 0 · 게이트 22 task · 세 모듈 lint·detekt·test 전부 실행
+
+## 2026-11-07T13:1xZ — 변이: **값을 나르는** 13번째 사유를 계속 걷기 쪽에(검증자 스크립트 그대로)
+- cmd: `v-award-r5-mut.sh class` 로 `data class AccessBlockedProbe(val status: Int)` 를 심고 기대 표는 손대지 않은 채 `:workflow:test --tests '…CollectAwardListUseCaseTest' --rerun`
+- exit: 1
+- 핵심 결과: **RED 9/9** — 폴백 한정 뒤에는 모수 초기화가 `NoSuchFieldException: INSTANCE` 로 죽어
+  클래스 전체가 선다(`…TestKt.<clinit>`). **고치기 전 이 판은 초록이었다**(검증자 실측) — 폴백이 그
+  사유를 `BudgetExhausted` 로 바꿔치우고 `associateWith` 가 중복 키를 접었기 때문이다. cr 처방 ⓐ 의
+  「소리 내며 죽는다」가 그대로 나왔다.
+
+## 2026-11-07T13:1xZ — 같은 변이의 `data object` 판(통제)
+- cmd: `v-award-r5-mut.sh object`, 같은 명령
+- exit: 1
+- 핵심 결과: **RED 1/9** — 표 test 하나만 붉다(`Values differed at keys`). 두 판이 **다른 기제로** 붉은
+  것이 맞다: `object` 는 모수에 들어와 표가 잡고, `class` 는 모수가 서지 못해 초기화가 죽는다.
+
+## 2026-11-07T13:2xZ — probe 재실행(새 §3.1 문면을 읽는다)
+- cmd: 검증자 probe(`VAwardRunbookProbeTest`)를 **출력 경로만 바꿔** 그대로. SQL 은 runbook 의 펜스를 축어로 읽는다
+- exit: 0
+- 핵심 결과: 다섯 판 모두 **슬롯 등식 성립**(`EQ true` 10 행). 새 판독 3(= `dup>0 || drp>0`)이 문면대로
+  선다 — `BLANK`(drp 1) ✓ · `DUP_SHIFT`(dup 1) ✓ · **`DUP_EXTRA`(rec 4 > tot 3 · dup 1) ✓**(구판 전제
+  `rec = tot` 에서는 서지 않던 바로 그 행이다) · `null`·`SHRINK` 는 서지 않는다 ✓. 신호 표도 맞는다 —
+  `SHRINK`(dup 0 · pages 2 ≤ 50) → 원인 ① · `DUP_EXTRA`(dup 1) → 원인 ②.
+- probe 의 `R3` 칸은 **구판 규칙**(`rec = tot` 전제 포함)이라 `DUP_EXTRA` 에서 false 다 — 측정 로직을
+  건드리지 않으려고 그대로 뒀고, 새 규칙은 같은 줄의 `(dup>0||drp>0)` 칸이다.
+
+## 승인 전 문면 일괄 (다섯째 병합 bd2f450e · 판정 SHA e4e856f6)
+
+## 2026-11-07T14:0xZ — `git merge bd2f450e`(다섯째 병합) 와 **겹침 0** 계수
+- cmd: `git merge bd2f450e` 뒤 두 목록의 `comm -12` 와 22 경로 각각의 main Δ 줄 수 합
+- exit: 0 (충돌 0)
+- 핵심 결과: #142(CVE)가 들어왔고 main 이 바꾼 **8 경로** 중 내 복원 목록 22 와 겹치는 것이 **0** —
+  `comm -12` 빈 출력이고 22 경로의 main Δ 줄 수 합도 **0**. 병합 커밋의 `--cc` 에 이 slice 파일 0
+  (자동 병합이 해소한 자리가 없다). main 쪽은 이미지 Dockerfile 둘과 그 chore evidence 다섯이다.
+
+## 2026-11-07T14:1xZ — 닿은 모듈 둘의 lint·test 와 `leakPatternGate` 재실행
+- cmd: `./gradlew --no-daemon --continue :workflow:ktlint{Test,Main}SourceSetCheck --rerun :workflow:detekt --rerun :app:ktlint{Test,Main}SourceSetCheck --rerun :app:detekt --rerun :workflow:test --tests 'bidvector.workflow.collection.*' --rerun :app:test --tests 'bidvector.app.collection.*' --rerun leakPatternGate --rerun sizeGate gateRegistrationGate memberEffectGate`
+- exit: 0
+- 핵심 결과: FAILED 0 — 이 배치가 고친 것은 **KDoc 둘과 문서뿐**이라 두 모듈만 표적으로 잡았고, 여덟
+  lint·detekt·test task 가 전부 **실행**됐다(실패 0) · `leakPatternGate` 도 `--rerun` 으로 실행 ·
+  크기·등재·멤버 게이트 동반 초록. 거동 변화 0(코드 문장 변경 0).
+
+## 여섯째 병합 (main `3101035f` · 판정 SHA `1a3b792a`)
+
+## 2026-11-08T04:5xZ — `git merge origin/main`(여섯째)과 겹침 다섯의 **합집합 실측**
+- cmd: `git merge --no-commit --no-ff origin/main` 뒤, 겹치는 다섯 경로 각각에서 base/ours/theirs/merged
+  의 **집합**을 기계 비교(properties 는 continuation 을 접어 키·항목으로, 문서·test 는 줄 집합으로)
+- exit: 1(충돌 둘) → 손 해소 뒤 0
+- 핵심 결과: #127(STR12)·#136(adr07-pitest)이 들어왔고 겹치는 경로는 **다섯**. 충돌 둘은 손으로,
+  자동 병합 셋은 계수로 확인해 **어느 쪽 항목도 잃지 않았다**.
+  ① `architecture-policy.properties` — 키 중복 **0**, 세 tier 합집합 **40 + 11 + 43 = 94**(중복 0),
+  ours 신설 7 · theirs 신설 6 이 전부 있고 base 에서 사라진 항목 0.
+  ② `gate-tests.properties` — 키 16 그대로, 네 키에서 ours+5 · theirs+15 가 전부 보존(키별 merged ==
+  base∪ours∪theirs 가 전건 참).
+  ③ `m6-6e-operations.md` — 양쪽 추가 줄 전건 존재 · 삭제 줄 전건 부재 · **어느 쪽에도 없는 줄 0**
+  (내 편집은 §3.1·§3.3, main 은 §4.6·§5.x 로 구간이 겹치지 않는다).
+  ④ `capability-map.md` §12 G3(충돌) — 결과 **3 행** = main 의 `OPEN-STR-12` 갱신 + main 신설
+  `OPEN-STR-12-INTERACTIVE` + 내 `OPEN-SET01-AWARD-NAME-INGEST` 갱신. 충돌 블록의 양쪽 2·3 행 중
+  각자가 **고친 쪽**을 골랐다(나머지 둘은 base 와 md5 동일임을 확인).
+  ⑤ `AppHttpDependencyGateTest.kt`(충돌) — 아래 줄.
+- 한쪽만 바꾼 파일은 그 쪽과 **blob 동일**이다(ours-only 22 · theirs-only 71, 불일치 0).
+  병합 커밋의 `--cc` 에서 **어느 부모에도 없는 줄은 10** 이고 전부 ⑤ 파일이다(재계산 문단 7 ·
+  KDoc 공백 ` *` 2 · 상수 1).
+
+## 2026-11-08T04:5xZ — 면제 래칫은 **숫자를 옮기지 않고 다시 셌다**
+- cmd: 병합된 세 tier 목록(`tier1-bootstrap-classes`·`tier2-request-scoped-classes`·
+  `tier3-collection-classes`)의 항목 이름 합집합 기계 계수
+- exit: 0
+- 핵심 결과: 양쪽이 **다른 수**를 들고 와 충돌했다(main 81 → **87**, 이 레인 81 → **88**). 어느 쪽을
+  골라도 여섯 또는 일곱이 조용히 사라진다. 재계산은 **40 + 11 + 43 = 94**(중복 0)이고 `87 + 7`·`88 + 6`
+  과 같다 — 계산이 아니라 검산이다. 양쪽 KDoc 문단은 **둘 다 남겼다**. 게이트가 그 수를 관측과
+  대조한다(`exempt.toSet().size shouldBe EXPECTED_EXEMPT_COUNT`) — 아래 전건 `check` 에서 초록.
+
+## 2026-11-08T04:5xZ — `procurement/**` 변경 0 은 **원천과 함께 옮겨 잰다**
+- cmd: `git diff --stat 79f3e5c4..HEAD -- procurement` 와 `git diff 3101035f..HEAD -- procurement` 와
+  `git log --no-merges HEAD ^3101035f -- procurement`
+- exit: 0 셋
+- 핵심 결과: 옛 base 기준은 이제 **1 줄**이고 그 줄은 #136 이 넣은 `id("bidvector.mutation-conventions")`
+  다. slice 몫을 재는 뒤 둘은 **빈 출력** — 이 slice 의 `procurement` 변경은 여전히 0 이다. acceptance
+  술어의 좌변을 병합 원천으로 옮기지 않으면 남의 줄을 내 위반으로 읽는다.
+
+## acceptance — 전건 `check`
+
+## 2026-11-08T05:5xZ — 판정 SHA `1a3b792a` 에서 CI Kotlin check job 명령 그대로
+- cmd: `./gradlew --no-daemon check` (`bv-build.sh` 자리 경유)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL 40m 17s · `FAILED`/`FAILURE` 줄 **0** · task 486(UP-TO-DATE 41 ·
+  FROM-CACHE 19, 나머지는 실행) · 열 모듈 test **507 클래스 4,070 건, 실패 0 · 오류 0** ·
+  루트 게이트 전부 실행(`contractGate` · `leakPatternGate` · `memberEffectGate` · `scriptSizeGate` ·
+  `conventionCoverageGate` · build-logic 게이트 다섯) · 모듈마다 `gateExecutionGate`·`gateRegistrationGate`·
+  `sizeGate`·ktlint·detekt · `:app:compatibilitySmoke`. 면제 래칫 test 도 이 실행 것이다
+  (`AppHttpDependencyGateTest` 21 건 실패 0).
+
+호스트 빌드 큐 포화(대기 12)로 팀장이 2026-11-05 에 전건 acceptance 를 **PR CI 로** 옮겼던 항목은 이
+실행이 로컬에서도 갈음한다(큐가 비어 자리를 잡았다). 같은 명령이 CI 의 Kotlin check job 에서 돈다.
+
+첫 CI 실행(run 42008427198)은 ktlint 한 건으로 붉었고, 그 뒤 **병합 + 포트 교체 + 게이트 등재**를
+담은 push 가 다음 실행을 만든다. **전건의 정본은 PR #128 의 체크 목록**이다 — evidence 를 고치는
+커밋마다 CI 가 다시 도는 되돌이를 만들지 않으려고 run id 를 여기 더 적지 않는다(판정 SHA 와 그
+SHA 의 체크 결과를 팀장 보고와 PR 조치 코멘트가 든다).
