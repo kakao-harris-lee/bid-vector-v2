@@ -5,6 +5,8 @@
 - 수정 라운드 1(팀장 지시 2026-11-06, verifier `not-ready` B-1·H-1·H-2 + code-reviewer `request_changes` HIGH 1·MEDIUM 6): 처방은 아래 「수정 라운드 1 의 처방」 절. **in_scope 에 `app/build.gradle.kts` 한 경로를 더한다**(cr M-4 — 닫힌 사각을 「열린 채」로 적는 주석 한 문단, 팀장 승인). 그 파일의 거동(`jar` 켜 둠)은 바꾸지 않는다.
 - 수정 라운드 4(팀장 지시 2026-11-08, **사용자가 상한 너머 한 라운드만 승인** — 다음 재검증이 not-ready 면 머지 없이 사용자 보고; verifier `not-ready` H-1 + code-reviewer `request_changes` HIGH 1·MEDIUM 4·LOW 5): 중첩 축을 경로·다중도·뿌리 밖으로 닫고, 문면을 술어 크기로 좁히며, main `3101035f` 를 병합한다. **in_scope 는 바뀌지 않는다** — 이 라운드가 만든 새 파일은 `build-logic/src/test/kotlin/bidvector/buildlogic/NestedArchivePolicyTest.kt` **하나**이고 `build-logic/**` 안이다(대조 완료). 라운드가 더한 정책 키 둘(`jar.boot-launcher-main-class` · `bytecode.env-access.allowed-callers`)도 `config/quality/**` 안이다. 뒤의 키는 **운영자 확인 대상**으로 `checklist.md` 제한 21·OPEN 에 등재했다.
 
+- 수정 라운드 5(팀장 지시 2026-11-08, **사용자가 상한 너머 한 라운드만 승인** — 이 재검증이 not-ready 면 머지 없이 사용자 보고; verifier r5 `not-ready` H-1 + code-reviewer r4 `approve` + MEDIUM 5·LOW 6): 중첩 축이 기대던 로더가 **배포 경로의 로더가 아니었다** — 출하 이미지는 `extract --layers` 로 풀려 뜬다. 그 도구가 읽는 manifest 속성 여섯과 classpath index 등식을 게이트로 세우고, 뿌리 밖 판독을 EOCD 로 바꾼다. main `70406318` 을 병합한다. **in_scope 는 바뀌지 않는다** — 이 라운드가 만든 새 파일은 넷(`BootArchivePolicy.kt` · `NestedArchiveReader.kt` · `BootArchivePolicyTest.kt` · `ArchiveFixtures.kt`)이고 전부 `build-logic/**` 안이다(`git diff --name-status 70406318..HEAD` 의 A 행 대조 — 이 slice 가 만든 A 행 24 가운데 이 라운드가 넷). 라운드가 더한 정책 키 넷(`jar.boot-start-class` · `jar.boot-classpath-index` · `jar.boot-layers-index` · `jar.boot-archive-module`)도 `config/quality/**` 안이다.
+
 ## 대상 (M6 종결 open-inventory §2 「하네스 레인」 열둘 중 build-logic 축 + 소스 축)
 | OPEN | 처방(구조로) |
 | --- | --- |
