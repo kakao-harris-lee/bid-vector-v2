@@ -668,3 +668,194 @@ cd <저장소>
   센다). 러너는 남의 것을 지우지 않으므로 사람이 치운다: `docker ps -a --filter name=<프로젝트>-app-run` →
   `docker rm -f <이름>`. 정상 종료면 `--rm` 이 이미 지웠다.
 - 로그인 실패·연속 실패 잠금은 응답에서 구분되지 않는다(401 하나).
+
+---
+
+## 13. 알림 실발송 (Telegram) 활성화 — 절차만, 실행은 운영자 확인 항목
+
+M9/STR12 가 발송 채널을 들였다. **이 문서를 쓴 slice 는 아래를 실행하지 않았다** — 실 토큰 투입과 timer
+설치는 「시간 기반 알림 타이머를 켠다」(§9)와 같은 등급의 운영자 확인 항목이다. 켜는 순간부터 **운영자의
+휴대폰으로 메시지가 나간다.**
+
+판정 구조(환경 → 모드 → claim → 종료 코드, 기동 거부의 뜻)의 정본은
+`docs/runbook/m6-6e-operations.md` §5 다. 여기에는 **어떻게 켜는가**만 적는다.
+
+### 13.1 봇 만들기 (Telegram 쪽, 한 번)
+
+1. Telegram 앱에서 `@BotFather` 와 대화해 봇을 만든다 — 받는 값이 **봇 자격**(BotFather 는 이것을
+   「token」이라 부른다)이다. **그 값을 채팅·저장소·로그·전달 메시지에 남기지 않는다.**
+2. 알림을 받을 대화(1:1 또는 그룹)에서 그 봇에게 아무 메시지나 한 번 보낸다 — 봇은 **먼저 말을 걸 수
+   없다**(Bot API 규칙). 이 한 번이 없으면 첫 발송이 `403` 으로 거부된다.
+3. 그 대화의 **chat id** 를 얻는다. 가장 좁은 방법은 `getUpdates` 한 번이다. 그 호출은 자격을
+   **URL 경로에 싣는다** — `curl https://…/bot$CRED/…` 는 셸이 확장해 **argv 에 올리므로** 같은 host
+   의 다른 프로세스가 `ps`·`/proc/<pid>/cmdline` 으로 읽는다. 자격 취급의 정본은
+   `m6-6e-operations.md` §5.4 ② 이고 그 조건은 「명령 문자열·**argv**·history·transcript 어디에도
+   값이 나타나지 않는다」다. 서비스 키는 질의 문자열이라 프로세스 환경에 넘기면 코드가 URL 을
+   조립하지만, 이 절차는 사람이 `curl` 을 직접 돈다 — **환경 변수로 넘기는 것만으로는 argv 축이
+   닫히지 않는다.** URL 자체를 표준 입력으로 넘긴다.
+
+   아래는 `python3` 이 host 에 있다고 전제한다(§13 의 다른 명령은 `curl`·`systemctl` 뿐이다). 없으면
+   본문을 눈으로 읽되 **그 본문이 자격을 담지 않는다는 점**은 같다(자격은 URL 에만 있다).
+
+   ```bash
+   # 자격을 **읽기** — 화면·history 에 남지 않는다.
+   read -rs -p 'bot credential: ' CRED; echo
+   # URL 을 `--config -` 의 `url =` 줄로 파이프에 넣는다 — argv 에는 자격이 없다.
+   printf 'url = "https://api.telegram.org/bot%s/getUpdates"\n' "$CRED" \
+     | curl --config - -sS \
+     | python3 -c 'import json,sys
+   d = json.load(sys.stdin)
+   if not d.get("ok"):
+       sys.exit("getUpdates 실패: " + str(d.get("description")))
+   print([u["message"]["chat"]["id"] for u in d["result"] if "message" in u])'
+   unset CRED
+   ```
+
+   **`ok` 를 먼저 읽는 것이 요점이다.** `result` 만 꺼내면 「자격이 틀렸다」(`ok:false`, `result` 없음)와
+   「② 를 아직 하지 않았다」(`ok:true`, 빈 `result`)가 **둘 다 `[]`** 로 나와 구별되지 않는다 — 그 둘이
+   이 절차의 첫 시도에서 가장 있을 법한 실패다. 401 의 본문도 정상 JSON 이라 `curl -sS` 는 성공으로
+   끝난다(§13.6 의 두 행이 그 갈래를 가른다).
+
+   확인: 이 명령이 도는 동안 다른 창에서 `ps -ef | grep curl` 을 보면 자격이 **보이지 않는다**(URL
+   전체가 argv 가 아니라 표준 입력으로 간다). `printf` 는 셸 내장이라 별 프로세스를 만들지 않는다.
+
+   **응답 본문은 chat id 를 담는다**(`result[].message.chat.id`) — 위 마지막 줄은 그 값만 뽑아 화면에
+   낸다. 그 값도 §13.2 의 env 파일에만 넣고 **채팅·저장소·로그·PR·전달 메시지에 붙이지 않는다**:
+   자격만큼 위험하지는 않아도 그것이 있으면 남이 이 봇의 수신 대화를 지목할 수 있다.
+
+### 13.2 env 두 값 + 링크 도메인
+
+세 값이 **전부 있어야** `Live` 모드 환경의 러너가 뜬다(없으면 기동 실패, 메시지가 빈 칸 이름을 말한다).
+
+```ini
+# relay 러너 unit 의 env 파일 — root 소유 0600, **저장소 밖**
+# 예: /etc/bidvector-v2/relay.env
+BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=   # §13.1 ①
+BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=          # §13.1 ③
+BIDVECTOR_NOTIFICATION_SITE_BASE_URL=             # 예: https://<운영 도메인> — 끝에 `/` 없이
+```
+
+**`docker/prod.env.template` 에는 넣지 않는다.** 그 파일의 키 집합은 `tools/prod-env-keys-check.sh` 가
+compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay 는 compose 서비스가 아니라 일회
+러너다 — 템플릿에 넣으면 compose 가 요구하지 않는 죽은 키가 되어 그 검사가 붉어진다.
+
+바꿀 수 있는 나머지 넷은 기본이 있다(건드릴 이유가 거의 없다):
+`…_TELEGRAM_BASE_URL`(기본 `https://api.telegram.org`) · `…_TELEGRAM_ROUTE_KEY`(기본
+`telegram-primary`) · `…_TELEGRAM_CONNECT_TIMEOUT`(기본 `5s`) · `…_TELEGRAM_RESPONSE_TIMEOUT`(기본 `10s`).
+
+### 13.3 일회 러너 — relay 와 평가 커밋
+
+둘 다 `mode=once` 일회 러너다(상주 스케줄러가 없다 — `OPEN-6F10-SCHEDULER`). **순서가 있다**: 평가
+커밋이 `outbox` 에 행을 남기고, relay 가 그 행을 집어 보낸다. 같은 주기에 둘을 거는 쪽이 자연스럽다.
+
+```ini
+# /etc/systemd/system/bidvector-notification-relay.service
+[Unit]
+Description=bidvector 알림 relay (일회 러너)
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=<저장소>
+EnvironmentFile=/etc/bidvector-v2/relay.env
+# 호출 모양은 반입된 스택의 일회 컨테이너다 — §9.1 의 훑기 러너와 같은 전제(같은 compose 파일 셋 ·
+# 같은 프로젝트 이름 · release 태그는 <state>/current 에서 읽는다 · `--pull never`).
+#   bidvector.relay.mode=once · bidvector.relay.environment=production
+#   bidvector.relay.owner=<운영자 id> · bidvector.relay.channel=telegram · bidvector.relay.claim-limit=50
+#     (첫 run 은 이 상한이 아니라 §13.4 ② 를 따른다 — `claim-limit=1`)
+#   SPRING_MAIN_WEB_APPLICATION_TYPE=none
+# **env 파일이 둘이다.** `--env-file` 은 **스택 설정**(§1 ③ 의 `prod.env` — compose 가 요구하는 키
+# 집합이고 `prod-env-keys-check.sh` 가 등식으로 잰다)이고, `EnvironmentFile` 은 **알림 채널 설정**
+# (§13.2 의 `relay.env` — compose 가 모르는 키라 템플릿에 넣지 않는다)이다. 둘을 한 파일로 합치면
+# 그 등식 검사가 relay 키를 죽은 키로 보고 붉어진다.
+ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+# 상한을 반드시 둔다(§9.1 과 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다.
+TimeoutStartSec=15m
+TimeoutStopSec=1m
+```
+
+```ini
+# /etc/systemd/system/bidvector-notification-relay.timer
+[Unit]
+Description=bidvector 알림 relay — 하루 두 번
+
+[Timer]
+OnCalendar=*-*-* 07:40 Asia/Seoul
+OnCalendar=*-*-* 13:40 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+**`tools/prod-notification-relay.sh` 는 아직 없다** — §9.1 의 훑기 스크립트와 같은 모양으로 만드는 것이
+활성화 slice 의 몫이다(이 slice 는 코드와 절차까지만 낸다). 그때까지 손으로 돌리려면 §9.1 의 스크립트를
+읽고 같은 전제(잠금 · manifest 대조 · `--pull never`)를 지켜야 한다 — 그 전제를 건너뛰면 반입이 막는
+것을 러너만 통과시키는 길이 생긴다.
+
+**그 스크립트가 반드시 해야 하는 것이 하나 더 있다**: `relay.env` 의 세 값을 **일회 컨테이너까지**
+넘겨야 한다(둘째 `--env-file /etc/bidvector-v2/relay.env`, 또는 세 키를 `-e` 로). 위 unit 의
+`EnvironmentFile` 은 그 값을 **스크립트 프로세스**의 환경에 올릴 뿐이고, §9.1 선례의 일회 컨테이너는
+`--env-file` 로 받은 파일만 컨테이너에 전달한다 — 이 한 줄이 빠지면 세 값이 JVM 에 닿지 않고
+`production` 러너가 §13.2 를 채웠는데도 `RefusedMissingChannelConfig` 로 기동 실패한다.
+
+**금지되는 JVM 옵션 — 전제이고 선택이 아니다.** 이 러너의 JVM 에 JDK HttpClient 의 내부 로그 속성
+(`jdk.httpclient.HttpClient.log` · `jdk.internal.httpclient.debug`)을 **지정하지 않는다**. 켜면 요청
+URL 이 stderr 로 나가고, 그 URL 은 **경로에 봇 자격을 싣는다** — 발송 어댑터가 로거를 쥐지 않는다는
+보증은 그 축을 덮지 못한다(JDK 자신의 로그다). `JAVA_TOOL_OPTIONS` 로도 켜지므로 그 환경 변수까지
+본다. 러너는 그 둘이 지정된 채로는 **기동하지 않는다**(`RefusedHttpClientLogging` — 아래 §13.6) —
+문면이 아니라 기동 판정이 그 전제를 진다.
+
+**「켜지 않는다」가 아니라 「지정하지 않는다」다.** 판정은 속성의 **존재**만 본다 — `=false` 나 빈 값
+(`-Djdk.internal.httpclient.debug=false`·`-Djdk.httpclient.HttpClient.log=`)처럼 JDK 가 실제로는
+아무것도 찍지 않는 값도 **거부된다.** 값마다 JDK 의 해석을 이 자리에서 흉내 내지 않는 쪽이
+fail-closed 라 그렇게 두었다. 그 옵션을 디버깅에 쓰려면 **비-Live 환경에서** 쓴다(거기서는 거부하지
+않는다 — 보낼 자격도 찍힐 URL 도 없다).
+
+### 13.4 첫 발송 확인
+
+1. **먼저 억제 환경에서 한 번** — `bidvector.relay.environment=staging` 으로 돌린다. 정책표가 그 환경에
+   `DryRun` 을 붙이므로 claim 0 이고 종료 코드는 `4` `ENV_SUPPRESSED` 다. 여기서 확인하는 것은
+   「러너가 뜨고 DB·잠금에 닿는다」뿐이다(발송은 0).
+2. **다음에 `production` 으로 한 번 — 단, `bidvector.relay.claim-limit=1` 로 시작한다.** 첫 실발송은
+   **한 건만** 보낸다: 설정이 틀렸을 때(chat id 오타·봇 차단) 거부가 전 행을 태우는 것을 한 건으로
+   막는다. 종료 코드 `0` 과 마침 줄의 `delivered=1` 을 본 뒤에 상한을 평소 값(§13.3 의 `50`)으로
+   올린다. 메시지가 실제로 도착했는지는 **Telegram 앱에서** 확인한다(장부는 발송을 선언하지만 읽음을
+   알지 못한다).
+3. 어긋나면 §13.6.
+
+### 13.5 끄는 법
+
+```bash
+sudo systemctl disable --now bidvector-notification-relay.timer
+systemctl list-timers bidvector-notification-relay.timer   # 비어 있어야 한다
+```
+
+타이머만 끄면 **행은 `outbox` 에 `PENDING` 으로 쌓인다**(잃지 않는다) — 다시 켜면 그때 나간다. 보존
+러너는 `DELIVERED` 행만 파기하므로 미발송 행은 그 대상이 아니다(보존 기간은 **정책값**이고 2026-11-05
+부터 **1년**이다 — 정본은 `m6-6b3-retention.md`. 여기에 숫자를 박으면 정책이 바뀌는 날 이 문서가
+거짓이 된다). 더 센 차단이 필요하면 env 의 세 값을 비운다 — 그러면 `production` 러너가 **기동
+실패**한다(claim 0, 행 보존).
+
+### 13.6 어긋날 때
+
+| 증상 | 뜻 | 처방 |
+|---|---|---|
+| 기동 실패, `RefusedMissingChannelConfig(missing=…)` — 빈 칸 이름을 말한다 | env 세 값 중 결손 | §13.2 를 채운다. **채웠는데도 나면** 그 값이 스크립트 프로세스에만 있고 **컨테이너까지 가지 않은 것**이다 — §13.3 의 둘째 `--env-file` 요구를 본다 |
+| 기동 실패, 「봇 자격이 Bot API 모양이 아니다」 | 자격에 공백·줄바꿈이 섞였거나 `<봇 id>:<비밀 조각>` 모양이 아니다(복사 사고) | §13.1 ① 에서 받은 값을 그대로 다시 넣는다. 메시지는 **칸 이름만** 말하고 원문도 길이도 말하지 않는다 |
+| 기동 실패, 「Telegram base URL 이 URI 로 해독되지 않는다」 | `…_TELEGRAM_BASE_URL` 을 덮어썼고 그 주소가 `java.net.URI` 가 받지 않는 모양이다(`\| \ " { } ^` · 16진 두 자리가 없는 `%` · 숫자 아닌 포트 · 65535 초과 포트) | 그 값을 지워 기본값(`https://api.telegram.org`)으로 되돌린다. **이 거부가 행을 지킨다** — 그대로 떴으면 첫 발송이 모호로 기록되고 집은 행이 전부 `ISOLATED` 로 탔다 |
+| 기동 실패, `RefusedChannelWithoutActiveRoute(channel=Email)` | `bidvector.relay.channel` 이 활성 경로가 없는 채널이다(Email 은 `enabled=false`) | `channel=telegram` 으로 고친다. 이 거부가 **행을 지킨다** — 그대로 떴으면 집은 행이 전부 `FAILED` 로 탔다 |
+| 기동 실패, `RefusedHttpClientLogging(enabled=…)` | JVM 에 JDK HttpClient 내부 로그 속성이 **지정돼** 있다(`JAVA_TOOL_OPTIONS` 로도 들어온다) | 그 속성을 **지운다**(값을 `false`·빈 값으로 두는 것으로는 풀리지 않는다 — 판정은 존재만 본다, §13.3). 지정해 두면 **요청 URL 이 stderr 로 나가고 그 URL 에 자격이 들어 있다**(§13.1 ①). 운영에서 이 속성은 금지다 |
+| 종료 코드 `4` | 그 환경이 발송 가능 모드가 아니다 | `environment=production` 인지 본다(§5 사상표) |
+| 마침 줄 `failed>0` | Telegram 이 **확정 거부**했다 — chat id 가 틀렸거나(400) 봇이 차단됐거나(403) 자격이 무효(401) | §13.1 ②③ 를 다시 본다. 본문 길이는 사유가 **아니다**(발송 어댑터가 4096자 상한에서 자르고 표지를 남긴다). 그 행은 되살아나지 않는다 — 설정을 고치면 **다음** 판정이 새 행을 낳는다 |
+| 메시지 끝에 「이하 생략」 | 본문이 Bot API 의 4096자 상한을 넘어 잘렸다 | 정상 거동이다(알림을 잃지 않는다). 뒷부분은 알림함·공고 상세에서 본다 |
+| 마침 줄 `isolated>0` | 받았는지 **모른다**(timeout · 5xx · 429 · 응답 해독 불가) — 재시도하지 않는다 | Telegram 앱에서 중복·누락을 눈으로 본다. 모호를 재발송하지 않는 것이 at-most-once 설계다 |
+| 메시지에 「저장된 공고 정보가 없습니다」 | 그 공고 행이 보존 기한에 파기됐거나 아직 수집되지 않았다 | 정상 거동이다. 알림 자체를 버리지 않고 **사실을 주장하지 않는** 본문을 보낸다 |
+| §13.1 ③ 이 `getUpdates 실패: …` 를 낸다 | Bot API 가 `ok:false` 를 냈다 — 대개 자격이 무효(401)다 | §13.1 ① 의 값을 다시 넣는다 |
+| §13.1 ③ 이 **빈 목록 `[]`** 을 낸다 | 호출은 성공했는데(`ok:true`) 받은 메시지가 없다 | §13.1 ② 를 아직 하지 않은 것이다 — 그 대화에서 봇에게 한 번 말을 걸고 다시 돈다 |
+
+**로그에 자격·chat id 원문이 남지 않는다 — 단, 전제가 하나 있다.** 발송 어댑터는 로거를 쥐지 않고
+(바이트코드 게이트가 잰다) 결과 타입에 provider 문자열을 담을 칸이 없다. **그러나 JDK HttpClient 자신의
+내부 로그 속성을 켜면 요청 URL 이 stderr 로 나가고 그 URL 은 경로에 자격을 싣는다** — 그 축은 패키지
+로거 게이트 **밖**이다. 그래서 **운영에서 그 두 속성은 금지**이고(§13.3), 켜진 채로는 러너가 **기동하지
+않는다**(`RefusedHttpClientLogging`). 그 전제 위에서 「무엇이 거부됐는지」는 계수와 이 표로 읽는다.

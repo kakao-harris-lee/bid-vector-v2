@@ -51,6 +51,12 @@ class DetailCode(StrEnum):
     RUNNER_CRASHED = "RUNNER_CRASHED"
     ARTIFACT_WRITE_REJECTED = "ARTIFACT_WRITE_REJECTED"
     REPORT_CANONICALIZATION_REJECTED = "REPORT_CANONICALIZATION_REJECTED"
+    POLICY_SOURCE_MISMATCH = "POLICY_SOURCE_MISMATCH"
+    """M9/ml-lifecycle 수정 라운드(v H-1) — 평가 정책 객체의 값이 **자기가 왔다는 파일의
+    값과 다르다**(또는 그 파일이 로드 시점과 다르다). 조립 근이 게이트를 돌리기 전에
+    대조하고, 어긋나면 조용히 파일 값으로 갈아끼우지 않고 job 을 실패시킨다 —
+    그 판정은 어느 승인된 정책의 것도 아니다. 파이프라인 실행 자체의 실패 축이다
+    (`HoldoutRejectionReason` 계승이 아니다 — 게이트 안에서 난 일이 아니다)."""
     # M6/6B-4 신설 — 대기 큐 상한 폐기와 재기동 고아 처분(Q-1). 셋 다 job 이 **실행
     # 되지 못한** 사유다(파이프라인 안의 실패가 아니다).
     PENDING_QUEUE_OVERFLOW = "PENDING_QUEUE_OVERFLOW"

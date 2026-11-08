@@ -20,6 +20,10 @@ from ml_engine.adapters.artifact_files import (
 )
 from ml_engine.adapters.dataset_files import DatasetUnreadable, read_dataset_files
 from ml_engine.evaluation import EvaluationPolicy, EvaluationReportV1, WeekMaturity
+from ml_engine.evaluation.policy_source import (
+    PolicySourceMismatch,
+    verify_policy_source,
+)
 from ml_engine.evaluation.report import canonical_report_bytes, report_checksum
 from ml_engine.features import CanonicalizationRejected
 from ml_engine.inference.maturity import (
@@ -28,6 +32,7 @@ from ml_engine.inference.maturity import (
     SettlementObservation,
     build_weekly_maturity,
 )
+from ml_engine.inference.time_axis import TimeAxisPolicy, resolve_time_axis
 from ml_engine.training.artifact_writer import ArtifactBytes, write_artifact
 from ml_engine.training.booster import TrainerLike
 from ml_engine.training.dataset import DatasetReference, DatasetRejected, LoadedDataset
@@ -67,6 +72,9 @@ def _week_maturity(window: MaturityWindow) -> WeekMaturity:
     else:
         opened_count = 0
         settled_count = 0
+    # M9/ml-lifecycle 알려진 제한 — 평가 층 타입(`WeekMaturity`)은 시간축 provenance 를
+    # 담지 않는다(import 계약상 evaluation 은 inference 어휘를 알 수 없다). SET-06 의
+    # 리포트는 `MaturityTable` 자신이고, 평가 report 로의 전달은 앱 배선 축과 함께 미룬다.
     return WeekMaturity(
         start=window.start,
         end=window.end,
@@ -81,6 +89,7 @@ class _PipelineDeps:
     training_policy: TrainingPolicy
     evaluation_policy: EvaluationPolicy
     maturity_window_days: int
+    time_axis_policy: TimeAxisPolicy
     trainer: TrainerLike
     code_version: CodeVersion
     artifact_out_dir: Path
@@ -152,28 +161,62 @@ class _ConcreteTrainingPipeline:
             return PipelineFailed(code, detail)
         return trained
 
+    def _maturities(self, dataset: LoadedDataset) -> tuple[WeekMaturity, ...]:
+        """정산 행을 K7 성숙도 표로 — 시간축은 versioned 정책으로 해석한다.
+
+        `settlements.jsonl` 의 `opened_at` 은 필수라 이 경로의 측정 불가 행은 구조적으로
+        0 이다(M9/ml-lifecycle 알려진 제한) — 커널의 측정 불가 갈래는 커널 test 가 잰다."""
+        axis_policy = self._deps.time_axis_policy
+        observations = tuple(
+            SettlementObservation(
+                time_axis=resolve_time_axis(
+                    opened_at=row.opened_at, bid_close_at=None, policy=axis_policy
+                ),
+                settled=row.settled,
+            )
+            for row in dataset.settlement_rows
+        )
+        table = build_weekly_maturity(
+            observations,
+            window_days=self._deps.maturity_window_days,
+            policy=axis_policy,
+        )
+        return tuple(_week_maturity(window) for window in table.windows)
+
     def _run_holdout(
         self, dataset: LoadedDataset, cancel_token: CancelToken
     ) -> EvaluationReportV1 | PipelineFailed | PipelineCancelled:
         """D-5E3-4 — 같은 `cancel_token`의 `is_cancelled`를 `should_stop`
         으로 넘긴다(D-5E3-3). `HoldoutCancelled`(창 루프 도중 취소)는
         `PipelineFailed`로 위장하지 않고 `PipelineCancelled`로만 옮긴다(우회
-        (4))."""
-        observations = tuple(
-            SettlementObservation(opened_at=row.opened_at, settled=row.settled)
-            for row in dataset.settlement_rows
-        )
-        windows = build_weekly_maturity(
-            observations, window_days=self._deps.maturity_window_days
-        )
-        maturities = tuple(_week_maturity(window) for window in windows)
+        (4)).
+
+        **정책 출처 재검증이 여기 있다**(M9/ml-lifecycle 수정 라운드 v H-1 · r3 H-3a ·
+        r4 H-4). 축이 **셋**이다 — **승인**(이 자리에 도착한 값의 출처가 승인 등록부에 있는
+        산출물인가, r3 H-3a) · **파일 바이트** · **값**. 그리고 게이트에 넘기는 것은
+        `self._deps.evaluation_policy` 가 **아니라 재검증의 반환값**이다: 로더가 승인
+        바이트에서 **다시 만든** 정책이다(r4 H-4 — 직렬화는 승인값이고 거동은 완화값인
+        객체가 세 축을 전부 지나갔다). 검사와 사용이 갈리면 처방이 비어 있으므로 둘을
+        한 값으로 묶는다. 그리고 **돌려주는 그것**이 승인 산출물인지 한 번 더 묻는다 —
+        **안전 성질은 그 검사가 진다**(r5 H-5): 앞 세 축의 비교는 한쪽 피연산자가 호출자
+        객체여서 거동으로 이길 수 있었고, 마지막 검사의 피연산자 둘은 로더 산출이다.
+
+        어긋나면 `DetailCode.POLICY_SOURCE_MISMATCH` 로 job 을 실패시킨다. 제품 경로는 이것
+        하나이고 `run_holdout` 자신은 라이브러리 진입점으로 남긴다 — 사유와 세 축의 역할
+        분담은 `evaluation.policy_source` 모듈 docstring 에 있다."""
+        approved_policy = verify_policy_source(self._deps.evaluation_policy)
+        if isinstance(approved_policy, PolicySourceMismatch):
+            return PipelineFailed(
+                JobFailureCode.EVALUATION_ERROR, DetailCode.POLICY_SOURCE_MISMATCH
+            )
+        maturities = self._maturities(dataset)
 
         report = run_holdout(
             dataset,
             maturities,
             self._deps.spec,
             self._deps.training_policy,
-            self._deps.evaluation_policy,
+            approved_policy,
             self._deps.trainer,
             self._deps.code_version,
             should_stop=cancel_token.is_cancelled,
@@ -249,6 +292,7 @@ def build_training_pipeline(
     training_policy: TrainingPolicy,
     evaluation_policy: EvaluationPolicy,
     maturity_window_days: int,
+    time_axis_policy: TimeAxisPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
     artifact_out_dir: Path,
@@ -261,6 +305,7 @@ def build_training_pipeline(
         training_policy=training_policy,
         evaluation_policy=evaluation_policy,
         maturity_window_days=maturity_window_days,
+        time_axis_policy=time_axis_policy,
         trainer=trainer,
         code_version=code_version,
         artifact_out_dir=artifact_out_dir,
@@ -273,6 +318,7 @@ def pipeline_factory(
     training_policy: TrainingPolicy,
     evaluation_policy: EvaluationPolicy,
     maturity_window_days: int,
+    time_axis_policy: TimeAxisPolicy,
     trainer: TrainerLike,
     code_version: CodeVersion,
     artifact_out_dir: Path,
@@ -286,6 +332,7 @@ def pipeline_factory(
             training_policy=training_policy,
             evaluation_policy=evaluation_policy,
             maturity_window_days=maturity_window_days,
+            time_axis_policy=time_axis_policy,
             trainer=trainer,
             code_version=code_version,
             artifact_out_dir=artifact_out_dir,

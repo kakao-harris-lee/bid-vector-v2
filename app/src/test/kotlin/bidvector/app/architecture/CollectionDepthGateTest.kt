@@ -75,7 +75,7 @@ class CollectionDepthGateTest {
             DepthAxis.TRANSPORT -> transportPairs(depth)
             DepthAxis.REFLECTION -> reflectionPairs(depth)
             DepthAxis.COLLECTION_PROCUREMENT -> procurementTypes(depth)
-            DepthAxis.USECASE -> referencers(listOf(policy.packageRoot), setOf(policy.collectionUseCaseType), depth)
+            DepthAxis.USECASE -> referencers(listOf(policy.packageRoot), policy.collectionUseCaseTypes.toSet(), depth)
             DepthAxis.KEY_HASH -> referencers(policy.keyHashRoots, setOf(policy.keyHashType), depth)
             DepthAxis.RAW_ACCESS -> referencers(policy.rawAccessRoots, policy.rawAccessTypes.toSet(), depth)
             DepthAxis.RUNNER -> referencers(listOf(appRoot()), policy.runnerTypes.toSet(), depth)

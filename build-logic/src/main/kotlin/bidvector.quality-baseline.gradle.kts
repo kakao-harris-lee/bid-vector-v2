@@ -4,6 +4,7 @@ import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.GateRegistrationGateTask
 import bidvector.buildlogic.LeakPatternGateTask
 import bidvector.buildlogic.MemberEffectGateTask
+import bidvector.buildlogic.MutationCoverageGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.TestShapeGateTask
@@ -221,6 +222,25 @@ val conventionCoverageGate =
         registeredModules = baseline.map { task -> task.modules.map { it.moduleName.get() }.toSet() }
         report = layout.buildDirectory.file("reports/convention-coverage/modules.txt")
     }
+
+// ADR 0007 `OPEN-ADR-07` — mutation 레인은 **`check` 밖**에 선다(D-1). 루트가 그 진입점
+// (`mutationCheck`)과 대상 집합 등식(`mutationCoverageGate`)을 든다. 모듈별 래칫 task 와
+// 등록 집합은 `bidvector.mutation-conventions` 가 여기에 붙인다 — `qualityBaseline` 과 같은 관례
+// (루트가 subproject 의 configuration 을 먼저 읽으려 하면 평가 순서에 걸린다).
+val mutationCoverageGate =
+    tasks.register<MutationCoverageGateTask>("mutationCoverageGate") {
+        group = "verification"
+        description = "mutation 대상 모듈 집합과 실제 적용 집합의 양방향 등식 — 적용의 부재는 조용하다"
+        policyFile = layout.settingsDirectory.file("config/quality/mutation-policy.properties")
+        architecturePolicyFile = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
+        report = layout.buildDirectory.file("reports/mutation-gate/modules.txt")
+    }
+
+tasks.register("mutationCheck") {
+    group = "verification"
+    description = "mutation 래칫 전건 — check 가 아니라 CI 의 별도 job 이 부른다(ADR 0007 OPEN-ADR-07 D-1)"
+    dependsOn(mutationCoverageGate)
+}
 
 tasks.register("check") {
     group = "verification"

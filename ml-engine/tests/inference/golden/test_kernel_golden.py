@@ -63,6 +63,7 @@ from ml_engine.inference.reserve_draw import (
 from ml_engine.inference.results import Unmeasurable, UnmeasurableReason
 from ml_engine.inference.rounding import quantize_bid_rate
 from ml_engine.inference.scenario import build_scenario_candidates
+from ml_engine.inference.time_axis import TimeAxisPolicy, resolve_time_axis
 from ml_engine.registry.artifact import (
     ArtifactRejected,
     _VerifiedBytes,
@@ -473,15 +474,26 @@ def test_ml_kernel_012_zero_opened_is_no_observation_not_a_zero_ratio() -> None:
     나타나지 않는다 — 개찰은 있고 정산이 `0`인 주(0/2)와 값·표 등재 여부가 갈린다."""
     case = _CASES["ml-kernel-012"]
     inp, exp = case["input"], case["expected"]
+    # M9/ml-lifecycle — 관측은 이제 `TimeAxis` 를 든다. golden 입력의 `openedAt` 은
+    # 개찰 시각이므로 정본 축(`OPENED_AT`)으로 해석되고, 기대값은 그대로다(이 케이스는
+    # 시간축 provenance 를 단언하지 않는다 — 접힘 제거만 잰다).
+    axis_policy = TimeAxisPolicy(version="golden", substitute_approved=False)
     observations = [
         SettlementObservation(
-            opened_at=parse_instant(o["openedAt"]), settled=o["settled"]
+            time_axis=resolve_time_axis(
+                opened_at=parse_instant(o["openedAt"]),
+                bid_close_at=None,
+                policy=axis_policy,
+            ),
+            settled=o["settled"],
         )
         for o in inp["observations"]
     ]
     window_days = inp["policy"]["maturity"]["windowDays"]
-    windows = build_weekly_maturity(observations, window_days=window_days)
-    windows_by_start = {window.start: window for window in windows}
+    table = build_weekly_maturity(
+        observations, window_days=window_days, policy=axis_policy
+    )
+    windows_by_start = {window.start: window for window in table.windows}
 
     for exp_window in exp["windows"]:
         requested_start = parse_instant(exp_window["weekStartKst"])
