@@ -1,6 +1,6 @@
 # M9 / award-ingest — rollback
 
-실측 HEAD: `e4e856f6`
+실측 HEAD: `1a3b792a`
 
 ## 끄는 법(되돌리지 않고)
 
@@ -10,21 +10,24 @@
 
 ## 되돌리는 법(코드·문서)
 
-원천은 **이 브랜치에 병합한 main 커밋 `bd2f450e`** 다(움직이는 `origin/main` 이 아니다). 목록은 손으로
-쓰지 않고 `git log --no-merges --format= --name-only HEAD ^bd2f450e | sort -u` 에서 내며
+원천은 **이 브랜치에 병합한 main 커밋 `3101035f`** 다(움직이는 `origin/main` 이 아니다). 목록은 손으로
+쓰지 않고 `git log --no-merges --format= --name-only HEAD ^3101035f | sort -u` 에서 내며
 (= 이 slice 의 커밋만), evidence 디렉터리를 뺀 **22 경로**다(복원 뒤 D 12 · M 10). **라운드마다 다시
 산출한다** — 원천이 움직이거나 라운드가 파일을 더하면 목록도 함께 움직인다: 둘째 병합이 원천을
 `df4976cc` 에서 옮겼고, 수정 라운드 1 이 회귀 test 하나를, 라운드 2 가 **공유 incident runbook**
-(`docs/runbook/m6-6e-operations.md` — 팀장 승인 in_scope 확장)을 들였다. **라운드 3·4·교차 지적·병합 둘 어느 것도 새 파일을 만들지 않아 목록이 22 그대로다**(라운드마다 기계
-재산출 — 앞 목록과 `comm` 차이 0). 셋째 병합이 원천을 `3ad4f3f6` → `97ed49c4` 로, 넷째가 `56bd33ea` 로, 다섯째가 `bd2f450e` 로
-옮겼다(다섯째는 겹침 0 — 계수로 확인). 겹치는 공유 파일은 셋째에서 등록부 하나, 넷째에서 **셋**(architecture-policy · gate-tests · capability map)이고 넷째는 합집합을 **계수 예측**으로 확인했다(`commands.md` 의 그 줄).
+(`docs/runbook/m6-6e-operations.md` — 팀장 승인 in_scope 확장)을 들였다. **라운드 3·4·교차 지적·병합 넷 어느 것도 새 파일을 만들지 않아 목록이 22 그대로다**(라운드마다 기계
+재산출 — 앞 목록과 `comm` 양방향 차이 0). 셋째 병합이 원천을 `3ad4f3f6` → `97ed49c4` 로, 넷째가 `56bd33ea` 로, 다섯째가 `bd2f450e` 로,
+여섯째가 `3101035f` 로 옮겼다. 겹치는 공유 파일은 셋째에서 등록부 하나, 넷째와 여섯째에서 **다섯**
+(architecture-policy · gate-tests · capability map · incident runbook · `AppHttpDependencyGateTest`),
+다섯째에서 0 이다. 넷째는 합집합을 **계수 예측**으로 확인했고, 여섯째는 다섯 경로 각각에서
+base/ours/theirs/merged 의 **항목 집합을 기계로 대조**했다(`commands.md` 의 그 줄).
 
-그 공유 문서는 **다른 레인도 만지는 자리**다. 원천 `bd2f450e` 에 이 slice 의 문단이 없고 남의 §3.3 이
-있으므로 단일 복원이 남의 줄을 지우지 않는다 — 아래 ③c 가 양쪽을 센다. 이 파일이 main 에서 또 움직이면
-다음 병합 뒤 목록·계수를 다시 산출한다.
+그 공유 문서는 **다른 레인도 만지는 자리**다. 원천 `3101035f` 에 이 slice 의 문단이 없고 남의 §3.3 ·
+#127(STR12)·#136(adr07-pitest)의 줄이 있으므로 단일 복원이 남의 줄을 지우지 않는다 — 아래 ③c 가
+양쪽을 센다. 이 파일들이 main 에서 또 움직이면 다음 병합 뒤 목록·계수를 다시 산출한다.
 
 ```
-git restore --source=bd2f450e --staged --worktree -- \
+git restore --source=3101035f --staged --worktree -- \
   adapters/src/main/kotlin/bidvector/adapters/koneps/KonepsOpeningResultSource.kt \
   adapters/src/test/kotlin/bidvector/adapters/koneps/KonepsAwardListSourceTest.kt \
   app/src/main/kotlin/bidvector/app/collection/AwardCollectionProperties.kt \
@@ -49,7 +52,7 @@ git restore --source=bd2f450e --staged --worktree -- \
   workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTest.kt
 ```
 
-**hunk 격리가 필요하지 않다 — 전제 둘을 기계로 확인했다.** ⓐ `bd2f450e` 는 HEAD 의 조상이고
+**hunk 격리가 필요하지 않다 — 전제 둘을 기계로 확인했다.** ⓐ `3101035f` 는 HEAD 의 조상이고
 ⓑ 이 slice 의 첫 산출물 커밋을 담지 않는다(`git merge-base --is-ancestor` 둘). 그 커밋은 main 에서
 만든 트리라 공유 파일(`config/quality/**`·`docs/discovery/capability-map.md`)에 **다른 레인의 줄은
 이미 들어 있고 내 줄은 없다** — 그래서 단일 복원이 남의 줄을 지우지 않는다(아래 표지 계수가 그것을
@@ -66,9 +69,9 @@ evidence 디렉터리(`reports/evidence/m9/award-ingest/**`). evidence 를 남�
 | --- | --- |
 | ① `git restore …` 종료 코드 | 0 |
 | ② 상태 계수 | `D` 12 · `M` 10 — 기계 산출 22 경로와 같다 |
-| ③ `git diff bd2f450e -- <22 경로>` 줄 수 | 0 |
+| ③ `git diff 3101035f -- <22 경로>` 줄 수 | 0 |
 | ③b 결과 트리 == 그 main 트리 | evidence 를 뺀 **전수** diff 가 빈 목록 |
-| ③c 내 표지 0 · 남의 표지 보존 | 내 표지 0 — gate-tests 의 내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`. 남의 표지 보존 — gate-tests 의 main 쪽 셋이 각 1 · incident runbook §3.3 머리 1 · capability map §12.3 머리 1 |
+| ③c 내 표지 0 · 남의 표지 보존 | **표지는 바른 어휘(`Award`)가 아니라 내가 실제로 더한 항목**이다 — 등록부 둘은 continuation 을 접어 항목 집합으로 비교했다: 내가 더한 gate-tests 5 · architecture-policy 23 이 복원 뒤 **전부 0**, 상류 항목은 **전수 보존**(`src ⊆ restored` 참). 문서 표지도 축어로 0 — `M9/award-ingest` · `EXPECTED_EXEMPT_COUNT = 94` · `OPENING_AWARD_LIST` · `bidvector.award-collection`. 남의 표지 보존 — `M9/STR12` 8 · `EXPECTED_EXEMPT_COUNT = 87` 1 · `OPEN-STR-12-INTERACTIVE` 7 · `OPEN-ADR07-KOTLIN-JUNK` 3 · `OPEN-ADR07-MUTATION-BUDGET` 3 · incident runbook §3.3 머리 1 · capability map §12.3 머리 1 |
 | ④ 세 모듈 `compileTestKotlin` | `commands.md` 의 rollback 줄 |
 | ⑤⑥ 영향 test 와 이 slice 가 닿은 게이트 | `commands.md` 의 rollback 줄 |
 

@@ -46,29 +46,34 @@ base `79f3e5c4` · 브랜치 `feature/m9-award-ingest` · 실행은 전부 workt
 
 ## rollback
 
-원천은 이 브랜치가 병합한 main 의 **고정 SHA `56bd33ea`** 이고(움직이는 `origin/main` 이 아니다),
-라운드마다 목록을 다시 산출한다. 아래가 현재 판이며 앞 원천(`3ad4f3f6`·`97ed49c4`·`df4976cc`·
-`79f3e5c4`) 기준의 판들은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
+원천은 이 브랜치가 병합한 main 의 **고정 SHA `3101035f`** 이고(움직이는 `origin/main` 이 아니다),
+라운드마다 목록을 다시 산출한다. 아래가 현재 판이며 앞 원천(`bd2f450e`·`56bd33ea`·`3ad4f3f6`·
+`97ed49c4`·`df4976cc`·`79f3e5c4`) 기준의 판들은 이 줄이 갈음한다(라운드 이력은 PR 조치 코멘트).
 
-## 2026-11-07T14:2xZ — 임시 clone 에서 22 경로를 `bd2f450e` 로 되돌림(①②③, 다섯째 병합 뒤)
-- cmd: `git clone --no-local -b feature/m9-award-ingest …` → `git checkout <실측 HEAD>` → `git merge-base --is-ancestor` 둘 → `xargs git restore --source=bd2f450e --staged --worktree --`
+## 2026-11-08T05:2xZ — 임시 clone 에서 22 경로를 `3101035f` 로 되돌림(①②③, 여섯째 병합 뒤)
+- cmd: `git clone <worktree>` → `git merge-base --is-ancestor` 둘 → `git restore --source=3101035f --staged --worktree -- <22 경로>`
 - exit: 0
-- 핵심 결과: 전제 둘 참 · 상태 계수 `D` 12 · `M` 10(= 기계 산출 22 경로) · `git diff bd2f450e -- <22 경로>`
-  **0 줄** · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 내 표지 0(gate-tests 의
-  내 test 클래스 다섯 · incident runbook 의 `award-collection` 문단 · capability map 의 `award-ingest`) ·
-  남의 표지 보존(gate-tests 항목이 main 과 같은 **515** · architecture-policy 항목이 main 과 같은 **752** ·
-  main 이 취소선으로 닫은 OPEN 1 · V25 파일 1 · #142 의 docker 변경이 되돌림 밖 0 · incident runbook §3.3 머리 1 · capability §12.3 1) ·
-  되돌리지 않은 evidence 다섯 그대로(그 안의 `unfinishedSlots` 한 자리가 유일한 내 어휘 잔존이고 의도다)
-- 되돌린 트리에 남는 `Award` 토큰 하나는 **main 쪽**이다(`bidvector.workflow.result.AwardWinnerNamePort` —
-  base 에도 있다). 넓은 grep 이 잡은 것이라 확인해 적는다.
+- 핵심 결과: 전제 둘 참(ⓐ 조상 exit 0 · ⓑ 첫 산출물 커밋 `a6e51b70` 미포함 exit 1) · 상태 계수 `D` 12 ·
+  `M` 10(= 기계 산출 22 경로, 앞 목록과 `comm` **양방향 빈 출력**) · `git diff 3101035f -- <22 경로>`
+  **0 줄** · **evidence 를 뺀 전수 diff 가 빈 목록**(결과 트리 == 그 main 트리) · 되돌리지 않은
+  evidence 다섯 그대로
+- **표지를 어휘에서 항목으로 바꿨다.** 바른 `Award` grep 은 복원 뒤에도 gate-tests 7 · architecture-policy 1
+  을 낸다 — 전부 **상류 것**이다(settlement 의 `AwardMatching*`·`AwardOutcome*` test 와
+  `bidvector.workflow.result.AwardWinnerNamePort`). 그래서 등록부 둘은 continuation 을 접어 **항목 집합**
+  으로 쟀다: 내가 더한 gate-tests **5** · architecture-policy **23** 이 복원 뒤 **전부 0** 이고, 상류 항목은
+  **전수 보존**(`src ⊆ restored` 참, 사라진 항목 0). 문서 표지도 축어로 0 — `M9/award-ingest` ·
+  `EXPECTED_EXEMPT_COUNT = 94` · `OPENING_AWARD_LIST` · `bidvector.award-collection`.
+- 남의 표지 보존(축어 계수): `M9/STR12` 8 · `EXPECTED_EXEMPT_COUNT = 87` 1 · `OPEN-STR-12-INTERACTIVE` 7 ·
+  `OPEN-ADR07-KOTLIN-JUNK` 3 · `OPEN-ADR07-MUTATION-BUDGET` 3 · incident runbook §3.3 머리 1 ·
+  capability map §12.3 머리 1 — 즉 #127·#136 이 넣은 줄이 되돌림 뒤에도 그대로다.
 
-## 2026-11-07T14:3xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
+## 2026-11-08T05:4xZ — 되돌린 트리의 ④ compile · ⑤⑥ 영향 test 와 닿은 게이트
 - cmd: `./gradlew --no-daemon --continue :workflow:compileTestKotlin :adapters:compileTestKotlin :app:compileTestKotlin` 와 `… :workflow:test --tests 'bidvector.workflow.collection.*' :adapters:test --tests 'bidvector.adapters.koneps.*' :app:test --tests 'bidvector.app.architecture.*' --tests 'bidvector.app.wiring.*' gateRegistrationGate leakPatternGate sizeGate memberEffectGate`
 - exit: 0 과 0
-- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 유지) 이 slice 가 닿은 게이트
-  22 task 까지 초록이다. `:adapters:test`·`:app:test` 는 실행, `:workflow:test` 는 **FROM-CACHE** —
-  되돌린 입력이 그 main 트리의 통과 실행과 바이트 동일이라는 뜻이고, 이 확인이 노리는 트리 동일성과
-  같은 말이다.
+- 핵심 결과: FAILED 0 — 되돌린 트리가 서고(복원 계수 `D` 12 · `M` 10 이 빌드 뒤에도 유지) 이 slice 가
+  닿은 게이트까지 초록이다. 세 모듈 test 는 **실행**(workflow 10 클래스 101 · adapters 13/100 ·
+  app 33/306, 실패·오류 0), 나머지 일곱 모듈은 FROM-CACHE — 되돌린 입력이 그 main 트리의 통과 실행과
+  바이트 동일이라는 뜻이고, 이 확인이 노리는 트리 동일성과 같은 말이다.
 
 ## 병합과 그 뒤
 
@@ -373,11 +378,59 @@ runbook 포함). 앞 evidence 커밋 메시지가 「알려진 제한 **셋**」
   lint·detekt·test task 가 전부 **실행**됐다(실패 0) · `leakPatternGate` 도 `--rerun` 으로 실행 ·
   크기·등재·멤버 게이트 동반 초록. 거동 변화 0(코드 문장 변경 0).
 
+## 여섯째 병합 (main `3101035f` · 판정 SHA `1a3b792a`)
+
+## 2026-11-08T04:5xZ — `git merge origin/main`(여섯째)과 겹침 다섯의 **합집합 실측**
+- cmd: `git merge --no-commit --no-ff origin/main` 뒤, 겹치는 다섯 경로 각각에서 base/ours/theirs/merged
+  의 **집합**을 기계 비교(properties 는 continuation 을 접어 키·항목으로, 문서·test 는 줄 집합으로)
+- exit: 1(충돌 둘) → 손 해소 뒤 0
+- 핵심 결과: #127(STR12)·#136(adr07-pitest)이 들어왔고 겹치는 경로는 **다섯**. 충돌 둘은 손으로,
+  자동 병합 셋은 계수로 확인해 **어느 쪽 항목도 잃지 않았다**.
+  ① `architecture-policy.properties` — 키 중복 **0**, 세 tier 합집합 **40 + 11 + 43 = 94**(중복 0),
+  ours 신설 7 · theirs 신설 6 이 전부 있고 base 에서 사라진 항목 0.
+  ② `gate-tests.properties` — 키 16 그대로, 네 키에서 ours+5 · theirs+15 가 전부 보존(키별 merged ==
+  base∪ours∪theirs 가 전건 참).
+  ③ `m6-6e-operations.md` — 양쪽 추가 줄 전건 존재 · 삭제 줄 전건 부재 · **어느 쪽에도 없는 줄 0**
+  (내 편집은 §3.1·§3.3, main 은 §4.6·§5.x 로 구간이 겹치지 않는다).
+  ④ `capability-map.md` §12 G3(충돌) — 결과 **3 행** = main 의 `OPEN-STR-12` 갱신 + main 신설
+  `OPEN-STR-12-INTERACTIVE` + 내 `OPEN-SET01-AWARD-NAME-INGEST` 갱신. 충돌 블록의 양쪽 2·3 행 중
+  각자가 **고친 쪽**을 골랐다(나머지 둘은 base 와 md5 동일임을 확인).
+  ⑤ `AppHttpDependencyGateTest.kt`(충돌) — 아래 줄.
+- 한쪽만 바꾼 파일은 그 쪽과 **blob 동일**이다(ours-only 22 · theirs-only 71, 불일치 0).
+  병합 커밋의 `--cc` 에서 **어느 부모에도 없는 줄은 10** 이고 전부 ⑤ 파일이다(재계산 문단 7 ·
+  KDoc 공백 ` *` 2 · 상수 1).
+
+## 2026-11-08T04:5xZ — 면제 래칫은 **숫자를 옮기지 않고 다시 셌다**
+- cmd: 병합된 세 tier 목록(`tier1-bootstrap-classes`·`tier2-request-scoped-classes`·
+  `tier3-collection-classes`)의 항목 이름 합집합 기계 계수
+- exit: 0
+- 핵심 결과: 양쪽이 **다른 수**를 들고 와 충돌했다(main 81 → **87**, 이 레인 81 → **88**). 어느 쪽을
+  골라도 여섯 또는 일곱이 조용히 사라진다. 재계산은 **40 + 11 + 43 = 94**(중복 0)이고 `87 + 7`·`88 + 6`
+  과 같다 — 계산이 아니라 검산이다. 양쪽 KDoc 문단은 **둘 다 남겼다**. 게이트가 그 수를 관측과
+  대조한다(`exempt.toSet().size shouldBe EXPECTED_EXEMPT_COUNT`) — 아래 전건 `check` 에서 초록.
+
+## 2026-11-08T04:5xZ — `procurement/**` 변경 0 은 **원천과 함께 옮겨 잰다**
+- cmd: `git diff --stat 79f3e5c4..HEAD -- procurement` 와 `git diff 3101035f..HEAD -- procurement` 와
+  `git log --no-merges HEAD ^3101035f -- procurement`
+- exit: 0 셋
+- 핵심 결과: 옛 base 기준은 이제 **1 줄**이고 그 줄은 #136 이 넣은 `id("bidvector.mutation-conventions")`
+  다. slice 몫을 재는 뒤 둘은 **빈 출력** — 이 slice 의 `procurement` 변경은 여전히 0 이다. acceptance
+  술어의 좌변을 병합 원천으로 옮기지 않으면 남의 줄을 내 위반으로 읽는다.
+
 ## acceptance — 전건 `check`
 
-호스트 빌드 큐 포화(대기 12)로 팀장이 2026-11-05 에 전건 acceptance 를 **PR CI 로** 옮겼다 — 같은 명령
-(`./gradlew --no-daemon check`)이 CI 의 Kotlin check job 에서 돈다. 로컬에서 큐에 걸어 둔 전건 실행은
-그 공지로 내렸다(내 진행 중 실행 0 — 큐에 남은 내 랩퍼 없음을 `pgrep` 으로 확인).
+## 2026-11-08T05:5xZ — 판정 SHA `1a3b792a` 에서 CI Kotlin check job 명령 그대로
+- cmd: `./gradlew --no-daemon check` (`bv-build.sh` 자리 경유)
+- exit: 0
+- 핵심 결과: BUILD SUCCESSFUL 40m 17s · `FAILED`/`FAILURE` 줄 **0** · task 486(UP-TO-DATE 41 ·
+  FROM-CACHE 19, 나머지는 실행) · 열 모듈 test **507 클래스 4,070 건, 실패 0 · 오류 0** ·
+  루트 게이트 전부 실행(`contractGate` · `leakPatternGate` · `memberEffectGate` · `scriptSizeGate` ·
+  `conventionCoverageGate` · build-logic 게이트 다섯) · 모듈마다 `gateExecutionGate`·`gateRegistrationGate`·
+  `sizeGate`·ktlint·detekt · `:app:compatibilitySmoke`. 면제 래칫 test 도 이 실행 것이다
+  (`AppHttpDependencyGateTest` 21 건 실패 0).
+
+호스트 빌드 큐 포화(대기 12)로 팀장이 2026-11-05 에 전건 acceptance 를 **PR CI 로** 옮겼던 항목은 이
+실행이 로컬에서도 갈음한다(큐가 비어 자리를 잡았다). 같은 명령이 CI 의 Kotlin check job 에서 돈다.
 
 첫 CI 실행(run 42008427198)은 ktlint 한 건으로 붉었고, 그 뒤 **병합 + 포트 교체 + 게이트 등재**를
 담은 push 가 다음 실행을 만든다. **전건의 정본은 PR #128 의 체크 목록**이다 — evidence 를 고치는
