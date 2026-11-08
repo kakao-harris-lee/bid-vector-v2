@@ -390,3 +390,112 @@ main 의 `Mutation*Test` 네 행이 나란히 섰다.
 변이는 **전부 커밋 뒤에** 돌렸고 되돌림은 백업 사본 복사다(`checkout --` 를 쓰지 않았다 — 미커밋
 산출물을 함께 지우는 자리). 각 되돌림 뒤 `git status --porcelain` 빈 출력. 양성 대조: 변이를 심은
 직후 같은 명령이 그 경로를 냈다.
+
+## 수정 라운드 5 — 배포 경로의 적재 선언을 게이트로 · main 여섯째 병합
+
+### 왜 이 라운드가 열렸나 — 앞 판 네 축은 작동했고, 모델이 틀렸다
+
+verifier r5 는 수정 라운드 4 의 네 축(경로·다중도·선언·뿌리 밖)이 **주장대로 작동한다**고 쟀다(우회
+열둘 전부 RED). 그런데 **그 축이 기대는 로더가 배포 경로의 로더가 아니었다.** 출하 이미지는
+`JarLauncher` 로 뜨지 않는다 — `docker/app.Dockerfile` 이 `jarmode=tools extract --layers` 로 풀고
+평범한 `java -jar` 로 띄운다.
+
+읽는 속성이 무엇인지는 **짐작하지 않고 셌다**: 배포물 안의 도구 jar 를 풀어 `javap -p -c -constants`
+로 상수 풀을 훑었다. manifest 를 읽는 자리는 `IndexedJarStructure`·`IndexedLayers` 둘이고 이름은
+`Start-Class`·`Spring-Boot-Classes`·`Spring-Boot-Lib`·`Spring-Boot-Classpath-Index`·
+`Spring-Boot-Layers-Index` **다섯**이다. 게이트가 단언하는 집합을 그 다섯 + `Main-Class` 로 맞췄다.
+같은 판독으로 **그 도구가 index 에 없고 클래스 뿌리 밑도 아닌 엔트리는 복사하지 않는다**는 것도
+확인했다(`resolve` 의 마지막 분기가 `null`). 그래서 index 등식이 서면 실리는 집합이 닫힌다.
+
+### 양성 대조 — verifier 의 재현을 **그대로** 심었다 (게이트 층)
+
+`bootJar` 에 셋을 함께 심고 `:app:bootJar :app:jarContentGate --rerun`. 셋 다 **게이트를 끄지 않는**
+변경이다(manifest 속성은 플러그인이 `putIfAbsent` 라 사용자 값이 이기고, `doLast` 도 게이트 밑이다).
+
+| 심은 것 |
+| --- |
+| `manifest { attributes("Spring-Boot-Lib" to "BOOT-INF/") }` |
+| `BOOT-INF/ext/evil.jar` — 앞에 셸 머리글을 붙인 진짜 jar |
+| `doLast` 로 `classpath.idx`·`layers.idx` 에 한 줄씩 |
+
+**BUILD FAILED · 위반 3 줄** — 뿌리 밖(EOCD 판독) · `Spring-Boot-Lib` 속성 · classpath index 등식.
+셋이 **서로 다른 축**이라 하나를 되돌려도 나머지가 남는다.
+
+같은 app.jar 에 Dockerfile 과 같은 명령을 돌려 **그 실패가 실제 적재에 대응함**을 확인했다:
+`java -Djarmode=tools -jar application.jar extract --layers --destination out` exit 0 →
+`out/dependencies/lib/ext/evil.jar` 가 생기고 런처 jar 의 `Class-Path` 103 번째 항목이
+`lib/ext/evil.jar` 다.
+
+### 차등 — 같은 심음을 **앞 판 술어**로 재판한다
+
+`JarContentPolicy.kt`·`JarContentGateTask.kt` 를 `edede50b`(verifier r5 가 판정한 판)으로 바꿔치우고
+`BootArchivePolicy.kt` 를 지운 뒤, 심은 셋을 그대로 두고 다시 돌렸다.
+
+| 레그 | 결과 |
+| --- | --- |
+| **앞 판 술어** + 심은 셋 | **BUILD SUCCESSFUL** · `nestedJars=102 nestedOutside=0` — 통제군과 **같은 수**다. 뿌리 밖 판정이 앞 네 바이트라 그 jar 는 위반도 면제도 아닌 **미계수**였다 |
+| **지금** + 심은 셋 | **FAILED · 3 줄** |
+| 음성 대조(심은 것 제거) | **BUILD SUCCESSFUL** |
+
+### 허용 축 — 같은 모양의 차등
+
+`RelayWiring` 에 **다른 메서드의 다른 속성 읽기**를 하나 더했다(verifier r5 (2) 의 첫 변이).
+
+| 레그 | 결과 |
+| --- | --- |
+| **지금** | `:app:environmentAccessGate` **FAILED** — 「허용 하나가 호출 2건을 연다」 |
+| **앞 판 술어**(`EnvironmentAccess.kt` 만 `edede50b` 로) | **BUILD SUCCESSFUL** · `accesses 10141 → 10142 · violations=0` — 접근을 **세고도** 판정하지 않는다 |
+
+오늘 그 쌍의 바이트코드 참조가 하나뿐임은 따로 확인했다
+(`javap -c RelayWiring.class | grep -c 'java/lang/System.getProperty'` → 1).
+
+### 변이 — 바꿔치우기 넷 (더하기가 아니라 대체)
+
+| 변이 | 결과 |
+| --- | --- |
+| `BootArchivePolicy.judge` 가 **위반을 내지 않게** (수는 그대로 센다) | `:build-logic:test` **452 중 11 FAILED** — 속성 축 넷 · index 축 넷 · 소유 모듈 바닥값 · 판독기 연결 둘 |
+| 판독기의 zip 판정을 **앞 판 술어**(앞 네 바이트)로 | **1 FAILED** — 「앞에 바이트를 붙인 zip 도 아카이브로 읽힌다」. 이 한 test 가 앞 판 제한 20 ⓐ 를 잠근다 |
+| 허용 **횟수 단언 제거**(1 이상이면 통과) | **1 FAILED** — 「허용 하나는 호출 하나까지다」 |
+| 정책 두 값(`jar.boot-archive-module=nosuch` · `jar.boot-start-class` 를 다른 FQN) | `:build-logic:test` **1 FAILED**(정책 값 고정 test) · `:app:jarContentGate` **FAILED**(`Start-Class` 속성 축이 실제 배포물에서 붉는다) |
+
+마지막 줄이 **「정책 한 줄로는 꺼지지 않는다」의 실측**이다: 값을 바꾸면 test 가 붉고, 그 test 를
+맞춰 고치면 이번에는 **실제 배포물의 manifest 와 어긋나** 게이트가 붉는다.
+
+변이는 전부 **커밋 뒤에** 돌렸고 되돌림은 백업 사본 복사다(`checkout --` 금지 — 미커밋 산출물을 함께
+지우는 자리). 각 되돌림 뒤 `git status --porcelain` 빈 출력.
+
+### main 여섯째 병합 (`70406318`, PR #128 award-ingest)
+
+자동 병합이고 **손 해소 줄 0**(`git show --cc` 가 아무 hunk 도 내지 않는다). 충돌 0 인 병합이 같은
+본문을 접을 수 있으므로 계수로 검산했다 — merge-base `3101035f` 기준으로 양쪽이 **더한 줄**이 병합
+결과에 전부 있는지.
+
+| 겹친 경로 | 내 추가 | main 추가 | 유실 |
+| --- | --- | --- | --- |
+| `architecture-policy.properties` | 174 | 23 | 0 / 0 |
+| `gate-tests.properties` | 6 | 5 | 0 / 0 |
+| `capability-map.md` | 27 | 3 | 0 / 0 |
+
+키 중복도 셌다(이어달리기를 펴서): `architecture-policy` 162 키 · `gate-tests` 16 키, 둘 다 중복 **0**.
+`policy.version` 은 main 이 건드리지 않았다(8 에 머물러 있다) → 이 라운드가 **13** 으로 올린다.
+main 이 `collection.usecase.type` 을 `…types`(목록)로 바꾼 것은 **대체**이고 유실이 아니다.
+
+### 전건 `check` — **실측 HEAD `f3969ce7`**
+
+| 명령 | 결과 |
+| --- | --- |
+| `./gradlew --no-daemon check`(CI job 명령 그대로) | **BUILD SUCCESSFUL in 32m 34s** — 435 actionable tasks(388 executed · 9 from cache · 38 up-to-date) |
+| `:build-logic:test --rerun` | 452 tests · 0 failed |
+| `jarContentGate environmentAccessGate migrationOrderGate --rerun`(전 모듈) | **BUILD SUCCESSFUL** — app `judged=594 exempt=99 nestedJars=102 nestedOutside=0 bootArchives=1 runtimeJars=109` · `classFiles=297 types=297 anonymousTypes=14 accesses=10141 denied=10 allowed=1 violations=0` · 나머지 아홉 `nestedJars=0 bootArchives=0` |
+| `leakPatternGate --rerun` | exit 0 |
+
+전건은 **이 라운드가 만든 세 자리**를 냈고(표적만으로는 보이지 않았다) 별 커밋으로 고쳤다 —
+`gate()` 59 줄(한도 50) · `JarContentGateTask.kt` 함수 12 개(한도 11) · `MagicNumber` 아홉. 둘째를
+**판독기 파일 분리**로 푼 것이 이 라운드의 유일한 구조 변경이고, 나눈 선은 크기가 아니라 다루는 것
+(Gradle 선언 입력 ↔ zip 포맷)이다. **실측 HEAD 뒤의 커밋은 evidence 뿐**이고, 마지막 HEAD 의 전건
+결과 정본은 verifier 와 PR 조치 코멘트다(evidence 에 넣으려는 시도가 커밋을 또 낳는다).
+
+### clean-tree
+
+`git status --porcelain -- <in_scope 개별 인자>` 빈 출력. 양성 대조 1 회(비파괴 절삭) — 변이를 심은
+직후 같은 명령이 그 경로를 냈고, 백업 사본 복사로 되돌린 뒤 다시 빈 출력이다.
