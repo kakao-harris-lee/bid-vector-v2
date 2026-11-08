@@ -1,17 +1,17 @@
 # M9 / ops-migrations — 계약 대조
 
-마지막 산출물 커밋 **`6199b39f`** · 착수 base `df4976cc` · **내 병합 1**(main `56bd33ea` — `56bd33ea..HEAD` 구간에서 센 값) · 계약 갱신 2026-11-06 반영(DEC-08 제외 · 번호 V26·V27 ·
-in_scope 밖 다섯 승인).
+마지막 산출물 커밋 **`8c1cddb4`** · 착수 base `df4976cc` · **내 병합 2**(main `56bd33ea` · `3101035f` — `3101035f..HEAD` 구간에서 센 값) · 계약 갱신 2026-11-06·11-07·11-08 반영(DEC-08 제외 · 번호 V26·V27 ·
+in_scope 밖 다섯 + 보존 runbook 둘 승인).
 
 ## acceptance 줄별 대조
 
 | 계약 문면 | 상태 | 어디서 |
 | --- | --- | --- |
-| 각 마이그레이션 clean-migrate | **전건 실측** — `:adapters:test` 전체 **1327 tests · 0 실패**(V25 → V26 → V27 적용 순서 포함). 적용 **순간**의 축도 섰다 — 잠금 대기 상한이 **migrate 연결**에 걸린다(v r6 V-1). 전건 `check` 는 PR CI | `commands.md` 라운드 6·7·8 표 |
+| 각 마이그레이션 clean-migrate | **전건 실측** — `:adapters:test` 전체 **1394 tests · 0 실패**(V25 → V26 → V27 적용 순서 포함, 둘째 병합 뒤 재측정). 적용 **순간**의 축도 섰다 — 잠금 대기 상한이 **migrate 연결**에 걸린다(v r6 V-1). 전건 `check` 는 PR CI | `commands.md` 라운드 6·7·8 표 |
 | CHECK·GRANT 등식 | 래칫 갱신 완료 — CHECK 개수(`collection_run` 13+1 · `outbox` 11+1+1, **증분 주석**) · 열 셋 · 트리거 셋. **GRANT 변경 0**(두 축이 열·제약·트리거만 더한다) | `CleanMigration{Check,Column,Trigger}Test` |
 | 되돌림 리허설 두 갈래 | **둘 다 실측** — 미적용(목록 산출 + 트리 동일성) · 적용(버릴 Postgres 에서 forward-fix 를 **Flyway 로** 적용, 장부 기입·음성 대조 포함, 팀장 허용 1회) | `rollback.md` §3 / §5 |
 | 기본값 제거로 깨지는 배선 전수 갱신 | **기동점 전수를 다시 셌다**(v H-1) — 6G runbook 의 스냅숏 추출 갈래가 빠져 있었고, 키를 공통 인자 **한 자리**로 모아 갈래가 늘어도 함께 가게 했다. 배선 test·출하 조립 속성 자리는 로컬 exit 0. **아직 키가 없는 기동점 하나**(`tools/image-hygiene-check.sh` jvm-app `PROBE_ENV`, 오늘 무해)는 `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS` 문면이 든다 | `commands.md` 「in_scope 밖」 표 · capability map 그 OPEN 행 |
-| 변이 RED | **열여섯** 로컬 실측 — 라운드 1~3 의 셋(사유 바꿔치우기 · 릴리스 결속 상수화 · 생성자 기본값 복귀) · 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) · 라운드 5 의 둘(출하 기동점 default properties · env 제거 무력화) · 라운드 7 의 넷(V26 상한 삭제 · 릴리스 바꿔치기 허용 · outbox 트리거 `BEFORE INSERT` · 출하 초기화자 기본값) · **라운드 8 의 넷**(`initSql` 제거 · V27 선언 제거 · 선언 값 `'0'` · 선언을 DDL 뒤로) + 통제군 | `commands.md` 변이 절 |
+| 변이 RED | **열일곱** 로컬 실측 — 라운드 1~3 의 셋(사유 바꿔치우기 · 릴리스 결속 상수화 · 생성자 기본값 복귀) · 라운드 4 의 셋(`gap_all` · V27 outbox 트리거 UPDATE 전용 · 출하 리소스 기본값) · 라운드 5 의 둘(출하 기동점 default properties · env 제거 무력화) · 라운드 7 의 넷(V26 상한 삭제 · 릴리스 바꿔치기 허용 · outbox 트리거 `BEFORE INSERT` · 출하 초기화자 기본값) · **라운드 8 의 넷**(`initSql` 제거 · V27 선언 제거 · 선언 값 `'0'` · 선언을 DDL 뒤로) · **라운드 9 의 하나**(V14 리소스에 상한 선언을 더해 하중 전제 단언이 RED — cr r4 M-2) + 통제군 | `commands.md` 변이 절 |
 | 전건 PR CI | **미실행** — push 는 팀장 몫(공통 규율) | — |
 
 ## 설계 검토가 지목한 우회 ↔ 무엇이 막는가
@@ -52,6 +52,13 @@ in_scope 밖 다섯 승인).
 (`config/quality/architecture-policy.properties` · `AppHttpDependencyGateTest` — 둘 다 계약 문면
 「`config/quality/**`」·「관련 app 코드와 test」 안)과 라운드 7 의 하나(`MigrationLockTimeoutTest`)이고,
 라운드 5 는 더하지 않았다.
+
+**라운드 9 가 만든 새 파일은 0 이다** — 고친 것은 기존 파일 여섯(`PersistenceWiring` KDoc ·
+`MigrationLockBoundTest` · evidence 넷)과 **둘째 병합이 건드린 여덟**이다. 병합이 들여온 main 의
+새 파일(STR12 발송 축 등)은 **내가 만든 것이 아니므로** 이 대조의 대상이 아니고, 그 가운데 내가
+편집한 것은 `PipelineTelegramDeliveryE2ETest` 하나다(`release = TEST_RELEASE` 한 줄 + import —
+in_scope 문면 「관련 adapters … test」 안). `docs/runbook/m6-6b2-backup-restore.md` 한 줄은
+in_scope 밖이라 `scope.md` 계약 갱신 2026-11-08 에 등재했다.
 
 **라운드 6(병합)이 만든 새 파일도 0 이다** — main 이 들여온 새 파일은 많지만 내 커밋이 만든 것은
 없고, 내가 고친 것은 병합 결과 둘(`CleanMigrationCheckTest` 의 본문 집합 · 남의 새 배선 test 에

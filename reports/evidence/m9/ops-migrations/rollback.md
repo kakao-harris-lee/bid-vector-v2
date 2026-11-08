@@ -1,18 +1,20 @@
 # M9 / ops-migrations rollback
 
-착수 base **`df4976cc`** · **복원 원천 `56bd33ea`** · **실측 HEAD `6199b39f`**(라운드 8 의 마지막
+착수 base **`df4976cc`** · **복원 원천 `3101035f`** · **실측 HEAD `8c1cddb4`**(라운드 9 의 마지막
 산출물 커밋).
 
-**원천을 병합한 main 으로 다시 고정했다**(라운드 6) — 이 브랜치는 paper-bid(V25)가 들어간
-main `56bd33ea` 를 합쳤다 — **내가 만든 병합은 하나**다(`git log --merges 56bd33ea..HEAD` 한 줄.
-착수 base 부터 세면 21 이고 그 가운데 20 은 main 자신의 PR 병합이다 — 세는 구간을 원천으로
-잡아야 「내 병합」이 나온다). 원천은 **그때 합친 main 의
-고정 SHA** 이고 움직이는 `origin/main` 을 쓰지 않는다. 전제도 함께 쟀다 — 이 slice 의 첫 산출물
-커밋은 `56bd33ea` 의 조상이 **아니다**(그 SHA 에 이 slice 가 없다).
+**원천을 병합한 main 으로 다시 고정했다**(라운드 9 — 앞 판은 `56bd33ea`) — 이 브랜치는 CVE
+chore(#142)·STR12 telegram(#127)·pitest(#136)가 들어간 main `3101035f` 를 합쳤다. **내가 만든
+병합은 둘**이다(`git log --merges 3101035f..HEAD` 두 줄 중 하나는 앞 라운드의 `56bd33ea` 병합이고,
+그 병합 자체가 이 구간에 남는다). 원천은 **이번에 합친 main 의 고정 SHA** 이고 움직이는
+`origin/main` 을 쓰지 않는다 — `3101035f` 는 조회 시점의 tip 이며 `bd2f450e`(#142)를 **조상으로
+담는다**(`git merge-base --is-ancestor` 로 확인). 전제도 함께 쟀다 — 이 slice 의 첫 산출물
+커밋은 `3101035f` 의 조상이 **아니다**(그 SHA 에 이 slice 가 없다).
 
-**병합이 「남의 변경 보존」 축을 실재하게 만들었다** — 앞 라운드까지는 병합 0 이라 그 축이
-없었다. 이제 복원 뒤에 main 이 들여온 것(V25 의 `bid_kind` · portal-02 의 `02` 경로 · 그 되돌림
-인자 test)이 **남아 있어야** 하고, 아래 표지 계수가 그것을 센다.
+**병합이 「남의 변경 보존」 축을 실재하게 만들었다** — 처음 두 라운드까지는 병합 0 이라 그 축이
+없었다. 이제 복원 뒤에 main 이 들여온 것(첫 병합의 V25 `bid_kind` · portal-02 의 `02` 경로 · 그
+되돌림 인자 test, **둘째 병합의 STR12 발송 축**)이 **남아 있어야** 하고, 아래 표지 계수가 그것을
+센다.
 
 **되돌릴 마이그레이션은 둘이다** — 계약 갱신(2026-11-06)으로 DEC-08 축이 빠지고 번호가 당겨졌다:
 `V26__outbox_terminal_reason.sql`(OPS-05) · `V27__execution_row_release.sql`(OPS-10).
@@ -25,7 +27,7 @@ evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SH
 range revert 가 아니라 **in_scope 경로 한정 복원**이고 목록은 기계가 낸다.
 
 ```
-MAIN=56bd33ea                                         # 이 브랜치가 **실제로 합친** main 의 고정 SHA
+MAIN=3101035f                                         # 이 브랜치가 **실제로 합친** main 의 고정 SHA
 EXCL=':(exclude)reports/evidence/m9/ops-migrations'   # 자기 자신은 되돌릴 수 없다
 
 mapfile -t MINE < <(git log --no-merges --format= --name-only $MAIN..HEAD -- . "$EXCL" | sort -u)
@@ -47,7 +49,7 @@ git rm -q -f -- "${ADDED[@]}"
 「있음/없음」을 `--diff-filter` 가 아니라 **`git cat-file -e`** 로 가른다(병합이 끼면 필터가 남의
 변경을 M 으로 센다). `git rm -f` 인 이유는 색인까지 지워야 복원 뒤 색인이 원천과 같아지기 때문이다.
 
-`ADDED` 일곱 가운데 **둘이 V 파일**(V26·V27)이다. 미적용 DB 에서는 그 파일들이 사라지는 것이
+`ADDED` **여덟** 가운데 **둘이 V 파일**(V26·V27)이다. 미적용 DB 에서는 그 파일들이 사라지는 것이
 되돌림의 전부다 — Flyway 이력에 없으므로 흔적이 0 이고 체크섬 충돌도 없다.
 
 ### 실측이 고친 자리 — 「원천에 없음」만으로 가르면 깨진다
@@ -89,21 +91,21 @@ ALTER TABLE outbox DROP CONSTRAINT outbox_terminal_reason_state_check, DROP COLU
 전이가 `terminal_reason` 을 싣는다). 설정 쪽도 같은 축이다 — `bidvector.release.sha` 를 지우는 것은
 옛 jar 로 돌아간 **뒤**라야 한다(새 jar 는 그 값 없이 못 뜬다).
 
-## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `6199b39f`)
+## 3. 실측 (버릴 clone, `git clone --no-hardlinks`, HEAD `8c1cddb4`)
 
 | 단계 | 실측 |
 | --- | --- |
-| ① 목록 산출 | 내 커밋 경로 **110**(원천 `56bd33ea`, evidence 제외) = 복원 **96**(M) · 삭제 **8**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 110 으로 닫힌다. **목록 완전성**: 병합본이 main 과 다른 경로 91 전부가 이 목록 안에 있고(차집합 빈 출력), 병합 커밋이 목록 밖 경로를 만들지 않았다 |
-| ①′ **재측정한 이유** | 라운드 8 이 복원 목록에 경로 **둘**을 더했다(`PersistenceWiring` · 새 `MigrationLockBoundTest`). 새 파일이 하나라 삭제 갈래가 7 → **8** 이다. **마지막 산출물 커밋 `6199b39f` 에서** ①~③ 을 다시 쟀다(앞 실측 `b5e7eef0` 을 옮기지 않았다) |
-| ② 명령 종료 코드 | `restore` **0** · `git rm -f` **0** — 이 라운드는 **둘 다 실행했다**(앞 라운드는 이 환경의 안전 검사가 스크립트 안의 `git rm` 을 막아 끝 상태로만 쟀다. 경로를 명령행 인자로 넘기면 돈다) |
-| ③ 결과 트리 == `56bd33ea` 트리 | 복원·삭제만으로 `git diff --name-only 56bd33ea -- . :(exclude)<evidence>` **0 파일** · 미추적 **0** · 남은 V25+ 마이그레이션은 **V25 하나**(paper-bid 것이고 내 둘은 사라졌다) |
-| ③′ 남의 변경 보존 | **이제 실재하는 축이다**(병합 1) — 아래 표지 계수가 main 이 들여온 것을 센다 |
+| ① 목록 산출 | 내 커밋 경로 **112**(원천 `3101035f`, evidence 제외) = 복원 **98**(M) · 삭제 **8**(A) · **할 일 0 여섯**(HISTORY_ONLY). 세 갈래 합이 112 로 닫힌다. **목록 완전성**: 병합본이 main 과 다른 경로 전부가 이 목록 안에 있다(`comm -23` **0 줄**) |
+| ①′ **재측정한 이유** | 원천이 `56bd33ea` → **`3101035f`** 로 옮겼다(팀장 지시 병합). 복원 갈래가 96 → **98** 로 는 것은 이번 병합이 내 경로로 들여온 relay 조립·배선·그 test 다. 삭제(A) 여덟·HISTORY_ONLY 여섯은 그대로다. **마지막 산출물 커밋 `8c1cddb4` 에서** ①~③ 을 다시 쟀다(앞 실측 `6199b39f` 을 옮기지 않았다) |
+| ② 명령 종료 코드 | `restore` **0** · `git rm -f` **0** — 둘 다 실행했다 |
+| ③ 결과 트리 == `3101035f` 트리 | 복원·삭제만으로 `git diff --name-only 3101035f -- . :(exclude)<evidence>` **0 파일** · 미추적 **0** · 남은 V25+ 마이그레이션은 **V25 하나**(paper-bid 것이고 내 둘은 사라졌다) |
+| ③′ 남의 변경 보존 | **병합 둘**(`56bd33ea` · `3101035f`)이 들여온 것이 남아야 한다 — 아래 표지 계수가 STR12 의 발송 축까지 센다 |
 | ④⑤⑥ 복원 트리의 컴파일·test·게이트 | **트리 동일성으로 갈음** — 아래 |
 | ⑦ 원천과 남는 차이 | `read-tree` 갈래에서는 **0**(evidence 까지 함께 되돌아간다). §1 의 실제 절차는 evidence 를 `EXCL` 로 빼므로 그 갈래에서는 이 디렉터리의 파일만 남고, §4 의 술어가 그 디렉터리를 대상에서 빼므로 유효성은 흔들리지 않는다 |
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-복원한 트리는 `56bd33ea` 의 트리와 **파일 단위로 같다**(③ 의 0 파일). 그 커밋은 머지된 main 이고
+복원한 트리는 `3101035f` 의 트리와 **파일 단위로 같다**(③ 의 0 파일). 그 커밋은 머지된 main 이고
 CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 돌리는 것은 같은 입력을 다시 재는 일이다.
 `read-tree` 갈래는 evidence 까지 되돌리므로 「같지 않은 입력」이 **없다**.
 
@@ -124,7 +126,7 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 
 | 남의 표지(남아 있어야 한다) | 복원 뒤 |
 | --- | --- |
-| `raw_observation.release_sha`(V1 — OPS-10 조인의 원천) | 2 |
+| `release_sha`(V1 `raw_observation` — OPS-10 조인의 원천. HEAD 는 **29**, 내 여덟이 빠진다) | 21 |
 | `OutboxEntryState`(M4/4C-1) | 17 |
 | `BIDVECTOR_RELEASE_TAG`(M7/7F) | 12 |
 | `forceOutboxState`(relay DB 지원 — 내가 **사유를 더한** 함수가 원판으로 돌아왔다) | 5 |
@@ -132,17 +134,24 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 | `COMMON_PROPERTIES`(여정 하네스 — 파일은 남고 내 한 줄만 사라진다) | 1 |
 | `ProfileWiring`(면제 목록의 남의 이름 — 목록 자체가 원판으로 돌아왔다) | 17 |
 | `PRODUCTION_DISPATCH_PROPERTIES`(출하 기동점 — 내 test 만 사라지고 기동점은 남는다) | 17 |
-| **`bid_kind`**(paper-bid V25 — 병합이 들여온 축) | 34 |
+| **`bid_kind`**(paper-bid V25 — 첫 병합이 들여온 축) | 34 |
 | **`NotificationBidKind`**(그 축의 workflow 타입) | 31 |
 | **`BidPublicInfoService02`**(portal-02 전환) | 6 |
-| **`KonepsRollbackArgumentsTest`**·**`koneps-portal-02-rollback-args`**(main 의 새 test 와 그 정본 리소스) | 7 · 4 |
+| **`KonepsRollbackArgumentsTest`**(main 의 새 test) | 7 |
+| **`NotificationChannelSettings`**·**`TelegramNotificationSender`**·**`HttpClientLogProperty`**(STR12 발송 축 — **둘째 병합**이 들여왔고 내 복원이 지우지 않는다) | 7 · 8 · 6 |
 | **`SET LOCAL lock_timeout`**(V18 이 세운 관례 — 내 둘이 빠지고 남의 열둘이 남는다) | 12 |
 | **`MigrationLockTimeoutTest`**(그 test 는 main 것이다 — 내 lint·V26 거동 둘만 빠져 **@Test 가 4 → 2**) | 9 |
-| **`V18/V19`**(보존 runbook 의 옛 문면 — 내 일반화가 걷히고 원판이 돌아온다) | 5 |
-| 래칫 셋 | `EXPECTED_EXEMPT_COUNT = 81` · `collection_run` **13** · `outbox` **11**(내 증분이 사라졌다)이고 `notification_inbox` **7** 은 **남는다**(V25 의 증분) |
+| 래칫 셋 | `EXPECTED_EXEMPT_COUNT` **87**(main 의 값. HEAD 는 **88** — 내 `ReleaseWiring` 하나가 빠졌다) · `collection_run` **13** · `outbox` **11**(HEAD 는 14 · 13 — 내 증분이 사라졌다)이고 `notification_inbox` **7** 은 **남는다**(V25 의 증분) |
 
-`OutboxEntryState` 가 앞 라운드 표의 **18** 과 다른 이유는 술어다 — 위 문단대로 evidence
-디렉터리를 뺐고, 그 디렉터리의 파일 둘이 그 이름을 든다(포함해 세면 19). 산출물 쪽 변화가 아니다.
+**계수 전에 도구를 먼저 쟀다**(이 라운드가 실패로 배운 자리). 첫 시도는 `grep` 플래그를 경로
+**뒤**에 둬 `--exclude-dir` 가 파일 이름으로 읽혔고, evidence 가 모집단에 남아 내 표지가 전부 0 이
+아니었다. 고친 뒤 **양성 대조**(`OutboxEntryState` 17 · `bid_kind` 34 — 0 이 아님)를 먼저 확인하고
+위를 셌다. 모집단은 §1 절차와 같다 — **이 slice 의 evidence 디렉터리만** 뺀다(`reports/` 전체를
+빼면 같은 트리에서 `OutboxEntryState` 가 10 으로 떨어진다. 그 수는 다른 질문의 답이다).
+
+앞 판의 `raw_observation.release_sha` 행은 **그 축어가 저장소에 없다**(`ColumnSpec("raw_observation",
+"release_sha", …)` 로 떨어져 있어 2 는 evidence 쪽을 세고 있었다) — 실재하는 토큰 `release_sha` 로
+바꿔 쟀고, 「남는다」는 복원 뒤 21 과 HEAD 29 의 차이가 센다.
 
 내 표지를 고를 때 `release_sha` 단독은 쓸 수 없다 — V1 의 `raw_observation.release_sha` 가 그
 이름을 이미 들고 있어 **남의 줄까지 센다**. 그래서 이 slice 가 처음 들여온 이름들로 골랐다.
@@ -150,8 +159,8 @@ CI 가 초록으로 통과한 자리다. 같은 트리에서 `check` 를 다시 
 ## 4. 실측 HEAD 와 판정 SHA 사이가 움직였는가
 
 ```
-git diff --name-only 6199b39f..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 56bd33ea..6199b39f \
+git diff --name-only 8c1cddb4..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 3101035f..8c1cddb4 \
       -- . ':(exclude)reports/evidence/m9/ops-migrations' | sort -u)
 ```
 
@@ -167,6 +176,8 @@ git diff --name-only 6199b39f..<판정 SHA> -- \
 forward-fix 가 손대는 객체는 `outbox`·`collection_run` 의 열·제약·트리거뿐이고 V25 가 바꾼 것은
 `notification_inbox`(열 하나 · CHECK 둘 · PK 한 칸)라 **겹치는 객체가 0** 이다. 적용 순서
 V25 → V26 → V27 자체는 병합 뒤 전건 `:adapters:test`(clean-migrate 전수)가 초록으로 실측했다.
+**둘째 병합(`3101035f`)은 마이그레이션을 0 개 들여온다** — 복원 트리의 V25+ 파일이 V25 하나뿐인
+것이 그 계수다. 그래서 이 근거는 그대로 선다.
 
 | 단계 | 실측 |
 | --- | --- |

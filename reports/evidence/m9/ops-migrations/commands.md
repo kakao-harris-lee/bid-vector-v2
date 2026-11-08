@@ -350,3 +350,53 @@ census 는 **관례 lint 로 격하**했다 — 「파일도 관례대로 선언
 `ReleaseIdentifier.MAX_LENGTH = 128` 은 **Kotlin 에만** 있다 — 열은 TEXT 이고 길이 CHECK 가 없다.
 쓰는 자리가 값 객체 경유 하나라 오늘 영향이 없고, 주석도 「설정 오타를 자르는 값」이라 적어 사실과
 일치한다. 저장 층으로 내리지 않은 이유는 그것이 어휘가 아니라 식별자이기 때문이다(L-1 과 같은 축).
+
+## 라운드 9 — 승인 전 일괄(cr r4 M-1·M-2·LOW · v r7 L-1~L-3) + main `3101035f` 병합
+
+거동 변경 0 을 목표로 한 라운드다. 고친 것은 **문면·단언·병합 해소**이고 SQL 은 손대지 않았다
+(`git diff --name-status 457378ff..HEAD` 에 `.sql` **0**).
+
+### 병합 — 「충돌 일곱 · 조용히 접힌 자리 셋」
+
+팀장 전언은 「겹침 계수 확인, 손 해소 줄 0」이었으나 **그렇게 되지 않았다**. 겹치는 경로는 13 이고
+그 가운데 **일곱이 content 충돌**이다(relay 조립·배선과 그 test 넷, 면제 계수 하나).
+
+| 자리 | 해소 |
+| --- | --- |
+| `NotificationRelayRun` 생성자·본문 | **합집합** — 내 `release` 와 main 의 `channels`·`clock` 을 함께 받고, 본문은 main 의 구조(채널 없으면 use case 를 만들지 않는다)에 `JdbcOutboxPort(boundary, release)` |
+| `RelayWiring` · relay test 넷 | 같은 합집합(인자 둘 다 · import 둘 다) |
+| `EXPECTED_EXEMPT_COUNT` | 양쪽이 **다른 수**(내 82 · main 87). 숫자를 옮기지 않고 세 tier 목록의 항목 이름 합집합을 기계로 셌다 — **39 + 11 + 38 = 88**(중복 0). 검산: 82 + 6 = 88. 두 레인의 근거 문단은 둘 다 남겼다 |
+
+**더 위험한 것은 충돌이 아니라 충돌이 **나지 않은** 자리였다.** main 의 새 호출 **셋**
+(`PipelineTelegramDeliveryE2ETest` 하나 · `RelayVocabularyDatabaseTest` 둘)이 `NotificationRelayRun(`
+을 `release` 없이 조립한다. 표지가 서지 않으므로 git 은 조용했고 **컴파일만이 잡았다** — 셋 다
+`release = TEST_RELEASE` 를 더했다. 합집합 함정의 교과서적 자리다.
+
+그 밖의 병합 점검(전부 실측): properties 중복 키 **0**(architecture-policy 140 키 · gate-tests 33) ·
+인접 중복 줄 **0**(capability map · 운영 runbook · CI) · CI job 이름 중복 **0**(6) ·
+`MigrationLockBoundTest` 의 게이트 등록부 등재 **유지** · 양쪽 레인의 면제 이름이 둘 다 목록에 있음.
+
+### 결과
+
+| 명령 | 결과 |
+| --- | --- |
+| `:adapters:test --rerun`(전체) | exit 0 · **1394 tests · 0 실패** · skip 4(202 클래스) |
+| `:app:test --rerun`(전체) | exit 0 · **1055 tests · 0 실패**(128 클래스) |
+| `:app:gateRegistrationGate` | exit 0 |
+| `leakPatternGate --rerun` | exit 0 |
+| `:adapters:`·`:app:` × `ktlint{Main,Test}SourceSetCheck`·`detekt` | **처음에 붉었다** — `ktlintTestSourceSetCheck` 둘(새 단언의 체인 넷 · 병합이 더한 import 의 사전순). 고친 뒤 **exit 0** |
+
+전건 한 번(35m41s)에 위를 함께 돌렸다. **그 실행의 셸 종료 코드는 `echo` 의 것이라 0 이었다** —
+판정은 로그의 `BUILD FAILED` 와 `Task … FAILED` 두 줄이 냈다. 표적 실행에는 보이지 않던 형식
+위반이 전건에서만 드러난 것도 같은 축이다.
+
+### 변이 — cr r4 M-2 의 하중 전제
+
+| 변이 | 표적 | 결과 |
+| --- | --- | --- |
+| **V14 리소스에 `SET LOCAL lock_timeout = '5s';` 한 줄을 더한다**(바꿔치우기 — 「다음 파일은 선언하지 않는다」를 「선언한다」로) | `MigrationLockBoundTest` | **RED 1** — `V14__notice_title.sql 가 상한을 선언하면 … expected:<0> but was:<1>`. 전제가 깨지면 **test 가 먼저 운다** |
+| 통제군(원복 뒤 `--rerun`) | 같은 test | 초록 1 · 0 실패. 원복 뒤 `git status --porcelain -- <V14>` **빈 출력** |
+
+단언은 하중 전제 **둘**을 잡는다 — ㉠ 다음 파일에 선언 0 건(`--` 주석 걷은 본문) ㉡ 그 파일의
+`ALTER TABLE` 대상이 **준비가 끝난 DB 에 이미 있다**(`to_regclass`). 다음 파일의 이름은 Flyway 의
+`info()` 가 고르므로 이름 규칙을 test 가 다시 적지 않는다.
