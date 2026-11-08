@@ -1,6 +1,7 @@
 package bidvector.app.relay
 
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.NotificationDeliveryPolicyData
@@ -12,57 +13,293 @@ import java.time.LocalDate
 private const val MASKED_SUFFIX_LENGTH = 4
 
 /**
- * cr R-2 — 기동 거부 판정을 **표를 바꿔 넣어** 직접 친다. 배선을 세우지 않고 bean 을 주입하지
- * 않는다: 입력이 둘(환경, 정책표)뿐인 순수 함수이기 때문이다.
+ * cr R-2 — 기동 거부 판정을 **표와 설정 유무를 바꿔 넣어** 직접 친다. 배선을 세우지 않고 bean 을
+ * 주입하지 않는다: 입력이 셋(환경, 정책표, 설정 존재 여부)뿐인 순수 함수이기 때문이다.
  *
- * 기대값을 표에서 끌어오지 않는다 — 전부 리터럴이다. 표에서 끌어오면 표가 바뀌는 날 기대값도
- * 함께 바뀌어 test 가 **아무것도 고정하지 않는다**(「더하기만 한 변이는 초록」의 사촌).
+ * **M9/STR12 로 판정 내용이 바뀌었다**(D-7). 실 sender 가 들어왔으므로 「Live 면 거부」가 아니라
+ * **「Live 인데 채널 설정이 비면 거부」**다. cr G-1 이 고친 **성질**(환경 이름이 아니라 정책표가 그
+ * 환경에 붙인 모드를 본다)은 그대로이고, 아래 변이 셋이 그것을 계속 잠근다.
+ *
+ * 판정 함수는 설정의 **값**을 받지 않는다 — `Boolean` 셋만 받는다. 그래서 거부 메시지가 자격·chat
+ * id 원문을 담을 경로가 타입에 없다(설계 검토 (1)).
+ *
+ * 기대값은 전부 리터럴이다. 표에서 끌어오면 표가 바뀌는 날 기대값도 함께 바뀌어 아무것도 고정하지
+ * 않는다.
  */
 class RelayBootDecisionTest {
     /**
      * **이 slice 의 핵심 변이**(cr G-1 이 고친 성질): 표가 `Staging -> Live` 를 갖는 날이면
-     * `Staging` 기동도 거부된다. 앞 판의 술어(`environment != Production`)는 여기서 `Allowed`
-     * 를 냈고, 그 뒤 relay 가 claim 한 행이 자리지킴 sender 에서 터져 영구 격리됐다.
+     * `Staging` 에도 설정이 요구된다. 이름 술어(`environment != Production`)는 여기서 허용을 낸다.
      */
     @Test
-    fun `표가 Staging 에 Live 를 붙이면 Staging 기동도 거부된다`() {
+    fun `표가 Staging 에 Live 를 붙이면 Staging 도 설정을 요구한다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Staging, mutated) shouldBe RelayBootDecision.RefusedLiveWithoutSender
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            mutated,
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.Allowed
     }
 
     /**
-     * 같은 변이표의 **다른 환경**은 거부되지 않는다 — 판정이 「표 전체에 Live 가 있는가」가
-     * 아니라 「이 환경의 모드가 Live 인가」임을 가른다. 이 칸이 없으면 「표에 Live 가 하나라도
-     * 있으면 거부」하는 구현도 위 test 에서 초록이다.
+     * 같은 변이표의 **다른 환경**은 설정 없이도 허용이다 — 판정이 「표 전체에 Live 가 있는가」가
+     * 아니라 「이 환경의 모드가 Live 인가」임을 가른다.
      */
     @Test
-    fun `표에 Live 가 있어도 그 환경이 아니면 허용이다`() {
+    fun `표에 Live 가 있어도 그 환경이 아니면 설정 없이 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Staging to DeliveryMode.Live)
 
-        relayBootDecision(RuntimeEnvironment.Development, mutated) shouldBe RelayBootDecision.Allowed
+        relayBootDecision(
+            RuntimeEnvironment.Development,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.Allowed
     }
 
-    /** 이름 축의 **음성 대조** — 표가 `Production` 에서 Live 를 떼면 `Production` 도 허용된다. */
+    /** 이름 축의 **음성 대조** — 표가 `Production` 에서 Live 를 떼면 설정이 비어도 허용이다. */
     @Test
-    fun `표가 Production 에서 Live 를 떼면 Production 도 허용된다`() {
+    fun `표가 Production 에서 Live 를 떼면 설정이 비어도 허용이다`() {
         val mutated = tableWith(RuntimeEnvironment.Production to DeliveryMode.DryRun)
 
-        relayBootDecision(RuntimeEnvironment.Production, mutated) shouldBe RelayBootDecision.Allowed
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            mutated,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.Allowed
     }
 
     /**
-     * **승인된 실제 표**에서의 두 칸 — 오늘 `Production` 이 거부되고 `Staging` 이 허용된다.
-     * 위 변이 셋이 「표를 본다」를 잠그고, 이 둘이 「오늘의 답」을 잠근다.
+     * **승인된 실제 표**에서의 세 칸 — 오늘 `Production` 만 설정을 요구하고 `Staging` 은 설정 없이
+     * 뜬다(D-7 「Live 가 아니면 지금처럼 설정 없이 뜬다」).
      */
     @Test
-    fun `승인된 표에서는 Production 만 거부된다`() {
+    fun `승인된 표에서는 Production 만 설정을 요구한다`() {
         val approved = approvedPolicy()
 
-        relayBootDecision(RuntimeEnvironment.Production, approved) shouldBe RelayBootDecision.RefusedLiveWithoutSender
-        relayBootDecision(RuntimeEnvironment.Staging, approved) shouldBe RelayBootDecision.Allowed
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approved,
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.Allowed
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approved,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            approved,
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = noLogging(),
+        ) shouldBe
+            RelayBootDecision.Allowed
+    }
+
+    /**
+     * **빠진 칸이 무엇인지 거부가 나른다** — 운영자가 받는 기동 실패가 「무언가 비었다」가 아니라
+     * 「이 칸이 비었다」여야 한다. 칸 하나만 비는 조합 셋을 각각 잰다(칸을 통째로 접으면 그 셋이
+     * 같은 값을 낸다).
+     */
+    @Test
+    fun `거부는 빠진 칸만 나른다`() {
+        val approved = approvedPolicy()
+
+        refusalFor(approved, fullyConfigured().copy(botCredential = false)) shouldBe
+            setOf(ChannelConfigField.BotCredential)
+        refusalFor(approved, fullyConfigured().copy(chatId = false)) shouldBe
+            setOf(ChannelConfigField.ChatId)
+        refusalFor(approved, fullyConfigured().copy(siteBaseUrl = false)) shouldBe
+            setOf(ChannelConfigField.SiteBaseUrl)
+        refusalFor(approved, fullyConfigured().copy(botCredential = false, chatId = false)) shouldBe
+            setOf(ChannelConfigField.BotCredential, ChannelConfigField.ChatId)
+    }
+
+    /** 칸 어휘가 셋이다 — 새 설정 칸이 생기면 이 수가 움직여 그 칸의 기동 검사를 함께 보게 된다. */
+    @Test
+    fun `설정 칸 어휘는 셋이다`() {
+        ChannelConfigField.entries.map { it.name } shouldBe listOf("BotCredential", "ChatId", "SiteBaseUrl")
+    }
+
+    /**
+     * cr M-2 — 설정은 다 찼는데 **그 채널에 활성 route 가 없다**. 그대로 뜨면 relay 가 집은 행이
+     * 전부 `Suppressed` → `FAILED` 로 탄다. 오늘 그 상태가 되는 길은 `channel=email` 이다.
+     */
+    @Test
+    fun `설정이 다 차도 활성 route 가 없으면 거부다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Email,
+            activeRoute = false,
+            httpClientLogging = noLogging(),
+        ) shouldBe RelayBootDecision.RefusedChannelWithoutActiveRoute(Channel.Email)
+    }
+
+    /**
+     * **설정 결손이 route 보다 먼저다**(첫 위반 승) — 설정이 없으면 route 를 물을 대상 자체가
+     * 없다. 이 칸이 없으면 두 사유의 순서가 미결이고, 운영자는 먼저 고칠 것을 모른다.
+     */
+    @Test
+    fun `설정 결손과 route 부재가 함께면 설정 결손을 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Email,
+            activeRoute = false,
+            httpClientLogging = noLogging(),
+        ) shouldBe RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+    }
+
+    /** Live 가 아니면 route 도 보지 않는다 — 그 환경은 claim 조차 하지 않는다. */
+    @Test
+    fun `Live 가 아니면 활성 route 가 없어도 허용이다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Staging,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Email,
+            activeRoute = false,
+            httpClientLogging = noLogging(),
+        ) shouldBe RelayBootDecision.Allowed
+    }
+
+    /**
+     * **v N-2** — JDK HttpClient 의 내부 로그가 켜져 있으면 Live 기동을 거부한다. 그대로 뜨면 발송마다
+     * 요청 URL 이 stderr 로 나가고 그 URL 은 경로에 봇 자격을 싣는다 — 「이 패키지는 로거를 쥐지
+     * 않는다」는 바이트코드 게이트가 덮지 못하는 축이다(찍는 주체가 JDK 다).
+     */
+    @Test
+    fun `로그 속성이 켜져 있으면 Live 기동을 거부한다`() {
+        HttpClientLogProperty.entries.forEach { property ->
+            relayBootDecision(
+                RuntimeEnvironment.Production,
+                approvedPolicy(),
+                fullyConfigured(),
+                Channel.Telegram,
+                activeRoute = true,
+                httpClientLogging = setOf(property),
+            ) shouldBe RelayBootDecision.RefusedHttpClientLogging(setOf(property))
+        }
+    }
+
+    /**
+     * **설정 축이 로그 속성보다 먼저다**(첫 위반 승). ①② 상태에서는 발송이 0 이라 **찍힐 자격도
+     * 없으므로** 로그 속성을 먼저 말하면 운영자를 덜 급한 곳으로 보낸다. 이 칸이 없으면 세 사유의
+     * 순서가 미결이다.
+     */
+    @Test
+    fun `설정 결손과 로그 속성이 함께면 설정 결손을 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            nothingConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.RefusedMissingChannelConfig(ChannelConfigField.entries.toSet())
+    }
+
+    /** route 부재도 로그 속성보다 먼저다 — 같은 이유다(발송 0). */
+    @Test
+    fun `route 부재와 로그 속성이 함께면 route 부재를 먼저 말한다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Production,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Email,
+            activeRoute = false,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.RefusedChannelWithoutActiveRoute(Channel.Email)
+    }
+
+    /**
+     * **Live 가 아니면 로그 속성도 거부 사유가 아니다**(cr L-6 와 같은 축) — 보내지 않으므로 찍힐
+     * 자격이 없다. 거기서 거부하면 개발자가 HTTP 를 들여다보는 일을 막는다.
+     */
+    @Test
+    fun `Live 가 아니면 로그 속성이 켜져 있어도 허용이다`() {
+        relayBootDecision(
+            RuntimeEnvironment.Development,
+            approvedPolicy(),
+            fullyConfigured(),
+            Channel.Telegram,
+            activeRoute = true,
+            httpClientLogging = HttpClientLogProperty.entries.toSet(),
+        ) shouldBe RelayBootDecision.Allowed
+    }
+
+    /**
+     * **JDK 가 읽는 이름 철자를 잠그는 유일한 칸이다**(v N-3<r3> L-1 로 문면 정정).
+     *
+     * 앞 문면은 「새 속성을 조용히 더하는 길을 막는다」였는데 그것은 이 test 가 하는 일이 아니다 —
+     * 어휘에 속성을 더하면 거부가 **늘어날** 뿐이라 막을 이유가 없다.
+     *
+     * 실제로 이 칸이 없으면 **철자 오타가 조용히 지나간다**: `RelayWiringTest` 는 enum 값으로
+     * `setProperty` 하고 production 도 같은 enum 값으로 `getProperty` 하므로, 이름이 틀려도 둘이
+     * 같은 틀린 값을 쓰고 그 test 는 초록이다. 그때 JDK 는 아무것도 안 켜진 것으로 보고 운영에서는
+     * **거부가 발화하지 않는다.** 그래서 이 test 는 「그 값이 wire 에 닿는가」 축을 재는 자리다
+     * (verifier 실측: 이름 오타 변이는 이 test **하나**만 붉힌다).
+     */
+    @Test
+    fun `로그 속성 어휘는 둘이고 이름이 고정이다 — JDK 가 읽는 철자를 잠근다`() {
+        HttpClientLogProperty.entries.map { it.propertyName } shouldBe
+            listOf("jdk.httpclient.HttpClient.log", "jdk.internal.httpclient.debug")
+    }
+
+    private fun refusalFor(
+        policy: NotificationDeliveryPolicyData,
+        presence: ChannelConfigPresence,
+    ): Set<ChannelConfigField> {
+        val decision =
+            relayBootDecision(
+                RuntimeEnvironment.Production,
+                policy,
+                presence,
+                Channel.Telegram,
+                activeRoute = true,
+                httpClientLogging = noLogging(),
+            )
+        return (decision as RelayBootDecision.RefusedMissingChannelConfig).missing
     }
 }
+
+private fun fullyConfigured() = ChannelConfigPresence(botCredential = true, chatId = true, siteBaseUrl = true)
+
+private fun nothingConfigured() = ChannelConfigPresence(botCredential = false, chatId = false, siteBaseUrl = false)
 
 /**
  * 전 환경을 `DryRun` 으로 덮은 표에 [overrides] 만 바꿔치운다 — [NotificationDeliveryPolicyData]
@@ -79,3 +316,5 @@ private fun approvedPolicy(): NotificationDeliveryPolicyData {
     check(resolution is Resolution.Resolved) { "NOTIFICATION_DELIVERY_POLICY 가 해소되지 않았다: $resolution" }
     return resolution.value
 }
+
+private fun noLogging(): Set<HttpClientLogProperty> = emptySet()

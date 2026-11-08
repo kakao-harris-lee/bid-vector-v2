@@ -1,0 +1,227 @@
+package bidvector.adapters.notification
+
+import bidvector.workflow.notification.DeliveryResult
+import bidvector.workflow.notification.MaskedTarget
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import org.junit.jupiter.api.Test
+
+/**
+ * D-3 — **원문 0**. 토큰이 URI 경로에 들어가므로(`/bot<자격>/sendMessage`) `HttpRequest`·
+ * `HttpResponse` 의 `toString()` 은 그 자격을 싣는다. 이 묶음은 「JDK 가 URI 를 싣는지」에
+ * 의존하지 않고 **그 두 객체가 어느 관측 가능한 문자열에도 닿지 않음**을 거동으로 잰다.
+ *
+ * 갈래마다 같은 바늘 둘(가짜 자격·가짜 chat id 원문)을 **관측 가능한 표면 전수**에서 찾는다:
+ * 결과값 문자열 · 설정 문자열 · 자격 값 타입 문자열 · 발송이 던진 예외(있으면 그 stack trace).
+ * 로그 축은 문자열이 아니라 **구조**로 닫는다 — 이 패키지는 로거를 쥐지 않고,
+ * [NotificationAdapterDependencyTest] 가 바이트코드로 그것을 단언한다.
+ */
+class TelegramCredentialLeakTest {
+    private val settings = telegramSettings("http://127.0.0.1:1")
+
+    /**
+     * **바늘이 진짜임을 먼저 잰다**(양성 대조). 자격이 실제로 경로에 실려 나가고 chat id 가 form
+     * 에 실려 나간다 — 그러지 않으면 아래 부재 단언은 「보내지 않았다」와 구별되지 않는다.
+     */
+    @Test
+    fun `가짜 서버는 자격과 chat id 를 실제로 받는다 — 바늘 양성 대조`() {
+        FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+            dispatchThrough(telegramSender(telegramSettings(server.baseUrl)))
+
+            val call = server.received().single()
+            call.path shouldContain FAKE_BOT_CREDENTIAL
+            call.form.getValue("chat_id") shouldBe FAKE_CHAT_ID
+        }
+    }
+
+    /**
+     * v M-1 — **URI 에 쓸 수 없는 문자를 생성 시점에 막는다.** 막지 않으면 그 자격이 요청 URI 의
+     * 경로 조각이 되어 `URI.create` 가 던지고, 그 예외가 발송의 포괄 `catch` 에 걸려 **설정
+     * 오류가 `Unknown`(모호)으로 기록**된다 — 그 행은 `ISOLATED` 로 탄다. 모양을 막으면 같은
+     * 오류가 기동 실패다.
+     */
+    @Test
+    fun `자격 모양이 아니면 생성이 거부된다 — URI 불가 문자가 Unknown 으로 새지 않는다`() {
+        listOf(
+            "811122233:FAKE with space",
+            "811122233:FAKE{brace}",
+            "811122233:FAKE/slash",
+            "no-colon-at-all",
+            ":없는봇id",
+            "811122233:",
+            "811122233:한글",
+        ).forEach { malformed ->
+            withClue("'$malformed' 는 거부돼야 한다") {
+                shouldThrow<IllegalArgumentException> { TelegramBotCredential.of(malformed) }
+            }
+        }
+    }
+
+    /**
+     * 거부 메시지는 원문도 **길이도** 담지 않는다(v N-6). 앞 판은 길이를 남겼고 그것은 설정
+     * `toString` 의 「길이도 비밀 값의 단서다」와 어긋났다 — 두 자리를 한 문면으로 맞췄다.
+     * 남는 것은 **어느 칸이 어떤 모양을 어겼는지**이고 그것이 runbook §13.6 의 행 키다.
+     */
+    @Test
+    fun `자격 모양 거부 메시지는 원문도 길이도 담지 않는다`() {
+        val malformed = "$FAKE_BOT_CREDENTIAL with space"
+
+        val failure = shouldThrow<IllegalArgumentException> { TelegramBotCredential.of(malformed) }
+        val message = failure.message.orEmpty()
+
+        assertNoRaw("모양 거부 메시지", message)
+        message shouldNotContain malformed.length.toString()
+        message shouldNotContain "length"
+        message shouldContain "Bot API 모양"
+    }
+
+    /** 양성 대조 — 실제 Bot API 모양은 통과한다(술어가 전부 거부하는 회귀를 막는다). */
+    @Test
+    fun `Bot API 모양은 통과한다 — 양성 대조`() {
+        TelegramBotCredential.of(FAKE_BOT_CREDENTIAL).toString() shouldBe "TelegramBotCredential(***)"
+        TelegramBotCredential.of("1:a").toString() shouldBe "TelegramBotCredential(***)"
+        TelegramBotCredential.of("99:A_b-c9").toString() shouldBe "TelegramBotCredential(***)"
+    }
+
+    @Test
+    fun `자격 값 타입의 toString 은 원문을 담지 않는다`() {
+        val credential = TelegramBotCredential.of(FAKE_BOT_CREDENTIAL)
+        val chatId = TelegramChatId.of(FAKE_CHAT_ID)
+
+        assertNoRaw("credential.toString", credential.toString())
+        assertNoRaw("chatId.toString", chatId.toString())
+        // data class 의 합성 toString 은 필드 타입의 toString 을 쓴다 — 그래서 설정도 함께 깨끗하다.
+        assertNoRaw("settings.toString", settings.toString())
+    }
+
+    /** 전달 결과가 나르는 target 은 마스킹된 값이다 — 끝 네 자리만 남고 원문은 복원되지 않는다. */
+    @Test
+    fun `전달 결과의 target 은 마스킹 값이다`() {
+        FakeTelegramServer.start(listOf(TelegramScript.ok())).use { server ->
+            val result = dispatchThrough(telegramSender(telegramSettings(server.baseUrl)))
+
+            val delivered = result as DeliveryResult.Delivered
+            assertNoRaw("delivered.toString", delivered.toString())
+            delivered.target.toString() shouldBe MaskedTarget.mask(FAKE_CHAT_ID, LIVE_POLICY).toString()
+            delivered.target.toString() shouldContain CHAT_ID_SUFFIX
+        }
+    }
+
+    /**
+     * **응답 본문이 chat id 를 되비추어도** 새지 않는다 — Telegram 의 실제 `sendMessage` 응답은
+     * `result.chat.id` 를 싣는다. 우리는 `ok` 한 칸만 읽고 본문을 어디에도 옮기지 않는다.
+     */
+    @Test
+    fun `응답 본문이 chat id 를 되비추어도 결과에 남지 않는다`() {
+        val echo = """{"ok":true,"result":{"message_id":7,"chat":{"id":$FAKE_CHAT_ID}}}"""
+
+        FakeTelegramServer.start(listOf(TelegramScript.Reply(OK, echo))).use { server ->
+            val result = dispatchThrough(telegramSender(telegramSettings(server.baseUrl)))
+
+            assertNoRaw("echo 응답의 결과", result.toString())
+        }
+    }
+
+    /**
+     * **갈래 전수**. 어느 갈래에서도 발송은 예외를 밖으로 내지 않고(`runCatching` 이 성공이다),
+     * 결과 문자열에 바늘이 없다. 갈래가 하나라도 예외로 빠져나가면 그 stack trace 가 함께 검사된다.
+     */
+    @Test
+    fun `실패 갈래 전수에서 원문이 어느 관측 표면에도 없다`() {
+        leakProbes().forEach { probe ->
+            val attempt = runCatching { probe.run() }
+
+            withClue("${probe.name} 은 예외를 밖으로 내지 않는다") { attempt.isSuccess shouldBe true }
+            attempt.getOrNull()?.let { outcome ->
+                assertNoRaw("${probe.name} 결과", outcome.result.toString())
+                // **갈래마다** 설정 객체도 본다(v H-1) — 결과만 보면 설정의 마스킹이 미측정이다.
+                assertNoRaw("${probe.name} 설정", outcome.settings.toString())
+            }
+            attempt.exceptionOrNull()?.let { assertNoRaw("${probe.name} 예외", it.stackTraceToString()) }
+        }
+    }
+
+    @Test
+    fun `갈래 목록이 비어 있지 않다 — 공허한 전수 금지`() {
+        leakProbes() shouldHaveSize EXPECTED_PROBE_COUNT
+    }
+
+    private fun assertNoRaw(
+        where: String,
+        observed: String,
+    ) {
+        withClue("$where 에 자격 원문이 있다") { observed shouldNotContain FAKE_BOT_CREDENTIAL }
+        withClue("$where 에 chat id 원문이 있다") { observed shouldNotContain FAKE_CHAT_ID }
+    }
+
+    private fun leakProbes(): List<LeakProbe> =
+        listOf(
+            serverProbe("2xx ok", TelegramScript.ok()),
+            serverProbe("2xx ok false", TelegramScript.Reply(OK, """{"ok":false,"description":"no"}""")),
+            serverProbe("2xx 해독 불가", TelegramScript.Reply(OK, "<<<not json>>>")),
+            serverProbe("400", TelegramScript.Reply(BAD_REQUEST, """{"ok":false}""")),
+            serverProbe("401", TelegramScript.Reply(UNAUTHORIZED, """{"ok":false}""")),
+            serverProbe("403", TelegramScript.Reply(FORBIDDEN, """{"ok":false}""")),
+            serverProbe("429", TelegramScript.Reply(TOO_MANY_REQUESTS, """{"ok":false}""")),
+            serverProbe("5xx", TelegramScript.Reply(SERVER_ERROR, "")),
+            serverProbe("송신 뒤 끊김", TelegramScript.Truncate),
+            LeakProbe("응답 timeout") {
+                FakeTelegramServer.start(listOf(stallLongerThanTimeout())).use { server ->
+                    val settings = impatientSettings(server.baseUrl)
+                    ProbeOutcome(dispatchThrough(telegramSender(settings)), settings)
+                }
+            },
+            LeakProbe("연결 거부") {
+                val settings = telegramSettings(FakeTelegramServer.closedPortBaseUrl())
+                ProbeOutcome(dispatchThrough(telegramSender(settings)), settings)
+            },
+        )
+
+    private fun serverProbe(
+        name: String,
+        script: TelegramScript,
+    ): LeakProbe =
+        LeakProbe(name) {
+            FakeTelegramServer.start(listOf(script)).use { server ->
+                val settings = telegramSettings(server.baseUrl)
+                ProbeOutcome(dispatchThrough(telegramSender(settings)), settings)
+            }
+        }
+
+    /**
+     * 갈래 하나의 관측 — 결과 **그리고 그 갈래가 쓴 설정 객체**다(v H-1 처분). 앞 판은 결과만
+     * 봤고, 그래서 설정 객체의 `toString` 마스킹은 전용 test 한 자리만 지켰다(변이 ③ 이 1 건만
+     * 붉혔다). 지금은 갈래마다 설정도 본다.
+     */
+    private class ProbeOutcome(
+        val result: DeliveryResult,
+        val settings: TelegramSenderSettings,
+    )
+
+    private class LeakProbe(
+        val name: String,
+        val run: () -> ProbeOutcome,
+    )
+
+    private companion object {
+        const val OK = 200
+        const val BAD_REQUEST = 400
+        const val UNAUTHORIZED = 401
+        const val FORBIDDEN = 403
+        const val TOO_MANY_REQUESTS = 429
+        const val SERVER_ERROR = 500
+        const val CHAT_ID_SUFFIX = "3210"
+
+        /**
+         * 갈래 수 — 「전수」가 조용히 줄어드는 것을 막는 하한이자 상한이다. 이름 해소 실패 갈래는
+         * **여기 없다**: 그 갈래를 거동으로 재려면 통제하지 않는 resolver 에 의존해야 하고, 그래서
+         * 분류는 [TelegramDeliveryMappingTest] 가 타입으로 직접 친다(그 경로의 결과 타입에도
+         * 자유 문자열 칸이 없으므로 누출 표면은 여기 열한 갈래와 같다).
+         */
+        const val EXPECTED_PROBE_COUNT = 11
+    }
+}
