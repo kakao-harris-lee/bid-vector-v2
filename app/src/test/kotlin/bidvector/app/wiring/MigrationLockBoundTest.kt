@@ -2,7 +2,9 @@ package bidvector.app.wiring
 
 import bidvector.app.adminDataSource
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.FlywayException
@@ -41,7 +43,17 @@ private const val LOCK_HOLD_MS = 35_000L
 private const val BEFORE_UNDECLARED_ALTER_MIGRATION = "13"
 
 /** V14 가 `ALTER` 하는 표 — 평범한 읽기(`ACCESS SHARE`)가 그 `ACCESS EXCLUSIVE` 와 부딪힌다. */
-private const val LOCK_READ_SQL = "SELECT 1 FROM notice LIMIT 1"
+private const val LOCK_READ_TABLE = "notice"
+
+private const val LOCK_READ_SQL = "SELECT 1 FROM $LOCK_READ_TABLE LIMIT 1"
+
+/** 하중 전제를 재는 술어 — `--` 줄 주석을 걷은 본문만 본다(주석 속 문장은 선언이 아니다). */
+private val SQL_LINE_COMMENT = Regex("--[^\n]*")
+
+private val LOCK_BOUND_DECLARATION = Regex("""SET\s+LOCAL\s+lock_timeout""", RegexOption.IGNORE_CASE)
+
+private val ALTER_TABLE_TARGET =
+    Regex("""ALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)""", RegexOption.IGNORE_CASE)
 
 private const val POSTGRES_IMAGE = "postgres:16.4"
 
@@ -55,8 +67,14 @@ private const val POSTGRES_IMAGE = "postgres:16.4"
  *
  * **이 test 가 고르는 자리가 그 차이를 가른다.** V14 는 상한을 선언하지 않은 채 기존 표를
  * `ALTER` 하는 파일이다. 파일 census 로는 영원히 닿지 않고(관례 이전 구간), 파일 선언으로도
- * 막히지 않는다. 여기서 `55P03` 이 나오면 상한을 세운 것은 **연결 하나**다 — 그래서 이 단언이
- * 「모든 현재·미래 마이그레이션」을 덮는다.
+ * 막히지 않는다. 여기서 `55P03` 이 나오면 상한을 세운 것은 **연결 하나**다.
+ *
+ * **이 단언이 덮는 범위.** 재는 것은 **그 한 자리** — 실행의 첫 파일이다. 「실행 중간 파일에도
+ * 상한이 남는가」(Flyway 가 파일 사이에 세션을 되돌리지 않는가)는 verifier r7 의 프로브가 따로
+ * 실측했다: 같은 실행 셋째 파일 V16 에서 `55P03`, `initSql` 제거 변이에서 RED. 그 둘이 함께여야
+ * 「현재·미래 전부」라고 말할 수 있고, 그 중 **덮어쓰기**(파일이 `SET LOCAL lock_timeout` 을 `'0'`
+ * 이나 더 큰 값으로 명시)는 어느 쪽도 막지 않는다 — [PersistenceWiring.MIGRATION_LOCK_TIMEOUT] 의
+ * KDoc 이 그 경계를 적는다.
  *
  * **출하 구성을 그대로 부른다.** 준비(V13 까지)는 target 을 주어야 해서 별도 Flyway 지만, **재는
  * 호출**은 `ownerMigration(...)` 하나다 — test 가 자기 사본으로 Flyway 를 세우면 출하 쪽
@@ -72,6 +90,7 @@ class MigrationLockBoundTest {
         require(LOCK_HOLD_MS > ELAPSED_BOUND_MS) { "홀더가 먼저 놓으면 「기다렸다」를 「실패했다」와 가를 수 없다" }
         withOwnCluster { owner ->
             migrateUpTo(owner, BEFORE_UNDECLARED_ALTER_MIGRATION)
+            undeclaredAlterTargetAhead(owner) shouldBe LOCK_READ_TABLE
 
             val holder = LockHolder(owner)
             val failure =
@@ -97,6 +116,57 @@ class MigrationLockBoundTest {
             appliedVersions(owner) shouldContain RELEASE_AXIS_MIGRATION
         }
     }
+
+    /**
+     * 이 test 의 **하중 전제**를 잰다(cr r4 M-2) — 다음 파일이 ㉠ 상한을 선언하지 않고 ㉡ **이미
+     * 있는** 표를 `ALTER` 한다. 둘 중 하나라도 깨지면 여기서 `55P03` 이 나와도 그것을 세운 것이
+     * 연결이라고 말할 수 없다. 전제를 KDoc 에만 두면 [BEFORE_UNDECLARED_ALTER_MIGRATION] 을 옮기거나
+     * 그 파일이 선언을 얻었을 때 test 는 **초록인 채 증명력만** 잃는다.
+     *
+     * 「이미 있는 표」는 `to_regclass` 로 **그 시점의 DB 에** 묻는다 — 본문을 다시 읽는 것이 아니라
+     * 준비가 끝난 상태를 보므로, 같은 파일이 만든 표를 자기가 `ALTER` 하는 경우와 갈린다.
+     */
+    private fun undeclaredAlterTargetAhead(owner: DataSource): String {
+        val script = scriptAfter(owner, BEFORE_UNDECLARED_ALTER_MIGRATION)
+        val body = readMigration(script).replace(SQL_LINE_COMMENT, "")
+        withClue("$script 가 상한을 선언하면 이 자리는 「연결만이 상한을 세운다」를 재지 못한다") {
+            LOCK_BOUND_DECLARATION.findAll(body).count() shouldBe 0
+        }
+        val target = ALTER_TABLE_TARGET.find(body)?.groupValues?.get(1).shouldNotBeNull()
+        withClue("$script 의 `ALTER TABLE $target` 대상이 준비 단계에 없다 — 기존 표를 건드리는 자리가 아니다") {
+            existsInDatabase(owner, target) shouldBe true
+        }
+        return target
+    }
+
+    /** 다음 파일의 이름은 **Flyway 자신의 해석**으로 고른다 — 이름 규칙을 test 가 다시 적지 않는다. */
+    private fun scriptAfter(
+        owner: DataSource,
+        version: String,
+    ): String {
+        val after = MigrationVersion.fromVersion(version)
+        return PersistenceWiring
+            .ownerMigration(owner)
+            .info()
+            .all()
+            .first { info -> info.version?.let { it > after } == true }
+            .script
+    }
+
+    private fun readMigration(script: String): String =
+        checkNotNull(javaClass.getResourceAsStream("/db/migration/$script")) { "classpath 에 $script 가 없다" }
+            .use { it.readBytes().toString(Charsets.UTF_8) }
+
+    private fun existsInDatabase(
+        owner: DataSource,
+        table: String,
+    ): Boolean =
+        owner.connection.use { connection ->
+            connection.prepareStatement("SELECT to_regclass(?) IS NOT NULL").use { statement ->
+                statement.setString(1, table)
+                statement.executeQuery().use { rows -> rows.next() && rows.getBoolean(1) }
+            }
+        }
 
     /** 준비 단계 — target 을 주어야 하므로 출하 구성이 아니다(재는 호출은 위 하나다). */
     private fun migrateUpTo(
