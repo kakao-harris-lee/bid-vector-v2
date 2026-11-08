@@ -478,5 +478,21 @@ class AppHttpDependencyGateTest {
  * **승인 전 라운드에서 하나 더 늘어 87 이다**(기계 재계산: 38 + 11 + 38 = 87, 중복 0). 늘어난 것은
  * `HttpClientLogProperty` 하나다 — JDK HttpClient 의 내부 로그 속성 어휘이고, 기동 판정이 그것을
  * 거부 사유로 받으므로 `ChannelConfigField` 와 같은 자리(tier3)다.
+ *
+ * **M9/award-ingest 가 일곱을 더한다** — tier3 에 다섯(`AwardCollectionProperties` ·
+ * `AwardCollectionPropertiesKt` · `AwardCollectionRunner` · `AwardCollectionRunnerKt` ·
+ * `KonepsAwardEndpointProperties`)과 tier1 조립에 둘(`AwardCollectionWiring` · `AwardCollectionSources`).
+ * 면제 사유는 기존 러너 레인과 **같다**: 요청 경로가 아니다(cron 이 프로세스를 띄워 한 번 돌고
+ * 끝낸다)이고 조립은 어댑터를 쥐어 꽂는 자리다. 수는 옮기지 않고 세 tier 목록의 항목 이름 합집합을
+ * **기계로** 셌다:
+ * 37 + 11 + 40 = **88**(중복 0).
+ *
+ * **병합 재계산 다섯째(M9/award-ingest ← main `3101035f`, 2026-11-08)**: 또 양쪽이 **다른 수**를
+ * 들고 와 충돌이 났다 — main 이 M9/STR12 로 81 → **87**, 이 레인이 award 수집으로 81 → **88**.
+ * 어느 쪽 숫자를 고르든 여섯 또는 일곱이 조용히 사라진다. 앞의 재계산들과 같은 방식으로 **숫자를
+ * 옮기지 않고 세 tier 목록의 항목 이름 합집합을 기계로** 셌다: 40 + 11 + 43 = **94**(중복 0).
+ * 그 수가 87 + 7 과도 88 + 6 과도 같다는 것은 계산이 아니라 **검산**이고, 아래 등식이 관측과
+ * 다시 대조한다. 어느 레인의 면제도 지우지 않았다 — 허용 목록 쪽 합집합은 기계 병합이 냈고,
+ * 여기 수는 그 병합된 목록을 다시 세어 적었다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 87
+private const val EXPECTED_EXEMPT_COUNT = 94

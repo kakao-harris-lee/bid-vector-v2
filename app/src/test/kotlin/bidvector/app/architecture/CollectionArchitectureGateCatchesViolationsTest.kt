@@ -153,7 +153,7 @@ class CollectionArchitectureGateCatchesViolationsTest {
 
     @Test
     fun `러너와 배선 밖에서 수집 use case 를 참조하면 잡는다 — 컨트롤러·리스너로 수집을 여는 길`() {
-        typeRule(setOf(policy.collectionUseCaseType), policy.collectionUseCaseReferencers.toSet(), "use case")
+        typeRule(policy.collectionUseCaseTypes.toSet(), policy.collectionUseCaseReferencers.toSet(), "use case")
             .mustReport("RogueUseCaseCaller", "CollectNoticesUseCase")
     }
 
