@@ -88,28 +88,38 @@ class EnvironmentAccessTest {
 
     @Test
     fun `허용은 그 클래스의 그 멤버만 연다 — 다른 멤버는 그대로 위반이다`() {
+        // 허용된 호출도 **함께** 넣는다 — 그래야 이 test 가 재는 것이 「다른 멤버가 걸리는가」 하나다
+        // (허용된 호출이 없으면 죽은 허용 축이 같이 울려 수가 둘이 된다).
         val violations =
             EnvironmentAccess.violations(
-                access(ALLOWED_CALLER, "java.lang.System", "getenv"),
+                listOf(
+                    ClassMemberAccess(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                    ClassMemberAccess(ALLOWED_CALLER, "java.lang.System", "getenv"),
+                ),
                 DENIED,
                 listOf(ALLOWED_PAIR),
                 setOf(ALLOWED_CALLER),
             )
 
         assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("#getenv"), "$violations")
     }
 
     @Test
     fun `허용은 그 클래스만 연다 — 다른 호출자는 같은 좌표라도 위반이다`() {
         val violations =
             EnvironmentAccess.violations(
-                access("bidvector.app.Other", "java.lang.System", "getProperty"),
+                listOf(
+                    ClassMemberAccess(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                    ClassMemberAccess("bidvector.app.Other", "java.lang.System", "getProperty"),
+                ),
                 DENIED,
                 listOf(ALLOWED_PAIR),
                 setOf(ALLOWED_CALLER, "bidvector.app.Other"),
             )
 
         assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("bidvector.app.Other"), "$violations")
     }
 
     @Test
