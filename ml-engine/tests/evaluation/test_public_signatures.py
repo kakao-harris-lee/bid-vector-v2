@@ -154,46 +154,100 @@ conftest.py` 의 `pytest_collection_finish` 가 `ml_engine.training.*` 를 `sys.
 전건에서만 붉어, 모집단이 조용히 줄어드는 모양이었다 — 실측으로 드러났다."""
 
 
-def _flatten_annotation(annotation: object) -> list[object]:
+_UNRESOLVED_BOUND: Final = object()
+"""**해석하지 못한 경계**를 나타내는 잎 — 「모집단 밖」이 아니라 **해석 실패**로 보낸다.
+
+`TypeVar` 의 경계·제약은 `typing.get_type_hints` 가 들어가지 않는 구멍이라, 거기 적힌
+문자열은 아무도 풀어 주지 않는다(`def f[P: "EvaluationPolicy"]` 의 `__bound__` 는 `str`,
+`TypeVar("_P", bound="EvaluationPolicy")` 는 `ForwardRef`). 아래에서 **같은 namespace 로
+직접 푼다** — 풀리면 그 정책 타입이 잎으로 나와 모집단 등식이 받고, 안 풀리면 이 잎을 내서
+`_resolved_hints` 가 **해석 실패**를 선언한다(해석 실패 등식이 붉다). 둘 중 어느 쪽도
+「조용히 빠진다」가 아니다 — fail-closed(v r8 M-1')."""
+
+
+def _flatten_annotation(
+    annotation: object, namespace: dict[str, object]
+) -> list[object]:
     """주석을 **끝까지 펴서** 잎 노드 목록으로.
 
     `typing.get_type_hints` 는 `type X = …`(PEP 695) **별칭을 풀지 않는다** — 반환값이
     `TypeAliasType` 이고 `get_args` 는 빈 tuple 이다(실측). 그래서 앞 판은 별칭으로 가린
     입구를 모집단에서 놓쳤다(변이 O4 가 GREEN 으로 그것을 잡았다). 별칭은 `__value__` 로
-    한 겹 풀고, 합 타입은 `get_args` 로 풀고, **재귀**한다(별칭의 별칭도 풀린다)."""
-    return _flatten_with_guard(annotation, set())
+    한 겹 풀고, 합 타입은 `get_args` 로 풀고, **재귀**한다(별칭의 별칭도 풀린다).
+
+    `namespace` 는 문자열 경계를 푸는 자리다(`_annotation_namespace`)."""
+    return _flatten_with_guard(annotation, set(), namespace)
 
 
-def _flatten_with_guard(annotation: object, seen: set[int]) -> list[object]:
+def _flatten_with_guard(
+    annotation: object, seen: set[int], namespace: dict[str, object]
+) -> list[object]:
     """`_flatten_annotation` 의 본체 — **재귀 별칭 가드**가 있다.
 
     이 저장소에는 자기를 참조하는 합 타입 별칭이 있어(실측: 가드 없이 `RecursionError`),
     이미 지난 노드를 `id` 로 기억한다. 가드가 **잎을 버리지는 않는다**: 같은 노드를 두 번째로
     만났을 때만 멈추므로 처음 만난 모든 잎이 결과에 들어간다."""
+    if annotation is _UNRESOLVED_BOUND:
+        # 가드보다 먼저 — 해석 실패 표지는 몇 번을 만나든 잎으로 남아야 한다.
+        return [annotation]
     if id(annotation) in seen:
         return []
     seen.add(id(annotation))
     if isinstance(annotation, typing.TypeAliasType):
-        return _flatten_with_guard(annotation.__value__, seen)
+        return _flatten_with_guard(annotation.__value__, seen, namespace)
     if isinstance(annotation, typing.TypeVar):
         # v r7 M-1 — `def f[P: EvaluationPolicy](…) -> P` 는 `-> P` 가 `TypeVar` 로
         # 해석된다. 잎으로 두면 `_is_policy_type` 이 거짓이라 그 입구가 모집단에서
         # **조용히 빠진다**(두 인터프리터 모두 실측 GREEN). 경계(`__bound__`)와 제약
         # (`__constraints__`)을 펴면 그 정책 타입이 잎으로 나온다. 구식
         # `TypeVar("_P", bound=…)` 도 같은 가지로 닫힌다.
+        #
+        # v r8 M-1' — 경계를 **따옴표로 적으면**(`[P: "EvaluationPolicy"]` ·
+        # `TypeVar("_P", bound="EvaluationPolicy")`) 그 잎이 `str`·`ForwardRef` 라
+        # `_is_policy_type` 이 다시 거짓이었다(두 인터프리터 모두 실측 GREEN). 따옴표
+        # 두 개 차이로 같은 구멍이 열린다. 그래서 잎을 **풀어서** 넘기고, 풀리지 않으면
+        # 해석 실패 표지를 낸다 — 열거를 늘리는 게 아니라 가지를 fail-closed 로 닫는다.
         leaves: list[object] = []
         if annotation.__bound__ is not None:
-            leaves.extend(_flatten_with_guard(annotation.__bound__, seen))
+            leaves.extend(
+                _flatten_with_guard(
+                    _resolved_bound(annotation.__bound__, namespace), seen, namespace
+                )
+            )
         for constraint in annotation.__constraints__:
-            leaves.extend(_flatten_with_guard(constraint, seen))
+            leaves.extend(
+                _flatten_with_guard(
+                    _resolved_bound(constraint, namespace), seen, namespace
+                )
+            )
         return leaves or [annotation]
     args = typing.get_args(annotation)
     if not args:
         return [annotation]
     leaves: list[object] = []
     for arg in args:
-        leaves.extend(_flatten_with_guard(arg, seen))
+        leaves.extend(_flatten_with_guard(arg, seen, namespace))
     return leaves
+
+
+def _resolved_bound(bound: object, namespace: dict[str, object]) -> object:
+    """문자열로 적은 `TypeVar` 경계·제약을 **같은 namespace 로** 푼다.
+
+    푸는 자리를 `get_type_hints` 로 통일한다(직접 `eval` 하지 않는다): 빈 함수에 그
+    표현식을 주석으로 달아 해석시키면, 이 저장소가 전 모듈에 쓰는
+    `from __future__ import annotations` 와 **같은 경로**로 풀린다. 못 풀면
+    `_UNRESOLVED_BOUND` — 호출부가 해석 실패로 올린다."""
+    if not isinstance(bound, str | typing.ForwardRef):
+        return bound
+    expression = bound if isinstance(bound, str) else bound.__forward_arg__
+
+    def probe() -> None: ...
+
+    probe.__annotations__ = {"return": expression}
+    try:
+        return typing.get_type_hints(probe, globalns=dict(namespace))["return"]
+    except (NameError, TypeError, AttributeError, SyntaxError):
+        return _UNRESOLVED_BOUND
 
 
 _UNRESOLVABLE_ANNOTATIONS: Final[frozenset[tuple[str, str]]] = frozenset(
@@ -237,6 +291,18 @@ def _resolution_localns(func: object) -> dict[str, object]:
     return {param.__name__: param for param in getattr(func, "__type_params__", ())}
 
 
+def _annotation_namespace(func: object) -> dict[str, object]:
+    """문자열 경계를 푸는 namespace — `get_type_hints` 가 쓰는 것과 **같은 자리**.
+
+    `get_type_hints` 는 함수의 `__globals__` 에 `localns` 를 얹어 주석을 푼다. 경계는 그
+    함수가 들어가지 않는 구멍이므로 여기서 같은 조합을 만들어 `_resolved_bound` 에 넘긴다 —
+    두 자리가 다른 namespace 를 쓰면 「주석은 풀리는데 경계는 안 풀린다」가 사유가 아니라
+    namespace 차이로 생긴다."""
+    namespace: dict[str, object] = dict(getattr(func, "__globals__", {}))
+    namespace.update(_resolution_localns(func))
+    return namespace
+
+
 def _resolved_hints(func: object) -> dict[str, object] | None:
     """해석된 주석, 해석 불가면 `None`.
 
@@ -248,13 +314,26 @@ def _resolved_hints(func: object) -> dict[str, object] | None:
     **환경 의존**으로 만들었다(CI 만 붉었다).
 
     `__type_params__` 를 `localns` 로 넘기면 **어느 파이썬에서도** 해석된다 — 등식에 남는
-    실패는 환경과 무관한 것(생성 stub 의 모듈 속성 부재)뿐이다."""
+    실패는 환경과 무관한 것(생성 stub 의 모듈 속성 부재)뿐이다.
+
+    **`get_type_hints` 가 성공해도 끝이 아니다**(v r8 M-1'): 그것은 `TypeVar` 의 경계
+    안으로 들어가지 않으므로, 문자열 경계는 풀리지 않은 채 남는다. 펴 본 잎에 해석 실패
+    표지가 있으면 **여기서 해석 실패를 선언한다** — 그 함수는 모집단에서 빠지는 대신 해석
+    실패 등식을 붉힌다."""
     try:
-        return typing.get_type_hints(  # type: ignore[arg-type]
+        hints = typing.get_type_hints(  # type: ignore[arg-type]
             func, localns=_resolution_localns(func)
         )
     except (NameError, TypeError, AttributeError):
         return None
+    namespace = _annotation_namespace(func)
+    if any(
+        leaf is _UNRESOLVED_BOUND
+        for hint in hints.values()
+        for leaf in _flatten_annotation(hint, namespace)
+    ):
+        return None
+    return hints
 
 
 def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
@@ -265,7 +344,8 @@ def _returns_a_policy(func: object, policy_types: tuple[type, ...]) -> bool:
     if returned is None:
         return False
     return any(
-        _is_policy_type(part, policy_types) for part in _flatten_annotation(returned)
+        _is_policy_type(part, policy_types)
+        for part in _flatten_annotation(returned, _annotation_namespace(func))
     )
 
 
