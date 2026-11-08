@@ -1,36 +1,43 @@
 # M9 / gates-build — 되돌리기
 
-**복원 원천은 고정된 main SHA `56bd33ea`** 다 — 이 브랜치가 **실제로 병합한** main 커밋이고, 그 SHA 에는
-이 slice 가 없다(첫 산출물 커밋이 `56bd33ea` 의 조상이 아님을 `git merge-base --is-ancestor` 로 단언).
-움직이는 `origin/main` 을 쓰지 않는다. 머지 뒤 되돌림은 PR revert 다.
+**복원 원천은 고정된 main SHA `3101035f`** 다 — 이 브랜치가 **실제로 병합한** 다섯째 main 커밋이고,
+그 SHA 에는 이 slice 가 없다(첫 산출물 커밋 `692af252` 가 `3101035f` 의 조상이 **아님**을
+`git merge-base --is-ancestor` 로 단언 — 실측). 움직이는 `origin/main` 을 쓰지 않는다. 머지 뒤
+되돌림은 PR revert 다.
 
 착수 base `df4976cc` 는 **병합 뒤에는 경계로 쓸 수 없다**. 그 경계로 세면 병합이 들여온 남의 레인
 커밋까지 세어 162 경로가 나오고 그 중 82 가 내 것이 아니다(web · usecase · 다른 slice 의 evidence).
-이 브랜치는 main 을 **네 번** 병합했고(`e12c0485` → `3ad4f3f6` → `97ed49c4` → `56bd33ea`) 원천은 그때마다 옮긴다.
+이 브랜치는 main 을 **다섯 번** 병합했고(`e12c0485` → `3ad4f3f6` → `97ed49c4` → `56bd33ea` →
+`3101035f`) 원천은 그때마다 옮긴다.
 
-**실측 HEAD: `c64c1468`**(수정 라운드 3 의 마지막 산출물 커밋). 그 뒤에 움직인 되돌림 대상은 **이 파일 하나**(`rollback.md` 를 담은 커밋)다 —
-유효성 확인은 `git diff --name-only c64c1468..<판정 SHA> -- <아래 목록>` 이 그 한 경로만 내는 것으로
-본다(evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」는 성립할 수 없다).
+**실측 HEAD: `18c21275`**(수정 라운드 4 의 마지막 산출물 커밋 — evidence 포함). 그 뒤에 움직인 되돌림
+대상은 **이 파일 하나**(`rollback.md` 를 담은 커밋)다 — 유효성 확인은
+`git diff --name-only 18c21275..<판정 SHA> -- <아래 목록>` 이 그 한 경로만 내는 것으로 본다
+(evidence 커밋은 언제나 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」는 성립할 수 없다).
 
 ## 복원 목록 — 기계 산출, 내 커밋만
 
 ```
-git log --no-merges --format= --name-only HEAD ^56bd33ea | sort -u
+git log --no-merges --format= --name-only HEAD ^3101035f | sort -u
 ```
 
-**85 경로**(추가 20 · 수정 65). 등식 확인: 위 목록과 `git diff --name-only 56bd33ea..HEAD | sort -u` 의
+**86 경로**(추가 21 · 수정 65). 등식 확인: 위 목록과 `git diff --name-only 3101035f..HEAD | sort -u` 의
 `comm -23`·`comm -13` 이 **둘 다 빈 출력**이다(한쪽 방향만 보면 「내가 커밋하지 않아도 들어오는 경로」를
-못 본다). 라운드마다 재산출한다. **수정 라운드 3 은 새 파일을 만들지 않았다**(두 축의 고침이 기존 파일 안에
-들어갔다) — 그래서 경로 수가 85 로 같고 바뀐 것은 **경계**다. 수정 라운드 1 이 더한 것은 다섯(새 바이트코드 축 셋 · 나눈 배선 하나 · 계약이
-그 라운드에 더한 `app/build.gradle.kts`)이고, 수정 라운드 2 는 **새 파일을 만들지 않았다**(중첩 jar
-축이 기존 `JarContentPolicy`·`JarContentGateTask` 안에 들어갔다). 그래서 경로 수가 85 로 같다 — 다만
-**경계가 라운드마다 옮겼고**(지금은 `97ed49c4` → `56bd33ea`), main 이 바꾼 `gate-tests.properties` 가 내 목록에도 있어
-복원이 그 파일을 main 의 새 판으로 되돌린다(내 등재 행 넷이 빠지고 main 의 주석이 남는다 — 의도된 방향).
+못 본다). 라운드마다 재산출한다.
+
+**수정 라운드 4 는 새 파일을 **하나** 만들었다** — `build-logic/src/test/kotlin/bidvector/buildlogic/
+NestedArchivePolicyTest.kt`(전건 `check` 의 `buildLogicSizeGate` 가 붉어 중첩 축 test 를 자기 클래스로
+나눈 것). 그래서 경로 수가 **85 → 86** 이다. 그 경로는 `build-logic/**` 안이라 **in_scope 는 바뀌지
+않는다**(scope.md 에 대조를 적었다). 앞 라운드들: 1 이 다섯을 더했고 2·3 은 새 파일을 만들지 않았다.
 **새 파일 ↔ in_scope 대조는 라운드마다 다시 한다** — 그 대조를 빼먹는 것이 반복되는 사각이다.
 
-경로의 묶음은 다섯이다 — `build-logic/**` **33**(게이트 구현·convention plugin·나눈 배선·included
-build 스크립트) · `config/quality/**` **4**(정책 데이터) · **새 게이트가 찾은 기존 위반을 고친 40
-파일**(adapters·app·procurement·workflow 의 import 줄 삭제 — 목록은 `checklist.md`) ·
+경계도 라운드마다 옮겼다(지금은 `56bd33ea` → `3101035f`). main 이 바꾼 `gate-tests.properties` 가 내
+목록에도 있어 복원이 그 파일을 main 의 새 판으로 되돌린다(내 등재 행 다섯이 빠지고 main 의 `Mutation*`
+네 행이 남는다 — 의도된 방향).
+
+경로의 묶음은 다섯이다 — `build-logic/**` **34**(게이트 구현·convention plugin·나눈 배선·included
+build 스크립트·나눈 test 클래스) · `config/quality/**` **4**(정책 데이터) · **새 게이트가 찾은 기존
+위반을 고친 40 파일**(adapters·app·procurement·workflow 의 import 줄 삭제 — 목록은 `checklist.md`) ·
 `reports/evidence/m9/gates-build/**` **5** · 그 밖 **3**(`capability-map.md` 의 그 절 ·
 `open-inventory.md` 의 그 절 · `app/build.gradle.kts` 의 주석 한 문단).
 
@@ -41,37 +48,42 @@ build 스크립트) · `config/quality/**` **4**(정책 데이터) · **새 게�
 ## 복원 명령 — range revert 가 아니라 경로 한정
 
 ```
-git log --no-merges --format= --name-only HEAD ^56bd33ea | sort -u \
-  | xargs git restore --source=56bd33ea --staged --worktree --
+git log --no-merges --format= --name-only HEAD ^3101035f | sort -u \
+  | xargs git restore --source=3101035f --staged --worktree --
 ```
 
 추가된 파일은 원천에 없으므로 이 명령이 **지운다**(별도 `rm` 이 필요 없다).
 
 ## 리허설 실측 — 버릴 clone, ①~⑥
 
-저장소 밖 임시 clone 에서 `c64c1468` 을 체크아웃하고 위 명령을 돌렸다.
+저장소 밖 임시 clone 에서 `18c21275`(실측 HEAD)를 체크아웃하고 위 명령을 돌렸다.
 
 | # | 항목 | 결과 |
 | --- | --- | --- |
-| ① | 복원 목록 ↔ diff 등식 | `comm -23`·`comm -13` 둘 다 빈 출력 · 85 경로(A 20 · M 65) |
+| ① | 복원 목록 ↔ diff 등식 | `comm -23`·`comm -13` 둘 다 빈 출력 · 86 경로(A 21 · M 65) |
 | ② | 복원 명령 exit | 0 |
-| ③ | 복원 뒤 `git status --porcelain` 계수 | **D 20 · M 65**(= 추가 20 삭제 + 수정 65 되돌림), 합 85 |
-| ④ | **트리 동일성** | 복원한 트리의 `git write-tree` 가 `56bd33ea^{tree}`(`00016987…`) 와 **같은 해시**다(경로 목록이 비는 것보다 강한 형태) · `git diff --name-only 56bd33ea -- .` 도 빈 출력 |
+| ③ | 복원 뒤 `git status --porcelain` 계수 | **D 21 · M 65**(= 추가 21 삭제 + 수정 65 되돌림), 합 86 |
+| ④ | **트리 동일성** | 복원한 트리의 `git write-tree` 가 `3101035f^{tree}`(`c0913842…`) 와 **같은 해시**다(경로 목록이 비는 것보다 강한 형태) · `git diff --name-only 3101035f -- .` 도 빈 출력 |
 | ⑤ | compile | ④ 로 갈음 — 아래 |
 | ⑥ | test · 게이트 | ④ 로 갈음 — 아래 |
 
-**⑤⑥ 의 갈음은 「HEAD 초록」이 아니라 트리 동일성이다.** 복원된 트리는 `56bd33ea` 의 트리와 해시가
-같고(`00016987…`), `56bd33ea` 의 트리는 PR #137 의 head `816fe690` 과 **경로 차 0**이며 그 head 에서 CI 네 job
-(`check`·`container`·`ml-engine`·`web`)이 전부 pass 다. 즉 되돌린 트리는 이미 전건으로 측정된 트리이고,
-같은 트리에서 compile·test·게이트를 다시 도는 것은 그 측정의 재탕이다.
+**⑤⑥ 의 갈음은 「HEAD 초록」이 아니라 트리 동일성이다.** 복원된 트리는 `3101035f` 의 트리와 해시가
+같다(`c0913842…`). `3101035f` 는 **main 의 머지 커밋**이고 main 의 CI 가 그 자리에서 돈다. 즉 되돌린
+트리는 이미 전건으로 측정된 트리이고, 같은 트리에서 compile·test·게이트를 다시 도는 것은 그 측정의
+재탕이다.
 
-**「내 표지 0 · 남의 표지 보존」 계수** — 복원 뒤 이 slice 가 추가한 게이트 task 파일이 **0** 개 남고,
-main 이 들여온 남의 표지는 보존된다(web 개찰 축 하네스 **2** · `opening-harness` evidence **5**).
-완료를 종료 코드가 아니라 이 두 계수로 본다.
+**「내 표지 0 · 남의 표지 보존」 계수** — 복원 뒤 이 slice 가 만든 파일(`EnvironmentAccessGateTask` ·
+`MigrationOrderGateTask` · `PolicyGateWiring` · `NestedArchivePolicyTest`)이 **0** 개 남고, 정책에서
+이 slice 의 키 셋(`jar.nested-lib-roots` · `jar.boot-launcher-main-class` ·
+`bytecode.env-access.allowed-callers`)도 **0** 회 나온다. main 이 들여온 남의 표지는 보존된다 — 다섯째
+병합이 들여온 여섯을 각각 확인했다(`MutationReportGateTask.kt` · `mutation-policy.properties` ·
+`TelegramNotificationSender.kt` · `NotificationRelayRun.kt` · `m9/adr07-pitest/scope.md` ·
+`m9/str12/scope.md`). 완료를 종료 코드가 아니라 이 두 계수로 본다.
 
 **되돌림이 실제로 무엇을 되돌리는지**: 복원된 트리에서 app 의 아카이브 판정은 `jar` 하나만 보는 앞 판
-(`judged=279`)으로 돌아가고, 이 slice 의 HEAD 에서는 배포물까지 포함한 `archives=2 entries=657
-judged=558` 이다. adapters 의 소스 참조 축도 복원 뒤 판정 없이 통과하던 앞 판으로 돌아간다.
+(`judged=279`)으로 돌아가고, 이 slice 의 HEAD 에서는 배포물까지 포함한 `archives=2 entries=677
+judged=578 nestedJars=102 nestedOutside=0` 이다. 환경 축도 복원 뒤 그 게이트 자체가 사라지고, adapters
+의 소스 참조 축은 판정 없이 통과하던 앞 판으로 돌아간다.
 
 ## 축별 부분 비활성화 (전면 되돌림 없이)
 
@@ -103,5 +115,5 @@ judged=558` 이다. adapters 의 소스 참조 축도 복원 뒤 판정 없이 �
 
 ## 예상 복구 시간
 
-위 복원 명령 하나로 1 분 이내(트리 조작만). 복원된 트리는 `56bd33ea` 과 같은 트리라 재빌드 없이
+위 복원 명령 하나로 1 분 이내(트리 조작만). 복원된 트리는 `3101035f` 과 같은 트리라 재빌드 없이
 그 SHA 의 CI 결과가 그대로 적용된다.
