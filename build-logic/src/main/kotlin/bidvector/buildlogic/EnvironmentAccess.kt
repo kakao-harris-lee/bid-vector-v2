@@ -81,7 +81,8 @@ internal object EnvironmentAccess {
                     "「0 건이다」가 아니라 「재지 못했다」이고, 그 초록은 배선이 끊긴 게이트의 초록이다",
             )
         } else {
-            sniffViolations(accesses, denied, allowed.toSet()) + deadAllowances(accesses, allowed, presentClasses)
+            sniffViolations(accesses, denied, allowed.toSet()) +
+                allowanceViolations(accesses, allowed, presentClasses)
         }
 
     private fun sniffViolations(
@@ -104,27 +105,62 @@ internal object EnvironmentAccess {
             }
 
     /**
-     * **대상 없는 허용은 위반이다** — 허용 목록의 죽은 항목은 그 좌표의 자리를 비워 두어, 나중에
-     * 누가 같은 자리에 같은 호출을 넣으면 말없이 통과시킨다(OPS-13 원리 4).
+     * **허용 하나는 호출 하나만 연다** — 대상이 없어도, 둘 이상이어도 위반이다.
+     *
+     * 대상이 없는 쪽(OPS-13 원리 4): 죽은 허용은 그 좌표의 자리를 비워 두어, 나중에 누가 같은 자리에
+     * 같은 호출을 넣으면 말없이 통과시킨다.
+     *
+     * **둘 이상인 쪽**(수정 라운드 5, 리뷰 M-1 · verifier M-1): 허용 키의 귀속은 **최상위 클래스**라,
+     * 한 번 열면 그 클래스 안의 다른 메서드·중첩 클래스·람다에서 **몇 번이든** 같은 호출이 통과했다
+     * (실측 — 네 변이 전부 초록). 메서드 단위 키는 람다·callable reference 가 다른 메서드로 나가
+     * 모양이 부서지므로, 범위를 **행사 횟수 1**로 묶는다: 허용된 자리는 하나로 남고, 두 번째 호출은
+     * 그 자리를 넓히는 것이므로 정책을 다시 쓰게 한다. (닫히지 않는 것 하나: 그 **한 호출이 읽는
+     * 값**은 키에 없다 — 인자가 상수가 아니라 enum 값이라 속성 이름 단위 허용이 이 저장소에서는
+     * 성립하지 않는다. `checklist.md` 제한 21 에 범위를 그대로 적는다.)
      *
      * 검출 범위는 **그 클래스를 읽은 모듈**로 제한한다 — 게이트는 모듈마다 돌고 모집단이 다르므로,
      * 범위를 두지 않으면 아홉 모듈이 남의 모듈 허용을 「죽었다」고 센다. 클래스가 통째로 사라진
      * 경우는 어느 모듈도 세지 않는다(알려진 제한).
+     *
+     * **모양이 아닌 항목은 모든 모듈에서 위반이다**(리뷰 LOW-5). `->` 나 `#` 가 없는 줄은 어떤 접근과도
+     * 같아질 수 없어 앞 판에서 **아무 말 없이 무효**였다 — 오타 하나가 허용을 지우고도 조용했다.
+     * 그 줄은 모집단과 무관한 **정책 데이터의 오류**라 모듈 범위를 묻지 않는다.
      */
-    private fun deadAllowances(
+    private fun allowanceViolations(
         accesses: List<ClassMemberAccess>,
         allowed: List<String>,
         presentClasses: Set<String>,
     ): List<String> {
-        val exercised = accesses.map(::allowKey).toSet()
-        return allowed
-            .filter { it !in exercised && it.substringBefore(CALLER_SEPARATOR) in presentClasses }
-            .sorted()
-            .map {
-                "허용한 좌표에 대상이 없다 — 그 클래스는 읽혔는데 그 호출이 없다. 죽은 허용은 " +
-                    "그 자리를 비워 두어 다음 사람의 같은 호출을 말없이 통과시킨다: $it"
-            }
+        val exercised = accesses.map(::allowKey)
+        val (shaped, malformed) = allowed.partition(::isAllowKeyShaped)
+        return malformed.sorted().map {
+            "허용 항목이 '귀속클래스${CALLER_SEPARATOR}선언클래스${MEMBER_SEPARATOR}멤버' 모양이 아니다 — " +
+                "어떤 접근과도 같아질 수 없어 **말없이 무효**인 허용이다: $it"
+        } + shaped.sorted().mapNotNull { allowance -> countViolation(allowance, exercised, presentClasses) }
     }
+
+    private fun countViolation(
+        allowance: String,
+        exercised: List<String>,
+        presentClasses: Set<String>,
+    ): String? =
+        when (val count = exercised.count { it == allowance }) {
+            1 -> null
+            0 ->
+                if (allowance.substringBefore(CALLER_SEPARATOR) !in presentClasses) {
+                    null
+                } else {
+                    "허용한 좌표에 대상이 없다 — 그 클래스는 읽혔는데 그 호출이 없다. 죽은 허용은 " +
+                        "그 자리를 비워 두어 다음 사람의 같은 호출을 말없이 통과시킨다: $allowance"
+                }
+
+            else ->
+                "허용 하나가 호출 ${count}건을 연다 — 이 키의 귀속은 **최상위 클래스**라 그 안의 다른 " +
+                    "메서드·중첩 클래스·람다까지 함께 열린다. 허용은 자리 하나까지다: $allowance"
+        }
+
+    private fun isAllowKeyShaped(allowance: String): Boolean =
+        allowance.contains(CALLER_SEPARATOR) && allowance.substringAfter(CALLER_SEPARATOR).contains(MEMBER_SEPARATOR)
 
     /**
      * 허용 키는 **`귀속클래스->선언클래스#멤버`** 다 — 고칠 자리(귀속)와 능력(좌표)의 쌍이고,
@@ -133,6 +169,7 @@ internal object EnvironmentAccess {
     private fun allowKey(access: ClassMemberAccess): String = "${access.enclosingClass}$CALLER_SEPARATOR${key(access)}"
 
     private const val CALLER_SEPARATOR = "->"
+    private const val MEMBER_SEPARATOR = "#"
 
     /**
      * 거부 키는 `선언클래스#멤버` 이고 **`*#멤버` 는 「어떤 수신자든」**이다.
@@ -148,5 +185,5 @@ internal object EnvironmentAccess {
         denied: Set<String>,
     ): Boolean = key(access) in denied || "*#${access.member}" in denied
 
-    private fun key(access: ClassMemberAccess): String = "${access.ownerFqn}#${access.member}"
+    private fun key(access: ClassMemberAccess): String = "${access.ownerFqn}$MEMBER_SEPARATOR${access.member}"
 }

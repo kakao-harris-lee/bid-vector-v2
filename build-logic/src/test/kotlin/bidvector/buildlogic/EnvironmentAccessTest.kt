@@ -139,6 +139,42 @@ class EnvironmentAccessTest {
     }
 
     @Test
+    fun `허용 하나는 호출 하나까지다 — 같은 클래스에서 한 번 더 부르면 위반이다`() {
+        // 리뷰 M-1 · verifier M-1: 허용 키의 귀속은 **최상위 클래스**라, 한 번 열면 그 클래스 안의
+        // 다른 메서드·중첩 클래스·람다에서 몇 번이든 통과했다(실측 — 네 변이 전부 초록). 메서드 단위
+        // 키는 람다가 다른 메서드로 나가 모양이 부서지므로, 범위를 **행사 횟수 1**로 묶는다.
+        val violations =
+            EnvironmentAccess.violations(
+                listOf(
+                    ClassMemberAccess(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                    ClassMemberAccess("$ALLOWED_CALLER\$relay\$1", "java.lang.System", "getProperty", ALLOWED_CALLER),
+                ),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("호출 2건"), "$violations")
+    }
+
+    @Test
+    fun `모양이 아닌 허용 항목은 위반이다 — 앞 판은 말없이 무효였다`() {
+        // 리뷰 LOW-5: `->` 나 `#` 가 없는 줄은 어떤 접근과도 같아질 수 없다. 오타 하나가 허용을
+        // 지우고도 조용했고, 그 조용함은 「허용이 살아 있다」로 읽혔다.
+        val violations =
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                DENIED,
+                listOf(ALLOWED_PAIR, "bidvector.app.Typo"),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("모양이 아니다"), "$violations")
+    }
+
+    @Test
     fun `남의 모듈 허용은 죽었다고 세지 않는다 — 모듈마다 모집단이 다르다`() {
         val violations =
             EnvironmentAccess.violations(
