@@ -276,7 +276,7 @@ PR CI 가 `:build-logic:ktlintKotlinScriptCheck` 에서 붉었다(앞 라운드 
 
 | 변이 | RED |
 | --- | --- |
-| `EnvironmentAccess.isDenied` 의 `*#멤버` 가지 제거 | 1 (Spring 하위 타입 수신자 test) |
+| `EnvironmentAccess.isDenied` 의 `*#멤버` 가지 제거 | 1 (Spring **상위 타입**(`Environment`) 수신자 test — 라벨 정정, 리뷰 LOW-4: 그 RED 는 상위 타입 입력에서 났고 하위 타입을 입력으로 둔 test 는 그때 **없었다**. 라운드 4 가 그 test 를 더했다) |
 | 건너뛰기 목록을 test 에 넘기지 않음(선언 ↔ 판독 끊기) | 1 (죽은 면제 0 test 의 비-공허 단언) |
 | 중첩 면제를 **느슨한 접두 일치**로 대체 | 1 (사칭 test) |
 
@@ -288,4 +288,105 @@ PR CI 가 `:build-logic:ktlintKotlinScriptCheck` 에서 붉었다(앞 라운드 
 
 익명 클래스 필터 제거는 **task 층**이라 순수 test 로는 잡히지 않는다 — 그 축의 변이 실측은 위 H-1
 차등(앞 판 재현 레그 0/8)이 대신한다. 같은 이유로 중첩 판독기와 마이그레이션 입력 교체도 게이트 층
-양성 대조가 그 자리를 진다.
+양성 대조가 그 자리를 진다. **라운드 4 가 그 셋 중 둘을 상시 회귀로 바꿨다**(아래) — 그 일회 측정은
+세션과 함께 죽는다는 지적(리뷰 M-1)이 옳았다.
+
+## 수정 라운드 4 — 중첩 축을 네 축으로 · main 다섯째 병합
+
+### 양성 대조 — 우회 셋을 **실제 배포물에** 심었다 (게이트 층)
+
+`app/build.gradle.kts` 의 `bootJar` 에 진짜 zip 셋을 심고 `:app:jarContentGate --rerun`.
+심은 것은 verifier 가 쓴 U1·U2·U3 그대로다.
+
+| 심은 것 | 로더가 싣는가 | 결과 |
+| --- | --- | --- |
+| `BOOT-INF/lib/x/spring-boot-jarmode-tools-4.1.1.jar` — **면제와 같은 정확 이름**, 하위 디렉터리 | 싣는다 | **FAILED** — 경로 축 + 다중도 축 |
+| `BOOT-INF/lib/y/kotlin-reflect-2.4.10.jar` — **선언된 이름**, 하위 디렉터리 | 싣는다 | **FAILED** — 경로 축 + 다중도 축 |
+| `BOOT-INF/ext/sneak.jar` — 뿌리 밖 | 런처를 바꾸면 싣는다 | **FAILED** — 뿌리 밖 축(zip 서명) |
+
+판정 수: `nestedJars 102 → 104` · `nestedOutside 0 → 1` · 위반 **5 줄**(경로 2 · 다중도 2 · 뿌리 밖 1).
+`unzip -l` 로 셋이 실제 아카이브 안에 있음을 따로 확인했다.
+
+### 차등 — 같은 심은 셋을 **앞 판 술어**로 재판한다
+
+술어만 앞 판(이름 **집합 소속** 하나)으로 **대체**하고 심은 셋을 그대로 둔 채 다시 돌렸다.
+
+| 레그 | 결과 |
+| --- | --- |
+| **앞 판 술어** + 심은 셋 | **BUILD SUCCESSFUL · 리포트 위반 줄 0** (`nestedJars=104 nestedOutside=1` — 세기는 세는데 판정하지 않는다) |
+| **지금** + 심은 셋 | **FAILED · 5 줄** |
+| 음성 대조(심은 것 제거, 전 모듈) | **BUILD SUCCESSFUL** — app `nestedJars=102 nestedOutside=0 runtimeJars=109`, 나머지 아홉 `0` |
+
+**0 → 5** 가 이 라운드의 근거다. 같은 레그에서 `:build-logic:test --rerun` 은 **429 중 8 FAILED** —
+경로·다중도·죽은 면제·런처·뿌리 밖·뿌리 밖 음성 대조·판독기 연결 test 가 전부 RED 다. 판독기 층까지
+재는 test(`@TempDir` 에 진짜 아카이브를 만들어 `readNestedArchive` 를 거쳐 판정)가 그중 둘이라,
+**경로를 버리는 변이가 이제 상시로 붉는다**(리뷰 M-1 ⓑ).
+
+### 변이 — 정책 두 자리와 모집단 한 자리
+
+| 변이 | 결과 |
+| --- | --- |
+| `jar.nested-lib-roots` 를 **비움**(지우지 않고) | `:app:jarContentGate` **FAILED** — 「값이 비어 있다 — 이 축은 빈 목록으로 꺼지지 않는다」. 앞 판은 모집단 0 으로 **조용히 초록**이었다(리뷰 M-2) |
+| 허용 쌍의 멤버를 대상 없는 것으로 바꿈 | `:app:environmentAccessGate` **FAILED** — 「허용한 좌표에 대상이 없다」 |
+| `filterNot { it.isAnonymousClass }` **복귀**(앞 판 그대로) | `environmentAccessGate` **네 모듈 FAILED** — shared-kernel 73/71 · workflow 702/686 · adapters 520/492 · app 289/276 |
+
+마지막 변이의 **범위가 이 축의 현재 크기**다: 익명 클래스가 0 인 여섯 모듈에서는 같은 변이가 초록이고,
+그 여섯에서는 변이가 거동을 바꾸지 않는다(뺄 것이 없다). 리뷰 M-1 이 처방한 바닥값(「익명 ≥ 1」)이
+**그 여섯을 상시로 붉힐 것**이라는 것도 같은 수에서 나온다 — 그래서 바닥값 대신 등식을 썼다.
+
+### main 다섯째 병합 (`3101035f`, PR #142 CVE · #127 str12 · #136 adr07-pitest)
+
+겹친 경로 **다섯**(`build-logic/build.gradle.kts` · `bidvector.quality-baseline.gradle.kts` ·
+`architecture-policy.properties` · `gate-tests.properties` · `capability-map.md`). 손 해소는
+**`gate-tests.properties` 한 파일**이고(`--cc` 로 그 한 hunk만 나온다), 내 `MigrationOrderTest` 행과
+main 의 `Mutation*Test` 네 행이 나란히 섰다.
+
+| 검산 | 결과 |
+| --- | --- |
+| 합집합 보존 | 다섯 경로 모두 **양쪽 추가 줄이 병합 결과에 전부 있다**(missing 0 / 0) |
+| 중복 키 | `architecture-policy` 키 156 · `gate-tests` 키 16 — 둘 다 중복 **0**(이어달리기를 펴서 셌다) |
+| `policy.version` | main 은 건드리지 않았다(11 그대로) → 이 라운드가 **12** 로 올린다 |
+
+### 병합이 들여온 위반 하나 — 임계 0 축이 처음으로 붉었다
+
+병합 직후 `:app:environmentAccessGate` 가 **FAILED** 했다:
+`bidvector.app.wiring.RelayWiring → java.lang.System#getProperty`. PR #127(str12)이 더한 **기동 거부
+가드**이고, JDK HttpClient 로그 속성이 켜졌으면 알림 본문이 로그로 샐 수 있어 **뜨지 않는다**.
+
+이 축을 끄지도 좌표를 빼지도 않고, 게이트 문면이 OPS-07 (a) 로 **약속하던** 억제 경로
+(`bytecode.env-access.allowed-callers`)를 구현해 정확 쌍 하나만 열었다. 임계 0 축에 허용이 생기는
+것이므로 셋을 함께 걸었다 — 와일드카드 없음 · **대상 없는 허용은 위반** · 목록 전체를 test 가 값으로
+고정. **이 판단은 운영자 확인 대상**이다(`checklist.md` 제한 21 · OPEN).
+
+### 전건 `check` 를 돌려서야 보인 것 넷 — **표적만으로는 셋이 숨어 있었다**
+
+`./gradlew --no-daemon check`(CI job 명령 그대로)를 끝까지 돌렸다. 표적 실행이 전부 초록인 상태에서
+**네 자리가 붉었고**, 그중 셋은 이 라운드의 변경이 만든 것이 아니라 **병합이 들여온 것**이다. 앞 두
+라운드의 차단이 전부 이 `check` 였던 이유가 여기 있다.
+
+| # | 붉은 자리 | 원인 | 처분 |
+| --- | --- | --- | --- |
+| 1 | `:buildLogicSizeGate` | 새 test 가 `JarContentPolicyTest` 를 **521 줄**로 올렸다(한도 500) | **판정 대상으로 나눴다** — class 엔트리 판정은 그대로, 중첩 아카이브 축은 `NestedArchivePolicyTest`(정책 타입이 둘이니 test 도 둘). 크기 회피용 기계 분할이 아니다. 149 + 399 줄. **같은 커밋에서 `gate-tests.properties` 에 등재**했다 |
+| 2 | `:build-logic:ktlintMainSourceSetCheck`·`…TestSourceSetCheck` | 새 코드의 형식 셋(함수 서명 한 줄 · 인자 줄바꿈 · 최대 길이) | 형식만 고쳤다. 긴 리터럴 둘은 이름 붙인 상수로(`PROPERTIES_LAUNCHER`·`CLASS_MAGIC`) |
+| 3 | `:adapters:domainSourceReferenceGate` | **알려진 제한 8 이 실현됐다** — 범위 축 허용 뿌리가 두 자리에 살고, main(PR #127)이 `RelayAdapterDependencyTest.ALLOWED_ROOTS` 에만 `bidvector.adapters.notification` 을 더했다 | 정책 쪽에 값 복사. 그리고 **여덟 축 전부를 기계로 대조**했다 — `relay` 하나만 어긋났고(test만=`{bidvector.adapters.notification}`) 나머지 일곱은 양방향 차집합이 빈 집합이다 |
+| 4 | `:app:domainSourceReferenceGate` | 바이트코드 축에만 허용을 열어 **소스 1차 그물이 같은 호출에서 붉었다** | 두 층이 **같은 키 하나**(`bytecode.env-access.allowed-callers`)를 읽게 했다. 목록을 둘로 두면 억제가 한 층에서만 들어 OPS-07 (a) 가 약속한 경로가 실제로는 못 쓰는 경로가 된다 |
+
+3·4 는 **표적 실행으로는 영원히 보이지 않았을 자리**다(둘 다 내가 이번에 만진 task 가 아니거나,
+만졌어도 그 모듈을 표적에 넣지 않았다). 전건을 끝까지 돌린 것이 그 둘을 낸 유일한 이유다.
+
+### 전건과 clean-tree
+
+| 명령 | 결과 |
+| --- | --- |
+| `:build-logic:test --rerun`(전건) | 429 tests · 0 failed(분할·새 test 전) |
+| `jarContentGate environmentAccessGate migrationOrderGate --rerun`(전 모듈) | **BUILD SUCCESSFUL** — app `judged=578 exempt=99 nestedJars=102 nestedOutside=0` · `classFiles=289 types=289 anonymousTypes=13 denied=10 allowed=1 violations=0` |
+| `./gradlew --no-daemon check`(CI job 명령 그대로) | **BUILD SUCCESSFUL in 33m 5s** — 435 actionable tasks(388 executed · 9 from cache · 38 up-to-date) |
+| `./gradlew --no-daemon leakPatternGate --rerun` | exit 0 (라운드 내내 매 실행에서) |
+
+전건을 **끝까지** 돌린 것은 이 slice 에서 처음이다(앞 라운드들은 로컬에서 표적만 돌리고 전건은 PR CI 를
+정본으로 삼았고, 그 전건이 두 번 붉어 두 라운드를 썼다). 33 분은 CI 의 `check` job(35m14s)과 같은
+자릿수다.
+
+변이는 **전부 커밋 뒤에** 돌렸고 되돌림은 백업 사본 복사다(`checkout --` 를 쓰지 않았다 — 미커밋
+산출물을 함께 지우는 자리). 각 되돌림 뒤 `git status --porcelain` 빈 출력. 양성 대조: 변이를 심은
+직후 같은 명령이 그 경로를 냈다.
