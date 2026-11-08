@@ -130,8 +130,7 @@ internal object EnvironmentAccess {
      * 허용 키는 **`귀속클래스->선언클래스#멤버`** 다 — 고칠 자리(귀속)와 능력(좌표)의 쌍이고,
      * 와일드카드가 없다. 이 저장소의 `collection.transport.holders.*` 와 같은 모양이다.
      */
-    private fun allowKey(access: ClassMemberAccess): String =
-        "${access.enclosingClass}$CALLER_SEPARATOR${key(access)}"
+    private fun allowKey(access: ClassMemberAccess): String = "${access.enclosingClass}$CALLER_SEPARATOR${key(access)}"
 
     private const val CALLER_SEPARATOR = "->"
 
