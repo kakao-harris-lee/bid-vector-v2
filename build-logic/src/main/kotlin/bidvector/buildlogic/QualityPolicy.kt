@@ -44,4 +44,14 @@ internal fun Map<String, String>.requireList(key: String): List<String> =
 internal fun Map<String, String>.requireNonEmptyList(key: String): List<String> =
     requireList(key).ifEmpty { error("정책 키 '$key' 의 값이 비어 있다 — 이 축은 빈 목록으로 꺼지지 않는다") }
 
+/**
+ * **목록이되 항목이 꼭 하나**인 값. 배포 아카이브의 적재 자리(`Spring-Boot-Lib`·`Spring-Boot-Classes`)
+ * 처럼 **하나만 선언될 수 있는 자리**를 그 목록에서 가져올 때 쓴다 — 같은 값을 다른 키에 복사하면
+ * 둘이 갈라지는 날 게이트가 자기 전제를 잃고, 목록이 둘이 되면 「어느 쪽이 그 자리인가」가 판정 밖에서
+ * 정해진다.
+ */
+internal fun Map<String, String>.requireSingle(key: String): String =
+    requireNonEmptyList(key).singleOrNull()
+        ?: error("정책 키 '$key' 는 항목이 하나여야 한다 — 이 값은 배포물이 **하나만** 선언할 수 있는 자리다")
+
 internal fun Map<String, String>.requireValue(key: String): String = this[key] ?: error("정책 키 '$key' 가 없다")

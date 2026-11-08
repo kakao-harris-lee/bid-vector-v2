@@ -107,10 +107,15 @@ internal fun archiveEmptinessFailure(
     }
 
 /**
- * 아카이브 한 엔트리의 판정 입력 — **엔트리 전체 경로**와, 그 바이트가 zip 아카이브로 **시작하는가**.
+ * 아카이브 한 엔트리의 판정 입력 — **엔트리 전체 경로**와, 그 바이트가 **zip 으로 읽히는가**.
  *
  * 뒤의 것이 이름이 아니라 내용인 이유: 확장자는 넣는 쪽이 정하는 값이라 `.zip`·`.JAR`·무확장으로
- * 비껴간다(실측). zip local/central 헤더 서명은 **읽는 쪽이 정하는 값**이다.
+ * 비껴간다(실측).
+ *
+ * **앞 네 바이트가 아니라 끝의 중앙 디렉터리 끝 레코드(EOCD)로 판독한다**(수정 라운드 5). zip 판독기는
+ * 끝에서 EOCD 를 찾으므로 **앞에 아무 바이트나 붙인 jar 도 그대로 읽힌다** — 앞 판의 서명 네 바이트
+ * 술어는 그 포장 하나로 열려 있었고(앞 판 제한 20 ⓐ 가 스스로 적은 자리), 뿌리 밖에서 미계수였다.
+ * EOCD 는 **읽는 쪽이 찾는 자리**라 포장으로 옮길 수 없다.
  */
 internal data class ArchiveEntry(
     val path: String,
@@ -118,17 +123,21 @@ internal data class ArchiveEntry(
 )
 
 /**
- * 중첩 축이 보는 아카이브 한 채.
+ * 중첩 축과 배포 경로 축이 함께 보는 아카이브 한 채.
  *
  * [path] 가 키다 — 서로 다른 디렉터리의 Jar task 가 같은 `archiveFileName` 을 내면 이름 키에서 하나가
  * 조용히 사라진다. [displayName] 만 판정 문면에 들어간다 — 절대 경로는 기계마다 다른 글자이고, 그
  * 문면을 인용하면 낡는 좌표가 된다(리뷰 LOW-2).
+ *
+ * [descriptor] 는 **출하 경로의 도구가 읽는 자리**다([BootArchivePolicy]). 엔트리 목록만으로는 그
+ * 도구가 무엇을 싣는지 알 수 없다 — 싣는 집합의 정본은 manifest 와 index 파일이고, 이 축의 뿌리
+ * 술어는 그 정본이 정책 값일 때에만 배포 경로의 전제가 된다.
  */
 internal data class NestedArchive(
     val path: String,
     val displayName: String,
     val entries: List<ArchiveEntry>,
-    val mainClass: String?,
+    val descriptor: BootArchiveDescriptor,
 )
 
 /** 중첩 축의 판정과 그 축이 **실제로 센 수** — 수가 0 으로 내려가면 리포트에서 보인다. */
@@ -156,8 +165,9 @@ internal data class NestedArchiveVerdict(
  *
  * 뿌리 밖은 **미계수가 아니다**(수정 라운드 4 — verifier M-1, 리뷰 H-1). 앞 판은 모집단을 뿌리 접두로
  * 좁히면서 뿌리 밖의 중첩 아카이브를 「위반도 면제도 아닌」 자리에 두었고, `PropertiesLauncher` +
- * `Loader-Path` 조합이 그 자리를 실어 날랐다. 지금은 뿌리 밖의 엔트리도 **zip 서명으로** 전수 판정하고
- * ([ArchiveEntry.archiveMagic]), 그 조합 자체는 [launcherMainClass] 단언이 받는다.
+ * `Loader-Path` 조합이 그 자리를 실어 날랐다. 지금은 뿌리 밖의 엔트리도 **중앙 디렉터리 끝 레코드**로
+ * 전수 판정한다([ArchiveEntry.archiveMagic]). 적재 자리를 정하는 manifest·index 자체는
+ * [BootArchivePolicy] 가 받는다 — 그 축이 닫혀야 이 축의 「뿌리」가 배포 경로의 전제가 된다.
  *
  * 면제는 **정확 이름 집합** 하나다([exemptNames]) — Boot 플러그인이 넣는 자기 도구 jar 는 이 저장소의
  * 소스가 아니라 대조 집합이 없다(`jar.external-class-roots` 가 launcher 클래스를 면제하는 것과 같은
@@ -174,7 +184,6 @@ internal class NestedArchivePolicy(
     private val roots: List<String>,
     private val runtimeJarNames: Set<String>,
     private val exemptNames: List<String>,
-    private val launcherMainClass: String,
 ) {
     init {
         require(roots.isNotEmpty()) {
@@ -201,7 +210,13 @@ internal class NestedArchivePolicy(
             outside = archive.entries.filter { it.archiveMagic && rootOf(it) == null }.map(ArchiveEntry::path),
         )
 
-    private fun rootOf(entry: ArchiveEntry): String? = roots.firstOrNull { entry.path.startsWith(it) }
+    /**
+     * **가장 긴 접두를 고른다** — [JarContentPolicy.stripClassRoot] 와 같은 규칙이다(리뷰 LOW-1).
+     * 뿌리가 서로의 접두면(`BOOT-INF/` 와 `BOOT-INF/lib/`) 선언 순서가 「바로 밑인가」의 답을 바꾸므로,
+     * 목록의 순서가 판정에 들어가지 않게 한다.
+     */
+    private fun rootOf(entry: ArchiveEntry): String? =
+        roots.filter { entry.path.startsWith(it) }.maxByOrNull(String::length)
 
     private fun violations(
         module: String,
@@ -215,8 +230,7 @@ internal class NestedArchivePolicy(
                 pathViolations(where, split.under) +
                     multiplicityViolations(where, split.under) +
                     undeclaredViolations(where, split.under) +
-                    deadExemptViolations(where, split.under) +
-                    launcherViolations(where, split.archive)
+                    deadExemptViolations(where, split.under)
             }
         return nested + split.outside.sorted().map { outsideViolation(where, it) }
     }
@@ -280,29 +294,13 @@ internal class NestedArchivePolicy(
                     "이름으로 넣어도 통과시킨다: $it"
             }
 
-    /**
-     * 뿌리 접두 술어의 **전제**를 게이트로 만든다(verifier M-1) — `PropertiesLauncher` 는 `Loader-Path`
-     * 의 중첩 경로를 싣고, 그러면 모집단의 전제가 바뀐다. 런처를 바꾸는 것은 manifest 한 줄이다.
-     */
-    private fun launcherViolations(
-        where: String,
-        archive: NestedArchive,
-    ): List<String> =
-        if (archive.mainClass == launcherMainClass) {
-            emptyList()
-        } else {
-            listOf(
-                "$where 의 Main-Class 가 '$launcherMainClass' 가 아니다 — 중첩 축의 뿌리 술어는 그 런처의 " +
-                    "적재 규칙이고, 런처가 바뀌면 뿌리 밖도 실린다: ${archive.mainClass}",
-            )
-        }
-
     private fun outsideViolation(
         where: String,
         path: String,
     ): String =
-        "$where 가 로더 뿌리 **밖에** 중첩 아카이브를 품는다(zip 서명으로 판독) — 기본 런처는 싣지 않지만 " +
-            "그 바이트는 어느 게이트도 거치지 않았고, 런처 설정 한 줄이면 실린다: $path"
+        "$where 가 로더 뿌리 **밖에** 중첩 아카이브를 품는다(중앙 디렉터리 끝 레코드로 판독) — 지금의 " +
+            "적재 자리 선언으로는 실리지 않지만 그 바이트는 어느 게이트도 거치지 않았고, 선언 한 줄이면 " +
+            "실린다: $path"
 
     private class SplitArchive(
         val archive: NestedArchive,

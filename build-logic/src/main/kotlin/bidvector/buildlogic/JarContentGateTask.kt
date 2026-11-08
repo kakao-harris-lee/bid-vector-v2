@@ -5,7 +5,6 @@ import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
@@ -14,9 +13,11 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import java.io.File
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.jar.JarEntry
 import java.util.jar.JarFile
+import java.util.zip.ZipEntry
 
 /**
  * **아카이브에 들어간 클래스가 게이트를 거친 그 바이트인지 본다.**
@@ -56,10 +57,13 @@ abstract class JarContentGateTask : DefaultTask() {
      * 모듈이 **선언한** runtime 의존이 해석된 결과. 중첩 아카이브 축의 기준 집합이고 이름으로만 쓴다
      * ([nestedArchiveViolations]). 해석 자체는 Gradle 이 실행 시점에 하므로 설정 단계에서 강제하지 않는다.
      *
-     * `@Classpath` 다 — 해석된 classpath 의 관례이고(리뷰 LOW-3) 순서 민감·무관 엔트리 무시로
-     * up-to-date 판정이 `@InputFiles` 보다 정확하고 싸다. 거동은 같다(이름만 쓴다).
+     * **`@Classpath` 가 아니다**(수정 라운드 5, 리뷰 M-5). 그 정규화는 **파일 이름을 무시한다** — 같은
+     * 내용이면 이름이 달라도 up-to-date 다. 그런데 이 축의 판정 근거가 바로 그 이름이라, 의존의 이름만
+     * 바뀌는 변이에서 게이트가 재판 없이 앞의 초록을 재사용할 수 있었다. `NAME_ONLY` 는 **판정이 읽는
+     * 것**과 **선언 입력**을 같은 축으로 맞춘다(「게이트 판정 근거는 선언 입력으로」).
      */
-    @get:Classpath
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
     abstract val runtimeClasspath: ConfigurableFileCollection
 
     /** 형식·크기·언어 도구가 검사한 소스. 그 **이름 집합**이 원산지 판정의 기준이다. */
@@ -91,7 +95,15 @@ abstract class JarContentGateTask : DefaultTask() {
             )
         val verdict = policy.judge(entries, verified)
         val runtimeJarNames = runtimeClasspath.files.map(File::getName).toSet()
-        val nested = nestedVerdict(module, values, archiveFiles, runtimeJarNames)
+        val expectation = bootArchiveExpectation(values)
+        val read = archiveFiles.map { readNestedArchive(it, expectation.indexLocations) }
+        val nested = nestedVerdict(module, values, read, runtimeJarNames)
+        val deployment =
+            BootArchivePolicy(
+                expectation,
+                exemptNames = values.requireList(EXTERNAL_NESTED_JARS),
+                ownerModule = values.requireValue(BOOT_ARCHIVE_MODULE),
+            ).judge(module, read)
 
         val header =
             listOf(
@@ -104,16 +116,18 @@ abstract class JarContentGateTask : DefaultTask() {
                 "exempt=${verdict.exempt}",
                 "nestedJars=${nested.nestedCount}",
                 "nestedOutside=${nested.outsideCount}",
+                "bootArchives=${deployment.bootArchiveCount}",
                 "runtimeJars=${runtimeJarNames.size}",
             )
+        val found = verdict.violations + nested.violations + deployment.violations
         report
             .get()
             .asFile
             .apply { parentFile.mkdirs() }
-            .writeText((header + verdict.violations + nested.violations).joinToString(separator = "\n", postfix = "\n"))
+            .writeText((header + found).joinToString(separator = "\n", postfix = "\n"))
 
         archiveEmptinessFailure(module, archiveFiles.size, verdict.judged)?.let { throw GradleException(it) }
-        failOnNestedJars(module, nested.violations)
+        failOnNestedJars(module, nested.violations + deployment.violations)
         if (verdict.violations.isNotEmpty()) {
             throw GradleException(
                 verdict.violations.joinToString(
@@ -147,15 +161,29 @@ abstract class JarContentGateTask : DefaultTask() {
     private fun nestedVerdict(
         module: String,
         values: Map<String, String>,
-        archiveFiles: List<File>,
+        archives: List<NestedArchive>,
         runtimeJarNames: Set<String>,
     ): NestedArchiveVerdict =
         NestedArchivePolicy(
             roots = values.requireNonEmptyList(NESTED_LIB_ROOTS),
             runtimeJarNames = runtimeJarNames,
             exemptNames = values.requireList(EXTERNAL_NESTED_JARS),
+        ).judge(module, archives)
+
+    /**
+     * 배포 경로가 읽는 자리의 기대 값([BootArchivePolicy]). 적재 자리 둘은 **다른 키를 복사하지 않고**
+     * 중첩 축·클래스 뿌리 목록에서 가져온다 — 같은 값을 두 자리에 적으면 그 둘이 갈라지는 날 게이트가
+     * 자기 전제를 잃는다. 목록이 둘 이상이면 어느 쪽이 배포 자리인지가 정해지지 않으므로 거부한다.
+     */
+    private fun bootArchiveExpectation(values: Map<String, String>): BootArchiveExpectation =
+        BootArchiveExpectation(
             launcherMainClass = values.requireValue(BOOT_LAUNCHER_MAIN_CLASS),
-        ).judge(module, archiveFiles.map(::readNestedArchive))
+            startClass = values.requireValue(BOOT_START_CLASS),
+            classesLocation = values.requireSingle(CLASS_ROOTS),
+            libLocation = values.requireSingle(NESTED_LIB_ROOTS),
+            classpathIndex = values.requireValue(BOOT_CLASSPATH_INDEX),
+            layersIndex = values.requireValue(BOOT_LAYERS_INDEX),
+        )
 
     private fun failOnNestedJars(
         module: String,
@@ -164,7 +192,7 @@ abstract class JarContentGateTask : DefaultTask() {
         if (violations.isEmpty()) return
         throw GradleException(
             violations.joinToString(
-                prefix = "아카이브의 중첩 아카이브 축이 붉다 (모듈 '$module'):\n  ",
+                prefix = "배포물이 품은 아카이브의 축이 붉다 (모듈 '$module'):\n  ",
                 separator = "\n  ",
             ),
         )
@@ -184,16 +212,26 @@ abstract class JarContentGateTask : DefaultTask() {
 }
 
 /**
- * **판독기 층** — 아카이브를 [NestedArchive] 로 읽는다. 판정은 [NestedArchivePolicy] 가 한다.
+ * **판독기 층** — 아카이브를 [NestedArchive] 로 읽는다. 판정은 [NestedArchivePolicy] 와
+ * [BootArchivePolicy] 가 한다.
  *
  * 최상위 함수인 것은 그래야 **test 가 진짜 아카이브를 하나 만들어 이 층을 잴 수 있기** 때문이다
  * (리뷰 M-1): 판정만 순수 test 로 잠그면 판독이 경로를 버리는 변이가 아무 test 도 깨뜨리지 않는다 —
  * 실제로 그렇게 한 라운드가 열렸다.
  *
- * 엔트리 전수를 읽고 각 엔트리의 **앞 네 바이트**를 본다. 이름(확장자)을 믿지 않기 위해서다.
+ * 읽는 것은 셋이다 — ⓐ 엔트리 전수의 경로와 **zip 으로 읽히는가** ⓑ 배포 경로의 도구가 읽는 manifest
+ * 속성 ⓒ 그 속성이 가리킨 자리와 [indexLocations] 가 가리킨 자리의 index 줄. ⓑⓒ 가 없으면 「무엇이
+ * 실리는가」를 엔트리 목록만으로 짐작하게 된다(verifier H-1).
  */
-internal fun readNestedArchive(archive: File): NestedArchive =
+internal fun readNestedArchive(
+    archive: File,
+    indexLocations: Set<String>,
+): NestedArchive =
     JarFile(archive).use { jar ->
+        val attributes =
+            BOOT_ARCHIVE_ATTRIBUTES
+                .mapNotNull { name -> jar.manifest?.mainAttributes?.getValue(name)?.let { name to it } }
+                .toMap()
         NestedArchive(
             path = archive.path,
             displayName = archive.name,
@@ -202,36 +240,141 @@ internal fun readNestedArchive(archive: File): NestedArchive =
                     .entries()
                     .asSequence()
                     .filterNot { it.isDirectory }
-                    .map { ArchiveEntry(it.name, jar.startsWithArchiveSignature(it)) }
+                    .map { ArchiveEntry(it.name, jar.holdsArchiveDirectory(it)) }
                     .toList(),
-            mainClass = jar.manifest?.mainAttributes?.getValue("Main-Class"),
+            descriptor =
+                BootArchiveDescriptor(
+                    attributes = attributes,
+                    indexes = jar.readIndexes(indexLocations + attributes.indexLocations()),
+                ),
         )
     }
 
-/**
- * zip 의 네 바이트 서명 — local file header · 중앙 디렉터리만 있는 빈 아카이브 · 분할 아카이브.
- * 세 가지 모두 **읽는 쪽이 정한 값**이고, 이름과 달리 넣는 쪽이 고를 수 없다.
- */
-private val ARCHIVE_SIGNATURES =
+/** 판독기가 읽는 manifest 속성 — [BootArchiveExpectation] 이 단언하는 것과 **같은 집합**이다. */
+private val BOOT_ARCHIVE_ATTRIBUTES =
     listOf(
-        byteArrayOf(0x50, 0x4B, 0x03, 0x04),
-        byteArrayOf(0x50, 0x4B, 0x05, 0x06),
-        byteArrayOf(0x50, 0x4B, 0x07, 0x08),
+        MAIN_CLASS_ATTRIBUTE,
+        START_CLASS_ATTRIBUTE,
+        CLASSES_LOCATION_ATTRIBUTE,
+        LIB_LOCATION_ATTRIBUTE,
+        CLASSPATH_INDEX_ATTRIBUTE,
+        LAYERS_INDEX_ATTRIBUTE,
     )
 
-private fun JarFile.startsWithArchiveSignature(entry: JarEntry): Boolean {
-    val head = ByteArray(ARCHIVE_SIGNATURE_LENGTH)
-    val read = getInputStream(entry).use { stream -> stream.readNBytes(head, 0, head.size) }
-    return read == head.size && ARCHIVE_SIGNATURES.any(head::contentEquals)
+private fun Map<String, String>.indexLocations(): Set<String> =
+    setOfNotNull(this[CLASSPATH_INDEX_ATTRIBUTE], this[LAYERS_INDEX_ATTRIBUTE])
+
+/**
+ * index 파일 한 줄의 모양은 `- "<엔트리 경로>"` 다 — 추출 도구가 그 자리에서 따옴표 안쪽만 떼어
+ * 쓴다. 떼어지지 않는 줄은 **그대로 둔다**: 그 줄은 기대 집합에 없으므로 판정이 「뿌리 밑 엔트리가
+ * 아닌 줄」로 지목하고, 판독기가 조용히 버리면 그 지목이 사라진다.
+ */
+private fun JarFile.readIndexes(locations: Set<String>): Map<String, List<String>> =
+    locations
+        .mapNotNull { location -> getEntry(location)?.let { location to readIndexLines(it) } }
+        .toMap()
+
+private fun JarFile.readIndexLines(entry: ZipEntry): List<String> =
+    getInputStream(entry)
+        .use { it.readBytes() }
+        .decodeToString()
+        .lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .map { line -> line.removePrefix("- ").removeSurrounding("\"") }
+        .toList()
+
+/**
+ * zip 판독기가 아카이브를 찾는 자리 — **끝의 중앙 디렉터리 끝 레코드(EOCD)** 다.
+ *
+ * 앞 판은 앞 네 바이트의 서명을 보았는데, 그러면 **앞에 아무 바이트나 붙인 jar** 가 빠져나갔다
+ * (앞 판 제한 20 ⓐ). zip 은 앞에서가 아니라 뒤에서 읽히므로 그 포장은 적재를 막지 않는다. 서명 네
+ * 바이트만으로는 우연한 일치가 많아 **주석 길이가 남은 바이트와 맞는가**와 **중앙 디렉터리가 그 앞에
+ * 놓이는가**를 함께 본다(실측: 이 저장소의 배포물에서 뿌리 밖 오탐 0).
+ */
+private fun JarFile.holdsArchiveDirectory(entry: JarEntry): Boolean =
+    getInputStream(entry).use { it.readTail(EOCD_SCAN_WINDOW) }.holdsCentralDirectoryEnd()
+
+/** 엔트리의 **끝 [size] 바이트**와 전체 길이. 큰 중첩 jar 를 통째로 들고 있지 않기 위해서다. */
+private class ArchiveTail(
+    val bytes: ByteArray,
+    val total: Long,
+)
+
+private fun InputStream.readTail(size: Int): ArchiveTail {
+    val window = ByteArray(size)
+    var filled = 0
+    var total = 0L
+    val chunk = ByteArray(READ_CHUNK)
+    while (true) {
+        val read = read(chunk)
+        if (read < 0) break
+        total += read
+        val take = minOf(read, size)
+        val keep = minOf(filled, size - take)
+        if (keep > 0) System.arraycopy(window, filled - keep, window, 0, keep)
+        System.arraycopy(chunk, read - take, window, keep, take)
+        filled = keep + take
+    }
+    return ArchiveTail(window.copyOf(filled), total)
 }
 
-private const val ARCHIVE_SIGNATURE_LENGTH = 4
+private fun ArchiveTail.holdsCentralDirectoryEnd(): Boolean {
+    val base = total - bytes.size
+    for (index in bytes.size - EOCD_LENGTH downTo 0) {
+        if (bytes.readIntLe(index) == EOCD_SIGNATURE && isConsistentEnd(index, base)) return true
+    }
+    return false
+}
+
+/**
+ * 서명 네 바이트는 우연히도 나온다 — 그래서 **주석 길이가 남은 바이트와 정확히 같은가**와 **중앙
+ * 디렉터리가 이 레코드 앞에 놓이는가**를 함께 본다.
+ *
+ * 뒤의 확인은 zip64 에서 성립하지 않는다 — 그 형식은 두 자리에 `0xFFFFFFFF` 표지를 넣고 실제 값을
+ * 별도 레코드에 둔다. 표지가 보이면 **자리 확인을 하지 않는다**: 하면 zip64 로 포장한 아카이브가
+ * 「아카이브가 아니다」로 빠져나간다(앞 판 서명 술어가 열어 두던 것과 같은 종류의 구멍이다).
+ */
+private fun ArchiveTail.isConsistentEnd(
+    index: Int,
+    base: Long,
+): Boolean {
+    val commentLength = bytes.readShortLe(index + EOCD_COMMENT_OFFSET)
+    if (commentLength != bytes.size - (index + EOCD_LENGTH)) return false
+    val directorySize = bytes.readIntLe(index + EOCD_SIZE_OFFSET).toUInt().toLong()
+    val directoryOffset = bytes.readIntLe(index + EOCD_OFFSET_OFFSET).toUInt().toLong()
+    val zip64 = directorySize == ZIP64_MARKER || directoryOffset == ZIP64_MARKER
+    return zip64 || directoryOffset + directorySize <= base + index
+}
+
+private fun ByteArray.readIntLe(at: Int): Int =
+    (this[at].toInt() and 0xFF) or
+        ((this[at + 1].toInt() and 0xFF) shl 8) or
+        ((this[at + 2].toInt() and 0xFF) shl 16) or
+        ((this[at + 3].toInt() and 0xFF) shl 24)
+
+private fun ByteArray.readShortLe(at: Int): Int = (this[at].toInt() and 0xFF) or ((this[at + 1].toInt() and 0xFF) shl 8)
+
+private const val EOCD_SIGNATURE = 0x06054B50
+private const val EOCD_LENGTH = 22
+private const val EOCD_SIZE_OFFSET = 12
+private const val EOCD_OFFSET_OFFSET = 16
+private const val EOCD_COMMENT_OFFSET = 20
+private const val ZIP64_MARKER = 0xFFFFFFFFL
+
+/** EOCD 는 주석 길이(최대 `0xFFFF`)만큼만 끝에서 밀린다 — 그래서 끝의 이만큼만 보면 전수다. */
+private const val EOCD_SCAN_WINDOW = EOCD_LENGTH + 0xFFFF
+private const val READ_CHUNK = 8192
 
 private const val CLASS_ROOTS = "jar.class-roots"
 private const val EXTERNAL_CLASS_ROOTS = "jar.external-class-roots"
 private const val EXTERNAL_NESTED_JARS = "jar.external-nested-jars"
 private const val NESTED_LIB_ROOTS = "jar.nested-lib-roots"
 private const val BOOT_LAUNCHER_MAIN_CLASS = "jar.boot-launcher-main-class"
+private const val BOOT_START_CLASS = "jar.boot-start-class"
+private const val BOOT_CLASSPATH_INDEX = "jar.boot-classpath-index"
+private const val BOOT_LAYERS_INDEX = "jar.boot-layers-index"
+private const val BOOT_ARCHIVE_MODULE = "jar.boot-archive-module"
 
 /** jar 엔트리는 항상 `/` 구분자다 — 플랫폼 구분자로 만든 상대 경로를 그 표기에 맞춘다. */
 private fun File.invariantPath(): String = path.replace(File.separatorChar, '/')

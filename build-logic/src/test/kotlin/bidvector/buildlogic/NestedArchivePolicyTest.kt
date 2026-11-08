@@ -2,12 +2,7 @@ package bidvector.buildlogic
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.jar.Attributes
-import java.util.jar.JarOutputStream
-import java.util.jar.Manifest
-import java.util.zip.ZipEntry
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -19,7 +14,11 @@ import kotlin.test.assertTrue
  * 아카이브 안의 class 바이트를, 이쪽은 아카이브 안의 **아카이브**를 본다. 정책 타입도 둘이다
  * ([JarContentPolicy] · [NestedArchivePolicy]).
  *
- * 각 단언은 우회 하나를 고정한다. 마지막 둘은 **판독기 층까지** 잰다 — 진짜 아카이브를 하나 만들어
+ * **무엇이 실리는지를 정하는 선언**(manifest·index)은 이 축이 보지 않는다 — [BootArchivePolicy] 가
+ * 받는다. 그 선이 라운드 하나를 열었다(verifier H-1): 이 축은 뿌리를 전제로 쟀는데 그 뿌리를 정하는
+ * 것이 manifest 한 줄이었다.
+ *
+ * 각 단언은 우회 하나를 고정한다. 마지막 셋은 **판독기 층까지** 잰다 — 진짜 아카이브를 하나 만들어
  * [readNestedArchive] 를 거쳐 판정한다(리뷰 M-1: 판정만 순수 test 로 잠그면 판독이 경로를 버리는
  * 변이가 아무 test 도 깨뜨리지 않는다).
  */
@@ -47,12 +46,23 @@ class NestedArchivePolicyTest {
     }
 
     @Test
+    fun `runtime 집합이 비면 중첩 jar 전부가 위반이다 — 기준 집합이 사라지면 조용해지지 않는다`() {
+        // 수정 라운드 4 의 술어 교체에서 사라졌다가 되살린 단언이다(리뷰 LOW-4). 기준 집합을 공급하는
+        // 배선(`runtimeClasspath`)이 끊기면 이 축은 **모두 통과**가 아니라 **모두 위반**이어야 한다.
+        val violations =
+            nestedPolicy().violations(archive(nested("adapters.jar"), nested("workflow.jar")))
+
+        assertEquals(2, violations.size, "$violations")
+        assertTrue(violations.all { it.contains("선언되지 않은") }, "$violations")
+    }
+
+    @Test
     fun `중첩 jar 가 없으면 위반이 없다 — 열 모듈 중 아홉의 정상 상태`() {
-        // 뿌리 밑이 비면 런처·면제·다중도 축이 전부 쉰다. 그 아홉 모듈은 Main-Class 도 없다.
+        // 뿌리 밑이 비면 면제·다중도·경로 축이 전부 쉰다.
         assertEquals(
             emptyList<String>(),
             nestedPolicy(runtime = setOf("a.jar"), exempt = listOf(EXEMPT))
-                .violations(archive(mainClass = null, entries = arrayOf(ArchiveEntry("bidvector/App.class", false)))),
+                .violations(archive(ArchiveEntry("bidvector/App.class", archiveMagic = false))),
         )
     }
 
@@ -196,21 +206,10 @@ class NestedArchivePolicyTest {
     }
 
     @Test
-    fun `런처를 바꾸면 위반이다 — 뿌리 접두 술어의 전제가 그 런처다`() {
-        val violations =
-            nestedPolicy(runtime = setOf("adapters.jar")).violations(
-                archive(nested("adapters.jar"), mainClass = PROPERTIES_LAUNCHER),
-            )
-
-        assertEquals(1, violations.size, "$violations")
-        assertTrue(violations.single().contains("Main-Class"), "$violations")
-    }
-
-    @Test
     fun `뿌리 목록이 비면 생성에서 거부한다 — 비우면 모집단이 0 이라 축이 조용해진다`() {
         val failure =
             assertFailsWith<IllegalArgumentException> {
-                NestedArchivePolicy(emptyList(), emptySet(), emptyList(), LAUNCHER)
+                NestedArchivePolicy(emptyList(), emptySet(), emptyList())
             }
 
         assertTrue(failure.message!!.contains("뿌리 목록이 비었다"), "${failure.message}")
@@ -231,37 +230,52 @@ class NestedArchivePolicyTest {
     // ---- 판독기 층(리뷰 M-1) — 진짜 아카이브 하나를 만들어 잰다 ----
 
     @Test
-    fun `판독기가 엔트리 전체 경로와 zip 서명을 낸다 — 경로를 버리는 변이가 여기서 붉는다`(
+    fun `판독기가 엔트리 전체 경로와 zip 판독 여부를 낸다 — 경로를 버리는 변이가 여기서 붉는다`(
         @TempDir dir: File,
     ) {
         val outer = dir.resolve("outer.jar")
         writeArchive(
             outer,
-            mainClass = LAUNCHER,
-            entries =
-                mapOf(
-                    "BOOT-INF/lib/adapters.jar" to zipBytes(),
-                    "BOOT-INF/lib/y/adapters.jar" to zipBytes(),
-                    "BOOT-INF/classes/bidvector/App.class" to CLASS_MAGIC,
-                    "BOOT-INF/ext/sneak.zip" to zipBytes(),
-                ),
+            "BOOT-INF/lib/adapters.jar" to ArchiveFixtures.zipBytes(),
+            "BOOT-INF/lib/y/adapters.jar" to ArchiveFixtures.zipBytes(),
+            "BOOT-INF/classes/bidvector/App.class" to ArchiveFixtures.CLASS_MAGIC,
+            "BOOT-INF/ext/sneak.zip" to ArchiveFixtures.zipBytes(),
         )
 
-        val read = readNestedArchive(outer)
+        val read = readNestedArchive(outer, emptySet())
 
-        assertEquals(LAUNCHER, read.mainClass)
         assertEquals("outer.jar", read.displayName)
-        val archiveEntries =
-            read.entries
-                .filter(ArchiveEntry::archiveMagic)
-                .map(ArchiveEntry::path)
-                .toSet()
 
         assertEquals(
             setOf("BOOT-INF/ext/sneak.zip", "BOOT-INF/lib/adapters.jar", "BOOT-INF/lib/y/adapters.jar"),
-            archiveEntries,
-            "class 리소스는 zip 이 아니고, 중첩 아카이브 셋은 자리와 무관하게 서명으로 보인다",
+            read.archiveEntryPaths(),
+            "class 리소스는 zip 이 아니고, 중첩 아카이브 셋은 자리와 무관하게 내용으로 보인다",
         )
+    }
+
+    @Test
+    fun `앞에 바이트를 붙인 zip 도 아카이브로 읽힌다 — 포장으로 비껴가던 자리`(
+        @TempDir dir: File,
+    ) {
+        // 앞 판은 **앞 네 바이트**의 서명을 보았고, 그래서 셸 머리글을 붙인 jar 가 뿌리 밖에서
+        // 미계수였다(앞 판 제한 20 ⓐ — verifier H-1 이 그 포장을 재료로 썼다). zip 판독기는 끝의
+        // 중앙 디렉터리 끝 레코드를 찾으므로 그 포장은 적재를 막지 않는다.
+        val outer = dir.resolve("outer.jar")
+        writeArchive(
+            outer,
+            "BOOT-INF/ext/evil.jar" to ArchiveFixtures.prefixedZipBytes(),
+            "BOOT-INF/classes/bidvector/App.class" to ArchiveFixtures.CLASS_MAGIC,
+            "BOOT-INF/classes/bidvector/notes.txt" to "PK\u0005\u0006 라고 적힌 평범한 글".toByteArray(),
+        )
+
+        val read = readNestedArchive(outer, emptySet())
+
+        assertEquals(
+            setOf("BOOT-INF/ext/evil.jar"),
+            read.archiveEntryPaths(),
+            "서명 글자를 품은 평범한 파일은 아카이브가 아니다 — 주석 길이와 중앙 디렉터리 자리가 맞아야 한다",
+        )
+        assertEquals(1, nestedPolicy().judge("app", listOf(read)).outsideCount)
     }
 
     @Test
@@ -271,17 +285,15 @@ class NestedArchivePolicyTest {
         val outer = dir.resolve("outer.jar")
         writeArchive(
             outer,
-            mainClass = LAUNCHER,
-            entries =
-                mapOf(
-                    "BOOT-INF/lib/adapters.jar" to zipBytes(),
-                    "BOOT-INF/lib/y/adapters.jar" to zipBytes(),
-                    "BOOT-INF/ext/sneak.zip" to zipBytes(),
-                ),
+            "BOOT-INF/lib/adapters.jar" to ArchiveFixtures.zipBytes(),
+            "BOOT-INF/lib/y/adapters.jar" to ArchiveFixtures.zipBytes(),
+            "BOOT-INF/ext/sneak.zip" to ArchiveFixtures.zipBytes(),
         )
 
         val violations =
-            nestedPolicy(runtime = setOf("adapters.jar")).judge("app", listOf(readNestedArchive(outer))).violations
+            nestedPolicy(runtime = setOf("adapters.jar"))
+                .judge("app", listOf(readNestedArchive(outer, emptySet())))
+                .violations
 
         assertEquals(3, violations.size, "$violations")
         assertTrue(violations.any { it.contains("하위 경로") }, "$violations")
@@ -307,19 +319,18 @@ class NestedArchivePolicyTest {
     }
 
     @Test
-    fun `중첩 축의 뿌리와 런처 값이 정책에 있고 비어 있지 않다 — 비우면 축이 조용해진다`() {
+    fun `중첩 축의 뿌리가 정책에 있고 비어 있지 않다 — 비우면 축이 조용해진다`() {
         // 리뷰 M-2: 키를 **지우면** `requireValue` 가 죽지만 **비우면** 앞 판은 조용했다. 값을 읽는
         // 자리가 빈 목록을 거부하고, 그 거부가 실제 정책 파일에 대해 성립하는지를 여기서 잰다.
         val values = readPolicy(policyFile())
 
-        assertEquals(listOf("BOOT-INF/lib/"), values.requireNonEmptyList("jar.nested-lib-roots"))
-        assertEquals(LAUNCHER, values.requireValue("jar.boot-launcher-main-class"))
+        assertEquals(listOf(ROOT), values.requireNonEmptyList("jar.nested-lib-roots"))
     }
 
     private fun nestedPolicy(
         runtime: Set<String> = emptySet(),
         exempt: List<String> = emptyList(),
-    ) = NestedArchivePolicy(listOf(ROOT), runtime, exempt, LAUNCHER)
+    ) = NestedArchivePolicy(listOf(ROOT), runtime, exempt)
 
     private fun NestedArchivePolicy.violations(vararg archives: NestedArchive): List<String> =
         judge("app", archives.toList()).violations
@@ -330,18 +341,25 @@ class NestedArchivePolicyTest {
     private fun archive(
         vararg entries: ArchiveEntry,
         name: String = "app.jar",
-        mainClass: String? = LAUNCHER,
-    ) = NestedArchive("$ARCHIVE_DIRECTORY/$name", name, entries.toList(), mainClass)
+    ) = NestedArchive(
+        "$ARCHIVE_DIRECTORY/$name",
+        name,
+        entries.toList(),
+        BootArchiveDescriptor(emptyMap(), emptyMap()),
+    )
+
+    private fun NestedArchive.archiveEntryPaths(): Set<String> =
+        entries.filter(ArchiveEntry::archiveMagic).map(ArchiveEntry::path).toSet()
+
+    private fun writeArchive(
+        target: File,
+        vararg entries: Pair<String, ByteArray>,
+    ) = ArchiveFixtures.write(target, attributes = emptyMap(), entries = entries.toMap())
 
     private companion object {
         const val EXEMPT = "spring-boot-jarmode-tools-4.1.1.jar"
         const val ROOT = "BOOT-INF/lib/"
-        const val LAUNCHER = "org.springframework.boot.loader.launch.JarLauncher"
-        const val PROPERTIES_LAUNCHER = "org.springframework.boot.loader.launch.PropertiesLauncher"
         const val ARCHIVE_DIRECTORY = "/build/libs"
-
-        /** class 파일의 네 바이트 서명 — zip 이 아니라는 것이 이 입력의 요점이다. */
-        val CLASS_MAGIC = byteArrayOf(0xCA.toByte(), 0xFE.toByte(), 0xBA.toByte(), 0xBE.toByte())
 
         fun policyFile(): File = File(System.getProperty("bidvector.architecture.policy"))
 
@@ -364,36 +382,6 @@ class NestedArchivePolicyTest {
                 .first { it.trimStart().startsWith("spring-boot ") }
                 .substringAfter('"')
                 .substringBefore('"')
-        }
-
-        /** zip 서명으로 시작하는 진짜 아카이브 한 채. 이름이 아니라 이 바이트가 판정 입력이다. */
-        fun zipBytes(): ByteArray =
-            ByteArrayOutputStream()
-                .also { out ->
-                    JarOutputStream(out).use {
-                        it.putNextEntry(ZipEntry("inner.txt"))
-                        it.write("inner".toByteArray())
-                        it.closeEntry()
-                    }
-                }.toByteArray()
-
-        fun writeArchive(
-            target: File,
-            mainClass: String?,
-            entries: Map<String, ByteArray>,
-        ) {
-            val manifest =
-                Manifest().apply {
-                    mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
-                    mainClass?.let { mainAttributes[Attributes.Name.MAIN_CLASS] = it }
-                }
-            JarOutputStream(target.outputStream(), manifest).use { out ->
-                entries.forEach { (name, bytes) ->
-                    out.putNextEntry(ZipEntry(name))
-                    out.write(bytes)
-                    out.closeEntry()
-                }
-            }
         }
     }
 }
