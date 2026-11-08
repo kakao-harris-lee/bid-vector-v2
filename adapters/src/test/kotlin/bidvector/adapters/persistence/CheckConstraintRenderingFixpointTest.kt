@@ -98,7 +98,12 @@ class CheckConstraintRenderingFixpointTest : PersistenceTestSupport() {
             ).use { statement ->
                 statement.executeQuery().use { rs ->
                     while (rs.next()) {
-                        constraints += CheckConstraint(rs.getString("table_name"), rs.getString("conname"), rs.getString("def"))
+                        constraints +=
+                            CheckConstraint(
+                                table = rs.getString("table_name"),
+                                name = rs.getString("conname"),
+                                definition = rs.getString("def"),
+                            )
                     }
                 }
             }
