@@ -168,11 +168,26 @@ _UNRESOLVED_BOUND: Final = object()
 변이로 쟀다(cr r9 M-2·M-4). **이 가지가 아닌 잔여**는 그대로 있다: 반환 주석에 정책 타입이
 한 번도 나오지 않는 모양(`-> Self` · `NewType("Pol", EvaluationPolicy)` · **무경계** 제네릭
 `def f[P](…) -> P`)은 풀 문자열이 없어 여기 오지 않는다 — 아래 모집단 등식 docstring 의
-잔여 목록이 정본이다. 오탐 쪽 대가도 하나 있다: **클래스 스코프 이름을 문자열 경계로** 쓴
-비정책 함수(`class Box: class Inner: …; def f[P: "Inner"](…) -> P`)는 그 이름이 함수
-`__globals__` 에 없어 해석 실패로 붉다(선언 목록에 등재할 수도 없다 — `get_type_hints`
-자체는 성공하므로 사유 test 가 붉힌다). 탈출구는 따옴표를 빼는 것이고, src 에 그런 모양은
-0 이다(집합 불변)."""
+잔여 목록이 정본이다.
+
+**오탐 쪽 대가는 하나가 아니라 최소 셋이다**(v r10 M-A — 앞 판은 「하나」로 적었고 그것이
+잰 범위를 넘었다). 셋 다 비정책 코드를 통과도 등재도 아닌 **해석 실패**로 붉힌다.
+⑴ **클래스 스코프 이름을 문자열 경계로** 쓴 함수
+(`class Box: class Inner: …; def f[P: "Inner"](…) -> P`) — 그 이름이 함수 `__globals__` 에
+없다(선언 목록에 등재할 수도 없다 — `get_type_hints` 자체는 성공하므로 사유 test 가 붉힌다).
+⑵ **`Annotated` 의 문자열 메타데이터**가 이 가지 안에 들어온 경우
+(`type Meters = Annotated[int, "meters"]` → `-> Meters` ·
+`def f[T: Annotated[int, "positive"]](…) -> T`) — `get_args(Annotated[int, "meters"])` 는
+`(int, "meters")` 라 **메타데이터가 잎 자리로** 가고, 거기서 `"meters"` 는 타입이 아니라
+풀리지 않는다. ⑶ **제네릭 별칭이 자기 타입 파라미터를 문자열로** 가리키는 경우
+(`type Box[T] = list["T"]` → `-> Box`) — 푸는 namespace 가 함수 쪽이라 `"T"` 가 없다.
+
+⑵⑶ 이 터지는 자리는 `get_type_hints` 가 **들어가지 않는 구멍**(별칭 `__value__` ·
+`TypeVar` 경계)뿐이다 — 매개변수·반환에 **직접** 적은 `Annotated[int, "meters"]` 는
+`get_type_hints` 가 최상위를 벗기므로 통과한다(v r10 F1·F2 GREEN 실측). 셋 다 src 에
+**0** 이고(집합 불변), 탈출구는 ⑴ 따옴표 제거 · ⑵ 메타데이터를 비문자열로 · ⑶ 첨자를
+적기(`-> Box[int]`)다. **후속 처방**(이 slice 밖, 등재만 한다): `get_origin` 이
+`Annotated` 면 첫 인자만 펴고 `__metadata__` 는 버린다."""
 
 
 def _flatten_annotation(
@@ -541,8 +556,9 @@ def test_policy_factories_split_into_file_entry_points_and_derivations() -> None
     """src 전체의 정책 파생 함수 전수 == 파일 입구 + 명시 예외.
 
     **측정한 모양**에 대해 이 등식이 먼저 붉다: 모듈 수준 함수 · 클래스 멤버
-    (`staticmethod`·`classmethod`) · 어느 모듈에 두든 · 반환 주석을 PEP 695 **별칭**으로
-    가려도(해석이 풀고, 자기참조는 가드) · 인자를 **개명**해도 · 반환 타입을
+    (`staticmethod`·`classmethod`) · 어느 모듈에 두든 · 반환 주석을 PEP 695 **무첨자
+    별칭**으로 가려도(해석이 풀고, 자기참조는 가드 — 첨자를 단 별칭은 아래 잔여다,
+    v r10 M-B) · 인자를 **개명**해도 · 반환 타입을
     `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다) · **PEP 695 제네릭 반환**
     (`def f[P: EvaluationPolicy](…) -> P`)이나 구식 `TypeVar(bound=…)` 반환으로 가려도
     (경계·제약을 펴서 받는다 — v r7 M-1, 두 인터프리터에서 RED 실측) · 그 경계를
@@ -556,8 +572,19 @@ def test_policy_factories_split_into_file_entry_points_and_derivations() -> None
     **잔여 반례 — 닫지 않았다**(측정해서 등재한다, r6 L-2 계열): `@classmethod … -> Self` ·
     `NewType("Pol", EvaluationPolicy)` 반환 · **무경계** 제네릭 `def f[P](…) -> P`. 셋 다
     ruff·`mypy --strict` 를 통과하는 모양으로 두 인터프리터에서 **GREEN** 이다(v r8 실측).
-    반대편 대가도 등재한다: **클래스 스코프 이름의 문자열 경계**는 통과도 등재도 아닌
-    해석 실패로 붉다(`_UNRESOLVED_BOUND` docstring 「주장의 범위」, v r9 C4).
+    **여기에 별칭 두 모양을 더 등재한다**(v r10 M-B, 두 버전 GREEN 실측 — 이 라운드가 만든
+    것이 아니라 처음부터 있던 틈이다): ⑴ **첨자를 단** 제네릭 별칭
+    (`type Pol[T] = EvaluationPolicy` → `-> Pol[int]` · `type Pol[T] = T | EvaluationPolicy`)
+    — `get_type_hints` 가 내주는 것이 `TypeAliasType` 이 아니라 그것을 origin 으로 하는
+    첨자 꼴이라, 아래 별칭 가지가 받지 못하고 `get_args` 가 **첨자 인자만**(`(int,)`) 낸다.
+    ⑵ `typing_extensions.TypeAliasType("Pol", EvaluationPolicy)` — 3.12 에서 이 타입은
+    `typing.TypeAliasType` 이 **아니라** 같은 가지로 가지 않는다. 둘 다 정책 타입을 반환하는
+    함수를 모집단 **밖**에 둔다(`paired_t_threshold` 인자까지 실린 모양으로 실측).
+
+    반대편 대가도 등재한다: **클래스 스코프 이름의 문자열 경계** · **`Annotated` 의 문자열
+    메타데이터**(별칭 값·`TypeVar` 경계 안) · **제네릭 별칭의 자기 파라미터 문자열**은 통과도
+    등재도 아닌 해석 실패로 붉다(`_UNRESOLVED_BOUND` docstring 「주장의 범위」, v r9 C4 ·
+    v r10 M-A).
     무경계 제네릭은 반환 주석에 정책 타입이 한 번도 나오지 않으므로 **반환 타입 술어로는
     원리상** 못 닫는다. 이 전수가 지는 것은
     **유입 층**이고 방어선이 아니다 — 그 잔여는 리뷰의 자리이고, 미승인 값이 판정에 닿는 것은
