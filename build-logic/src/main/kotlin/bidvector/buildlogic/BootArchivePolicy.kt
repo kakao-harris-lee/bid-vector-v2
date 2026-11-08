@@ -107,7 +107,8 @@ internal class BootArchivePolicy(
      * `Main-Class` 는 신고로 세지 않는다 — 평범한 실행 가능 jar 도 그 속성을 갖는다.
      */
     private fun isBootArchive(archive: NestedArchive): Boolean =
-        archive.descriptor.attributes.keys.any { it != MAIN_CLASS_ATTRIBUTE && it in expectation.attributes } ||
+        archive.descriptor.attributes.keys
+            .any { it != MAIN_CLASS_ATTRIBUTE && it in expectation.attributes } ||
             libEntries(archive).isNotEmpty()
 
     private fun violations(
@@ -124,14 +125,19 @@ internal class BootArchivePolicy(
     ): List<String> =
         expectation.attributes.mapNotNull { (name, expected) ->
             when (val actual = declared[name]) {
-                expected -> null
-                null ->
+                expected -> {
+                    null
+                }
+
+                null -> {
                     "$where 의 manifest 에 '$name' 이 없다 — 출하 경로의 추출 도구가 **그 속성으로** " +
                         "적재 자리를 정한다. 기대 값: $expected"
+                }
 
-                else ->
+                else -> {
                     "$where 의 manifest '$name' 이 정책 값이 아니다 — 이 속성이 출하 이미지의 " +
                         "classpath 를 정한다. 기대 '$expected' · 실제 '$actual'"
+                }
             }
         }
 
@@ -203,6 +209,7 @@ internal class BootArchivePolicy(
     private fun libEntries(archive: NestedArchive): List<String> =
         archive.entries
             .map(ArchiveEntry::path)
-            .filter { it.startsWith(expectation.libLocation) && !it.removePrefix(expectation.libLocation).contains('/') }
-            .filter { it != expectation.libLocation }
+            .filter { it.startsWith(expectation.libLocation) }
+            .filterNot { it == expectation.libLocation }
+            .filterNot { it.removePrefix(expectation.libLocation).contains('/') }
 }

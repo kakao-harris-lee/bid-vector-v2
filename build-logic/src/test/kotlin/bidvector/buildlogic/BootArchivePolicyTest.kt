@@ -30,7 +30,10 @@ class BootArchivePolicyTest {
         // verifier H-1 의 재현 ⓐ: `Spring-Boot-Lib: BOOT-INF/` 로 두면 추출 도구가 `BOOT-INF/` 밑
         // **어디든** 라이브러리로 받아들인다. Boot 플러그인은 이 속성을 `putIfAbsent` 로 넣으므로
         // 빌드 스크립트의 값이 이긴다 — 게이트를 끄지 않는 한 줄이다.
-        val violations = policy().violations(bootArchive(attributes = attributes(LIB_LOCATION_ATTRIBUTE to "BOOT-INF/")))
+        val violations =
+            policy().violations(
+                bootArchive(attributes = attributes(LIB_LOCATION_ATTRIBUTE to "BOOT-INF/")),
+            )
 
         assertTrue(violations.any { it.contains("'$LIB_LOCATION_ATTRIBUTE'") }, "$violations")
         assertTrue(violations.any { it.contains(LIB_ROOT) }, "기대 값이 문면에 있어야 한다: $violations")
@@ -43,7 +46,12 @@ class BootArchivePolicyTest {
         // 그 경로에서 공허했다.
         val violations =
             policy().violations(
-                bootArchive(attributes = attributes(START_CLASS_ATTRIBUTE to "org.springframework.boot.loader.launch.PropertiesLauncher")),
+                bootArchive(
+                    attributes =
+                        attributes(
+                            START_CLASS_ATTRIBUTE to "org.springframework.boot.loader.launch.PropertiesLauncher",
+                        ),
+                ),
             )
 
         assertEquals(1, violations.size, "$violations")
@@ -55,7 +63,10 @@ class BootArchivePolicyTest {
         // `PropertiesLauncher` 는 `Loader-Path` 의 중첩 경로를 싣는다(수정 라운드 4, verifier M-1).
         val violations =
             policy().violations(
-                bootArchive(attributes = attributes(MAIN_CLASS_ATTRIBUTE to "org.springframework.boot.loader.launch.PropertiesLauncher")),
+                bootArchive(
+                    attributes =
+                        attributes(MAIN_CLASS_ATTRIBUTE to "org.springframework.boot.loader.launch.PropertiesLauncher"),
+                ),
             )
 
         assertEquals(1, violations.size, "$violations")

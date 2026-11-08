@@ -145,18 +145,23 @@ internal object EnvironmentAccess {
         presentClasses: Set<String>,
     ): String? =
         when (val count = exercised.count { it == allowance }) {
-            1 -> null
-            0 ->
+            1 -> {
+                null
+            }
+
+            0 -> {
                 if (allowance.substringBefore(CALLER_SEPARATOR) !in presentClasses) {
                     null
                 } else {
                     "허용한 좌표에 대상이 없다 — 그 클래스는 읽혔는데 그 호출이 없다. 죽은 허용은 " +
                         "그 자리를 비워 두어 다음 사람의 같은 호출을 말없이 통과시킨다: $allowance"
                 }
+            }
 
-            else ->
+            else -> {
                 "허용 하나가 호출 ${count}건을 연다 — 이 키의 귀속은 **최상위 클래스**라 그 안의 다른 " +
                     "메서드·중첩 클래스·람다까지 함께 열린다. 허용은 자리 하나까지다: $allowance"
+            }
         }
 
     private fun isAllowKeyShaped(allowance: String): Boolean =
