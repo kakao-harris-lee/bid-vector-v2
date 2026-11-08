@@ -257,11 +257,16 @@ internal fun idempotencyKeyFor(number: String): String = "notification-requested
 /**
  * 합성 공고 항목 — `bssamt`(기초금액)가 있어야 예측 호출이 일어난다(`OpportunityAnalysis`
  * 는 기초금액 없는 공고의 예측을 생략한다). 마감은 평가 시각 뒤라 후보 질의에 걸린다.
+ *
+ * [demandAgency] 는 **기본이 없다**(M9/STR12) — 알림 본문이 수요기관 칸을 읽으므로 그 칸까지
+ * 수집 경로로 채우는 여정이 필요했고, 기존 호출부의 관측 모양은 바꾸지 않는다(`null` 이면 키
+ * 자체가 항목에 들어가지 않는다). 코드 없이 이름만으로도 기관 fact 가 선다(`Agency.init`).
  */
 internal fun e2eNoticeItem(
     number: String,
     baseAmount: String = E2E_BASE_AMOUNT,
     closing: String = E2E_CLOSING,
+    demandAgency: String? = null,
 ): Map<String, String?> =
     mapOf(
         "bidNtceNo" to number,
@@ -269,7 +274,7 @@ internal fun e2eNoticeItem(
         "bidNtceNm" to "E2E 통합 유지관리 용역 $number",
         "bssamt" to baseAmount,
         "bidClseDt" to closing,
-    )
+    ) + (demandAgency?.let { mapOf("dminsttNm" to it) } ?: emptyMap())
 
 /** 수집·평가가 공유하는 고정 시각 — 재현 등식(⑤)의 전제이자 후보 질의의 기준이다. */
 internal val E2E_NOW: Instant = Instant.parse("2026-09-24T03:00:00Z")
