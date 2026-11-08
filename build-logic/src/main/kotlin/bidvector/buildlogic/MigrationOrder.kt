@@ -94,7 +94,8 @@ internal object MigrationOrder {
         } else {
             listOf(
                 "마이그레이션을 가진 모듈 '$module' 의 디렉터리가 비어 있다 — 게이트가 아무것도 보지 못했다 " +
-                    "(경로가 옮겨졌는지 'migration.resource-path' 를 본다)",
+                    "(게이트가 읽는 자리는 처리된 리소스 밑 'migration.classpath-location' 이고, " +
+                    "사람이 파일을 두는 자리는 'migration.resource-path' 다)",
             )
         }
 

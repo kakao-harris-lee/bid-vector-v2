@@ -85,6 +85,7 @@ private fun Project.registerEnvironmentAccessGate(policy: RegularFile): TaskProv
     tasks.register<EnvironmentAccessGateTask>("environmentAccessGate") {
         description = "production 클래스가 실행 환경을 묻는 멤버를 부르는지 산출물에서 잰다(OPS-13 임계 0)"
         policyFile = policy
+        moduleName = project.name
         classes.from(provider { sourceSets().getByName("main").output.classesDirs })
         dependsOn(tasks.named("classes"))
         report = layout.buildDirectory.file("reports/environment-access/violations.txt")

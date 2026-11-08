@@ -26,6 +26,32 @@ internal data class ClassMemberAccess(
 )
 
 /**
+ * **모집단 등식** — 읽은 타입 수가 읽은 `.class` 파일 수와 **같아야** 한다.
+ *
+ * 이 축의 반복된 사고는 「판정이 틀렸다」가 아니라 **「모집단이 조용히 작아졌다」**였다: 앞 판은
+ * `filterNot { it.isAnonymousClass }` 로 59 클래스 · 718 접근을 빼고 있었고, 그 필터를 지운 것은
+ * **어느 test 도 잠그지 않는 task 층 한 줄**이었다(리뷰 M-1 — 되돌리면 전부 조용히 초록이다).
+ *
+ * 왜 「익명 클래스 수 ≥ 1」이 아닌가(리뷰 M-1 의 처방): 그 바닥값의 전제가 **실측으로 거짓**이다 —
+ * 열 모듈 가운데 **여섯이 오늘 0**(`settlement`·`decision`·`procurement`·`qualification`·`bidding`·
+ * `strategy`)이라 바닥값은 그 여섯을 상시로 붉힌다. 등식은 전제가 필요 없다: 어떤 필터를 어디에
+ * 끼워 넣어도 두 수가 갈라진다. 실측으로 열 모듈 전부에서 `types == class 파일 수` 다.
+ *
+ * **순수 함수다** — 세는 것은 task 가 하고 판정은 여기서 한다.
+ */
+internal fun populationFailure(
+    module: String,
+    classFiles: Int,
+    importedTypes: Int,
+): String? =
+    if (classFiles == importedTypes) {
+        null
+    } else {
+        "모듈 '$module' 의 모집단이 읽은 class 파일 수와 다르다 — class 파일 $classFiles · 읽은 타입 " +
+            "$importedTypes. 이 축은 **전수**라야 하고, 차이는 판정 앞에 필터가 끼었다는 뜻이다"
+    }
+
+/**
  * **실행 환경 스니핑 0**(OPS-13) 을 바이트코드 층에서 재는 순수 술어.
  *
  * 왜 소스 층으로 모자랐나 — 앞 판은 소스의 `수신자.멤버` **글자 쌍**이었다. 수신자를 별칭으로 바꾸거나
@@ -46,6 +72,8 @@ internal object EnvironmentAccess {
     fun violations(
         accesses: List<ClassMemberAccess>,
         denied: Set<String>,
+        allowed: List<String> = emptyList(),
+        presentClasses: Set<String> = emptySet(),
     ): List<String> =
         if (accesses.isEmpty()) {
             listOf(
@@ -53,20 +81,59 @@ internal object EnvironmentAccess {
                     "「0 건이다」가 아니라 「재지 못했다」이고, 그 초록은 배선이 끊긴 게이트의 초록이다",
             )
         } else {
-            accesses
-                .filter { isDenied(it, denied) }
-                .sortedBy { "${it.enclosingClass} ${it.sourceClass} ${key(it)}" }
-                .map {
-                    val where =
-                        if (it.sourceClass == it.enclosingClass) {
-                            it.enclosingClass
-                        } else {
-                            "${it.enclosingClass} (안쪽 ${it.sourceClass})"
-                        }
-                    "$where → ${key(it)} — production 코드가 실행 환경을 스니핑한다 " +
-                        "(OPS-13 임계 0; 억제는 명시적 정책 값으로, OPS-07 (a))"
-                }
+            sniffViolations(accesses, denied, allowed.toSet()) + deadAllowances(accesses, allowed, presentClasses)
         }
+
+    private fun sniffViolations(
+        accesses: List<ClassMemberAccess>,
+        denied: Set<String>,
+        allowed: Set<String>,
+    ): List<String> =
+        accesses
+            .filter { isDenied(it, denied) && allowKey(it) !in allowed }
+            .sortedBy { "${it.enclosingClass} ${it.sourceClass} ${key(it)}" }
+            .map {
+                val where =
+                    if (it.sourceClass == it.enclosingClass) {
+                        it.enclosingClass
+                    } else {
+                        "${it.enclosingClass} (안쪽 ${it.sourceClass})"
+                    }
+                "$where → ${key(it)} — production 코드가 실행 환경을 스니핑한다 " +
+                    "(OPS-13 임계 0; 억제는 명시적 정책 값으로, OPS-07 (a))"
+            }
+
+    /**
+     * **대상 없는 허용은 위반이다** — 허용 목록의 죽은 항목은 그 좌표의 자리를 비워 두어, 나중에
+     * 누가 같은 자리에 같은 호출을 넣으면 말없이 통과시킨다(OPS-13 원리 4).
+     *
+     * 검출 범위는 **그 클래스를 읽은 모듈**로 제한한다 — 게이트는 모듈마다 돌고 모집단이 다르므로,
+     * 범위를 두지 않으면 아홉 모듈이 남의 모듈 허용을 「죽었다」고 센다. 클래스가 통째로 사라진
+     * 경우는 어느 모듈도 세지 않는다(알려진 제한).
+     */
+    private fun deadAllowances(
+        accesses: List<ClassMemberAccess>,
+        allowed: List<String>,
+        presentClasses: Set<String>,
+    ): List<String> {
+        val exercised = accesses.map(::allowKey).toSet()
+        return allowed
+            .filter { it !in exercised && it.substringBefore(CALLER_SEPARATOR) in presentClasses }
+            .sorted()
+            .map {
+                "허용한 좌표에 대상이 없다 — 그 클래스는 읽혔는데 그 호출이 없다. 죽은 허용은 " +
+                    "그 자리를 비워 두어 다음 사람의 같은 호출을 말없이 통과시킨다: $it"
+            }
+    }
+
+    /**
+     * 허용 키는 **`귀속클래스->선언클래스#멤버`** 다 — 고칠 자리(귀속)와 능력(좌표)의 쌍이고,
+     * 와일드카드가 없다. 이 저장소의 `collection.transport.holders.*` 와 같은 모양이다.
+     */
+    private fun allowKey(access: ClassMemberAccess): String =
+        "${access.enclosingClass}$CALLER_SEPARATOR${key(access)}"
+
+    private const val CALLER_SEPARATOR = "->"
 
     /**
      * 거부 키는 `선언클래스#멤버` 이고 **`*#멤버` 는 「어떤 수신자든」**이다.

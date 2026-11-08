@@ -48,6 +48,111 @@ class EnvironmentAccessTest {
     }
 
     @Test
+    fun `하위 타입 수신자로 받아도 잡힌다 — 바이트코드 owner 는 수신자의 정적 타입이다`() {
+        // 리뷰 M-2 의 원 결함이 이 형태였다: owner 를 `Environment` 로만 열거하면 `ConfigurableEnvironment`
+        // 로 받은 같은 호출이 비껴간다. `*#멤버` 는 수신자를 **묻지 않는다** — 그 성질을 입력으로 고정한다
+        // (앞 판에는 상위 타입 test 만 있어 변이 표가 말하는 이 자리가 비어 있었다 — 리뷰 LOW-4).
+        val owner = "org.springframework.core.env.ConfigurableEnvironment"
+
+        assertEquals(1, violations(access("bidvector.app.Wiring", owner, "getActiveProfiles")).size)
+    }
+
+    @Test
+    fun `모집단 등식이 어긋나면 붉는다 — 판정 앞에 끼운 필터는 이 수에서 보인다`() {
+        // 리뷰 M-1: 익명 클래스 필터를 되돌리는 변이가 **어느 test 도 깨뜨리지 않았다**. 바닥값
+        // (「익명 ≥ 1」)은 전제가 거짓이라 쓸 수 없다 — 열 모듈 가운데 여섯이 오늘 0 이다(실측).
+        val failure = populationFailure("app", classFiles = 279, importedTypes = 266)
+
+        assertTrue(failure != null && failure.contains("279") && failure.contains("266"), "$failure")
+    }
+
+    @Test
+    fun `모집단 등식이 맞으면 조용하다`() {
+        assertEquals(null, populationFailure("app", classFiles = 279, importedTypes = 279))
+    }
+
+    // ---- 명시적 허용(OPS-07 (a)) — 게이트 문면이 약속하던 억제 경로 ----
+
+    @Test
+    fun `허용한 정확 쌍은 통과한다`() {
+        assertEquals(
+            emptyList<String>(),
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER),
+            ),
+        )
+    }
+
+    @Test
+    fun `허용은 그 클래스의 그 멤버만 연다 — 다른 멤버는 그대로 위반이다`() {
+        val violations =
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "getenv"),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+    }
+
+    @Test
+    fun `허용은 그 클래스만 연다 — 다른 호출자는 같은 좌표라도 위반이다`() {
+        val violations =
+            EnvironmentAccess.violations(
+                access("bidvector.app.Other", "java.lang.System", "getProperty"),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER, "bidvector.app.Other"),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+    }
+
+    @Test
+    fun `대상 없는 허용은 위반이다 — 죽은 허용은 그 자리를 비워 둔다`() {
+        // 그 클래스는 읽혔는데 그 호출이 없다. 「고쳤는데 허용만 남은」 상태이고, 그대로 두면
+        // 다음 사람의 같은 호출이 말없이 통과한다.
+        val violations =
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "currentTimeMillis"),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("대상이 없다"), "$violations")
+    }
+
+    @Test
+    fun `남의 모듈 허용은 죽었다고 세지 않는다 — 모듈마다 모집단이 다르다`() {
+        val violations =
+            EnvironmentAccess.violations(
+                access("bidvector.workflow.Run", "java.lang.System", "currentTimeMillis"),
+                DENIED,
+                listOf(ALLOWED_PAIR),
+                setOf("bidvector.workflow.Run"),
+            )
+
+        assertEquals(emptyList<String>(), violations)
+    }
+
+    @Test
+    fun `정책의 허용 목록이 이 저장소의 그 한 쌍이다 — 넓어지면 여기가 붉는다`() {
+        // 임계 0 축의 허용 목록은 **조용히 자라면 안 되는** 자리다. 거부 목록과 달리 이 목록은
+        // 늘어나는 방향이 느슨해지는 방향이라, 수와 값을 둘 다 고정한다.
+        val allowed =
+            readPolicy(File(requireProperty("bidvector.architecture.policy")))
+                .requireList("bytecode.env-access.allowed-callers")
+
+        assertEquals(listOf(ALLOWED_PAIR), allowed)
+    }
+
+    @Test
     fun `거부 집합 밖의 멤버는 통과한다 — 같은 선언 클래스여도`() {
         // 같은 `java.lang.System` 의 `currentTimeMillis` 는 환경 질의가 아니다. 클래스 전체를 거부하면
         // 과잉이고, 그 과잉이 게이트를 끄는 쪽으로 몬다.
@@ -129,13 +234,23 @@ class EnvironmentAccessTest {
     }
 
     private companion object {
+        const val ALLOWED_CALLER = "bidvector.app.wiring.RelayWiring"
+        const val ALLOWED_PAIR = "$ALLOWED_CALLER->java.lang.System#getProperty"
+
         /**
          * **실제 정책을 읽는다** — 사본을 쓰면 정책 축소가 어느 test 도 깨뜨리지 않는다(리뷰 M-3).
          * 경로는 `:build-logic:test` 가 선언 입력으로 넘기는 것이고, 그 파일은 이미 입력 목록에 있다.
+         *
+         * 속성이 없으면 **그 사실을 말하고 죽는다**(리뷰 LOW-5) — 앞 판은 `File(null)` 로 NPE 가 나
+         * 「클래스 초기화 실패」라는 모호한 오류가 됐고, 그 오류는 「배선이 끊겼다」를 가리키지 않았다.
          */
         val DENIED: Set<String> =
-            readPolicy(File(System.getProperty("bidvector.architecture.policy")))
+            readPolicy(File(requireProperty("bidvector.architecture.policy")))
                 .requireList("bytecode.env-access.denied-members")
                 .toSet()
+
+        fun requireProperty(name: String): String =
+            System.getProperty(name)
+                ?: error("시스템 속성 '$name' 이 없다 — `:build-logic:test` 의 선언 입력 배선이 끊겼다")
     }
 }
