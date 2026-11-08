@@ -36,12 +36,13 @@ internal object SourceAxisViolations {
     ): SourceAxisVerdict {
         val references = SourceReferences.extractFrom(ktFile, fileName)
         val calls = SourceMemberCalls.extractFrom(ktFile, fileName)
-        val scope = policy.scopeOf(ktFile.packageFqName.asString())
+        val packageName = ktFile.packageFqName.asString()
+        val scope = policy.scopeOf(packageName)
         return SourceAxisVerdict(
             violations =
                 allowlistViolations(policy, module, references) +
                     scopeViolations(policy, references, scope) +
-                    envSniffViolations(policy, calls),
+                    envSniffViolations(policy, calls, owningType(packageName, fileName)),
             references = references.size,
             scopedFiles = if (scope == null) 0 else 1,
             memberCalls = calls.size,
@@ -82,13 +83,28 @@ internal object SourceAxisViolations {
                 }
         }
 
+    /**
+     * 이 파일이 담은 **최상위 타입의 좌표** — 패키지 + 파일 이름이다(이 저장소는 파일마다 같은 이름의
+     * 최상위 타입 하나를 둔다). 바이트코드 축의 허용 키가 그 좌표를 쓰므로, 두 층이 **같은 키 하나**를
+     * 읽으려면 소스 층에서도 같은 모양을 만들어야 한다.
+     */
+    private fun owningType(
+        packageName: String,
+        fileName: String,
+    ): String =
+        fileName
+            .substringAfterLast('/')
+            .removeSuffix(".kt")
+            .let { if (packageName.isEmpty()) it else "$packageName.$it" }
+
     /** ⓒ 환경 스니핑 축 — 임계 0. 억제는 환경 질의가 아니라 명시적 정책 값이어야 한다(OPS-13). */
     private fun envSniffViolations(
         policy: SourceReferencePolicy,
         calls: List<SourceMemberCall>,
+        owningType: String,
     ): List<String> =
         calls
-            .filter(policy::isEnvSniff)
+            .filter { policy.isEnvSniff(it) && !policy.allowsEnvSniff(owningType, it.member) }
             .map {
                 "${it.fileName}:${it.line} ${it.receiver}.${it.member} — production 코드가 실행 환경을 스니핑한다 " +
                     "(OPS-13 임계 0; 억제는 명시적 정책 값으로, OPS-07 (a))"

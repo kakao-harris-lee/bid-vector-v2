@@ -29,6 +29,7 @@ internal class SourceReferencePolicy private constructor(
     private val domainModules: Set<String>,
     private val scopedRoots: Map<String, List<String>>,
     private val envSniffPairs: Set<String>,
+    private val allowedEnvSniff: Set<Pair<String, String>>,
 ) {
     /**
      * 정규화된 FQN(패키지는 `.`, 중첩 클래스는 `$`)이 허용 목록 안인가. T-A(하위 허용) ·
@@ -69,6 +70,20 @@ internal class SourceReferencePolicy private constructor(
     fun isEnvSniff(call: SourceMemberCall): Boolean =
         "${call.receiver}.${call.member}" in envSniffPairs || "*.${call.member}" in envSniffPairs
 
+    /**
+     * **명시적 허용은 바이트코드 축과 같은 키 하나에서 읽는다**(`bytecode.env-access.allowed-callers`).
+     * 두 층이 각자 목록을 가지면 OPS-07 (a) 의 억제가 한 층에서만 들어 다른 층이 조용히 붉는다.
+     *
+     * 다만 **짝은 느슨하다**: 소스 층은 수신자의 **선언 타입을 해석하지 못하므로**(`System` 이 어느
+     * `System` 인지 모른다) 허용 항목의 선언 클래스 부분을 보지 않고 **(귀속 타입, 멤버)** 로만 맞춘다.
+     * 임계 0 의 정본은 바이트코드 축이고 거기서는 선언 클래스까지 정확히 맞아야 한다 — 이 층은 좌표를
+     * 지목해 주는 1차 그물이라 그 느슨함이 정본을 넓히지 않는다.
+     */
+    fun allowsEnvSniff(
+        owningType: String,
+        member: String,
+    ): Boolean = (owningType to member) in allowedEnvSniff
+
     private fun isUnderSubtree(packageName: String): Boolean =
         subtrees.any { packageName == it || packageName.startsWith("$it.") }
 
@@ -77,6 +92,7 @@ internal class SourceReferencePolicy private constructor(
         private const val SCOPED_PACKAGES = "source.scoped-packages"
         private const val SCOPED_ROOTS_PREFIX = "source.scoped-allowed-roots."
         private const val ENV_SNIFF_PAIRS = "source.env-sniff.member-pairs"
+        private const val ALLOWED_CALLERS = "bytecode.env-access.allowed-callers"
 
         fun load(policyFile: File): SourceReferencePolicy {
             val policy = readPolicy(policyFile)
@@ -92,6 +108,11 @@ internal class SourceReferencePolicy private constructor(
                         policy.requireList("$SCOPED_ROOTS_PREFIX$scope")
                     },
                 envSniffPairs = policy.requireList(ENV_SNIFF_PAIRS).toSet(),
+                allowedEnvSniff =
+                    policy
+                        .requireList(ALLOWED_CALLERS)
+                        .map { it.substringBefore("->") to it.substringAfterLast('#') }
+                        .toSet(),
             )
         }
     }

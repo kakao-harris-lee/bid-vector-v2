@@ -114,6 +114,19 @@ class SourceReferencePolicyTest {
         assertFalse(policy.isEnvSniff(call("clock", "instant")))
     }
 
+    @Test
+    fun `명시적 허용은 바이트코드 축과 같은 키에서 읽는다 — 두 층이 한 목록을 본다`() {
+        // 수정 라운드 4: 억제를 한 층에만 두면 다른 층이 조용히 붉고, OPS-07 (a) 가 약속한 「명시적
+        // 정책 값」이 실제로는 쓸 수 없는 경로가 된다(실측 — 바이트코드 축을 연 뒤 소스 축이 붉었다).
+        assertTrue(policy.allowsEnvSniff("bidvector.app.wiring.RelayWiring", "getProperty"))
+    }
+
+    @Test
+    fun `허용은 그 타입의 그 멤버만 연다`() {
+        assertFalse(policy.allowsEnvSniff("bidvector.app.wiring.RelayWiring", "getenv"))
+        assertFalse(policy.allowsEnvSniff("bidvector.app.wiring.Other", "getProperty"))
+    }
+
     private fun call(
         receiver: String,
         member: String,
