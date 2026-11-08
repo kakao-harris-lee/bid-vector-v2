@@ -75,14 +75,20 @@ judged=558` 이다. adapters 의 소스 참조 축도 복원 뒤 판정 없이 �
 
 ## 축별 부분 비활성화 (전면 되돌림 없이)
 
-정책 데이터 한 줄로 끈다.
+정책 데이터 한 줄로 끈다 — **① 과 ③ 중첩 축은 예외다**(수정 라운드 4 정정, 리뷰 M-3: 앞 판 문면 둘이
+**실패하는 방향**을 적고 있었다).
 
-- ① **`migration.module` 을 없는 모듈로 바꾸는 경로는 더 이상 쓸 수 없다**(수정 라운드 3, verifier
-  L-1): 이 slice 의 소유 단언이 「그 모듈에 마이그레이션 22개가 있다」로 **빌드를 깬다**(실측). 끄려면
-  `migration.classpath-location` 을 비어 있는 위치로 돌린다.
+- ① **한 키로는 꺼지지 않는다.** `migration.module` 만 없는 모듈로 바꾸면 소유 단언이 「그 모듈에
+  마이그레이션 22개가 있다」로 깨지고(수정 라운드 3, verifier L-1), `migration.classpath-location` 만
+  빈 위치로 돌리면 **소유 모듈의 비-공허 단언**이 깨진다(앞 판 문면이 이쪽이었다 — 같은 이유로 실패하는
+  절차를 적고 있었다). 끄려면 **둘을 함께** 돌린다: `migration.module` 을 없는 모듈로 **그리고**
+  `migration.classpath-location` 을 빈 위치로.
 - ② `normalize.*=false`(오늘 거동은 어느 쪽이든 같다).
-- ③ `jar.class-roots`·`jar.external-class-roots` 를 비움(비우면 배포물 판정이 붉는다 — 그것이 의도다).
-  중첩 축은 `jar.external-nested-jars` 를 넓히는 쪽으로 끈다(비우면 Boot 의 도구 jar 가 붉는다).
+- ③ 아카이브 판정은 `jar.class-roots`·`jar.external-class-roots` 를 비움(비우면 배포물 판정이 붉는다 —
+  그것이 의도다). **중첩 축은 정책만으로 꺼지지 않는다**: `jar.external-nested-jars` 를 넓히면 ⓐ
+  카탈로그 등식 test 가 「목록은 정확히 한 항목」으로 붉고 ⓑ 더한 이름은 대상이 없어 **죽은 면제**로
+  붉는다. `jar.nested-lib-roots` 를 비우는 길도 닫혔다(빈 값 거부). 끄려면 `JarContentPolicyTest` 의
+  두 단언과 정책을 **함께** 고친다.
 - ④ 끌 수 없다(등식의 한 종류다).
 - ⑤ **`source.import.syntax-fqns`** 로 면제 확대 — 앞 판 문면의 `source.import.syntax-names` 는 **이제
   없는 키**라 그 절차가 `requireValue` 에서 죽는다(수정 라운드 3, 리뷰 M-5).
@@ -91,6 +97,9 @@ judged=558` 이다. adapters 의 소스 참조 축도 복원 뒤 판정 없이 �
   `bytecode.env-access.denied-members`**. 정본을 비우면 그 축은 공허해지고 거부 집합 크기만 0 이 된다
   (끄는 쪽 선택이다). 다만 그 축소는 이제 `EnvironmentAccessTest` 가 **붉게 받는다**(리뷰 M-3) — 끄려면
   그 test 의 좌표 목록도 함께 줄여야 한다. 「조용히 작아지지 않는다」가 그 test 의 목적이다.
+  **허용 목록(`bytecode.env-access.allowed-callers`)도 같다**(수정 라운드 4): 넓히면 그 목록을 값으로
+  고정한 test 가 붉고, 대상 없는 항목을 더하면 게이트가 붉는다. 허용을 늘리는 것은 정책 한 줄이 아니라
+  **정책 + test + 대상의 존재** 셋이 맞아야 하는 일이다.
 
 ## 예상 복구 시간
 
