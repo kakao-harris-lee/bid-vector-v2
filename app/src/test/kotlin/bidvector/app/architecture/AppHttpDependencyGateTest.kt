@@ -475,5 +475,22 @@ class AppHttpDependencyGateTest {
  * 어댑터도 workflow 타입도 쥐지 않아 제한 층에서 그대로 초록이고(게이트가 낸 위반 다섯은 전부
  * `ReleaseWiring` 것이었다), 면제를 필요 이상 넓히면 이 게이트가 그만큼 약해진다(7C⑤-0 의 같은
  * 판단). 수는 세 tier 목록의 **항목 이름 합집합**을 센 값이다: 36 + 11 + 35.
+ *
+ * **M9/STR12 — 다섯이 늘어 86 이었다**(기계 재계산: 38 + 11 + 37 = 86, 중복 0). 늘어난 것은 알림 채널
+ * 설정·기동 판정 값 타입이다: tier1 에 `NotificationChannelProperties`·`TelegramChannelProperties`·
+ * 그 파일 facade 셋(`RelayProperties` 와 같은 자격 — 조립 층의 설정 타입), tier3 에
+ * `ChannelConfigPresence`·`ChannelConfigField` 둘(`RelayBootDecisionKt` 와 같은 자리 — 기동 판정의
+ * 값 타입). **이 수를 손으로 올리는 것이 이 래칫의 일이다** — 면제가 눈에 띄지 않게 늘지 않게 한다.
+ *
+ * **승인 전 라운드에서 하나 더 늘어 87 이다**(기계 재계산: 38 + 11 + 38 = 87, 중복 0). 늘어난 것은
+ * `HttpClientLogProperty` 하나다 — JDK HttpClient 의 내부 로그 속성 어휘이고, 기동 판정이 그것을
+ * 거부 사유로 받으므로 `ChannelConfigField` 와 같은 자리(tier3)다.
+ *
+ * **병합 재계산 다섯째(ops-migrations ← main `3101035f`, 2026-11-08)**: 양쪽이 **다른 수**를 들고 와
+ * 충돌이 났다 — 이 레인이 81 → **82**(릴리스 배선 하나), main 이 STR12 로 81 → **87**(여섯). 어느 쪽
+ * 숫자를 고르든 하나 또는 여섯이 조용히 사라진다. 앞의 재계산들과 같이 **숫자를 옮기지 않고 세 tier
+ * 목록의 항목 이름 합집합을 기계로** 셌다: 39 + 11 + 38 = **88**(중복 0). 그 수가 82 + 6 과 같다는
+ * 것은 계산이 아니라 **검산**이고, 아래 등식이 관측과 다시 대조한다. 위 두 문단은 **둘 다 남긴다** —
+ * 어느 레인의 면제 근거도 지우지 않는다.
  */
-private const val EXPECTED_EXEMPT_COUNT = 82
+private const val EXPECTED_EXEMPT_COUNT = 88

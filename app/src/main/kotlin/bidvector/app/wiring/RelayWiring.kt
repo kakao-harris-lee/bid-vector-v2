@@ -1,12 +1,16 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.notification.ConfiguredRouteDirectory
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
+import bidvector.app.relay.HttpClientLogProperty
+import bidvector.app.relay.NotificationChannelProperties
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayBootDecision
 import bidvector.app.relay.relayBootDecision
+import bidvector.app.relay.relayDeliveryIsLive
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
@@ -21,6 +25,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Import
+import java.time.Clock
 import java.time.LocalDate
 import javax.sql.DataSource
 
@@ -46,15 +51,16 @@ data class RelayProperties(
  * 올라온다. 속성이 없으면(기본) 러너도, 조립도, 임대 어댑터 생성도 없다 — 평가 endpoint 만
  * 쓰는 배포는 relay 설정 없이 그대로 뜬다(compose 는 `*.mode` 를 설정하지 않는다, D-6A2a-5).
  *
- * **발송 가능(`DeliveryMode.Live`) 모드 환경 설정은 기동을 거부한다(D-6F10-20, 술어는 cr G-1
- * 로 정정).** 이 slice 에는 실 sender 가 없고(`OPEN-STR-12`) 자리지킴 셋은 호출되면 던진다.
- * 그 모드로 뜨면 relay 가 claim 한 뒤 발송 자리에서 터지고 그 행은 다음 run 의 고아 격리가
- * 태운다 — 매 run 이 행을 영구히 잃는다. 그래서 「실 sender 없이 Live 환경」을 **설정 오류**로
- * 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
+ * **발송 가능(`DeliveryMode.Live`) 모드 환경인데 알림 채널 설정이 비면 기동을 거부한다**
+ * (M9/STR12 D-7 — 앞 판의 D-6F10-20 「Live 면 무조건 거부」를 승계해 좁혔다).
+ * 그 모드로 뜨면 relay 가 claim 한 뒤 보낼 곳이 없어 그 행들이 어휘 밖 종단으로 타 버린다 —
+ * 종단 전이는 단방향이라 되돌릴 간선이 없다. 그래서 「Live 인데 채널 설정 결손」을 **설정
+ * 오류**로 만든다: 러너가 돌기 전에 실패해야 claim 이 0 이다.
+ *
+ * **Live 가 아니면 설정 없이 뜬다**(D-7) — 그 환경의 relay 는 claim 조차 하지 않는다(환경 억제).
  *
  * 검사가 보는 것은 **환경 이름이 아니라 정책표가 그 환경에 붙인 모드**다 — 그 판정은
  * [relayBootDecision] 이 값으로 내고(cr R-2), 이 자리는 그 값을 기동 실패로 옮긴다.
- * `OPEN-STR-12` 가 실 sender 를 들이면 그 함수와 자리지킴 셋이 함께 사라진다.
  *
  * 이 클래스가 조립을 직접 하지 않는 이유: outbox 쓰기 타입을 `app` 이 이름으로 볼 수 없다
  * (D-6A3-17(a)③). [NotificationRelayRun](어댑터 조립 경계)만 든다.
@@ -62,30 +68,85 @@ data class RelayProperties(
 @Configuration
 @Import(CollectionTerminationWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.relay", name = ["mode"], havingValue = "once")
-@EnableConfigurationProperties(RelayProperties::class)
+@EnableConfigurationProperties(RelayProperties::class, NotificationChannelProperties::class)
 open class RelayWiring {
     @Bean
     open fun notificationRelayRun(
         dataSource: DataSource,
         properties: RelayProperties,
         release: ReleaseIdentifier,
+        channelProperties: NotificationChannelProperties,
     ): NotificationRelayRun {
         val policy = resolvedNotificationPolicy()
         // 판정은 [relayBootDecision] 이 **값으로** 낸다(cr R-2) — 여기 인라인되어 있던 동안은
         // 정책표를 바꿔 넣은 변이로 직접 칠 수 없었다. 이 자리의 몫은 그 값을 기동 실패로
-        // 옮기는 것뿐이다.
-        require(relayBootDecision(properties.environment, policy) == RelayBootDecision.Allowed) {
-            "실 발송 채널이 없는 동안 relay 는 발송 가능(Live) 모드 환경으로 기동하지 않는다(OPEN-STR-12)"
-        }
+        // 옮기는 것뿐이다. 판정이 받는 것은 설정의 **값이 아니라 존재 여부**라 이 메시지가
+        // 자격·chat id 원문을 담을 경로가 없다.
         require(properties.owner.isNotBlank()) { "bidvector.relay.owner 는 빈 문자열일 수 없다" }
         require(properties.claimLimit > 0) { "bidvector.relay.claim-limit 는 1 이상이어야 한다" }
+        val owner = OperatorId(properties.owner)
+        // `live &&` 의 단축 평가가 **설정 값 객체를 짓는 시점**을 Live 뒤로 미룬다(cr L-6<r2>) —
+        // 자격 모양 검사는 그 생성 시점에 있으므로, 미루지 않으면 모양 위반이 비-Live 환경까지
+        // 기동 실패로 만든다. D-7 의 문면은 **부재**를 말하고 모양 위반은 말하지 않았다.
+        val live = relayDeliveryIsLive(properties.environment, policy)
+        val decision =
+            relayBootDecision(
+                environment = properties.environment,
+                policy = policy,
+                channels = channelProperties.presence(),
+                deliveryChannel = properties.channel,
+                activeRoute = !live || hasActiveRoute(owner, channelProperties, properties.channel),
+                httpClientLogging = enabledHttpClientLogProperties(),
+            )
+        // 판정 객체를 그대로 싣는다(cr L-6<r1> 의 처분 「`decision.missing`」을 **택하지 않았다**):
+        // 거부가 여럿이 된 뒤로 운영자가 먼저 알아야 하는 것은 칸 목록이 아니라 **어느 거부인가**이고,
+        // 그 타입 이름이 runbook §13.6 의 행 키다. 세 타입이 나르는 것은 칸 이름·채널 이름·속성
+        // 이름뿐이라 이 문장에 값이 들어올 경로는 없다.
+        //
+        // 앞 문구는 **사유 중립**이다(cr L-5<r2>) — 「알림 채널 설정을 고쳐야 한다」로 적으면
+        // `RefusedChannelWithoutActiveRoute`(고칠 것은 `bidvector.relay.channel`)와
+        // `RefusedHttpClientLogging`(고칠 것은 JVM 옵션)에서 **다른 설정 묶음을 가리킨다.**
+        require(decision is RelayBootDecision.Allowed) {
+            "relay 기동 거부 — 아래 사유 타입이 어느 설정을 고쳐야 하는지 말한다(runbook §13.6): $decision"
+        }
         return NotificationRelayRun(
             dataSource = dataSource,
-            target = RelayTarget(OperatorId(properties.owner), properties.channel),
+            target = RelayTarget(owner, properties.channel),
             environment = properties.environment,
             policy = policy,
             release = release,
+            channels = if (live) channelProperties.channelSettings() else null,
+            clock = Clock.systemUTC(),
         )
+    }
+
+    /**
+     * 켜진 JDK HttpClient 로그 속성 — **이름만** 본다(v N-2). `JAVA_TOOL_OPTIONS` 로 켜도 JVM 시스템
+     * 속성이 되므로 이 한 자리에서 보인다. 값은 읽지 않는다: 어떤 값이든 켜진 것이고, 값에는 로그
+     * 수준·대상이 들어와 거부를 읽는 데 쓸모가 없다.
+     *
+     * 빈 문자열도 **켜진 것으로 센다** — `-Djdk.httpclient.HttpClient.log=` 는 속성을 존재하게 만들고,
+     * JDK 가 그것을 어떻게 해석하는지는 이 자리의 몫이 아니다. 「있으면 거부」가 fail-closed 다.
+     */
+    private fun enabledHttpClientLogProperties(): Set<HttpClientLogProperty> =
+        HttpClientLogProperty.entries.filterTo(mutableSetOf()) { System.getProperty(it.propertyName) != null }
+
+    /**
+     * **relay 가 실제로 쓸 그 객체에 묻는다**(cr M-2) — 활성 route 의 정의를 배선이 따로 적으면
+     * 그 사본이 [ConfiguredRouteDirectory] 와 갈릴 수 있고, 갈리면 기동 검사가 통과한 채 그 run 의
+     * 전 행이 `FAILED` 로 탄다. 같은 생성자 인자(owner·슬러그)로 같은 클래스를 세워 묻는다.
+     *
+     * 설정이 결손이면 route 를 물을 대상이 없으므로 `false` 다 — 그 경우의 거부 사유는 판정 함수가
+     * 설정 결손으로 먼저 낸다(첫 위반 승).
+     */
+    private fun hasActiveRoute(
+        owner: OperatorId,
+        channelProperties: NotificationChannelProperties,
+        channel: Channel,
+    ): Boolean {
+        val settings = channelProperties.channelSettings() ?: return false
+        val route = ConfiguredRouteDirectory(owner, settings.telegram.routeKey).routesFor(owner)[channel]
+        return route != null && route.enabled && route.key != null
     }
 
     @Bean
