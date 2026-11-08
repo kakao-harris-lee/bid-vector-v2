@@ -17,6 +17,7 @@
 | `agency_baseline_min_count` | `10` | `award_rate_scoring.py` `AGENCY_BASELINE_MIN_COUNT`(얕은 기관 자기 평균이 베이스라인을 부당하게 나쁘게 만든다) | legacy-behavior |
 | `stability_seeds.0` ~ `.4` | `20260812, 1, 7, 42, 2026` | `award_rate_diagnostics.py` `GATE_STABILITY_SEEDS`(헤드라인 seed 20260812 = 5C-1 spec `seed` — 조립 시 선두 고정) | legacy-behavior |
 | `amount_band_edges.0` ~ `.3` | `100000000, 500000000, 1000000000, 5000000000` | `app/services/synthetic_experiment/constants.py` 밴드 경계(lt_1eok/1eok_5eok/5eok_10eok/10eok_50eok/gte_50eok) — legacy 는 업무 모듈 private 이름을 교차 import(`award_rate_scoring.py`), V2 는 정책 데이터로(`OPEN-5C-BUDGET-BAND-SOURCE` 종결) | legacy-behavior |
+| `effective_date` | `"2026-09-16"` | **M9/ml-lifecycle 신설**(ML-07 acceptance ③ 의 「effective date 를 가진 정책 산출물」). 값은 **이 표의 승인 날짜**다 — 아래 change_history 2026-09-16 행(운영자 「둘 다 승인」, M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ④). 새 임계가 아니라 **그 승인 기록을 기계가 읽게 적은 것**이고, 효력 시작 전에 시작한 평가 창의 통과는 승격 근거로 인용되지 않는다. **인용 필수** — 비인용 ISO 날짜는 YAML 이 `date` 객체로 읽어 정책 값 축(문자열·수·bool) 밖이고 로더가 거부한다. **지위: 승인(2026-11-06, 사용자)** — 아래 change_history 2026-11-06 승인 행. 앞 문면(「그 표 승인 날짜의 파생이고 effective date 로서의 별도 승인은 받지 않았다」)은 **덮지 않고 그대로 둔다**: 그것이 이 값이 어떻게 정해졌는지의 기록이고, 이제 그 해석에 **별도 승인이 붙었다** | 승인 기록 파생(지어낸 날짜 아님) → **effective date 로서 승인** |
 | `segment_axes.0` ~ `.1` | `category, amount_band` | `award_rate_scoring.py` `SEGMENT_SPECS` 두 축 중 `category` 이식, `published_floor` 는 **없음**(D-5C2-9 — `FeatureFacts` 에 없고 백필 커버리지의 함수) · `amount_band` 는 베이스라인 축을 세그먼트로도 씀(신규 축 — 운영자 확인) | 이식 1 + 신규 1 |
 
 ## §2 정책이 아닌 것(같은 자리에 두지 않는다)
@@ -27,7 +28,34 @@
 - 승격 게이트 B 계보 env 5·프리셋 4 — 이식 없음(D-5C-1).
 
 ## §3 불변식(로더가 거부)
-`paired_t_threshold > 0` · `0 < maturity_threshold ≤ 1` · `min_evaluation_rows ≥ 2`(설계 검토 (16) — `paired_t` ddof=1) · `max_origins ≥ 1` · `agency_baseline_min_count ≥ 1` · `stability_seeds` 비어 있지 않음·정수·중복 없음 · `amount_band_edges` 양수·엄격 오름차순 · `segment_axes` ⊆ {category, amount_band}·중복 없음 · `gate_baseline` ∈ 베이스라인 표 이름 · `gate_stratum` 비어 있지 않음.
+`paired_t_threshold > 0` · `0 < maturity_threshold ≤ 1` · `min_evaluation_rows ≥ 2`(설계 검토 (16) — `paired_t` ddof=1) · `max_origins ≥ 1` · `agency_baseline_min_count ≥ 1` · `stability_seeds` 비어 있지 않음·정수·중복 없음 · `amount_band_edges` 양수·엄격 오름차순 · `segment_axes` ⊆ {category, amount_band}·중복 없음 · `gate_baseline` ∈ 베이스라인 표 이름 · `gate_stratum` 비어 있지 않음 · `effective_date` 는 ISO-8601 날짜 **문자열**(M9/ml-lifecycle).
+
+## §4 승인된 산출물 지문 (M9/ml-lifecycle, 2026-11-06)
+
+| version | 승인된 파일 내용 sha256 |
+| --- | --- |
+| `evaluation-v1` | `fba628efb97b313ff511504e942a11ca5dc709c454a34ff73d84b09ae4670855` |
+
+이 표가 생긴 이유: 앞 판은 **version 문자열이 내용에 묶여 있지 않았다**. 임계만 완화한 사본을
+같은 `evaluation-v1` 이름으로 로드하면(코드가 써도, `ML_ENGINE_EVALUATION_POLICY` 로 가리켜도)
+모든 게이트가 초록이었다 — verifier 실측(M9/ml-lifecycle 수정 라운드 2, v H-2). 지문은
+`ml_engine.registry.policy_approvals` 의 코드 상수 등록부와 같은 값이다.
+
+**어느 층이 무엇을 막는가**(cr r3 M-2 정정 — 앞 판은 이 거부를 **뿌리 로더**에 귀속했는데
+그 검사는 같은 라운드에 옮겨졌다):
+- **조립 근**(`app.server._preload` → `evaluation.policy_source.load_approved_evaluation_policy`)
+  이 미승인 산출물을 거부한다 — 이름을 유지한 편집 사본과 이름을 바꿔 단 사본 **둘 다**.
+- **게이트 자리**(`evaluation.policy_source.verify_policy_source`, `app.pipeline._run_holdout`
+  가 부른다)가 **다시** 묻는다 — 부팅 뒤에 정책 객체를 바꿔 끼우는 길이 있기 때문이다
+  (수정 라운드 3, v H-3a).
+- **CI** 가 출하 파일 자체를 고치는 길을 막는다 — 아래 지문 등식 test.
+- 뿌리 로더(`registry.policy.load_policy`)는 승인을 **묻지 않는다**(사유는 그 모듈 docstring —
+  승인 밖 조합으로 로더를 검사하는 값 불변식 test 들이 재던 것을 잃는다).
+
+**이 version 의 값을 바꾸려면 세 자리를 같은 커밋에서 바꿔야 한다** — ⑴ §1 표(이 문서)
+⑵ `ml-engine/policy/evaluation-v1.yaml` ⑶ 등록부 한 줄. 어긋나면 test 가 붉다
+(`tests/registry/test_policy_approvals.py`). 지문은 **주석·공백까지 포함한 파일 내용**의
+해시다(그 자리에 근거가 적히므로 의도된 성질이다).
 
 ## change_history
 | 일자 | 변경 | 근거 |
@@ -35,3 +63,5 @@
 | 2026-09-15 착수 | 표 등재(승인 대기) | D-5C2-3 · 조사 02 §2-6 |
 | 2026-09-16 승인 | 지위 「승인 대기」→「승인」(값·표 무변경) | 운영자 「둘 다 승인」 — M5 종결 판정 `reports/evidence/m5/closure/checklist.md` §3 ④ |
 | 2026-09-15 구현 | `policy/evaluation-v1.yaml` 실물 작성·로더(`evaluation/policy.py`) 구현 완료 — 값 §1 표와 완전 일치, 재학습·튜닝 근거로 인한 값 변경 0건 | `test_evaluation_policy.py::test_shipped_policy_file_matches_policy_values_md`(값 11개 하드코딩 대조) |
+| 2026-11-06 신설 | `effective_date` 한 칸 추가(**임계 11개 무변경**). M9/ml-lifecycle 이 ML-07 ③ 을 이행하며 더했고, 이 문서를 갱신하지 않은 채 YAML·test 만 고친 것을 code-reviewer M-4 가 지적해 **같은 라운드에서** 등재했다(절차는 머리말대로 이 문서 → YAML → test). 값의 지위: 위 2026-09-16 승인 날짜의 파생이고, **effective date 로서의 별도 승인은 받지 않았다** — 사용자 확인 항목 | `test_shipped_policy_file_matches_policy_values_md`(값 **12개** 대조) · verifier M-2 |
+| 2026-11-06 승인 | `effective_date` 의 **지위**가 「그 표 승인 날짜의 파생 · 구현자 해석 · 사용자 확인 대기」에서 **「승인」**으로. **값과 파일 지문은 바뀌지 않는다** — `"2026-09-16"` 그대로이고 `ml-engine/policy/evaluation-v1.yaml` 의 승인 지문도 그대로다(이 승인은 문면만 바꾼다). 확인된 거동: 같은 `evaluation-v1` version 을 유지한 채 칸이 늘어 **같은 version 의 checksum 과 승격 거동이 바뀐다**(효력 시작 전에 시작한 창의 통과는 인용되지 않아 이전 `Passed` 창 → `Superseded`) | **사용자 승인 2026-11-06**(팀장 전달) — v M-2 가 올린 확인 항목의 종결 |

@@ -18,9 +18,11 @@ from ml_engine.evaluation import (
     ModelScore,
     NotEvaluable,
     Passed,
+    cite_promotion_window,
     derive_promotion,
 )
-from ml_engine.evaluation.report import PromotionNotEvaluable
+from ml_engine.evaluation.epoch import CitationRejectionReason
+from ml_engine.evaluation.report import PromotionNotEvaluable, PromotionSuperseded
 from ml_engine.evaluation.windows import (
     WeekMaturity,
     WindowExclusion,
@@ -42,6 +44,7 @@ from ml_engine.training.holdout import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
+from tests.policy_fixture import TEST_POLICY_EFFECTIVE_DATE, kernel_policy
 
 _HYPERPARAMETERS = LightGbmHyperparameters(
     objective="regression",
@@ -77,7 +80,6 @@ def _spec(**overrides: object) -> TrainingSpec:
 
 def _policy(**overrides: object) -> EvaluationPolicy:
     base: dict[str, object] = dict(
-        version="test",
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
@@ -91,7 +93,7 @@ def _policy(**overrides: object) -> EvaluationPolicy:
         segment_axes=("category", "amount_band"),
     )
     base.update(overrides)
-    return EvaluationPolicy(**base)  # type: ignore[arg-type]
+    return kernel_policy(**base)
 
 
 def _feature_inputs(*, category: str, agency: str) -> features_pb2.FeatureInputs:
@@ -149,11 +151,14 @@ def _raw_row_missing_base_amount(
 
 
 def _dataset(
-    rows: tuple[RawTrainingRow, ...], *, dataset_id: str = "ds-holdout"
+    rows: tuple[RawTrainingRow, ...],
+    *,
+    dataset_id: str = "ds-holdout",
+    sample_scope: str = "feed-origin-only",
 ) -> LoadedDataset:
     manifest = DatasetManifestV1(
         dataset_id=dataset_id,
-        sample_scope="feed-origin-only",
+        sample_scope=sample_scope,
         feed_origin_only=True,
         row_count=len(rows),
         rows_checksum="0" * 64,
@@ -277,6 +282,32 @@ def test_run_holdout_with_no_evaluable_windows_still_produces_report() -> None:
     assert len(result.excluded_windows) == 1
     assert result.excluded_windows[0].reason == WindowExclusionReason.IMMATURE
     assert isinstance(result.promotion, PromotionNotEvaluable)
+
+
+def test_report_carries_the_digest_of_the_policy_file_it_judged_with() -> None:
+    """v r2 M-1 — 값 slice 의 **wire 축**. 「어느 파일로 판정했는가」는 report 에 지문으로
+    남아야 하고, 그 배선이 없으면(또는 상수로 채워지면) 산출물이 거짓을 공시한다 — 그런데
+    앞 판에는 그 등식을 재는 test 가 없어 배선을 상수로 바꿔도 전건이 초록이었다."""
+    policy = _policy()
+    result = run_holdout(
+        _dataset(_many_rows(10)),
+        [
+            WeekMaturity(
+                start=_EPOCH + timedelta(days=8),
+                end=_EPOCH + timedelta(days=15),
+                opened_count=10,
+                settled_count=1,
+            )
+        ],
+        _spec(),
+        _training_policy(),
+        policy,
+        _DeterministicTrainer(),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.policy_source_digest == policy.source.digest
+    assert result.policy_version == policy.version
 
 
 def _selected_window_scenario(
@@ -1029,7 +1060,11 @@ def test_run_holdout_promotion_uses_latest_evaluable_window_not_latest_calendar_
     assert not isinstance(result.promotion, PromotionNotEvaluable)
     assert (
         derive_promotion(
-            result.windows[0].outcome, window_start=result.windows[0].window_start
+            result.windows[0].outcome,
+            window_start=result.windows[0].window_start,
+            citation=cite_promotion_window(
+                policy=_policy(min_evaluation_rows=5), window_start=window1.start
+            ),
         )
         == result.promotion
     )
@@ -1213,3 +1248,89 @@ def test_run_holdout_should_stop_checked_before_first_window_too() -> None:
     assert isinstance(result, HoldoutCancelled)
     assert result.completed_windows == 0
     assert trainer.call_count == 0
+
+
+def test_run_holdout_report_carries_policy_effective_date() -> None:
+    """M9/ml-lifecycle — 「언제부터의 규칙으로 판정했는가」가 report 에 남는다."""
+    dataset, window = _selected_window_scenario()
+    result = run_holdout(
+        dataset,
+        [window],
+        _spec(),
+        _training_policy(),
+        _policy(),
+        _DeterministicTrainer(base=0.6, slope=0.0),
+        CodeVersion("sha-1"),
+    )
+    assert not isinstance(result, HoldoutRejected)
+    assert result.policy_effective_date == TEST_POLICY_EFFECTIVE_DATE.isoformat()
+
+
+def test_run_holdout_promotion_is_superseded_when_window_predates_policy() -> None:
+    """ML-07 acceptance ③·⑥ 의 **배선 자리** — 같은 데이터·같은 임계·같은 판정인데
+    정책 effective date 만 창 뒤로 옮기면 승격 측정이 갈린다.
+
+    두 실행의 창 판정(`windows[0].outcome`)이 **같음**을 함께 단언한다 — 바뀐 것이
+    게이트 판정이 아니라 승격 인용임을 그 등식이 고정한다."""
+    dataset, window = _selected_window_scenario()
+    late_effective = (window.end + timedelta(days=1)).date()
+    runs = [
+        run_holdout(
+            dataset,
+            [window],
+            _spec(),
+            _training_policy(),
+            policy,
+            _DeterministicTrainer(base=0.6, slope=0.0),
+            CodeVersion("sha-1"),
+        )
+        for policy in (_policy(), _policy(effective_date=late_effective))
+    ]
+    early_run, late_run = runs
+    assert not isinstance(early_run, HoldoutRejected)
+    assert not isinstance(late_run, HoldoutRejected)
+    assert early_run.windows[0].outcome == late_run.windows[0].outcome
+    assert not isinstance(early_run.promotion, PromotionSuperseded)
+    assert isinstance(late_run.promotion, PromotionSuperseded)
+    assert (
+        late_run.promotion.reason
+        == CitationRejectionReason.MEASURED_BEFORE_EFFECTIVE_DATE
+    )
+
+
+def test_window_release_id_changes_with_the_sample_scope() -> None:
+    """v M-1 — ML-05 의 새 축이 **창 경로**에서도 잠긴다. `sample_scope` 만 다른 두
+    manifest 로 같은 코퍼스를 돌리면 창의 `release_id` 가 갈린다.
+
+    앞 판은 `_window_release_id` 의 `sample_scope=` 를 상수로 바꿔도 전건이 초록이었다
+    (verifier 변이 R4) — 함수 시그니처 sweep 과 artifact 경로만 잠겨 있었고, 이 slice 가
+    만든 창 경로 자체에는 대응 단언이 없었다. `dataset_id` 는 양쪽 같게 두어 **범위
+    축만** 다르게 한다(창 id 의 dataset 성분에 창 시작이 섞이므로 범위 축을 따로 가른다)."""
+    rows = _many_rows(20, start_day=0) + _many_rows(10, start_day=30)
+    window = WeekMaturity(
+        start=_EPOCH + timedelta(days=30),
+        end=_EPOCH + timedelta(days=37),
+        opened_count=10,
+        settled_count=9,
+    )
+
+    def _window_ids(scope: str) -> list[str]:
+        result = run_holdout(
+            _dataset(rows, sample_scope=scope),
+            [window],
+            _spec(),
+            _training_policy(min_training_rows=5),
+            _policy(min_evaluation_rows=5),
+            _DeterministicTrainer(base=0.6, slope=0.0),
+            CodeVersion("sha-1"),
+        )
+        assert not isinstance(result, HoldoutRejected), result
+        assert result.windows, "창이 하나도 성공하지 않으면 이 test 는 헛돈다"
+        return [item.release_id for item in result.windows]
+
+    narrow = _window_ids("feed-origin-only")
+    wide = _window_ids("all-strata")
+    assert narrow and len(narrow) == len(wide)
+    assert narrow != wide
+    # 통제군 — 같은 범위를 두 번 돌리면 같다(갈림이 범위 때문임을 고정한다).
+    assert narrow == _window_ids("feed-origin-only")

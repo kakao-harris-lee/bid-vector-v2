@@ -30,6 +30,7 @@ from ml_engine.evaluation import (
     WindowExclusion,
     WindowResult,
     category_counts,
+    cite_promotion_window,
     derive_promotion,
     holdout_overlaps,
     indices_in_window,
@@ -263,6 +264,28 @@ def _unaccounted_or_reject(
     return unaccounted
 
 
+def _promotion_of(
+    windows_outcome: _WindowsOutcome, evaluation_policy: EvaluationPolicy
+) -> Promotion:
+    """최신 창의 판정 + **그 창을 이 정책의 근거로 인용할 수 있는가**(M9/ml-lifecycle,
+    ML-07 ③·⑥). 창 시작 시각은 `succeeded_windows`에서 온다 — `results`와 같은 순서로
+    보관된 원 `WeekMaturity`라(H-2r) ISO 문자열을 다시 파싱하지 않는다."""
+    results = windows_outcome.results
+    windows = windows_outcome.succeeded_windows
+    latest = results[-1] if results else None
+    latest_outcome: GateOutcome | None = latest.outcome if latest is not None else None
+    citation = (
+        cite_promotion_window(policy=evaluation_policy, window_start=windows[-1].start)
+        if windows
+        else None
+    )
+    return derive_promotion(
+        latest_outcome,
+        window_start=latest.window_start if latest is not None else None,
+        citation=citation,
+    )
+
+
 def _assemble_report(
     dataset: LoadedDataset,
     spec: TrainingSpec,
@@ -279,15 +302,13 @@ def _assemble_report(
         return unaccounted_or_reject
     unaccounted = unaccounted_or_reject
     opened_first, opened_last, strata, categories = _corpus_profile(ordered_rows)
-    latest = windows_outcome.results[-1] if windows_outcome.results else None
-    latest_outcome: GateOutcome | None = latest.outcome if latest is not None else None
-    promotion: Promotion = derive_promotion(
-        latest_outcome, window_start=latest.window_start if latest is not None else None
-    )
+    promotion: Promotion = _promotion_of(windows_outcome, evaluation_policy)
     return EvaluationReportV1(
         report_schema_version="evaluation-report-v1",
         policy_version=evaluation_policy.version,
         policy_checksum=evaluation_policy_checksum(evaluation_policy),
+        policy_effective_date=evaluation_policy.effective_date.isoformat(),
+        policy_source_digest=evaluation_policy.source.digest,
         training_spec_version=spec.version,
         training_spec_checksum=spec_checksum(spec),
         feature_schema_version=dataset.manifest.feature_schema_version,
@@ -328,11 +349,12 @@ def run_holdout(
     `EvaluationReportV1`을 조립한다. 임계·seed 목록·창 수를 낱개 인자로 받지 않는다 —
     전부 `evaluation_policy`/`spec`/`training_policy`에서만 온다.
 
+    정책 출처 재검증은 조립 근이 한다(`app.pipeline._run_holdout`).
+
     D-5E3-3 — `should_stop`(기본: 항상 거짓, 기존 호출자·test 무변경)이
     참이 되면 창 루프가 남은 창을 학습하지 않고 `HoldoutCancelled`를 낸다(창 단위
     취소 — 창 하나 안의 LightGBM 학습 자체를 중단하지는 않는다, 알려진 제한).
-    `training.jobs`는 여기서 import 하지 않는다 — 취소 확인 함수는 호출부가
-    콜러블로 주입한다(층 결합 회피)."""
+    `training.jobs`는 import 하지 않는다 — 취소 확인은 호출부가 주입한다(층 결합 회피)."""
     admitted = admit_corpus(dataset.raw_rows)
     if isinstance(admitted, CorpusRejected) or not admitted.rows:
         return HoldoutRejected(HoldoutRejectionReason.EMPTY_SIDE, "빈 코퍼스")

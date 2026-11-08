@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
+import importlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -15,12 +17,20 @@ from google.protobuf import json_format
 
 from ml_engine.app.pipeline import build_training_pipeline
 from ml_engine.contracts import common_pb2, features_pb2
-from ml_engine.evaluation import EvaluationPolicy
+from ml_engine.evaluation import (
+    EvaluationPolicy,
+    EvaluationReportV1,
+    PromotionNotEvaluable,
+    load_evaluation_policy,
+    policy_checksum,
+)
+from ml_engine.inference.time_axis import TimeAxisPolicy
 from ml_engine.training.booster import BoosterLike, LightGbmTrainer, TrainerFailed
 from ml_engine.training.holdout import HoldoutCancelled
 from ml_engine.training.jobs.pipeline import (
     CancelToken,
     DatasetRefInput,
+    DetailCode,
     PipelineCancelled,
     PipelineFailed,
     PipelineOutcome,
@@ -28,6 +38,9 @@ from ml_engine.training.jobs.pipeline import (
 from ml_engine.training.policy import TrainingPolicy
 from ml_engine.training.spec import LightGbmHyperparameters, TrainingSpec
 from ml_engine.training.train import CodeVersion
+
+_TIME_AXIS_POLICY = TimeAxisPolicy(version="test", substitute_approved=False)
+"""조립 근 test 의 시간축 정책 — 출하와 같은 미승인(`OPEN-SET-10` 미결)."""
 
 _HYPERPARAMETERS = LightGbmHyperparameters(
     objective="regression",
@@ -61,21 +74,30 @@ def _training_policy() -> TrainingPolicy:
     return TrainingPolicy(version="test-v1", min_training_rows=4)
 
 
+_SHIPPED_EVALUATION_POLICY = (
+    Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
+)
+
+
 def _evaluation_policy() -> EvaluationPolicy:
-    return EvaluationPolicy(
-        version="test",
-        paired_t_threshold=2.58,
-        gate_baseline="category_x_band",
-        gate_model="gbm_all_strata",
-        gate_stratum="clean-base",
-        maturity_threshold=0.70,
-        min_evaluation_rows=2,
-        max_origins=5,
-        agency_baseline_min_count=2,
-        stability_seeds=(20260812, 1),
-        amount_band_edges=(1e8, 5e8, 1e9, 5e9),
-        segment_axes=("category", "amount_band"),
-    )
+    """**출하 승인 정책 그대로**(v r3 H-3a).
+
+    앞 판은 작은 데이터셋에 맞춘 임계(`min_evaluation_rows=2` 등)의 파생 정책을 썼다.
+    게이트 자리의 승인 대조가 들어온 뒤 그 정책은 **미승인**이라 제품 경로가 거부한다 —
+    그리고 그것이 올바른 거동이다(승인 밖 임계로 게이트를 돌릴 수 없다).
+
+    **출하 임계로 바꿔도 이 test 들이 재던 것을 잃지 않는다**: 이 파일의 데이터셋은
+    `settlements.jsonl` 이 비어 있어 성숙한 주가 **0** 이고, 그래서 평가 창이 선택되지
+    않는다(report 는 `windows == ()` · `PromotionNotEvaluable`). 즉 `min_evaluation_rows`
+    같은 임계는 애초에 물리지 않는다 — 이 test 들이 재는 것은 **조립·취소 경계·파일
+    쓰기**이고 그 축은 임계와 무관하다.
+
+    승인 밖 조합이 **필요한** 커널 test 는 라이브러리 진입점(`run_holdout`)을 직접 부르고
+    `tests/policy_fixture.kernel_policy` 를 쓴다 — 그 경로에는 재검증이 없다(그 사유는
+    `evaluation.policy_source` 모듈 docstring)."""
+    loaded = load_evaluation_policy(_SHIPPED_EVALUATION_POLICY)
+    assert isinstance(loaded, EvaluationPolicy), loaded
+    return loaded
 
 
 def _feature_inputs_json(*, category: str, agency: str) -> dict[str, object]:
@@ -188,6 +210,7 @@ def test_pipeline_with_fake_trainer_writes_files_and_returns_matching_refs(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -225,6 +248,7 @@ def test_pipeline_cancelled_before_training_returns_pipeline_cancelled(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -251,6 +275,7 @@ def test_pipeline_dataset_unreadable_without_settlements_file(tmp_path: Path) ->
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -272,6 +297,7 @@ def test_pipeline_with_real_lightgbm_trainer(tmp_path: Path) -> None:
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=LightGbmTrainer(),
         code_version=CodeVersion("sha-test-real"),
         artifact_out_dir=out_dir,
@@ -354,6 +380,7 @@ def _pipeline_with_counters(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=trainer,
         code_version=CodeVersion("sha-boundary-test"),
         artifact_out_dir=out_dir,
@@ -508,6 +535,7 @@ def test_run_holdout_receives_cancel_tokens_is_cancelled_as_should_stop(
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -550,6 +578,7 @@ def test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifa
         training_policy=_training_policy(),
         evaluation_policy=_evaluation_policy(),
         maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
         trainer=_FakeTrainer(),
         code_version=CodeVersion("sha-test-1"),
         artifact_out_dir=out_dir,
@@ -558,3 +587,174 @@ def test_holdout_cancelled_mid_windows_maps_to_pipeline_cancelled_with_no_artifa
 
     assert isinstance(outcome, PipelineCancelled)
     assert list(out_dir.iterdir()) == []
+
+
+def test_pipeline_rejects_a_policy_whose_values_differ_from_its_file(
+    tmp_path: Path,
+) -> None:
+    """v H-1 — 제품 경로의 둘째 겹. 임계를 비튼 정책(여기서는 생성 토큰을 동적으로 훔쳐
+    위조한다 — AST 가 보지 못하는 그 경로)으로 게이트를 돌리려 하면 job 이 실패한다.
+    조용히 파일 값으로 갈아끼우지 않는다 — 그러면 「무엇으로 판정했는가」가 다시 흐려진다."""
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    honest = _evaluation_policy()
+    module = importlib.import_module("ml_engine.evaluation.policy")
+    token = getattr(module, "_Parsed" + "PolicyFile")
+    forged = module.EvaluationPolicy(
+        parsed=token(digest=honest.source.digest),
+        **{**vars(honest), "paired_t_threshold": 0.01},
+    )
+    assert forged.paired_t_threshold != honest.paired_t_threshold
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=forged,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    assert isinstance(outcome, PipelineFailed), outcome
+    assert outcome.detail_code == DetailCode.POLICY_SOURCE_MISMATCH
+
+    # 통제군 — 같은 파이프라인이 정직한 정책으로는 끝까지 돈다(실패가 다른 이유가 아니다).
+    honest_out = tmp_path / "artifacts-honest"
+    honest_out.mkdir()
+    honest_pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=honest,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=honest_out,
+    )
+    assert isinstance(
+        honest_pipeline.run(_dataset_ref(dataset_dir), CancelToken()), PipelineOutcome
+    )
+
+
+# ---- v r4 H-4 — 게이트에 **넘기는** 객체가 재검증이 재구성한 것인가 ----
+#
+# 재검증이 승인 파일에서 다시 만든 객체를 돌려주더라도, 부르는 자리가 그 **반환값을 쓰지
+# 않고** 자기가 들고 있던 객체를 다시 넘기면 처방이 비어 있다(검사와 사용의 분리).
+
+
+class _LenientThreshold(float):
+    """직렬화는 승인값, 부정은 완화값 — 게이트가 쓰는 연산만 갈라 놓는다(verifier F7)."""
+
+    def __neg__(self) -> float:
+        return -0.1
+
+
+def test_run_holdout_receives_the_policy_rebuilt_by_verification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """파이프라인에 **거동이 위조된** 정책을 주입하고, `run_holdout` 이 받는 정책을 잡아
+    그것이 승인값으로 **거동**하는지 본다. 반환값을 무시하는 배선이면 위조 객체가 그대로
+    넘어가 `-t` 가 -0.1 이다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    honest = _evaluation_policy()
+    forged = copy.copy(honest)
+    object.__setattr__(
+        forged, "paired_t_threshold", _LenientThreshold(honest.paired_t_threshold)
+    )
+    # 전제 — 위조는 세 직렬화 축을 전부 통과한다(그래서 이 축이 따로 필요하다).
+    assert policy_checksum(forged) == policy_checksum(honest)
+    assert -forged.paired_t_threshold == -0.1
+
+    seen: list[EvaluationPolicy] = []
+    original = pipeline_module.run_holdout
+
+    def capturing(*args: object, **kwargs: object) -> object:
+        seen.extend(a for a in args if isinstance(a, EvaluationPolicy))
+        return original(*args, **kwargs)  # type: ignore[misc]
+
+    monkeypatch.setattr(pipeline_module, "run_holdout", capturing)  # type: ignore[attr-defined]
+
+    pipeline = build_training_pipeline(
+        _spec(),
+        training_policy=_training_policy(),
+        evaluation_policy=forged,
+        maturity_window_days=7,
+        time_axis_policy=_TIME_AXIS_POLICY,
+        trainer=_FakeTrainer(),
+        code_version=CodeVersion("sha-test-1"),
+        artifact_out_dir=out_dir,
+    )
+    outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    assert isinstance(outcome, PipelineOutcome), outcome
+
+    assert len(seen) == 1, seen
+    # 지역 변수로 받는다 — pytest 는 단항 연산을 **문면으로** 설명해서
+    # (`-` + 피연산자 repr) 실패 메시지가 실제 비교값을 가린다.
+    behaviour = -seen[0].paired_t_threshold
+    assert behaviour == -2.58  # 승인값으로 거동한다
+    assert type(seen[0].paired_t_threshold) is float
+
+
+def test_the_shipped_policy_premise_holds_for_this_files_dataset(
+    tmp_path: Path,
+) -> None:
+    """cr r4 L-2 — 이 파일의 test 들이 **출하 승인 정책**을 쓸 수 있는 전제를 단언으로
+    잠근다: `_write_dataset` 은 `settlements.jsonl` 을 비워 두므로 성숙한 주가 **0** 이고,
+    평가 창이 선택되지 않아 출하 임계(`min_evaluation_rows: 100` 등)가 **물리지 않는다**.
+
+    그 전제는 지금까지 fixture 의 성질이기만 했다 — 그 바이트가 비지 않게 되는 날 다른
+    test 들의 뜻이 **조용히** 바뀐다(출하 임계가 갑자기 물린다). 여기서 report 를 직접 보고
+    「창 0 · 승격 인용 불가」를 단언해 그 변화가 **이 자리에서** 드러나게 한다."""
+    import ml_engine.app.pipeline as pipeline_module
+
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    _write_dataset(dataset_dir, n=6)
+    out_dir = tmp_path / "artifacts"
+    out_dir.mkdir()
+
+    reports: list[object] = []  # run_holdout 의 반환은 report 또는 거부/취소다
+    original = pipeline_module.run_holdout
+
+    def capturing(*args: object, **kwargs: object) -> object:
+        result = original(*args, **kwargs)  # type: ignore[misc]
+        reports.append(result)
+        return result
+
+    monkeypatch_free_policy = _evaluation_policy()
+    assert monkeypatch_free_policy.min_evaluation_rows == 100  # 출하값이다
+    pipeline_module.run_holdout = capturing  # type: ignore[attr-defined]
+    try:
+        pipeline = build_training_pipeline(
+            _spec(),
+            training_policy=_training_policy(),
+            evaluation_policy=monkeypatch_free_policy,
+            maturity_window_days=7,
+            time_axis_policy=_TIME_AXIS_POLICY,
+            trainer=_FakeTrainer(),
+            code_version=CodeVersion("sha-premise"),
+            artifact_out_dir=out_dir,
+        )
+        outcome = pipeline.run(_dataset_ref(dataset_dir), CancelToken())
+    finally:
+        pipeline_module.run_holdout = original  # type: ignore[attr-defined]
+    assert isinstance(outcome, PipelineOutcome), outcome
+
+    assert len(reports) == 1
+    report = reports[0]
+    assert isinstance(report, EvaluationReportV1), report
+    assert report.windows == ()  # 평가 창 0 — 임계가 물리지 않는다
+    assert isinstance(report.promotion, PromotionNotEvaluable)

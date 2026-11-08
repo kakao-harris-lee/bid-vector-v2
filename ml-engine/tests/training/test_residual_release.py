@@ -1,7 +1,11 @@
 """RED — `ml_engine.training.residual`·`ml_engine.training.release`(scope ⑦⑨,
 D-5C-10). H-1 뒤 — `ReleaseInputs` 타입은 삭제됐다. `derive_release_id`는
-다섯 값을 키워드 인자로 직접 받는다(값의 유효성은 각 값의 원 출처 타입이 강제 —
-이 모듈은 더 이상 검증하지 않는다)."""
+값을 키워드 인자로 직접 받는다(값의 유효성은 각 값의 원 출처 타입이 강제 —
+이 모듈은 더 이상 검증하지 않는다).
+
+M9/ml-lifecycle — 입력이 여섯이 되었다(`sample_scope` 가 model_version 축에 들어왔다).
+아래 민감도 단언은 **손으로 열거한 것**이라 축이 늘면 낡는다 — 시그니처에서 모집단을
+만드는 전수 sweep 은 `tests/training/test_release_identity.py` 가 진다."""
 
 from __future__ import annotations
 
@@ -35,6 +39,7 @@ def _kwargs(**overrides: object) -> dict[str, object]:
         training_spec_checksum="a" * 64,
         seed=20260812,
         code_version="abc123",
+        sample_scope="clean-base",
     )
     base.update(overrides)
     return base
@@ -54,6 +59,7 @@ def test_derive_release_id_changes_when_any_input_changes() -> None:
     )
     assert derive_release_id(**_kwargs(seed=1)) != baseline  # type: ignore[arg-type]
     assert derive_release_id(**_kwargs(code_version="def456")) != baseline  # type: ignore[arg-type]
+    assert derive_release_id(**_kwargs(sample_scope="all-strata")) != baseline  # type: ignore[arg-type]
 
 
 def test_derive_release_id_is_16_hex_chars() -> None:
