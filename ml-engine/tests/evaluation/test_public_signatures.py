@@ -433,7 +433,11 @@ def test_every_declared_resolution_failure_has_the_same_structural_cause() -> No
     넷 다 `AttributeError` 여야 한다 — 주석이 생성 stub 의 없는 모듈 속성을 가리키는 모양이고,
     그것은 파이썬 패치 버전이 아니라 **생성 stub 의 모양**이 정한다. 다른 종류의 실패
     (예: PEP 695 타입 파라미터의 `NameError`)가 섞이면 그 순간 **이 test 가 붉다** — 위
-    등식만 있으면 그런 실패는 「선언했으니 괜찮다」로 조용히 묻힌다."""
+    등식만 있으면 그런 실패는 「선언했으니 괜찮다」로 조용히 묻힌다.
+
+    같은 이유로 **문자열 경계가 안 풀려 생긴 해석 실패는 이 목록에 등재할 수 없다**(v r8
+    M-1' 처방의 짝, 실측): 그런 함수는 `get_type_hints` 자체는 성공하므로 여기서 「이제
+    해석된다 — 목록에서 빼라」로 붉다. 위 등식을 피하려고 선언 목록에 적는 길이 막힌다."""
     for module_name, name in sorted(_UNRESOLVABLE_ANNOTATIONS):
         func = _resolve(module_name, name)
         try:
@@ -508,9 +512,15 @@ def test_policy_factories_split_into_file_entry_points_and_derivations() -> None
     가려도(해석이 풀고, 자기참조는 가드) · 인자를 **개명**해도 · 반환 타입을
     `TYPE_CHECKING` 에서만 import 해도(해석 실패 등식이 받는다) · **PEP 695 제네릭 반환**
     (`def f[P: EvaluationPolicy](…) -> P`)이나 구식 `TypeVar(bound=…)` 반환으로 가려도
-    (경계·제약을 펴서 받는다 — v r7 M-1, 두 인터프리터에서 RED 실측).
+    (경계·제약을 펴서 받는다 — v r7 M-1, 두 인터프리터에서 RED 실측) · 그 경계를
+    **따옴표로 적어도**(`[P: "EvaluationPolicy"]` · `TypeVar("_P", bound="EvaluationPolicy")`
+    — 풀리면 이 등식이, 안 풀리면 해석 실패 등식이 받는다; v r8 M-1', 두 인터프리터 RED 실측).
 
-    이 전수가 지는 것은
+    **잔여 반례 — 닫지 않았다**(측정해서 등재한다, r6 L-2 계열): `@classmethod … -> Self` ·
+    `NewType("Pol", EvaluationPolicy)` 반환 · **무경계** 제네릭 `def f[P](…) -> P`. 셋 다
+    ruff·`mypy --strict` 를 통과하는 모양으로 두 인터프리터에서 **GREEN** 이다(v r8 실측).
+    무경계 제네릭은 반환 주석에 정책 타입이 한 번도 나오지 않으므로 **반환 타입 술어로는
+    원리상** 못 닫는다. 이 전수가 지는 것은
     **유입 층**이고 방어선이 아니다 — 그 잔여는 리뷰의 자리이고, 미승인 값이 판정에 닿는 것은
     `evaluation.policy_source` 의 재구성 승인 축이 막는다(파일 머리 참조)."""
     assert _policy_factories() == _POLICY_FILE_ENTRY_POINTS | _POLICY_ENTRY_EXCEPTIONS
