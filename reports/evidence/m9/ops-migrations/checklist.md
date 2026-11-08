@@ -31,7 +31,7 @@ in_scope 밖 다섯 승인).
 | OPS-10 ⑤ compose·runbook 미갱신 | 기동 실패 + 전수 갱신(열거표) |
 | OPS-10 ⑥ test 배선이 기본값에 기댄다 | 배선 test 일곱·출하 조립 19 자리 갱신, 로컬 exit 0 |
 | OPS-10 ⑦ 적힌 릴리스를 나중에 **덮는다** | 트리거가 「한 번만 적는다」로 지우기·바꿔치기를 함께 거부(cr M-1). 앱 역할이 UPDATE 권한을 가진 표가 `outbox` 하나라 그 길이 실제로 열려 있었다 |
-| 두 축 공통 ⑧ 마이그레이션이 **기동을 멈춘다** | **migrate 연결의 `lock_timeout`**(`PersistenceWiring.ownerMigration` 의 `initSql`) — 표기·선언과 무관하게 전수를 덮는다. 거동은 `MigrationLockBoundTest` 가 **상한을 선언하지 않은 파일**(V14)에서 잰다. 파일의 `SET LOCAL` 과 그 전수를 세는 census 는 **관례 lint** 이고 안전망이 아니다(v r6 V-1 정정 — 정규식이 평범한 표기 열에 빗나갔다) |
+| 두 축 공통 ⑧ 마이그레이션이 **기동을 멈춘다** | **migrate 연결의 `lock_timeout`**(`PersistenceWiring.ownerMigration` 의 `initSql`) — 연결이 **기본값**을 깔아 표기와 무관하게, 선언을 잊어도 전수가 그 값으로 시작한다. **깔개이지 하한이 아니다**(cr r4 M-1): 파일의 `SET LOCAL`(또는 `SET`·`RESET`)은 그 값을 덮을 수 있고 — 오늘 선언은 열둘 전부 `'5s'` — 「의도적 덮어쓰기」는 관례 lint 가 **기존 표 세 모양**에 한해 본다. 거동은 `MigrationLockBoundTest` 가 **상한을 선언하지 않은 파일**(V14)에서 잰다. 파일의 `SET LOCAL` 과 그 전수를 세는 census 는 **관례 lint** 이고 안전망이 아니다(v r6 V-1 정정 — 정규식이 평범한 표기 열에 빗나갔다) |
 
 ## 설계 검토의 「과잉·미달」 대조
 

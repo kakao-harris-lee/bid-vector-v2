@@ -72,6 +72,22 @@
    닫은 것은 「값이 없거나 지어낸 값」이고, 「운영자가 댄 값이 그 jar 인가」는 배포 절차의 몫이다.
 4. **outbox 의 시도 계수·시간 기반 janitor 는 만들지 않았다**(계약이 등재만 하라고 적는다).
    회수 축은 임대 기반이고 그 잔여는 `OPEN-6F10-CLAIM-OBSERVABILITY` 가 계속 든다.
+5. **마이그레이션 잠금 상한은 「기본값」이고 파일이 덮을 수 있다**(cr r4 M-1 · v r7 L-2). 연결의
+   `initSql` 은 「선언을 잊음」을 덮지만 `SET LOCAL lock_timeout = '0'`·`RESET`·더 큰 값을 **명시한**
+   파일은 밖이다. 그 자리를 보는 것은 관례 lint 뿐이고 그 모집단은 **기존 표 세 모양**(V18 이후의
+   `ALTER TABLE`·`CREATE INDEX … ON`·`CREATE TRIGGER … ON`)이다. 오늘 선언 열둘이 전부 `'5s'` 라
+   거동 차이는 0 이다.
+6. **lint 가 보는 값과 `MIGRATION_LOCK_TIMEOUT` 이 등식으로 묶여 있지 않다**(cr r4 LOW). lint 는
+   `'[1-9]` 로 시작하는 값만 요구하므로 `'9h'` 같은 선언도 통과한다. 등식(`= '$MIGRATION_LOCK_TIMEOUT'`)
+   으로 좁히는 처방은 **이 라운드에서 시행하지 않았다** — 게이트 술어를 바꾸면 severity 와 무관하게
+   표적 재검증이 따라오고(CLAUDE.md), 이 라운드의 범위는 문면·단언이다. 후속 slice 의 입력으로 둔다.
+7. **출하 호출 자리(`migrateAsOwner` → `ownerMigration`)가 구조로 묶여 있지 않다**(cr r4 LOW).
+   오늘 `:app` main 에 `Flyway.configure()` 자리는 **하나**뿐이고(verifier r7 표적 ①도 그 수를 쟀다),
+   둘째 자리가 생기면 그것이 `initSql` 없이 migrate 할 수 있다. 그 자리의 수를 세는 census 는
+   두지 않았다 — 같은 후속의 입력이다.
+8. **`tools/db-rehearsal.sh` 의 주석 한 줄이 이 변경으로 낡았다**(v r7 L-3). 「`PersistenceWiring.migrate()`
+   와 같은 설정(전부 기본값)」이 더는 사실이 아니다(리허설 Flyway 에 `initSql` 없음). **in_scope 밖이라
+   고치지 않았다** — 격리 컨테이너라 거동 차이는 관측되지 않고, 문면만 고치는 후속으로 둔다.
 
 ## in_scope 밖으로 나간 파일 — 전수 열거
 
@@ -281,11 +297,17 @@ verifier 가 심은 15 변이 가운데 **10 이 초록**이었다(`ALTER TABLE 
 따옴표 이름 · `EXECUTE format(...)` · `LOCK TABLE` · `DROP TRIGGER` · 블록 주석 · 값 `0` · DDL
 뒤에 적은 선언 · 문자열 리터럴). **구조로 지켜지던 것은 거동 test 가 있는 V26 하나였다.**
 
-### 처방 — 바닥을 연결로 내린다
+### 처방 — 기본값을 연결로 내린다
 
 `PersistenceWiring.ownerMigration` 이 출하 마이그레이션 구성 하나를 들고
-`initSql("SET lock_timeout = '5s'")` 를 건다. **표기·선언과 무관하게** 모든 마이그레이션이 상한
-아래에서 돈다. census 가 설계상 제외한 FK 축(참조 표의 `SHARE ROW EXCLUSIVE`)도 함께 덮인다.
+`initSql("SET lock_timeout = '5s'")` 를 건다. **표기와 무관하게, 선언을 잊어도** 모든 마이그레이션이
+이 값을 **기본값으로** 깔고 시작한다. census 가 설계상 제외한 FK 축(참조 표의
+`SHARE ROW EXCLUSIVE`)도 함께 덮인다.
+
+**깔개이지 하한이 아니다**(cr r4 M-1). `SET LOCAL lock_timeout`(또는 `SET`·`RESET`)은 세션 값을
+덮으므로 파일이 `'0'`·`RESET`·더 큰 값을 명시하면 그 파일은 이 값 밖이다 — 연결이 덮는 것은
+「잊음」이고 「의도적 덮어쓰기」는 관례 lint 가 **기존 표 세 모양**(`ALTER TABLE`·`CREATE INDEX … ON`·
+`CREATE TRIGGER … ON`, V18 이후)에 한해 본다. 오늘 선언은 열둘 전부 `'5s'` 라 거동 차이가 0 이다.
 파일의 `SET LOCAL` 은 **그대로 둔다** — 같은 값이라 중복이 무해하고 고치면 checksum 이 움직인다
 (cr r3 는 SQL 지적 0 으로 approve 했다).
 
@@ -308,15 +330,20 @@ census 는 **관례 lint 로 격하**했다 — 「파일도 관례대로 선언
 | 변이 | 표적 | 결과 |
 | --- | --- | --- |
 | `ownerMigration` 에서 `initSql` 제거 | `MigrationLockBoundTest` | **RED** · **41.7s**(초록 12.9s) — 상한이 없으면 **기다린다**. 이 한 줄이 안전망임을 그 차이가 센다 |
-| V27 의 `SET LOCAL` 선언 제거 | 둘 다 | census **RED**(관례 lint 가 운다) · **`MigrationLockBoundTest` 는 초록** · V18·V19·V26 거동도 초록 — **선언이 없어도 연결 상한이 막는다** |
+| V27 의 `SET LOCAL` 선언 제거 | census | **RED**(관례 lint 가 운다). 같이 돌린 `MigrationLockBoundTest`·V18·V19·V26 거동은 초록이지만 **그 초록은 이 변이를 재지 않는다**(v r7 L-1 정정) — 그 test 들은 V27 을 지나지 않는다 |
 | V27 선언의 값을 `'0'` 으로 | census | **RED**(앞 판에서는 초록이었다 — cr r3 M-1) |
 | V27 선언을 ALTER **뒤**로 옮김 | census | **RED**(앞 판에서는 초록이었다 — cr r3 M-1) |
 | 통제군(원복 뒤 전건) | 전부 | 아래 결과표 |
 
 **새 test 가 고른 자리**: V14 는 기존 표(`notice`)를 `ALTER` 하면서 상한을 **선언하지 않는** 관례
 이전 파일이다. 파일 census 로는 영원히 닿지 않고 파일 선언으로도 막히지 않으므로, 거기서 `55P03`
-이 나오면 상한을 세운 것은 **연결 하나**다 — 그래서 이 단언이 현재·미래의 모든 마이그레이션을
-덮는다. 출하 구성을 test 가 **같이** 쓴다(자기 사본이면 `initSql` 을 지워도 초록이다).
+이 나오면 상한을 세운 것은 **연결 하나**다. 출하 구성을 test 가 **같이** 쓴다(자기 사본이면
+`initSql` 을 지워도 초록이다).
+
+**이 test 가 재는 범위**(v r7 L-1 정정): 그 한 자리 — **실행의 첫 파일**이다. 「실행 중간 파일에도
+상한이 남는가」는 레인이 재지 않았고 **verifier r7 의 프로브가 실측**했다(PR #141 의 r7 판정
+코멘트 표 A·B): 같은 실행 셋째 파일 V16(선언 없음)에서 `55P03`, `initSql` 제거 변이에서 RED.
+「현재·미래 전부」는 그 둘이 함께일 때의 주장이고, 그 안에서도 **명시적 덮어쓰기**는 밖이다.
 
 ## 등재만 (cr L-5)
 
