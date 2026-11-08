@@ -124,21 +124,29 @@ open class PersistenceWiring {
 
     companion object {
         /**
-         * **마이그레이션 연결의 잠금 대기 상한**(M9/ops-migrations, verifier r6 V-1). 값은 V18 이
-         * 세운 파일 관례와 같다.
+         * **마이그레이션 연결이 까는 잠금 대기 기본값**(M9/ops-migrations, verifier r6 V-1). 값은
+         * V18 이 세운 파일 관례와 같다.
          *
          * **왜 연결에 거는가.** 기본 `lock_timeout` 은 0(무한)이고 migrate 는 기동의 부수효과라,
          * 열린 트랜잭션 뒤에 선 DDL 은 **기동 정지**가 된다(그 큐 뒤로 그 표의 읽기까지 선다).
          * 파일마다 `SET LOCAL` 을 적는 관례는 그 상한을 **저자의 기억**에 맡긴다 — 표기 하나
          * (`ALTER TABLE IF EXISTS`·스키마 한정·동적 SQL·`DROP TRIGGER`)만 달라도 그것을 세는
          * 술어가 빗나가고, 값이 `0` 이거나 DDL **뒤에** 적힌 선언도 선언으로 보인다. 연결에 한 번
-         * 걸면 **어떤 표기로 쓰였든, 선언을 잊었든** 모든 마이그레이션이 상한 아래에서 돈다.
+         * 걸면 **어떤 표기로 쓰였든, 선언을 잊었든** 모든 마이그레이션이 이 값을 깔고 시작한다.
+         *
+         * **깔개이지 하한이 아니다**(cr r4 M-1). `SET LOCAL lock_timeout`(또는 `SET`·`RESET`)은
+         * 세션 값을 **덮으므로**, 파일이 `'0'`·`RESET`·더 큰 값을 명시하면 그 파일은 이 값 밖이다.
+         * 연결이 덮는 것은 「선언을 잊음」이고, 「의도적 덮어쓰기」는 `MigrationLockTimeoutTest` 의
+         * 관례 lint 가 **기존 표 세 모양**(`ALTER TABLE` · `CREATE INDEX … ON` · `CREATE TRIGGER …
+         * ON`, V18 이후 구간)에 한해 본다. 오늘 선언은 열둘 전부 `'5s'` 로 이 값과 같다.
          *
          * 파일의 `SET LOCAL` 은 그대로 둔다 — 같은 값이라 중복이 무해하고, 고치면 적용된 DB 의
-         * Flyway checksum 이 움직인다. 둘의 관계는 「연결이 바닥을 깔고 파일이 그 자리를 설명한다」다.
+         * Flyway checksum 이 움직인다. 둘의 관계는 「연결이 기본값을 깔고 파일이 그 자리를
+         * 설명한다」다.
          *
-         * Flyway 의 배타 제어는 `pg_try_advisory_xact_lock` 재시도라 이 상한의 대상이 아니다
-         * (relation 잠금이 아니다) — 그래서 이 값이 Flyway 자신의 잠금 획득을 깨지 않는다.
+         * Flyway 의 배타 제어는 `pg_try_advisory_xact_lock` 재시도다 — **기다리지 않는** `try` 라
+         * 이 값이 깎을 대기가 애초에 없다. 면제의 사유는 잠금의 종류가 아니다(`lock_timeout` 은
+         * advisory 대기에도 걸린다 — cr r4 LOW 정정).
          */
         internal const val MIGRATION_LOCK_TIMEOUT = "5s"
 
