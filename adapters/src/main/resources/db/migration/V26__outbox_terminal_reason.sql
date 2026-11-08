@@ -32,22 +32,29 @@ SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE outbox ADD COLUMN terminal_reason TEXT;
 
--- ① 사유 어휘 + 사유→상태 사상을 한 제약으로 닫는다. 행 값 비교(`IN ((...), ...)`)라
+-- ① 사유 어휘 + 사유→상태 사상을 한 제약으로 닫는다. 어휘가 아니라 **쌍**을 적으므로
 --    「어휘에 있으나 다른 상태에 붙은」 조합도 같이 거부된다 — 어휘만 세는 CHECK 둘로
 --    나누면 `FAILED` + `ORPHANED_CLAIM` 이 통과한다.
+--
+--    **쌍을 행 값 비교(`(state, terminal_reason) IN ((...), ...)`)로 적지 않는다.** 진리표는
+--    같지만 그 문법은 파서가 **왼쪽으로 깊게 중첩된** OR 트리로 저장하고, 덤프가 싣는
+--    `pg_get_constraintdef` 가 그 중첩을 그대로 찍는다. 복원이 그 텍스트를 다시 읽을 때 파서는
+--    같은 OR 사슬을 **평평하게** 접으므로, 제약은 그대로인데 복원본의 문면만 달라진다 —
+--    `tools/db-rehearsal.sh` 의 복원 등식 `constraints` 가 그 한 줄로 붉어졌다(CI `container`
+--    job, 2026-11-08 실측). 아래처럼 OR 를 평평하게 적은 식은 자기 렌더링의 **고정점**이라
+--    왕복에서 문면이 변하지 않는다. 그 성질은 `CheckConstraintRenderingFixpointTest` 가
+--    스키마의 CHECK 전수로 잠근다 — 리허설은 CI 뒤쪽 비싼 job 에서야 같은 말을 한다.
 ALTER TABLE outbox
     ADD CONSTRAINT outbox_terminal_reason_state_check
     CHECK (
         terminal_reason IS NULL
-        OR (state, terminal_reason) IN (
-            ('DELIVERED', 'DELIVERED'),
-            ('DELIVERED', 'DUPLICATE_SKIPPED'),
-            ('FAILED', 'DELIVERY_REJECTED'),
-            ('FAILED', 'DELIVERY_SUPPRESSED'),
-            ('ISOLATED', 'DELIVERY_OUTCOME_UNKNOWN'),
-            ('ISOLATED', 'UNKNOWN_PAYLOAD'),
-            ('ISOLATED', 'ORPHANED_CLAIM')
-        )
+        OR (state = 'DELIVERED' AND terminal_reason = 'DELIVERED')
+        OR (state = 'DELIVERED' AND terminal_reason = 'DUPLICATE_SKIPPED')
+        OR (state = 'FAILED' AND terminal_reason = 'DELIVERY_REJECTED')
+        OR (state = 'FAILED' AND terminal_reason = 'DELIVERY_SUPPRESSED')
+        OR (state = 'ISOLATED' AND terminal_reason = 'DELIVERY_OUTCOME_UNKNOWN')
+        OR (state = 'ISOLATED' AND terminal_reason = 'UNKNOWN_PAYLOAD')
+        OR (state = 'ISOLATED' AND terminal_reason = 'ORPHANED_CLAIM')
     );
 
 -- ② 새 종단 전이는 사유를 요구하고, 적힌 사유는 **한 번만** 적는다. 「새」의 판정은 **이
