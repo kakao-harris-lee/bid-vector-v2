@@ -98,15 +98,35 @@ M-1). 판정 입력을 **Flyway 가 읽는 자리**(처리된 리소스의 `db/m
 | 경로 | 뿌리 밑 엔트리의 전체 경로 == `<뿌리><이름>` | 하위 디렉터리에 같은 이름 더하기(U1·U2) |
 | 다중도 | 한 아카이브에서 이름마다 **정확히 한 번** | 같은 이름 두 번 |
 | 선언 | 이름 ∈ (runtime 해석 결과 ∪ 정확 이름 면제), 면제는 **대상이 있어야** 한다 | 사칭 · 죽은 면제(U5) |
-| 뿌리 밖 | 뿌리 밖의 엔트리는 **zip 서명**으로 전수 판정 + Main-Class == `JarLauncher` | `BOOT-INF/ext/` 류 · 런처 교체(U3) |
+| 뿌리 밖 | 뿌리 밖 엔트리는 **끝의 중앙 디렉터리 끝 레코드(EOCD)** 로 전수 판정 | `BOOT-INF/ext/` 류 · 앞에 바이트를 붙인 포장 |
+| 적재 선언 | manifest 속성 여섯이 정책의 정확 값 | 런처 교체 · **적재 뿌리 넓히기**(수정 라운드 5) |
+| `Class-Path` | classpath index 의 줄 집합 == 뿌리 바로 밑 엔트리 ∖ 면제 | index 에 줄 더하기(수정 라운드 5) |
 
-새 public 표면은 정책 키 하나(`jar.boot-launcher-main-class`)뿐이고, 판독기(`readNestedArchive`)가
-최상위 함수가 된 것은 **test 가 진짜 아카이브 하나를 만들어 그 층을 재기 위해서**다(리뷰 M-1 — 판정만
-순수 test 로 잠그면 판독이 경로를 버리는 변이가 조용하다).
+**수정 라운드 5 가 축 둘을 더한 사유**(verifier r5 H-1): 앞 넷은 전부 주장대로 작동했지만 **그 축이
+기대는 로더가 배포 경로의 로더가 아니었다**. 출하 이미지는 `JarLauncher` 로 뜨지 않는다 —
+`docker/app.Dockerfile` 이 `jarmode=tools extract --layers` 로 풀고 평범한 `java -jar` 로 띄우며, 그
+추출 도구는 manifest 의 `Spring-Boot-Lib` 로 적재 자리를 정하고 `Spring-Boot-Classpath-Index` 가 가리킨
+index 의 **줄 그대로** 런처 jar 의 `Class-Path` 를 만든다. 즉 **뿌리를 정하는 것이 manifest 한 줄**이고,
+앞 판은 그 줄을 보지 않았다. 뿌리 밖 판정을 서명 네 바이트에서 EOCD 탐색으로 바꾼 것도 같은 재현이
+쓴 포장(앞에 셸 머리글을 붙인 jar)을 닫기 위해서다.
+
+새 public 표면은 정책 키 **다섯**(`jar.boot-launcher-main-class`·`jar.boot-start-class`·
+`jar.boot-classpath-index`·`jar.boot-layers-index`·`jar.boot-archive-module`)과 순수 판정 타입
+`BootArchivePolicy` 다. 적재 자리 둘(`Spring-Boot-Lib`·`Spring-Boot-Classes`)은 **새 키를 만들지 않고**
+`jar.nested-lib-roots`·`jar.class-roots` 에서 가져온다 — 같은 값을 두 자리에 적으면 갈라지는 날 게이트가
+자기 전제를 잃는다. 판독기(`readNestedArchive`)가 최상위 함수인 것은 **test 가 진짜 아카이브 하나를
+만들어 그 층을 재기 위해서**다(리뷰 M-1 — 판정만 순수 test 로 잠그면 판독이 경로를 버리는 변이가
+조용하다).
 
 - ⓐ **경계**: 「게이트를 통과한 바이트인가」를 **그 모듈이 만드는 Jar 타입 task 전수**에 건다. `jar`
   하나를 보던 하드코딩을 provider 로 바꾼다.
-- ⓑ **새 public 표면**: 없다. 정책 키 둘(`jar.class-roots`·`jar.external-class-roots`).
+- ⓑ **새 public 표면**: 순수 판정 타입 둘(`NestedArchivePolicy`·`BootArchivePolicy`)과 판독기
+  최상위 함수 하나(`readNestedArchive`). task 입력 둘(`archives`·`runtimeClasspath`). 정책 키 **아홉** —
+  `jar.class-roots`·`jar.external-class-roots`·`jar.nested-lib-roots`·`jar.external-nested-jars`·
+  `jar.boot-launcher-main-class`·`jar.boot-start-class`·`jar.boot-classpath-index`·
+  `jar.boot-layers-index`·`jar.boot-archive-module`. 「경계로 처리」가 아니라 **값을 읽는 자리**인
+  것이 둘 있다: `requireSingle` 이 적재 자리 둘을 목록에서 꺼내고(둘 이상·빈 목록 거부),
+  `requireNonEmptyList` 가 뿌리 목록을 꺼낸다 — 둘 다 **비우는 것으로 축이 꺼지지 않게** 하는 자리다.
 - ⓒ **우회**
   1. 배포물을 `bootJar` 로 내고 `jar` 만 재게 둔다 → `tasks.withType<Jar>()` 전수(provider).
   2. `BOOT-INF/classes/` 접두 때문에 소유 판정이 전부 붉는 것을 「게이트가 시끄럽다」로 끈다 →
@@ -122,10 +142,24 @@ M-1). 판정 입력을 **Flyway 가 읽는 자리**(처리된 리소스의 `db/m
   7. (수정 라운드 4) 선언된 이름의 jar 를 **하위 디렉터리에 하나 더** 넣는다 → 경로 축. 뿌리 밑은
      전체 경로가 `<뿌리><이름>` 이어야 한다.
   8. (수정 라운드 4) 같은 이름을 **두 번** 넣는다 → 다중도 축. 해석 결과에 그 이름은 한 번뿐이다.
-  9. (수정 라운드 4) 뿌리 **밖**(`BOOT-INF/ext/`·아카이브 뿌리)에 넣고 런처 설정으로 싣는다 → 뿌리
-     밖은 zip **서명**으로 전수 판정하고, 런처 교체 자체를 Main-Class 단언이 받는다.
+  9. (수정 라운드 5 정정) 뿌리 **밖**(`BOOT-INF/ext/`·아카이브 뿌리)에 넣고 **적재 선언으로 싣는다**
+     → 배포물에는 적재 경로가 둘이고 둘 다 manifest 가 정한다. ⓐ 풀지 않고 띄우는 경로는 `Main-Class`
+     (런처 교체) ⓑ **출하 이미지의 경로**는 `extract --layers` 가 읽는 `Spring-Boot-Lib` + classpath
+     index 다. 수정 라운드 4 의 문면은 ⓐ 만 들고 「두 겹을 함께 뚫어야 한다」고 적었는데, ⓑ 는 한 겹도
+     없었다 — `Spring-Boot-Lib: BOOT-INF/` 한 줄과 index 두 줄로 뿌리 밖 jar 가 출하 `Class-Path` 에
+     실렸다(verifier r5 실측, 게이트는 초록). 지금은 속성 축과 index 등식이 각각 받고, 뿌리 밖 바이트
+     자체는 EOCD 판정이 받는다(앞에 바이트를 붙인 포장 포함).
   10. (수정 라운드 4) 도구 jar 를 빼서(`includeTools = false`) 면제를 **대상 없이** 남긴 뒤 그 이름으로
       넣는다 → 죽은 면제가 위반이다.
+  11. (수정 라운드 5) `bootJar { enabled = false }` 로 **모집단을 통째로** 없앤다 → 그 0 은 배포물이
+      없는 아홉 모듈의 정상 상태와 리포트가 같아 비-공허 단언을 전 모듈에 걸 수 없다. 그래서
+      `jar.boot-archive-module` 이 소유 모듈을 지목하고 **그 모듈에서만** 바닥값을 건다(리뷰 M-3).
+  12. (수정 라운드 5) 풀린 뒤의 진입점(`Start-Class`)을 바꿔 다른 런처를 띄운다 → 추출 도구는
+      `Main-Class` 를 **지우고** `Start-Class` 를 새 런처 manifest 의 `Main-Class` 로 쓴다. 그래서 그
+      경로에서 실제로 뜨는 것은 이 속성이고, 속성 축이 여섯 가운데 하나로 받는다.
+  13. (수정 라운드 5) index 를 **다른 자리**로 선언하고 기대 자리의 파일은 그대로 둔다 → 속성 축이
+      선언 불일치로, index 축이 「선언한 자리에 파일이 없다」로 각각 받는다(둘이 서로를 가리지 않게
+      판독기가 **선언한 자리와 기대 자리를 둘 다** 읽는다).
 - **알려진 한계**: 면제 접두 밑의 바이트는 대조 집합이 없어 내용 판정이 없다(그 바이트의 출처는 Boot
   Gradle 플러그인이고 이 저장소의 소스가 아니다).
 
@@ -212,7 +246,11 @@ M-1). 판정 입력을 **Flyway 가 읽는 자리**(처리된 리소스의 `db/m
 - ⓑ **새 public 표면**: 앞 판은 「없다(같은 task 의 축)」였고 정책 키 하나였다. 수정 라운드 1 에서
   **task 하나와 정책 키 하나가 늘었다** — `EnvironmentAccessGateTask`(순수 술어 `EnvironmentAccess`) ·
   `bytecode.env-access.denied-members`. 소스 쌍 축(`source.env-sniff.member-pairs`)은 1 차 그물로
-  남고 `*.getenv` 가 더해졌다.
+  남고 `*.getenv` 가 더해졌다. 수정 라운드 4 가 `bytecode.env-access.allowed-callers` 를 더했다.
+  **전수에서 빠져 있던 자리 하나**(수정 라운드 5, 리뷰 LOW-3): 그 task 의 입력은 `policyFile`·
+  `classes`·`report` 셋이 아니라 **넷**이다 — `moduleName`(`@get:Input`)이 함께 있다. 값의 출처는
+  `project.name` 이고 쓰임은 둘이다: 모집단 등식의 실패 문면과, 죽은 허용을 **그 모듈의 모집단
+  안에서만** 세는 범위. 「경계로 처리」가 아니라 **판정에 들어가는 값**이라 전수에 적는다.
 - ⓒ **우회**
   1. `System.getenv("CI")` → 수신자 뿌리 이름 + selector 이름 **쌍**을 PSI 에서 본다.
   2. `System.getProperty("…")` → 같은 쌍 집합.

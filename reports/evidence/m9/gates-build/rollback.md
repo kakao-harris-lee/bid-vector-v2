@@ -97,10 +97,12 @@ judged=578 nestedJars=102 nestedOutside=0` 이다. 환경 축도 복원 뒤 그 
   `migration.classpath-location` 을 빈 위치로.
 - ② `normalize.*=false`(오늘 거동은 어느 쪽이든 같다).
 - ③ 아카이브 판정은 `jar.class-roots`·`jar.external-class-roots` 를 비움(비우면 배포물 판정이 붉는다 —
-  그것이 의도다). **중첩 축은 정책만으로 꺼지지 않는다**: `jar.external-nested-jars` 를 넓히면 ⓐ
-  카탈로그 등식 test 가 「목록은 정확히 한 항목」으로 붉고 ⓑ 더한 이름은 대상이 없어 **죽은 면제**로
-  붉는다. `jar.nested-lib-roots` 를 비우는 길도 닫혔다(빈 값 거부). 끄려면 `JarContentPolicyTest` 의
-  두 단언과 정책을 **함께** 고친다.
+  그것이 의도다). **중첩 축과 배포 경로 축은 정책만으로 꺼지지 않는다**: `jar.external-nested-jars` 를
+  넓히면 ⓐ 카탈로그 등식 test 가 「목록은 정확히 한 항목」으로 붉고 ⓑ 더한 이름은 대상이 없어 **죽은
+  면제**로 붉는다. `jar.nested-lib-roots` 를 비우는 길도 닫혔다(빈 값 거부). 수정 라운드 5 의 새 키
+  다섯은 `BootArchivePolicyTest` 가 정책 파일에 대해 값으로 고정하고, 적재 자리 둘은 **다른 키에서
+  오므로**(`requireSingle`) 그 자리만 따로 넓힐 수 없다. 끄려면 `NestedArchivePolicyTest` 와
+  `BootArchivePolicyTest` 의 단언과 정책을 **함께** 고친다.
 - ④ 끌 수 없다(등식의 한 종류다).
 - ⑤ **`source.import.syntax-fqns`** 로 면제 확대 — 앞 판 문면의 `source.import.syntax-names` 는 **이제
   없는 키**라 그 절차가 `requireValue` 에서 죽는다(수정 라운드 3, 리뷰 M-5).
