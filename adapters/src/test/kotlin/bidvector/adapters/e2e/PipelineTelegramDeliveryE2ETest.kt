@@ -1,6 +1,5 @@
 package bidvector.adapters.e2e
 
-import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.notification.FAKE_CHAT_ID
 import bidvector.adapters.notification.FAKE_SITE_BASE_URL
 import bidvector.adapters.notification.FakeTelegramServer
@@ -9,6 +8,7 @@ import bidvector.adapters.notification.NoticeMessageRenderer
 import bidvector.adapters.notification.NoticeMessageSettings
 import bidvector.adapters.notification.TelegramScript
 import bidvector.adapters.notification.channelSettings
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel

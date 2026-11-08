@@ -132,7 +132,7 @@ class MigrationLockBoundTest {
         withClue("$script 가 상한을 선언하면 이 자리는 「연결만이 상한을 세운다」를 재지 못한다") {
             LOCK_BOUND_DECLARATION.findAll(body).count() shouldBe 0
         }
-        val target = ALTER_TABLE_TARGET.find(body)?.groupValues?.get(1).shouldNotBeNull()
+        val target = ALTER_TABLE_TARGET.find(body).shouldNotBeNull().groupValues[1]
         withClue("$script 의 `ALTER TABLE $target` 대상이 준비 단계에 없다 — 기존 표를 건드리는 자리가 아니다") {
             existsInDatabase(owner, target) shouldBe true
         }
