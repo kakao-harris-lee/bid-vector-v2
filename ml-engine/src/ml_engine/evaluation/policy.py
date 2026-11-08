@@ -12,6 +12,10 @@
 
 **임계를 낱개 인자로 받는 public 함수는 없다**(설계 검토 (1) 첫 행) — `load_evaluation_policy`
 는 `path` 하나만 받고, 이 파일을 편집해야만 값이 바뀐다.
+
+**「완화 불가」는 이름이 아니라 구조로 닫는다** — 겹 둘: ⑴ 아래 `_ParsedPolicyFile` 생성 토큰
+⑵ `evaluation.policy_source` 의 출처 재검증. 앞 판의 「생성 호출 이름이 로더 안에 하나」 술어가
+왜 모자랐는지와 경계(어느 파일을 쓸지는 운영자가 고른다)는 그 모듈 docstring 에 있다.
 """
 
 from __future__ import annotations
@@ -20,7 +24,8 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass
+from datetime import date
 from enum import StrEnum
 from pathlib import Path
 from typing import Final, cast
@@ -32,6 +37,23 @@ from ml_engine.registry.policy import load_policy as _load_raw_policy
 
 SHIPPED_EVALUATION_POLICY_VERSION: Final[str] = "evaluation-v1"
 
+
+@dataclass(frozen=True)
+class PolicySource:
+    """정책이 **어느 파일의 어느 바이트**에서 왔는지. `path` 는 report 에 싣지 않는다
+    (호스트마다 다르다) — 재검증 전용이고, report 에 남는 것은 `digest` 다."""
+
+    path: Path
+    digest: str
+
+
+@dataclass(frozen=True)
+class _ParsedPolicyFile:
+    """**모듈 private 생성 토큰** — `load_evaluation_policy` 안에서만 만들어진다."""
+
+    digest: str
+
+
 # 평탄 인덱스 목록 값의 상한 — 실제 값(seeds 5개·edges 4개·axes 2개)보다 넉넉한 정적
 # 상한이다(5A `known_keys`는 문자열 집합 전수라 가변 길이를 표현할 수 없다). 이 값을
 # 넘는 인덱스는 미지 키로 거부된다.
@@ -39,6 +61,7 @@ _MAX_INDEXED_LIST_LENGTH: Final[int] = 32
 
 _SCALAR_KEYS: Final[frozenset[str]] = frozenset(
     {
+        "effective_date",
         "paired_t_threshold",
         "gate_baseline",
         "gate_model",
@@ -121,7 +144,15 @@ class EvaluationPolicy:
     """평가 게이트 임계 한 벌 — 값은 `reports/evidence/m5/5c2/policy-values.md` §1 과
     대조된다. 기본값 없음("안 넘겼다"와 "미공시"를 구별, 5C-1 관행 계승)."""
 
+    parsed: InitVar[_ParsedPolicyFile]
+    """생성 토큰 — 기본값 없음, 인스턴스에 저장되지 않는다."""
+    source: PolicySource
     version: str
+    effective_date: date
+    """이 정책이 **언제부터의 규칙인가**(ML-07 acceptance ③). 효력 시작 전에 시작한 평가
+    창의 통과는 승격 근거로 인용되지 않는다 — 판정과 달력 해석은 `evaluation.epoch` 하나가
+    지고 이 타입은 값만 나른다."""
+
     paired_t_threshold: float
     gate_baseline: str
     gate_model: str
@@ -134,7 +165,15 @@ class EvaluationPolicy:
     amount_band_edges: tuple[float, ...]
     segment_axes: tuple[str, ...]
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, parsed: _ParsedPolicyFile) -> None:
+        if not isinstance(parsed, _ParsedPolicyFile):
+            raise ValueError(
+                "EvaluationPolicy 는 정책 파일 로더만 만들 수 있다(생성 토큰 없음)"
+            )
+        if parsed.digest != self.source.digest:
+            raise ValueError(
+                "생성 토큰의 지문이 source 와 다르다 — 다른 파일의 토큰으로 조립했다"
+            )
         self._validate_scalars()
         self._validate_collections()
 
@@ -243,6 +282,19 @@ def collect_indexed_list(
     return tuple(entries[index] for index in sorted(entries))
 
 
+def require_iso_date(values: dict[str, PolicyScalar], key: str) -> date | None:
+    """ISO-8601 날짜 **문자열**만 받는다. 비인용 ISO 날짜는 `yaml.safe_load` 가 `date`
+    객체로 읽어 `PolicyScalar` 축(문자열·수·bool) 밖이고 여기서 `None`(→ `INVALID_VALUE`)이
+    된다 — 축 밖의 값이 조용히 들어오는 자리를 닫는다."""
+    value = values.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
 def require_str(values: dict[str, PolicyScalar], key: str) -> str | None:
     value = values.get(key)
     return value if isinstance(value, str) and value else None
@@ -293,6 +345,7 @@ class _ParsedFields:
     """형 검사를 통과한 원시 필드 한 벌 — `EvaluationPolicy.__post_init__`의 값
     불변식은 아직 거치지 않았다."""
 
+    effective_date: date
     paired_t_threshold: float
     gate_baseline: str
     gate_model: str
@@ -310,6 +363,7 @@ def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
     """평탄 인덱스 목록 조립 + 스칼라 형 검사 — 형이 맞지 않으면 `None`(설계 래칫
     함수 길이 한도로 `load_evaluation_policy`에서 분리, L-5 형식)."""
     fields = (
+        require_iso_date(values, "effective_date"),
         require_number(values, "paired_t_threshold"),
         require_str(values, "gate_baseline"),
         require_str(values, "gate_model"),
@@ -329,6 +383,7 @@ def _parse_fields(values: dict[str, PolicyScalar]) -> _ParsedFields | None:
 
 def _assemble_parsed_fields(
     fields: tuple[
+        date | None,
         float | None,
         str | None,
         str | None,
@@ -345,6 +400,7 @@ def _assemble_parsed_fields(
     """`_parse_fields`가 `None` 없음을 확인한 뒤에만 부른다 — `cast`는 그 불변식을
     타입에 반영할 뿐 재검증하지 않는다(설계 래칫 함수 길이 한도로 분리)."""
     (
+        effective_date,
         paired_t_threshold,
         gate_baseline,
         gate_model,
@@ -358,6 +414,7 @@ def _assemble_parsed_fields(
         segment_axes,
     ) = fields
     return _ParsedFields(
+        effective_date=cast(date, effective_date),
         paired_t_threshold=cast(float, paired_t_threshold),
         gate_baseline=cast(str, gate_baseline),
         gate_model=cast(str, gate_model),
@@ -391,7 +448,10 @@ def load_evaluation_policy(path: Path) -> EvaluationPolicy | PolicyRejected:
 
     try:
         return EvaluationPolicy(
+            parsed=_ParsedPolicyFile(digest=raw.digest),
+            source=PolicySource(path=path, digest=raw.digest),
             version=raw.version,
+            effective_date=parsed.effective_date,
             paired_t_threshold=parsed.paired_t_threshold,
             gate_baseline=parsed.gate_baseline,
             gate_model=parsed.gate_model,
@@ -412,10 +472,15 @@ def policy_checksum(policy: EvaluationPolicy) -> str:
     """sha256 hex(소문자 64자) — 5B `features/manifest.py::canonical_json`·5C-1
     `spec_checksum`과 같은 규칙(키 정렬·구분자 `(",", ":")`·`allow_nan=False`). 값이
     전부 정책 불변식을 통과한 유한값이라 `CanonicalizationRejected` 갈래가 성립하지
-    않는다 — 결과 타입이 아니라 `str` 을 낸다(5C-1 `spec_checksum`과 같은 판단)."""
+    않는다 — 결과 타입이 아니라 `str` 을 낸다(5C-1 `spec_checksum`과 같은 판단).
+
+    **`source` 는 payload 에 넣지 않는다** — `path` 는 호스트마다 다르고 `digest` 는 같은
+    값의 다른 표기(공백·주석)에도 달라져, 섞으면 같은 임계로 판정한 두 실행의 report
+    checksum 이 갈린다. 출처는 `policy_source` 가 따로 재고 report 는 별도 칸에 싣는다."""
     payload = json.dumps(
         {
             "version": policy.version,
+            "effective_date": policy.effective_date.isoformat(),
             "paired_t_threshold": policy.paired_t_threshold,
             "gate_baseline": policy.gate_baseline,
             "gate_model": policy.gate_model,

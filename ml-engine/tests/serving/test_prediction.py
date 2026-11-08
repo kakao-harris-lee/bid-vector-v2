@@ -24,6 +24,7 @@ from ml_engine.inference.results import (
     UnmeasurableDetail,
     UnmeasurableReason,
 )
+from ml_engine.inference.time_axis import TimeAxisSubstitute
 from ml_engine.serving.prediction import BidPredictionServicer
 from ml_engine.serving.readiness import PreloadOutcome, ReadinessGate
 from ml_engine.serving.runtime import PredictionRuntime, build_derived_release
@@ -51,6 +52,7 @@ _POLICY = InferencePolicy(
     bid_ratio_plausible_max=Decimal("1.5"),
     gbm_min_category_rows=40,
     maturity_window_days=7,
+    maturity_time_axis_substitute=TimeAxisSubstitute.NOT_APPROVED,
 )
 
 _SUPPORTED_SCHEMAS = ("award-rate-features-v2",)
