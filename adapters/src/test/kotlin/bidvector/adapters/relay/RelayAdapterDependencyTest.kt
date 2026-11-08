@@ -22,6 +22,13 @@ import java.io.File
  * 타입, `adapters.persistence` 는 트랜잭션 경계([bidvector.adapters.persistence.TransactionBoundary])다.
  * `workflow.evaluation`·`procurement`·`decision` 은 **목록에 없다** — relay 는 판정을 다시
  * 조립하지 않고 payload 투영만 읽는다.
+ *
+ * **M9/STR12 — `adapters.notification` 한 좌표가 늘었다.** 6F-10 의 자리지킴 셋(`Unavailable*`)이
+ * 있던 자리를 실 발송 축 셋(route·renderer·sender)이 대체했고, 그 셋은 이 패키지가 아니라 자기
+ * 패키지에 산다. 그 패키지를 여기 두지 **않은** 이유가 이 목록의 뜻이다 — 이 목록은 「**조립**이
+ * 보는 것」이고, 거기에 HTTP 전송·공고 표 읽기를 더하면 그 등식이 무엇을 말하는지 흐려진다.
+ * 늘어난 간선은 **조립 → 구현** 한 방향뿐이다: 반대 방향은 `NotificationAdapterDependencyTest`
+ * 가 막는다(그 허용 루트에 `adapters.event`·`adapters.relay` 가 없다).
  */
 private val ALLOWED_ROOTS =
     setOf(
@@ -30,6 +37,7 @@ private val ALLOWED_ROOTS =
         "bidvector.workflow.strategy",
         "bidvector.sharedkernel",
         "bidvector.adapters.event",
+        "bidvector.adapters.notification",
         "bidvector.adapters.persistence",
         "bidvector.adapters.relay",
     )
@@ -111,6 +119,7 @@ class RelayAdapterDependencyTest {
         isDisallowed("bidvector.workflow.strategy") shouldBe false
         isDisallowed("bidvector.sharedkernel") shouldBe false
         isDisallowed("bidvector.adapters.event") shouldBe false
+        isDisallowed("bidvector.adapters.notification") shouldBe false
         isDisallowed("bidvector.adapters.persistence") shouldBe false
         isDisallowed("bidvector.adapters.relay") shouldBe false
     }
