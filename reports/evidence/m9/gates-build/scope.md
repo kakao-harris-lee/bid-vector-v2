@@ -7,6 +7,8 @@
 
 - 수정 라운드 5(팀장 지시 2026-11-08, **사용자가 상한 너머 한 라운드만 승인** — 이 재검증이 not-ready 면 머지 없이 사용자 보고; verifier r5 `not-ready` H-1 + code-reviewer r4 `approve` + MEDIUM 5·LOW 6): 중첩 축이 기대던 로더가 **배포 경로의 로더가 아니었다** — 출하 이미지는 `extract --layers` 로 풀려 뜬다. 그 도구가 읽는 manifest 속성 여섯과 classpath index 등식을 게이트로 세우고, 뿌리 밖 판독을 EOCD 로 바꾼다. main `70406318` 을 병합한다. **in_scope 는 바뀌지 않는다** — 이 라운드가 만든 새 파일은 넷(`BootArchivePolicy.kt` · `NestedArchiveReader.kt` · `BootArchivePolicyTest.kt` · `ArchiveFixtures.kt`)이고 전부 `build-logic/**` 안이다(`git diff --name-status 70406318..HEAD` 의 A 행 대조 — 이 slice 가 만든 A 행 24 가운데 이 라운드가 넷). 라운드가 더한 정책 키 넷(`jar.boot-start-class` · `jar.boot-classpath-index` · `jar.boot-layers-index` · `jar.boot-archive-module`)도 `config/quality/**` 안이다.
 
+- 수정 라운드 6(팀장 지시 2026-11-10 · **사용자 승인 2026-11-08** 「작은 수정 + 짧은 표적 재검증 → CI → 머지」; verifier r6 `ready-for-review`(차단 0 · medium 4 · low 1) + code-reviewer r5 `request_changes` HIGH 1·MEDIUM 3·LOW 3): EOCD 술어를 등식에서 **포함**으로(뒤로 붙인 포장 — 1 바이트로 열리던 자리), 판독기가 조용히 좁아지던 자리 둘에 test, 적재 자리 키의 이중 읽기를 한 번으로, 허용 목록의 빈 칸·중복을 정책 오류로, 문면 넷을 술어 크기로. main `07140729` 을 병합한다(겹침 **하나** — `docs/discovery/capability-map.md` · 충돌 0 · 손 해소 줄 0; 「충돌 0 자동 병합이 같은 본문을 접는다」를 양쪽 추가 줄 **전수 생존**으로 확인했다 — 내 28/28 · 상대 51/51 · 중복 제목 0). **in_scope 는 바뀌지 않고, 이 라운드는 새 파일을 하나도 만들지 않았다** — `git diff --name-status 4991dde9^..HEAD` 가 **전부 M 행**이고 `build-logic/**` 와 `reports/evidence/m9/gates-build/**` 안이다. 정책 키도 더하지 않았다(새 test 클래스가 없으므로 `gate-tests.properties` 등재도 해당 없음).
+
 ## 대상 (M6 종결 open-inventory §2 「하네스 레인」 열둘 중 build-logic 축 + 소스 축)
 | OPEN | 처방(구조로) |
 | --- | --- |
