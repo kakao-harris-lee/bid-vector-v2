@@ -1,6 +1,6 @@
 # M9/ops-code checklist
 
-판정 SHA **`63d74653`**(병합한 main `07140729`). 계약의 acceptance 넷에 대한 대조표다.
+판정 SHA **`82564c72`**(병합한 main `07140729`). 계약의 acceptance 넷에 대한 대조표다.
 
 ## 1. acceptance 대조
 
@@ -9,7 +9,7 @@
 | 403/401 비재시도 | `KonepsStatusDispositionTest` — 본문에 **재시도 가능 코드**를 싣고 상태만 차단인 응답에서 서버 카운터 1. **출하 정책을 resolve 한 값 위에서** 같은 계수를 `KonepsShippedPolicyWireTest` 가 다시 잰다 | 충족 |
 | 간격 위반 없음(주입 시계) | **세 단계를 따로 잰다** — 기계는 `KonepsCallPacerTest`(거동 여덟, 과수면 포함), 출하 값과 상한 뒤 순서는 `KonepsShippedPolicyWireTest`, **배선이 그 값과 잠드는 함수를 넘기는지는** `CollectionWiringTest` 둘 | 충족 |
 | 평가 → 알림함 1건(실 DB) | `EvaluationCommitInboxProductionTest` — 계정·공고를 심고 production 조립을 직접 세워 돌린 뒤 `notification_inbox` 행을 되읽는다. **투찰 종류 열까지 읽는다**(M9/paper-bid V25 병합 — 새 후보는 `NONE`) | 충족 |
-| 각 바꿔치우기 변이 RED | `commands.md` §4 — 표의 **스물하나** 전부 RED 이고 통제군은 같은 run 에서 초록이다. **초록으로 남은 시도 하나를 그 절이 사실로 적는다** — 쪽 넘김을 노린 첫 변이가 **거동 0** 이었다(봉투의 `totalCount` 가 받은 항목 수와 같아 한 쪽에서 끝났다). 바꿔치운 뒤 음성 대조가 붉어졌고, 앞 판들이 통과시킨 둘(버린 5인자 호출 · 개찰 자리)도 그 자리에 사실로 남아 있다 | 충족 |
+| 각 바꿔치우기 변이 RED | `commands.md` §4 — 표의 **스물셋** 전부 RED 이고 통제군은 같은 run 에서 초록이다. 마지막 둘(cr r7)에는 **음성 대조**가 붙는다 — 같은 변이가 구판에서 초록이었음을 실행으로 확인했다. **초록으로 남은 시도 하나를 그 절이 사실로 적는다** — 쪽 넘김을 노린 첫 변이가 **거동 0** 이었다(봉투의 `totalCount` 가 받은 항목 수와 같아 한 쪽에서 끝났다). 바꿔치운 뒤 음성 대조가 붉어졌고, 앞 판들이 통과시킨 둘(버린 5인자 호출 · 개찰 자리)도 그 자리에 사실로 남아 있다 | 충족 |
 
 ## 2. 왜 이 술어가 문자열이 아니라 구조인가
 
@@ -118,6 +118,14 @@
    있고**(변이 MW3·MW4·MW4d·MWO·MWOd·MWA 전부 RED) 잠기지 않은 자리는 지금 없다. 명령 스트림
    계수(`invokestatic` 수)로 닫는 길은 있으나 이 라운드에서 택하지 않았다 — 반례가 새 전송 생성
    경로를 **더하는** 변경이라 diff 에 그 호출이 보인다.
+14. **`AwardCollectionRunner.awardExitCodeOf` KDoc 이 아직 「멈춤(예산·쿼터)」이다**(cr r7 M-2 의 네
+   번째 자리). 그 파일은 **in_scope 밖**이라 팀장 지시로 건드리지 않았다 — 종료 코드 거동은 그대로이고
+   (멈춤 여부만 보므로 차단도 같은 코드로 간다) 틀린 것은 문면 하나다. 다음에 그 파일을 여는 slice 가
+   고친다.
+15. **`CollectAwardListUseCaseTest.kt` 의 남은 여유가 세 줄이다**(497/500). 이 라운드에 `sizeGate` 가
+   502 줄을 거부했고, 같은 `haltOf` 축이라 가르는 대신 겹치던 문면을 합쳤다(크기 회피용 분할 금지).
+   **다음에 이 파일에 더하는 변경은 관심사 경계를 보고 갈라야 한다** — 선례는 이 slice 가 간격 축을
+   `CollectionWiringSleeperTest` 로 가른 자리다(v r4 B-1).
 
 ## 5. 새 파일 ↔ in_scope 대조
 
@@ -146,11 +154,19 @@ evidence 넷을 뺀 새 파일 **열셋** — 전부 in_scope 안이다. 목록�
 **한 줄** 고쳤다 — 청중 포트의 반환 타입이 바뀌어 그 대역의 값 하나가 따라 움직였다.
 `EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다(늦게 머지되는 쪽이 맞춘다).
 
-**이 라운드는 새 파일을 하나도 만들지 않았다** — 원천이 `07140729` 로 옮긴 뒤에도 위 목록은 그대로
-열셋이고(기계 산출), 그래서 `gate-tests.properties` 등재도 움직이지 않았다(이 라운드가 만진 셋은
-전부 **이미 등재된** class 다). 이 라운드가 만진 파일은 **넷**이다 — `CollectAwardListUseCase.kt` ·
-`CollectAwardListUseCaseTest.kt`(둘 다 계약 갱신 3차가 등재) · `CollectionWiringSleeperTest.kt`
-(이미 in_scope) · `scope.md`.
+**병합 뒤 두 라운드는 새 파일을 하나도 만들지 않았다** — 원천이 `07140729` 로 옮긴 뒤에도 위 목록은
+그대로 열셋이고(기계 산출), 그래서 `gate-tests.properties` 등재도 움직이지 않았다(만진 test class 는
+전부 **이미 등재된** 것이다).
+
+**만진 파일은 기계 산출로 센다**(cr r7 LOW-1). `git diff --name-only 1d53dd6e..82564c72` 가 **일곱**
+이고 그중 **셋이 산출물**, **넷이 이 디렉터리의 evidence** 다. 앞 판의 「넷」은 산출물 셋에 `scope.md`
+하나만 더한 수였다 — 같은 줄에서 두 기준을 섞었다.
+
+| 만진 산출물 | in_scope 항목 |
+| --- | --- |
+| `workflow/…/collection/CollectAwardListUseCase.kt` | 계약 갱신 3차 |
+| `workflow/…/collection/CollectAwardListUseCaseTest.kt` | 같음 |
+| `app/…/wiring/CollectionWiringSleeperTest.kt` | 「각 test」(이미 in_scope) |
 
 **이 라운드가 in_scope 밖에서 만진 파일은 없다** — 보고 항목으로 `git log --no-merges --format=
 --name-only <복원 원천>..HEAD | sort -u` 를 계약과 대조했다.

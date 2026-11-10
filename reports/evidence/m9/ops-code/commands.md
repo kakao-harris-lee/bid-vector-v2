@@ -1,14 +1,15 @@
 # M9/ops-code commands
 
 base `df4976cc` · **병합한 main `07140729`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·
-`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · 판정 SHA **`63d74653`**(마지막 산출물 커밋).
+`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · 판정 SHA **`82564c72`**(마지막 산출물 커밋).
 레인 규율대로 push 하지 않았다.
 
 로컬에서 돌린 것은 **CI Kotlin job 의 명령 그대로** `./gradlew --no-daemon check` **전건**(§2)과
-변이(§4)다. 앞 판들은 `:app:check` + 나머지 모듈 표적으로 줄였는데, 이 라운드는 병합이 `workflow` 의
-**production 한 줄**을 강제했으므로 줄이지 않았다 — 줄일 수 있는 단위는 job 이다. Gradle 은 전부
-`~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(빌드 자리 둘 · 획득 순간 메모리 재확인)로 돌렸고
-레인이 남긴 java 프로세스는 0 이다(종료 뒤 `pgrep` 로 확인).
+변이(§4)다. 앞 판들은 `:app:check` + 나머지 모듈 표적으로 줄였는데, 병합이 `workflow` 의
+**production 한 줄**을 강제했으므로 줄이지 않았다 — 줄일 수 있는 단위는 job 이다. 그 뒤 cr r7 수정
+라운드는 **test·KDoc 만** 바꿔 production 거동이 0 이라 전건을 CI 에 맡기고 `:workflow:check` 로
+재실측했다(§2a). Gradle 은 전부 `~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(빌드 자리 둘 ·
+획득 순간 메모리 재확인)로 돌렸고 레인이 남긴 java 프로세스는 0 이다(종료 뒤 `pgrep` 로 확인).
 
 ## 1. 커밋
 
@@ -55,6 +56,9 @@ base `df4976cc` · **병합한 main `07140729`**(복원 원천 — 앞서 `3ad4f
 | `1d53dd6e` | main `07140729`(PR #128 낙찰 수집 · #139 ml-lifecycle) 병합 — **깨진 셋**(§4d) |
 | `eaf846a2` | 병합이 깬 둘 — 낙찰 갈래 소진 `when`(컴파일 실패) · 그 전수 표의 빠진 행 |
 | `63d74653` | 병합이 깬 셋째 — census 집합 대조가 가리킨 **낙찰 전송 자리**에 탐침(거동까지 잰다) |
+| `9dbb1fec` · `d5c0ba01` · `8654e95a` | 계약 갱신 3차 · rollback 재실측 · evidence 10차(판정 SHA `63d74653`) |
+| `0bff48ff` | cr r7 M-1·M-2·L-3 — 멈춤을 「멈추는가」가 아니라 **무엇이라 적는가**로 잠근다 · 「둘뿐」 문면 넷 |
+| `82564c72` | `sizeGate` 가 거부한 502 줄을 문면 합쳐 497 로(분할하지 않는다 — 같은 관심사다) |
 
 ## 2. acceptance 실행 — CI Kotlin job 의 명령 그대로
 
@@ -83,6 +87,26 @@ failures 0 · errors 0):
 **`qualityBaseline` 은 돌리지 않았다** — CI 가 그것을 게이트가 아니라 측정으로 두고 실패시키지
 않는다(워크플로 주석 「게이트가 아니라 측정이라 실패시키지 않는다」). 그 자리는 PR CI 가 정본이고
 명령이 같다.
+
+**실행 트리는 `9dbb1fec`** 다(cr r7 LOW-2) — 그 시점의 산출물 커밋 `63d74653` 에 계약 갱신 하나를
+얹은 HEAD 이고, 둘의 차이는 `scope.md` 한 파일뿐이라 Kotlin 빌드 입력(소스·설정·정책)은 산출물
+커밋의 것과 같다. evidence 는 **빌드 입력이 맞으므로**(누출 게이트가 `reports/evidence` 를 스캔한다)
+이 트리로 돈 것이 좁은 쪽이 아니라 **넓은 쪽**이다.
+
+## 2a. cr r7 수정 라운드 — `:workflow:check`
+
+그 라운드는 test 단언·KDoc 만 바꿨고 **production 거동이 0** 이라(§4 의 MABK/MABS 는 측정용 변이,
+산출물 아님) 전건 `check` 는 PR CI 에 맡기고 영향 모듈을 로컬로 쟀다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `:workflow:test --tests '*CollectAwardListUseCaseTest*' --rerun` | `tests=9 failures=0` |
+| **`:workflow:check`**(1차) | **BUILD FAILED** — `sizeGate`, 파일 500 줄 한도 초과 1건(`CollectAwardListUseCaseTest.kt` **502 줄**) |
+| **`:workflow:check`**(문면 합친 뒤) | **BUILD SUCCESSFUL · exit 0 · `FAILED` 줄 0** · workflow 전건 **85 클래스 762 test 실패 0** · `sizeGate`·`detekt`·ktlint(main·test·script)·`cpdCheck`·`typeShapeGate`·`testShapeGate`·`moduleDependencyGate`·`domainApiTypeGate` 포함 |
+
+**그 거부가 측정이다.** 파일이 이미 480 줄이었고 KDoc 둘이 한도를 넘겼다 — 가르지 않고 겹치던 문단
+둘을 합쳤다(같은 `haltOf` 처분의 같은 축이라 분할은 크기 회피가 된다). **남은 여유는 세 줄**이고
+알려진 제한에 등재했다.
 
 ## 3. 실 Spring 컨텍스트 — OPS-08 의 비용(앞 라운드 실측, 재측정하지 않았다)
 
@@ -126,6 +150,8 @@ failures 0 · errors 0):
 | **낙찰** 호출 자리가 자기 sleeper 를 넘긴다(MWA) | `CollectionWiringSleeperTest` 1/3 — 거동 단언, 문면이 그 자리를 짚는다(`wiring/AwardCollectionWiring · 출하 간격 PT1S · 46.5ms`) | 같은 class 의 값·잠듦 단언 초록. **셋째 탐침이 키만 더한 손 불변식이 아님을 잰다**(cr r6 M-2 ⓑ) — 그 키를 기존 탐침에 묶었다면 이 변이가 초록이었다 |
 | mock 봉투가 받은 항목보다 큰 `totalCount` 를 선언한다(M3NEG2 — 첫 소스가 관문을 **두 번** 지난다) | 같은 class 2/3 — **음성 대조가 먼저** 붉는다(`wiring/CollectionWiring · 음성 대조 — 첫 소스의 호출 2.07s 는 출하 간격 PT1S 미만`) | 같은 batch 의 CTRL(주석 한 줄) 3/3 초록 · 되돌린 뒤 porcelain 0 |
 | 병합이 깨운 낙찰 처분을 **반대로**(차단이 계속 걷는 쪽으로) | `CollectAwardListUseCaseTest` 1/9 — 전수 표 | 나머지 8 초록 — 멈춤 집합만 갈린다 |
+| 차단을 **엉뚱한 칸에** 적는다 — `AccessBlocked -> AwardCollectionHalt(BudgetLimit.DAILY, null)`(MABK) | 같은 class 1/9 — 전수 표 | CTRL3(주석 한 줄) 9/9 초록. **구판에서는 이 변이가 초록이었다**(아래 음성 대조) |
+| 멈춘 뒤 **남은 슬롯 수**를 0 으로 적는다 — `notAttemptedSlots = 0`(MABS) | 같은 class **2/9** — 전수 표 + 예산 소진 test(`expected:<1> but was:<0>`) | 나머지 7 초록 — 손대지 않은 슬롯 축만 갈린다 |
 
 세 축이 요점이다. ⓐ 출하 값을 겨눈 변이는 **좁힌 정책으로 도는 test 를 붉히지 않는다** — 그
 비대칭이 「출하 값이 wire 에 닿는가」의 증거다. ⓑ 배선 변이 둘은 **서로 다른 단언**을 붉힌다(값과
@@ -146,6 +172,17 @@ failures 0 · errors 0):
 `totalCount` 자체를 받은 항목보다 크게 바꾸는 M3NEG2 로 바꿔치웠고, 그때 첫 호출이 2.07s 로
 늘어나며 음성 대조가 먼저 붉어졌다(위 표). 거동이 **실제로** 바뀐 증거는 그 2.07s 와, 같은 run 에서
 기다림 기록이 `[PT1S]` → `[PT1S, PT2S, PT3S]` 로 늘어난 것이다.
+
+**cr r7 의 낙찰 변이 넷(CTRL3·MABK·MABS·MAB)은 `82564c72` 에서 쟀다.** 그 라운드는
+`CollectAwardListUseCase.kt`·`CollectAwardListUseCaseTest.kt` 만 만졌고 app 배선·탐침 test 를
+건드리지 않았으므로 간격 축 표(위 `63d74653` 실측)는 그대로 유효하다. 문면만 합친 `82564c72` 에서
+다시 돌려 **앞 커밋에서 잰 결과와 같음**을 확인했다(주석 변경이 단언을 건드리지 않았다는 주장을
+실행으로 바꿨다).
+
+**강해진 단언에는 음성 대조를 붙였다**(cr r7 M-1). 같은 변이 MABK 를 **구판**(`63d74653`, 기대값이
+Boolean 이던 표)에 적용하면 `tests=9 failures=0` — **초록**이다. 같은 변이가 새 판에서 붉으므로,
+이 라운드가 더한 것은 「없던 방어」이지 「있던 방어의 다른 표현」이 아니다. 리뷰어가 정적으로 지목한
+자리를 실행으로 확인한 것이기도 하다.
 
 **게이트 둘이 이 라운드의 코드를 거부했고 그 거부가 측정이다**: `javaClass.simpleName` 은 수집
 리플렉션 게이트가(선례와 같은 자리에 쌍 하나 등재), 주입 인자가 생긴 `konepsTransportFor` 는 전송

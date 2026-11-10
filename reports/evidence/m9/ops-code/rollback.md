@@ -2,7 +2,7 @@
 
 착수 base `df4976cc` · **복원 원천 `07140729`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · **실측 HEAD
-`63d74653`**(마지막 산출물 커밋).
+`82564c72`**(마지막 산출물 커밋).
 
 **원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **다섯 번** 병합했으므로 공유 파일(§2)에는 다른
 slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니라 마지막으로 병합한 그 고정 SHA** 에서
@@ -46,7 +46,7 @@ git rm -q -f -- "${ADDED[@]}"
 역적용하는 경로는 쓰지 않았다(병합 커밋의 해소 줄이 `--no-merges` 목록 밖이라 끝까지 완료되지
 않는다 — 그 실패가 2026-10-09 에 실측됐다).
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `63d74653` 체크아웃
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `82564c72` 체크아웃
 
 | 단계 | 실측 |
 | --- | --- |
@@ -170,8 +170,8 @@ workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTe
 evidence 커밋은 실측 뒤에 오므로 유효성은 **되돌림 대상이 그 사이에 움직였는가**로 본다:
 
 ```
-git diff --name-only 63d74653..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 07140729..63d74653 \
+git diff --name-only 82564c72..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 07140729..82564c72 \
       -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
@@ -186,7 +186,13 @@ git diff --name-only 63d74653..<판정 SHA> -- \
 
 **앞 라운드 실측을 옮기지 않았다.** 9차 제출의 원천은 `bd2f450e`·실측 HEAD 는 `6b5b52bc` 였고
 다섯째 병합이 **원천을 옮겼다**. 복원 경로가 42 → **44** 로 늘고(병합이 강제한 낙찰 두 자리) 공유
-파일이 **열**이 된 것이 그 결과이며, 이 절의 수는 전부 **다시 잰** 것이다.
+파일이 **열**이 된 것이 그 결과이며, 10차 제출의 수는 전부 **다시 잰** 것이다.
+
+**cr r7 수정 라운드에서 또 다시 쟀다.** 그 라운드가 `CollectAwardListUseCase.kt`·
+`CollectAwardListUseCaseTest.kt` 를 **다시 만졌고**, 둘은 복원 목록 안이라 앞 실측이 무효가 된다
+(실측 HEAD `63d74653` → **`82564c72`**). 복원 목록은 **44 로 같고**(두 산출 `comm` 양방향 빈 출력,
+앞 라운드 목록과 `diff` 빈 출력) 공유 파일도 **열** 그대로이며, ①~③′ · 표지 계수 · 트리 해시
+(`f0eef6df…`, 경로 48)를 전부 다시 실측했다.
 
 ## 하네스 레인 변경
 
