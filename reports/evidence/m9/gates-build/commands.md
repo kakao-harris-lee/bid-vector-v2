@@ -560,9 +560,23 @@ evidence 커밋 뒤 같은 명령을 다시 돌려 둘이 나왔다. ⓐ `:build
 (`buildLogicSizeGate` · `detekt` · `:build-logic:test`)에 **그 task 가 없었다**. 같은 라운드에서 두
 번째로 「안 돌린 게이트가 표적 초록 뒤에 숨은」 자리다. 별 커밋으로 고쳤고 formatter 출력 그대로라
 의미 변경 0. ⓑ `:app:test` 의 구조 test 셋이 **`javap` 를 띄우지 못해** 실패했다(`Failed to exec
-spawn helper` — fork 실패). 셋 다 바이트코드를 외부 `javap` 로 읽는 test 이고, 호스트에서 다른 레인의
-전건과 겹친 자리다. 코드 변경과 무관한 환경 실패로 보고 **다음 전건에서 다시 잰다** — 그 결과는
-verifier 와 PR 조치 코멘트가 정본이다(evidence 에 넣으려는 시도가 커밋을 또 낳는다).
+spawn helper`). 셋 다 바이트코드를 외부 `javap` 로 읽는 test 다. 코드와 무관하고, 원인은 아래다.
+
+### ⓑ 의 원인 — 측정이 **JDK 교체를 가로질렀다**
+
+2026-11-11 **06:42:53 KST** 에 호스트의 `openjdk-21-jdk` 가 21.0.12 → **21.0.13** 으로 자동
+업그레이드됐다(`dpkg.log`). 그 전에 뜬 JVM 은 디스크에서 바뀐 `jspawnhelper` 를 실행하지 못해
+**외부 프로세스 기동이 깨진다**. 내 전건 1 회차는 06:15:43 에 시작해 06:43:43 에 끝났다 — **경계를
+가로질렀다**. 2 회차(06:53:50 시작)는 새 JVM 이었는데도 `contractGate` 의 중첩 빌드가 **경계 이전에
+뜬 재사용 daemon**(1 회차의 contractGate 가 06:42:21 에 띄운 것)에 다시 붙어 protoc 가 같은 이유로
+죽었다. 계약 게이트의 daemon 은 빌드와 레인을 넘어 재사용되므로 **「새 JVM 으로 시작했다」만으로는
+충분하지 않다** — 경계를 넘긴 daemon 은 PID 로 지목해 멈춰야 한다.
+
+그래서 경계에 걸린 측정을 **버리고 새 JDK 에서 전수로 다시 쟀다**. 전건은 `--rerun-tasks` 로 돌려
+up-to-date 재사용을 0 으로 만들었고(**426 actionable · 426 executed · FAILED 0**), 변이 여덟은 전부
+다시 RED(같은 test · 같은 실패 수), 통제군은 초록이며 test XML 의 timestamp 가 그 실행 시각이다.
+게이트 수도 **아래에 적은 수치와 같다**. 「원인 불명의 환경 실패」로 적고 넘어갔다면 이 라운드의
+변이와 통제군이 **근거 없는 초록**인 채로 남았을 자리다.
 
 일곱째 병합과 이 라운드의 판독기 변경 **뒤에도 app 의 수는 같다** — `module=app verified=297
 archives=2 entries=693 judged=594 exempt=99 nestedJars=102 nestedOutside=0 bootArchives=1
