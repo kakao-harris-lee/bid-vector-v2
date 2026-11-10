@@ -146,13 +146,16 @@ internal object EnvironmentAccess {
                 .filterValues { it > 1 }
                 .keys
                 .sorted()
-                .map { "허용 항목이 ${allowed.count { line -> line == it }}번 적혔다 — 허용 수와 열린 자리 수가 어긋난다: $it" }
+                .map { "허용 항목이 ${allowed.count { line -> line == it }}번 적혔다 — " + "허용 수와 열린 자리 수가 어긋난다: $it" }
 
-        return duplicates +
+        val shapeless =
             malformed.distinct().sorted().map {
                 "허용 항목이 '귀속클래스${CALLER_SEPARATOR}선언클래스${MEMBER_SEPARATOR}멤버' 모양이 아니다 — " +
                     "어떤 접근과도 같아질 수 없어 **말없이 무효**인 허용이다: $it"
-            } + shaped.distinct().sorted().mapNotNull { allowance -> countViolation(allowance, exercised, presentClasses) }
+            }
+
+        return duplicates + shapeless +
+            shaped.distinct().sorted().mapNotNull { countViolation(it, exercised, presentClasses) }
     }
 
     private fun countViolation(

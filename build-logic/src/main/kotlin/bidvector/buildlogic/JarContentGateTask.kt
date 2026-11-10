@@ -83,10 +83,7 @@ abstract class JarContentGateTask : DefaultTask() {
         val archiveFiles = archives.files.filter(File::isFile)
         val entries = archiveFiles.flatMap(::classEntries)
 
-        // 적재 자리 둘(`BOOT-INF/classes/`·`BOOT-INF/lib/`)은 **여기서 한 번만 읽는다**(리뷰 r5 M-3).
-        // 앞 판은 같은 키를 목록(`requireList`)이자 단일값(`requireSingle`)으로 읽어, 뿌리를 하나 더
-        // 더하면 한 자리는 받아들이고 다른 자리는 `error()` 를 냈다 — 「이 키는 몇 개인가」의 답이 읽는
-        // 자리마다 달랐다. 자리가 하나인 것은 배포물의 성질이므로 엄밀한 쪽으로 접는다.
+        // 적재 자리 둘은 [bootArchiveExpectation] 이 **한 번만** 읽고 세 축이 그 값을 받아 쓴다.
         val expectation = bootArchiveExpectation(values)
         val policy =
             JarContentPolicy(
@@ -194,8 +191,11 @@ abstract class JarContentGateTask : DefaultTask() {
      * 중첩 축·클래스 뿌리 목록에서 가져온다 — 같은 값을 두 자리에 적으면 그 둘이 갈라지는 날 게이트가
      * 자기 전제를 잃는다. 목록이 둘 이상이면 어느 쪽이 배포 자리인지가 정해지지 않으므로 거부한다.
      *
-     * **그 두 키를 읽는 자리는 여기 하나뿐이다**(리뷰 r5 M-3) — 중첩 축과 class 축은 여기서 나온 값을
-     * 받아 쓴다. 읽는 자리가 둘이면 엄밀함도 둘이 되어, 뿌리를 더한 날 한쪽만 거부한다.
+     * **그 두 키를 읽는 자리는 여기 하나뿐이다**(리뷰 r5 M-3). 앞 판은 같은 키를 이 자리에서는
+     * 단일값(`requireSingle`)으로, 중첩 축·class 축에서는 목록(`requireList`)으로 읽었다 — 「이 키는
+     * 몇 개인가」의 답이 읽는 자리마다 달라, 뿌리를 하나 더하면 한 자리는 받아들이고 다른 자리는
+     * `error()` 를 냈다. 자리가 하나인 것은 배포물의 성질이므로 엄밀한 쪽으로 접고, 두 축은 여기서
+     * 나온 값을 받아 쓴다.
      */
     private fun bootArchiveExpectation(values: Map<String, String>): BootArchiveExpectation =
         BootArchiveExpectation(
