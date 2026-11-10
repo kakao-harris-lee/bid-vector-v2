@@ -3,6 +3,7 @@ package bidvector.app.wiring
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.evaluation.EvaluationCommitRunner
@@ -94,6 +95,7 @@ open class EvaluationCommitWiring {
         // 같은 값의 둘째 빈 정의를 만들지 않는다(다른 포트들과 같은 규율).
         notificationInboxPort: NotificationInboxPort,
         notificationAudiencePort: NotificationAudiencePort,
+        release: ReleaseIdentifier,
     ): EvaluationCommitRun {
         require(commitProperties.currentActiveBids >= 0) {
             "bidvector.evaluation.commit.current-active-bids 는 음수일 수 없다"
@@ -120,6 +122,7 @@ open class EvaluationCommitWiring {
             analysisBudget = strategy.candidateLimit?.value,
             notificationInbox = notificationInboxPort,
             audience = notificationAudiencePort,
+            release = release,
         )
     }
 

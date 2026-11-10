@@ -2,6 +2,7 @@ package bidvector.app.evaluation
 
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.http.TestStrategyRepository
 import bidvector.app.wiring.RecordedExitCodes
@@ -96,4 +97,5 @@ private fun deadCommitRun(): EvaluationCommitRun =
         // 다른 협력자와 같은 형태로 「불리면 터지는」 구현을 꽂아 그 사실을 단언으로 만든다.
         notificationInbox = { error("알림함 쓰기가 불렸다 — 전략 읽기가 먼저 던져야 한다") },
         audience = { error("청중 질의가 불렸다 — 전략 읽기가 먼저 던져야 한다") },
+        release = ReleaseIdentifier("commit-runner-test"),
     )

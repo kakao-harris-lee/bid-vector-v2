@@ -2,6 +2,7 @@ package bidvector.app.collection
 
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.result.JdbcAwardWinnerNameView
 import bidvector.adapters.result.JdbcBatchOpeningFactsView
 import bidvector.adapters.snapshot.RunStateDirectory
@@ -65,6 +66,13 @@ internal const val AWARD_WINNER_NAME = "SYN-낙찰업체-이름"
 private const val POSTGRES_IMAGE = "postgres:16.4"
 private const val TEST_CREDENTIAL_VALUE = "award-e2e-test-fixture-credential"
 private const val SERVICE_KEY = "AWARD-E2E-SENTINEL+KEY/value="
+private const val AWARD_E2E_RELEASE_SHA = "award-e2e-release"
+
+/**
+ * 하네스가 **미리 심는** 원문 행의 릴리스 표식(M9/OPS-10) — 수집이 쓰는 [AWARD_E2E_RELEASE_SHA] 와
+ * 일부러 다르게 둔다. 「심은 행」과 「걷어 온 행」이 release 칸으로 갈린다.
+ */
+private val AWARD_E2E_SEED_RELEASE = ReleaseIdentifier("award-e2e")
 
 /**
  * 낙찰 목록 수집 E2E 의 **출하 조립 기동기**(M9/award-ingest).
@@ -154,7 +162,7 @@ internal class AwardCollectionE2EHarness {
      */
     fun seedOpeningAxisBeforeAward(id: NoticeId) {
         val policy = (KONEPS_COLLECTION_POLICY.resolve(today) as Resolution.Resolved).value
-        val rawStore = JdbcRawObservationStore(dataSource, policy.fieldContracts, "award-e2e")
+        val rawStore = JdbcRawObservationStore(dataSource, policy.fieldContracts, AWARD_E2E_SEED_RELEASE)
         val noticeObservation = identityObservation(id, SourceEndpoint.NOTICE_LIST)
         JdbcNoticeRepository(dataSource).persist(
             NoticeCollected(
@@ -301,6 +309,9 @@ internal class AwardCollectionE2EHarness {
             "bidvector.persistence.credential" to postgres.password,
             "operator.credential.value" to TEST_CREDENTIAL_VALUE,
             "bidvector.evaluation.candidate-cap" to "1000",
+            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`). 이 하네스가 띄우는
+            // 갈래 전부가 실행 행을 쓰므로 **base 에** 둔다 — 갈래별 묶음에 흩어 두면 새 갈래가 빠뜨린다.
+            "bidvector.release.sha" to AWARD_E2E_RELEASE_SHA,
         )
 
     private fun awardProperties(mock: MockAwardKonepsHttp): Map<String, String> =

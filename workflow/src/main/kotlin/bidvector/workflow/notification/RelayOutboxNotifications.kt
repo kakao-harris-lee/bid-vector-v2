@@ -12,7 +12,9 @@ import bidvector.workflow.event.NotificationRequestedPayload
 import bidvector.workflow.event.OutboxCommand
 import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntry
+import bidvector.workflow.event.OutboxEntryState
 import bidvector.workflow.event.OutboxPort
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.event.OutboxTransition
 import bidvector.workflow.event.OutboxTransitionOutcome
 import bidvector.workflow.event.decideInbox
@@ -192,7 +194,7 @@ class RelayOutboxNotifications(
         orphansIsolated: Int,
     ): RelayReport {
         val rows = transactions.inTransaction { outbox.claim(limit, OutboxConsumerKind.NotificationRequested) }
-        val dispositions = mutableListOf<RowDisposition>()
+        val reasons = mutableListOf<OutboxTerminalReason>()
         // 행마다 발송 **전에** 임대를 다시 묻는다(R1-M-1) — 거짓이면 남은 행을 건드리지
         // 않는다. 그 행들은 `CLAIMED` 에 남아 다음 run 의 고아 격리가 받는다(놓침).
         var leaseLost = false
@@ -202,7 +204,7 @@ class RelayOutboxNotifications(
                     leaseLost = true
                     break
                 }
-                dispositions += settleRow(row)
+                reasons += settleRow(row)
             }
         } catch (
             @Suppress("TooGenericExceptionCaught") failure: Exception,
@@ -210,9 +212,9 @@ class RelayOutboxNotifications(
             // 그때까지의 집계를 **실어서** 올린다(PR #63 finding 4) — 앞 판은 예외를 그대로
             // 통과시켜 「스물 집어 열둘 전달하고 열셋째에서 터졌다」가 어디에도 남지 않았다.
             // 운영자가 알아야 하는 것은 「터졌다」가 아니라 **얼마나 갔고 얼마가 좌초했는가**다.
-            throw RelayAborted(reportOf(orphansIsolated, rows.size, dispositions), failure)
+            throw RelayAborted(reportOf(orphansIsolated, rows.size, reasons), failure)
         }
-        val report = reportOf(orphansIsolated, rows.size, dispositions)
+        val report = reportOf(orphansIsolated, rows.size, reasons)
         return if (leaseLost) RelayReport.LeaseLost(report) else report
     }
 
@@ -233,7 +235,9 @@ class RelayOutboxNotifications(
         var isolated = 0
         for (row in orphans) {
             if (!guard.stillHeld()) return OrphanIsolation(isolated, leaseHeld = false)
-            transactions.inTransaction { transition(OutboxEntry.restore(row), OutboxCommand.Isolate) }
+            transactions.inTransaction {
+                transition(OutboxEntry.restore(row), OutboxTerminalReason.ORPHANED_CLAIM)
+            }
             isolated += 1
         }
         return OrphanIsolation(isolated, leaseHeld = true)
@@ -242,11 +246,11 @@ class RelayOutboxNotifications(
     /**
      * 미지 payload 는 **조용히 건너뛰지 않는다** — 건너뛰면 그 행이 `CLAIMED` 에 좌초하고
      * 계수만 줄어 사유가 사라진다(6D-1 review L-3 과 같은 처분). 전달 여부가 모호한 것이
-     * 아니라 **전달을 시도조차 못 한 것**이지만, 어휘에 그 칸이 없고 V6 CHECK 를 바꾸는 것은
-     * 범위 밖이라 `ISOLATED`(모호) 로 보내고 [RelayReport.Completed.unknownPayload] 가 사유를
-     * 가른다(D-6F10-12 어휘 해석표).
+     * 아니라 **전달을 시도조차 못 한 것**이고, 상태는 `ISOLATED` 로 같지만 사유가 다르다
+     * ([OutboxTerminalReason.UNKNOWN_PAYLOAD], M9 OPS-05) — 앞 판은 어휘에 그 칸이 없어
+     * 계수([RelayReport.Completed.unknownPayload])만이 둘을 갈랐고 run 이 끝나면 사라졌다.
      */
-    private fun settleRow(row: ClaimedOutboxRow<*>): RowDisposition {
+    private fun settleRow(row: ClaimedOutboxRow<*>): OutboxTerminalReason {
         val entry = OutboxEntry.restore(row)
         val payload =
             entry.envelope.payload as? NotificationRequestedPayload
@@ -256,10 +260,10 @@ class RelayOutboxNotifications(
             ?: settleDispatch(entry, key, dispatcher.dispatch(intentFor(key, payload, target)))
     }
 
-    private fun isolateUnknownPayload(entry: OutboxEntry): RowDisposition =
+    private fun isolateUnknownPayload(entry: OutboxEntry): OutboxTerminalReason =
         transactions.inTransaction {
-            transition(entry, OutboxCommand.Isolate)
-            RowDisposition.ISOLATED_UNKNOWN_PAYLOAD
+            transition(entry, OutboxTerminalReason.UNKNOWN_PAYLOAD)
+            OutboxTerminalReason.UNKNOWN_PAYLOAD
         }
 
     /**
@@ -270,19 +274,20 @@ class RelayOutboxNotifications(
     private fun skipDuplicate(
         entry: OutboxEntry,
         key: IdempotencyKey,
-    ): RowDisposition? {
+    ): OutboxTerminalReason? {
         val alreadyProcessed = transactions.inTransaction { inbox.hasProcessed(key) }
         if (decideInbox(alreadyProcessed) != InboxDecision.SkipDuplicate) return null
         return transactions.inTransaction {
-            transition(entry, OutboxCommand.Deliver)
-            RowDisposition.SKIPPED_DUPLICATE
+            transition(entry, OutboxTerminalReason.DUPLICATE_SKIPPED)
+            OutboxTerminalReason.DUPLICATE_SKIPPED
         }
     }
 
     /**
-     * T2 — 종단 전이와 inbox 기록이 **한 커밋**이다. 매핑은 D-6F10-12 어휘 해석표다:
-     * `Delivered` → `DELIVERED` + inbox · `Rejected` → `FAILED` · `Unknown` → `ISOLATED`
-     * (모호, 재시도 없음 D-4E-2) · `Suppressed` → `FAILED`.
+     * T2 — 종단 전이와 inbox 기록이 **한 커밋**이다. 매핑은 D-6F10-12 어휘 해석표이고, 이제
+     * 사유까지 함께 적는다(M9 OPS-05): `Delivered` → `DELIVERED` + inbox · `Rejected` →
+     * `DELIVERY_REJECTED` · `Unknown` → `DELIVERY_OUTCOME_UNKNOWN`(모호, 재시도 없음
+     * D-4E-2) · `Suppressed` → `DELIVERY_SUPPRESSED`. 상태는 사유가 정한다.
      *
      * 여기 오는 [DeliveryOutcome.Suppressed] 는 **채널 비활성·route 부재**다 — 환경 억제는
      * [relayUnderLease] 가 claim 전에 걸렀다. 그 둘은 「이 entry 로는 전달이 일어나지 않았고
@@ -293,12 +298,12 @@ class RelayOutboxNotifications(
         entry: OutboxEntry,
         key: IdempotencyKey,
         outcome: DeliveryOutcome,
-    ): RowDisposition =
+    ): OutboxTerminalReason =
         transactions.inTransaction {
             when (outcome) {
                 is DeliveryOutcome.Suppressed -> {
-                    transition(entry, OutboxCommand.Fail)
-                    RowDisposition.FAILED
+                    transition(entry, OutboxTerminalReason.DELIVERY_SUPPRESSED)
+                    OutboxTerminalReason.DELIVERY_SUPPRESSED
                 }
 
                 is DeliveryOutcome.Attempted -> {
@@ -311,28 +316,28 @@ class RelayOutboxNotifications(
         entry: OutboxEntry,
         key: IdempotencyKey,
         result: DeliveryResult,
-    ): RowDisposition =
+    ): OutboxTerminalReason =
         when (result) {
             is DeliveryResult.Delivered -> {
                 inbox.markProcessed(key)
-                transition(entry, OutboxCommand.Deliver)
-                RowDisposition.DELIVERED
+                transition(entry, OutboxTerminalReason.DELIVERED)
+                OutboxTerminalReason.DELIVERED
             }
 
             is DeliveryResult.Rejected -> {
-                transition(entry, OutboxCommand.Fail)
-                RowDisposition.FAILED
+                transition(entry, OutboxTerminalReason.DELIVERY_REJECTED)
+                OutboxTerminalReason.DELIVERY_REJECTED
             }
 
             is DeliveryResult.Unknown -> {
-                transition(entry, OutboxCommand.Isolate)
-                RowDisposition.ISOLATED
+                transition(entry, OutboxTerminalReason.DELIVERY_OUTCOME_UNKNOWN)
+                OutboxTerminalReason.DELIVERY_OUTCOME_UNKNOWN
             }
         }
 
     /**
-     * **전이표를 지나 port 로 올리는 유일한 자리** — 명령과 통로 타입의 짝이 이 한 함수에만
-     * 있다. 소진 `when` 이라 [OutboxTransition] 에 하위 타입이 생기면 컴파일이 깨진다(사본
+     * **전이표를 지나 port 로 올리는 유일한 자리** — 사유와 통로 타입의 짝이 이 한 함수에만
+     * 있다. 호출부는 **사유만** 댄다(상태를 고르지 않는다, M9 OPS-05). 소진 `when` 이라 [OutboxTransition] 에 하위 타입이 생기면 컴파일이 깨진다(사본
      * SQL 0, `internal` 완화 0).
      *
      * 거부는 `error` 다. 호출부가 넘기는 상태는 늘 [OutboxEntry.restore] 가 고정한
@@ -342,10 +347,10 @@ class RelayOutboxNotifications(
      */
     private fun transition(
         entry: OutboxEntry,
-        command: OutboxCommand,
+        reason: OutboxTerminalReason,
     ) {
         val accepted =
-            when (val outcome = transitionOutbox(entry.id, entry.state, command)) {
+            when (val outcome = transitionOutbox(entry.id, entry.state, OutboxCommand.Terminate(reason))) {
                 is OutboxTransitionOutcome.Accepted -> {
                     outcome.transition
                 }
@@ -394,33 +399,26 @@ private data class OrphanIsolation(
  * 11개 한도, detekt `TooManyFunctions`).
  */
 private fun leaseLostBefore(orphansIsolated: Int): RelayReport.LeaseLost =
-    RelayReport.LeaseLost(reportOf(orphansIsolated, claimed = 0, dispositions = emptyList()))
+    RelayReport.LeaseLost(reportOf(orphansIsolated, claimed = 0, reasons = emptyList()))
 
-/** 행 하나의 처분 — [RelayReport.Completed] 의 계수가 이 값들을 센다. */
-private enum class RowDisposition {
-    DELIVERED,
-    SKIPPED_DUPLICATE,
-    FAILED,
-    ISOLATED,
-    ISOLATED_UNKNOWN_PAYLOAD,
-}
-
+/**
+ * 행 하나의 처분은 **저장 층에 적는 사유 그 값**이다(M9 OPS-05) — 전용 처분 enum 을 두지
+ * 않는다. 두면 같은 갈래를 두 어휘로 적게 되고, DB 의 사유와 보고의 계수가 서로 다른 날이
+ * 온다. `failed`·`isolated` 는 사유의 종단 상태로 센다(사유를 상태에 다시 사상하지 않는다).
+ */
 private fun reportOf(
     orphansIsolated: Int,
     claimed: Int,
-    dispositions: List<RowDisposition>,
+    reasons: List<OutboxTerminalReason>,
 ): RelayReport.Completed =
     RelayReport.Completed(
         orphansIsolated = orphansIsolated,
         claimed = claimed,
-        delivered = dispositions.count { it == RowDisposition.DELIVERED },
-        skippedDuplicates = dispositions.count { it == RowDisposition.SKIPPED_DUPLICATE },
-        failed = dispositions.count { it == RowDisposition.FAILED },
-        isolated =
-            dispositions.count {
-                it == RowDisposition.ISOLATED || it == RowDisposition.ISOLATED_UNKNOWN_PAYLOAD
-            },
-        unknownPayload = dispositions.count { it == RowDisposition.ISOLATED_UNKNOWN_PAYLOAD },
+        delivered = reasons.count { it == OutboxTerminalReason.DELIVERED },
+        skippedDuplicates = reasons.count { it == OutboxTerminalReason.DUPLICATE_SKIPPED },
+        failed = reasons.count { it.terminalState == OutboxEntryState.Failed },
+        isolated = reasons.count { it.terminalState == OutboxEntryState.Isolated },
+        unknownPayload = reasons.count { it == OutboxTerminalReason.UNKNOWN_PAYLOAD },
     )
 
 /**

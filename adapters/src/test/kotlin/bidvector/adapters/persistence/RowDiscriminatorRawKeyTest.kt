@@ -30,7 +30,7 @@ class RowDiscriminatorRawKeyTest : PersistenceTestSupport() {
 
     @Test
     fun `행 구별 축 없이 재료가 같은 두 행을 append 하면 둘째가 조용히 버려진다 — 결함 재현`() {
-        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val first = store.append(identicalReserveRowObservation())
         val second = store.append(identicalReserveRowObservation())
 
@@ -40,7 +40,7 @@ class RowDiscriminatorRawKeyTest : PersistenceTestSupport() {
 
     @Test
     fun `순번 부재 15행이 Positional discriminator 로 raw 에 15행 그대로 남는다`() {
-        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val keys =
             (0 until 15).map { ordinal ->
                 store.append(identicalReserveRowObservation(), RowDiscriminator.Positional(ordinal))
@@ -52,11 +52,11 @@ class RowDiscriminatorRawKeyTest : PersistenceTestSupport() {
 
     @Test
     fun `값이 있으면 위치가 섞여도 같은 키를 낸다 — 재수집 순서 변화에 안전하다`() {
-        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val observation = identicalReserveRowObservation()
 
         val keyAtPositionZero = store.append(observation, RowDiscriminator.of("003", ordinalIfAbsent = 0))
-        val secondStore = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val secondStore = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val keyAfterReshuffleToPositionFive =
             secondStore.append(observation, RowDiscriminator.of("003", ordinalIfAbsent = 5))
 
@@ -67,7 +67,7 @@ class RowDiscriminatorRawKeyTest : PersistenceTestSupport() {
 
     @Test
     fun `Identified 값이 다른 두 행은 서로 다른 키를 낸다`() {
-        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val observation = identicalReserveRowObservation()
 
         val keyForRowThree = store.append(observation, RowDiscriminator.Identified("003"))

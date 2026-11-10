@@ -24,6 +24,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import javax.sql.DataSource
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "production-browser-access-release"
+
 private const val SESSION_PATH = "/api/session"
 private const val LOGIN_NAME = "production-assembly-operator"
 private const val PASSPHRASE = "production-assembly-fixture-passphrase"
@@ -72,6 +75,9 @@ class ProductionBrowserAccessTest {
                             "server.port" to "0",
                             "management.server.port" to "0",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,

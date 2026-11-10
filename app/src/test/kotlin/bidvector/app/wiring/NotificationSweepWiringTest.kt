@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.notificationinbox.NotificationSweepRunner
 import bidvector.workflow.bidding.DaysBeforeWindow
 import bidvector.workflow.bidding.NotificationSweepCandidatePort
@@ -20,6 +21,9 @@ import java.time.ZoneOffset
 import java.util.function.Supplier
 import java.util.logging.Logger
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 /**
  * M7/7C③-b — 알림 훑기 배선의 **켜짐 조건과 표면**.
@@ -42,6 +46,8 @@ class NotificationSweepWiringTest {
         context.registerBean(Clock::class.java, Supplier { Clock { Instant.EPOCH } })
         // 연결하지 않는다 — 배선은 조립만 하고 질의는 러너가 refresh 뒤에 돌린다.
         context.registerBean(DataSource::class.java, Supplier { UnusableDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         context.registerBean(
             NotificationInboxPort::class.java,
             Supplier { NotificationInboxPort { NotificationInboxOutcome.Created } },

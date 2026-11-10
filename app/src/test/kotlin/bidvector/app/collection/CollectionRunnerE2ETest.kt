@@ -44,6 +44,9 @@ import java.time.LocalTime
 import java.time.ZonedDateTime
 import javax.sql.DataSource
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "collection-runner-e2e-release"
+
 /**
  * D-6F8-1~4 E2E — production 조립을 `mode=once` 로 부팅해 mock KONEPS → 원문 저장 → 정규화 → 영속 →
  * 회계까지 끝에서 끝으로 잰다(실 KONEPS 호출 없음). 잠그는 것: ① 공고명이 계약 경유로 `notice_title` 에 실린다
@@ -140,6 +143,9 @@ class CollectionRunnerE2ETest {
                             "server.port" to "0",
                             "spring.profiles.active" to "collection-e2e",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,

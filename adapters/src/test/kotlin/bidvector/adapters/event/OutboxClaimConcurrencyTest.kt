@@ -1,6 +1,7 @@
 package bidvector.adapters.event
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.event.OutboxConsumerKind
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -53,7 +54,7 @@ class OutboxClaimConcurrencyTest : PersistenceTestSupport() {
         val workerA =
             Callable {
                 boundary.inTransaction {
-                    val claimed = JdbcOutboxPort(boundary).claim(1, KIND).map { it.entryId.value }
+                    val claimed = JdbcOutboxPort(boundary, TEST_RELEASE).claim(1, KIND).map { it.entryId.value }
                     aClaimedLatch.countDown()
                     // 반환값을 올려 단언한다 — 여기서 시한이 넘으면 A 는 B 가 끝나기 전에
                     // 커밋해 버리고, 그러면 B 의 빈손이 SKIP LOCKED 의 증거가 아니게 된다.
@@ -63,7 +64,7 @@ class OutboxClaimConcurrencyTest : PersistenceTestSupport() {
         val aFuture = executor.submit(workerA)
         val aClaimedInTime = aClaimedLatch.await(CLAIM_TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
-        val bClaimed = boundary.inTransaction { JdbcOutboxPort(boundary).claim(1, KIND) }
+        val bClaimed = boundary.inTransaction { JdbcOutboxPort(boundary, TEST_RELEASE).claim(1, KIND) }
         bDoneLatch.countDown()
         val aResult = aFuture.get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         executor.shutdown()
@@ -84,7 +85,7 @@ class OutboxClaimConcurrencyTest : PersistenceTestSupport() {
         var threw = false
         try {
             boundary.inTransaction {
-                JdbcOutboxPort(boundary).claim(1, KIND)
+                JdbcOutboxPort(boundary, TEST_RELEASE).claim(1, KIND)
                 error("워커 사망 시뮬레이션 — 커밋 전 예외")
             }
         } catch (expected: IllegalStateException) {
@@ -93,7 +94,7 @@ class OutboxClaimConcurrencyTest : PersistenceTestSupport() {
 
         threw shouldBe true
         outboxStateOf(dataSource(), "dies-1") shouldBe "PENDING"
-        val reclaimed = boundary.inTransaction { JdbcOutboxPort(boundary).claim(1, KIND) }
+        val reclaimed = boundary.inTransaction { JdbcOutboxPort(boundary, TEST_RELEASE).claim(1, KIND) }
         reclaimed.map { it.entryId.value } shouldBe listOf("dies-1")
     }
 
@@ -115,7 +116,7 @@ class OutboxClaimConcurrencyTest : PersistenceTestSupport() {
 
         val strategyClaimed =
             boundary.inTransaction {
-                JdbcOutboxPort(boundary).claim(10, OutboxConsumerKind.StrategyUpdated)
+                JdbcOutboxPort(boundary, TEST_RELEASE).claim(10, OutboxConsumerKind.StrategyUpdated)
             }
 
         strategyClaimed.map { it.entryId.value } shouldBe listOf("kind-strategy")

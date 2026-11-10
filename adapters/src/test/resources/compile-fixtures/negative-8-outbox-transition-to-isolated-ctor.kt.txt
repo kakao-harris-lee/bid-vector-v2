@@ -1,6 +1,7 @@
 import bidvector.workflow.event.OutboxEntryId
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.event.OutboxTransition
 
 fun probe() {
-    OutboxTransition.ToIsolated(OutboxEntryId("e"))
+    OutboxTransition.ToIsolated(OutboxEntryId("e"), OutboxTerminalReason.ORPHANED_CLAIM)
 }

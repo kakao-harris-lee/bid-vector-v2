@@ -17,6 +17,9 @@ export BIDVECTOR_APP_MANAGEMENT_PORT="${BIDVECTOR_APP_MANAGEMENT_PORT:-18081}"
 export BIDVECTOR_APP_JDBC_URL="${BIDVECTOR_APP_JDBC_URL:-jdbc:postgresql://postgres:5432/${BIDVECTOR_PG_DB}}"
 export BIDVECTOR_APP_OPERATOR_CREDENTIAL="${BIDVECTOR_APP_OPERATOR_CREDENTIAL:-$(openssl rand -hex 24)}"
 export BIDVECTOR_APP_CANDIDATE_CAP="${BIDVECTOR_APP_CANDIDATE_CAP:-1000}"
+# M9/OPS-10 — 로컬 실행도 자기 릴리스를 댄다(기본값 없음 규율). 이미지 태그가 아니라 **행에 찍히는
+# 식별자**로 쓰인다 — compose.yaml 의 `BIDVECTOR_RELEASE_SHA` 가 이 값을 받는다.
+export BIDVECTOR_RELEASE_TAG="${BIDVECTOR_RELEASE_TAG:-$(git rev-parse --short HEAD)}"
 export BIDVECTOR_WEB_PORT="${BIDVECTOR_WEB_PORT:-18090}"
 export BIDVECTOR_PROXY_HTTPS_PORT="${BIDVECTOR_PROXY_HTTPS_PORT:-18443}"
 # 도메인은 **반드시 export 한다** — compose 는 이 변수를 통과시킬 뿐이라(기본값의 정본은

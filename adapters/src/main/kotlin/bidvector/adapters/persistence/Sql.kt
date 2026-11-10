@@ -399,8 +399,8 @@ internal object Sql {
             reference_date, source_endpoint, started_at, finished_at,
             received, normalized, duplicate, dropped, drop_reasons,
             source_total, pages_fetched, truncated, unknown_fields,
-            truncation_cause, quota_exceeded, backoff_skipped
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+            truncation_cause, quota_exceeded, backoff_skipped, release_sha
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
     const val SELECT_EDIT_SESSION =

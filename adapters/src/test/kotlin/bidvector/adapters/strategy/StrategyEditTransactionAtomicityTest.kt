@@ -1,6 +1,7 @@
 package bidvector.adapters.strategy
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
@@ -65,6 +66,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
             strategyPolicy = policy(),
             sessionPolicy = EditSessionPolicyData(Duration.ofMinutes(15)),
             clock = FixedClock(),
+            release = TEST_RELEASE,
         )
 
     private fun execute(sql: String) =

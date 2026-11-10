@@ -1,5 +1,6 @@
 package bidvector.app.evaluation
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.adminDataSource
 import bidvector.app.http.SequentialCorrelationIdFactory
 import bidvector.app.http.TestStrategyRepository
@@ -189,6 +190,7 @@ class DryRunCommitParityTest {
             // 이 자리에서도 잡힌다.
             notificationInboxPort = { error("청중이 비었는데 알림함 쓰기가 불렸다") },
             notificationAudiencePort = { NotificationAudience.Accounts(emptyList()) },
+            release = ReleaseIdentifier("parity-test"),
         )
 }
 

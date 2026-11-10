@@ -25,8 +25,10 @@ data class AwardCollectionProperties(
      * 0 에서 다시 시작한다.
      */
     val runStateDir: String,
-    /** 원문 저장 행의 출처 표식 — 빌드 식별자를 모르는 로컬 실행이 값을 지어내지 않고 「모름」을 적는다. */
-    val releaseSha: String = "unversioned",
+    // 릴리스 식별자는 **이 타입이 들지 않는다**(M9/OPS-10, ops-migrations ← award-ingest 병합).
+    // 같은 개념이 갈래마다 제 키를 들면 한 호스트에서 서로 다른 값이 적힐 수 있고, 기본값
+    // `unversioned` 는 「모름」을 지어낸 값으로 적는다 — 둘 다 OPS-10 이 없앤 형태다. 키는
+    // `bidvector.release.sha` 하나이고 기본값이 없다(`ReleaseWiring`). 이 갈래도 그 빈을 주입받는다.
 )
 
 /**

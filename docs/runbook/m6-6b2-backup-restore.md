@@ -26,9 +26,10 @@
   `validate()` 가 깨지지 않는다. 리허설 (i) 가 이 성질을 매 PR 에 실측한다.
 - **Flyway community 판에는 `undo` 가 없다.** 역 SQL 파일(`U*.sql`)을 만들지 않는다 — 이 저장소에 0 건이고
   그대로 둔다.
-- **`clean` 은 구성상 불가하다.** `PersistenceWiring.migrate()` 가 전부 기본값으로 Flyway 를 부르므로
-  `cleanDisabled` 가 켜져 있고 호출자도 없다. 「DB 를 비운다」는 Flyway 로 할 수 없고, 리허설은 **컨테이너·볼륨
-  폐기**로만 한다.
+- **`clean` 은 구성상 불가하다.** 출하 마이그레이션 구성(`PersistenceWiring.ownerMigration`)은 `cleanDisabled`
+  기본값(켜짐)을 그대로 두고 호출자도 없다. **「전부 기본값」은 더 이상 사실이 아니다**(M9/ops-migrations) —
+  그 구성은 `initSql` 로 잠금 대기 기본값을 깐다. `cleanDisabled` 는 그와 무관하게 켜져 있다. 「DB 를 비운다」는
+  Flyway 로 할 수 없고, 리허설은 **컨테이너·볼륨 폐기**로만 한다.
 - 되돌림 문장은 새 마이그레이션의 머리 주석에 그 자리에서 적는다(`V16`·`V17` 이 선례다).
 
 ## 2. 백업 절차
