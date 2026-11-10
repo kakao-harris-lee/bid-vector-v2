@@ -3,6 +3,7 @@ package bidvector.buildlogic
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.util.jar.JarFile
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -279,6 +280,60 @@ class NestedArchivePolicyTest {
     }
 
     @Test
+    fun `zip 판독기가 여는 포장은 판독기도 본다 — 두 판정을 같은 바이트로 대조한다`(
+        @TempDir dir: File,
+    ) {
+        // 리뷰 r5 HIGH 의 자리다. 앞 판은 **주석 길이 == 남은 바이트**를 요구했는데 JDK 의 zip
+        // 판독기는 그 어긋남을 용인하고 되짚어 연다. 그래서 뒤에 1 바이트만 붙여도 게이트는
+        // 「아카이브 아님」이고 로더는 그대로 열었다 — 뿌리 밖 판정이 그 한 바이트로 공허해진다.
+        //
+        // 단언이 **표가 아니라 함의**인 것이 요점이다: 어느 덧붙임에서 `JarFile` 이 열고 닫는지는
+        // JDK 판에 달렸지만, 「여는 것은 모두 본다」는 그 판과 무관하게 성립해야 한다. 표로 적으면
+        // JDK 가 바뀌는 날 **맞는 쪽으로도** 붉는다.
+        val missed =
+            SUFFIX_PADS.filter { pad ->
+                val bytes = ArchiveFixtures.suffixedZipBytes(pad)
+                val outer = dir.resolve("outer-$pad.jar")
+                writeArchive(outer, "$EXT_ROOT$pad.jar" to bytes)
+
+                opensAsZip(dir.resolve("standalone-$pad.jar").apply { writeBytes(bytes) }) &&
+                    readNestedArchive(outer, emptySet()).archiveEntryPaths().isEmpty()
+            }
+
+        assertEquals(emptyList(), missed, "zip 판독기가 여는데 게이트가 못 보는 덧붙임 바이트 수")
+    }
+
+    @Test
+    fun `대조가 공허하지 않다 — 여는 판과 열지 못하는 판이 둘 다 표본에 있다`(
+        @TempDir dir: File,
+    ) {
+        // 위 함의는 **아무것도 열리지 않으면** 저절로 성립한다. 표본이 그렇게 되지 않았음을 따로 센다.
+        val opened = SUFFIX_PADS.filter { opensAsZip(dir.resolve("p-$it.jar").apply { writeBytes(ArchiveFixtures.suffixedZipBytes(it)) }) }
+
+        assertTrue(opened.isNotEmpty(), "여는 판이 없으면 함의가 공허하다: $opened")
+        assertTrue(opened.size < SUFFIX_PADS.size, "전부 열리면 창 밖을 재지 못한 표본이다: $opened")
+    }
+
+    @Test
+    fun `창보다 큰 아카이브도 뿌리 밖에서 잡힌다 — 실제 중첩 jar 는 모두 이 경로를 탄다`(
+        @TempDir dir: File,
+    ) {
+        // verifier r6 M-2: 끝 창을 넘는 엔트리를 「아카이브 아님」으로 만드는 변이가 test 두 클래스와
+        // 실제 게이트를 모두 통과했다 — 이 저장소의 배포물에는 뿌리 밖 엔트리가 0 이라 실측이 그
+        // 변이를 보지 못한다. 그 사각을 **창보다 큰 fixture 하나**로 닫는다.
+        val big = ArchiveFixtures.largeZipBytes()
+        assertTrue(big.size > EOCD_SCAN_WINDOW, "창(${EOCD_SCAN_WINDOW})보다 커야 이 경로를 탄다: ${big.size}")
+
+        val outer = dir.resolve("outer.jar")
+        writeArchive(outer, "${EXT_ROOT}big.jar" to big)
+
+        val read = readNestedArchive(outer, emptySet())
+
+        assertEquals(setOf("${EXT_ROOT}big.jar"), read.archiveEntryPaths())
+        assertEquals(1, nestedPolicy().judge("app", listOf(read)).outsideCount)
+    }
+
+    @Test
     fun `판독한 아카이브를 그대로 판정하면 세 축이 모두 붉는다 — 판독기와 판정이 이어진다`(
         @TempDir dir: File,
     ) {
@@ -356,10 +411,20 @@ class NestedArchivePolicyTest {
         vararg entries: Pair<String, ByteArray>,
     ) = ArchiveFixtures.write(target, attributes = emptyMap(), entries = entries.toMap())
 
+    /** 로더가 실제로 여는가 — 게이트 술어가 아니라 **읽는 쪽**에 묻는다. */
+    private fun opensAsZip(file: File): Boolean = runCatching { JarFile(file).use { it.entries().hasMoreElements() } }.isSuccess
+
     private companion object {
         const val EXEMPT = "spring-boot-jarmode-tools-4.1.1.jar"
         const val ROOT = "BOOT-INF/lib/"
+        const val EXT_ROOT = "BOOT-INF/ext/"
         const val ARCHIVE_DIRECTORY = "/build/libs"
+
+        /**
+         * 덧붙인 바이트 수의 표본 — 작은 쪽(리뷰 r5 가 든 +1·+16)과 **명목 창 경계의 양쪽**이다.
+         * 경계 값들은 실측에서 갈린 자리라, 창을 명목으로 되돌리는 변이가 여기서 붉는다.
+         */
+        val SUFFIX_PADS = listOf(0, 1, 16, 1_024, 65_535, 65_536, 65_614, 70_000)
 
         fun policyFile(): File = File(System.getProperty("bidvector.architecture.policy"))
 

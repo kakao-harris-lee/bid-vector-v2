@@ -6,6 +6,7 @@ import java.util.jar.Attributes
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
 import java.util.zip.ZipEntry
+import kotlin.random.Random
 
 /**
  * **진짜 아카이브를 하나 만드는 자리** — 판독기 층([readNestedArchive])을 재는 test 들의 공용 입력.
@@ -54,7 +55,35 @@ internal object ArchiveFixtures {
      */
     fun prefixedZipBytes(): ByteArray = "#!/bin/sh\nexec java -jar \"$0\"\n".toByteArray() + zipBytes()
 
+    /**
+     * **뒤에 바이트를 붙인 zip** — EOCD 뒤에 [trailing] 바이트가 남는다.
+     *
+     * 이 포장이 fixture 인 이유는 **읽는 쪽이 관대하기 때문**이다: JDK 의 zip 판독기는 주석 길이가 남은
+     * 바이트와 어긋나도 EOCD 를 받아들인다. 그래서 「주석 길이가 정확히 맞는가」로 묻던 앞 판 술어
+     * 아래에서는 **단 1 바이트**를 덧붙인 jar 가 「아카이브 아님」인데 로더는 그대로 열었다.
+     */
+    fun suffixedZipBytes(trailing: Int): ByteArray = zipBytes() + ByteArray(trailing)
+
+    /**
+     * **끝 탐색 창보다 큰 zip** — 실제 중첩 jar 는 모두 이 경로를 탄다(가장 작은 것도 수십 KB 다).
+     *
+     * 내용이 난수인 것은 압축되지 않게 하기 위해서다 — 0 으로 채우면 deflate 가 창보다 작게 줄여 이
+     * fixture 가 재려던 경로를 아예 타지 않는다. 씨앗을 고정해 바이트를 재현 가능하게 둔다.
+     */
+    fun largeZipBytes(): ByteArray =
+        ByteArrayOutputStream()
+            .also { out ->
+                JarOutputStream(out).use {
+                    it.putNextEntry(ZipEntry("big.bin"))
+                    it.write(Random(LARGE_ENTRY_SEED).nextBytes(LARGE_ENTRY_BYTES))
+                    it.closeEntry()
+                }
+            }.toByteArray()
+
     /** 추출 도구가 읽는 index 파일의 줄 모양은 `- "<엔트리 경로>"` 다. */
     fun indexBytes(paths: List<String>): ByteArray =
         paths.joinToString(separator = "\n", postfix = "\n") { "- \"$it\"" }.toByteArray()
+
+    private const val LARGE_ENTRY_SEED = 20261109
+    private const val LARGE_ENTRY_BYTES = 200_000
 }

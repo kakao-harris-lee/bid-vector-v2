@@ -94,8 +94,13 @@ private fun JarFile.readIndexLines(entry: ZipEntry): List<String> =
  *
  * 앞 판은 앞 네 바이트의 서명을 보았는데, 그러면 **앞에 아무 바이트나 붙인 jar** 가 빠져나갔다
  * (앞 판 제한 20 ⓐ). zip 은 앞에서가 아니라 뒤에서 읽히므로 그 포장은 적재를 막지 않는다. 서명 네
- * 바이트만으로는 우연한 일치가 많아 **주석 길이가 남은 바이트와 맞는가**와 **중앙 디렉터리가 그 앞에
- * 놓이는가**를 함께 본다(실측: 이 저장소의 배포물에서 뿌리 밖 오탐 0).
+ * 바이트만으로는 우연한 일치가 많아 **주석 길이가 남은 바이트 안에 드는가**와 **중앙 디렉터리가 그
+ * 앞에 놓이는가**를 함께 본다(실측: 이 저장소의 배포물에서 뿌리 밖 오탐 0).
+ *
+ * 끝에서 [EOCD_SCAN_WINDOW] 만큼만 보는 것은 큰 중첩 jar 를 통째로 들지 않기 위해서다. 그 창이
+ * **읽는 쪽이 닿는 범위보다 넓어야** 한다는 것이 이 축의 요구다 — 좁으면 로더가 여는 바이트를 게이트가
+ * 못 본다. 그 등식은 가정이 아니라 측정이다: `NestedArchivePolicyTest` 가 진짜 `JarFile` 과 같은
+ * 입력으로 대조해 **「여는 것은 모두 본다」**를 잰다.
  */
 private fun JarFile.holdsArchiveDirectory(entry: JarEntry): Boolean =
     getInputStream(entry).use { it.readTail(EOCD_SCAN_WINDOW) }.holdsCentralDirectoryEnd()
@@ -133,8 +138,14 @@ private fun ArchiveTail.holdsCentralDirectoryEnd(): Boolean {
 }
 
 /**
- * 서명 네 바이트는 우연히도 나온다 — 그래서 **주석 길이가 남은 바이트와 정확히 같은가**와 **중앙
+ * 서명 네 바이트는 우연히도 나온다 — 그래서 **주석 길이가 남은 바이트 안에 드는가**와 **중앙
  * 디렉터리가 이 레코드 앞에 놓이는가**를 함께 본다.
+ *
+ * **정확 일치가 아니라 부등식인 것이 요점이다**(리뷰 r5 HIGH 실측). 앞 판은 주석 길이가 남은 바이트와
+ * 같아야 한다고 요구했는데, zip 판독기는 그 둘이 어긋나도 중앙 디렉터리 서명으로 되짚어 연다
+ * (`ZipFile.findEND` 의 「padded at the end」 경로). 그래서 **뒤에 1 바이트만 붙여도** 게이트는
+ * 「아카이브 아님」인데 로더는 그대로 적재했다 — 뿌리 밖 판정이 그 한 바이트로 공허해지는 자리였다.
+ * 주석 길이가 남은 바이트를 넘으면 그 레코드는 이 파일의 EOCD 일 수 없으므로 그쪽만 거부한다.
  *
  * 뒤의 확인은 zip64 에서 성립하지 않는다 — 그 형식은 두 자리에 `0xFFFFFFFF` 표지를 넣고 실제 값을
  * 별도 레코드에 둔다. 표지가 보이면 **자리 확인을 하지 않는다**: 하면 zip64 로 포장한 아카이브가
@@ -145,7 +156,7 @@ private fun ArchiveTail.isConsistentEnd(
     base: Long,
 ): Boolean {
     val commentLength = bytes.readShortLe(index + EOCD_COMMENT_OFFSET)
-    if (commentLength != bytes.size - (index + EOCD_LENGTH)) return false
+    if (commentLength > bytes.size - (index + EOCD_LENGTH)) return false
     val directorySize = bytes.readIntLe(index + EOCD_SIZE_OFFSET).toUInt().toLong()
     val directoryOffset = bytes.readIntLe(index + EOCD_OFFSET_OFFSET).toUInt().toLong()
     val zip64 = directorySize == ZIP64_MARKER || directoryOffset == ZIP64_MARKER
@@ -176,6 +187,19 @@ private const val ZIP64_MARKER = 0xFFFFFFFFL
 
 private const val UNSIGNED_SHORT_MAX = 0xFFFF
 
-/** EOCD 는 주석 길이(최대 [UNSIGNED_SHORT_MAX])만큼만 끝에서 밀린다 — 끝의 이만큼만 보면 전수다. */
-private const val EOCD_SCAN_WINDOW = EOCD_LENGTH + UNSIGNED_SHORT_MAX
+/**
+ * **읽는 쪽이 닿는 범위보다 넓은 여유**. EOCD 의 명목 최대 밀림은 주석 길이(최대 [UNSIGNED_SHORT_MAX])
+ * 지만, JDK 의 zip 판독기는 끝에서 **블록 단위로 되짚어** 읽어서 마지막 블록이 그 명목 경계를 걸치면
+ * 너머의 EOCD 도 집는다. 실측(JDK 21): 평범한 zip 뒤에 65_536~65_614 바이트를 덧붙인 판을 `JarFile` 이
+ * 열었다 — 명목 창만 보던 판에서 그 79 바이트 띠는 **게이트는 「아카이브 아님」인데 로더는 적재한다**
+ * 였고, 이 축이 닫으려는 바로 그 비대칭이다.
+ *
+ * 여유를 블록 하나보다 넉넉히 두는 쪽을 고른 것은 **틀리는 방향이 다르기** 때문이다: 창이 넓어서
+ * 생기는 대가는 오탐(게이트가 가짜로 붉음)이고 그것은 시끄럽게 실패한다. 좁아서 생기는 대가는 미탐이고
+ * 그것은 조용하다.
+ */
+private const val READER_SCAN_SLACK = 4096
+
+/** 끝에서 EOCD 를 찾는 창 — 명목 최대 밀림 + [READER_SCAN_SLACK]. */
+internal const val EOCD_SCAN_WINDOW = EOCD_LENGTH + UNSIGNED_SHORT_MAX + READER_SCAN_SLACK
 private const val READ_CHUNK = 8192
