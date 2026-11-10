@@ -254,13 +254,8 @@ class EvaluationCommitRunE2ETest {
      * 성립하지 않는다는 사실의 측정이다 — 오늘 평가에는 outbox 밖 write 가 없다. 판정 기록 표가
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
      *
-     * **M9/ops-code — 그 예고가 반쯤 닿았다.** NOTI-01 이 평가 커밋 경로에 `notification_inbox`
-     * write 를 더했다. 이 fixture 에서는 그 표가 **여전히 안 변한다**: 알림함 항목은 계정에
-     * 귀속되고 이 fixture 는 계정을 심지 않으므로 청중이 비어 기록이 0 건이다(그 「0 건이 정상」
-     * 축도 재는 자리가 있다). 그래서 이 단언은 그대로 유효하고, 조립이 **실제로 알림함에 쓰는가**
-     * 는 계정을 심어 실 DB 로 재는 `bidvector.adapters.evaluation.EvaluationCommitInboxProductionTest`
-     * 가 든다 — 이 fixture 를 계정까지 심는 쪽으로 늘리면 이 class 의 다른 단언들(표별 전후 등식)
-     * 이 함께 움직여야 해서, 측정을 그쪽으로 옮기고 여기서는 **빈 청중**이라는 전제를 명시한다.
+     * **M9/ops-code — 전제는 빈 청중이다.** 이 fixture 는 계정을 심지 않아 알림함 기록이 0 건이고
+     * 그래서 이 등식이 유효하다. 실제로 쓰는가는 `EvaluationCommitInboxProductionTest` 가 든다.
      *
      * **M6/6E-2a PR #66 — 표 목록은 admin 연결로 읽는다.** `information_schema.tables` 는 **권한으로
      * 걸러진 뷰**다. 최소 권한 역할로 읽으면 그 역할에 GRANT 가 없는 표가 **목록에서 사라지고**,
@@ -433,9 +428,6 @@ class EvaluationCommitRunE2ETest {
                 correlationIds = seedContext.getBean(CorrelationIdFactory::class.java),
                 clock = seedContext.getBean(Clock::class.java),
                 analysisBudget = null,
-                // NOTI-01(M9/ops-code) — **실 어댑터를 꽂는다**(바꿔치우는 것은 ML 하나라는 이
-                // 함수의 규율 그대로). 이 fixture 는 계정을 심지 않으므로 청중이 비어 알림함
-                // 기록이 0 건이고, 그래서 「변한 표 == {outbox}」가 유효하다(위 KDoc).
                 notificationInbox = JdbcNotificationInbox(dataSource()),
                 audience = JdbcNotificationAudience(dataSource()),
                 release = TEST_RELEASE_ID,
