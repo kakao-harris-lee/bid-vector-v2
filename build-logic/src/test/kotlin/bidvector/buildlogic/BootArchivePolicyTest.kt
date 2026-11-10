@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -230,6 +231,38 @@ class BootArchivePolicyTest {
     }
 
     @Test
+    fun `모양이 깨진 index 줄을 버리지 않는다 — 버리면 선언과 엔트리의 어긋남이 조용해진다`(
+        @TempDir dir: File,
+    ) {
+        // 리뷰 r5 M-1. 판독기 KDoc 이 「떼어지지 않는 줄은 그대로 둔다」고 적는데 그 성질이 어느
+        // test 에도 걸려 있지 않았다 — 줄을 조용히 거르는 `mapNotNull` 변이가 초록이었다.
+        //
+        // 왜 버리면 안 되는가: 추출 도구는 줄 모양을 **묻지 않고** 자리로 떼어 간다. 그러니 게이트가
+        // 읽지 못한 줄은 「없는 줄」이 아니라 **게이트의 index 모델이 도구와 갈라진 자리**다. 버리면
+        // 그 갈라짐이 판정에서 사라지고, 남겨 두면 뿌리 밑 엔트리가 아닌 줄로 지목된다.
+        val outer = dir.resolve("app.jar")
+        val malformed = "BOOT-INF/ext/evil.jar"
+        ArchiveFixtures.write(
+            outer,
+            attributes = attributes(),
+            entries =
+                mapOf(
+                    DECLARED to ArchiveFixtures.zipBytes(),
+                    CLASSPATH_INDEX to ArchiveFixtures.indexBytes(listOf(DECLARED)) + "$malformed\n".toByteArray(),
+                    LAYERS_INDEX to ArchiveFixtures.indexBytes(listOf(DECLARED)),
+                ),
+        )
+
+        val read = readNestedArchive(outer, INDEX_LOCATIONS)
+
+        assertEquals(listOf(DECLARED, malformed), read.descriptor.indexes[CLASSPATH_INDEX])
+
+        val violations = policy().judge(OWNER, listOf(read)).violations
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains(malformed), "$violations")
+    }
+
+    @Test
     fun `판독한 아카이브를 그대로 판정하면 재현이 붉는다 — 적재 뿌리와 index 를 함께 바꾼 판`(
         @TempDir dir: File,
     ) {
@@ -279,6 +312,30 @@ class BootArchivePolicyTest {
         assertEquals(CLASSES_ROOT, values.requireSingle("jar.class-roots"))
     }
 
+    @Test
+    fun `소유 모듈 값이 settings 의 include 목록에 실재한다 — 개명하면 이 축이 조용히 쉰다`() {
+        // 리뷰 r5 M-2: `jar.boot-archive-module` 은 **모듈 이름 글자**다. 모듈을 개명하면 그 값은
+        // 어느 모듈에도 걸리지 않고, 「배포물을 내는 모듈인데 배포 아카이브가 없다」는 바닥값이
+        // 영영 돌지 않는다 — 축이 죽은 것이 리포트에서 **아홉 모듈의 정상 상태와 같은 모양**이다.
+        val owner = readPolicy(policyFile()).requireValue("jar.boot-archive-module")
+        val included = includedModules()
+
+        assertTrue(included.isNotEmpty(), "include 목록을 읽지 못했다 — 비-공허 단언")
+        assertTrue(owner in included, "소유 모듈 '$owner' 이 include 목록에 없다: $included")
+    }
+
+    @Test
+    fun `적재 자리 둘은 디렉터리 접두다 — 끝의 구분자가 빠지면 이웃 이름이 뿌리 밑으로 샌다`() {
+        // 리뷰 r5 LOW: `BOOT-INF/lib` 로 적으면 `BOOT-INF/libextra.jar` 가 접두 비교를 통과해 **뿌리
+        // 바로 밑 엔트리**로 세어진다. 정책 오타 하나가 모집단을 바꾸는 자리라 값을 읽는 쪽이 거부한다.
+        val failure =
+            assertFailsWith<IllegalArgumentException> {
+                BootArchiveExpectation(LAUNCHER, START_CLASS, CLASSES_ROOT, "BOOT-INF/lib", CLASSPATH_INDEX, LAYERS_INDEX)
+            }
+
+        assertTrue(failure.message!!.contains("'/' 로 끝나야"), "${failure.message}")
+    }
+
     private fun policy() = BootArchivePolicy(expectation(), listOf(EXEMPT), OWNER)
 
     private fun BootArchivePolicy.violations(archive: NestedArchive): List<String> =
@@ -318,5 +375,25 @@ class BootArchivePolicyTest {
             expectation().attributes + overrides
 
         fun policyFile(): File = File(System.getProperty("bidvector.architecture.policy"))
+
+        /**
+         * `settings.gradle.kts` 의 `include(...)` 블록이 드는 모듈 이름.
+         *
+         * `includeBuild(...)` 를 함께 집지 않도록 **여는 줄이 정확히 `include(`** 인 블록만 본다 —
+         * 접두로 맞추면 included build 둘이 모듈로 세어진다. 블록을 못 찾으면 빈 목록이고, 그 빈
+         * 목록은 부르는 쪽의 비-공허 단언이 받는다(조용한 통과가 되지 않게).
+         */
+        fun includedModules(): List<String> {
+            val lines = File(System.getProperty("bidvector.settings.file")).readLines()
+            val start = lines.indexOfFirst { it.trim() == "include(" }
+            if (start < 0) return emptyList()
+            return lines
+                .asSequence()
+                .drop(start + 1)
+                .takeWhile { it.trim() != ")" }
+                .mapNotNull { line -> line.trim().removeSuffix(",").takeIf { it.startsWith("\"") && it.endsWith("\"") } }
+                .map { it.removeSurrounding("\"") }
+                .toList()
+        }
     }
 }

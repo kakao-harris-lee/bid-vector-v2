@@ -108,6 +108,13 @@ fun Test.declarePolicyInputs(repoRoot: File) {
     inputs.file(versionCatalog).withPropertyName("versionCatalog")
     systemProperty("bidvector.version.catalog", versionCatalog.absolutePath)
 
+    // `BootArchivePolicyTest` 가 배포물 소유 모듈(`jar.boot-archive-module`)이 **실재하는 모듈인지**
+    // 견준다(리뷰 r5 M-2). 그 값은 모듈 이름 글자라, 모듈을 개명하면 배포 경로 축의 소유 바닥이
+    // 아무 모듈에도 걸리지 않고 조용히 쉰다 — 어긋남을 settings 의 include 목록과 대조해 잡는다.
+    val settingsFile = repoRoot.resolve("settings.gradle.kts")
+    inputs.file(settingsFile).withPropertyName("settingsFile")
+    systemProperty("bidvector.settings.file", settingsFile.absolutePath)
+
     // `MigrationOrderTest` 의 뒤 둘이 실제 정책과 실제 디렉터리를 읽는다. 경로는 그 test 가
     // `bidvector.architecture.policy` 에서 유도하므로 system property 를 더 넘기지 않는다.
     val migrationPolicy = repoRoot.resolve("config/quality/migration-policy.properties")
