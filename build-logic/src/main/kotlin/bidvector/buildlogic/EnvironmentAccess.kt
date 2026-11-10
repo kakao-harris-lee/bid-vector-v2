@@ -124,7 +124,13 @@ internal object EnvironmentAccess {
      *
      * **모양이 아닌 항목은 모든 모듈에서 위반이다**(리뷰 LOW-5). `->` 나 `#` 가 없는 줄은 어떤 접근과도
      * 같아질 수 없어 앞 판에서 **아무 말 없이 무효**였다 — 오타 하나가 허용을 지우고도 조용했다.
-     * 그 줄은 모집단과 무관한 **정책 데이터의 오류**라 모듈 범위를 묻지 않는다.
+     * 그 줄은 모집단과 무관한 **정책 데이터의 오류**라 모듈 범위를 묻지 않는다. **빈 칸도 모양이 아니다**
+     * (수정 라운드 6, 리뷰 r5 LOW): `A->B#` 처럼 멤버 자리가 빈 항목은 구분자를 둘 다 갖췄지만 어떤
+     * 접근과도 같아질 수 없어 같은 종류의 말없는 무효다.
+     *
+     * **같은 항목이 두 번 적힌 것도 위반이다**(리뷰 r5 LOW). 중복은 여는 범위를 넓히지는 않지만, 행사
+     * 횟수 1 을 재는 이 축에서 **허용 수와 열린 자리 수가 어긋나게** 만든다 — 목록을 세어 범위를 읽는
+     * 운영자에게 둘은 같은 글자가 아니다.
      */
     private fun allowanceViolations(
         accesses: List<ClassMemberAccess>,
@@ -133,10 +139,20 @@ internal object EnvironmentAccess {
     ): List<String> {
         val exercised = accesses.map(::allowKey)
         val (shaped, malformed) = allowed.partition(::isAllowKeyShaped)
-        return malformed.sorted().map {
-            "허용 항목이 '귀속클래스${CALLER_SEPARATOR}선언클래스${MEMBER_SEPARATOR}멤버' 모양이 아니다 — " +
-                "어떤 접근과도 같아질 수 없어 **말없이 무효**인 허용이다: $it"
-        } + shaped.sorted().mapNotNull { allowance -> countViolation(allowance, exercised, presentClasses) }
+        val duplicates =
+            allowed
+                .groupingBy { it }
+                .eachCount()
+                .filterValues { it > 1 }
+                .keys
+                .sorted()
+                .map { "허용 항목이 ${allowed.count { line -> line == it }}번 적혔다 — 허용 수와 열린 자리 수가 어긋난다: $it" }
+
+        return duplicates +
+            malformed.distinct().sorted().map {
+                "허용 항목이 '귀속클래스${CALLER_SEPARATOR}선언클래스${MEMBER_SEPARATOR}멤버' 모양이 아니다 — " +
+                    "어떤 접근과도 같아질 수 없어 **말없이 무효**인 허용이다: $it"
+            } + shaped.distinct().sorted().mapNotNull { allowance -> countViolation(allowance, exercised, presentClasses) }
     }
 
     private fun countViolation(
@@ -164,8 +180,15 @@ internal object EnvironmentAccess {
             }
         }
 
-    private fun isAllowKeyShaped(allowance: String): Boolean =
-        allowance.contains(CALLER_SEPARATOR) && allowance.substringAfter(CALLER_SEPARATOR).contains(MEMBER_SEPARATOR)
+    /** 구분자 둘이 있고 **세 칸이 모두 차 있어야** 어떤 접근과 같아질 수 있다. */
+    private fun isAllowKeyShaped(allowance: String): Boolean {
+        if (!allowance.contains(CALLER_SEPARATOR)) return false
+        val coordinate = allowance.substringAfter(CALLER_SEPARATOR)
+        return allowance.substringBefore(CALLER_SEPARATOR).isNotEmpty() &&
+            coordinate.contains(MEMBER_SEPARATOR) &&
+            coordinate.substringBefore(MEMBER_SEPARATOR).isNotEmpty() &&
+            coordinate.substringAfter(MEMBER_SEPARATOR).isNotEmpty()
+    }
 
     /**
      * 허용 키는 **`귀속클래스->선언클래스#멤버`** 다 — 고칠 자리(귀속)와 능력(좌표)의 쌍이고,

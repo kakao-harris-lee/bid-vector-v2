@@ -175,6 +175,38 @@ class EnvironmentAccessTest {
     }
 
     @Test
+    fun `칸이 빈 허용 항목도 모양이 아니다 — 구분자만 갖춘 항목은 여전히 말없이 무효다`() {
+        // 리뷰 r5 LOW: `A->B#` 는 `->` 와 `#` 를 둘 다 갖춰 앞 판의 모양 검사를 통과했는데, 멤버 자리가
+        // 비어 어떤 접근과도 같아질 수 없다 — LOW-5 가 닫은 것과 **같은 종류**의 조용한 무효다.
+        val violations =
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                DENIED,
+                listOf(ALLOWED_PAIR, "bidvector.app.Half->java.lang.System#"),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("모양이 아니다"), "$violations")
+    }
+
+    @Test
+    fun `같은 허용을 두 번 적으면 위반이다 — 허용 수와 열린 자리 수가 어긋난다`() {
+        // 리뷰 r5 LOW: 중복은 여는 범위를 넓히지 않지만, **목록을 세어 범위를 읽는** 운영자에게는
+        // 자리가 둘로 보인다. 행사 횟수 1 을 재는 축에서 그 어긋남은 조용했다.
+        val violations =
+            EnvironmentAccess.violations(
+                access(ALLOWED_CALLER, "java.lang.System", "getProperty"),
+                DENIED,
+                listOf(ALLOWED_PAIR, ALLOWED_PAIR),
+                setOf(ALLOWED_CALLER),
+            )
+
+        assertEquals(1, violations.size, "$violations")
+        assertTrue(violations.single().contains("2번 적혔다"), "$violations")
+    }
+
+    @Test
     fun `남의 모듈 허용은 죽었다고 세지 않는다 — 모듈마다 모집단이 다르다`() {
         val violations =
             EnvironmentAccess.violations(
