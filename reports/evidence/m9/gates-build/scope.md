@@ -1,7 +1,7 @@
 # M9 / gates-build — 게이트 술어의 약한 층 (build-logic · 정책)
 - base: main `df4976cc` · 공통 규율: `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/b843a5c1-93ae-42d9-82cf-0a5222fc9820/scratchpad/m9-lane-rules.md`
 - 사용자 지시 2026-11-06: 「남은 묶음도 지금 같이 병렬로」(2026-11-05 「남은 항목이 없도록 전체 병렬」의 연속). 결정 지점은 추천안으로 진행(전역 규칙), 외부 비용·운영 결정이 필요한 축은 만들지 않고 등재.
-- rollback: 공통 규율대로(원천은 **실제로 병합한 main 고정 SHA**, 내 커밋만, 결과 트리 동일성). 하네스 레인 변경: 계약이 명시한 것 외 없음.
+- rollback: 공통 규율대로(원천은 **실제로 병합한 main 고정 SHA**, 내 커밋만, 결과 트리 동일성). 하네스 레인 변경: 계약이 명시한 것 외 없음 — 이 slice 는 `.claude/**` 를 만지지 않는다. **다음 하네스 편집 대상 하나를 등재만 한다**(verifier r6 L-1): rollback 유효성 술어를 「`git diff --name-only <실측 HEAD>..<판정 SHA> -- <복원 목록>` 이 빈 출력」에서 「∀ p ∈ D : p 가 원천에 없다」로 넓힌 것은 건전하지만(원천에 없는 경로는 복원이 내용과 무관하게 지운다), CLAUDE.md 하네스 요약과 `evidence-pack` 문면은 아직 「한 줄이라도 나오면 미검증」이다. 장부를 고치지 않으면 다음 검증자가 이 `rollback.md` 를 규칙 위반으로 읽는다.
 - 수정 라운드 1(팀장 지시 2026-11-06, verifier `not-ready` B-1·H-1·H-2 + code-reviewer `request_changes` HIGH 1·MEDIUM 6): 처방은 아래 「수정 라운드 1 의 처방」 절. **in_scope 에 `app/build.gradle.kts` 한 경로를 더한다**(cr M-4 — 닫힌 사각을 「열린 채」로 적는 주석 한 문단, 팀장 승인). 그 파일의 거동(`jar` 켜 둠)은 바꾸지 않는다.
 - 수정 라운드 4(팀장 지시 2026-11-08, **사용자가 상한 너머 한 라운드만 승인** — 다음 재검증이 not-ready 면 머지 없이 사용자 보고; verifier `not-ready` H-1 + code-reviewer `request_changes` HIGH 1·MEDIUM 4·LOW 5): 중첩 축을 경로·다중도·뿌리 밖으로 닫고, 문면을 술어 크기로 좁히며, main `3101035f` 를 병합한다. **in_scope 는 바뀌지 않는다** — 이 라운드가 만든 새 파일은 `build-logic/src/test/kotlin/bidvector/buildlogic/NestedArchivePolicyTest.kt` **하나**이고 `build-logic/**` 안이다(대조 완료). 라운드가 더한 정책 키 둘(`jar.boot-launcher-main-class` · `bytecode.env-access.allowed-callers`)도 `config/quality/**` 안이다. 뒤의 키는 **운영자 확인 대상**으로 `checklist.md` 제한 21·OPEN 에 등재했다.
 
