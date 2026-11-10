@@ -4,6 +4,7 @@ import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.qualification.PinnedLicenseGate
 import bidvector.decision.MlUnavailableReason
 import bidvector.decision.PublishedFloorExclusion
@@ -149,6 +150,10 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
             analysisBudget = null,
             notificationInbox = JdbcNotificationInbox(dataSource()),
             audience = JdbcNotificationAudience(dataSource()),
+            // M9/ops-migrations 병합 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(컴파일이 강제했다).
+            // 이 test 가 재는 것은 알림함 기록이라 값 자체는 축이 아니고, 그 축은 그 slice 의
+            // `ExecutionRowReleaseTest` 가 든다.
+            release = ReleaseIdentifier("m9-ops-code-inbox-test"),
         )
 
     private fun bidNowStrategy() =
