@@ -75,3 +75,43 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
 (생성자 인자 둘에 따른 조립). `app/…/EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다 — 늦게 머지되는 쪽이 맞춘다.
 
 **H-1 처방(v)** — 출하 정책 `KONEPS_HTTP_POLICY` 를 resolve 한 그 값 위에서 ① 403 한 번이면 호출 1회 ② 연속 호출 간격 ≥ 출하 `minimumCallInterval`(주입 시계)을 잰다. 상수 표로 만든 test 정책 위의 시나리오로 갈음하지 않는다. 변이 `minimumCallInterval=ZERO` · 출하 `statusRules` 에서 403 행 제거가 각각 RED.
+
+## 계약 갱신 2026-11-10 (팀장, 3차) — 다섯째 병합이 강제한 세 자리
+
+main `07140729`(PR #128 낙찰 수집을 담은 자리) 병합 `1d53dd6e` 뒤 **셋이 깨졌다.** 셋 다 이 slice 의
+새 절단 사유 `AccessBlocked` 와 main 의 새 낙찰 갈래가 만난 자리이고, 가리킨 것은 사람이 아니라
+**타입과 게이트**다.
+
+**더하는 in_scope 경로 둘**
+
+| 경로 | 사유 |
+| --- | --- |
+| `workflow/src/main/kotlin/bidvector/workflow/collection/CollectAwardListUseCase.kt` | main `07140729` 이 만든 파일. 그 `haltOf` 가 `TruncationCause` 소진 `when` 이고 이 slice 가 `AccessBlocked` 를 들여와 **컴파일이 멈췄다**(`'when' expression must be exhaustive`). 처분은 새 결정이 아니다 — 이 계약의 「#128 의 소진 `when` 은 컴파일이 강제한다」와 main 저자가 그 `when` KDoc 에 적어 둔 답(403 계열 차단은 멈춤)이 둘 다 미리 정해 두었다 |
+| `workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTest.kt` | 그 처분 표의 전수 test. 모수를 sealed 계층에서 도출하므로 새 사유가 병합과 **동시에** 표에 들어왔고, 기대 행이 없어 등식이 붉었다 |
+
+**셋째 자리는 이미 in_scope 다** — `app/src/test/kotlin/bidvector/app/wiring/CollectionWiringSleeperTest.kt`.
+main 의 `AwardCollectionWiring` 이 `konepsTransportFor` 를 부르는데 탐침표에 그 클래스가 없어 집합
+대조가 `Some elements were unexpected: ["wiring/AwardCollectionWiring"]` 로 먼저 붉어졌다. 그 test 의
+KDoc 이 「셋째 클래스가 전송을 만들면 거동을 재지 않은 채 지나갈 수 없다」를 **주장**했고 병합이 그
+주장을 **실측**으로 바꿨다. 탐침은 키만 더하지 않고 그 클래스의 production 조립 메서드로 거동까지
+잰다(cr r6 M-2 가 지목한 손 불변식을 피한다).
+
+**이 라운드의 범위 문면을 고친다.** 앞 라운드의 「production 거동 변경 0」은 더 이상 참이 아니다 —
+**병합이 강제한 한 줄**이 있다: `haltOf` 의 `TruncationCause.AccessBlocked -> AwardCollectionHalt(null, cause)`.
+그 한 줄이 없으면 컴파일되지 않으므로 「등재하고 넘긴다」가 선택지가 아니었다.
+
+**복원 목록과 공유 파일은 기계가 낸다**
+
+- 복원 목록 **44**(앞 판 42) — `git log --no-merges --format= --name-only <원천>..HEAD -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u`.
+  `git diff --name-only` 산출과 `comm` **양방향 빈 출력**으로 대조했다.
+- 공유 파일 **10** — `comm -12 <복원 목록> <git diff --name-only df4976cc 07140729>`. 문서가 말하던
+  「여섯」은 그때도 적었고(v r6 L-3 가 잡은 자리의 재발), 그 사유는 **열거를 손으로 적고 수를 따로
+  적은** 데 있다. 이제 열거와 계수가 **같은 산출**에서 나온다.
+
+**표지 축을 바꾼다 — `AccessBlocked` 는 더 이상 내 표지가 아니다.** 원천 `07140729` 에 그 어휘가
+**4 파일**(award-ingest 가 쓴 KDoc 둘 · 그 slice 의 evidence 둘)에 있다. 상류가 내 이름을 **예고로
+채택한** 경우이고, 그대로 두면 「복원 뒤 0」이 영원히 거짓이 된다. 그 이름을 **보존 쪽(4/4)** 으로
+옮기고, 같은 축의 내 표지는 `ACCESS_BLOCKED`(원천 **0** · HEAD **5**)로 바꾼다.
+
+**복원 원천도 옮긴다** — `bd2f450e` → `07140729`(이 브랜치가 마지막으로 병합한 main 의 고정 SHA).
+`bd2f450e` 는 `07140729` 의 조상이라 그것으로 복원하면 그 사이 main 의 줄을 함께 되돌린다.
