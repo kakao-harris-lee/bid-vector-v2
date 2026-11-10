@@ -330,7 +330,14 @@ class BootArchivePolicyTest {
         // 바로 밑 엔트리**로 세어진다. 정책 오타 하나가 모집단을 바꾸는 자리라 값을 읽는 쪽이 거부한다.
         val failure =
             assertFailsWith<IllegalArgumentException> {
-                BootArchiveExpectation(LAUNCHER, START_CLASS, CLASSES_ROOT, "BOOT-INF/lib", CLASSPATH_INDEX, LAYERS_INDEX)
+                BootArchiveExpectation(
+                    LAUNCHER,
+                    START_CLASS,
+                    CLASSES_ROOT,
+                    "BOOT-INF/lib",
+                    CLASSPATH_INDEX,
+                    LAYERS_INDEX,
+                )
             }
 
         assertTrue(failure.message!!.contains("'/' 로 끝나야"), "${failure.message}")
@@ -391,8 +398,9 @@ class BootArchivePolicyTest {
                 .asSequence()
                 .drop(start + 1)
                 .takeWhile { it.trim() != ")" }
-                .mapNotNull { line -> line.trim().removeSuffix(",").takeIf { it.startsWith("\"") && it.endsWith("\"") } }
-                .map { it.removeSurrounding("\"") }
+                .mapNotNull { line ->
+                    line.trim().removeSuffix(",").takeIf { it.startsWith("\"") && it.endsWith("\"") }
+                }.map { it.removeSurrounding("\"") }
                 .toList()
         }
     }

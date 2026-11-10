@@ -308,7 +308,10 @@ class NestedArchivePolicyTest {
         @TempDir dir: File,
     ) {
         // 위 함의는 **아무것도 열리지 않으면** 저절로 성립한다. 표본이 그렇게 되지 않았음을 따로 센다.
-        val opened = SUFFIX_PADS.filter { opensAsZip(dir.resolve("p-$it.jar").apply { writeBytes(ArchiveFixtures.suffixedZipBytes(it)) }) }
+        val opened =
+            SUFFIX_PADS.filter {
+                opensAsZip(dir.resolve("p-$it.jar").apply { writeBytes(ArchiveFixtures.suffixedZipBytes(it)) })
+            }
 
         assertTrue(opened.isNotEmpty(), "여는 판이 없으면 함의가 공허하다: $opened")
         assertTrue(opened.size < SUFFIX_PADS.size, "전부 열리면 창 밖을 재지 못한 표본이다: $opened")
@@ -412,7 +415,8 @@ class NestedArchivePolicyTest {
     ) = ArchiveFixtures.write(target, attributes = emptyMap(), entries = entries.toMap())
 
     /** 로더가 실제로 여는가 — 게이트 술어가 아니라 **읽는 쪽**에 묻는다. */
-    private fun opensAsZip(file: File): Boolean = runCatching { JarFile(file).use { it.entries().hasMoreElements() } }.isSuccess
+    private fun opensAsZip(file: File): Boolean =
+        runCatching { JarFile(file).use { it.entries().hasMoreElements() } }.isSuccess
 
     private companion object {
         const val EXEMPT = "spring-boot-jarmode-tools-4.1.1.jar"
