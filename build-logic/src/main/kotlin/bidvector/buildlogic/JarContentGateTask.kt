@@ -83,18 +83,22 @@ abstract class JarContentGateTask : DefaultTask() {
         val archiveFiles = archives.files.filter(File::isFile)
         val entries = archiveFiles.flatMap(::classEntries)
 
+        // 적재 자리 둘(`BOOT-INF/classes/`·`BOOT-INF/lib/`)은 **여기서 한 번만 읽는다**(리뷰 r5 M-3).
+        // 앞 판은 같은 키를 목록(`requireList`)이자 단일값(`requireSingle`)으로 읽어, 뿌리를 하나 더
+        // 더하면 한 자리는 받아들이고 다른 자리는 `error()` 를 냈다 — 「이 키는 몇 개인가」의 답이 읽는
+        // 자리마다 달랐다. 자리가 하나인 것은 배포물의 성질이므로 엄밀한 쪽으로 접는다.
+        val expectation = bootArchiveExpectation(values)
         val policy =
             JarContentPolicy(
                 owned,
                 verifiedSourceNames(verifiedSources.files),
-                classRoots = values.requireList(CLASS_ROOTS),
+                classRoots = listOf(expectation.classesLocation),
                 externalClassRoots = values.requireList(EXTERNAL_CLASS_ROOTS),
             )
         val verdict = policy.judge(entries, verified)
         val runtimeJarNames = runtimeClasspath.files.map(File::getName).toSet()
-        val expectation = bootArchiveExpectation(values)
         val read = archiveFiles.map { readNestedArchive(it, expectation.indexLocations) }
-        val nested = nestedVerdict(module, values, read, runtimeJarNames)
+        val nested = nestedVerdict(module, values, expectation.libLocation, read, runtimeJarNames)
         val deployment =
             BootArchivePolicy(
                 expectation,
@@ -169,15 +173,18 @@ abstract class JarContentGateTask : DefaultTask() {
      * 기준 집합은 **해석된 runtime classpath 의 파일 이름 전수**다. 확장자를 묻지 않는 것이 판정 쪽과
      * 대칭이다(리뷰 LOW-1) — 선언된 의존에 `.jar` 아닌 파일이 있고 Boot 가 그것을 뿌리에 넣으면,
      * 묻는 쪽만 확장자를 보면 **선언된 것이 위반으로** 지목된다.
+     *
+     * 뿌리는 [libRoot] 로 **받는다** — 이 자리가 정책을 다시 읽으면 같은 키의 답이 둘이 된다(리뷰 r5 M-3).
      */
     private fun nestedVerdict(
         module: String,
         values: Map<String, String>,
+        libRoot: String,
         archives: List<NestedArchive>,
         runtimeJarNames: Set<String>,
     ): NestedArchiveVerdict =
         NestedArchivePolicy(
-            roots = values.requireNonEmptyList(NESTED_LIB_ROOTS),
+            roots = listOf(libRoot),
             runtimeJarNames = runtimeJarNames,
             exemptNames = values.requireList(EXTERNAL_NESTED_JARS),
         ).judge(module, archives)
@@ -186,6 +193,9 @@ abstract class JarContentGateTask : DefaultTask() {
      * 배포 경로가 읽는 자리의 기대 값([BootArchivePolicy]). 적재 자리 둘은 **다른 키를 복사하지 않고**
      * 중첩 축·클래스 뿌리 목록에서 가져온다 — 같은 값을 두 자리에 적으면 그 둘이 갈라지는 날 게이트가
      * 자기 전제를 잃는다. 목록이 둘 이상이면 어느 쪽이 배포 자리인지가 정해지지 않으므로 거부한다.
+     *
+     * **그 두 키를 읽는 자리는 여기 하나뿐이다**(리뷰 r5 M-3) — 중첩 축과 class 축은 여기서 나온 값을
+     * 받아 쓴다. 읽는 자리가 둘이면 엄밀함도 둘이 되어, 뿌리를 더한 날 한쪽만 거부한다.
      */
     private fun bootArchiveExpectation(values: Map<String, String>): BootArchiveExpectation =
         BootArchiveExpectation(

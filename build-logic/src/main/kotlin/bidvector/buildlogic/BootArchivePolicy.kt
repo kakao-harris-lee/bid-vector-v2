@@ -37,6 +37,16 @@ internal class BootArchiveExpectation(
     val classpathIndex: String,
     val layersIndex: String,
 ) {
+    init {
+        // **적재 자리 둘은 디렉터리 접두다**(리뷰 r5 LOW). 끝의 `/` 가 빠지면 접두 비교가 이웃 이름까지
+        // 집어, `BOOT-INF/lib` 아래에서 `BOOT-INF/libextra.jar` 가 뿌리 바로 밑 엔트리로 세어진다 —
+        // 모집단을 소리 없이 바꾸는 오타라 값을 읽는 자리에서 거부한다.
+        listOf(CLASSES_LOCATION_ATTRIBUTE to classesLocation, LIB_LOCATION_ATTRIBUTE to libLocation)
+            .forEach { (name, value) ->
+                require(value.endsWith("/")) { "'$name' 의 적재 자리 '$value' 는 '/' 로 끝나야 한다 — 디렉터리 접두다" }
+            }
+    }
+
     val attributes: Map<String, String> =
         linkedMapOf(
             MAIN_CLASS_ATTRIBUTE to launcherMainClass,
