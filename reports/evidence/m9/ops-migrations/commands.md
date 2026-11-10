@@ -1,6 +1,6 @@
 # M9 / ops-migrations — 명령과 결과
 
-마지막 산출물 커밋 **`6199b39f`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 1**(라운드 6 이 main `56bd33ea` = paper-bid V25 를 합쳤다 — rollback 복원 원천도 그 SHA 이고, 그 구간에서 센 값이다. 착수 base 부터 세면 21 이고 20 은 main 자신의 PR 병합이다).
+마지막 산출물 커밋 **`eac93b15`** — **판정 SHA 는 이 파일이 적지 않는다**(동결 보고가 갖는다. evidence 커밋은 늘 실측 뒤에 오므로 여기 적으면 자리표가 남거나 매 라운드 틀린다) · 착수 base `df4976cc` · **내 병합 넷** — main `56bd33ea`(라운드 6, paper-bid V25) · `3101035f`(라운드 9) · `70406318`(라운드 10, award-ingest) · `07140729`(라운드 10, ml-lifecycle). **rollback 복원 원천은 마지막으로 합친 `07140729`** 이고 아래 계수는 그 구간에서 센 값이다(착수 base 부터 세면 병합이 **51** 이고, 그 가운데 이 브랜치가 만든 것은 **넷**이다 — 나머지는 main 자신의 PR 병합 열둘과 그것들이 데려온 다른 레인의 병합이다).
 
 ## 로컬 실행 (공통 규율: 표적 `--tests` + 그 모듈 lint·detekt 만)
 
@@ -66,8 +66,10 @@
    `MlAnalysisPort` 가 `UnavailableMlAnalysis` 고정이라 분류가 출하에서 **0 회** 돈다 — e2e 조립만
    쓰는 표를 스키마에 남기지 않는다. 받는 자리는 `OPEN-ML-ANALYSIS-WIRING` 이고 capability map
    DEC-08 행이 그 포인터와 근거를 적는다. 커널의 판정 봉투는 M1/1D 그대로 남아 있다.
-2. **적용 DB 되돌림 리허설을 로컬에서 돌리지 못했다**(container 금지 규율). 미적용 갈래는 실측했고
-   적용 갈래는 `rollback.md` §2 가 forward-fix 의 모양을 적는다 — 그 실행 실측은 verifier·CI 몫이다.
+2. **적용 DB 되돌림 리허설은 라운드 3 에서 한 번 돌았다**(팀장 허용 1회, 버릴 clone·버릴 클러스터) —
+   `rollback.md` §5 가 그 실측이고, 그 뒤 다시 돌리지 않은 근거(병합들이 들여온 겹치는 객체 0)도 같은
+   절에 있다. **앞 판의 「로컬에서 돌리지 못했다」는 라운드 1·2 의 사실이고 지금은 낡았다**(라운드 10
+   정정) — 미적용 갈래는 매 라운드 실측한다.
 3. **릴리스 라벨과 빌드의 동일성은 여전히 보장되지 않는다**(`OPEN-6G-RELEASE-SHA-LABEL`). 이 slice 가
    닫은 것은 「값이 없거나 지어낸 값」이고, 「운영자가 댄 값이 그 jar 인가」는 배포 절차의 몫이다.
 4. **outbox 의 시도 계수·시간 기반 janitor 는 만들지 않았다**(계약이 등재만 하라고 적는다).
@@ -88,6 +90,11 @@
 8. **`tools/db-rehearsal.sh` 의 주석 한 줄이 이 변경으로 낡았다**(v r7 L-3). 「`PersistenceWiring.migrate()`
    와 같은 설정(전부 기본값)」이 더는 사실이 아니다(리허설 Flyway 에 `initSql` 없음). **in_scope 밖이라
    고치지 않았다** — 격리 컨테이너라 거동 차이는 관측되지 않고, 문면만 고치는 후속으로 둔다.
+9. **CI `container` job 을 통째로 재현하지는 않았다**(라운드 10). 로컬에서 되살린 것은 그 job 이
+   붉었던 **술어 하나** — `tools/db-backup.sh` 의 덤프 왕복 등식 — 이고, 측정 전에 그 질의가 저장소의
+   것과 같은 문면임을 대조했다. 이미지 빌드 넷·위생/취약점 게이트·compose 스모크·`RealServerIntegrationTest`
+   는 돌리지 않았다. 그 자리들은 CI 몫이고, **이 slice 가 그것들을 붉게 할 이유는 관측되지 않았다**
+   (마이그레이션 둘과 릴리스 인자 외에 이미지·compose 표면을 건드린 것은 `scope.md` 가 승인한 다섯뿐).
 
 ## in_scope 밖으로 나간 파일 — 전수 열거
 
@@ -405,3 +412,89 @@ census 는 **관례 lint 로 격하**했다 — 「파일도 관례대로 선언
 단언은 하중 전제 **둘**을 잡는다 — ㉠ 다음 파일에 선언 0 건(`--` 주석 걷은 본문) ㉡ 그 파일의
 `ALTER TABLE` 대상이 **준비가 끝난 DB 에 이미 있다**(`to_regclass`). 다음 파일의 이름은 Flyway 의
 `info()` 가 고르므로 이름 규칙을 test 가 다시 적지 않는다.
+
+## 라운드 10 — V26 를 덤프 왕복 고정점으로 (CI `container` 붉음) + main `07140729` 병합
+
+### 원인 한 문장
+
+`(state, terminal_reason) IN ((…), …)` 는 **진리표가 같아도 문면이 왕복에서 변한다** — 파서가 그
+문법을 왼쪽으로 깊게 중첩된 OR 트리로 저장하고 `pg_get_constraintdef` 가 그 중첩을 그대로 찍는데,
+덤프 텍스트를 **다시 읽을 때** 파서는 같은 OR 사슬을 평평하게 접는다. `tools/db-rehearsal.sh` 의
+복원 등식 `constraints` 가 그 한 줄로 붉어졌다(제약은 그대로이고 **문면만** 다르다). 처방은 같은
+쌍을 처음부터 평평한 OR 로 적어 **자기 렌더링의 고정점**으로 만드는 것이다.
+
+### 재현 — 리허설의 **술어 그대로**, 이미지 빌드 없이
+
+버릴 postgres:16.4 컨테이너에 마이그레이션 전수를 적용하고 `pg_dump --format=custom` → `pg_restore`
+한 뒤 세 지문을 견준다. 질의는 `tools/db-backup.sh` 의 `Q_CONSTRAINTS`·`Q_TRIGGERS`·`Q_FUNCTIONS`
+**와 같은 문면**이고, 측정 전에 그 사실을 저장소에서 대조했다(두 술어 모두 일치). 역할
+`bidvector_app` 은 마이그레이션 자신이 만들므로(V2) 미리 만들지 않고, 역할이 클러스터 전역이라
+왕복마다 컨테이너를 새로 띄운다.
+
+| 축 | 모집단 | 결과 |
+| --- | --- | --- |
+| ① 왕복 불변 — HEAD(평평한 OR) | 마이그레이션 **25** 적용 · 제약 **258** · 트리거 **31** | `constraints`·`triggers`·`functions` **전부 EQUAL** |
+| ② 변이 — V26 의 CHECK 를 **옛 행 값 비교로 바꿔치운다** | 같은 모집단(적재 25 개 **완주**) | `constraints` **DIFF**, 키는 `outbox.outbox_terminal_reason_state_check` **하나**. `triggers`·`functions` 는 EQUAL |
+| ③ 진리표 동치 — 새 식 ↔ 옛 식 | state **6**(어휘 다섯 + 어휘 밖 하나) × terminal_reason **9**(일곱 + 어휘 밖 하나 + NULL) = **54** | 판정 동일 **54** · **어긋남 0** · 수용 **13 = 13** |
+| ③′ 양성 대조 | 위에서 **식 하나를 뺀 판**을 같은 전수에 건다 | 어긋남 **1** — 전수가 실제로 차이를 집는다 |
+| ④ 실 제약의 거동 | 롤백하는 INSERT **여섯**(짝 맞음 둘 · 어휘 내 짝 어긋남 · 어휘 밖 · 종단 아닌 상태 · 사유 NULL) | 여섯 **전부 기대와 같다** |
+
+②가 「적재가 깨졌다」가 아니라 「등식이 깨졌다」임을 하네스가 구별한다 — 적재 실패와 DIFF 의
+종료 코드를 가르고, 변이판도 25 개를 끝까지 적용한 뒤에야 등식을 잰다. 하네스를 고치며 **같은
+함정을 두 번 밟았다**: 첫 판은 역할을 미리 만들어 V2 가 「이미 있다」로 멈췄는데 변이 쪽이 그
+실패를 「음성 대조 성립」으로 읽었고, 다음 판은 `docker exec -i` 가 heredoc 을 삼켜 ④의 여섯 중
+하나만 돌고 초록이 났다. 둘 다 **측정이 조용히 줄어든** 자리다.
+
+### 그 축이 다시 열릴 자리 — 전수와 구조
+
+| 질문 | 실측 |
+| --- | --- |
+| 다른 마이그레이션에 같은 모양(행 값 비교)이 남아 있는가 | 본문 **0 건**(주석의 설명 문장만 남는다) |
+| 그 성질을 무엇이 지키는가 | `CheckConstraintRenderingFixpointTest` — 스키마의 **CHECK 전수**를 탐침으로 다시 세워 렌더링이 자기 고정점인지 본다. grep 이 아니라 **카탈로그**가 모집단이라 새 문법에도 선다 |
+| 그 test 가 게이트 등록부에 있는가 | **있다 — 만든 커밋(`4cda0103`)이 `config/quality/gate-tests.properties` 를 같이 고쳤다**(배선 클래스가 아니라 tier 등재는 해당 없음) |
+| V26·V27 이 main 에 있는가 | **없다** — `git cat-file -e origin/main:<두 경로>` 둘 다 실패하고 main 의 최고 버전은 V25 다 |
+
+### 병합 `07140729`(PR #139 ml-lifecycle)
+
+마이그레이션 **0 개**를 들여온다(`git diff --name-status 3101035f..07140729 -- <migration dir>` 빈
+출력) — rollback §5 의 「겹치는 객체 0」 근거가 그대로 선다. 겹치는 경로는 **27** 이고, 병합이 깬
+둘을 `40e30cfb` 가 고쳤다: ⓐ `AwardCollectionWiringTest` 의 수동 조립이 새로 주입되는 릴리스 빈
+없이 기동 실패 ⓑ 두 레인의 면제 KDoc 합집합이 파일 크기 한도를 넘김(519 → 452, 지운 것은 지나간
+계수 이력뿐이고 근거는 레인별로 남겼다).
+
+### 결과 — 판정 대상 트리에서 전건
+
+CI `check` job 의 명령을 **그대로**, 마지막 산출물 커밋 `eac93b15`(clean tree)에서 돌렸다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `./gradlew --no-daemon check` | exit **0** · `BUILD SUCCESSFUL in 32m 25s` · 392 actionable(**42 실행** · 350 up-to-date) |
+| `./gradlew --no-daemon qualityBaseline` | exit **0** |
+| `./gradlew --no-daemon leakPatternGate --rerun` | exit **0** — `--rerun` 이라 **cache 적중이 아니다**(1 실행) |
+| `./gradlew --no-daemon :adapters:test --rerun` | exit **0** · 4m 12s · **1 실행** — 아래 「up-to-date 를 믿지 않은 자리」 |
+
+| 모듈 | 클래스 | tests | 실패 | 오류 | skip |
+| --- | --- | --- | --- | --- | --- |
+| `:adapters` | 204 | 1397 | 0 | 0 | 4 |
+| `:app` | 131 | 1076 | 0 | 0 | 0 |
+| `:workflow` | — | 746 | 0 | 0 | 0 |
+| 도메인 여섯(`decision`·`procurement`·`strategy`·`settlement`·`qualification`·`bidding`) | — | 785 | 0 | 0 | 0 |
+| **합** | | **4004** | **0** | **0** | **4** |
+
+#### up-to-date 를 믿지 않은 자리
+
+전건 `check` 는 392 중 **350 을 up-to-date 로 건너뛰었다** — 앞 레인이 같은 SHA 에서 돌리다 세션과
+함께 끊긴 실행의 결과가 남아 있었기 때문이다. CI 는 빈 러너에서 시작하므로 **그 재사용은 CI 와
+같은 측정이 아니다**. 그래서 두 가지를 했다.
+
+1. **모듈마다 「그 결과가 난 뒤 그 모듈이 불변인가」를 대조했다** — `:adapters:test` 의 결과는
+   `ff918882`(award-ingest 병합) 직후의 것이고, `git diff --name-status ff918882..HEAD -- adapters/`
+   가 **빈 출력**이다(그 뒤 움직인 것은 ml-engine 45 · app 2 · docs · reports 뿐).
+2. 그래도 **이 slice 의 핵심 test 가 전부 `:adapters:test` 에 있으므로** 그 과제만 `--rerun` 으로
+   **강제 실행**했다. 결과 XML 전부가 그 실행 시각으로 다시 쓰였고(204 클래스), 핵심 넷이 그 안에
+   있다: `CheckConstraintRenderingFixpointTest` 1 · `CleanMigrationCheckTest` 11 ·
+   `MigrationLockTimeoutTest` 4 · `ExecutionRowReleaseTest` 9 · `OutboxTransitionSqlTest` 15, 실패 0.
+   `MigrationLockBoundTest`(1)는 `:app` 에 있고 전건 `check` 의 `:app:test` 에서 **실행**됐다.
+
+evidence 편집은 위 측정이 **전부 끝난 뒤** 시작했다. 편집 대상은 이 디렉터리의 `.md` 둘뿐이고 어느
+Gradle 과제의 입력도 아니다.
