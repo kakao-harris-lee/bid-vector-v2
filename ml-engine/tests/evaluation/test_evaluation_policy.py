@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -13,19 +14,37 @@ from ml_engine.evaluation.policy import (
     SHIPPED_EVALUATION_POLICY_VERSION,
     EvaluationPolicy,
     PolicyRejected,
+    PolicySource,
+    _ParsedPolicyFile,
     load_evaluation_policy,
     policy_checksum,
 )
+
+_TEST_SOURCE = PolicySource(
+    path=Path("/does-not-exist/evaluation-v1.yaml"), digest="f" * 64
+)
+"""직접 생성 test 전용 출처 — 이 파일의 세 test 는 **로더가 거부하는 값**으로 `__post_init__`
+불변식을 재므로 파일을 거칠 수 없다(로더를 거치면 그 값에 도달하지 못한다). 출처 재검증은
+제품 경로(`app.pipeline`)에만 있어 이 객체들은 그 겹과 무관하다."""
+
+
+def _token() -> _ParsedPolicyFile:
+    """모듈 private 생성 토큰 — `_TEST_SOURCE` 와 지문이 같아야 `__post_init__` 을 지난다."""
+    return _ParsedPolicyFile(digest=_TEST_SOURCE.digest)
+
 
 _SHIPPED_YAML = Path(__file__).resolve().parents[2] / "policy" / "evaluation-v1.yaml"
 
 
 def test_shipped_policy_file_matches_policy_values_md() -> None:
     """policy-values.md §1 의 값을 이 test 에 하드코딩해 실제 YAML 과 대조한다(5A/5B/5C-1
-    과 같은 관행 — 문서를 파싱하지 않는다)."""
+    과 같은 관행 — 문서를 파싱하지 않는다). **열둘**이다 — `effective_date` 가 M9/ml-lifecycle
+    에서 그 표에 등재됐다(cr M-4: 앞 라운드는 YAML·test 만 고쳐 「문서와 일치」라는 이름의
+    test 가 그 문서에 없는 값을 단언했다)."""
     result = load_evaluation_policy(_SHIPPED_YAML)
     assert isinstance(result, EvaluationPolicy)
     assert result.version == SHIPPED_EVALUATION_POLICY_VERSION
+    assert result.effective_date == date(2026, 9, 16)
     assert result.paired_t_threshold == 2.58
     assert result.gate_baseline == "category_x_band"
     assert result.gate_model == "gbm_all_strata"
@@ -48,7 +67,10 @@ def test_policy_checksum_is_deterministic_and_changes_with_value() -> None:
     assert len(first) == 64
 
     mutated = EvaluationPolicy(
+        parsed=_token(),
+        source=_TEST_SOURCE,
         version=result.version,
+        effective_date=result.effective_date,
         paired_t_threshold=1.0,
         gate_baseline=result.gate_baseline,
         gate_model=result.gate_model,
@@ -85,6 +107,7 @@ def _valid_values() -> dict[str, object]:
     `stability_seeds` 는 출하 다섯 그대로다(D-6G2e-6b·10 — 로더가 개수를 요구한다)."""
     return {
         "version": "evaluation-v1",
+        "effective_date": "2026-09-16",
         "paired_t_threshold": 2.58,
         "gate_baseline": "category_x_band",
         "gate_model": "gbm_all_strata",
@@ -259,7 +282,10 @@ def test_policy_checksum_never_raises_because_non_finite_cannot_be_constructed()
     확인한다(로더 경유 없이도 비유한 값은 생성 자체가 막힌다)."""
     with pytest.raises(ValueError):
         EvaluationPolicy(
+            parsed=_token(),
+            source=_TEST_SOURCE,
             version="x",
+            effective_date=date(2026, 9, 16),
             paired_t_threshold=float("nan"),
             gate_baseline="category_x_band",
             gate_model="gbm_all_strata",
@@ -278,7 +304,10 @@ def test_evaluation_policy_direct_construction_enforces_invariants() -> None:
     """직접 생성도 방어선 — Python 가시성 한계는 여전하나 명백한 위반은 막는다."""
     with pytest.raises(ValueError):
         EvaluationPolicy(
+            parsed=_token(),
+            source=_TEST_SOURCE,
             version="x",
+            effective_date=date(2026, 9, 16),
             paired_t_threshold=0.0,
             gate_baseline="category_x_band",
             gate_model="gbm_all_strata",
@@ -300,3 +329,50 @@ def test_no_cli_or_env_seam_for_thresholds() -> None:
 
     signature = inspect.signature(load_evaluation_policy)
     assert list(signature.parameters) == ["path"]
+
+
+def test_load_evaluation_policy_rejects_missing_effective_date(tmp_path: Path) -> None:
+    """ML-07 acceptance ③ — effective date 는 선택 칸이 아니다. 없으면 「언제부터의
+    규칙인가」가 미공시인 정책이므로 조용히 통과하지 않는다."""
+    path = tmp_path / "policy.yaml"
+    _write_full_policy(path, dropped="effective_date")
+    assert isinstance(load_evaluation_policy(path), PolicyRejected)
+
+
+@pytest.mark.parametrize(
+    "override_line",
+    [
+        # 비인용 ISO 날짜 — `yaml.safe_load` 가 `datetime.date` 객체로 읽는다(문자열이
+        # 아니다). `PolicyScalar` 축 밖의 값이 조용히 들어오는 자리라 거부해야 한다.
+        "effective_date: 2026-09-16",
+        "effective_date: '2026-13-99'",
+        "effective_date: 'yesterday'",
+        "effective_date: ''",
+        "effective_date: 20260916",
+    ],
+)
+def test_load_evaluation_policy_rejects_non_iso_effective_date(
+    tmp_path: Path, override_line: str
+) -> None:
+    values = _valid_values()
+    del values["effective_date"]
+    lines = [f"{key}: {value!r}" for key, value in values.items()]
+    lines.append(override_line)
+    path = tmp_path / "policy.yaml"
+    path.write_text("\n".join(lines) + "\n")
+    assert isinstance(load_evaluation_policy(path), PolicyRejected), override_line
+
+
+def test_policy_checksum_changes_with_effective_date(tmp_path: Path) -> None:
+    """effective date 가 **wire 에 닿는다** — report checksum 의 입력인 정책 checksum 이
+    그 칸을 포함한다(같은 임계·다른 효력 시작은 같은 값이 아니다)."""
+    first = tmp_path / "first.yaml"
+    second = tmp_path / "second.yaml"
+    _write_full_policy(first)
+    _write_full_policy(second, effective_date="2026-09-17")
+    loaded_first = load_evaluation_policy(first)
+    loaded_second = load_evaluation_policy(second)
+    assert isinstance(loaded_first, EvaluationPolicy)
+    assert isinstance(loaded_second, EvaluationPolicy)
+    assert loaded_first.effective_date != loaded_second.effective_date
+    assert policy_checksum(loaded_first) != policy_checksum(loaded_second)

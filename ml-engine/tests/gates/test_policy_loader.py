@@ -43,7 +43,7 @@ def test_known_key_accepted(tmp_path: Path) -> None:
 
 
 def test_policy_is_frozen() -> None:
-    policy = Policy(version="v1", values={})
+    policy = Policy(version="v1", values={}, digest="0" * 64)
     with pytest.raises(dataclasses.FrozenInstanceError):
         policy.version = "v2"
 

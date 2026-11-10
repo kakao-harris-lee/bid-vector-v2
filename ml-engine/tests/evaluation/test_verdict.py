@@ -6,7 +6,6 @@ from __future__ import annotations
 import numpy as np
 
 from ml_engine.evaluation.diagnostics import StabilitySummary
-from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.evaluation.verdict import (
     Failed,
     NotEvaluable,
@@ -16,9 +15,9 @@ from ml_engine.evaluation.verdict import (
     gate_outcome,
     passes_gate,
 )
+from tests.policy_fixture import kernel_policy
 
-_POLICY = EvaluationPolicy(
-    version="test",
+_POLICY = kernel_policy(
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",

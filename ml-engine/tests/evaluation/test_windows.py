@@ -9,7 +9,6 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.evaluation.windows import (
     InvalidMaturityInput,
     WeekMaturity,
@@ -18,9 +17,9 @@ from ml_engine.evaluation.windows import (
     indices_in_window,
     plan_evaluation_windows,
 )
+from tests.policy_fixture import kernel_policy
 
-_POLICY = EvaluationPolicy(
-    version="test",
+_POLICY = kernel_policy(
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",
@@ -140,8 +139,7 @@ def test_plan_evaluation_windows_earliest_reason_wins() -> None:
 
 
 def test_plan_evaluation_windows_beyond_max_origins_drops_oldest() -> None:
-    policy = EvaluationPolicy(
-        version="test",
+    policy = kernel_policy(
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",
@@ -241,8 +239,7 @@ def test_plan_evaluation_windows_uses_policy_min_evaluation_rows_not_literal() -
     """H-2 변이 #5 재현 — 기존 test 는 전부 `min_evaluation_rows=2`인
     `_POLICY`를 썼기 때문에 하한을 리터럴 `2`로 바꿔도 잡히지 않았다. 정책 값이
     2 가 아닐 때도 그 값이 실제로 쓰이는지 확인한다."""
-    stricter_policy = EvaluationPolicy(
-        version="test",
+    stricter_policy = kernel_policy(
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",

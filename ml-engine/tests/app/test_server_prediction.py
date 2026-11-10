@@ -20,7 +20,6 @@ from pathlib import Path
 
 import grpc
 import pytest
-import yaml
 
 from ml_engine.app.server import (
     ServerConfig,
@@ -52,10 +51,6 @@ _TESTDATA_REQUEST = (
     / "calculate_optimal_bid_request.binpb"
 )
 
-# `_policy_support.py`(tests/inference)와 같은 placeholder — `OPEN-5D2-POLICY-VALUES`
-# 값 결정이 아니다. tests/app 은 tests/inference 의 비공개 helper 를 import 하지 않는다
-# (디렉터리 경계를 넘지 않는다는 관례, tests/serving/test_kotlin_rules_parity.py 와 동일).
-_AGENCY_SAMPLE_THRESHOLD_PLACEHOLDER = 1
 # testdata 의 유일한 완비 competition_sample(예비가격 추첨 관측 포함)을 복제해
 # `reserve.min_reserve_records: 8`을 채운다 — 값을 새로 짓지 않는다(같은 authoritative
 # 표본의 반복, test_kotlin_rules_parity.py 와 같은 근거).
@@ -63,15 +58,19 @@ _MIN_RESERVE_RECORDS_FOR_SUCCESS = 10
 
 
 def _completed_case_inference_policy_path(tmp_path: Path) -> Path:
-    raw_values = dict(
-        yaml.safe_load(_SHIPPED_INFERENCE_POLICY.read_text(encoding="utf-8"))
-    )
-    raw_values.setdefault(
-        "assessment.agency_sample_threshold", _AGENCY_SAMPLE_THRESHOLD_PLACEHOLDER
-    )
-    path = tmp_path / "inference-v1-completed-case.yaml"
-    path.write_text(yaml.safe_dump(raw_values), encoding="utf-8")
-    return path
+    """출하 정책 **경로 그대로**(v r3 H-3b).
+
+    앞 판은 출하 값을 읽어 `assessment.agency_sample_threshold` placeholder 를
+    `setdefault` 로 얹고 `yaml.safe_dump` 로 다시 썼다. 그 `setdefault` 는 **5F-1 이후
+    무동작**이다(출하 파일이 그 키를 값 10 으로 선언한다) — 즉 그 사본은 **같은 값의 다른
+    서식**이었다. 조립 근이 승인 지문을 묻게 된 뒤 그 사본은 미승인으로 떨어지고, 이
+    파일의 N-2 test 는 「정책 넷 중 **하나만** 깨졌다」를 단언하므로 둘이 깨져 붉어졌다.
+
+    출하 경로를 그대로 쓰면 값이 **바뀌지 않고**(placeholder 가 무동작이었으므로) 승인
+    지문도 맞는다. `tmp_path` 는 더 쓰지 않지만 호출부 둘의 모양을 바꾸지 않기 위해
+    시그니처는 유지한다."""
+    del tmp_path
+    return _SHIPPED_INFERENCE_POLICY
 
 
 def _config(*, inference_policy_path: Path, artifact_out_dir: Path) -> ServerConfig:

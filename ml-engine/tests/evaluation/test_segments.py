@@ -6,16 +6,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.evaluation.segments import (
     regressed_segments,
     segment_scores,
     segment_specs,
 )
 from ml_engine.features import FeatureFacts, Present
+from tests.policy_fixture import kernel_policy
 
-_POLICY = EvaluationPolicy(
-    version="test",
+_POLICY = kernel_policy(
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",
@@ -45,8 +44,7 @@ def test_segment_specs_has_two_axes_from_policy() -> None:
 
 
 def test_segment_specs_only_declares_axes_present_in_policy() -> None:
-    single_axis_policy = EvaluationPolicy(
-        version="test",
+    single_axis_policy = kernel_policy(
         paired_t_threshold=2.58,
         gate_baseline="category_x_band",
         gate_model="gbm_all_strata",

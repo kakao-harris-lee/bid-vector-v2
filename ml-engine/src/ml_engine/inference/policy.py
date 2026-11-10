@@ -32,7 +32,9 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ml_engine.inference.rounding import quantize_bid_rate
+from ml_engine.inference.time_axis import TimeAxisPolicy, TimeAxisSubstitute
 from ml_engine.registry.policy import Policy, PolicyError, PolicyScalar, load_policy
+from ml_engine.registry.policy_approvals import policy_approval
 
 SHIPPED_INFERENCE_POLICY_VERSION = "inference-v1"
 
@@ -63,6 +65,7 @@ _KNOWN_KEYS: frozenset[str] = frozenset(
         "bid_ratio.plausible_max",
         "gbm.min_category_rows",
         "maturity.window_days",
+        "maturity.time_axis_substitute",
     }
 )
 
@@ -115,12 +118,32 @@ class InferencePolicy:
     bid_ratio_plausible_max: Decimal
     gbm_min_category_rows: int
     maturity_window_days: int
+    maturity_time_axis_substitute: TimeAxisSubstitute
+    """`OPEN-SET-10` — 개찰 시각 결측 시 마감 시각 대체를 승인된 정책으로 채택할 것인가
+    (M9/ml-lifecycle, SET-06). 미결이므로 출하값은 `NOT_APPROVED` 이고, 승인되면 **정책
+    파일의 이 한 칸**이 바뀐다 — 코드에는 승인 목록이 없다. 값이 bool 이 아니라 닫힌 어휘인
+    이유는 `TimeAxisSubstitute` docstring(YAML 1.1 참값 표기)."""
 
 
 def _to_decimal(value: PolicyScalar) -> Decimal:
     if isinstance(value, bool):
         raise TypeError(f"bool 은 decimal 정책 값이 될 수 없다: {value!r}")
     return Decimal(str(value))
+
+
+def _to_time_axis_substitute(value: PolicyScalar) -> TimeAxisSubstitute:
+    """닫힌 어휘 두 값만 받는다 — YAML 의 어떤 참값 표기(`true`·`yes`·`on`·`1`)도 승인이
+    되지 않는다(v L-2). `bool` 은 먼저 거부한다: `str(True)` 가 `"True"` 라 어휘 대조 전에
+    문자열로 접히는 길을 막는다."""
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise TypeError(f"시간축 대체 승인 값은 닫힌 어휘 문자열이어야 한다: {value!r}")
+    try:
+        return TimeAxisSubstitute(value)
+    except ValueError as exc:
+        raise TypeError(
+            f"시간축 대체 승인 값이 닫힌 어휘 밖이다: {value!r} "
+            f"(허용: {[item.value for item in TimeAxisSubstitute]})"
+        ) from exc
 
 
 def _to_int(value: PolicyScalar) -> int:
@@ -193,6 +216,9 @@ def _coerce_values(
             bid_ratio_plausible_max=_to_decimal(values["bid_ratio.plausible_max"]),
             gbm_min_category_rows=_to_int(values["gbm.min_category_rows"]),
             maturity_window_days=_to_int(values["maturity.window_days"]),
+            maturity_time_axis_substitute=_to_time_axis_substitute(
+                values["maturity.time_axis_substitute"]
+            ),
         )
     except (TypeError, ValueError, InvalidOperation, KeyError) as exc:
         return PolicyRejected(f"정책 값 타입 오류: {exc}")
@@ -276,16 +302,16 @@ def _validate_invariants(raw: InferencePolicy) -> str | None:
     return _validate_bands(raw) or _validate_thresholds(raw)
 
 
-def load_inference_policy(path: Path) -> InferencePolicy | PolicyRejected:
-    """`path`의 YAML 을 `InferencePolicy`로 검증한다 — 미지 키·타입 오류·값 불변식
-    위반은 전부 `PolicyRejected`(예외로 새지 않는다)."""
+def _read_policy_file(path: Path) -> Policy | PolicyRejected:
     try:
-        policy: Policy = load_policy(path, known_keys=_KNOWN_KEYS)
+        return load_policy(path, known_keys=_KNOWN_KEYS)
     except PolicyError as exc:
         return PolicyRejected(str(exc))
     except OSError as exc:
         return PolicyRejected(f"정책 파일을 읽을 수 없다: {exc}")
 
+
+def _inference_policy_of(policy: Policy) -> InferencePolicy | PolicyRejected:
     missing = _KNOWN_KEYS - set(policy.values)
     if missing:
         return PolicyRejected(f"정책 키 누락: {sorted(missing)}")
@@ -299,3 +325,51 @@ def load_inference_policy(path: Path) -> InferencePolicy | PolicyRejected:
         return PolicyRejected(invariant_violation)
 
     return dataclasses.replace(coerced, version=policy.version)
+
+
+def load_inference_policy(path: Path) -> InferencePolicy | PolicyRejected:
+    """`path`의 YAML 을 `InferencePolicy`로 검증한다 — 미지 키·타입 오류·값 불변식
+    위반은 전부 `PolicyRejected`(예외로 새지 않는다).
+
+    **승인은 여기서 묻지 않는다** — 값 불변식 test 들이 승인 밖 조합(파생 사본)으로 이
+    로더를 계속 검사해야 한다. 조립 근은 아래 `load_approved_inference_policy` 를 쓴다."""
+    policy = _read_policy_file(path)
+    if isinstance(policy, PolicyRejected):
+        return policy
+    return _inference_policy_of(policy)
+
+
+def load_approved_inference_policy(path: Path) -> InferencePolicy | PolicyRejected:
+    """**조립 근이 쓰는 로더**(v r3 H-3b = cr r3 H-1) — 승인 등록부에 있는 산출물만 받는다.
+
+    앞 판은 `inference-v1` 을 등록부에 올려 두고도 **런타임에 그 등록부를 묻는 자리가
+    없었다**. 그래서 `ML_ENGINE_INFERENCE_POLICY` 를 편집 사본으로 돌리면 코드 변경 0 으로
+    부팅이 통과했다(verifier 실측). 그 사본이 바꿀 수 있는 것에는 **승격 판정 입력**이
+    들어 있다 — `maturity.window_days` 는 `build_weekly_maturity` → `plan_evaluation_windows`
+    로 흘러 평가 창 선택을 바꾼다. 그리고 `maturity.time_axis_substitute` 는 `OPEN-SET-10`
+    이 미결인 동안 미승인이어야 하는 칸이다.
+
+    **지문은 한 번 읽기에서 나온다**: `registry.policy.load_policy` 가 파싱에 쓴 그 텍스트의
+    해시를 들고 오므로, 승인 대조와 값 조립이 **같은 바이트**를 본다. `InferencePolicy` 에
+    출처 칸을 더하지 않아도 되는 이유다(그 칸을 더하면 이 slice 밖의 생성 자리 전수가 함께
+    움직인다)."""
+    policy = _read_policy_file(path)
+    if isinstance(policy, PolicyRejected):
+        return policy
+    approval = policy_approval(version=policy.version, digest=policy.digest)
+    if approval is not None:
+        return PolicyRejected(approval.detail)
+    return _inference_policy_of(policy)
+
+
+def time_axis_policy_of(policy: InferencePolicy) -> TimeAxisPolicy:
+    """성숙도 시간축 정책을 **versioned 정책 객체에서만** 만든다(M9/ml-lifecycle,
+    SET-06 · `OPEN-SET-10`). 유일 생성 경로 — 「대체를 코드에서 승인한다」가 이 함수
+    밖에서는 성립하지 않고, `tests/inference/test_time_axis.py` 가 src 안의 생성 자리
+    전수를 AST 로 세어 그 하나임을 확인한다."""
+    return TimeAxisPolicy(
+        version=policy.version,
+        substitute_approved=(
+            policy.maturity_time_axis_substitute is TimeAxisSubstitute.APPROVED
+        ),
+    )

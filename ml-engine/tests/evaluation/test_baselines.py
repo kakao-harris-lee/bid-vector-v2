@@ -7,11 +7,10 @@ from __future__ import annotations
 import numpy as np
 
 from ml_engine.evaluation.baselines import baseline_specs, group_mean_predictions
-from ml_engine.evaluation.policy import EvaluationPolicy
 from ml_engine.features import FeatureFacts, Missing, Present
+from tests.policy_fixture import kernel_policy
 
-_POLICY = EvaluationPolicy(
-    version="test",
+_POLICY = kernel_policy(
     paired_t_threshold=2.58,
     gate_baseline="category_x_band",
     gate_model="gbm_all_strata",

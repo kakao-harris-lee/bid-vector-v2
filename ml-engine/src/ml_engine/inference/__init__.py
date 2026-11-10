@@ -28,10 +28,14 @@ from ml_engine.inference.distribution import (
 )
 from ml_engine.inference.engine import ENGINE, serve_bid_rates
 from ml_engine.inference.maturity import (
+    MaturityTable,
     MaturityWindow,
     NoObservation,
     Observed,
     SettlementObservation,
+    TimeAxisSourceCount,
+    TimeAxisUnmeasurableCount,
+    WindowTimeAxis,
     build_weekly_maturity,
     resolve_maturity,
     week_start_utc,
@@ -47,6 +51,7 @@ from ml_engine.inference.policy import (
     InferencePolicy,
     PolicyRejected,
     load_inference_policy,
+    time_axis_policy_of,
 )
 from ml_engine.inference.predict import (
     Available,
@@ -74,6 +79,15 @@ from ml_engine.inference.results import (
     UnmeasurableReason,
 )
 from ml_engine.inference.scenario import build_scenario_candidates, resolve_uncertainty
+from ml_engine.inference.time_axis import (
+    KnownTimeAxis,
+    TimeAxis,
+    TimeAxisPolicy,
+    TimeAxisSource,
+    TimeAxisUnmeasurableReason,
+    UnmeasurableTimeAxis,
+    resolve_time_axis,
+)
 
 __all__ = [
     "ENGINE",
@@ -92,8 +106,10 @@ __all__ = [
     "DrawMeanDistribution",
     "InferencePolicy",
     "IntervalSource",
+    "KnownTimeAxis",
     "LevelObservation",
     "LevelWeights",
+    "MaturityTable",
     "MaturityWindow",
     "NoObservation",
     "Observed",
@@ -107,10 +123,18 @@ __all__ = [
     "SegmentedSample",
     "SettlementObservation",
     "Success",
+    "TimeAxis",
+    "TimeAxisPolicy",
+    "TimeAxisSource",
+    "TimeAxisSourceCount",
+    "TimeAxisUnmeasurableCount",
+    "TimeAxisUnmeasurableReason",
     "Uncertainty",
     "Unmeasurable",
     "UnmeasurableDetail",
     "UnmeasurableReason",
+    "UnmeasurableTimeAxis",
+    "WindowTimeAxis",
     "admit_clean",
     "aggregate_level_observation",
     "build_scenario_candidates",
@@ -124,8 +148,10 @@ __all__ = [
     "predict_distribution",
     "resolve_assessment_posterior",
     "resolve_maturity",
+    "resolve_time_axis",
     "resolve_uncertainty",
     "segment_availability",
     "serve_bid_rates",
+    "time_axis_policy_of",
     "week_start_utc",
 ]

@@ -129,13 +129,16 @@ def _serialize_rejected_rows(accounting: RejectedRowAccounting) -> _RejectedRows
 
 
 def _release_for(trained: TrainedArtifact) -> ReleaseIdentity:
-    """다섯 입력 전부 `trained` 에서만 읽는다(H-1 — 호출자 인자 경로 없음)."""
+    """여섯 입력 전부 `trained` 에서만 읽는다(H-1 — 호출자 인자 경로 없음). `sample_scope`
+    는 M9/ml-lifecycle 이 더한 model_version 축이고, **manifest 가 싣는 것과 같은 값**이다
+    (식별자와 공시가 갈리지 않는다)."""
     release_id = derive_release_id(
         dataset_id=trained.dataset_id,
         training_spec_version=trained.training_spec_version,
         training_spec_checksum=trained.training_spec_checksum,
         seed=trained.reproducibility.seed,
         code_version=trained.code_version,
+        sample_scope=trained.sample_scope,
     )
     return ReleaseIdentity(
         release_id=release_id,
