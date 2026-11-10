@@ -553,6 +553,17 @@ SUCCESSFUL · 25 tests · 0 failed. 둘 다 test XML 의 timestamp 가 **그 실
 0」이 **통과와 미실행을 같은 얼굴로** 덮었을 자리다. 각 task 뒤에 `--rerun` 을 따로 붙여 다시 돌렸고
 (실행 2 · exit 0), 리포트 파일의 mtime 으로 그 실행을 확인했다.
 
+### 전건을 한 번 더 — evidence HEAD 에서, 그리고 표적이 **또** 가렸다
+
+evidence 커밋 뒤 같은 명령을 다시 돌려 둘이 나왔다. ⓐ `:build-logic:ktlintTestSourceSetCheck` 가 이
+라운드의 test 추가분에서 **네 자리**(긴 줄 · 인자 목록 줄바꿈 등)를 냈다 — 앞의 표적 재실행 셋
+(`buildLogicSizeGate` · `detekt` · `:build-logic:test`)에 **그 task 가 없었다**. 같은 라운드에서 두
+번째로 「안 돌린 게이트가 표적 초록 뒤에 숨은」 자리다. 별 커밋으로 고쳤고 formatter 출력 그대로라
+의미 변경 0. ⓑ `:app:test` 의 구조 test 셋이 **`javap` 를 띄우지 못해** 실패했다(`Failed to exec
+spawn helper` — fork 실패). 셋 다 바이트코드를 외부 `javap` 로 읽는 test 이고, 호스트에서 다른 레인의
+전건과 겹친 자리다. 코드 변경과 무관한 환경 실패로 보고 **다음 전건에서 다시 잰다** — 그 결과는
+verifier 와 PR 조치 코멘트가 정본이다(evidence 에 넣으려는 시도가 커밋을 또 낳는다).
+
 일곱째 병합과 이 라운드의 판독기 변경 **뒤에도 app 의 수는 같다** — `module=app verified=297
 archives=2 entries=693 judged=594 exempt=99 nestedJars=102 nestedOutside=0 bootArchives=1
 runtimeJars=109` · `classFiles=297 types=297 anonymousTypes=14 accesses=10141 denied=10 allowed=1
