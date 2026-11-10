@@ -3,7 +3,9 @@ package bidvector.app.wiring
 import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.koneps.KonepsOpenApiNoticeSource
 import bidvector.adapters.snapshot.RunStateDirectory
+import bidvector.app.collection.AwardCollectionProperties
 import bidvector.app.collection.CollectionProperties
+import bidvector.app.collection.KonepsAwardEndpointProperties
 import bidvector.app.collection.KonepsCredentialProperties
 import bidvector.app.collection.KonepsEndpointProperties
 import bidvector.app.collection.KonepsOpeningEndpointProperties
@@ -16,6 +18,7 @@ import bidvector.procurement.CollectionCallBudget
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.collection.AWARD_COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
 import bidvector.workflow.collection.CollectionRange
 import bidvector.workflow.collection.CollectionRangePolicyData
@@ -66,14 +69,19 @@ private const val UNREAD_RUN_STATE_DIR = "조립이 읽지 않는 자리"
  * 2. 배선이 pacer 에 넘기는 값 — [배선은 출하 간격을 관문의 기다림으로 넘긴다].
  * 3. 그 기다림 함수가 실제로 잠그는가 — [배선의 기다림은 실제로 잠든다].
  * 4. **production 이 넘기는 것이 그 함수인가** — [전송을 만드는 production 자리 전수가 출하 간격을 지킨다].
- *    두 조립 메서드(`CollectionWiring.collectionSources`·`OpeningCollectionWiring.openingCollectionSources`)
- *    가 **실제로 쓰는 전송 인스턴스**로 재고, 그 **호출자 클래스 전수**는 상수 풀에서 도출해 탐침표와
- *    대조한다. 그래서 **그 두 자리에서는** 기본값을 비우든 자기 sleeper 를 넘기든 붉어지고, 셋째
- *    **클래스**가 전송을 만들면 거동을 재지 않은 채 지나갈 수 없다(집합 대조가 먼저 붉어진다).
+ *    세 조립 메서드(`CollectionWiring.collectionSources` · `OpeningCollectionWiring.openingCollectionSources`
+ *    · `AwardCollectionWiring.awardCollectionSources`)가 **실제로 쓰는 전송 인스턴스**로 재고, 그
+ *    **호출자 클래스 전수**는 상수 풀에서 도출해 탐침표와 대조한다. 그래서 **그 세 자리에서는** 기본값을
+ *    비우든 자기 sleeper 를 넘기든 붉어지고, 넷째 **클래스**가 전송을 만들면 거동을 재지 않은 채 지나갈
+ *    수 없다(집합 대조가 먼저 붉어진다).
+ *
+ * **그 예고는 실측으로 확인됐다**: M9/ops-code 병합이 들여온 `AwardCollectionWiring` 이 탐침 없이
+ * 전송을 만들자 집합 대조가 먼저 붉어졌고(`Some elements were unexpected`), 그 자리에 탐침을 더해
+ * 닫았다 — 셋째 클래스는 설계대로 막혔다.
  *
  * **알려진 제한 — 같은 클래스 안의 둘째 호출은 census 밖이다**(v r6 M-1). 상수 풀이 같은 Methodref 를
  * 한 번만 담아 세는 단위가 클래스이고, 탐침은 클래스마다 조립 메서드 **하나**만 잰다. 그래서 이미 키에
- * 있는 두 클래스에 `konepsTransportFor` 호출을 하나 더 두면 어느 게이트도 붉어지지 않는다. 현존하는 두
+ * 있는 세 클래스에 `konepsTransportFor` 호출을 하나 더 두면 어느 게이트도 붉어지지 않는다. 현존하는 세
  * 호출은 그 조립 메서드의 것이라 아래 ②가 거동으로 잠근다 — 잠기지 않은 자리는 지금 없고, 반례는 새
  * 전송 생성 경로를 **더하는** 변경이라 diff 에 그 호출이 보인다.
  */
@@ -120,9 +128,10 @@ class CollectionWiringSleeperTest {
      *
      * 두 측정을 **한 자리에서 잇는다**.
      * ① 전수는 컴파일된 상수 풀에서 도출한다 — `konepsTransportFor` 를 참조하는 production **클래스**
-     *    집합이 아래 탐침표의 키와 **같아야** 한다. 셋째 **클래스**가 전송을 만들면 거동을 재지 않은
-     *    채 지나갈 수 없다(그 클래스가 자기 sleeper 를 넘길 수 있다). 같은 클래스 **안**의 둘째 호출은
-     *    이 축 밖이다(v r6 M-1) — 클래스 KDoc 의 알려진 제한.
+     *    집합이 아래 탐침표의 키와 **같아야** 한다. 새 **클래스**가 전송을 만들면 거동을 재지 않은
+     *    채 지나갈 수 없다(그 클래스가 자기 sleeper 를 넘길 수 있다 — 병합이 들여온 낙찰 갈래에서
+     *    실제로 붉어졌다). 같은 클래스 **안**의 둘째 호출은 이 축 밖이다(v r6 M-1) — 클래스 KDoc 의
+     *    알려진 제한.
      * ② 각 자리의 거동은 **그 자리의 조립 메서드가 낸 소스**로 잰다. 두 소스가 관문 하나를
      *    공유하고 계수 축(rate limiter)은 소스마다 자기 몫이 비어 있으므로, 둘째 호출이 기다린
      *    시간은 간격 축의 것이다. 그 **전제 자체를 음성 대조가 단언한다**(cr r6 M-3): 첫 호출이
@@ -202,6 +211,7 @@ private val CALL_SITE_PROBES: Map<String, (String) -> List<() -> Unit>> =
     mapOf(
         censusNameOf(CollectionWiring::class.java) to ::noticeCalls,
         censusNameOf(OpeningCollectionWiring::class.java) to ::openingCalls,
+        censusNameOf(AwardCollectionWiring::class.java) to ::awardCalls,
     )
 
 /** 클래스 심볼 → [appProductionConstantPools] 가 내는 이름(경로 형태). 둘이 같은 접두를 쓴다. */
@@ -218,13 +228,23 @@ private fun noticeCalls(baseUrl: String): List<() -> Unit> {
 }
 
 /**
- * 개찰 수집 자리 — 공고 갈래와 **같은 전송 공장, 다른 관문 인스턴스**다(cr r6 L-D). 두 조립이 각자
+ * 개찰 수집 자리 — 공고 갈래와 **같은 전송 공장, 다른 관문 인스턴스**다(cr r6 L-D). 조립마다 각자
  * `konepsTransportFor` 를 부르므로 관문은 갈래마다 하나이고, **그 갈래 안의** 소스 둘이 그것을 공유한다.
  * 이 자리가 앞 판에서 측정 밖이었다(v r5 H-1).
  */
 private fun openingCalls(baseUrl: String): List<() -> Unit> {
     val day = CollectionReferenceDate(PROBE_DAY)
     return productionOpeningSources(baseUrl).all.map { source -> { source.port.fetchOpeningResults(day, null) } }
+}
+
+/**
+ * 낙찰 목록 자리 — 개찰결과 갈래와 **같은 전송 공장, 다른 관문 인스턴스**다. 이 자리는 M9/ops-code
+ * 병합이 들여온 **셋째 클래스**이고, 집합 대조가 그것을 먼저 가리켰다(탐침 없이 들어온 호출자를
+ * `Some elements were unexpected: ["wiring/AwardCollectionWiring"]` 로 세웠다 — 설계가 예고한 거동이다).
+ */
+private fun awardCalls(baseUrl: String): List<() -> Unit> {
+    val day = CollectionReferenceDate(PROBE_DAY)
+    return productionAwardSources(baseUrl).all.map { source -> { source.port.fetchNotices(day, null) } }
 }
 
 /**
@@ -291,6 +311,26 @@ private fun productionOpeningSources(baseUrl: String): OpeningCollectionSources 
         range = probeRange(OPENING_COLLECTION_RANGE_POLICY, "공고일 범위"),
         runState = probeRunState("m9-opening-probe-gate"),
         budget = probeBudget(),
+        clock = Clock { PROBE_NOW },
+    )
+
+/** 낙찰 갈래의 production 조립 — 같은 `konepsTransportFor` 자리를 쓰는 **셋째** 호출자다. */
+private fun productionAwardSources(baseUrl: String): AwardCollectionSources =
+    AwardCollectionWiring().awardCollectionSources(
+        properties =
+            AwardCollectionProperties(
+                from = PROBE_DAY,
+                to = PROBE_DAY,
+                categories = listOf("construction", "service"),
+                callsPerDay = 10,
+                callsTotal = 10,
+                runStateDir = UNREAD_RUN_STATE_DIR,
+            ),
+        award = KonepsAwardEndpointProperties(scsbidBaseUrl = baseUrl),
+        credential = KonepsCredentialProperties("TRANSPORT-PROBE-KEY"),
+        awardCollectionRange = probeRange(AWARD_COLLECTION_RANGE_POLICY, "개찰일 범위"),
+        awardRunState = probeRunState("m9-award-probe-gate"),
+        awardCallBudget = probeBudget(),
         clock = Clock { PROBE_NOW },
     )
 
