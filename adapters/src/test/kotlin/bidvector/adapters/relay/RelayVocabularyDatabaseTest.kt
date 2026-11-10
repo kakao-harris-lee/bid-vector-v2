@@ -5,6 +5,8 @@ import bidvector.adapters.notification.FakeTelegramServer
 import bidvector.adapters.notification.TelegramScript
 import bidvector.adapters.notification.channelSettings
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.TEST_RELEASE
+import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 import bidvector.workflow.notification.RelayTarget
@@ -125,6 +127,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
                     target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
                     environment = RuntimeEnvironment.Production,
                     policy = relayNotificationPolicy(),
+                    release = TEST_RELEASE,
                     channels = channelSettings(server.baseUrl),
                     clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
                 )
@@ -158,6 +161,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
                 target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
                 environment = RuntimeEnvironment.Staging,
                 policy = relayNotificationPolicy(),
+                release = TEST_RELEASE,
                 channels = null,
                 clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
             )
@@ -180,6 +184,7 @@ class RelayVocabularyDatabaseTest : PersistenceTestSupport() {
                     target = RelayTarget(RELAY_DB_OWNER, RELAY_DB_CHANNEL),
                     environment = RuntimeEnvironment.Production,
                     policy = relayNotificationPolicy(),
+                    release = TEST_RELEASE,
                     channels = null,
                     clock = Clock.fixed(RELAY_DB_NOW, ZoneOffset.UTC),
                 )

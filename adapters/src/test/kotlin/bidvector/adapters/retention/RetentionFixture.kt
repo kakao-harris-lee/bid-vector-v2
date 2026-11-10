@@ -3,6 +3,8 @@ package bidvector.adapters.retention
 import bidvector.procurement.FieldConcept
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.event.OutboxEntryState
+import bidvector.workflow.event.OutboxTerminalReason
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -202,6 +204,24 @@ internal class TableSeed(
 /** `outbox.state` 의 CHECK 어휘 전수(V6) — 다섯을 다 심어 **둘만** 사라지는지 잰다. */
 internal val OUTBOX_STATE_VOCABULARY = listOf("PENDING", "CLAIMED", "DELIVERED", "FAILED", "ISOLATED")
 
+/**
+ * 상태별 **유효한** 종단 사유(M9/OPS-05, V26) — 비종단 둘은 사유가 없어야 하고(NULL) 종단 셋은
+ * 자기 상태에 짝이 맞는 사유여야 한다. 쌍이 어긋나면 CHECK 가, 사유가 비면 트리거가 거부한다 —
+ * 그래서 이 표가 **fixture 가 심을 수 있는 유일한 모양**이다. 값을 손으로 적지 않고
+ * `OutboxTerminalReason` 에서 받아 온다(어휘가 바뀌면 여기가 따라 움직인다).
+ */
+internal fun terminalReasonFor(state: String): String? =
+    OutboxTerminalReason.entries.firstOrNull { reason -> reason.terminalState.stateToken() == state }?.name
+
+private fun OutboxEntryState.stateToken(): String =
+    when (this) {
+        OutboxEntryState.Pending -> "PENDING"
+        OutboxEntryState.Claimed -> "CLAIMED"
+        OutboxEntryState.Delivered -> "DELIVERED"
+        OutboxEntryState.Failed -> "FAILED"
+        OutboxEntryState.Isolated -> "ISOLATED"
+    }
+
 /** 담당자 키 — 필드 계약에 **등재되지 않는다**(D-3H-7). 자리값은 전화·전자우편 꼴을 흉내내지 않는다. */
 internal val OFFICER_FIXTURE_KEYS =
     mapOf(
@@ -221,6 +241,9 @@ internal val COMPANY_NAME_FIXTURE_KEYS: List<String> = rawNamesOfConcepts(COMPAN
 
 /** 업체명 자리값 — 마스킹 뒤 이 문자열이 남아 있으면 업체명이 남은 것이다. */
 internal const val COMPANY_NAME_FIXTURE_VALUE = "COMPANY-NAME-FIXTURE"
+
+/** M9/OPS-10 — 보존 fixture 가 심는 실행 행의 릴리스 식별자. V27 트리거가 부재를 거부한다. */
+private const val RETENTION_FIXTURE_RELEASE = "retention-fixture-release"
 
 /** 계약 등재 키 둘(공고 식별자) — 마스킹 뒤에도 남아야 하는 축. */
 private fun identityFields(tag: String) = listOf(""""bidNtceNo":"RET-$tag"""", """"bidNtceOrd":"000"""")
@@ -318,9 +341,12 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         TableSeed("outbox") { tag, at ->
             OUTBOX_STATE_VOCABULARY.map { state ->
                 "INSERT INTO outbox (entry_id, event_id, aggregate_id, aggregate_version, occurred_at, " +
-                    "correlation_id, idempotency_key, payload_type, payload, state, inserted_at) " +
+                    "correlation_id, idempotency_key, payload_type, payload, state, inserted_at, release_sha, " +
+                    "terminal_reason) " +
                     "VALUES ('ret-$tag-$state', 'ev-$tag-$state', 'agg-$tag', 1, '$at', " +
-                    "'corr-$tag-$state', 'idem-$tag-$state', 'RET_FIXTURE', '{}', '$state', '$at')"
+                    "'corr-$tag-$state', 'idem-$tag-$state', 'RET_FIXTURE', '{}', '$state', '$at', " +
+                    "'$RETENTION_FIXTURE_RELEASE', " +
+                    (terminalReasonFor(state)?.let { "'$it'" } ?: "NULL") + ")"
             }
         },
         TableSeed("inbox") { tag, at ->
@@ -337,9 +363,9 @@ internal val RETENTION_SEEDS: List<TableSeed> =
             listOf(
                 "INSERT INTO collection_run (reference_date, source_endpoint, started_at, finished_at, " +
                     "received, normalized, duplicate, dropped, drop_reasons, pages_fetched, truncated, " +
-                    "unknown_fields, inserted_at) " +
+                    "unknown_fields, inserted_at, release_sha) " +
                     "VALUES (DATE '2026-01-01', 'NOTICE_LIST', '$at', '$at', 0, 0, 0, 0, '{}'::jsonb, 0, " +
-                    "false, 0, '$at')",
+                    "false, 0, '$at', '$RETENTION_FIXTURE_RELEASE')",
             )
         },
         TableSeed("operator_strategy") { _, at ->

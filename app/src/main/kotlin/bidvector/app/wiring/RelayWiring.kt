@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.notification.ConfiguredRouteDirectory
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -73,6 +74,7 @@ open class RelayWiring {
     open fun notificationRelayRun(
         dataSource: DataSource,
         properties: RelayProperties,
+        release: ReleaseIdentifier,
         channelProperties: NotificationChannelProperties,
     ): NotificationRelayRun {
         val policy = resolvedNotificationPolicy()
@@ -112,6 +114,7 @@ open class RelayWiring {
             target = RelayTarget(owner, properties.channel),
             environment = properties.environment,
             policy = policy,
+            release = release,
             channels = if (live) channelProperties.channelSettings() else null,
             clock = Clock.systemUTC(),
         )

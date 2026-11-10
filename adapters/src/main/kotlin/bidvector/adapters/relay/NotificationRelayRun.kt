@@ -10,6 +10,7 @@ import bidvector.adapters.notification.NoticeMessageRenderer
 import bidvector.adapters.notification.NotificationChannelSettings
 import bidvector.adapters.notification.TelegramNotificationSender
 import bidvector.adapters.notification.telegramHttpClient
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.workflow.notification.DeliveryMode
 import bidvector.workflow.notification.DispatchNotification
@@ -67,6 +68,7 @@ class NotificationRelayRun(
     target: RelayTarget,
     environment: RuntimeEnvironment,
     policy: NotificationDeliveryPolicyData,
+    release: ReleaseIdentifier,
     channels: NotificationChannelSettings?,
     clock: Clock,
 ) {
@@ -75,7 +77,7 @@ class NotificationRelayRun(
     private val relay: RelayOutboxNotifications? =
         channels?.let { settings ->
             RelayOutboxNotifications(
-                outbox = JdbcOutboxPort(boundary),
+                outbox = JdbcOutboxPort(boundary, release),
                 inbox = JdbcInboxPort(boundary),
                 dispatcher = dispatcherFor(dataSource, target, environment, policy, settings, clock),
                 leases = PostgresAdvisoryLockLease(dataSource),

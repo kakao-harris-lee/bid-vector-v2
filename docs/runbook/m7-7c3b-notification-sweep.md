@@ -18,8 +18,13 @@
 ```
 java -jar app.jar \
   --bidvector.notification-sweep.mode=once \
-  --bidvector.persistence.jdbc-url=... --bidvector.persistence.username=... --bidvector.persistence.credential=...
+  --bidvector.persistence.jdbc-url=... --bidvector.persistence.username=... --bidvector.persistence.credential=... \
+  --bidvector.release.sha=<배포 SHA>
 ```
+
+- **`bidvector.release.sha` 는 기본값이 없다**(M9/OPS-10) — 손으로 거는 이 형태는 그 값을 줘야
+  뜬다. compose 를 지나는 운영 도구(`tools/prod-notification-sweep.sh`)는 `BIDVECTOR_RELEASE_TAG`
+  를 통해 이미 받는다.
 
 - **다른 일회 러너와 같은 프로세스에 켜지 않는다.** `OneShotRunnerGuard` 가 `ApplicationRunner` 빈이 둘 이상이면
   기동을 실패시킨다 — 먼저 끝난 러너가 JVM 을 끝내 나머지가 조용히 안 돌기 때문이다.

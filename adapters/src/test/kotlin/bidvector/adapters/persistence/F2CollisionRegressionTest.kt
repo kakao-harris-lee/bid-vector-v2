@@ -18,7 +18,7 @@ class F2CollisionRegressionTest : PersistenceTestSupport() {
 
         ("Aa".hashCode()) shouldBe ("BB".hashCode()) // 전제 확인 — 여전히 32비트 충돌쌍이다.
 
-        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA)
+        val store = JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE)
         val keyA = store.append(obsA)
         val keyB = store.append(obsB)
 

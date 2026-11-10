@@ -17,6 +17,7 @@ import bidvector.adapters.ml.testMlCallEffectivePolicy
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcOpeningResultRepository
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.adapters.profile.JdbcOperatorProfileRepository
 import bidvector.adapters.qualification.JdbcRequirementStore
@@ -77,7 +78,7 @@ internal class PipelineAssembly(
     private val connections = OwnTransactionConnectionSource(dataSource)
     private val notificationPolicy: NotificationDeliveryPolicyData = resolvedNotificationPolicy(at)
 
-    val outbox = JdbcOutboxPort(connections)
+    val outbox = JdbcOutboxPort(connections, TEST_RELEASE)
     val inbox = JdbcInboxPort(connections)
     val sender = RecordingNotificationSender(at, notificationPolicy)
 
@@ -150,7 +151,7 @@ internal class PipelineAssembly(
 
     private val relayUseCase =
         RelayOutboxNotifications(
-            outbox = JdbcOutboxPort(relayBoundary),
+            outbox = JdbcOutboxPort(relayBoundary, E2E_RELEASE),
             inbox = JdbcInboxPort(relayBoundary),
             dispatcher = dispatcher,
             leases = PostgresAdvisoryLockLease(dataSource),

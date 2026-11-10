@@ -196,14 +196,19 @@ export** 한다:
 set -eu
 # 자격이 **아닌** 두 값도 환경에서 읽는다 — `set -u` 아래에서 없는 변수를 참조하면 래퍼가 그
 # 줄에서 죽고 cron 로그에는 `unbound variable` 만 남는다(cr low).
-. /etc/bidvector/retention.env   # BIDVECTOR_JDBC_URL · BIDVECTOR_DB_OWNER (자격 값이 아니다)
+. /etc/bidvector/retention.env   # BIDVECTOR_JDBC_URL · BIDVECTOR_DB_OWNER · BIDVECTOR_RELEASE_SHA (자격 값이 아니다)
 BIDVECTOR_PERSISTENCE_CREDENTIAL="$(cat /etc/bidvector/owner.credential)"   # 0400, 운영자 소유
 export BIDVECTOR_PERSISTENCE_CREDENTIAL
 SPRING_MAIN_WEB_APPLICATION_TYPE=none exec java -jar /opt/bidvector/app.jar \
   --bidvector.retention.mode=once \
   --bidvector.persistence.jdbc-url="$BIDVECTOR_JDBC_URL" \
-  --bidvector.persistence.username="$BIDVECTOR_DB_OWNER"
+  --bidvector.persistence.username="$BIDVECTOR_DB_OWNER" \
+  --bidvector.release.sha="$BIDVECTOR_RELEASE_SHA"
 ```
+
+`bidvector.release.sha` 는 **기본값이 없다**(M9/OPS-10) — 주지 않으면 래퍼가 바인딩 실패로 죽고
+cron 로그에만 남아 **파기·마스킹이 조용히 멈춘다**. 그래서 `retention.env` 에 배포 SHA 를 함께
+둔다(자격 값이 아니라 식별자다 — 운영 compose 의 `BIDVECTOR_RELEASE_TAG` 와 같은 값을 쓴다).
 
 접속 사용자는 **표 소유자**여야 한다 — 파기는 런타임 풀을 지나지 않는다(A-1).
 
@@ -390,8 +395,11 @@ SELECT count(*) FROM raw_observation WHERE pii_masked_at >= '<run 시작 시각>
 5. 트리거가 파기·마스킹을 거부할 때(`sqlState=P0001`) — append-only 계약과 어긋난 UPDATE 를
    보내고 있다는 뜻이고, 그것은 코드 결함이다.
 6. **마이그레이션이 `55P03`(`lock_not_available`)으로 실패해 기동이 멈췄을 때 — 이것은 설계된
-   실패다.** 진행 중인 쓰기·읽기가 V18/V19 가 요구하는 잠금과 부딪혔고, 상한이 무한 대기를 실패로
-   바꿨다. **스키마는 손대지 않았고 `flyway repair` 도 필요 없다**(§1.3 「실패 뒤에 남는 상태」) —
+   실패다.** 진행 중인 쓰기·읽기가 그 마이그레이션이 요구하는 잠금과 부딪혔고, 상한이 무한 대기를
+   실패로 바꿨다. **이 처분은 어느 마이그레이션에나 같다** — V18 이 관례를 세운 뒤로 V19·V23·V24·
+   V25·V26·V27 이 같은 상한을 선언하고, M9/ops-migrations 부터는 **migrate 연결 자체**에도 같은
+   상한이 걸려(`PersistenceWiring.ownerMigration`) 선언을 하지 않은 파일도 같은 실패를 낸다.
+   **스키마는 손대지 않았고 `flyway repair` 도 필요 없다**(§1.3 「실패 뒤에 남는 상태」) —
    쓰기를 멈춘 창에서 **그대로 재시도**하면 선다. 쓰기를 멈춘 창에서도 반복해 같은 코드로 실패하면
    그때는 멈추고 보고한다(ⓒ 가 비어 있는데 실패한다면 전제가 틀렸다는 뜻이다).
 

@@ -4,6 +4,7 @@ import bidvector.adapters.koneps.KonepsSourceConfig
 import bidvector.adapters.koneps.konepsAwardListSource
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.AwardCollectionProperties
 import bidvector.app.collection.AwardCollectionRunner
@@ -134,8 +135,8 @@ open class AwardCollectionWiring {
     @Bean
     open fun collectAwardListUseCase(
         dataSource: DataSource,
-        properties: AwardCollectionProperties,
         awardCollectionRange: CollectionRange,
+        release: ReleaseIdentifier,
         clock: Clock,
     ): CollectAwardListUseCase =
         CollectAwardListUseCase(
@@ -143,9 +144,9 @@ open class AwardCollectionWiring {
                 JdbcRawObservationStore(
                     dataSource,
                     collectionPolicyAt(CollectionReferenceDate(awardCollectionRange.to)).fieldContracts,
-                    properties.releaseSha,
+                    release,
                 ),
-            runs = JdbcCollectionRunStore(dataSource),
+            runs = JdbcCollectionRunStore(dataSource, release),
             clock = clock,
         )
 

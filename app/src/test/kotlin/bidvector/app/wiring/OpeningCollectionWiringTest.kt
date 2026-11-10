@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.OpeningCollectionRunner
 import bidvector.app.collection.SnapshotExtractionRunner
@@ -25,6 +26,9 @@ import java.nio.file.Path
 import java.time.Instant
 import java.util.function.Supplier
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
 /**
  * M6/6G D-6G-1·11 — 개찰 축 배선의 **켜짐 조건과 기동 실패**. 이 갈래는 `mode=once` 일 때만 올라오고,
@@ -77,6 +81,8 @@ class OpeningCollectionWiringTest {
         context.register(OpeningCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         val failure = runCatching { context.refresh() }.exceptionOrNull()
         return Booted(context, failure)
     }
@@ -259,6 +265,8 @@ class SnapshotExtractionWiringTest {
         TestPropertyValues.of(*properties).applyTo(context)
         context.register(SnapshotExtractionWiring::class.java)
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { WIRING_TEST_RELEASE })
         return context to runCatching { context.refresh() }.exceptionOrNull()
     }
 

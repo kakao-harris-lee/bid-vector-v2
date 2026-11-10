@@ -2,6 +2,7 @@ package bidvector.app.evaluation
 
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.http.TestStrategyRepository
 import bidvector.app.wiring.RecordedExitCodes
@@ -92,4 +93,5 @@ private fun deadCommitRun(): EvaluationCommitRun =
         correlationIds = CorrelationIdFactory { CorrelationId("commit-runner-test") },
         clock = Clock { Instant.parse("2026-10-07T00:00:00Z") },
         analysisBudget = null,
+        release = ReleaseIdentifier("commit-runner-test"),
     )

@@ -3,6 +3,7 @@ package bidvector.app.wiring
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.evaluation.EvaluationCommitRunner
@@ -84,6 +85,7 @@ open class EvaluationCommitWiring {
         correlationIdFactory: CorrelationIdFactory,
         clock: Clock,
         commitProperties: EvaluationCommitProperties,
+        release: ReleaseIdentifier,
     ): EvaluationCommitRun {
         require(commitProperties.currentActiveBids >= 0) {
             "bidvector.evaluation.commit.current-active-bids 는 음수일 수 없다"
@@ -108,6 +110,7 @@ open class EvaluationCommitWiring {
             correlationIds = correlationIdFactory,
             clock = clock,
             analysisBudget = strategy.candidateLimit?.value,
+            release = release,
         )
     }
 

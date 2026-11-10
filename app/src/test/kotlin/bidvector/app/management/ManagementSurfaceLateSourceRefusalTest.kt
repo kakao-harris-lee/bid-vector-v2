@@ -25,6 +25,9 @@ import org.springframework.core.Ordered
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "management-surface-late-source-refusal-release"
+
 /** 잠금이 **이름 대지 않은** 형제 키 — 이것이 열리면 readiness 가 구성 요소 세부를 낸다. */
 private const val LATE_SOURCE_SIBLING_KEY = "management.endpoint.health.group.readiness.show-details"
 
@@ -122,6 +125,9 @@ class ManagementSurfaceLateSourceRefusalTest {
                     "server.port" to "0",
                     "management.server.port" to "0",
                     "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                    // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                    // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                    "bidvector.release.sha" to TEST_RELEASE_LABEL,
                     "bidvector.persistence.username" to postgres.username,
                     "bidvector.persistence.credential" to postgres.password,
                     "operator.credential.value" to TEST_CREDENTIAL_VALUE,

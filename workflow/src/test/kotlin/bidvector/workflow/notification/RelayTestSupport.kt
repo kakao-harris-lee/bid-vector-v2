@@ -20,6 +20,7 @@ import bidvector.workflow.event.NotificationRequestedPayload
 import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntryId
 import bidvector.workflow.event.OutboxPort
+import bidvector.workflow.event.OutboxTerminalReason
 import bidvector.workflow.event.OutboxTransition
 import bidvector.workflow.strategy.OperatorId
 import java.time.Instant
@@ -45,6 +46,9 @@ internal class FakeOutboxPort(
     val claimedKinds = mutableListOf<OutboxConsumerKind>()
     val claimedEntriesKinds = mutableListOf<OutboxConsumerKind>()
 
+    /** 행마다 적힌 종단 사유(M9 OPS-05) — 상태만으로는 「왜」가 보이지 않으므로 함께 기록한다. */
+    val terminalReasons = mutableListOf<Pair<OutboxEntryId, OutboxTerminalReason>>()
+
     override fun register(envelope: EventEnvelope<*>): OutboxEntryId = error("relay 는 outbox 에 등록하지 않는다")
 
     override fun claim(
@@ -64,14 +68,17 @@ internal class FakeOutboxPort(
 
     override fun markDelivered(transition: OutboxTransition.ToDelivered) {
         delivered += transition.entryId
+        terminalReasons += transition.entryId to transition.reason
     }
 
     override fun markFailed(transition: OutboxTransition.ToFailed) {
         failed += transition.entryId
+        terminalReasons += transition.entryId to transition.reason
     }
 
     override fun markIsolated(transition: OutboxTransition.ToIsolated) {
         isolated += transition.entryId
+        terminalReasons += transition.entryId to transition.reason
     }
 }
 

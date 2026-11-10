@@ -19,6 +19,9 @@ import javax.sql.DataSource
 /** test 전역 고정 배포 식별자 — 실제 출처는 M6 6C 소관, 여기서는 비어 있지 않은 값만 필요하다. */
 internal const val TEST_RELEASE_SHA = "test-release"
 
+/** M9/OPS-10 — 저장소 넷이 받는 릴리스 식별자의 test 값. 값은 한 자리에만 둔다. */
+internal val TEST_RELEASE = ReleaseIdentifier(TEST_RELEASE_SHA)
+
 /**
  * S-2~S-5 공유 하네스 — Testcontainers `PostgreSQLContainer` 하나를 재사용한다(3D 설계
  * 검토 「구현 지침」). 컨테이너 이미지 태그는 여기 상수 하나가 정본이다(정책 데이터가
@@ -72,7 +75,7 @@ abstract class PersistenceTestSupport {
      * 사본을 두지 않는다(production 경로 대신 test 사본을 지나는 자리였다).
      */
     protected fun appendRawObservation(observation: RawNoticeObservation) =
-        JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE_SHA).append(observation)
+        JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE).append(observation)
 
     @BeforeEach
     fun truncateAllTables() {

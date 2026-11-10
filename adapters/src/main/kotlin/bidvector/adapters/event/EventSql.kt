@@ -19,8 +19,8 @@ internal object EventSql {
         INSERT INTO outbox (
             entry_id, event_id, aggregate_id, aggregate_version, occurred_at,
             correlation_id, causation_id, idempotency_key, actor_kind, actor_detail,
-            payload_type, payload, state
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            payload_type, payload, state, release_sha
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
         """
 
     // claim(⑫scope.md ④, 설계 검토 (4)-④) — `FOR UPDATE SKIP LOCKED`가 경쟁 창을 막고,
@@ -53,9 +53,16 @@ internal object EventSql {
         """
 
     const val MARK_CLAIMED = "UPDATE outbox SET state = 'CLAIMED' WHERE entry_id = ? AND state = 'PENDING'"
-    const val MARK_DELIVERED = "UPDATE outbox SET state = 'DELIVERED' WHERE entry_id = ? AND state = 'CLAIMED'"
-    const val MARK_FAILED = "UPDATE outbox SET state = 'FAILED' WHERE entry_id = ? AND state = 'CLAIMED'"
-    const val MARK_ISOLATED = "UPDATE outbox SET state = 'ISOLATED' WHERE entry_id = ? AND state = 'CLAIMED'"
+
+    // 종단 셋은 **상태와 사유를 한 UPDATE 로** 적는다(M9 OPS-05) — 사유를 따로 쓰는 문이
+    // 없으므로 「상태는 옮겼는데 사유가 비었다」가 생길 자리가 없다(V26 트리거도 그 조합을
+    // 거부한다). 첫 인자가 사유, 둘째가 entry_id 다.
+    const val MARK_DELIVERED =
+        "UPDATE outbox SET state = 'DELIVERED', terminal_reason = ? WHERE entry_id = ? AND state = 'CLAIMED'"
+    const val MARK_FAILED =
+        "UPDATE outbox SET state = 'FAILED', terminal_reason = ? WHERE entry_id = ? AND state = 'CLAIMED'"
+    const val MARK_ISOLATED =
+        "UPDATE outbox SET state = 'ISOLATED', terminal_reason = ? WHERE entry_id = ? AND state = 'CLAIMED'"
 
     const val SELECT_OUTBOX_STATE = "SELECT state FROM outbox WHERE entry_id = ?"
 

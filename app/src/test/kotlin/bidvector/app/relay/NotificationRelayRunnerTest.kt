@@ -5,6 +5,7 @@ import bidvector.adapters.notification.NotificationChannelSettings
 import bidvector.adapters.notification.TelegramBotCredential
 import bidvector.adapters.notification.TelegramChatId
 import bidvector.adapters.notification.TelegramSenderSettings
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -159,6 +160,7 @@ private fun unreachableRelayRun(): NotificationRelayRun =
         target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
         environment = RuntimeEnvironment.Staging,
         policy = relayRunnerTestPolicy(),
+        release = ReleaseIdentifier("relay-runner-test"),
         channels = fakeChannelSettings(),
         clock = Clock.systemUTC(),
     )
@@ -195,6 +197,7 @@ private fun suppressedRelayRun(dataSource: DataSource): NotificationRelayRun =
         target = RelayTarget(OperatorId("runner-test-owner"), Channel.Telegram),
         environment = RuntimeEnvironment.Staging,
         policy = relayRunnerTestPolicy(),
+        release = ReleaseIdentifier("relay-runner-test"),
         channels = fakeChannelSettings(),
         clock = Clock.systemUTC(),
     )
