@@ -259,7 +259,7 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
     }
 
 /**
- * 멈출 사유인가 — 오늘은 예산·쿼터뿐이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
+ * 멈출 사유인가 — 예산·쿼터·차단 셋이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
  * 원인으로 남고 실행은 다음 슬롯으로 간다. **짧은 걷기는 여기 오지 않는다** — 사유가 없으므로
  * 멈춤도 아니고, 미완 계수만 올린다([AwardCollectionReport.unfinishedSlots]).
  *
@@ -268,9 +268,11 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
  * 사유가 새로 생기면 조용히 그 길로 간다. 소진 `when` 이면 새 [TruncationCause] 가 생기는 순간 컴파일이
  * 이 자리를 가리켜 결정을 강제한다 — 저장소의 `truncationCodeOf`·`failureOf` 와 같은 형태·같은 이유다.
  *
- * **다음에 이 자리를 깨우는 사유의 답은 정해져 있다**: 403 계열 차단(ops-code 가 들여올 `AccessBlocked`)은
- * **멈춤**이다 — 쿼터와 같은 자리(`AwardCollectionHalt(null, cause)`)로 보낸다. 차단된 키로 남은 슬롯을
- * 계속 부르면 승인 호출만 태우고 차단을 키운다. 오늘 이 브랜치에는 그 사유가 없어 그대로 컴파일된다.
+ * **그 자리가 깨어났다**(M9/ops-code 병합). 위 문단이 예고한 사유([TruncationCause.AccessBlocked])가
+ * 들어오며 이 `when` 이 컴파일을 멈췄고, 예고한 답 그대로 **멈춤**으로 — 쿼터와 같은 자리
+ * (`AwardCollectionHalt(null, cause)`)로 보낸다. 차단된 키로 남은 슬롯을 계속 부르면 승인 호출만 태우고
+ * 차단을 키운다. 두 변경이 **서로 다른 파일**이라 병합은 충돌 없이 지나갔고, 이 자리를 가리킨 것은
+ * 사람이 아니라 타입이다 — 세 갈래(공고·개찰·낙찰)가 이제 같은 답을 낸다.
  */
 private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
     when (cause) {
@@ -279,6 +281,8 @@ private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
         is TruncationCause.BudgetExhausted -> AwardCollectionHalt(cause.limit, null)
 
         TruncationCause.QuotaExhausted -> AwardCollectionHalt(null, cause)
+
+        TruncationCause.AccessBlocked -> AwardCollectionHalt(null, cause)
 
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,

@@ -257,11 +257,13 @@ class CollectAwardListUseCaseTest {
      * `haltOf` 가 소진 `when` 이라 새 사유가 생기면 컴파일이 그 자리를 가리키지만, 컴파일은 **어느
      * 쪽으로** 보낼지 묻지 않는다. 이 등식이 그 선택을 고정한다.
      *
-     * 멈추는 것은 **승인 범위·계정 한도를 다 쓴** 둘뿐이다(예산·쿼터). 그 둘은 다음 슬롯을 불러도 같은
-     * 거절이 오므로 창을 더 걷는 의미가 없다. 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
-     * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
+     * 멈추는 것은 **더 불러도 같은 거절이 오는** 셋이다 — 승인 범위·계정 한도를 다 쓴 둘(예산·쿼터)과
+     * 403 계열 차단([TruncationCause.AccessBlocked]). 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한
+     * 날의 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
      *
-     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc).
+     * 차단 행은 **이 표가 예고해 둔 자리**였고 M9/ops-code 병합이 그것을 채웠다(근거는 `haltOf` KDoc).
+     * 모수를 sealed 계층에서 도출하므로 그 사유는 병합과 동시에 표에 **들어왔고**, 행을 더하지 않으면
+     * 이 등식이 먼저 붉어진다 — 컴파일이 `haltOf` 를 가리키고 이 표가 그 선택을 가린다.
      *
      * **집합이 아니라 사유마다의 결정을 맞춘다**(실측으로 고친 자리) — 「멈춤 집합의 등식」만 두면 새 사유를
      * **계속 걷기** 쪽에 넣은 판이 초록이다(그 사유가 멈춤 집합에 안 들어오므로 등식이 그대로 성립한다).
@@ -289,6 +291,9 @@ class CollectAwardListUseCaseTest {
                 TruncationCause.BudgetExhausted(BudgetLimit.DAILY) to true,
                 TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) to true,
                 TruncationCause.QuotaExhausted to true,
+                // 차단은 **자격의 사실**이라 다음 슬롯도 같은 답이다 — 더 부르면 승인 호출만 태우고
+                // 차단을 키운다(공고 `WalkDirective.HALT_RUN`·개찰 `openingDirective` 와 같은 답).
+                TruncationCause.AccessBlocked to true,
                 // 그 슬롯만 접고 다음 슬롯으로 — 한 날의 실패로 창 전체를 버리지 않는다.
                 TruncationCause.MaxPages to false,
                 TruncationCause.RepeatedPage to false,
