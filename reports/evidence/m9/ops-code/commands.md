@@ -1,14 +1,14 @@
 # M9/ops-code commands
 
-base `df4976cc` · **병합한 main `bd2f450e`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea` 도
-병합했다) · 판정 SHA **`6b5b52bc`**(마지막 산출물 커밋 = 넷째 병합 커밋). 레인 규율대로 push 하지 않았다.
+base `df4976cc` · **병합한 main `07140729`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·
+`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · 판정 SHA **`63d74653`**(마지막 산출물 커밋).
+레인 규율대로 push 하지 않았다.
 
-로컬에서 돌린 것은 **`:app:check` 전건**(30m 33s · exit 0 — 그 모듈의 게이트·test 전부, container
-여정 포함) + 나머지 세 모듈의 표적 `--tests`·lint·등재 게이트 + 변이다. `qualityBaseline` 과 다른
-모듈의 전건 `check` 는 PR CI 가 정본이고 명령이 같다. **앞 판의 「그 모듈 게이트」 문면은 거짓이었다**
-(v r4 L-3) — 그때 `:app:sizeGate` 가 붉었고 표적 세트가 그것을 안 돌렸다. Gradle 은 전부 `~/.local/bin/bv-build.sh ./gradlew
---no-daemon …`(빌드 자리 둘 · 획득 순간 메모리 재확인)로 돌렸고 레인이 남긴 java 프로세스는 0 이다
-(종료 뒤 `pgrep` 로 확인).
+로컬에서 돌린 것은 **CI Kotlin job 의 명령 그대로** `./gradlew --no-daemon check` **전건**(§2)과
+변이(§4)다. 앞 판들은 `:app:check` + 나머지 모듈 표적으로 줄였는데, 이 라운드는 병합이 `workflow` 의
+**production 한 줄**을 강제했으므로 줄이지 않았다 — 줄일 수 있는 단위는 job 이다. Gradle 은 전부
+`~/.local/bin/bv-build.sh ./gradlew --no-daemon …`(빌드 자리 둘 · 획득 순간 메모리 재확인)로 돌렸고
+레인이 남긴 java 프로세스는 0 이다(종료 뒤 `pgrep` 로 확인).
 
 ## 1. 커밋
 
@@ -50,32 +50,39 @@ base `df4976cc` · **병합한 main `bd2f450e`**(복원 원천 — 앞서 `3ad4f
 | `2294beb7` | evidence 8차(판정 SHA `f577e69d`) |
 | `704554b4` | v r5 H-1 — 자리 전수를 상수 풀에서 도출해 **자리마다** 간격을 잰다(개찰 자리가 측정 밖이었다) |
 | `6b5b52bc` | main `bd2f450e`(#142 CVE) 병합 — 겹침 **0**(계수로 확인) |
+| `f2c64019` | v r6 M-1 · cr r6 L-E — census 의 단위는 **클래스**다(문면을 측정 범위로 좁히고 전제를 음성 대조로 잠근다) |
+| `eab9e196` | evidence 9차(판정 SHA `6b5b52bc`) — 장부·rollback 수·원천 정정 |
+| `1d53dd6e` | main `07140729`(PR #128 낙찰 수집 · #139 ml-lifecycle) 병합 — **깨진 셋**(§4d) |
+| `eaf846a2` | 병합이 깬 둘 — 낙찰 갈래 소진 `when`(컴파일 실패) · 그 전수 표의 빠진 행 |
+| `63d74653` | 병합이 깬 셋째 — census 집합 대조가 가리킨 **낙찰 전송 자리**에 탐침(거동까지 잰다) |
 
-## 2. 표적 실행 — 핵심 결과 한 줄씩(판정 SHA 기준, 병합 뒤)
+## 2. acceptance 실행 — CI Kotlin job 의 명령 그대로
 
-전부 `--rerun` 이다 — UP-TO-DATE 는 실행이 아니다.
+`./gradlew --no-daemon check` **전건**이다(`.github/workflows/ci.yml` 의 `check` job 이 그 명령을
+그대로 돈다). **앞 판들이 줄였던 자리를 job 단위로 되돌렸다** — 줄일 수 있는 단위가 job 이고, 이
+라운드는 `workflow` 의 **production 한 줄**을 바꿨으므로 `:app:check` + 표적으로 가를 자리가 아니다.
 
-| 명령 | 결과 |
+| 측정 | 값 |
 | --- | --- |
-| `:procurement:test --rerun`(전건 — sealed 열거 축) | `tests=317 failures=0` |
-| `:workflow:test --rerun --tests 'bidvector.workflow.collection.*' --tests '…InboxRecordingNotificationsTest'` | `tests=116 failures=0` |
-| `:adapters:test --rerun --tests 'bidvector.adapters.koneps.*' --tests '…NotificationAudienceFailureTest' --tests '…EvaluationAdapterDependencyTest'` | `tests=135 failures=0` |
-| **`:app:check`**(전건 — 그 모듈의 게이트·test 전부, container 여정 포함) | BUILD SUCCESSFUL · 30m 33s · exit 0 · **127 클래스 1028 test 실패 0**. `sizeGate`·`gateRegistrationGate` 포함 |
-| `:adapters:test --rerun --tests 'bidvector.adapters.notificationinbox.*' --tests 'bidvector.adapters.evaluation.*'`(**실 DB** — 팀장 지시) | `tests=241 failures=0`(koneps 포함 합) · `EvaluationCommitInboxProductionTest` 3/0 · `NotificationInboxBidKindTest` 4/0 · `NotificationInboxPairConstraintTest` 5/0 |
-| `gateRegistrationGate` — workflow · adapters · app · procurement | 전부 통과(새 test 클래스 넷 등재 포함) |
-| ktlint(main·test)·detekt — workflow · adapters · app · procurement | 전부 BUILD SUCCESSFUL |
-| `leakPatternGate` | BUILD SUCCESSFUL |
+| 결과 | **BUILD SUCCESSFUL · 34m 47s · exit 0** |
+| task | 401 actionable(256 executed · 99 from cache · 46 up-to-date) · `FAILED` 줄 **0** |
+| test(모듈별 XML 집계) | shared-kernel 8/92 · procurement 37/317 · workflow 85/762 · adapters 207/1402 · app 131/1074 — **합 468 클래스 3647 test · 실패 0 · 오류 0** |
+| skipped | **4**, 전부 `adapters.contract.RealServerIntegrationTest`(실 외부 서버 전제, 이 slice 와 무관한 기존 조건부) |
+| 함께 돈 게이트 | `contractGate`(buf 1.72.0 — 정책 파일의 핀과 같다) · `leakPatternGate` · `memberEffectGate` · `conventionCoverageGate` 각 1 · `sizeGate`·`gateRegistrationGate`·`gateExecutionGate` 각 10(모듈마다) · `domainApiTypeGate`·`domainSourceReferenceGate`·`moduleDependencyGate` · `compatibilitySmoke` 2 · detekt 11 · ktlint(main·test·script) 전 모듈 |
 
-**app 표적에 architecture 전건이 들어가는 이유가 둘 늘었다**: 리플렉션 쌍 하나와 전송 표면 서명
-하나를 갱신했고(아래 §4 ⓒ) 그 둘을 재는 게이트가 거기 있다.
+**실 DB 와 container 여정이 그 안에 있다** — `adapters` 의 알림함·평가 경로와 `app` 의 수집 E2E 가
+같은 실행에서 돌았다. 앞 판이 「PR CI 가 정본」으로 미룬 `:workflow:check`·`:adapters:check`·
+`:procurement:check` 도 이번에는 **여기서** 돌았다. acceptance 를 지는 class 들의 XML(전부 skipped 0 ·
+failures 0 · errors 0):
 
-`:app:gateRegistrationGate` 는 그 모듈 `test` task 의 제외 목록을 입력으로 받아 **`test` 뒤에
-선다** — 표적 실행에서도 그 task 가 함께 돌아야 하므로 app 은 architecture 전건 + 배선 test 로
-걸었다(container 여정은 걸지 않았다, PR CI 가 정본).
+`EvaluationCommitInboxProductionTest` 3 · `NotificationInboxBidKindTest` 4 ·
+`KonepsShippedPolicyWireTest` 6 · `CollectionWiringSleeperTest` 3 · `CollectAwardListUseCaseTest` 9 ·
+`OpeningAccessBlockedHaltTest` 5. `app` 의 E2E 여덟(`AwardCollectionE2ETest`·`CollectionRunnerE2ETest`·
+`OpeningCollectionE2ETest` 등)도 같은 실행에 있다.
 
-**앞 라운드가 놓친 둘을 이 라운드가 실측했다.** `:procurement:test` 는 **UP-TO-DATE 가 실행이
-아니므로** `--rerun` 으로 돌렸고, 새 test 클래스 셋의 등재는 표적 `--tests` 가 재지 않으므로 네
-모듈의 등재 게이트를 함께 걸었다.
+**`qualityBaseline` 은 돌리지 않았다** — CI 가 그것을 게이트가 아니라 측정으로 두고 실패시키지
+않는다(워크플로 주석 「게이트가 아니라 측정이라 실패시키지 않는다」). 그 자리는 PR CI 가 정본이고
+명령이 같다.
 
 ## 3. 실 Spring 컨텍스트 — OPS-08 의 비용(앞 라운드 실측, 재측정하지 않았다)
 
@@ -116,6 +123,9 @@ base `df4976cc` · **병합한 main `bd2f450e`**(복원 원천 — 앞서 `3ad4f
 | 알림함 기록을 채널 뒤로 | `InboxRecordingNotificationsTest` 1/9 | 결말 단언 둘(채널 실패에도 기록 1건 · 기록 실패에도 채널 1회)이 **초록으로 남는다** — v L-1 ① 이 지적한 그 사실 |
 | `awaitTurn` 을 상한 검사 앞으로 | `KonepsShippedPolicyWireTest` 1/5 | `KonepsCallGateTest` 3/3 · `KonepsCallPacerTest` 7/7 |
 | 사유 모집단에서 차단을 빼기(test 대역) | `OpeningAccessBlockedHaltTest` 1/5 | 나머지 4 — **모집단 등식이 비는 쪽도 붉어진다**는 대리 측정이다(새 `data class` 사유를 지어낼 수는 없다) |
+| **낙찰** 호출 자리가 자기 sleeper 를 넘긴다(MWA) | `CollectionWiringSleeperTest` 1/3 — 거동 단언, 문면이 그 자리를 짚는다(`wiring/AwardCollectionWiring · 출하 간격 PT1S · 46.5ms`) | 같은 class 의 값·잠듦 단언 초록. **셋째 탐침이 키만 더한 손 불변식이 아님을 잰다**(cr r6 M-2 ⓑ) — 그 키를 기존 탐침에 묶었다면 이 변이가 초록이었다 |
+| mock 봉투가 받은 항목보다 큰 `totalCount` 를 선언한다(M3NEG2 — 첫 소스가 관문을 **두 번** 지난다) | 같은 class 2/3 — **음성 대조가 먼저** 붉는다(`wiring/CollectionWiring · 음성 대조 — 첫 소스의 호출 2.07s 는 출하 간격 PT1S 미만`) | 같은 batch 의 CTRL(주석 한 줄) 3/3 초록 · 되돌린 뒤 porcelain 0 |
+| 병합이 깨운 낙찰 처분을 **반대로**(차단이 계속 걷는 쪽으로) | `CollectAwardListUseCaseTest` 1/9 — 전수 표 | 나머지 8 초록 — 멈춤 집합만 갈린다 |
 
 세 축이 요점이다. ⓐ 출하 값을 겨눈 변이는 **좁힌 정책으로 도는 test 를 붉히지 않는다** — 그
 비대칭이 「출하 값이 wire 에 닿는가」의 증거다. ⓑ 배선 변이 둘은 **서로 다른 단언**을 붉힌다(값과
@@ -123,6 +133,19 @@ base `df4976cc` · **병합한 main `bd2f450e`**(복원 원천 — 앞서 `3ad4f
 (rate limiter 1 permit/1초)이 같은 크기의 지연을 만들어 벽시계에서 두 축이 섞였다(실측 1.088s,
 초록). 그래서 그 단언을 지우고 둘로 갈랐다. ⓒ 순서·대기 변이는 앞 판 test 를 초록으로 두고 새
 단언만 붉힌다.
+
+**다섯째 병합 뒤 간격 축 변이를 전부 다시 돌렸다**(버릴 clone 에서 `63d74653` 체크아웃). 사유는
+앞 배치의 **통제군이 붉었다**는 것이다 — 병합이 들여온 셋째 전송 자리 때문에 집합 대조가 먼저
+멈춰 MWO·MWOd 가 거동 루프에 닿지도 못했다. 그 표는 버렸다. **FROM-CACHE 통제군은 실행이
+아니므로** 전부 `--rerun` 이고, 결과 XML 의 mtime 과 test 수를 매 변이마다 적었다.
+
+**음성 대조를 깨우려던 첫 변이는 거동이 0 이었다.** 101 행 fixture(`numOfRows` 100 초과)로 쪽
+넘김을 일으키려 했으나 **mock 봉투가 `totalCount` 를 받은 항목 수로 적어** 걷기의 완료 술어
+(`items + duplicate + dropped >= total`)가 첫 쪽에서 참이 된다 — 한 쪽만 받고 끝나 변이 전과 같은
+거동이었고 test 는 초록이었다. **빌드가 0 인 것과 거동이 0 인 것은 다르다**: 그래서 봉투의
+`totalCount` 자체를 받은 항목보다 크게 바꾸는 M3NEG2 로 바꿔치웠고, 그때 첫 호출이 2.07s 로
+늘어나며 음성 대조가 먼저 붉어졌다(위 표). 거동이 **실제로** 바뀐 증거는 그 2.07s 와, 같은 run 에서
+기다림 기록이 `[PT1S]` → `[PT1S, PT2S, PT3S]` 로 늘어난 것이다.
 
 **게이트 둘이 이 라운드의 코드를 거부했고 그 거부가 측정이다**: `javaClass.simpleName` 은 수집
 리플렉션 게이트가(선례와 같은 자리에 쌍 하나 등재), 주입 인자가 생긴 `konepsTransportFor` 는 전송
@@ -179,17 +202,52 @@ record 생성 한 줄(「actual type is NoticeId」). 새 후보는 건이 생�
 `git diff --name-only 56bd33ea bd2f450e` 는 **8 경로**(의존 고정·docker·그 slice 의 evidence)이고
 내 산출물 경로와의 교집합이 **0** 이다. 자동 병합이고 충돌 0 이다. 병합 뒤
 `git diff --name-only bd2f450e HEAD -- config/quality/vuln-allowlist.properties docker` 가 **빈
-출력**이라 그 slice 의 줄이 그대로 남아 있다(내 쪽 diff 는 내 산출물 46 경로뿐이다).
+출력**이라 그 slice 의 줄이 그대로 남아 있다(내 쪽 diff 는 내 산출물 46 경로뿐이다 — **그때의
+계수다**, 다섯째 병합 뒤 원천 `07140729` 기준으로는 48 이다).
+
+## 4d. 다섯째 병합(main `07140729`, #128 낙찰 수집 · #139 ml-lifecycle) — 깨진 셋
+
+`git diff --name-only bd2f450e 07140729` 는 **150 경로**이고 내 산출물과의 교집합이 **여섯**이다.
+충돌이 난 자리는 둘(`git show --cc` 가 `architecture-policy.properties`·`gate-tests.properties`
+두 파일만 낸다)이고 양쪽을 보존해 풀었다. **깨진 것은 셋이고 전부 `AccessBlocked` × 새 낙찰
+갈래의 교차**다 — 셋 다 사람이 아니라 타입·게이트가 가리켰다.
+
+| 깨진 자리 | 무엇이 가리켰나 | 고친 커밋 |
+| --- | --- | --- |
+| `CollectAwardListUseCase.haltOf` | **컴파일**(`'when' expression must be exhaustive`) — main 이 세운 소진 `when` 에 이 slice 의 새 사유가 들어왔다 | `eaf846a2` |
+| `CollectAwardListUseCaseTest` 전수 표 | 모수를 sealed 계층에서 뽑으므로 새 사유가 병합과 **동시에** 표에 들어왔고 기대 행이 없었다 | 같은 커밋 |
+| `CollectionWiringSleeperTest` 집합 대조 | `Some elements were unexpected: ["wiring/AwardCollectionWiring"]` — main 의 낙찰 배선이 `konepsTransportFor` 를 부르는데 탐침표에 없었다 | `63d74653` |
+
+**셋째가 이 라운드의 수확이다.** 그 test 의 KDoc 이 「셋째 클래스가 전송을 만들면 거동을 재지 않은
+채 지나갈 수 없다 — 집합 대조가 먼저 붉어진다」를 **주장**했고 병합이 그 주장을 **실측**으로 바꿨다.
+탐침은 키만 더하지 않고 그 클래스의 production 조립 메서드로 거동까지 재며, 변이 MWA 가 그 결속을
+잰다(§4).
+
+**합집합을 계수로 확인했다**(충돌 0 이 「접히지 않았다」를 뜻하지 않고, 충돌 해소도 마찬가지다).
+
+| 겹친 경로 | 내 변경(원천 대비) | 합집합 확인 |
+| --- | --- | --- |
+| `config/quality/gate-tests.properties` | +9 −0 | 고유 FQN **548 = main 539 ∪ 레인 528**(누락 0 · 초과 0). 중복 FQN 넷은 **원천·레인 양쪽에 이미 있던 같은 집합**이라 병합이 만든 것이 아니다 |
+| `config/quality/architecture-policy.properties` | +2 −1 | 키 **140 = 합집합 141 − 하나**. 그 하나는 `collection.usecase.type` 이고 **main 이 `a6e51b70` 에서 지운 키**다(내 slice 는 그 키를 만지지 않았다 — 앞 원천 대비 diff 빈 출력). 지워진 채 남는 것이 맞다 |
+| `docs/discovery/capability-map.md` | +3 −3 | 줄 수 **4032 → 4032**(내 편집은 줄 수 불변 치환) |
+| `app/…/evaluation/EvaluationCommitRunE2ETest.kt` | +15 −0 | main 의 482 줄이 **삭제 0** 으로 남고 내 15 줄이 얹혔다 |
+| `workflow/…/collection/CollectAwardListUseCase.kt` | +8 −4 | main 이 만든 파일 — 낡은 예고 KDoc 문단을 깨어난 사실로 바꾸고 분기 한 줄을 더했다 |
+| `workflow/…/collection/CollectAwardListUseCaseTest.kt` | +9 −4 | 같은 자리의 전수 표 한 행 + 그 주장의 문면 |
 
 ## 5. clean-tree 게이트
 
-`git status --porcelain -- <복원 목록 경로 개별 인자>` **빈 출력**. 양성 대조 1회 — 한 파일에
-개행 하나를 붙이면 그 파일 한 줄이 나오고 `truncate` 로 원래 크기로 되돌리면 다시 빈 출력이다
-(비파괴 절삭, `checkout --` 를 쓰지 않았다).
+`git status --porcelain -- <복원 목록 경로 개별 인자>`(**인자 44**, 기계 산출 목록 그대로) **빈
+출력**. 양성 대조 1회 — `config/quality/gate-tests.properties` 에 개행 하나를 붙이면 그 파일 한 줄이
+나오고 `truncate -s <원래 바이트>` 로 되돌리면 다시 빈 출력이다(비파괴 절삭, `checkout --` 를 쓰지
+않았다 — 미커밋 산출물을 함께 지운다). 되돌린 뒤 남은 porcelain 은 이 디렉터리의 evidence 뿐이고,
+그 파일들은 복원 목록 **밖**이라 §4 의 rollback 유효성 술어를 움직이지 않는다.
 
 ## 6. 비밀값 스캔
 
 `grep -rniE -f config/quality/leak-patterns.txt` 축은 CI 의 누출 게이트가 정본이다(이 slice 는 그
-어휘를 evidence 에 축어로 적지 않는다). `leakPatternGate` 를 판정 SHA 의 트리에서 실행해 exit 0 을
-실측했다. 이 라운드가 더한 문자열에 외부 값이 없다 — 전송 경로는 상태 코드 숫자 하나를 싣고,
+어휘를 evidence 에 축어로 적지 않는다). `leakPatternGate` 는 **§2 의 전건 `check` 안에서 돌았고**
+(task 1회) 그 빌드가 exit 0 이다 — 그 실행의 트리는 `9dbb1fec`(계약 갱신까지 담은 HEAD)이라 이
+디렉터리의 evidence 도 스캔 입력에 들어 있었다. 뒤따르는 evidence 커밋은 같은 제외 디렉터리만
+만지고, **마지막 HEAD 의 재실측 정본은 verifier 와 PR 조치 코멘트**다(여기 넣으려는 시도가 커밋을
+또 낳는다). 이 라운드가 더한 문자열에 외부 값이 없다 — 전송 경로는 상태 코드 숫자 하나를 싣고,
 청중 표지는 **계수도 주체도 싣지 않는** 고정 문장 하나다.
