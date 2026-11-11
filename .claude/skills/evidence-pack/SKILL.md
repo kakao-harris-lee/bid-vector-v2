@@ -280,8 +280,8 @@ cr OQ-2 → `OPEN-ROLLBACK-PREDICATE-WORDING`). 후속 PR #143 은 자기 eviden
 ```
 git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
- 근거: M9/
-ops-migrations-followups(PR #145)의 병합 라운드.
+
+근거: 규칙은 M9/ops-migrations-followups(PR #145)의 병합 라운드에서, 이 보완 술어는 PR #147 verifier M-2 에서 왔다.
 
 **복원 원천을 바꾸면 단언 셋째를 잰다 (2026-11-11).** main 을 병합해 원천을 착수 base 에서 병합한 main SHA
 로 옮길 때, 위 단언 둘(원천이 HEAD 의 조상 · 원천에 첫 산출물 커밋 없음)은 **원천이 적법한가**만 말한다.

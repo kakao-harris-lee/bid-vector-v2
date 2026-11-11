@@ -283,7 +283,7 @@ evidence 만 더하는 커밋이면 **rollback 실측의** 유효성은 §4 술�
 근거: 2026-09-16 M5/5F-1 — 구현 완료 보고와 팀장 지시가 엇갈려 검증 중 HEAD 가 다섯 커밋 이동했다(PR #24 조치
 코멘트). 그동안 이 규율은 `CLAUDE.md` 요약에만 있었다.
 
-**code-reviewer 를 verifier 와 병렬로 띄운다 (이 문서로 이관 2026-11-11 · 전역 규약 §1 유래).** 코드 slice 의
+**code-reviewer 를 verifier 와 병렬로 띄운다 (이 문서로 이관 2026-11-11 · 원 출처는 `CLAUDE.md` 가 가리키던 전역 규약 `~/.claude/review-lane.md` §1 이다. 그 파일은 2026-11-11 이 호스트에 없다 — 이 문장이 정본이 된다).** 코드 slice 의
 PR 은 verifier(ready-for-review / not-ready)와 code-reviewer(approve / request_changes)를 **같은 판정 SHA** 에 대해
 동시에 띄운다. code-reviewer 는 호출 때 `model: sonnet` 을 명시하고 저자와 다른 패스로 둔다. 두 판정은 지적이 0 이어도
 각각 PR 코멘트로 남긴다. **(2026-11-11 추가 — 원 규율에 없던 완화)** 수정 라운드 뒤의 재리뷰는 바뀐 범위
