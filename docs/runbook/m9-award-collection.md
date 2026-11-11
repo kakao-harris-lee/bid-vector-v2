@@ -28,12 +28,19 @@
 | `bidvector.award-collection.calls-total` | **제안 3,000** | 같은 디렉터리의 누적 호출을 덮는다 |
 | `bidvector.award-collection.run-state-dir` | 저장소 밖 경로 | 미리 만들어 둔다 |
 | `bidvector.koneps.service-key` | 서비스 키 | 로그·원장에 남지 않는다 |
+| `bidvector.release.sha` | jar 의 빌드 SHA | **모드와 무관하게 필수**(M9/OPS-10) — 이 프로세스가 쓰는 행에 찍히는 릴리스 식별자이고 **기본값이 없다.** 갈래마다 다른 키가 아니라 **한 키**다 |
 
 제안 상한의 근거: 오퍼레이션 둘 × 키당 일 1,000 건 쿼터의 한참 아래. 1년 창을 조각으로 나눠 덮으면
 총 1,460 호출 안팎이다(조각마다 쪽 수 여유 포함).
 
-**기본값이 없는 값(기간·상한 둘·실행 상태·서비스 키)은 미설정이면 기동이 실패한다.** 코드가 안전한
-기본값을 지어내지 않는다.
+**기본값이 없는 값(기간·상한 둘·실행 상태·서비스 키·릴리스 식별자)은 미설정이면 기동이 실패한다.**
+코드가 안전한 기본값을 지어내지 않는다.
+
+**이 표는 이 갈래의 키 + 릴리스 식별자만 든다.** 모드와 무관하게 늘 필요한 나머지(DB 접속 셋 ·
+운영자 토큰 · 평가 endpoint 속성)의 전수는 `m6-6e-operations.md` §1.2·§1.4 가 정본이고, 기동을
+거부하는 조합의 전수는 같은 문서 §1.5 다 — 여기에 베껴 두면 그 목록이 두 자리에서 갈린다. 릴리스
+식별자만 예외로 이 표에 함께 적는 이유는, 낙찰 갈래가 **병합으로** 그 요건을 받았는데 이 문서가
+따라오지 않아 「블록 그대로 돌리면 기동 실패」가 실제로 지적된 자리이기 때문이다(cr r10 M-2).
 
 ## 2. 창을 조각으로 나눈다
 
@@ -57,8 +64,14 @@ java -jar app.jar \
   --bidvector.award-collection.categories=construction,service \
   --bidvector.award-collection.calls-per-day=<승인값> \
   --bidvector.award-collection.calls-total=<승인값> \
-  --bidvector.award-collection.run-state-dir=<저장소 밖 경로>
+  --bidvector.award-collection.run-state-dir=<저장소 밖 경로> \
+  --bidvector.release.sha=<jar SHA>
 ```
+
+마지막 줄은 **이 갈래의 인자가 아니다** — 모드와 무관하게 요구되는 릴리스 식별자이고 기본값이 없어
+주지 않으면 바인딩에서 거부된다(M9/OPS-10). 값은 그 jar 의 빌드 SHA 다(`git rev-parse --short HEAD`).
+DB 접속·운영자 토큰·평가 endpoint 속성은 §1 끝 문단이 가리키는 자리에서 가져온다 — 이 블록이 그
+전수가 아니다.
 
 | 코드 | 뜻 | 처방 |
 | --- | --- | --- |
@@ -195,8 +208,13 @@ ORDER BY reference_date, started_at;
 java -jar app.jar \
   --bidvector.opening-promote.mode=once \
   --bidvector.opening-promote.run-state-dir=<개찰결과 갈래의 실행 상태 경로> \
-  --bidvector.opening-promote.reference-date=<기준일>
+  --bidvector.opening-promote.reference-date=<기준일> \
+  --bidvector.release.sha=<jar SHA>
 ```
+
+릴리스 식별자는 **같은 jar 의 어느 모드에서나** 요구되므로 이 블록에도 있다(§3 의 같은 줄과 **같은
+값**이다 — 한 호스트가 두 값을 적지 않게 한다). 이 갈래를 위해 바뀐 것이 없다는 말은 승격 **코드**에
+대한 것이고, 기동 요건은 그 코드와 무관하게 조립이 정한다.
 
 승격 범위는 그 디렉터리의 **확정 표본**이다. 낙찰 목록 원문은 창 전체를 받으므로 표본 밖 공고의 낙찰
 원문은 적재만 되고 canonical 로 올라가지 않는다 — 「내 입찰」 공고가 그 표본에 없으면 화면의 낙찰자
