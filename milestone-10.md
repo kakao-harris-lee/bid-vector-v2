@@ -18,6 +18,8 @@
 
 ## slice
 
+> 이 표는 registry(§12.3 (b))에서 유도한 착수 전 판이다. 처분의 정본은 아래 「착수 실측」 표다.
+
 네 slice 는 서로 다른 경로를 만지고 병렬로 진행한다. main 이 strict up-to-date 이므로 머지는 하나씩 하고,
 뒤 PR 은 앞 머지를 병합한 뒤 다시 잰다.
 
@@ -40,10 +42,10 @@
 | --- | --- | --- | --- | --- |
 | 10A | `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` | — | — | — |
 | 10B | `OPEN-M9-COMMAND-OPENAPI-ENUM` | `OPEN-M9-TIMELINE-COMMAND-WORDING`(#132). 10B 가 그 방어를 계약 유도로 교체한다 | — | `OPEN-M10-TIMELINE-STATE-OPENAPI-ENUM`(상태 두 칸) |
-| 10C | `OPEN-SCOPED-ROOTS-PARITY-REST` | `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` · `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`(#134 `97ed49c4`) | `OPEN-VERDICT-CONSTRUCTION-VISIBILITY`. production 가시성 변경이 필요하고, testFixtures 전역 차단(`OPEN-1BC-TESTFIXTURES-GATE`, ADR 선행)을 우회하게 되며, 모듈 밖 test 18 파일이 깨진다. 팀장 판정 2026-11-06(M9/gates-tests 계약 갱신 ①)과 같다 | `OPEN-M10-SCOPED-PACKAGES-COVERAGE`(이름 층 축 없는 여섯) |
-| 10D | `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | `OPEN-M9-CLOCK-LINT-SCOPE` · `OPEN-M9-SCREEN-COVERAGE-SYMBOL-GRAPH` · `OPEN-M9-MONEY-VOCAB-CROSS-LANG`(#132 `fabc496b`). 10D 가 재측정한다 | 금액 어휘 「하나의 출처」(enum 은 네 벌 중 하나만 지우고 해악은 등식이 이미 닫았다) | `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER`(간접 렌더 — 조용한 초록 재현) |
+| 10C | `OPEN-SCOPED-ROOTS-PARITY-REST` | `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` · `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS`(#134 `97ed49c4`) | `OPEN-VERDICT-CONSTRUCTION-VISIBILITY`. production 가시성 변경이 필요하고, testFixtures 전역 차단(`OPEN-1BC-TESTFIXTURES-GATE`, ADR 선행)을 우회하게 되며, 모듈 밖 test 17 파일이 깨진다. 2026-11-06 판정 때는 16 이었고, M9/ops-code 가 하나를 더했다. 판정은 팀장 판정 2026-11-06(M9/gates-tests 계약 갱신 ①)과 같다 | `OPEN-M10-SCOPED-PACKAGES-COVERAGE`(이름 층 축 없는 여섯) |
+| 10D | `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | `OPEN-M9-CLOCK-LINT-SCOPE` · `OPEN-M9-SCREEN-COVERAGE-SYMBOL-GRAPH` · `OPEN-M9-MONEY-VOCAB-CROSS-LANG`(PR #132 머지 `e12c0485`). 10D 가 재측정한다 | 금액 어휘 「하나의 출처」(enum 은 네 벌 중 하나만 지우고 해악은 등식이 이미 닫았다) | `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER`(간접 렌더 — 조용한 초록 재현) |
 
-그래서 실제 구현은 넷이고, 장부 정정은 여섯, 범위 밖 유지는 하나, 새 등재는 넷이다.
+그래서 실제 구현은 넷이고, 장부 정정은 여섯, 범위 밖 유지는 하나, 새 등재는 셋이다. 10D 의 「하나의 출처」는 OPEN 이 아니라 그 OPEN 안의 처방 하나를 남긴 판정이라 id 를 세우지 않는다.
 
 ## 완료 조건
 
@@ -52,7 +54,7 @@
    - **닫힘**: 이 마일스톤의 PR·SHA 가 닫은 것.
    - **이미 닫힘**: 앞 PR 이 닫았는데 장부만 비어 있던 것. 근거 PR·SHA 와 이 마일스톤의 재측정을 함께 적는다.
    - **범위 밖 유지**: 사유와 함께 남긴 것. 판정자는 레인이 아니라 **팀장**이고, 착수 보고에 대한 답으로만 낸다. 그 판정은 위 「착수 실측」 표에 적힌 것이 전부이고, 사후 추가는 인정하지 않는다.
-3. 닫힌 OPEN 의 처분이 `docs/discovery/capability-map.md` §12.3 에 등재됐다. 각 slice 가 자기 머지에서 한다.
+3. 처분 전부(닫힘·이미 닫힘·범위 밖 유지·새 OPEN)가 `docs/discovery/capability-map.md` §12.3 의 slice 하위 절 (g)~(j) 에 날짜와 함께 등재됐다. 각 slice 가 자기 머지에서 한다.
 4. 외부 effect 0 이다. 새 KONEPS 호출·실 DB·실 발송이 없다.
 5. 이 문서의 종결 절을 세션 모델이 쓴다.
 
