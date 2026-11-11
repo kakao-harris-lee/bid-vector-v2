@@ -14,10 +14,18 @@
 # 그 컨테이너는 `--network none` 에 호스트 포트 publish 가 없으며 이 실행의 표식을 라벨로
 # 단다. 시작 전에 만들 이름이 호스트의 기존 컨테이너 이름과 교차 0 임을 확인한다.
 #
-# Flyway 호출은 **production 과 같은 조건**으로 한다 — 앱 이미지가 이미 풀어 둔
+# Flyway 호출은 **production 에 가장 가까운 조건**으로 한다 — 앱 이미지가 이미 풀어 둔
 # `/application/lib` 를 그대로 classpath 로 쓰므로 Flyway·방언·JDBC 드라이버가 출하본과
-# 같은 바이트이고, 설정도 `PersistenceWiring.migrate()` 와 같이 전부 기본값이다.
-# (validateOnMigrate · cleanDisabled · baselineOnMigrate=false). 앱을 기동하지 않는 이유는
+# 같은 바이트이고, 설정도 출하 구성(`PersistenceWiring.ownerMigration`)과 같이 location 하나
+# 밖에는 전부 기본값이다(validateOnMigrate · cleanDisabled · baselineOnMigrate=false).
+#
+# **남는 차이는 하나다**: 출하 구성은 migration 연결에 잠금 대기 상한을 `initSql` 로 깔고
+# (M9/ops-migrations — 파일의 `SET LOCAL` 선언을 잊어도 그 값이 깔리게 한다) 아래 호출자는
+# 그것을 주지 않는다. 그 값이 깎는 것은 **다른 세션이 쥔 잠금을 기다리는 시간**이고, 이
+# 리허설은 자기가 만든 컨테이너 안에서 배타적으로 돌아 기다릴 상대가 없다 — 거동 차이 0 이다
+# (그 축을 재는 자리는 `MigrationLockBoundTest`·`MigrationLockTimeoutTest` 다).
+#
+# 앱을 기동하지 않는 이유는
 # 둘이다: 기동은 비싸고, bootJar 안에 봉인된 `classpath:db/migration` 에는 임시 V18·V19 를
 # 넣을 수 없다. Flyway CLI 는 이 저장소에 없고 flyway-core 에는 main 이 없다.
 #
@@ -186,7 +194,11 @@ PROBE_FIX=$((PROBE_BASE + 2))
 cat > "$JVM/RehearsalFlyway.java" <<'JAVA'
 import org.flywaydb.core.Flyway;
 
-/** PersistenceWiring.migrate() 와 같은 설정(전부 기본값)으로 Flyway 를 부른다. */
+/**
+ * 출하 마이그레이션 구성(PersistenceWiring.ownerMigration)과 같은 설정으로 Flyway 를 부른다 —
+ * location 하나 밖에는 전부 기본값이다. 유일한 차이(잠금 대기 상한 initSql)와 그것이 여기서
+ * 거동을 바꾸지 않는 이유는 이 스크립트 머리말이 든다.
+ */
 public final class RehearsalFlyway {
     public static void main(String[] args) {
         Flyway flyway = Flyway.configure()

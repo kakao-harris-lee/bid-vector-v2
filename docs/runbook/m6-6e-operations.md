@@ -31,22 +31,37 @@
 배포가 주는 값은 **환경변수 또는 명령행 인자**뿐이고, 그 가운데 관리 표면에 닿는 것은 §2 의 두 키만
 허용된다. logback·log4j2 설정 파일도 없다 — 로그 출력은 Boot 기본 패턴이다.
 
-### 1.2 `@ConfigurationProperties` prefix 전수 — 10
+### 1.2 `@ConfigurationProperties` prefix 전수 — 17
+
+**한 행이 한 prefix 다**(행 수 = 위 수). prefix 하나에 바인딩 클래스가 둘이면 조건이 갈릴 수 있고,
+그 차이는 조건 열이 든다 — 행을 쪼개면 행 수로 세는 길이 막힌다.
 
 | prefix | 바인딩 클래스 | 모드와 무관하게 필수인가 |
 |---|---|---|
 | `operator.credential` | `OperatorCredentialProperties` | **항상 필수** — 조립 근이 모드와 무관하게 바인딩한다 |
 | `bidvector.persistence` | `PersistenceProperties` | **항상 필수** |
+| `bidvector.release` | `ReleaseProperties` | **항상 필수**(M9/OPS-10 — `sha`, 기본값 없음). 조립에 조건이 없다: 어느 모드로 뜨든 행을 쓰는 경로가 있으므로 전부 이 값을 요구한다 |
 | `bidvector.evaluation` | `EvaluationProperties` | **항상 필수**(`candidate-cap`; 수집 모드에서도 부팅 요건) |
+| `bidvector.access` | `AccessCookieProperties` | 기본값이 있어 **주지 않아도 뜬다**(§2 참조) |
+| `bidvector.notification` | `NotificationChannelProperties`(· `TelegramChannelProperties`) | **relay 를 켤 때만** 바인딩된다(`RelayWiring` 이 그 자리를 든 유일한 곳이다). 전부 기본값 — 채널 설정이 없으면 그 채널이 비활성이다(M9/STR12) |
 | `bidvector.evaluation.commit` | `EvaluationCommitProperties` | 평가 커밋 러너를 켤 때만 |
 | `bidvector.collection` | `CollectionProperties` | 공고 목록 갈래를 켤 때만 |
-| `bidvector.koneps` | `KonepsEndpointProperties` · `KonepsCredentialProperties` | 수집 갈래 둘 중 하나를 켤 때 |
+| `bidvector.koneps` | `KonepsEndpointProperties` · `KonepsCredentialProperties` | **타입마다 다르다** — credential(서비스 키)은 수집 갈래 **셋**(공고 목록·개찰·낙찰) 전부가 쥐고, endpoint 는 **공고 목록·개찰 둘**뿐이다. 낙찰 갈래는 자기 `koneps.award` 를 쓰므로 §1.4 의 이 prefix 의 endpoint leaf 는 낙찰 갈래에 해당하지 않는다 |
 | `bidvector.koneps.opening` | `KonepsOpeningEndpointProperties` | 개찰 갈래를 켤 때 |
+| `bidvector.koneps.award` | `KonepsAwardEndpointProperties` | 낙찰 갈래를 켤 때 |
 | `bidvector.opening-collection` | `OpeningCollectionProperties` | 개찰 갈래를 켤 때만 |
+| `bidvector.opening-promote` | `OpeningPromotionProperties` | 승격 러너를 켤 때만 |
+| `bidvector.award-collection` | `AwardCollectionProperties` | 낙찰 갈래를 켤 때만 |
 | `bidvector.snapshot-extract` | `SnapshotExtractionProperties` | 스냅숏 추출을 켤 때만 |
 | `bidvector.relay` | `RelayProperties` | relay 를 켤 때만 |
+| `bidvector.account` | `AccountCommandProperties` | 계정 명령을 켤 때만 |
 
-### 1.3 러너 스위치 — `mode=once` 여섯
+**이 수와 표는 `@ConfigurationProperties(prefix = …)` 선언에서 기계로 뽑는다** — 2026-11-11 에 일곱이
+밀려 있었다(릴리스·접속 쿠키·알림 채널·낙찰 둘·승격·계정). 그 등식을 지키는 술어가 아직 없고, 세우는
+일이 `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`(capability map)다. `bidvector.notification-sweep` 은
+이 표에 없다 — 스위치 하나뿐이고 바인딩할 타입이 없다(§1.3).
+
+### 1.3 러너 스위치 — `mode=once` 아홉 + 어휘가 다른 하나
 
 러너는 **전부 기본 꺼짐**이고 `@ConditionalOnProperty(name = ["mode"], havingValue = "once")` 하나로만
 켜진다. 한 프로세스에 둘 이상을 켜면 **기동하지 않는다**(`OneShotRunnerGuard` — 임의의
@@ -56,10 +71,18 @@
 |---|---|
 | `bidvector.collection.mode=once` | 공고 목록 수집 |
 | `bidvector.opening-collection.mode=once` | 개찰 수집(축 다섯) |
+| `bidvector.opening-promote.mode=once` | 개찰 결과 canonical 승격(M7/7C⑤-0 — 절차는 `m9-award-collection.md` §4) |
+| `bidvector.award-collection.mode=once` | 낙찰 목록 수집(M9/award-ingest — 절차는 `m9-award-collection.md`) |
 | `bidvector.snapshot-extract.mode=once` | 스냅숏 추출 |
 | `bidvector.evaluation.mode=once` | 평가 커밋(outbox 기록) |
 | `bidvector.relay.mode=once` | 알림 relay |
+| `bidvector.notification-sweep.mode=once` | 알림함 훑기(M7/7C③-b — 절차는 `m7-7c3b-notification-sweep.md`) |
 | `bidvector.retention.mode=once` | 보존 파기·PII 마스킹(M6/6B-3 — 절차는 `m6-6b3-retention.md`) |
+| `bidvector.account.mode=<어휘>` | 운영자 계정 명령(M7/7D — 절차는 `m7-7f-production.md`). **이 하나만 `once` 가 아니다** — 어휘가 명령 종류를 고르므로 `havingValue` 없이 「값이 있으면 켜짐」이다 |
+
+**이 표를 지키는 술어는 없다.** 러너가 늘 때 함께 오지 않으면 조용히 낡는다 — 그 등식을 게이트로
+세우는 일이 `OPEN-M9-REQUIRED-KEY-ENTRYPOINT-CENSUS`(capability map)다. 2026-11-11 에 네 줄이
+밀려 있었고(승격·낙찰·알림 훑기·계정) 이 라운드에서 코드와 대조해 채웠다.
 
 러너를 하나도 켜지 않으면 **HTTP 표면만 뜬다**(운영자 API). 러너를 켤 때는 6G runbook §2 의 관례대로
 `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 으로 HTTP 표면을 끈다.
@@ -74,16 +97,23 @@
 |---|---|
 | `operator.credential` | `value` |
 | `bidvector.persistence` | `jdbc-url` · `username` · `credential` |
+| `bidvector.access` | `cookie-secure` (기본 `true`) |
+| `bidvector.notification` | `site-base-url` · `telegram.{bot-credential,chat-id,route-key,base-url,connect-timeout,response-timeout}` — `telegram.bot-credential` 은 **위 문단의 자격 값과 같은 취급**이다 |
 | `bidvector.evaluation` | `candidate-cap` · `mode` |
 | `bidvector.evaluation.commit` | `current-active-bids` |
 | `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` |
 | `bidvector.koneps` | `base-url` · `service-key` · `operations.<업종>.path` · `operations.<업종>.division` |
 | `bidvector.koneps.opening` | `scsbid-base-url` · `opening-complete-path` · `bid-price-formula-a-path` · `rows-per-page` · `operations.<업종>.{opening-result-list-path,reserve-price-detail-path,base-amount-path,division}` |
 | `bidvector.opening-collection` | `mode` · `from` · `to` · `categories` · `sampling-seed` · `sample-size` · `calls-per-day` · `calls-total` · `run-state-dir` |
-| `bidvector.release` | `sha` — **모드와 무관하게 필수**(M9/OPS-10). 이 프로세스가 쓰는 실행 행에 찍히는 릴리스 식별자이고 기본값이 없다(없으면 기동 실패). 앞 판의 `bidvector.collection.release-sha`·`bidvector.opening-collection.release-sha` 둘을 대체한다 |
+| `bidvector.award-collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` — 낙찰 목록 일회 수집(M9/award-ingest, 절차는 `m9-award-collection.md`). **`from`/`to` 는 개찰일**이고 한 실행의 창은 60일 이하다 |
+| `bidvector.koneps.award` | `scsbid-base-url` · `operations.<업종>` · `rows-per-page` |
+| `bidvector.release` | `sha` — **모드와 무관하게 필수**(M9/OPS-10). 이 프로세스가 쓰는 실행 행에 찍히는 릴리스 식별자이고 기본값이 없다(없으면 기동 실패). 앞 판의 갈래별 키 **셋**을 대체한다 — `bidvector.collection.release-sha` · `bidvector.opening-collection.release-sha` · `bidvector.award-collection.release-sha`. 셋 다 기본값 `unversioned` 를 가졌고(「모름」을 지어낸 값으로 적는 형태) 서버 프로세스는 자기 키가 아예 없었다 — 한 호스트에서 서로 다른 값이 적힐 수 있는 형태 자체를 없앴다 |
+| `bidvector.opening-promote` | `mode` · `run-state-dir` · `reference-date` |
 | `bidvector.snapshot-extract` | `mode` · `from` · `to` · `output-dir` · `snapshot-id` · `run-state-dir` |
 | `bidvector.relay` | `mode` · `environment` · `owner` · `channel` · `claim-limit` |
+| `bidvector.notification-sweep` | `mode` — 스위치 하나뿐이다(설정 타입이 없다) |
 | `bidvector.retention` | `mode` |
+| `bidvector.account` | `mode` · `login` · `initial-value` — 마지막 하나가 비밀 문구이고 **그 값은 위 문단의 자격 값과 같은 취급**이다(환경변수로만, 명령행·로그·transcript 금지). 키 **이름**은 스캔 어휘를 피해 고른 것이라 적어도 되고(그 사유는 그 타입 KDoc 이 든다), 적지 않으면 이 표가 그 prefix 의 정본이 아니게 된다. 절차는 `m7-7f-production.md` |
 
 ### 1.5 설정이 **기동을 거부하는** 조합 — 값을 지어내지 않는다
 
@@ -91,12 +121,16 @@
 
 | 거부 | 어디서 |
 |---|---|
-| 러너 둘을 함께 켰다 | `OneShotRunnerGuard` |
-| 수집 모드 둘(`collection`·`opening-collection`)을 함께 켰다 | `CollectionWiring` |
-| 러너는 켜졌는데 KONEPS 서비스 키가 없거나 비었다 | `CollectionWiring`·`OpeningCollectionWiring` |
+| **릴리스 식별자(`bidvector.release.sha`)가 없거나 비었다** | `ReleaseWiring` — **조건 없는 조립**이라 러너를 하나도 켜지 않아도 거부된다. §1.2 의 「항상 필수」가 이 자리다(`candidate-cap` 과 같은 모양) |
+| 러너 **둘 이상**을 함께 켰다 | `OneShotRunnerGuard` — 모드 이름이 아니라 **`ApplicationRunner` 빈 수 ≤ 1** 을 본다. 그래서 수집·개찰·낙찰·승격·추출·평가커밋·relay·훑기·보존·계정 **어느 조합이든** 이 하나가 막는다(먼저 끝난 러너가 JVM 을 끝내 나머지가 돌지 않기 때문이다) |
+| 수집 모드 둘(`collection`·`opening-collection`)을 함께 켰다 | **관문이 둘이다** — 위 러너 수 관문과, 두 배선이 **각자 등록하는 공유 타입 셋**(실행 상태·호출 상한 원장·조회 범위)이 둘씩 되어 생기는 **주입의 모호함**이다(`CollectionWiringTest` 가 그 사유를 타입으로 잡는다). **`CollectionWiring` 자신에는 이 검사가 없다** — 앞 판이 그렇게 적었던 자리다 |
+| 러너는 켜졌는데 KONEPS 서비스 키가 없거나 비었다 | `CollectionWiring`·`OpeningCollectionWiring`·`AwardCollectionWiring` |
 | KONEPS base URL 이 평문 `http` 로 **외부** 호스트를 가리킨다(loopback mock 은 허용) | 같은 자리 — 서비스 키가 쿼리로 나간다 |
-| 조회 범위가 상한 초과·미래·역전 — 공고 목록 **31일**, 개찰 **120일** | 같은 자리(`SPAN_TOO_LONG`) |
+| 조회 범위가 상한 초과·미래·역전 — 공고 목록 **31일**, 개찰 **120일**, **낙찰 60일**(개찰일 축) | 같은 자리(`SPAN_TOO_LONG`) — 상한은 갈래마다 **자기 정책**이 정한다 |
 | 업종이 표에 없다 · 빈 목록 · 중복 · 대분류 누락·어휘 밖 · 빈 경로 | 같은 자리 |
+| 낙찰 갈래의 **기본값 없는 값 여섯**(개찰일 창 둘 · 업종 · 호출 상한 둘 · 실행 상태)이 없다 | `AwardCollectionProperties` 생성자 바인딩 — 코드가 안전한 기본값을 지어내지 않는다 |
+| `bidvector.koneps.award.rows-per-page` 가 `1..게이트웨이 상한` 밖이다 · `operations` 가 비었거나 경로가 비었다 | `KonepsAwardEndpointProperties` 의 `init` |
+| `bidvector.account.login` 또는 `initial-value` 가 **공백**이다 | `AccountCommandProperties` 의 `init` |
 | 호출 상한·표본 정책(seed·층당 목표)이 없다 | `OpeningCollectionWiring` — 기본값을 지어내지 않는다 |
 | 총 상한이 일 상한보다 작다 | 같은 자리 |
 | 실행 상태 디렉터리가 없거나 **저장소 안**이다 | 같은 자리 |

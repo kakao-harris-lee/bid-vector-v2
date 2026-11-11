@@ -431,6 +431,10 @@ class AppHttpDependencyGateTest {
  *   7C⑤-a(개찰 조회 둘)가 같은 형태다.
  * - 7C② 는 조립 층 ② 에 요청 스코프 팩토리·run 둘(dry-run 짝의 등재를 미러링).
  * - 7C④-2b 는 `ProfileWiring` 하나(V22 저장소·V12 저장 어댑터를 세우는 tier1).
+ * - 7C⑤-b 는 `MyBidResultWiring` 하나(기준 ② — `PersistenceWiring` 의 `DataSource` 와 전역 `Clock`
+ *   으로 결과 조회 어댑터 셋을 세우는 tier1). 조회기를 ② 층에 올리지 않은 것이 위 원형과 다른 점이다 —
+ *   컨트롤러가 use case 를 직접 받는다. **이 줄은 앞 판 KDoc 의 이력 문단에만 있어 재작성에서 함께
+ *   사라졌다**(cr r10 L-1): 그 레인이 상수를 75 → 76 으로 올린 사실만 적혀 있었고 근거 줄이 없었다.
  * - 7C③-b 는 알림 훑기 일회 러너 갈래 넷 + 조립 `NotificationSweepWiring` 하나(기준 ①·②).
  * - M9/ops-migrations 는 `ReleaseWiring` 하나(기준 ②). **설정 타입 `ReleaseProperties` 는 넣지
  *   않았다** — 어댑터도 workflow 타입도 쥐지 않아 제한 층에서 그대로 초록이고, 면제를 필요 이상
