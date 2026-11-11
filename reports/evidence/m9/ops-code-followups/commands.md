@@ -1,7 +1,7 @@
 # M9/ops-code-followups commands
 
-base `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. 전건 `check` 가 돈 트리는 `2719bb32`
-(scope.md 까지 담은 HEAD — cr r7 LOW-2 가 지적한 「실행 트리를 적지 않는다」를 피한다).
+착수 base `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. PR #144 수정 라운드에서 main
+`c21adb2a` 를 병합했으므로 **rollback 원천은 `c21adb2a`** 다(§2a · `rollback.md`).
 
 ## 1. 커밋
 
@@ -13,6 +13,9 @@ base `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. 전건 `check` 가 �
 | `815eb5b9` | `awardExitCodeOf` KDoc(cr r7 M-2) |
 | `b988e7f5` | 원 slice evidence 정정(cr r7 LOW-B·LOW-C) |
 | `2719bb32` | 이 slice 의 scope.md |
+| `3425bcc6` | commands·checklist·rollback (첫 판정 대상) |
+| `3615fc10` | main `c21adb2a` 병합(§2a) |
+| 아래 둘 | PR #144 지적 반영 — 코드 KDoc 한 문단 · evidence 문면 |
 
 ## 2. acceptance — CI Kotlin job 의 명령 그대로
 
@@ -24,6 +27,25 @@ base `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. 전건 `check` 가 �
 `gateExecutionGate`·`unusedImportGate`·`typeShapeGate`·`testShapeGate`, 그리고 `leakPatternGate`
 (§6)와 `cpdCheck`.
 
+## 2a. 병합 — main `c21adb2a`(#143 gates-build-followups), 겹침 0
+
+PR #144 가 BEHIND 라 팀장 지시로 **SHA 를 고정해** 병합했다(`git merge c21adb2a`, 움직이는
+`origin/main` 이 아니다). 충돌 **0**이고, 「충돌 0 이 곧 합집합 정확」은 아니므로 넷을 따로 쟀다.
+
+| 검산 | 실측 |
+| --- | --- |
+| #143 쪽 파일이 축어로 왔는가 | `git diff c21adb2a..HEAD -- config/quality/ adapters/ build-logic/ reports/evidence/m9/gates-build*` **빈 출력** |
+| 내 산출물이 병합으로 움직였는가 | `git diff 3425bcc6..HEAD -- app/ reports/evidence/m9/ops-code*` **빈 출력** |
+| properties 중복 키 | `gate-tests` 키 16 · `architecture-policy` 키 162 — **중복 0**(두 파일 다) |
+| 등재 계수가 접히지 않았는가 | `gate.tests.adapters` **208 → 209**(#143 의 새 class 하나) · `gate.tests.app` **133 → 133** · 나머지 열한 키 불변 |
+
+**경로 겹침이 0 이다** — #143 은 `adapters/`·`build-logic/`·`config/quality/` 둘·자기 evidence 를
+만졌고 내 in_scope 와 교집합이 없다(`git diff --name-only 6e6f953c..c21adb2a -- <내 in_scope>` 빈 출력).
+그래서 손 해소가 없고, 합집합 함정(같은 본문을 접기·키 두 번)이 들어설 자리도 없다. 마지막 행이 중요한
+이유: `app` 등재 수가 **133 그대로**라 §4 의 「133 = 133」 등식이 병합 뒤에도 성립한다.
+
+병합 뒤 `compileTestKotlin`(전 모듈) **exit 0** — 전건 `check` 는 §2 다.
+
 ## 3. ① 분할이 test 를 보존했는가 — 네 축
 
 - **이름 집합**: 분할 전후 `@Test` 함수 이름을 뽑아 정렬해 `diff` — **차이 없음, 다섯**. 전·후 목록을
@@ -34,8 +56,12 @@ base `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. 전건 `check` 가 �
 - **`@Order` 가 살아 있는가**: XML 의 `testcase` 가 **실행 순서**로 적히고, 그 순서가 `@Order` 1→5
   그대로다(개정 축 → 변한 표 → outbox 실패 → relay → 역할 모집단). 이 순서가 `@BeforeEach` 의 표
   비우기에 짐을 지우는 그 결합이다 — class 를 갈랐다면 여기서 깨진다.
-- **크기**: `sizeGate` 리포트에서 test 파일 **347**, 새 fixture 파일 **196**(한도 500, 술어 `> limit`).
+- **크기**: `sizeGate` 리포트에서 test 파일 **347**, 새 fixture 파일 **201**(한도 500, 술어 `> limit`).
   한도 초과 파일 **0**. 이제 저장소 최대 파일은 이 slice 의 것이 아니다.
+
+**가시성 — 이 slice 가 넓힌 표면은 둘뿐이다**: 새 `CommitRunE2EFixture`(internal)와 지역 fake
+`AlwaysBidNowMl`(base 의 파일 private → internal). 파일이 갈리면 file-private 로는 보이지 않아 분할에
+필요한 변경이고, test 소스셋 안이다. 그 둘이 여는 것과 그 비용은 checklist 알려진 제한 ②가 든다.
 
 ## 4. 새 파일이 등재를 요구하지 않는다 — 양방향
 
@@ -74,7 +100,8 @@ base 쪽 class 는 버릴 clone 을 base `6e6f953c` 로 체크아웃해 `:app:co
 
 ## 7. clean-tree 와 하네스 레인 변경
 
-- `git status --porcelain -- <복원 목록 경로 개별 인자>`(**인자 여섯**) **빈 출력**. 양성 대조 1회 —
+- `git status --porcelain -- <in_scope 경로 개별 인자>`(**인자 여섯** — 게이트의 규정 술어가 in_scope
+  이고, 그 여섯은 복원 목록 다섯 + 이 slice 의 evidence 디렉터리다) **빈 출력**. 양성 대조 1회 —
   새 fixture 파일에 개행 하나를 붙이면 그 파일 한 줄이 나오고 `truncate -s <원래 바이트>` 로 되돌리면
   다시 빈 출력이며 바이트 수가 같다(비파괴 절삭, `checkout --` 를 쓰지 않았다 — 미커밋 산출물을 함께
   지운다).
