@@ -11,7 +11,8 @@
 - `README.md` 로드맵 표의 M9 행
 - `docs/discovery/capability-map.md`
   - §12 머리 집계의 재계산(51 → 54)과 그 산술 한 단락
-  - §12.3 (f) 등재 넷
+  - §12.3 (f) 등재 다섯(evidence 넷 + PR #135 코멘트 하나)과 (b) 의 CVE-APT 둘 종결 표기 — (b) 문면은 덮지 않는다
+  - 머리 54 의 행 수·결정 단위(53) 공시
 - `reports/evidence/m9/close/{scope,checklist}.md`
 
 ## out_scope

@@ -27,7 +27,7 @@ M9 가 따른 범위 규칙(ledger 계약)은 **「외부 비용·운영 결정�
    - 그 술어로 센 값은 G1 3 · G2 7 · G3 16 · G4 8 · G5 7 · G6 7 이고, 여기에 M6 잔여·메뉴 6 을 더한다.
    - 차이 +3 은 M9 가 등재하고 머리에 합산하지 않은 셋이다. `OPEN-STR-12-INTERACTIVE` 가 G3 +1, `OPEN-ADR07-*` 둘이 G6 +2 다.
 2. **등재 누락 넷을 §12.3 (f) 에 세운다.**
-   - 모집단은 `reports/evidence/m9/**` 의 `OPEN-` 식별자 67 가운데 capability map 에 0 회인 열여섯이다. 67 은 `git grep -ohE 'OPEN-[A-Z0-9]+(-[A-Z0-9]+)+' -- reports/evidence/m9 | sort -u` 의 값이고, 셋 이상 이어지지 않는 와일드카드 어근(`OPEN-ADR07-*` 꼴)은 이 정규식이 세지 않는다.
+   - 모집단은 `reports/evidence/m9/**` 의 `OPEN-` 식별자 67 가운데 capability map 에 0 회인 열여섯이다. 67 은 `git grep -ohE 'OPEN-[A-Z0-9]+(-[A-Z0-9]+)+' -- reports/evidence/m9 ':!reports/evidence/m9/close' | sort -u | wc -l` 의 값이다. 이 slice 자신의 디렉터리를 빼야 base 시점의 모집단이 나온다. 이 정규식은 하이픈 토막이 셋 이상인 이름만 집는다. 와일드카드 어근 가운데 `OPEN-ADR07-*` 처럼 토막이 둘인 것은 빠지고, `OPEN-CVE-APT-*` 처럼 셋인 것은 잡힌다. 결론 16 → 12 는 다른 정규식으로도 재현된다(PR #146 cr r1).
    - 그 가운데 열하나는 M9 이전 식별자를 인용만 한 것이다. M1~M7 문서에 정의가 있다.
    - `OPEN-M9-CLASSIFICATION-RELEASE` 하나는 레인이 **걷은** 이름이다. ops-migrations scope 가 그렇게 적는다.
    - 남는 넷이 새 등재다. 편집 뒤 같은 대조를 다시 돌리면 0 회는 그 열둘(열하나와 걷은 이름 하나)만 남는다.
