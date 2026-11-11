@@ -86,9 +86,25 @@ RED 를 내므로 그 변이는 **실제로 쌍 다섯을 열었고**, 초록의
 | 같은 실행의 `./gradlew --no-daemon qualityBaseline` | exit 0 |
 | 체인을 한 호출로 고친 뒤 `:adapters:ktlintTestSourceSetCheck` · `:app:ktlintTestSourceSetCheck` · 두 모듈 `detekt` | exit 0 |
 | `./gradlew --no-daemon check` @ `54211baa` | **exit 0** · 36m40s · 433 task(226 실행 · 112 cache · 95 up-to-date) |
-| **`./gradlew --no-daemon check`** @ **`83d97128`**(마지막 산출물 커밋) | **exit 0** · 4m35s · 424 task(51 실행 · 373 up-to-date) — 바뀐 모듈의 `:adapters:test` 는 **실행**, `:app:test` 는 app 입력이 안 바뀌어 up-to-date |
-| **`./gradlew --no-daemon qualityBaseline`** @ 같은 HEAD | **exit 0** |
+| `./gradlew --no-daemon check` @ `83d97128` | exit 0 · 4m35s · 424 task(51 실행 · 373 up-to-date) |
 | 그 앞의 표적 lint(`ktlint` 둘 · `detekt` 둘) | exit 0 — 전건 한 회차를 ktlint 한 줄로 날리지 않기 위해 먼저 돌린다 |
+| **`./gradlew --no-daemon check`** @ **`2dbcc121`**(main 병합 커밋) | **exit 0** · 36m49s · 433 task(164 실행 · 6 cache · 263 up-to-date) — `:adapters:test`·`:app:test` **둘 다 상태 줄에 표식 없이 실행** |
+| **`./gradlew --no-daemon qualityBaseline`** @ 같은 HEAD | **exit 0** |
+| 그 앞의 `:adapters:`·`:app:`·`:workflow:compileTestKotlin` | exit 0 — **병합 뒤 컴파일을 먼저** 본다(충돌 0 이어도 합집합이 타입을 깨뜨릴 수 있다) |
+
+### main 병합의 합집합 검산 (고정 SHA `836e44ed`)
+
+충돌 0 은 **합집합이 맞다는 증거가 아니다** — git 이 조용히 접은 것이 없는지 따로 센다.
+
+| 축 | 결과 |
+| --- | --- |
+| 병합 자체 | `git merge <고정 SHA>` exit 0 · `merge-tree` 충돌 표지 **0** · unmerged 경로 **0** · 트리 충돌 표지 **0** |
+| 내 산출물 여섯 | 병합 전 내 판과 **blob 전부 동일**(접힌 것 0) · 원천 판과는 **여섯 다 다름**(내 변경이 살아 있다) |
+| 내가 안 만진 공유 파일 | architecture 정책·게이트 test 등재 둘이 **원천과 blob 동일** — 내 쪽 기여가 없으므로 main 판이 그대로 이기는 것이 옳다 |
+| properties 중복 키 | `config/quality/*.properties` 전 파일 **0**(같은 키가 두 번 선언되는 합집합 함정) |
+| 게이트 test 등재 중복 | **0** |
+| 면제 래칫 | tier 셋 줄 수 **41 · 11 · 43** · 교차 중복 **0** · 상수 **95** — 양쪽이 **같은 수**를 들고 와도 접히지 않았음을 **항목으로** 셌다(수를 옮기지 않는다) |
+| main 쪽 신규 | 다른 두 slice 의 evidence 디렉터리 둘이 들어왔다 |
 
 CI 워크플로 Kotlin job 의 명령 **그대로**다(부분 게이트로 줄이지 않았다). 변경이 닿은 job 이 그
 하나뿐이라 Python·web·container job 은 돌리지 않았다 — 워크플로가 job 사이 소스 독립을 선언한다.

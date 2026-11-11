@@ -46,15 +46,16 @@ CI `.github/workflows/ci.yml` 의 Kotlin job 명령 그대로:
 - `./gradlew --no-daemon qualityBaseline`
 
 ## rollback
-`rollback.md` — in_scope 경로 한정 `git restore --source=<base> --staged --worktree --`. 공유 파일은
-base(= 병합된 main 커밋 `6e6f953c`)에서 복원한다. 전제: 그 SHA 에 이 slice 의 커밋이 없다(base 가 곧
-착수 전 main 이다).
+`rollback.md` 가 정본이다 — in_scope 경로 한정 `git restore --source=<원천> --staged --worktree --`.
+**원천은 「이 브랜치가 마지막으로 합친 main 의 고정 SHA」**이고, 2026-11-11 병합으로 착수 base 에서
+`836e44ed` 로 **옮겨갔다**(그 절이 전제 둘과 교체 근거를 측정으로 든다). 이 자리에 SHA 를 두 번 적지
+않는다 — 원천은 병합마다 움직이므로 정본을 한 자리에 둔다.
 
 ## 하네스 레인 변경
-`git log --oneline 6e6f953c..HEAD -- CLAUDE.md .claude/` — **없음**(0 줄). 라운드 1 판정 SHA
-`cd1afcd8` 와 수정 라운드 1 둘 다에서 재산출해 같았다. **이 브랜치에는 하네스 레인 커밋이 하나도
-없다** — slice 산출물이 아닌 커밋이 range 에 섞이지 않았다는 뜻이고, 라운드가 더 붙어도 그 명령이
-정본이다.
+`git log --oneline <base 또는 원천>..HEAD -- CLAUDE.md .claude/` — **없음**(0 줄). 라운드마다
+재산출했고 main 병합 뒤에 **착수 base 기준과 새 원천 기준 둘 다** 0 줄이다. **이 브랜치에는 하네스
+레인 커밋이 하나도 없다** — slice 산출물이 아닌 커밋이 range 에 섞이지 않았다는 뜻이고, 라운드가
+더 붙어도 그 명령이 정본이다.
 
 ## 원 slice 라운드 10 계약 갱신 (cr M-4)
 
@@ -119,6 +120,18 @@ cr M-2 는 두 자리(낙찰 runbook §1·§3 · 6E runbook 의 `bidvector.relea
 
 **cr r11 L-7 · L-6 · v r11 L-1 은 코드를 바꾸지 않았다** — L-7 은 어긋나면 탐침이 실패해 소견으로
 나오는 fail-closed 이고, L-6·L-1 은 후보 격자가 열거라는 **구조적 한계**여서 문면으로만 닫힌다.
+
+## main 병합 하나 (2026-11-11)
+
+이 브랜치는 **`836e44ed`**(PR #144 머지분 — PR #143 `c21adb2a` 를 포함)를 **고정 SHA 로** 한 번
+병합했다(병합 커밋 `2dbcc121`). 움직이는 `origin/main` 을 쓰지 않았다. PR 이 main 보다 뒤처져 병합이
+필요했고 팀장이 그 SHA 를 지정했다.
+
+**합집합 검산은 commands.md** 가 든다 — 충돌 0 은 합집합이 맞다는 증거가 아니라서 properties 중복
+키·등재 중복·면제 래칫을 **항목으로** 따로 셌다. **되돌림 원천이 이 병합으로 옮겨갔고** rollback.md
+가 그 갱신과 ①~⑥ 재실측을 든다. 원천 교체를 안전하게 만든 측정은 하나다 — **원천의 내 in_scope
+여섯이 착수 base 와 blob 동일**이므로 그 사이 남의 slice 가 내 복원 대상을 만지지 않았고, 병합한
+main 으로 복원해도 누구의 줄도 떨어지지 않는다.
 
 ## 알려진 제한
 
