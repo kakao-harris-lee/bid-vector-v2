@@ -287,11 +287,11 @@ git rev-list --merges <실측 HEAD>..<판정 SHA>
 로 옮길 때, 위 단언 둘(원천이 HEAD 의 조상 · 원천에 첫 산출물 커밋 없음)은 **원천이 적법한가**만 말한다.
 셋째 단언은 다음 대조다. 모집단은 복원 목록 가운데 **두 원천 어느 쪽에든 있는 경로**(M·D)다. 양쪽에 다 없는 신설(A)
 경로는 복원이 내용과 무관하게 지우므로 대조할 것이 없다. 부재는 `-q --verify` 로 빈 값으로 받아, 한쪽에만 있는 경로도
-「다름」으로 판정한다(그냥 `git rev-parse <sha>:<경로>` 는 부재 경로에서 exit 128 로 멈춘다).
+「다름」으로 판정한다(그냥 `git rev-parse <sha>:<경로>` 는 부재 경로에서 exit 128 로 멈춘다. `-q --verify` 도 부재면 exit 1 이라 `set -e` 셸에서는 루프가 조용히 멈추고 「다름 0」으로 읽힌다 — 그래서 `|| echo ABSENT` 를 붙인다).
 
 ```
 for p in <복원 목록의 M·D 경로>; do
-  a=$(git rev-parse -q --verify <착수 base>:"$p"); b=$(git rev-parse -q --verify <새 원천>:"$p")
+  a=$(git rev-parse -q --verify <착수 base>:"$p" || echo ABSENT); b=$(git rev-parse -q --verify <새 원천>:"$p" || echo ABSENT)
   [ "$a" = "$b" ] || echo "다름: $p"
 done
 ```

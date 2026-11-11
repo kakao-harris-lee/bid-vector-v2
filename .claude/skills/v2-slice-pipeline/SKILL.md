@@ -278,7 +278,7 @@ verifier 만 실측으로 판정한다.
 보고된 SHA 를 확인한 뒤, 그 40자 SHA 를 verifier·code-reviewer 프롬프트에 판정 대상으로 박는다. 동결 뒤에
 HEAD 를 움직일 일이 생기면(요청이 있어도) 「그 SHA 로 검증이 도는가」를 먼저 확인한다(M7/7B 2026-10-24 — 이관하며 덧붙임).
 evidence 만 더하는 커밋이면 **rollback 실측의** 유효성은 §4 술어로 판정한다. 그러나 그것이 그 커밋의 검증 전부는
-아니다 — evidence 편집 커밋마다 Kotlin `check`(누출·크기 게이트 포함)는 다시 돈다(정본은 verifier·PR 조치 코멘트).
+아니다 — evidence 편집 커밋마다 Kotlin `check`(`leakPatternGate` 가 `reports/evidence` 를 스캔한다)는 다시 돌고, evidence 크기 게이트(evidence ≤ 산출물)는 위 「크기 게이트」대로 verifier 가 본다 — Gradle 의 `sizeGate` 류는 소스 크기 래칫이라 다른 게이트다(정본은 verifier·PR 조치 코멘트).
 머지도 같은 SHA 에 `--match-head-commit` 으로 고정한다(전역 규약).
 근거: 2026-09-16 M5/5F-1 — 구현 완료 보고와 팀장 지시가 엇갈려 검증 중 HEAD 가 다섯 커밋 이동했다(PR #24 조치
 코멘트). 그동안 이 규율은 `CLAUDE.md` 요약에만 있었다.
