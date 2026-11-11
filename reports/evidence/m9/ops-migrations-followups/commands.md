@@ -28,28 +28,61 @@ acceptance 정본은 `scope.md` 의 두 줄(CI Kotlin job 명령 그대로). 아
 **조용히 공허**해지고, 그 공허는 모집단이 빠진 것과 구별되지 않는다. V26 이 CI `container` job 에서
 걸린 자리는 쌍 일곱이었다.
 
-## 2. 표적 test
+## 2. 표적 test — 쌍 셋으로 고친 뒤
 
 | 실측 | 결과 |
 | --- | --- |
-| (채움) | |
+| `:adapters:test` 표적 둘 `--rerun` | **exit 0** · 고정점 2/0 · OutboxTransitionSql 15/0 |
+| 고정점 첫째 test | 스키마의 제약·트리거 전부가 자기 렌더링의 고정점이다(소견 0) |
+| 고정점 둘째 test(양성 대조) | 심은 셋이 **그 셋만** 보고됐다 — CHECK · EXCLUDE 의 `WHERE` · 트리거 `WHEN` |
+| 실행 실측 | 결과 XML 의 `timestamp` 와 mtime 이 그 실행의 것이고(앞 판 실패본이 아니다) 각 case 에 실행 시간이 있다 — cache 적중이 아니다 |
+
+둘째 test 가 **모집단이 실제로 넓어졌는지**를 재는 자리다. 모집단에서 EXCLUDE 나 트리거를 빼면 그
+줄이 보고되지 않아 이 test 가 붉어지고, 반대로 탐침이 멀쩡한 객체를 집으면 심은 셋 밖의 줄이 나와
+역시 붉어진다(집합 등식).
 
 ## 3. 변이 — 새 판이 구판이 놓친 결함을 잡는가
 
-버릴 clone(`git clone --no-hardlinks`, detached)에서 재고 **worktree 는 읽기만** 했다.
+버릴 clone(`git clone --no-hardlinks`, detached)에서 재고 **worktree 의 `V*.sql` 은 무편집**이다
+(계약의 out_of_scope). 한 실행에 **통제군을 함께** 넣었다 — 구판(정규식 토큰) test 를 그 clone 에만
+되살려 새 판과 같은 JVM·같은 스키마에서 돌렸다. 「더하기만 한 변이」가 아니라 **바꿔치우기**다:
+V26 의 쌍 CHECK 본문에 동일성 절 하나를 더해 **토큰을 늘리지 않고** 수용 집합을 넓혔다.
 
 | 실측 | 결과 |
 | --- | --- |
-| (채움) | |
+| `:adapters:test --tests '*OutboxTransitionSqlTest' --rerun`(변이 적용) | **BUILD FAILED** · 16 중 **1 실패** |
+| 실패한 것 | **새 판**(전수 시도 거동 test) 하나뿐 |
+| 통제군 — 구판 정규식 토큰 집합 등식 | **초록** — v r10 M-2 가 보고한 구멍을 그대로 재현했다 |
+| 나머지 열넷(거부 실측·트리거 축·INSERT 갈래 포함) | 전부 초록 — 이 변이를 잡는 자리는 **새 판 하나**다 |
+| 새 판이 보고한 차이 | 수용이 **9 → 13**. 늘어난 넷은 상태와 사유가 **같은 문자열**인 쌍이고(종단 둘 + 비종단 둘) 전부 어휘 밖 조합이다 |
+
+**통제군이 초록인 이유**가 이 바꿔치우기의 요지다 — 더한 절은 새 리터럴을 쓰지 않으므로 본문에서
+수확하는 토큰 집합이 변이 전후로 같다. 렌더링을 읽는 술어는 그래서 구조상 이 확장을 볼 수 없고,
+수용 집합을 **시도해서** 세는 술어만 본다.
+
+변이를 되돌린 뒤 clone 의 `git status --porcelain` 0 줄.
 
 ## 4. acceptance 전건
 
 | 실측 | 결과 |
 | --- | --- |
-| (채움) | |
+| `./gradlew --no-daemon check` (1회차) | **exit 1** — `:adapters:ktlintTestSourceSetCheck` 가 네 번 이어진 호출 체인 한 줄을 막았다(`Expected newline before '.'`) |
+| 같은 실행의 `./gradlew --no-daemon qualityBaseline` | exit 0 |
+| 체인을 한 호출로 고친 뒤 `:adapters:ktlintTestSourceSetCheck` · `:app:ktlintTestSourceSetCheck` · 두 모듈 `detekt` | exit 0 |
+| **`./gradlew --no-daemon check`**(2회차, `54211baa`) | **exit 0** · 36m40s · 433 task(226 실행 · 112 cache · 95 up-to-date) |
+| **`./gradlew --no-daemon qualityBaseline`**(같은 HEAD) | **exit 0** |
 
-## 5. 비밀값 스캔 · clean-tree
+CI 워크플로 Kotlin job 의 명령 **그대로**다(부분 게이트로 줄이지 않았다). 변경이 닿은 job 이 그
+하나뿐이라 Python·web·container job 은 돌리지 않았다 — 워크플로가 job 사이 소스 독립을 선언한다.
+단, `tools/db-rehearsal.sh` 는 `container` job 이 쓰므로 그 파일에 **거동 변경이 없음**을 따로 쟀다
+(아래 §5).
+
+## 5. 그 밖의 실측
 
 | 실측 | 결과 |
 | --- | --- |
-| (채움) | |
+| 비밀값 스캔 — 참조형(`-f config/quality/leak-patterns.txt`), 대상은 evidence 디렉터리 | **매치 없음**(exit 1) → 허용 목록 편집 0 |
+| clean-tree 게이트 — `git status --porcelain --` 산출물 경로 **개별 인자** 여섯 | **0 줄** |
+| 같은 게이트의 **양성 대조** | 한 파일에 한 줄을 심으면 **1 줄**, 비파괴 절삭(`head -n <원래 줄수>`)으로 되돌리면 다시 0 줄 · 파일은 `git diff` 가 빈 것으로 동일성 확인 · 실행 비트 보존(`checkout --` 를 쓰지 않았다) |
+| `tools/db-rehearsal.sh` — 거동 무변경 | `bash -n` exit 0 · 스크립트가 생성하는 Flyway 호출자 Java 파일을 heredoc 에서 그대로 꺼내 **Flyway 스텁과 함께 `javac --release 21` 로 컴파일** exit 0(주석만 바뀌었고 그 주석이 한글이어도 컴파일된다는 사실까지 재서, `container` job 에서야 알게 되는 길을 피했다) |
+| 레인 뒷정리 | 내 Gradle daemon 잔존 **0**(`--stop` 을 쓰지 않았다 — 다른 레인 것이 돌고 있었다) |

@@ -107,6 +107,15 @@ cr M-2 는 두 자리(낙찰 runbook §1·§3 · 6E runbook 의 `bidvector.relea
    `OPEN-M9-REHEARSAL-FLYWAY-CONFIG-PARITY` 이며, 지금 그 이름을 가리키는 등재 행은 **없다**
    (커밋 `4af8c96b` 의 메시지가 「등재」로 적은 것은 이 절을 가리킨 말이다).
 
-② **EXCLUDE·트리거 `WHEN` 은 오늘 스키마에 0 이다.** 고정점 test 의 모집단을 넓힌 것은 「새 종류가
+② **다른 slice 의 evidence 가 쥔 좌표 하나가 밀렸다**(역방향 파급). `tools/db-rehearsal.sh` 머리말에
+   열두 줄이 들어가 그 뒤 줄 번호가 그만큼 내려갔고, **닫힌 slice 의 evidence 한 줄**이 그 아래를
+   `파일:줄` 로 가리킨다 — `reports/evidence/m7/7c1b/checklist.md` 의 「리허설 도구의 `truncate`」 행
+   (가리키던 `truncate` 문은 그 수만큼 아래로 옮겨갔고, 옛 번호 자리는 이제 빈 줄이다). **고치지
+   않는다**: 닫힌 slice 의 evidence 는 되쓰지 않고, 그 파일은 이 slice 의 in_scope 밖이다. 같은 축을
+   가리키는 다른 한 줄(`m7/7f2/checklist.md` 의 머리말 범위)은 **밀리지 않았다** — 삽입 지점이 그
+   범위 끝보다 아래임을 양쪽 트리에서 재서 확인했다. 이 종류가 반복되는 이유와 처방(좌표 대신
+   인용문·절 제목)은 evidence-pack 규격이 든다.
+
+③ **EXCLUDE·트리거 `WHEN` 은 오늘 스키마에 0 이다.** 고정점 test 의 모집단을 넓힌 것은 「새 종류가
    들어오는 순간 함께 잰다」는 구조적 폐쇄이고, **오늘 그 종류를 재는 것은 상설 양성 대조**(심은
    접힐 식)다. 실 스키마 쪽 계수는 0 이며 그 사실 자체가 `CleanMigrationCheckTest` 의 표별 셈 소관이다.
