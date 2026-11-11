@@ -283,8 +283,8 @@ HEAD 를 움직일 일이 생기면(요청이 있어도) 「그 SHA 로 검증�
 **code-reviewer 를 verifier 와 병렬로 띄운다 (이 문서로 이관 2026-11-11 · 전역 규약 §1 유래).** 코드 slice 의
 PR 은 verifier(ready-for-review / not-ready)와 code-reviewer(approve / request_changes)를 **같은 판정 SHA** 에 대해
 동시에 띄운다. code-reviewer 는 호출 때 `model: sonnet` 을 명시하고 저자와 다른 패스로 둔다. 두 판정은 지적이 0 이어도
-각각 PR 코멘트로 남긴다. 수정 라운드 뒤의 재리뷰는 바뀐 범위(`git diff <앞 판정 SHA>..<새 SHA>`)만 표적으로 해도
-된다. 게이트 술어를 바꾸는 커밋은 위 예외대로 verifier 표적 재검증을 거친다.
+각각 PR 코멘트로 남긴다. **(2026-11-11 추가 — 원 규율에 없던 완화)** 수정 라운드 뒤의 재리뷰는 바뀐 범위
+(`git diff <앞 판정 SHA>..<새 SHA>`)만 표적으로 해도 된다. 근거는 M9 의 #144·#145 재리뷰 운영이다. 게이트 술어를 바꾸는 커밋은 위 예외대로 verifier 표적 재검증을 거친다.
 
 verifier에 slice 계약, base/head, evidence 경로를 전달한다.
 - `ready-for-review` → Phase 5로 진행
