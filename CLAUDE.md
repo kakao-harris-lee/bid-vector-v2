@@ -3,8 +3,8 @@
 이 저장소에서 애플리케이션 코드는 Claude 가 구현한다. Codex 는 되돌리기 어려운 경로와 계약 파일에 한정된
 독립 심판이다. 이 문서는 **현행 규율만** 담는다 — 규율이 생긴 사유와 실측 이력은
 `docs/harness/change-history.md`(2026-09-16 에 이 문서에서 분리, append-only)에 있고, 각 규율의 정본은
-「대상」 열이 가리키는 스킬·에이전트 파일(`.claude/skills/*`, `.claude/agents/*`)이다 — **예외는 아래 하네스
-절 끝의 ※ 다섯**으로, 그것들은 스킬 파일에 아직 문장이 없어 이 문서의 요약이 정본이다.
+「대상」 열이 가리키는 스킬·에이전트 파일(`.claude/skills/*`, `.claude/agents/*`)이다. 예외는 없다 — 요약이
+정본이던 ※ 다섯은 2026-11-11 에 스킬로 옮겼다(하네스 절 끝).
 
 ## 운영자 지시 (2026-09-04, 2026-09-11 갱신) — 아래 모든 절보다 우선
 
@@ -125,7 +125,10 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
   실측을 옮기지 않는다. verifier 가 대조하는 것은 **「실측 HEAD == 판정 SHA」가 아니다**(2026-09-19 정정 —
   evidence 커밋은 언제나 뒤에 오므로 둘은 영원히 다르다). **그 사이에 되돌림 대상이 움직였는가**를 본다:
   `git diff --name-only <실측 HEAD>..<판정 SHA> -- <rollback.md 가 되돌리는 경로들>` 이 빈 출력이면 유효하고,
-  한 줄이라도 나오면 미검증이다. 이 확인은 **CI 텍스트 게이트로 대체되지 않는다**(2026-09-18 측정: 실제 PR
+  한 줄이라도 나오면 미검증이다. 예외는 하나뿐이다. 나온 경로가 전부 **원천에 없는 신설 파일**이고, 그 사실을
+  열거·실측해 적었을 때다(2026-11-11). main 병합이 마지막 산출물 커밋 뒤에 오면 실측 자리는 그 병합
+  커밋이다. 복원 원천을 바꾸면 **셋째 단언**을 잰다 — 복원 대상 blob 이 착수 base 와 새 원천에서 같은가이고,
+  다르면 새 원천 기준으로 다시 센다. 이 확인은 **CI 텍스트 게이트로 대체되지 않는다**(2026-09-18 측정: 실제 PR
   32건 재생 FAIL 23·진짜 결함 0·오탐 1).
 
 **Codex 레인(`codex-review-gate`)**
@@ -142,12 +145,9 @@ Codex 가 `request_changes` 를 반환하면 같은 scope 에서 Claude 가 수�
 · codex strict 스키마·`immutable=1` preflight·누출 판독 규칙·preflight 형제 JSON·`.gradle-home/`·사전 스모크
 (codex-review-gate) · CI 액션 major 정책(`.github/workflows/ci.yml` 주석).
 
-※ **아직 스킬 파일에 문장이 없어 이 요약이 정본인 규율** — 「레인 동결 + 판정 대상 SHA 고정」(구현 레인의 완료
-보고와 팀장 지시가 엇갈리면 검증 중 HEAD 가 움직인다 — 판정 전 동결하고 SHA 를 고정한다) · 「rollback 갈음은
-「HEAD 초록」이 아니라 트리 동일성(되돌린 트리의 파일 SHA 가 이미 실측한 트리와 같음)으로만」 · 「collection 선택에
-따라 답이 갈리는 게이트는 서브프로세스 격리」 · 「수정 라운드가 만든 새 파일 ↔ in_scope 대조를 보고 항목으로」 ·
-「code-reviewer(sonnet)를 verifier 와 병렬로」(전역 규약 §1 유래). 다음 하네스 편집에서 해당 스킬(v2-slice-pipeline
-Phase 3·4, evidence-pack rollback 절)로 옮긴다. **근거의 자리**: 뒤 넷은 M5 evidence·`milestone-5.md` 에
-실측이 있고(5E-1 순수성 게이트 · 5E-3·5F-2 rollback · 각 slice checklist), 「레인 동결 + 판정 대상 SHA
-고정」은 **이 문서가 유일한 근거**다(2026-09-16 M5/5F-1 에서 구현 완료 보고와 팀장 지시가 엇갈려 검증 중
-HEAD 가 다섯 커밋 이동한 실측 — 그 사건은 PR #24 조치 코멘트에 있고 이력 행은 다음 하네스 편집에서 세운다).
+※ **2026-11-11 이관** — 그동안 이 요약이 정본이던 다섯은 이제 스킬이 정본이다.
+- 「레인 동결 + 판정 대상 SHA 고정」 → `v2-slice-pipeline` Phase 4. 근거 사건 M5/5F-1 · PR #24 는 이력 행으로 세웠다.
+- 「code-reviewer(sonnet) ∥ verifier」 → `v2-slice-pipeline` Phase 4.
+- 「수정 라운드 새 파일 ↔ in_scope」 → `v2-slice-pipeline` Phase 3.
+- 「collection 선택 게이트는 서브프로세스 격리」 → `v2-slice-pipeline` Phase 3.
+- 「rollback 갈음은 트리 동일성으로만」 → `evidence-pack` rollback 절.
