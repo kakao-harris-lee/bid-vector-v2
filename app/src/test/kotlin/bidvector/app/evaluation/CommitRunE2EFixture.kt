@@ -51,6 +51,11 @@ private const val TEST_CREDENTIAL_VALUE = "evaluation-commit-e2e-test-fixture-cr
  * 쪽의 근거**라 test 파일에 남는다 — 이 자리는 받은 값을 심을 뿐이다. 같은 이름의 상수를 패키지의
  * 다른 test 파일들이 **다른 값으로** 각자 private 하게 들고 있어서(개정 7 ↔ 907, 상한 100 ↔ 5),
  * 공유 상수로 끌어올리면 그 파일들의 이름이 조용히 이쪽을 가리킬 수 있다.
+ *
+ * **쓰는 쪽은 하나다**(`EvaluationCommitRunE2ETest`). 파일이 갈려 `internal` 이 되었으므로 app test
+ * 소스셋의 다른 자리에서도 세울 수 있는데, **한 번 더 세우면 Postgres 컨테이너가 두 벌 뜬다** — 이
+ * 분할이 class 를 가르지 않은 사유 가운데 하나가 바로 그 비용이다. 둘째 사용처가 필요해지면 인스턴스를
+ * 하나 더 만드는 것이 아니라 **수명 공유를 다시 설계한다**(이 결합은 구조로 닫혀 있지 않다).
  */
 internal class CommitRunE2EFixture(
     private val seededRevision: Int,
