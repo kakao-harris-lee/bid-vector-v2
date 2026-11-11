@@ -49,6 +49,16 @@
   → 0 · 인용이 있는 stem 은 둘이고 **최대 인용 줄이 내 첫 변경 줄보다 앞**이다(capability-map
   3457 < 3746 · 계약 문서 874 < 2703 — 양끝을 명령으로 냈다). 나머지 다섯 stem 은 인용 0.
 
+## rollback 재측정 (팀장 결정 커밋 뒤 — 그 커밋이 복원 목록 안 문서를 움직였다)
+
+- 되돌린 트리 전수 대조 `git diff --name-status <앞 실측 트리> <이 트리>` → 0 · 차이가 **evidence
+  네 파일뿐**(되돌리지 않기로 한 디렉터리) — ④⑤ 와 Kotlin 게이트를 트리 동일성으로 갈음한 근거
+- `./gradlew --no-daemon leakPatternGate --rerun`(되돌린 트리 — evidence 가 입력인 유일한 게이트)
+  → **0** · web 게이트 여덟(되돌린 트리, 실 디렉터리 설치) → 전부 **0**
+- 산출물 쪽 재실측 범위: 그 결정 커밋은 `docs/` 한 파일이고 **어느 게이트의 입력도 아니다**
+  (build-logic 에 `docs/` 입력 0 · Kotlin 의 그 문서 언급은 전부 KDoc 산문) — 전건 `check` 를 다시
+  돌리지 않았다. 마지막 HEAD 의 `leakPatternGate` 결과 정본은 verifier 와 PR 조치 코멘트다.
+
 ## 위생
 
 - `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m10/timeline-command-enum/`
