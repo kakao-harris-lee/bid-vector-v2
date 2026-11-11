@@ -80,12 +80,18 @@ internal fun Map<String, Any?>.propertyEnum(
         requireNotNull(properties[property] as? Map<String, Any?>) {
             "$schemaName 의 $property 칸이 선언되지 않았다"
         }
-    val values =
-        requireNotNull(definition["enum"] as? List<String>) {
+    val declared =
+        requireNotNull(definition["enum"] as? List<*>) {
             "$schemaName 의 $property 칸이 enum 을 선언하지 않았다 — 닫힌 어휘가 열린 string 으로 돌아갔다"
         }
-    require(values.isNotEmpty()) { "$schemaName 의 $property 칸 enum 이 비었다" }
-    return values
+    require(declared.isNotEmpty()) { "$schemaName 의 $property 칸 enum 이 비었다" }
+    // 소거 때문에 `as? List<String>` 은 비문자 열거(`enum: [1, 2]`)도 통과시킨다 — 그러면 집합
+    // 등식이 Int 와 String 을 비교해 읽을 수 없는 실패를 낸다(cr r0 L-3). 여기서 가른다.
+    return declared.map { element ->
+        requireNotNull(element as? String) {
+            "$schemaName 의 $property 칸 enum 에 문자열이 아닌 값이 있다: $element"
+        }
+    }
 }
 
 /**

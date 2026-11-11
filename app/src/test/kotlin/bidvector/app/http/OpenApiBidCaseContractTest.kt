@@ -79,4 +79,31 @@ class OpenApiBidCaseContractTest {
             emptyVocabulary.propertyEnum("Probe", "command")
         }.message.orEmpty() shouldContain "비었다"
     }
+
+    /**
+     * **비문자 열거도 어휘가 아니다**(cr r0 L-3). 소거 때문에 `as? List<String>` 은 `enum: [1, 2]`
+     * 같은 선언을 **통과시킨다** — 그러면 위 집합 등식이 Int 와 String 을 비교해 읽기 어려운
+     * 실패를 낸다(초록이 되지는 않으니 공허하지는 않다 — **읽을 수 없게** 되는 것이다). 읽기가
+     * 그 꼴을 답으로 내지 않고 **던지는** 것을 잰다.
+     */
+    @Test
+    fun `문자열이 아닌 열거는 어휘로 읽지 않는다 — 소거를 지나가지 못한다`() {
+        val nonStringVocabulary =
+            parseOpenApiSpec(
+                """
+                components:
+                  schemas:
+                    Probe:
+                      type: object
+                      properties:
+                        command:
+                          type: string
+                          enum: [1, 2]
+                """.trimIndent(),
+            )
+
+        shouldThrow<IllegalArgumentException> {
+            nonStringVocabulary.propertyEnum("Probe", "command")
+        }.message.orEmpty() shouldContain "문자열이 아닌 값"
+    }
 }
