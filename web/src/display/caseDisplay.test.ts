@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { components } from '../api/generated/operator-api';
+
 import {
   BID_CASE_STATE_DISPLAY,
   BID_COMMAND_DISPLAY,
@@ -107,6 +109,27 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
     const closedVocabulary: NarrowerThanString<BidCommandToken> = 'ADD_TO_BID_BOX';
 
     expect(closedVocabulary).toBe('ADD_TO_BID_BOX');
+  });
+
+  /**
+   * **전수성을 별칭이 아니라 계약에 묶는다**(v M-1). 표의 전수는 `satisfies Record<BidCommandToken, …>`
+   * 이 지는데, 그 별칭이 **생성 타입 유도라는 사실을 잠그는 구조가 없었다**: 별칭을 리터럴 손
+   * 유니온으로 되돌리면 lint·typecheck·W-5·W-6 이 전부 초록이고(실측), 그 뒤 계약에 명령이 늘면
+   * web 이 그것을 「알 수 없는 상태」로 **조용히 degrade** 한다 — 10B 가 걷은 교차언어 명령 축이
+   * 메우던 바로 그 구멍이 별칭 한 줄 뒤에 남아 있었다.
+   *
+   * 그래서 **별칭을 거치지 않고** 생성 타입 경로에서 바로 뽑아 표의 키 집합과 맞댄다. 등식은
+   * **양방향**이다 — 한쪽 포함만 재면 반대쪽이 줄어든 것을 보지 못한다. 튜플로 감싸는 것은
+   * 맨 `extends` 가 유니온을 갈래별로 분배해 판정하는 것을 막기 위해서다.
+   */
+  it('표의 키 집합이 계약의 명령 어휘와 **같다** — 별칭을 거치지 않는다', () => {
+    type ContractCommand = components['schemas']['BidTimelineEntry']['command'];
+    type TableKey = keyof typeof BID_COMMAND_DISPLAY;
+    type MutuallySame<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+    const sameSet: MutuallySame<TableKey, ContractCommand> = true;
+
+    expect(sameSet).toBe(true);
   });
 
   /** 문면이 **토큰과 다른 글자**여야 이 표에 뜻이 있다 — 같으면 원문을 그린 것과 구별되지 않는다. */
