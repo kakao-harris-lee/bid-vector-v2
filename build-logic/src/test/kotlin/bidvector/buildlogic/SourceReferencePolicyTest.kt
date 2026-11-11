@@ -86,6 +86,25 @@ class SourceReferencePolicyTest {
         assertFalse(policy.admitsInScope("bidvector.decision.Verdict", roots))
     }
 
+    /**
+     * M9/gates-build-followups(리뷰 cr L-2) — 여덟째 병합이 이 축에 알림함 **포트**의 뿌리를 더했고
+     * 「넓어진 것은 포트의 뿌리뿐이고 **어댑터**는 들어오지 않는다」를 그때는 일회 양성 대조로만 보였다.
+     * 일회 측정은 세션과 함께 죽는다 — 그 음성 단언을 이름 층에도 상시로 남긴다(바이트코드 층은
+     * `EvaluationAdapterDependencyTest` 가 같은 뿌리에 같은 단언을 이미 갖는다).
+     *
+     * 마지막 줄은 **접두 경계**다: `뿌리.` 가 아니라 단순 접두로 견주면 `…notificationinboxadapter` 가
+     * 들어온다. 그 경계가 `admitsInScope` 술어의 한 축이라 여기서 함께 잰다.
+     */
+    @Test
+    fun `evaluation 축은 알림함 포트의 뿌리만 허용한다 — 그 어댑터와 접두 위장은 거부다`() {
+        val roots = policy.scopeOf("bidvector.adapters.evaluation") ?: error("축이 없다")
+
+        assertTrue(policy.admitsInScope("bidvector.workflow.notificationinbox.NotificationInboxPort", roots))
+        assertTrue(policy.admitsInScope("bidvector.workflow.notificationinbox.NotificationAudiencePort", roots))
+        assertFalse(policy.admitsInScope("bidvector.adapters.notificationinbox.JdbcNotificationAudience", roots))
+        assertFalse(policy.admitsInScope("bidvector.workflow.notificationinboxadapter.Thing", roots))
+    }
+
     @Test
     fun `자기 저장소 좌표만 범위 축의 대상이다 — 외부 좌표는 다른 축이 든다`() {
         assertTrue(policy.isSelfNamespace("bidvector.decision.Verdict"))
