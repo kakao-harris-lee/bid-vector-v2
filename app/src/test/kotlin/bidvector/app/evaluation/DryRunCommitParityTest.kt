@@ -42,6 +42,7 @@ import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
+import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -182,6 +183,13 @@ class DryRunCommitParityTest {
             correlationIdFactory = SequentialCorrelationIdFactory(),
             clock = clock,
             commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
+            // NOTI-01(M9/ops-code) — 이 test 가 재는 것은 **dry-run 과 커밋의 판정 동일성**이고
+            // 알림함 축은 그 등식의 입력이 아니다. 청중을 비워 두면 두 경로 비교에 알림함 상태가
+            // 끼어들지 않는다(기록 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로 잰다).
+            // 쓰기 포트는 **불리면 터지는** 구현이라 「청중이 비었는데 기록이 나간다」는 회귀가
+            // 이 자리에서도 잡힌다.
+            notificationInboxPort = { error("청중이 비었는데 알림함 쓰기가 불렸다") },
+            notificationAudiencePort = { NotificationAudience.Accounts(emptyList()) },
             release = ReleaseIdentifier("parity-test"),
         )
 }

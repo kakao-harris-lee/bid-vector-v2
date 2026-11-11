@@ -93,5 +93,9 @@ private fun deadCommitRun(): EvaluationCommitRun =
         correlationIds = CorrelationIdFactory { CorrelationId("commit-runner-test") },
         clock = Clock { Instant.parse("2026-10-07T00:00:00Z") },
         analysisBudget = null,
+        // NOTI-01(M9/ops-code) — 이 조립은 전략 읽기에서 던지므로 **알림 축에 닿지 않는다.**
+        // 다른 협력자와 같은 형태로 「불리면 터지는」 구현을 꽂아 그 사실을 단언으로 만든다.
+        notificationInbox = { error("알림함 쓰기가 불렸다 — 전략 읽기가 먼저 던져야 한다") },
+        audience = { error("청중 질의가 불렸다 — 전략 읽기가 먼저 던져야 한다") },
         release = ReleaseIdentifier("commit-runner-test"),
     )

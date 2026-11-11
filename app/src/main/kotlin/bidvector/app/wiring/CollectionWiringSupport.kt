@@ -2,6 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.adapters.koneps.KONEPS_HTTP_POLICY
 import bidvector.adapters.koneps.KonepsCallGate
+import bidvector.adapters.koneps.KonepsCallPacer
 import bidvector.adapters.koneps.KonepsHttpPolicyData
 import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.snapshot.RunStateDirectory
@@ -22,6 +23,7 @@ import bidvector.workflow.evaluation.OPENING_DATE_ZONE
 import bidvector.workflow.strategy.Clock
 import java.net.URI
 import java.net.http.HttpClient
+import java.time.Duration
 import java.time.LocalDate
 
 /**
@@ -97,6 +99,14 @@ internal fun konepsTransportFor(
     runState: RunStateDirectory,
     budget: CallBudgetLedger,
     clock: Clock,
+    /**
+     * 간격을 **실제로 기다리는 함수**(v r2 M-1) — production 기본값은 [sleepFor] 다. 주입 자리를 둔
+     * 이유는 「배선이 출하 간격을 pacer 에 넘기는가」를 재려면 **요청된 기다림**을 값으로 봐야 하기
+     * 때문이다: 벽시계로는 계수 축(rate limiter 1 permit/1초)이 같은 지연을 만들어 두 축이 섞인다
+     * (실측 — 간격을 0 으로 둔 변이가 벽시계 단언을 통과했다). 기다림 자신이 잠드는지는 [sleepFor]
+     * 를 직접 부르는 test 가 잰다.
+     */
+    sleeper: (Duration) -> Unit = ::sleepFor,
 ): KonepsTransport {
     val httpPolicy = resolvedOrFail(KONEPS_HTTP_POLICY.resolve(on), "KONEPS 전송 정책")
     return KonepsTransport(
@@ -108,9 +118,30 @@ internal fun konepsTransportFor(
                 budget = budget,
                 attempts = runState.attempts,
                 now = clock::now,
+                // OPS-08 — 간격도 **전송 정책**이 정한다(승인 상한처럼 설정에서 오는 값이 아니라
+                // rate limiter 값과 같은 표에서 온다: 둘은 같은 throttle 축의 두 축이다). 기다림이
+                // 주입이라 production 만 실제로 잠들고 test 는 벽시계를 태우지 않는다.
+                pacer = KonepsCallPacer(httpPolicy.minimumCallInterval, clock::now, sleeper),
             ),
     )
 }
+
+/**
+ * 간격을 실제로 기다리는 자리 — 관문 경로는 `suspend` 가 아니라 전부 동기이고 수집은 직렬이라
+ * 차단 대기가 이 경로의 모양이다(Resilience4j 의 rate limiter 도 같은 경로에서 차단으로 기다린다).
+ *
+ * **ms 아래를 버리지 않는다**(cr low). `Thread.sleep(toMillis())` 만 쓰면 1 ms 미만의 간격 선언이
+ * 조용히 「기다리지 않음」이 된다 — 끄는 자리는 `Duration.ZERO` 하나여야 하고 작은 값이 그것과 같은
+ * 뜻이 되면 안 된다. `TimeUnit.NANOSECONDS.sleep` 을 쓰지 않는 이유는 그것이 app production 에
+ * `java.util.concurrent` 참조를 들여와 **전송 표면 게이트**가 거부하기 때문이다(실측) — 그 게이트의
+ * 허용 집합을 넓히는 쪽이 아니라 `java.lang` 안에서 끝내는 쪽을 택했다.
+ */
+internal fun sleepFor(duration: Duration) {
+    Thread.sleep(duration.toMillis(), duration.toNanosPart() % NANOS_PER_MILLI)
+}
+
+/** ms 아래 나머지를 떼는 제수 — `Thread.sleep` 의 둘째 인자가 그 범위만 받는다. */
+private const val NANOS_PER_MILLI = 1_000_000
 
 /**
  * 승인 상한 원장 — **시도 원장에서 seed** 한다(D-6G-45·47). 하루의 경계는 [COLLECTION_BUDGET_ZONE]

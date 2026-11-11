@@ -22,6 +22,57 @@ fun interface NotificationInboxPort {
 }
 
 /**
+ * **체계의 알림이 누구의 알림함으로 가는가**(M9/ops-code · NOTI-01) — 계정 전수를 돌려준다.
+ *
+ * **주체를 인자로 받지 않는 둘째 질의다**(`NotificationSweepCandidatePort` 와 같은 자리). 그 포트와
+ * 같은 사유로 [NotificationInboxStore] 를 넓히지 않고 **별 포트**로 둔다 — 그쪽의 「전 메서드의 첫
+ * 인자가 주체」 규율은 요청 경로의 소유 경계이고, 그 자리에 계정 없는 메서드가 생기면 규율이
+ * 선언으로 내려앉는다.
+ *
+ * **왜 이 포트가 필요한가**: 훑기는 계정을 건 행에서 실어 오지만 후보 평가에는 그런 행이 없다 —
+ * 평가의 모집단은 공고이고 계정 축이 아예 없다. 그래서 「누구에게」를 어디선가 가져와야 하고,
+ * 그 자리를 **설정값으로 두지 않았다**: 없는 계정 id 를 설정이 주면 저장 층의 외래키가 거부하고
+ * 그 거부가 [NotificationInboxOutcome.Failed] 로 조용히 접힌다. 표를 읽으면 그 상태가 애초에
+ * 표현되지 않는다.
+ *
+ * 반환이 **빈 청중일 수 있다**(계정 부트스트랩 전). 그것은 실패가 아니라 「받을 사람이 아직
+ * 없다」는 사실이고, 소비자는 기록 0 건으로 끝낸다.
+ *
+ * **실패를 예외로 내보내지 않는다**(cr r1 MEDIUM · v M-2). 이 질의는 평가 커밋 run 안에서 불리고
+ * 그 run 의 본론은 판정과 outbox 등록이다 — 청중을 못 읽었다는 사실이 예외로 올라가면 **채널
+ * 요청 전에 run 이 멈춰** 그 판정의 흔적까지 함께 사라진다. 알림함 쓰기 포트가
+ * [NotificationInboxOutcome.Failed] 로 접는 것과 같은 갈래이고, 접는 자리도 같다(어댑터).
+ */
+fun interface NotificationAudiencePort {
+    fun accounts(): NotificationAudience
+}
+
+/**
+ * 청중 질의의 답 — **「받을 사람이 없다」와 「누가 받는지 못 읽었다」를 가른다**(cr r1 MEDIUM).
+ *
+ * 둘을 빈 목록 하나로 접으면 장애가 「알림함이 조용히 0 건」으로 보이고 아무도 모른다. 두 값이
+ * 다르므로 소비자는 소진 `when` 으로 받고, 조립이 [Unavailable] 에만 표지를 남긴다.
+ */
+sealed interface NotificationAudience {
+    /** 받을 계정들 — **빈 목록일 수 있다**(부트스트랩 전). 그것은 사실이고 실패가 아니다. */
+    data class Accounts(
+        val accounts: List<AccountId>,
+    ) : NotificationAudience
+
+    /**
+     * 저장 층이 답하지 못했다 — 기록 0 건이지만 그 0 은 **사실의 0 이 아니다**.
+     *
+     * [exceptionType] 은 **예외 클래스의 단순 이름뿐**이다(cr r2 MEDIUM). 메시지·SQLState 는 계속
+     * 버린다 — 저장소 예외 메시지에는 행 값이 실릴 수 있다. 클래스 이름만 싣는 수법은 전송 축의
+     * `TransportFailed(exceptionType)` 가 같은 사유로 이미 쓰는 것이고, 그 한 토큰이 「연결 고갈」과
+     * 「권한 회수」와 「표 부재」를 가른다(앞 판은 셋이 같은 한 줄이었다).
+     */
+    data class Unavailable(
+        val exceptionType: String,
+    ) : NotificationAudience
+}
+
+/**
  * **읽기·읽음 처리 포트**(산출물 2) — 운영자 표면만 쓴다. 쓰기 포트와 **갈라 둔다**: 읽음
  * 전이는 운영자의 행위이고 알림 기록은 체계의 행위라, 한 포트에 두면 HTTP 층에 기록 능력이
  * 딸려 온다.

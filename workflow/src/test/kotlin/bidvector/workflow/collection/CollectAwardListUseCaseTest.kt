@@ -20,8 +20,8 @@ import java.time.LocalDate
 /**
  * M9/award-ingest D-1 — 낙찰 목록 수집 use case 의 계약: 개찰일 × 업무마다 목록을 끝까지 걷고 항목마다
  * **원문 적재만** 하며 슬롯마다 `OPENING_AWARD_LIST` 회계를 남긴다. canonical 저장소를 받지 않으므로
- * 승격 경로는 구조적으로 없다. 멈춤은 예산·쿼터 둘뿐이고 그 밖에 끝내지 못한 슬롯(절단 · **사유 없는
- * 짧은 걷기**)은 미완 계수만 올리고 다음 슬롯으로 간다.
+ * 승격 경로는 구조적으로 없다. 멈춤은 **셋**(예산·쿼터·403 계열 차단)이고 그 밖에 끝내지 못한 슬롯
+ * (절단 · **사유 없는 짧은 걷기**)은 미완 계수만 올리고 다음 슬롯으로 간다.
  */
 class CollectAwardListUseCaseTest {
     private val construction = sourceName("construction")
@@ -253,20 +253,29 @@ class CollectAwardListUseCaseTest {
     }
 
     /**
-     * **멈춤 집합의 등식**(ops-code 레인 교차 지적) — 절단 사유마다 「실행을 멈추는가」를 전수로 잠근다.
-     * `haltOf` 가 소진 `when` 이라 새 사유가 생기면 컴파일이 그 자리를 가리키지만, 컴파일은 **어느
-     * 쪽으로** 보낼지 묻지 않는다. 이 등식이 그 선택을 고정한다.
+     * **처분 전수 표**(ops-code 레인 교차 지적) — 절단 사유마다 「실행을 멈추는가, 멈춘다면 무엇이라고
+     * 적는가」를 전수로 잠근다. `haltOf` 가 소진 `when` 이라 새 사유가 생기면 컴파일이 그 자리를
+     * 가리키지만, 컴파일은 **어느 쪽으로** 보낼지도 **어느 칸에 적을지**도 묻지 않는다. 이 표가 그 둘을
+     * 고정한다.
      *
-     * 멈추는 것은 **승인 범위·계정 한도를 다 쓴** 둘뿐이다(예산·쿼터). 그 둘은 다음 슬롯을 불러도 같은
-     * 거절이 오므로 창을 더 걷는 의미가 없다. 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
-     * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
+     * 멈추는 것은 **더 불러도 같은 거절이 오는** 셋이다 — 승인 범위·계정 한도를 다 쓴 둘(예산·쿼터)과
+     * 403 계열 차단([TruncationCause.AccessBlocked]). 나머지는 그 슬롯만 접고 다음 슬롯으로 간다 — 한
+     * 날의 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다.
      *
-     * 403 계열 차단(`AccessBlocked`)이 들어오면 **멈춤 쪽**이다(근거는 `haltOf` KDoc).
+     * 차단 행은 **이 표가 예고해 둔 자리**였고 M9/ops-code 병합이 그것을 채웠다(근거는 `haltOf` KDoc).
+     * 모수를 sealed 계층에서 도출하므로 그 사유는 병합과 동시에 표에 **들어왔고**, 행을 더하지 않으면
+     * 이 등식이 먼저 붉어진다 — 컴파일이 `haltOf` 를 가리키고 이 표가 그 선택을 가린다.
      *
-     * **집합이 아니라 사유마다의 결정을 맞춘다**(실측으로 고친 자리) — 「멈춤 집합의 등식」만 두면 새 사유를
-     * **계속 걷기** 쪽에 넣은 판이 초록이다(그 사유가 멈춤 집합에 안 들어오므로 등식이 그대로 성립한다).
-     * 그런데 그 방향이 바로 위험한 방향이다(403 이 조용히 계속 걷는다). 그래서 기대값을 **사유 → 멈추는가**
-     * 의 전수 표로 두고 모수를 sealed 계층에서 도출한다.
+     * **기대값은 두 번 강해졌고 둘 다 실측이 시켰다.** ⓐ 「멈춤 **집합**의 등식」만 두면 새 사유를 계속
+     * 걷기 쪽에 넣은 판이 초록이라(403 이 조용히 걷는 방향) **사유마다의 결정** 표로 바꿨고, ⓑ 그
+     * Boolean 표는 처분을 **엉뚱한 칸에 적는** 바꿔치우기를 전부 통과시켰다(cr r7 MEDIUM-1 · LOW-3,
+     * 구판에서 초록 실측) — 차단을 `AwardCollectionHalt(BudgetLimit.DAILY, null)` 로 보내도 멈추기는
+     * 멈추므로 운영 줄이 403 을 「일 상한 소진」으로 적는다. 그래서 기대값이 [AwardCollectionHalt]
+     * 자신이다: 세 칸(예산 한도 · 절단 사유 · 손대지 않은 슬롯 수)을 그대로 비교하면 그 변이가 붉고,
+     * **멈춘 뒤 남은 슬롯을 부르지 않는다**도 같은 줄에서 잠긴다(`OpeningAccessBlockedHaltTest` 와 같은 축).
+     *
+     * **이름은 그대로다** — 이미 머지된 M9/award-ingest 의 checklist 가 이 test 를 그 이름으로 인용한다.
+     * 남의 장부를 낡게 만드는 것이 좁아진 문면 한 줄보다 비싸고, 범위는 이 KDoc 이 말한다.
      *
      * **새 사유는 어느 쪽에 넣어도 붉지만 기제가 둘이다**(v r6 L-4, 실측). `data object` 면 모수에 들어와
      * **키가 하나 늘어** 이 표가 잡는다(1/9). 값을 나르는 사유면 폴백 한정 때문에 모수 초기화가
@@ -281,30 +290,43 @@ class CollectAwardListUseCaseTest {
         ALL_TRUNCATION_CAUSES shouldHaveSize permitted.size - 1 + BudgetLimit.entries.size
         ALL_TRUNCATION_CAUSES.map { it.javaClass }.toSet() shouldBe permitted
 
-        val decision = ALL_TRUNCATION_CAUSES.associateWith { cause -> haltedBy(cause) }
+        val decision = ALL_TRUNCATION_CAUSES.associateWith { cause -> haltOutcomeOf(cause) }
 
         decision shouldBe
             mapOf(
-                // 멈춤 — 승인 범위·계정 한도를 다 썼다(더 불러도 같은 거절이 온다).
-                TruncationCause.BudgetExhausted(BudgetLimit.DAILY) to true,
-                TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) to true,
-                TruncationCause.QuotaExhausted to true,
+                // 멈춤 — 승인 범위를 다 쓴 둘은 **예산 칸**에 그 한도를 싣는다(절단 사유 칸은 비운다).
+                // 둘째 슬롯을 부르지 않았으므로 손대지 않은 슬롯이 하나다.
+                TruncationCause.BudgetExhausted(BudgetLimit.DAILY) to
+                    AwardCollectionHalt(BudgetLimit.DAILY, null, notAttemptedSlots = 1),
+                TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) to
+                    AwardCollectionHalt(BudgetLimit.TOTAL, null, notAttemptedSlots = 1),
+                // 원천이 거절한 둘은 **절단 사유 칸**에 그 사유를 그대로 싣는다 — 쿼터와 차단이 서로의
+                // 칸에 적히면 운영 줄이 다른 원인을 가리킨다.
+                TruncationCause.QuotaExhausted to
+                    AwardCollectionHalt(null, TruncationCause.QuotaExhausted, notAttemptedSlots = 1),
+                // 차단은 **자격의 사실**이라 다음 슬롯도 같은 답이다 — 더 부르면 승인 호출만 태우고
+                // 차단을 키운다(공고 `WalkDirective.HALT_RUN`·개찰 `openingDirective` 와 같은 답).
+                TruncationCause.AccessBlocked to
+                    AwardCollectionHalt(null, TruncationCause.AccessBlocked, notAttemptedSlots = 1),
                 // 그 슬롯만 접고 다음 슬롯으로 — 한 날의 실패로 창 전체를 버리지 않는다.
-                TruncationCause.MaxPages to false,
-                TruncationCause.RepeatedPage to false,
-                TruncationCause.Timeout to false,
-                TruncationCause.TransportFailure to false,
-                TruncationCause.ServerError to false,
-                TruncationCause.NotRetryable to false,
-                TruncationCause.InputError to false,
-                TruncationCause.Unclassified to false,
-                TruncationCause.StructureFailure to false,
-                TruncationCause.SelfThrottled to false,
+                TruncationCause.MaxPages to null,
+                TruncationCause.RepeatedPage to null,
+                TruncationCause.Timeout to null,
+                TruncationCause.TransportFailure to null,
+                TruncationCause.ServerError to null,
+                TruncationCause.NotRetryable to null,
+                TruncationCause.InputError to null,
+                TruncationCause.Unclassified to null,
+                TruncationCause.StructureFailure to null,
+                TruncationCause.SelfThrottled to null,
             )
     }
 
-    /** 그 사유 하나로 끝나는 슬롯이 실행을 멈추는가 — 멈추지 않으면 미완 계수만 올라야 한다. */
-    private fun haltedBy(cause: TruncationCause): Boolean {
+    /**
+     * 그 사유 하나로 끝나는 슬롯이 실행을 멈추는가, 멈춘다면 **무엇이라고 적는가**. 창은 두 슬롯이라
+     * 첫 슬롯에서 멈추면 손대지 않은 슬롯이 하나 남고, 멈추지 않으면 두 슬롯 다 돌아 둘 다 미완이다.
+     */
+    private fun haltOutcomeOf(cause: TruncationCause): AwardCollectionHalt? {
         val fixture = AwardFixture()
         val source =
             ScriptedSource { _, _ ->
@@ -319,7 +341,7 @@ class CollectAwardListUseCaseTest {
 
         // 멈추지 않는 사유는 두 슬롯 다 돌고 둘 다 미완이다(조용히 완료로 세지 않는다).
         if (report.halted == null) report.unfinishedSlots shouldBe 2
-        return report.halted != null
+        return report.halted
     }
 
     @Test

@@ -29,6 +29,7 @@ import org.springframework.boot.test.util.TestPropertyValues
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.core.env.ConfigurableEnvironment
 import org.springframework.core.env.SystemEnvironmentPropertySource
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant

@@ -12,6 +12,8 @@ import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import org.slf4j.LoggerFactory
@@ -69,7 +71,11 @@ data class EvaluationCommitProperties(
  * 이유로 쓰는 선례, D-6A3-5).
  */
 @Configuration
-@Import(CollectionTerminationWiring::class)
+// NOTI-01(M9/ops-code) — 알림함 쓰기·청중 빈을 **명시 import** 한다. 그 조립은 production 에서
+// 상시 활성이라 중복이지만(같은 타입·같은 빈 이름이라 멱등), 이 배선을 **혼자 켰을 때** 그 빈이
+// 없어 기동이 실패하는 숨은 의존을 남기지 않는다 — `EvaluationProperties` 를 자기 등재에 함께
+// 적은 것과 같은 근거이고, `CollectionTerminationWiring` 이 겪은 그 자리다.
+@Import(CollectionTerminationWiring::class, NotificationInboxWiring::class)
 @ConditionalOnProperty(prefix = "bidvector.evaluation", name = ["mode"], havingValue = "once")
 @EnableConfigurationProperties(EvaluationCommitProperties::class, EvaluationProperties::class)
 open class EvaluationCommitWiring {
@@ -85,6 +91,10 @@ open class EvaluationCommitWiring {
         correlationIdFactory: CorrelationIdFactory,
         clock: Clock,
         commitProperties: EvaluationCommitProperties,
+        // NOTI-01 — 쓰기 빈과 청중 빈은 상시 활성인 `NotificationInboxWiring` 이 이미 낸다.
+        // 같은 값의 둘째 빈 정의를 만들지 않는다(다른 포트들과 같은 규율).
+        notificationInboxPort: NotificationInboxPort,
+        notificationAudiencePort: NotificationAudiencePort,
         release: ReleaseIdentifier,
     ): EvaluationCommitRun {
         require(commitProperties.currentActiveBids >= 0) {
@@ -110,6 +120,8 @@ open class EvaluationCommitWiring {
             correlationIds = correlationIdFactory,
             clock = clock,
             analysisBudget = strategy.candidateLimit?.value,
+            notificationInbox = notificationInboxPort,
+            audience = notificationAudiencePort,
             release = release,
         )
     }

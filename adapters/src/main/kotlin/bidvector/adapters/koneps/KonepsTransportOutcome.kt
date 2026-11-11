@@ -12,12 +12,22 @@ import java.util.concurrent.TimeoutException
 
 /** HTTP 전송 결과(①) — 예외를 값으로 접는다(경계 안에서 끝난다, port 밖은 값만 나간다). */
 internal sealed interface KonepsTransportOutcome {
+    /**
+     * **응답을 받지 못한** 결말 — 상태 코드가 없으니 처분 표(OPS-09)가 가를 것이 없다.
+     *
+     * 이 하위 타입을 둔 이유는 소비자의 **도달 불가 분기를 없애는** 것이다: 받은 응답은 처분
+     * 표를 지나 `RateLimitedStep`·`BlockedStep`·`EnvelopeStep` 중 하나가 되므로
+     * `KonepsRawStep.TransportStep` 에 [Received] 가 올 수 없는데, 앞 판은 그 불변식을 문자열과
+     * `error()` 두 자리로 적었다. 지금은 **타입이 그 말을 한다** — 어기려면 시그니처를 바꿔야 한다.
+     */
+    sealed interface NoResponse : KonepsTransportOutcome
+
     data class Received(
         val status: Int,
         val body: String,
     ) : KonepsTransportOutcome
 
-    data object TimedOut : KonepsTransportOutcome
+    data object TimedOut : NoResponse
 
     /**
      * 예외 **클래스 이름만** 싣는다 — JDK 전송 예외의 메시지에는 요청 URI(서비스 키가 쿼리에 실린다)가 실릴 수
@@ -25,7 +35,7 @@ internal sealed interface KonepsTransportOutcome {
      */
     data class TransportFailed(
         val exceptionType: String,
-    ) : KonepsTransportOutcome
+    ) : NoResponse
 }
 
 /**

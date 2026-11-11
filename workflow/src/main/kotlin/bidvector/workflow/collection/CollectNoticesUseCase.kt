@@ -28,6 +28,11 @@ private fun TruncationCause.directive(): WalkDirective =
 
         is TruncationCause.BudgetExhausted -> WalkDirective.HALT_RUN
 
+        // 차단(OPS-09)도 **실행을 멈춘다.** 401·403 은 슬롯의 사실이 아니라 자격의 사실이라
+        // 다음 슬롯도 같은 답을 받는다 — 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내고
+        // 승인 상한만 태운다(쿼터가 실행을 멈추는 D-6G-47 과 같은 근거).
+        TruncationCause.AccessBlocked -> WalkDirective.HALT_RUN
+
         TruncationCause.RepeatedPage,
         TruncationCause.Timeout,
         TruncationCause.TransportFailure,
@@ -50,8 +55,10 @@ private class PlannedSlot(
  * **원문 저장 → [canonicalize] → 영속**을 한 번씩 부르며, 슬롯마다 회계를 [CollectionRunStore] 에 남긴다.
  * 정규화는 [canonicalize] 하나뿐이다 — 이 클래스는 원문 필드를 직접 읽지 않는다(구조 게이트가 잠근다).
  *
- * **부분 실패**: 슬롯이 전송 실패·절단으로 끝나도 회계에 원인을 싣고 다음 슬롯으로 넘어간다. 쿼터
- * 소진([TruncationCause.QuotaExhausted])만 실행을 멈춘다 — 더 부르면 계속 실패하고 한도를 태운다.
+ * **부분 실패**: 슬롯이 전송 실패·절단으로 끝나도 회계에 원인을 싣고 다음 슬롯으로 넘어간다. 실행을
+ * 멈추는 사유는 **셋**이다 — 쿼터 소진([TruncationCause.QuotaExhausted]) · 승인 상한
+ * ([TruncationCause.BudgetExhausted]) · 차단([TruncationCause.AccessBlocked]). 더 부르면 계속 실패하고
+ * 한도를 태운다(정본은 이 파일의 절단 사유 → 다음 걸음 표다).
  * 저장소 장애 같은 인프라 예외는 삼키지 않고 전파한다(그 슬롯의 회계는 남지 않는다).
  *
  * 원문은 canonical 저장과 무관하게 먼저 커밋된다(`RawObservationStore` 계약 ⑤) — 정규화에서 탈락하거나
