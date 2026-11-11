@@ -13,7 +13,6 @@ import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import java.time.Instant
 
 /**

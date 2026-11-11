@@ -19,13 +19,8 @@ import bidvector.workflow.collection.NoticeKeyHash
 import bidvector.workflow.collection.SampleList
 import bidvector.workflow.collection.SampleScope
 import bidvector.workflow.collection.SampleStratum
-import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 /**
  * 추출 test 셋의 공통 대역(cr r4 ⑧ — 파일 500 줄 한도로 갈랐다). **문턱**을 재는 판과 **계수 배선**을

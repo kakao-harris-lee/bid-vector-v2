@@ -1,6 +1,4 @@
 import bidvector.buildlogic.CpdReportPresenceGateTask
-import bidvector.buildlogic.DomainApiTypeGateTask
-import bidvector.buildlogic.DomainSourceReferenceGateTask
 import bidvector.buildlogic.DuplicatePolicy
 import bidvector.buildlogic.GateExecutionGateTask
 import bidvector.buildlogic.GateRegistrationGateTask
@@ -10,12 +8,12 @@ import bidvector.buildlogic.ModuleDependencyGateTask
 import bidvector.buildlogic.PackageOwnershipGateTask
 import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
-import bidvector.buildlogic.SourceLanguageGateTask
 import bidvector.buildlogic.SourceSetLayoutGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
+import bidvector.buildlogic.registerPolicyGates
 import bidvector.buildlogic.requireList
 import bidvector.buildlogic.requireValue
 import bidvector.buildlogic.sourceSetLayoutFacts
@@ -159,6 +157,12 @@ extensions.configure(de.aaschmid.gradle.plugins.cpd.CpdExtension::class.java) {
     setMinimumTokenCount(duplicatePolicy.minimumTokenCount)
     setToolVersion(duplicatePolicy.toolVersion)
     setIgnoreFailures(duplicatePolicy.ignoreFailures)
+    // Type-2 정규화(`OPEN-CPD-GATE-RENAME-BYPASS`) — 변수명만·리터럴만 바꾼 복사판이 통과하던 자리.
+    // `language`·`minimumTokenCount` 와 **같은 전파 경로**로 두 Cpd task 에 닿는다(위 KDoc 의
+    // decompile 사실: `setupTaskDefaults` 가 모든 Cpd task 에 extension 값을 먼저 얹는다). 같은 값을
+    // task 둘에 다시 적지 않는다.
+    setIgnoreIdentifiers(duplicatePolicy.ignoreIdentifiers)
+    setIgnoreLiterals(duplicatePolicy.ignoreLiterals)
 }
 
 // 리포트 위치를 우리가 직접 정한다 — 플러그인 기본 report 객체의 `outputLocation`을 다른
@@ -212,6 +216,10 @@ val cpdReportPresenceGateObserved =
         expectedSource.from(cpdObservedSourceSets.map { name -> sourceSets[name].kotlin })
         dependsOn(cpdCheckObserved)
     }
+
+// 정책 데이터만 먹는 축은 `PolicyGateWiring.kt` 가 배선한다 — 이 파일이 500 줄 한도를 넘어
+// `buildLogicSizeGate` 가 붉었다(verifier B-1). 한도를 올리는 것은 게이트를 끄는 것과 같다.
+val policyGates = registerPolicyGates(configDir)
 
 // 경계의 1차 강제는 **모든 모듈**에 건다. domain 만 걸면 workflow 가 adapters 를 참조하는
 // 역방향 선언이 1차에서 통과한다 — 층 규칙은 domain 전용이 아니다(ADR 0006 D-3).
@@ -279,23 +287,21 @@ val packageOwnershipGate =
 val conventionSourceDirectories =
     provider { sourceSets.map { layout.projectDirectory.dir("src/${it.name}/kotlin").asFile } }
 
-val sourceLanguageGate =
-    tasks.register<SourceLanguageGateTask>("sourceLanguageGate") {
-        description = "소스 트리에 Kotlin 아닌 소스가 있으면 실패한다 — java.setSrcDirs 봉쇄의 2차 그물"
-        sourceDirectories.from(layout.projectDirectory.dir("src"))
-        excludedDirectories.from(provider { sourceSets.flatMap { it.resources.srcDirs } })
-        // `md` 는 소스가 아니라 그 트리를 설명하는 문서다 — 컴파일되지 않으므로 class output 을
-        // 만들 수 없고, 이 게이트가 막으려는 것(게이트를 비껴가는 산출물)에 해당하지 않는다.
-        allowedExtensions = setOf("kt", "kts", "md")
-        report = layout.buildDirectory.file("reports/source-language-gate/offenders.txt")
-    }
-
 val jarContentGate =
     tasks.register<JarContentGateTask>("jarContentGate") {
         description = "배포되는 아카이브의 class 가 게이트를 통과한 산출물 그 바이트인지 잰다"
         policyFile = configDir.file("quality/architecture-policy.properties")
         moduleName = project.name
-        archives.from(tasks.named("jar").map { (it as Jar).archiveFile })
+        // **모듈의 Jar 타입 task 전수**다(`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`). 앞 판은 `jar`
+        // 하나를 이름으로 걸어, 배포물이 `bootJar` 인 `app` 에서 게이트가 배포되지 않는 아카이브를
+        // 재고 있었다. 타입 전수라 나중에 생기는 Jar task(`bootJar`·shadow 류)도 정의상 대상이다 —
+        // `BOOT-INF/classes/` 접두는 `jar.class-roots` 가 벗기고, 그 아카이브가 품는 다른 출처의
+        // 클래스(Boot launcher)는 `jar.external-class-roots` 가 면제한다.
+        archives.from(provider { tasks.withType(Jar::class.java).filter { it.enabled }.map { it.archiveFile } })
+        dependsOn(tasks.withType(Jar::class.java))
+        // 중첩 jar 축의 기준 집합(verifier M-1) — 모듈이 **선언한** runtime 의존의 해석 결과다.
+        // 선언하지 않은 jar 는 이 집합에 없으므로 이름만으로 「누가 넣었는가」가 갈린다.
+        runtimeClasspath.from(configurations.named("runtimeClasspath"))
         verifiedSources.from(sourceSetKotlinFiles)
         // 대조 대상 = 소유 게이트가 이미 본 class output. 판정이 「이름이 맞는가」가 아니라
         // **「게이트를 거친 바이트인가」**가 되려면 이 집합이 필요하다.
@@ -397,31 +403,6 @@ val testShapeGate =
         report = layout.buildDirectory.file("reports/test-shape-gate/test-shape-gate.txt")
     }
 
-// 바이트코드 층(ArchUnit)과 의존 그래프 층이 함께 놓치는 자리 — 컴파일 시 인라인되는 상수와
-// class literal 은 domain 소스가 **이름으로** 부르지만 산출물에 타입 참조를 남기지 않는다
-// (알려진 제한 7·11). 소스 자체를 걸어 그 사각을 덮는다.
-val domainSourceReferenceGate =
-    tasks.register<DomainSourceReferenceGateTask>("domainSourceReferenceGate") {
-        description = "domain main 소스가 허용 목록 밖 좌표를 이름으로 부르는지 잰다"
-        policyFile = configDir.file("quality/architecture-policy.properties")
-        moduleName = project.name
-        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
-        report = layout.buildDirectory.file("reports/domain-source-reference/references.txt")
-    }
-
-// public domain API 의 타입 표면에 raw 부동소수가 없는지 잰다 — milestone-1.md 「완료 조건」의
-// 강제 장치(설계 검토 부록 「요구의 귀속」 — 내용은 1B, 장치는 1A). 소스 참조 게이트와 축이
-// 달라(이름 참조 대 타입 표면) 별도 task 로 둔다.
-val domainApiTypeGate =
-    tasks.register<DomainApiTypeGateTask>("domainApiTypeGate") {
-        description = "domain main 의 public(+protected) API 타입 표면에 raw 부동소수가 없는지 잰다"
-        policyFile = configDir.file("quality/architecture-policy.properties")
-        apiPolicyFile = configDir.file("quality/api-type-policy.properties")
-        moduleName = project.name
-        sourceRoot.from(layout.projectDirectory.dir("src/main/kotlin"))
-        report = layout.buildDirectory.file("reports/domain-api-type/violations.txt")
-    }
-
 val sizeGate =
     tasks.register<SizeGateTask>("sizeGate") {
         description = "파일·함수·타입 멤버 크기 래칫 — 도구에 의존하지 않는 자체 검사(ADR 0007 D-7)"
@@ -457,18 +438,16 @@ val typeShapeGate =
 // 「배선했다」와 「측정한다」는 다르다. XML 은 기계가, HTML 은 사람이 읽는다.
 tasks.named("check") {
     dependsOn(
+        policyGates,
         sizeGate,
         typeShapeGate,
         moduleDependencyGate,
         packageOwnershipGate,
-        sourceLanguageGate,
         jarContentGate,
         sourceSetLayoutGate,
         gateExecutionGate,
         gateRegistrationGate,
         testShapeGate,
-        domainSourceReferenceGate,
-        domainApiTypeGate,
         cpdReportPresenceGate,
         cpdReportPresenceGateObserved,
         tasks.named("koverXmlReport"),

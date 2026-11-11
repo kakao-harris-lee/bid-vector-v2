@@ -5,7 +5,6 @@ import bidvector.procurement.AttemptOutcome
 import bidvector.procurement.BusinessDivision
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionReferenceDate
-import bidvector.procurement.INTERRUPTED_ROUND
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsCollectionPolicyData
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
@@ -29,12 +28,8 @@ import bidvector.sharedkernel.Resolution
 import bidvector.workflow.retention.RETENTION_POLICY
 import bidvector.workflow.retention.RetentionPolicyData
 import bidvector.workflow.strategy.Clock
-import io.kotest.matchers.shouldBe
-import io.kotest.matchers.types.shouldBeInstanceOf
-import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 /**
  * M7/7C⑤-0 승격 use case test 의 **대역과 값**. 이 패키지의 수집 갈래가 이미 쓰는 모양이다

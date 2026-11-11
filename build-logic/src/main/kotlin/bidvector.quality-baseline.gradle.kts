@@ -9,6 +9,7 @@ import bidvector.buildlogic.QualityBaselineTask
 import bidvector.buildlogic.SizeGateTask
 import bidvector.buildlogic.TestShapeGateTask
 import bidvector.buildlogic.TypeShapeGateTask
+import bidvector.buildlogic.UnusedImportGateTask
 import bidvector.buildlogic.lib
 import bidvector.buildlogic.readPolicy
 import bidvector.buildlogic.requireList
@@ -198,6 +199,28 @@ val looseBuildScripts =
             .sortedBy { it.path }
     }
 
+// 쓰이지 않는 import 축(`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`)의 나머지 두 트리 — included build
+// 자신과 모듈 밖 느슨한 스크립트. 모듈 레인만 걸면 이 두 트리로 옮기는 것이 우회가 된다
+// (`buildLogicSizeGate`·`scriptSizeGate` 가 크기 축에서 같은 자리를 메우는 것과 같은 이유). 소스를
+// 텍스트로 읽을 뿐이라 순환이 없다.
+val buildLogicUnusedImportGate =
+    tasks.register<UnusedImportGateTask>("buildLogicUnusedImportGate") {
+        group = "verification"
+        description = "included build 의 소스에도 쓰이지 않는 import 게이트를 건다"
+        policyFile = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
+        sources.from(layout.settingsDirectory.dir("build-logic/src"))
+        report = layout.buildDirectory.file("reports/unused-import/build-logic.txt")
+    }
+
+val scriptUnusedImportGate =
+    tasks.register<UnusedImportGateTask>("scriptUnusedImportGate") {
+        group = "verification"
+        description = "모듈 밖 빌드 스크립트에도 쓰이지 않는 import 게이트를 건다"
+        policyFile = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
+        sources.from(looseBuildScripts)
+        report = layout.buildDirectory.file("reports/unused-import/build-scripts.txt")
+    }
+
 val scriptSizeGate =
     tasks.register<SizeGateTask>("scriptSizeGate") {
         group = "verification"
@@ -251,7 +274,9 @@ tasks.register("check") {
         buildLogicGateExecutionGate,
         buildLogicGateRegistrationGate,
         buildLogicTestShapeGate,
+        buildLogicUnusedImportGate,
         scriptSizeGate,
+        scriptUnusedImportGate,
         conventionCoverageGate,
         memberEffectGate,
         contractGate,

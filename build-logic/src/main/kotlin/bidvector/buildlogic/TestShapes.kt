@@ -124,11 +124,3 @@ internal object TestShapes {
         }
     }
 }
-
-/** `true`/`false` 리터럴만 허용한다 — 다른 값은 정책 오류(기본값 없음, D-6 관례). */
-private fun Map<String, String>.requireBoolean(key: String): Boolean =
-    when (val raw = requireValue(key).trim()) {
-        "true" -> true
-        "false" -> false
-        else -> error("정책 키 '$key' 의 값 '$raw' 이 true/false 가 아니다")
-    }

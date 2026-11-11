@@ -1,0 +1,299 @@
+# M9 / gates-build — 설계 검토 (구현 전)
+
+여덟 축을 한 slice 에 담는다. 축마다 ⓐ 경계 한 문장 · ⓑ 새 public 표면 · ⓒ 우회 ≥5 와 그것을 막는 층을
+적는다. 「막는 층」이 **문자열 비교**면 그 축은 다시 설계한다(공통 규율 「게이트 술어는 구조로」).
+
+## 공통 — 위협 모델 경계
+
+이 slice 가 막는 것은 **게이트를 끄지 않고 게이트 밑을 지나가는 변경**이다. 게이트를 명시적으로
+지우거나 `check` 에서 빼는 경로는 이미 `conventionCoverageGate`·`gateExecutionGate`·
+`gateRegistrationGate` 셋이 든다 — 이 slice 는 그 셋이 초록인 상태에서 통과하는 틈만 다룬다.
+레인 권한 밖: CI 워크플로 편집 · adapters test 술어 · mutation 도구 채택.
+
+## 배선을 나눈 자리 — 왜 새 plugin id 가 아닌가 (수정 라운드 1, 팀장 승인)
+
+`bidvector.kotlin-conventions` 가 파일 500 줄 한도를 넘어 나눠야 했을 때(verifier B-1) 정책 데이터만
+먹는 축 여섯을 **같은 plugin 이 부르는 별 `.kt` 파일**(`PolicyGateWiring.kt`)로 뺐다. precompiled script
+plugin 을 하나 더 만들지 않은 이유는 `conventionCoverageGate` 가 **`qualityBaseline` 등록 집합**으로
+「게이트가 적용된 모듈」을 세기 때문이다 — plugin 을 더하면 **그 plugin 만 빠진 모듈을 세는 축이 없어**
+「게이트의 부재는 조용하다」가 한 겹 더 생긴다. 호출 한 줄이면 그 부재가 diff 에 보인다.
+
+## ① 마이그레이션 번호 순서 (`OPEN-MIGRATION-ORDER-GATE`)
+
+- ⓐ **경계**: `db/migration` 파일 집합의 version 다중집합이 「1..max 에서 은퇴 번호를 뺀 집합」과
+  **같아야** 한다. Flyway `outOfOrder=false` 아래에서 결번은 「나중에 그 번호로 들어온 마이그레이션이
+  조용히 적용되지 않는다」와 같은 말이다.
+- ⓑ **새 public 표면**: `MigrationOrderGateTask`(task 하나) · 정책 키 셋(`migration.module` ·
+  `migration.resource-path` · `migration.retired-versions`). 판정은 `internal` 순수 함수.
+- ⓒ **우회**
+  1. 번호를 겹쳐 붙인다(`V24__a.sql` 둘) → 다중집합 등식이 중복을 센다(집합 크기 ≠ 파일 수).
+  2. 번호를 건너뛴다(`V26` 다음에 `V30`) → `1..max ∖ retired` 등식.
+  3. 결번을 은퇴 목록에 끼워 조용히 넓힌다 → 목록은 정책 데이터라 리뷰 diff 에 보이고, **대상이 없는
+     은퇴 항목**(max 밖·실재하는 파일과 겹침)도 위반이다(OPS-13 원리 4 「죽은 allowlist 검출」).
+  4. 파일 이름을 규약 밖으로 짓는다(`migrate-25.sql`) → 판독 불가 자체가 위반(열거가 아니라 전수).
+  5. 디렉터리를 옮긴다 → 경로가 정책 값이고, 그 모듈의 디렉터리가 **비면 실패**한다(비-공허 단언).
+  6. 게이트를 다른 모듈로 옮긴다 → `migration.module` 한 모듈만 단언 대상이고, 그 모듈에서 비면 실패.
+  7. 입력 선언을 비껴가 UP-TO-DATE 로 건너뛴다 → 디렉터리를 선언 입력으로 걸고 경로 민감도 RELATIVE
+     (이름 변경이 입력 변경이다).
+- **main 의 기존 상태**: version 10·11 이 결번이다(6F-4 가 쓰지 않은 번호 — `6f5a/scope.md` D-6F5-8
+  「V10 은 파일이 없어 기다리지 않는다」). 파일 이름을 다시 매기는 것은 adapters 의 production 거동
+  변경이므로 **하지 않는다** — 그 둘을 `migration.retired-versions` 로 **고정**한다. 효과는 「그 번호로
+  새 파일이 들어오면 실패」(은퇴 번호 재사용 금지)이고, 그것이 Flyway 사각을 닫는 방향이다.
+
+**수정 라운드 3 — 우회 여덟째(처리된 리소스).** 이 절의 우회 목록은 「디렉터리를 옮긴다」와 「다른 모듈에
+둔다」를 다뤘지만 **`processResources { from(…) { into("db/migration") } }`** 는 다루지 않았다. 관례 소스
+디렉터리를 비워 둔 채 처리된 리소스에만 파일을 넣으면 앞 판 입력이 그것을 보지 못했다(실측 — verifier
+M-1). 판정 입력을 **Flyway 가 읽는 자리**(처리된 리소스의 `db/migration`)로 옮겨 관례 디렉터리·
+`resources.srcDir`·`from().into()` 세 경로를 한 입력으로 모았다. H-2 를 닫은 것과 같은 원리다.
+
+## ② CPD 이름 치환 우회 (`OPEN-CPD-GATE-RENAME-BYPASS`)
+
+- ⓐ **경계**: 중복 판정이 **식별자·리터럴 글자에 의존하지 않는다**(PMD Type-2). 판정식 구조를 바꾼
+  복제(Type-3)는 닫지 않는다 — 알려진 한계로 선언한다.
+- ⓑ **새 public 표면**: 없다. 정책 키 둘(`normalize.identifiers`·`normalize.literals`)과
+  `CpdReportPresenceGateTask` 의 입력 하나.
+- ⓒ **우회**
+  1. 변수명만 바꾼 복사판 → `ignoreIdentifiers` 가 식별자를 토큰 한 종류로 정규화한다.
+  2. 리터럴만 바꾼 복사판 → `ignoreLiterals`.
+  3. 정책을 `mode=observe` 로 되돌린다 → 되돌림 경로로 **의도된** 자리(기존 rollback 근거). 거동이
+     바뀐 사실이 정책 diff 에 남는다.
+  4. `fail.source-sets` 를 비운다 → `DuplicatePolicy.failSourceSets` 가 이미 빈 값을 거부한다.
+  5. `check -x cpdCheck` 로 빼고 **낡은 리포트**가 가려 준다 → 프레즌스 게이트가 리포트 mtime 을
+     「가장 새 입력 소스의 mtime」과 견준다. 소스를 고친 뒤 cpd 를 빼면 리포트가 그보다 낡아 붉는다.
+  6. 정책 키 값에 아무 글자나 쓴다(`normalize.identifiers=yes`) → 참/거짓 외 값은 정책 오류로 거부
+     (닫히는 쪽으로 튼다).
+- **알려진 한계**: 리포트를 `touch` 하면 mtime 축은 통과한다(내용 무변). didWork 를 직접 보는 축은
+  configuration-cache 아래에서 task 참조를 실행 시점에 들고 있어야 해 쓰지 않았다.
+
+- **구현 뒤 실측 — 1·2 는 닫히지 않았다.** 두 값을 켜도 「구조는 같고 식별자·리터럴이 전부 다른」 블록
+  둘(≈200 토큰)이 탐지되지 않는다. 축어 동일 통제군은 탐지된다(임계·lexer 정상). 사유는 구조적이다 —
+  값은 `CPDConfiguration.setIgnoreIdentifiers` 까지 흐르지만 PMD 7.7.0 의
+  `KotlinLanguageModule.createCpdLexer(LanguagePropertyBundle)` 가 그 번들을 쓰지 않고 인자 없는
+  `KotlinCpdLexer()` 를 만든다(바이트코드 확인). **그 OPEN 의 이름 치환 축은 열린 채로 남는다** —
+  배선과 정책 키는 남기고 정책 주석 첫 문단이 그 사실을 들게 했다. 5(낡은 리포트)는 닫혔다.
+
+## ③ 배포물 아카이브 사각 (`OPEN-JAR-CONTENT-GATE-BOOTJAR-BLINDSPOT`)
+
+**수정 라운드 2 — 사각 셋째(중첩 jar)를 닫았다.** 이 절의 첫 판은 사각 둘(이름으로 건 `jar` · 빈 입력)만
+다뤘고, 술어가 아카이브 **최상위 `.class` 엔트리**에만 걸려 있다는 사실을 우회 목록에 넣지 않았다 —
+`bootJar { classpath(files(…)) }` 로 넣은 jar 가 `BOOT-INF/lib` 와 `classpath.idx` 에 들어가 런타임에
+실리면서 판정되지 않았다(verifier M-1 실측, 재현 확인). 처방은 **`중첩 jar 이름 ⊆ runtimeClasspath 가
+해석한 jar 이름`** 이다. 바이트가 아니라 이름인 근거: 중첩 jar 는 다시 압축돼 있어 바이트 대조에 원본이
+필요한데, **선언하지 않은 jar 는 해석 결과에 아예 없다**. 새 public 표면은 task 입력 하나
+(`runtimeClasspath`)와 정책 키 하나(`jar.external-nested-jars` — 축을 켜자 실측으로 나온 Boot 자신의
+도구 jar 면제).
+
+**수정 라운드 4 — 그 술어의 두 문장이 거짓이었다.** 라운드 2·3 의 이 절은 「경로를 보지 않으므로 다른
+자리에 넣는 것이 우회가 되지 않는다」와 「면제는 접두 비교」를 적었다. 둘 다 아니다 — 라운드 3 이 면제를
+**정확 이름**으로 바꿨고(그 문장이 그때 낡았다), 「경로를 보지 않는다」는 성질이 **그 자체로 구멍**이었다
+(verifier H-1 실측): 이름 **집합 소속**만 보므로 `BOOT-INF/lib/y/<선언된 이름>` 을 **더하면** 원본의
+선언에 업혀 통과하고, Boot 로더는 뿌리 밑을 평탄하게 훑어 **둘 다 싣는다**. 같은 라운드가 모집단을 뿌리
+접두로 좁히면서 뿌리 **밖**을 미계수로 만든 것도 반대 방향의 축소였다(`PropertiesLauncher` +
+`Loader-Path` 가 싣는 자리 — verifier M-1).
+
+그래서 이 라운드는 **술어를 문장에 맞추는 쪽이 아니라 문장을 술어에 맞추고, 술어를 네 축으로 넓혔다**.
+
+| 축 | 술어 | 닫는 우회 |
+| --- | --- | --- |
+| 경로 | 뿌리 밑 엔트리의 전체 경로 == `<뿌리><이름>` | 하위 디렉터리에 같은 이름 더하기(U1·U2) |
+| 다중도 | 한 아카이브에서 이름마다 **정확히 한 번** | 같은 이름 두 번 |
+| 선언 | 이름 ∈ (runtime 해석 결과 ∪ 정확 이름 면제), 면제는 **대상이 있어야** 한다 | 사칭 · 죽은 면제(U5) |
+| 뿌리 밖 | 뿌리 밖 엔트리는 **끝의 중앙 디렉터리 끝 레코드(EOCD)** 로 전수 판정 | `BOOT-INF/ext/` 류 · 앞에 바이트를 붙인 포장 |
+| 적재 선언 | manifest 속성 여섯이 정책의 정확 값 | 런처 교체 · **적재 뿌리 넓히기**(수정 라운드 5) |
+| `Class-Path` | classpath index 의 줄 집합 == 뿌리 바로 밑 엔트리 ∖ 면제 | index 에 줄 더하기(수정 라운드 5) |
+
+**수정 라운드 5 가 축 둘을 더한 사유**(verifier r5 H-1): 앞 넷은 전부 주장대로 작동했지만 **그 축이
+기대는 로더가 배포 경로의 로더가 아니었다**. 출하 이미지는 `JarLauncher` 로 뜨지 않는다 —
+`docker/app.Dockerfile` 이 `jarmode=tools extract --layers` 로 풀고 평범한 `java -jar` 로 띄우며, 그
+추출 도구는 manifest 의 `Spring-Boot-Lib` 로 적재 자리를 정하고 `Spring-Boot-Classpath-Index` 가 가리킨
+index 의 **줄 그대로** 런처 jar 의 `Class-Path` 를 만든다. 즉 **뿌리를 정하는 것이 manifest 한 줄**이고,
+앞 판은 그 줄을 보지 않았다. 뿌리 밖 판정을 서명 네 바이트에서 EOCD 탐색으로 바꾼 것도 같은 재현이
+쓴 포장(앞에 셸 머리글을 붙인 jar)을 닫기 위해서다.
+
+새 public 표면은 정책 키 **다섯**(`jar.boot-launcher-main-class`·`jar.boot-start-class`·
+`jar.boot-classpath-index`·`jar.boot-layers-index`·`jar.boot-archive-module`)과 순수 판정 타입
+`BootArchivePolicy` 다. 적재 자리 둘(`Spring-Boot-Lib`·`Spring-Boot-Classes`)은 **새 키를 만들지 않고**
+`jar.nested-lib-roots`·`jar.class-roots` 에서 가져온다 — 같은 값을 두 자리에 적으면 갈라지는 날 게이트가
+자기 전제를 잃는다. 판독기(`readNestedArchive`)가 최상위 함수인 것은 **test 가 진짜 아카이브 하나를
+만들어 그 층을 재기 위해서**다(리뷰 M-1 — 판정만 순수 test 로 잠그면 판독이 경로를 버리는 변이가
+조용하다).
+
+- ⓐ **경계**: 「게이트를 통과한 바이트인가」를 **그 모듈이 만드는 Jar 타입 task 전수**에 건다. `jar`
+  하나를 보던 하드코딩을 provider 로 바꾼다.
+- ⓑ **새 public 표면**: 순수 판정 타입 둘(`NestedArchivePolicy`·`BootArchivePolicy`)과 판독기
+  최상위 함수 하나(`readNestedArchive`). task 입력 둘(`archives`·`runtimeClasspath`). 정책 키 **아홉** —
+  `jar.class-roots`·`jar.external-class-roots`·`jar.nested-lib-roots`·`jar.external-nested-jars`·
+  `jar.boot-launcher-main-class`·`jar.boot-start-class`·`jar.boot-classpath-index`·
+  `jar.boot-layers-index`·`jar.boot-archive-module`. 「경계로 처리」가 아니라 **값을 읽는 자리**인
+  것이 둘 있다: `requireSingle` 이 적재 자리 둘을 목록에서 꺼내고(둘 이상·빈 목록 거부),
+  `requireNonEmptyList` 가 뿌리 목록을 꺼낸다 — 둘 다 **비우는 것으로 축이 꺼지지 않게** 하는 자리다.
+- ⓒ **우회**
+  1. 배포물을 `bootJar` 로 내고 `jar` 만 재게 둔다 → `tasks.withType<Jar>()` 전수(provider).
+  2. `BOOT-INF/classes/` 접두 때문에 소유 판정이 전부 붉는 것을 「게이트가 시끄럽다」로 끈다 →
+     접두를 정책 값으로 벗기고 그 **밑의** 경로로 판정한다(판정을 느슨하게 하지 않는다).
+  3. 새 Jar task 를 만들어(`shadowJar` 같은) 거기로 배포한다 → 타입 전수라 새 task 도 대상이다.
+  4. `jar.enabled = false` 로 아카이브를 통째로 없애 **빈 입력**으로 초록 → 아카이브 0 개 또는 class
+     엔트리 0 개는 실패(비-공허 단언). 지금 `app/build.gradle.kts` 가 `jar` 를 켜 두는 유일한 이유가
+     이 공허였고, 이 축이 서면 그 주석의 전제가 바뀐다(주석은 그 파일 소관이라 건드리지 않는다).
+  5. launcher 클래스(`org/springframework/boot/loader/**`)를 핑계로 비-소유 엔트리를 전면 허용한다 →
+     허용은 **접두 집합 정책 데이터**이고 그 밖의 비-소유 엔트리는 그대로 위반.
+  6. launcher 접두 밑에 자기 클래스를 심는다 → 그 접두는 「검증 집합 대조 면제」이지 「아무 이름 허용」이
+     아니다. 면제 엔트리 수를 리포트에 세어 수가 늘면 보인다(래칫은 아니고 관측).
+  7. (수정 라운드 4) 선언된 이름의 jar 를 **하위 디렉터리에 하나 더** 넣는다 → 경로 축. 뿌리 밑은
+     전체 경로가 `<뿌리><이름>` 이어야 한다.
+  8. (수정 라운드 4) 같은 이름을 **두 번** 넣는다 → 다중도 축. 해석 결과에 그 이름은 한 번뿐이다.
+  9. (수정 라운드 5 정정) 뿌리 **밖**(`BOOT-INF/ext/`·아카이브 뿌리)에 넣고 **적재 선언으로 싣는다**
+     → 배포물에는 적재 경로가 둘이고 둘 다 manifest 가 정한다. ⓐ 풀지 않고 띄우는 경로는 `Main-Class`
+     (런처 교체) ⓑ **출하 이미지의 경로**는 `extract --layers` 가 읽는 `Spring-Boot-Lib` + classpath
+     index 다. 수정 라운드 4 의 문면은 ⓐ 만 들고 「두 겹을 함께 뚫어야 한다」고 적었는데, ⓑ 는 한 겹도
+     없었다 — `Spring-Boot-Lib: BOOT-INF/` 한 줄과 index 두 줄로 뿌리 밖 jar 가 출하 `Class-Path` 에
+     실렸다(verifier r5 실측, 게이트는 초록). 지금은 속성 축과 index 등식이 각각 받고, 뿌리 밖 바이트
+     자체는 EOCD 판정이 받는다(앞에 바이트를 붙인 포장 포함).
+  10. (수정 라운드 4) 도구 jar 를 빼서(`includeTools = false`) 면제를 **대상 없이** 남긴 뒤 그 이름으로
+      넣는다 → 죽은 면제가 위반이다.
+  11. (수정 라운드 5) `bootJar { enabled = false }` 로 **모집단을 통째로** 없앤다 → 그 0 은 배포물이
+      없는 아홉 모듈의 정상 상태와 리포트가 같아 비-공허 단언을 전 모듈에 걸 수 없다. 그래서
+      `jar.boot-archive-module` 이 소유 모듈을 지목하고 **그 모듈에서만** 바닥값을 건다(리뷰 M-3).
+  12. (수정 라운드 5) 풀린 뒤의 진입점(`Start-Class`)을 바꿔 다른 런처를 띄운다 → 추출 도구는
+      `Main-Class` 를 **지우고** `Start-Class` 를 새 런처 manifest 의 `Main-Class` 로 쓴다. 그래서 그
+      경로에서 실제로 뜨는 것은 이 속성이고, 속성 축이 여섯 가운데 하나로 받는다.
+  13. (수정 라운드 5) index 를 **다른 자리**로 선언하고 기대 자리의 파일은 그대로 둔다 → 속성 축이
+      선언 불일치로, index 축이 「선언한 자리에 파일이 없다」로 각각 받는다(둘이 서로를 가리지 않게
+      판독기가 **선언한 자리와 기대 자리를 둘 다** 읽는다).
+- **알려진 한계**: 면제 접두 밑의 바이트는 대조 집합이 없어 내용 판정이 없다(그 바이트의 출처는 Boot
+  Gradle 플러그인이고 이 저장소의 소스가 아니다).
+
+## ④ 등재 장부의 블록 안 순서 (`OPEN-HARNESS-GATE-TESTS-ORDER`)
+
+- ⓐ **경계**: `gate.tests.<module>`·`…excluded` 의 **등재 행 순서가 정렬판과 같다**. 순서는 사람이
+  세 라운드 연속으로 잡은 축이다(6F-10 D-6F10-37).
+- ⓑ **새 public 표면**: 없다(기존 task 의 위반 목록에 한 종류 추가).
+- ⓒ **우회**
+  1. 새 이름을 블록 끝에 붙인다 → 정렬 등식.
+  2. 중복을 끼운다 → 정렬판 비교가 중복 인접을 통과시키므로 **집합 크기 == 행 수**를 함께 본다.
+  3. 한 줄에 쉼표로 여러 개를 몰아 쓴다 → 판정이 줄이 아니라 **쉼표로 가른 값 열**이다(줄바꿈은
+     `\` 이어달리기라 값에서 사라진다).
+  4. 제외 블록으로 옮겨 정렬을 피한다 → 제외 블록도 같은 단언 대상.
+  5. 정책 파일을 안 고친 척 UP-TO-DATE → 정책 파일은 이미 선언 입력이다.
+- **main 의 기존 상태**: `app`·`decision`·`procurement` 셋이 어긋나 있다(그 밖 열은 정렬 상태) —
+  같은 커밋에서 정렬한다.
+
+## ⑤ 쓰이지 않는 import (`OPEN-KTLINT-UNUSED-IMPORTS-SILENT`)
+
+- ⓐ **경계**: **import 가 들여온 이름이 그 파일 본문에서 이름으로 쓰인다.** 등식은
+  `도입 이름 ∖ (본문 참조 이름 ∪ 문법이 쓰는 이름) == ∅`.
+- ⓑ **새 public 표면**: `UnusedImportGateTask` · 정책 키 **하나**(`source.import.syntax-fqns`).
+  **정정(수정 라운드 1, 리뷰 LOW-1)**: 앞 판이 적은 `source.import.gate-source-sets` 는 구현되지
+  않았다 — 이 절이 「새 public 표면」을 실제 표면과 어긋나게 적었다. 면제 키는 같은 라운드에
+  짧은 이름에서 FQN 으로 바뀌었다(리뷰 M-3).
+- ⓒ **우회**
+  1. 쓰지 않는 import 를 남긴다 → 등식(이 축의 본문).
+  2. 별칭으로 들여와 안 쓴다(`import a.b.C as D`) → 도입 이름은 **별칭**이다.
+  3. KDoc 에만 쓴다(`[Foo]`) → KDoc 이름 참조도 본문 참조로 센다(오탐 방향 회피).
+  4. 문자열 템플릿 안에서만 쓴다 → 템플릿 안 식도 PSI 노드다.
+  5. 연산자 규약으로만 쓴다(`import …assign` 뒤 `=`) → 그 이름들은 **정책 데이터**로 면제하고,
+     면제는 이름 집합이라 리뷰 diff 에 보인다.
+  6. `.kts` 로 옮긴다 → 대상은 `kt`·`kts` 둘 다이고 모듈 밖 스크립트·build-logic 트리도 같은 task 가
+     잰다(`sizeGate`/`buildLogicSizeGate`/`scriptSizeGate` 세 쌍과 같은 배선).
+  7. wildcard 로 바꾼다(`import a.b.*`) → 이 축의 대상이 아니다(쓰임을 셀 수 없다). 그 경로는
+     `domainSourceReferenceGate` 의 wildcard 규칙이 이미 좁힌다 — **알려진 한계**로 선언한다.
+- **알려진 한계**: 같은 짧은 이름을 그 파일이 스스로 선언하면 import 는 「쓰인 것」으로 보인다(미탐).
+
+## ⑥ 컴파일 시간 상수 사각 (`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT`)
+
+- ⓐ **경계**: adapters 의 네 축(`evaluation`·`qualification`·`profile`·`audit`) 소스가 **이름으로**
+  부르는 `bidvector.*` 좌표가 그 축의 허용 뿌리 안이다. 바이트코드 층은 결합을, 이 층은 이름을 본다 —
+  `const val` 은 인라인돼 결합을 남기지 않지만 **이름은 소스에 남는다**.
+- ⓑ **새 public 표면**: 없다(`DomainSourceReferenceGateTask` 의 축 추가). 정책 키
+  `source.scoped-packages` + 축마다 `source.scoped-allowed-roots.<패키지>`.
+- ⓒ **우회**
+  1. `const val` 로 금지 좌표를 끌어온다 → import·완전수식 이름이 소스에 남아 걸린다.
+  2. top-level const·다른 모듈 companion const → 같은 이름 축(D-6A1-34 가 넓힌 문면 전부).
+  3. 완전수식으로 import 없이 부른다 → `SourceReferences` 가 수식 참조도 본다(S-2 단언).
+  4. 별칭 import → `importedFqName` 이 원 FQN 을 낸다.
+  5. wildcard import 로 뭉갠다 → T-C 패키지의 wildcard 는 그 자체가 위반(기존 규칙 재사용).
+  6. 패키지를 네 축 밖으로 옮겨 축을 비껴간다 → 그러면 바이트코드 층 네 test 의 대상도 아니게 되지만
+     `moduleDependencyGate`·`packageOwnershipGate` 가 모듈 경계를 그대로 든다.
+- **알려진 한계**: 허용 뿌리 목록이 **두 자리**에 산다(정책 데이터 + 네 test 의 `ALLOWED_ROOTS`).
+  어긋나면 두 층의 범위가 갈린다. 정본화(test 가 정책을 읽게)는 adapters test 술어라 out_scope.
+
+## ⑦ legacy 좌표의 상시 소스 축 (M6 종결 checklist §3 ④) — **구현하지 않는다(실측 뒤 처분)**
+
+- ⓐ **경계(의도)**: 완료 조건 2(「기존 `bid-vector` import·symlink·DB schema 에 runtime dependency
+  없음」)를 이미지 컨텍스트 밖에서도 잰다.
+- **실측 셋이 이 처방을 막는다.**
+  1. **Kotlin 쪽 좌표 거부 집합은 비어 있다.** legacy 는 Python 저장소라 Kotlin 이 import 할 수 있는
+     legacy 좌표가 없다. 이미지 정책의 `forbidden.packages`(`sqlalchemy`·`psycopg`·`requests`·`httpx`·
+     `celery`)는 **Python 런타임 의존**이고 그 소스 축은 ml-engine 레인의 몫이다(이 slice 의 in_scope
+     밖이고 Gradle task 가 잴 대상도 아니다). Maven group 축은 `group.forbidden` 이 **이미 상시로**
+     잰다(`moduleDependencyGate`).
+  2. **경로 리터럴 거부는 과잉이다.** V2 소스에서 `bid-vector` 가 나오는 자리는 **여섯**이고 전부
+     **출처 인용**이다 — 다섯은 KDoc(legacy 함수·줄 번호 인용), 하나는 정책 값의 `source` 문자열
+     (`SAMPLE_PROVENANCE_POLICY` — 「이 값이 어디서 왔나」를 나르는 provenance 데이터). 이 저장소는
+     provenance 를 **요구**하므로 그것을 지우게 만드는 게이트는 설계 검토 (3) 의 「과잉」이다.
+  3. **거부 목록의 입력이 없다.** legacy `bid-vector` symlink 가 이 환경에 **더 이상 없다**(확인:
+     저장소와 레인 worktree 양쪽에서 부재). 그래서 legacy 패키지 뿌리·테이블 이름을 전수로 열거할
+     근거가 없다 — 추측으로 적은 거부 목록은 그 자체가 틀린 게이트다.
+- **처분**: 이 축의 게이트를 만들지 않고 위 셋을 OPEN 으로 보고한다(inert 한 정책 키를 남기지
+  않는다 — ② 에서 본 것처럼 「있는데 아무것도 막지 않는 키」가 「닫혔다」로 읽힌다). 오늘 상태에서
+  조건 2 의 Kotlin 축은 `group.forbidden`·`moduleDependencyGate`·`packageOwnershipGate` 가 들고,
+  Python 축은 ml-engine 레인이 받는다.
+
+## ⑧ 실행 환경 스니핑 0 (OPS-13)
+
+- ⓐ **경계**: production(main) 소스가 **자기 실행 환경을 물어** 거동을 가르지 않는다. 억제는 환경
+  스니핑이 아니라 명시적 정책 값이어야 한다(OPS-07 (a) 형태).
+- ⓑ **새 public 표면**: 앞 판은 「없다(같은 task 의 축)」였고 정책 키 하나였다. 수정 라운드 1 에서
+  **task 하나와 정책 키 하나가 늘었다** — `EnvironmentAccessGateTask`(순수 술어 `EnvironmentAccess`) ·
+  `bytecode.env-access.denied-members`. 소스 쌍 축(`source.env-sniff.member-pairs`)은 1 차 그물로
+  남고 `*.getenv` 가 더해졌다. 수정 라운드 4 가 `bytecode.env-access.allowed-callers` 를 더했다.
+  **전수에서 빠져 있던 자리 하나**(수정 라운드 5, 리뷰 LOW-3): 그 task 의 입력은 `policyFile`·
+  `classes`·`report` 셋이 아니라 **넷**이다 — `moduleName`(`@get:Input`)이 함께 있다. 값의 출처는
+  `project.name` 이고 쓰임은 둘이다: 모집단 등식의 실패 문면과, 죽은 허용을 **그 모듈의 모집단
+  안에서만** 세는 범위. 「경계로 처리」가 아니라 **판정에 들어가는 값**이라 전수에 적는다.
+- ⓒ **우회**
+  1. `System.getenv("CI")` → 수신자 뿌리 이름 + selector 이름 **쌍**을 PSI 에서 본다.
+  2. `System.getProperty("…")` → 같은 쌍 집합.
+  3. 완전수식(`java.lang.System.getenv`) → 수신자 뿌리의 **마지막 세그먼트**로 견준다.
+  4. 별칭 import(`import java.lang.System as S`) → **이 판단이 틀렸다**(수정 라운드 1, verifier H-1 ·
+     리뷰 HIGH). 「import 가 원 FQN 을 내므로 ⑥ 축과 겹쳐 걸린다」고 적었지만 ⑥ 축(ⓑ)은
+     `bidvector.*` **자기 저장소 좌표만** 보고 ⓐ 축은 정책이 고른 **domain 모듈에서만** 돈다. 환경
+     스니핑이 실제로 쓰일 자리(`app`·`adapters`·`workflow` 의 배선)에서 그 형태를 받는 축이 **없었다**.
+     정적 import(`import java.lang.System.getenv`)는 수신자가 아예 사라져 쌍이 만들어지지도 않는다.
+     **처분**: 임계 0 의 정본을 바이트코드 층(`environmentAccessGate`)으로 옮겼다 — 소스 표기 넷이
+     컴파일된 참조 하나로 모인다. 같은 probe 로 **차등 실측**: 소스 축 2/6 · 바이트코드 축 6/6.
+  5. test 코드로 옮겨 그 값을 main 에 주입한다 → 주입은 명시적 정책 값이고 금지 대상이 아니다
+     (경계 문장 그대로).
+  6. 리플렉션으로 부른다 → **닫지 못한다.** 알려진 한계(리플렉션 축은 `collection.reflection.*` 가
+     따로 든다).
+  7. `System.getProperties().getProperty(…)` 로 한 단 거쳐 간다 → 앞 판 쌍 집합의 `System.getProperty`
+     를 비껴갔다(리뷰 HIGH). 바이트코드 축의 거부 집합이 `#getProperties` 를 든다.
+  8. `ProcessBuilder().environment()` → 같은 자리. 거부 집합이 그 멤버를 든다.
+  9. callable reference(`::getenv`)·정적 import → 소스 표기가 다르고 **컴파일된 참조는 하나**다.
+     이것이 바이트코드 층을 정본으로 고른 이유다 — 우회하려면 게이트 자신을 고쳐야 한다.
+     **정정(수정 라운드 3 — verifier H-1 · 리뷰 H-1)**: 참조가 하나라는 것은 맞지만 **그 하나가
+     어느 클래스에 있는지**를 이 문장이 다루지 않았다. callable reference·suspend 람다·익명 object 는
+     그 참조를 이름 없는 내부 클래스로 옮기고, 앞 판 task 는 모집단에서 익명 클래스를 **빼고**
+     있었다(타입 모양 래칫의 관례를 접근 전수 조사에 복사한 자리). 같은 probe 의 차등:
+     **앞 판 0/8 · 지금 8/8**, `types` 267 → 283(익명 16 복귀). 필터를 뺐고 귀속만 감싼 최상위
+     클래스로 올렸다.
+  10. 하위 타입 수신자(`ConfigurableEnvironment.activeProfiles`) → Methodref owner 는 수신자의
+     **정적 타입**이라 상위 타입 좌표만 든 거부 키를 비껴갔다(실측). 거부 키에 `*#멤버`(어떤 수신자든)를
+     더해 닫았다 — 하위 타입 열거는 또 다른 열거다.
+  11. 같은 능력의 다른 이름(`Boolean#getBoolean`·`Integer#getInteger`·`Long#getLong`·
+     `*#getSystemProperties`) → 넷 다 JDK 안에서 `System.getProperty` 를 읽는다. 정책 값으로 더했다.
+     `Runtime#exec`·`ProcessHandle` 은 **이 축 밖**으로 선언한다 — 그 축은 **전송 표면 게이트**가 든다
+     (`collection.transport.surface-types` 가 `Process`·`ProcessBuilder`·`ProcessHandle`·`Runtime` 을
+     열거하고 `TransportSurfaceGateTest` 가 쌍 등식으로 잰다). 앞 판 문면의 「하위 프로세스 정책」은
+     **그런 이름의 축이 없는** 말이었다(verifier L-3) — 다음 사람이 찾을 수 있는 이름으로 바꾼다.
+  12. (수정 라운드 4) **명시적 허용이 없어 정당한 한 자리가 임계 0 을 붉힌다** → 게이트 문면이
+     OPS-07 (a) 로 약속한 억제 경로(`bytecode.env-access.allowed-callers`)를 실제로 구현했다.
+     `귀속클래스->선언클래스#멤버` 정확 쌍이고 와일드카드가 없으며, **대상 없는 허용은 위반**이다
+     (그 클래스를 읽은 모듈에서만 센다). 목록 전체를 `EnvironmentAccessTest` 가 값으로 고정해 조용히
+     자라지 못하게 했다.
+- **main 의 기존 상태**: 모듈 main 소스에서 0 건(측정). build-logic 은 production 모듈이 아니라
+  대상 밖이다 — 그 트리의 JDK 판 단언은 빌드 도구의 정당한 질의다. **수정 라운드 4 의 병합(main
+  `3101035f`, PR #127 Telegram)이 그 0 을 1 로 바꿨다**: `RelayWiring` 이 JDK HttpClient 로그 속성이
+  켜졌는지 읽어 **기동을 거부**한다(알림 본문 누출 방지). 환경에 거동을 맞추는 스니핑이 아니라 환경을
+  보고 멈추는 안전 장치이고, JVM 속성을 읽지 않고는 쓸 수 없다. 위 12 의 허용 한 쌍으로 열었다 —
+  **이 판단은 운영자 확인 대상**으로 `checklist.md` 에 등재한다.

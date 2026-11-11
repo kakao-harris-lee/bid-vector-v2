@@ -1,39 +1,13 @@
 package bidvector.workflow.collection
 
-import bidvector.procurement.AttemptKind
 import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.BusinessDivision
-import bidvector.procurement.CollectionAttempt
-import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.INTERRUPTED_ROUND
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.KonepsCollectionPolicyData
-import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
-import bidvector.procurement.NOTICE_ROUND_RAW_KEY
-import bidvector.procurement.NoticeId
-import bidvector.procurement.NoticeNumber
-import bidvector.procurement.ObservationKey
-import bidvector.procurement.OpeningAxisGroup
-import bidvector.procurement.OpeningAxisObservation
 import bidvector.procurement.OpeningRawAxisRead
-import bidvector.procurement.OpeningRawAxisSource
-import bidvector.procurement.OpeningResult
 import bidvector.procurement.OpeningResultRepository
-import bidvector.procurement.PersistOutcome
-import bidvector.procurement.RawKey
-import bidvector.procurement.RawNoticeObservation
-import bidvector.procurement.RejectionReason
 import bidvector.procurement.SourceEndpoint
-import bidvector.sharedkernel.NoticeRound
-import bidvector.sharedkernel.Resolution
-import bidvector.workflow.retention.RETENTION_POLICY
-import bidvector.workflow.retention.RetentionPolicyData
-import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
-import java.time.Instant
-import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**

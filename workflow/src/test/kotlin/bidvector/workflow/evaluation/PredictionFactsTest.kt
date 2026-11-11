@@ -4,9 +4,7 @@ import bidvector.decision.MlUnavailableReason
 import bidvector.decision.ProvenanceRuleId
 import bidvector.decision.PublishedFloorExclusion
 import bidvector.decision.UnitScore
-import bidvector.decision.priority.PRIORITY_POLICY
 import bidvector.decision.priority.ScoreFact
-import bidvector.decision.priority.derive.DERIVATION_POLICY
 import bidvector.procurement.Agency
 import bidvector.procurement.AgencyCode
 import bidvector.procurement.AgencyName

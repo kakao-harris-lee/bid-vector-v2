@@ -1,8 +1,5 @@
 package bidvector.adapters.retention
 
-import bidvector.procurement.FieldConcept
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.sharedkernel.Resolution
 import bidvector.workflow.event.OutboxEntryState
 import bidvector.workflow.event.OutboxTerminalReason
 import java.time.Duration

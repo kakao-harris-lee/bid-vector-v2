@@ -2,7 +2,6 @@ package bidvector.adapters.access
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.persistence.TransactionBoundary
-import bidvector.workflow.access.AccountProvisioning
 import bidvector.workflow.access.BrowserAccessPolicyData
 import bidvector.workflow.access.BrowserSessionKey
 import bidvector.workflow.access.BrowserSessionKeySource

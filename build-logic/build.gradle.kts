@@ -1,4 +1,6 @@
 import org.gradle.api.artifacts.VersionCatalogsExtension
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.testing.Test
 import java.util.Properties
 
 plugins {
@@ -81,23 +83,61 @@ dependencies {
     testImplementation(gradleTestKit())
 }
 
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-    // 판정 테스트가 실제 정책 파일을 읽는다. input 으로 선언하지 않으면 정책을 느슨하게 고쳐도
-    // UP-TO-DATE 로 통과해 「규칙이 죽는다」는 단언이 조용히 무의미해진다.
-    // 경로도 넘긴다 — 작업 디렉터리에 기대면 실행 위치가 바뀔 때 조용히 깨진다(app 과 같은 형태).
+/**
+ * **판정 test 가 읽는 실제 정책·fixture 를 선언 입력으로 둔다.** 선언하지 않으면 정책을 느슨하게 고쳐도
+ * UP-TO-DATE 로 통과해 「규칙이 죽는다」는 단언이 조용히 무의미해진다. 경로도 시스템 속성으로 넘긴다 —
+ * 작업 디렉터리에 기대면 실행 위치가 바뀔 때 조용히 깨진다(app 과 같은 형태).
+ */
+fun Test.declarePolicyInputs(repoRoot: File) {
     val architecturePolicy = repoRoot.resolve("config/quality/architecture-policy.properties")
     inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
     systemProperty("bidvector.architecture.policy", architecturePolicy.absolutePath)
 
-    // ApiTypePolicyTest·DomainApiTypeFixtureTest 가 public API 타입 표면의 금지 목록을 읽는다 —
-    // 위와 같은 이유로 input 선언 + 경로를 시스템 속성으로 넘긴다.
+    // ApiTypePolicyTest·DomainApiTypeFixtureTest 가 public API 타입 표면의 금지 목록을 읽는다.
     val apiTypePolicy = repoRoot.resolve("config/quality/api-type-policy.properties")
     inputs.file(apiTypePolicy).withPropertyName("apiTypePolicy")
     systemProperty("bidvector.apitype.policy", apiTypePolicy.absolutePath)
 
-    // DomainSourceReferenceFixtureTest 가 app 모듈에 커밋된 fixture 를 같은 판정 로직으로
-    // 재현한다 — project 의존을 만들지 않고 정책 파일과 같은 형태(경로를 시스템 속성으로)로 넘긴다.
+    // `GateRegistrationCensusTest` 의 마지막 test 가 **등재 장부 전체**의 열 모양을 잰다(리뷰 LOW-7).
+    inputs.file(repoRoot.resolve("config/quality/gate-tests.properties")).withPropertyName("gateTests")
+
+    // `JarContentPolicyTest` 가 중첩 jar 면제의 버전을 카탈로그와 견준다(verifier H-2 처방). 경로는
+    // 속성으로 넘긴다 — 앞 판은 정책 파일에서 `parentFile` 세 겹으로 유도했고, 그 좌표는 config
+    // 디렉터리 깊이가 바뀌면 조용히 다른 파일을 가리킨다(리뷰 LOW-3).
+    val versionCatalog = repoRoot.resolve("gradle/libs.versions.toml")
+    inputs.file(versionCatalog).withPropertyName("versionCatalog")
+    systemProperty("bidvector.version.catalog", versionCatalog.absolutePath)
+
+    // `BootArchivePolicyTest` 가 배포물 소유 모듈(`jar.boot-archive-module`)이 **실재하는 모듈인지**
+    // 견준다(리뷰 r5 M-2). 그 값은 모듈 이름 글자라, 모듈을 개명하면 배포 경로 축의 소유 바닥이
+    // 아무 모듈에도 걸리지 않고 조용히 쉰다 — 어긋남을 settings 의 include 목록과 대조해 잡는다.
+    val settingsFile = repoRoot.resolve("settings.gradle.kts")
+    inputs.file(settingsFile).withPropertyName("settingsFile")
+    systemProperty("bidvector.settings.file", settingsFile.absolutePath)
+
+    // `MigrationOrderTest` 의 뒤 둘이 실제 정책과 실제 디렉터리를 읽는다. 경로는 그 test 가
+    // `bidvector.architecture.policy` 에서 유도하므로 system property 를 더 넘기지 않는다.
+    val migrationPolicy = repoRoot.resolve("config/quality/migration-policy.properties")
+    inputs.file(migrationPolicy).withPropertyName("migrationPolicy")
+    val migrationValues = Properties().apply { migrationPolicy.reader(Charsets.UTF_8).use(::load) }
+
+    // 키가 없으면 `null/null` 경로가 되어 **정책 오류가 모호한 `inputs.dir` 실패로** 나온다. 같은
+    // 저장소의 `requireValue` 관례대로 읽는 자리에서 끊는다(리뷰 LOW-6).
+    fun migrationValue(key: String): String =
+        migrationValues.getProperty(key) ?: error("정책 파일 '${migrationPolicy.name}' 에 키 '$key' 가 없다")
+    inputs
+        .dir(repoRoot.resolve("${migrationValue("migration.module")}/${migrationValue("migration.resource-path")}"))
+        .withPropertyName("migrationDirectory")
+}
+
+/**
+ * fixture 와 **저장소 전수 소스**. 뒤의 것은 `UnusedImportsTest` 의 죽은 면제 단언이 저장소의 import 를
+ * 모집단으로 쓰기 때문이다(리뷰 M-3) — 선언하지 않으면 면제를 넓히거나 마지막 도입을 지워도
+ * UP-TO-DATE 로 통과한다. 이 저장소가 「선언 입력이 아닌 판정 근거」로 반복해 물린 자리다.
+ */
+fun Test.declareSourceInputs(repoRoot: File) {
+    // DomainSourceReferenceFixtureTest 가 app 모듈에 커밋된 fixture 를 같은 판정 로직으로 재현한다 —
+    // project 의존을 만들지 않고 정책 파일과 같은 형태(경로를 시스템 속성으로)로 넘긴다.
     val violatingFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/violating")
     inputs.dir(violatingFixtures).withPropertyName("violatingFixtures")
     systemProperty("bidvector.archfixture.violating", violatingFixtures.absolutePath)
@@ -105,4 +145,24 @@ tasks.withType<Test>().configureEach {
     val allowedFixtures = repoRoot.resolve("app/src/test/kotlin/bidvector/archfixture/allowed")
     inputs.dir(allowedFixtures).withPropertyName("allowedFixtures")
     systemProperty("bidvector.archfixture.allowed", allowedFixtures.absolutePath)
+
+    // 건너뛰는 디렉터리의 **단일 출처는 이 선언**이고, 판독하는 test 는 그것을 시스템 속성으로 받는다
+    // (리뷰 LOW-4). 두 자리에 따로 적으면 재는 것과 선언한 것이 조용히 갈린다 — 같은 라운드가 게이트
+    // `walkTopDown` ↔ test `listFiles` 어긋남으로 한 번 물린 축이다.
+    val scanSkipped = listOf("build", ".gradle", ".gradle-home", "node_modules", ".git")
+    systemProperty("bidvector.scan.skipped", scanSkipped.joinToString(","))
+    inputs
+        .files(
+            fileTree(repoRoot) {
+                include("**/*.kt", "**/*.kts")
+                scanSkipped.forEach { exclude("**/$it/**") }
+            },
+        ).withPropertyName("repositoryKotlinSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    declarePolicyInputs(repoRoot)
+    declareSourceInputs(repoRoot)
 }

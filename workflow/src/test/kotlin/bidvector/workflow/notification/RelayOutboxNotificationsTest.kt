@@ -1,7 +1,5 @@
 package bidvector.workflow.notification
 
-import bidvector.workflow.event.ConsumerLeasePort
-import bidvector.workflow.event.ConsumerTransactionPort
 import bidvector.workflow.event.OutboxConsumerKind
 import bidvector.workflow.event.OutboxEntryId
 import bidvector.workflow.event.OutboxPort

@@ -3,8 +3,6 @@ package bidvector.workflow.bidding
 import bidvector.bidding.ActorKind
 import bidvector.bidding.BID_TRANSITIONS
 import bidvector.bidding.BidAmountOrigin
-import bidvector.bidding.BidCase
-import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
 import bidvector.bidding.BidCommandTag
 import bidvector.bidding.BidKind

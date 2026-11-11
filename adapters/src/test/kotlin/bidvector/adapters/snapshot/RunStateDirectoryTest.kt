@@ -1,29 +1,14 @@
 package bidvector.adapters.snapshot
 
-import bidvector.procurement.AttemptKind
-import bidvector.procurement.AttemptOutcome
-import bidvector.procurement.BusinessDivision
-import bidvector.procurement.CollectionAttempt
-import bidvector.procurement.SourceEndpoint
 import bidvector.workflow.collection.NoticeKeyHash
-import bidvector.workflow.collection.SampleConfirmation
 import bidvector.workflow.collection.SampleOutcome
-import bidvector.workflow.collection.SampleScope
-import bidvector.workflow.collection.SampleStratum
-import bidvector.workflow.collection.StratumOutcome
 import bidvector.workflow.collection.sha256Hex
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
 import java.time.Instant
-import java.time.LocalDate
-import java.util.Comparator
 
 /**
  * D-6G-45 — 실행 상태는 저장소 밖 디렉터리 하나다. 이 test 가 재는 것은 **거부**다: 디렉터리가
