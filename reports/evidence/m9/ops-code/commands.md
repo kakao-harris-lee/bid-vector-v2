@@ -1,8 +1,8 @@
 # M9/ops-code commands
 
-base `df4976cc` · **병합한 main `07140729`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·
-`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · 판정 SHA **`82564c72`**(마지막 산출물 커밋).
-레인 규율대로 push 하지 않았다.
+base `df4976cc` · **병합한 main `22c77cbb`**(복원 원천 — 앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·
+`bd2f450e`·`07140729` 도 병합했고 다섯 다 이 SHA 의 조상이다) · 판정 SHA **`df25a491`**(마지막
+산출물 커밋). 레인 규율대로 push 하지 않았다.
 
 로컬에서 돌린 것은 **CI Kotlin job 의 명령 그대로** `./gradlew --no-daemon check` **전건**(§2)과
 변이(§4)다. 앞 판들은 `:app:check` + 나머지 모듈 표적으로 줄였는데, 병합이 `workflow` 의
@@ -59,6 +59,10 @@ base `df4976cc` · **병합한 main `07140729`**(복원 원천 — 앞서 `3ad4f
 | `9dbb1fec` · `d5c0ba01` · `8654e95a` | 계약 갱신 3차 · rollback 재실측 · evidence 10차(판정 SHA `63d74653`) |
 | `0bff48ff` | cr r7 M-1·M-2·L-3 — 멈춤을 「멈추는가」가 아니라 **무엇이라 적는가**로 잠근다 · 「둘뿐」 문면 넷 |
 | `82564c72` | `sizeGate` 가 거부한 502 줄을 문면 합쳐 497 로(분할하지 않는다 — 같은 관심사다) |
+| `4578c4fd` | evidence 11차(판정 SHA `82564c72`) |
+| `e2a8fafc` | main `22c77cbb`(#141 ops-migrations) 병합 — 충돌 여섯, 전부 양쪽 보존(§4e) |
+| `a8ccb0b9` | 병합이 깬 첫째 — 충돌 집합 **밖**의 실 DB test 가 `release` 를 넘긴다(컴파일 강제) |
+| `df25a491` | 병합이 깬 둘째 — 합집합이 넘긴 508 줄을 **내 문면만** 줄여 500 으로 |
 
 ## 2. acceptance 실행 — CI Kotlin job 의 명령 그대로
 
@@ -107,6 +111,24 @@ failures 0 · errors 0):
 **그 거부가 측정이다.** 파일이 이미 480 줄이었고 KDoc 둘이 한도를 넘겼다 — 가르지 않고 겹치던 문단
 둘을 합쳤다(같은 `haltOf` 처분의 같은 축이라 분할은 크기 회피가 된다). **남은 여유는 세 줄**이고
 알려진 제한에 등재했다.
+
+## 2b. 여섯째 병합 뒤 — 전건 `check` 재실측 (판정 SHA `df25a491`)
+
+병합이 production 을 섞으므로 부분 게이트로 줄이지 않았다. **두 번 돌렸다** — 첫 실행이 `sizeGate`
+에서 붉었고(§4e) 문면을 줄인 뒤 다시 돌렸다.
+
+| 측정 | 값 |
+| --- | --- |
+| 1차 (`e2a8fafc`+`a8ccb0b9`) | **BUILD FAILED · 36m 30s** — `:app:sizeGate` 하나(`EvaluationCommitRunE2ETest.kt` 508 줄). 그 전에 `:adapters:test`·`:app:test` 는 이미 돌아 초록이었다 |
+| 2차 (`df25a491`) | **BUILD SUCCESSFUL · 34m 28s · exit 0** · 392 actionable(127 executed) · `FAILED` 줄 **0** |
+| test(모듈별 XML 집계) | shared-kernel 8/92 · procurement 37/317 · workflow 85/761 · adapters 209/1423 · app 133/1080 — **합 472 클래스 3673 test · 실패 0 · 오류 0** |
+| skipped | **4**, 앞 라운드와 같은 `adapters.contract.RealServerIntegrationTest` |
+
+**계수가 움직인 자리를 전부 귀속했다**(초록인데 조용한 것을 막는다). adapters +2 클래스·app +2
+클래스는 #141 의 새 test 넷이고 전부 실행됐다(`MigrationLockBoundTest` 1 · `ReleaseWiringTest` 5 ·
+`CheckConstraintRenderingFixpointTest` 1 · `ExecutionRowReleaseTest` 9, 실패 0). workflow 가
+**762 → 761** 로 **하나 줄어든 것도 #141 의 것**이다 — 그 slice 가 `OutboxTransitionTableTest` 의
+`@Test` 를 6 → 5 로 줄였고(원천에서 확인) 병합 결과도 5 다. 내 쪽에서 사라진 test 는 없다.
 
 ## 3. 실 Spring 컨텍스트 — OPS-08 의 비용(앞 라운드 실측, 재측정하지 않았다)
 
@@ -178,6 +200,12 @@ failures 0 · errors 0):
 건드리지 않았으므로 간격 축 표(위 `63d74653` 실측)는 그대로 유효하다. 문면만 합친 `82564c72` 에서
 다시 돌려 **앞 커밋에서 잰 결과와 같음**을 확인했다(주석 변경이 단언을 건드리지 않았다는 주장을
 실행으로 바꿨다).
+
+**여섯째 병합 뒤 변이를 다시 돌렸다**(`df25a491`, 버릴 clone). 병합이 두 수집 배선 파일을 만졌으므로
+앞 실측(`82564c72`)이 더는 그 트리의 것이 아니다. 간격 축 넷(MWO·MWOd·MWA·M3NEG2)과 낙찰 축
+셋(MABK·MABS·MAB)을 통제군 둘(`CTRL6`·`CTRL6w`, 주석 한 줄)과 함께 돌려 **판정이 앞 판과 같음**을
+확인했다 — 통제군 3/3·9/9 초록, 일곱 전부 RED 이고 실패 문면도 같은 자리를 짚는다(개찰 49.5ms ·
+낙찰 44.9ms · 집합 대조 `Some elements were missing` · 음성 대조 첫 호출 2.05s · 낙찰 전수 표).
 
 **강해진 단언에는 음성 대조를 붙였다**(cr r7 M-1). 같은 변이 MABK 를 **구판**(`63d74653`, 기대값이
 Boolean 이던 표)에 적용하면 `tests=9 failures=0` — **초록**이다. 같은 변이가 새 판에서 붉으므로,
@@ -270,6 +298,45 @@ record 생성 한 줄(「actual type is NoticeId」). 새 후보는 건이 생�
 | `app/…/evaluation/EvaluationCommitRunE2ETest.kt` | +15 −0 | main 의 482 줄이 **삭제 0** 으로 남고 내 15 줄이 얹혔다 |
 | `workflow/…/collection/CollectAwardListUseCase.kt` | +8 −4 | main 이 만든 파일 — 낡은 예고 KDoc 문단을 깨어난 사실로 바꾸고 분기 한 줄을 더했다 |
 | `workflow/…/collection/CollectAwardListUseCaseTest.kt` | +9 −4 | 같은 자리의 전수 표 한 행 + 그 주장의 문면 |
+
+## 4e. 여섯째 병합(main `22c77cbb`, #141 ops-migrations) — 충돌 여섯, 깨진 둘
+
+`git diff --name-only 07140729 22c77cbb` 는 **107 경로**이고 내 산출물과의 교집합이 **아홉**,
+충돌은 **여섯 파일 일곱 자리**다. main 은 `ReleaseIdentifier` 를 행 쓰는 조립에 꿰었고 이 slice 는
+같은 생성자·배선에 알림함·청중 포트를 더했다 — **둘 다 더하는 변경이라 합집합이 곧 해소**이고
+버린 거동이 없다.
+
+| 손 해소 자리 | 무엇을 했나 |
+| --- | --- |
+| `EvaluationCommitRun.kt` ② | 생성자는 내 포트 둘 **뒤에** `release` 를 두고, 내 `InboxRecordingNotifications` 가 감싸는 **안쪽** `JdbcOutboxPort` 에 `release` 를 넘긴다. 한쪽 해소를 그대로 쓰면 알림함 감싸기가 사라지거나 릴리스가 행에 안 실린다 |
+| `EvaluationCommitWiring.kt` ② | 빈 메서드 인자·생성자 호출 인자 각각 합집합 |
+| `DryRunCommitParityTest`·`EvaluationCommitRunnerTest`·`EvaluationCommitRunE2ETest` 각 ① | 내 「불리면 터지는」 대역·실 어댑터와 main 의 `release` 를 나란히 |
+| `gate-tests.properties` ① | 두 쪽이 **같은 사전순 자리**에 넣어 충돌 — 합집합으로 두고 사전순 유지 |
+
+**합집합을 계수로 확인했다**(충돌 0 자동 병합 자리도 함께).
+
+| 축 | 확인 |
+| --- | --- |
+| `gate-tests.properties` | 고유 FQN **552 = main 543 ∪ 레인 548**(누락 0 · 초과 0) · 중복 넷은 양쪽에 이미 있던 같은 집합 · 행 연속 `\` 온전 |
+| `architecture-policy.properties` | 항목 **1327 = 합집합 1328 − 하나**. 그 하나는 `konepsTransportFor` 의 **옛 5인자 서명**이고 이 slice 가 치환한 것이다(양방향 등식 게이트라 남으면 오히려 붉다). main 의 `ReleaseWiring` tier 항목 생존(tier 41 = 레인 40 + 하나) |
+| `docs/discovery/capability-map.md` | **4058** — main 의 +26 과 내 줄 수 불변 치환 +3/−3 이 둘 다 남았다 |
+| `CollectionWiringTest.kt`(자동 병합) | **412 = main 411 + 내 import 1** · main 의 여덟 줄 전수 생존 |
+
+**탐침·census 는 흔들리지 않았다** — main 의 `release` 는 세 수집 배선의 **저장소 빈 메서드**로
+갔고 내 탐침이 부르는 `*Sources` 조립 메서드 서명은 그대로다. `konepsTransportFor` 호출자 클래스도
+셋 그대로라 `CALL_SITE_PROBES` 집합 대조가 그대로 성립한다.
+
+**깨진 것 둘 — 둘 다 충돌 밖에서 게이트·타입이 가리켰다.**
+
+| 깨진 자리 | 무엇이 가리켰나 | 고친 커밋 |
+| --- | --- | --- |
+| `EvaluationCommitInboxProductionTest` | **컴파일**(`No value passed for parameter 'release'`). 이 파일은 이 브랜치에만 있는 **넷째 호출자**라 병합이 볼 수 없었다 — main 은 자기 쪽 호출자 셋만 고쳤다 | `a8ccb0b9` |
+| `EvaluationCommitRunE2ETest.kt` | **`:app:sizeGate`** 508 줄(한도 500). 기준 482 + main 11 + 내 15 — 해소가 틀린 것이 아니라 **두 slice 의 덧셈**이 넘겼다 | `df25a491` |
+
+둘째는 **남의 줄을 건드리지 않고** 내 문면만 줄였다(KDoc 8 → 2 · 인라인 주석 3 → 0, 코드 네 줄과
+전제 한 문장은 유지). 결과가 **정확히 500 줄**이고 게이트 술어가 `> limit` 이라 통과하지만 여유가
+0 이다 — 다음 main 병합이 같은 파일을 다시 깬다. class 를 가르는 것이 구조적 답이나 PR #127 이 같은
+파일을 만지는 중이라 이 라운드 범위 밖으로 두고 알려진 제한에 등재했다.
 
 ## 5. clean-tree 게이트
 

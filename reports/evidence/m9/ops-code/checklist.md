@@ -1,6 +1,6 @@
 # M9/ops-code checklist
 
-판정 SHA **`82564c72`**(병합한 main `07140729`). 계약의 acceptance 넷에 대한 대조표다.
+판정 SHA **`df25a491`**(병합한 main `22c77cbb`). 계약의 acceptance 넷에 대한 대조표다.
 
 ## 1. acceptance 대조
 
@@ -122,6 +122,11 @@
    번째 자리). 그 파일은 **in_scope 밖**이라 팀장 지시로 건드리지 않았다 — 종료 코드 거동은 그대로이고
    (멈춤 여부만 보므로 차단도 같은 코드로 간다) 틀린 것은 문면 하나다. 다음에 그 파일을 여는 slice 가
    고친다.
+16. **`EvaluationCommitRunE2ETest.kt` 가 한도와 같은 수다**(500/500, 게이트 술어는 `> limit`).
+   여섯째 병합의 **합집합**이 508 줄을 만들었고(기준 482 + main 11 + 내 15) 남의 줄은 건드리지 않고
+   내 문면만 줄여 500 으로 맞췄다. **여유가 0 이라 다음 main 병합이 이 파일을 다시 깬다** — 이
+   E2E class 를 가르는 것이 구조적 답이지만 PR #127 도 같은 파일을 만지는 중이라 이 라운드 범위
+   밖이다. 후속으로 등재하고 팀장에게 보고했다.
 15. **`CollectAwardListUseCaseTest.kt` 의 남은 여유가 세 줄이다**(497/500). 이 라운드에 `sizeGate` 가
    502 줄을 거부했고, 같은 `haltOf` 축이라 가르는 대신 겹치던 문면을 합쳤다(크기 회피용 분할 금지).
    **다음에 이 파일에 더하는 변경은 관심사 경계를 보고 갈라야 한다** — 선례는 이 slice 가 간격 축을
@@ -158,15 +163,30 @@ evidence 넷을 뺀 새 파일 **열셋** — 전부 in_scope 안이다. 목록�
 그대로 열셋이고(기계 산출), 그래서 `gate-tests.properties` 등재도 움직이지 않았다(만진 test class 는
 전부 **이미 등재된** 것이다).
 
-**만진 파일은 기계 산출로 센다**(cr r7 LOW-1). `git diff --name-only 1d53dd6e..82564c72` 가 **일곱**
-이고 그중 **셋이 산출물**, **넷이 이 디렉터리의 evidence** 다. 앞 판의 「넷」은 산출물 셋에 `scope.md`
-하나만 더한 수였다 — 같은 줄에서 두 기준을 섞었다.
+**만진 파일은 기계 산출로 센다**(cr r7 LOW-1). **병합이 낀 구간에서는 range 가 기준이 될 수 없다** —
+`1d53dd6e..df25a491` 는 main 의 107 경로를 함께 세고, `--no-merges` 는 손 해소가 **병합 커밋 안**이라
+그것을 못 본다. 그래서 세 산출을 따로 든다.
 
-| 만진 산출물 | in_scope 항목 |
+- **손 해소 여섯 파일 일곱 자리** — `git show --cc e2a8fafc` 가 내는 `diff --cc` 목록 그대로(§4e).
+- **병합 뒤 손으로 고친 둘** — `a8ccb0b9`(실 DB test 의 `release`) · `df25a491`(E2E 문면 축약).
+  각각 한 파일짜리 커밋이다.
+- **이 디렉터리의 evidence 넷.**
+
+이 slice 의 산출물 발자국 자체는 여전히 **복원 목록 44 경로**다(원천 `22c77cbb` 대비 기계 산출).
+앞 판의 「넷」은 산출물 셋에 `scope.md` 하나만 더한 수였다 — 같은 줄에서 두 기준을 섞었다.
+
+| 이 두 라운드가 만진 산출물 | in_scope 항목 |
 | --- | --- |
 | `workflow/…/collection/CollectAwardListUseCase.kt` | 계약 갱신 3차 |
 | `workflow/…/collection/CollectAwardListUseCaseTest.kt` | 같음 |
 | `app/…/wiring/CollectionWiringSleeperTest.kt` | 「각 test」(이미 in_scope) |
+| `adapters/…/evaluation/EvaluationCommitRun.kt` | 계약 갱신 1차(커밋 경로) — **여섯째 병합 해소** |
+| `adapters/…/evaluation/EvaluationCommitInboxProductionTest.kt` | 계약 갱신 1차(`adapters/src/test/…/evaluation/**`) — 병합이 컴파일로 강제 |
+| `app/…/wiring/EvaluationCommitWiring.kt` | 계약 갱신 2차 사후 등재 — 병합 해소 |
+| `app/…/evaluation/{DryRunCommitParityTest,EvaluationCommitRunnerTest,EvaluationCommitRunE2ETest}.kt` | 같음 — 병합 해소(E2E 는 sizeGate 로 문면 축약까지) |
+
+**여섯은 병합이 만진 자리이고 새로 등재할 경로가 없다** — 전부 앞선 계약 갱신이 이미 든 in_scope
+안이다.
 
 **이 라운드가 in_scope 밖에서 만진 파일은 없다** — 보고 항목으로 `git log --no-merges --format=
 --name-only <복원 원천>..HEAD | sort -u` 를 계약과 대조했다.

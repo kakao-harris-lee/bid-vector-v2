@@ -1,15 +1,15 @@
 # M9/ops-code rollback
 
-착수 base `df4976cc` · **복원 원천 `07140729`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
-앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·`bd2f450e` 도 병합했고 넷 다 이 SHA 의 조상이다) · **실측 HEAD
-`82564c72`**(마지막 산출물 커밋).
+착수 base `df4976cc` · **복원 원천 `22c77cbb`**(이 브랜치가 **마지막으로** 병합한 main 의 고정 SHA —
+앞서 `3ad4f3f6`·`97ed49c4`·`56bd33ea`·`bd2f450e`·`07140729` 도 병합했고 다섯 다 이 SHA 의 조상이다) ·
+**실측 HEAD `df25a491`**(마지막 산출물 커밋).
 
-**원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **다섯 번** 병합했으므로 공유 파일(§2)에는 다른
+**원천이 착수 base 가 아니다.** 이 브랜치는 main 을 **여섯 번** 병합했으므로 공유 파일(§2)에는 다른
 slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니라 마지막으로 병합한 그 고정 SHA** 에서
 한다 — 앞 병합 SHA 를 쓰면 그 사이 main 의 줄을 되돌린다. 실행 전 단언 둘을 명령으로 실측했다:
 
-- `git merge-base --is-ancestor 07140729 HEAD` — **참**(원천이 HEAD 의 조상이다).
-- `git merge-base --is-ancestor c724e1ee 07140729` — **거짓**(원천이 이 slice 의 **첫 산출물
+- `git merge-base --is-ancestor 22c77cbb HEAD` — **참**(원천이 HEAD 의 조상이다).
+- `git merge-base --is-ancestor c724e1ee 22c77cbb` — **거짓**(원천이 이 slice 의 **첫 산출물
   커밋**을 담지 않는다). 그래서 main 으로부터 만든 트리가 남의 줄을 떨어뜨릴 수 없고, 커밋 해시
   목록이 필요 없다.
 
@@ -24,7 +24,7 @@ slice 의 줄이 들어왔다. 복원은 **움직이는 `origin/main` 이 아니
 **range revert 가 아니라 in_scope 경로 한정 복원**이다. 목록은 손으로 적지 않고 기계가 낸다.
 
 ```
-BASE=07140729                                    # **마지막으로** 병합한 main 의 고정 SHA
+BASE=22c77cbb                                    # **마지막으로** 병합한 main 의 고정 SHA
 EXCL=':(exclude)reports/evidence/m9/ops-code'    # 자기 자신은 되돌릴 수 없다
 
 # 목록은 **내 커밋만** — 병합 커밋의 해소 줄은 들지 않는다
@@ -41,12 +41,12 @@ git rm -q -f -- "${ADDED[@]}"
 
 `git rm -f`(단순 `rm` 이 아니라)인 이유: 색인까지 지워야 복원 뒤 색인이 원천과 같아진다.
 
-**hunk 격리가 필요 없다.** 공유 파일 **열**(§2)을 **원천 트리에서 통째로 복원**하기 때문이다 — 그
+**hunk 격리가 필요 없다.** 공유 파일 **열다섯**(§2)을 **원천 트리에서 통째로 복원**하기 때문이다 — 그
 트리는 main 이 만든 것이라 다른 slice 의 줄이 이미 들어 있고 내 줄만 사라진다. 자기 커밋 해시로 hunk 를
 역적용하는 경로는 쓰지 않았다(병합 커밋의 해소 줄이 `--no-merges` 목록 밖이라 끝까지 완료되지
 않는다 — 그 실패가 2026-10-09 에 실측됐다).
 
-## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `82564c72` 체크아웃
+## 2. 실측 — 버릴 clone(`git clone --no-hardlinks`)에서 `df25a491` 체크아웃
 
 | 단계 | 실측 |
 | --- | --- |
@@ -60,15 +60,20 @@ git rm -q -f -- "${ADDED[@]}"
 **복원 목록은 두 산출을 대조해 고정한다**(수를 손으로 적지 않는다). 위 `git log --no-merges` 목록과
 `git diff --name-only $BASE..HEAD -- . "$EXCL"` 를 `comm` 으로 **양방향** 비교해 둘 다 빈 출력이다.
 
-**공유 파일은 열이다 — 열거와 계수가 같은 산출에서 나온다.** 앞 판은 수를 「여섯」이라 적었는데 바로
+**공유 파일은 열다섯이다 — 열거와 계수가 같은 산출에서 나온다.** 앞 판은 수를 「여섯」이라 적었는데 바로
 아래 열거가 **일곱**이었다(v r6 L-3 이 잡은 자리의 재발) — 열거를 손으로 적고 수를 따로 적었기
 때문이고, 그래서 둘 다 틀릴 수 있었다. 산출은
-`comm -12 <복원 목록> <(git diff --name-only df4976cc 07140729 | sort -u)>` 하나다.
+`comm -12 <복원 목록> <(git diff --name-only df4976cc 22c77cbb | sort -u)>` 하나다.
 
 ```
+adapters/src/main/kotlin/bidvector/adapters/evaluation/EvaluationCommitRun.kt
 adapters/src/test/kotlin/bidvector/adapters/evaluation/EvaluationAdapterDependencyTest.kt
+app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt
 app/src/main/kotlin/bidvector/app/wiring/NotificationInboxWiring.kt
+app/src/test/kotlin/bidvector/app/evaluation/DryRunCommitParityTest.kt
 app/src/test/kotlin/bidvector/app/evaluation/EvaluationCommitRunE2ETest.kt
+app/src/test/kotlin/bidvector/app/evaluation/EvaluationCommitRunnerTest.kt
+app/src/test/kotlin/bidvector/app/wiring/CollectionWiringTest.kt
 config/quality/architecture-policy.properties
 config/quality/gate-tests.properties
 docs/discovery/capability-map.md
@@ -78,15 +83,15 @@ workflow/src/main/kotlin/bidvector/workflow/notificationinbox/NotificationInboxP
 workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTest.kt
 ```
 
-열 모두 원천 `07140729` 에 다른 slice 의 줄이 있고, 복원이 그 줄을 보존하는지를 아래 표지 계수가
-잰다. **마지막 둘은 다섯째 병합이 들여온 자리**다(main 이 만든 파일에 이 slice 가 소진 `when` 의
-한 줄과 전수 표의 한 행을 얹었다 — 계약 갱신 3차).
+열다섯 모두 원천 `22c77cbb` 에 다른 slice 의 줄이 있고, 복원이 그 줄을 보존하는지를 아래 표지 계수가
+잰다. **열에서 열다섯으로 늘린 것은 여섯째 병합**(#141 ops-migrations)이다 — 그 slice 가 평가 커밋
+경로에 `ReleaseIdentifier` 를 꿰면서 내가 이미 만지던 다섯 파일을 함께 만졌다.
 
 ### ④⑤⑥ 의 갈음 — 「HEAD 초록」이 아니라 트리 동일성
 
-**evidence 를 포함해** 복원하면 작업 트리의 트리 객체 해시가 원천 `07140729` 의 트리 해시와
-**같다**(둘 다 `f0eef6df3de223aed875eb6657785219004923e0` — 같은 clone 에서 경로 48 로 실측).
-파일 단위 비교가 아니라 트리 객체의 동일성이므로 「빠뜨린 파일」이 있을 수 없다. `07140729` 는
+**evidence 를 포함해** 복원하면 작업 트리의 트리 객체 해시가 원천 `22c77cbb` 의 트리 해시와
+**같다**(둘 다 `731b8b415fe8d33761687c026a9099bd6848b12d` — 같은 clone 에서 경로 48 로 실측).
+파일 단위 비교가 아니라 트리 객체의 동일성이므로 「빠뜨린 파일」이 있을 수 없다. `22c77cbb` 는
 병합된 main 이고 CI 가 초록으로 통과한 자리라, 그 트리에서 `check` 를 다시 돌리는 것은 같은
 트리를 다시 재는 일이다.
 
@@ -116,7 +121,7 @@ workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTe
 | `CALL_SITE_PROBES` | **0** |
 | `EvaluationCommitInboxProductionTest` | **0** |
 
-**`AccessBlocked` 는 이 축에서 내려왔다**(계약 갱신 3차). 원천 `07140729` 이 그 어휘를 **4 파일**에
+**`AccessBlocked` 는 이 축에서 내려왔다**(계약 갱신 3차). 원천 `22c77cbb` 이 그 어휘를 **4 파일**에
 이미 담는다 — award-ingest 가 자기 소진 `when` 의 KDoc 에 「ops-code 가 들여올 `AccessBlocked`」로
 **예고로 채택**했고 그 slice 의 evidence 둘이 그것을 인용한다. 상류가 내 이름을 쓰면 「복원 뒤 0」은
 영원히 거짓이므로, 그 이름은 아래 보존 쪽으로 옮기고 같은 축의 내 표지를 `ACCESS_BLOCKED`(원천
@@ -128,29 +133,37 @@ workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTe
 | 남의 표지(남아 있어야 한다) | 복원 뒤 / 원천 |
 | --- | --- |
 | `AccessBlocked`(award-ingest 의 예고 KDoc·evidence) | **4 / 4** |
-| `AwardCollectionWiring`(#128 의 축) | **9 / 9** |
-| `NotificationBidKind`(#137 의 축) | **31 / 31** |
-| `NotificationInboxBidKindTest`(같음) | **3 / 3** |
+| `AwardCollectionWiring`(#128 의 축) | **11 / 11** |
+| `NotificationBidKind`(#137 의 축) | **32 / 32** |
 | `golang.org/x/net`(#142 의 축) | **10 / 10** |
+| `ReleaseIdentifier`(**#141 의 축**) | **43 / 43** |
+| `ReleaseWiring`(같음) | **40 / 40** |
+| `ExecutionRowReleaseTest`(같음) | **7 / 7** |
+| `OutboxTerminalReason`(같음) | **16 / 16** |
 | `NotificationInboxStore`(7C③) | **18 / 18** |
 | `MockKonepsRoutingTest`(#134) | **5 / 5** |
 | `UnavailableProducingPortFixture`(#134) | **2 / 2** |
-| `config/quality/gate-tests.properties` 줄 수 | **1098 / 1098** |
-| `config/quality/architecture-policy.properties` 줄 수 | **2009 / 2009** |
-| `docs/discovery/capability-map.md` 줄 수 | **4032 / 4032** |
+| `adapters/…/evaluation/EvaluationCommitRun.kt` 줄 수 | **78 / 78** |
 | `adapters/…/evaluation/EvaluationAdapterDependencyTest.kt` 줄 수 | **483 / 483** |
+| `app/…/wiring/EvaluationCommitWiring.kt` 줄 수 | **131 / 131** |
 | `app/…/wiring/NotificationInboxWiring.kt` 줄 수 | **79 / 79** |
-| `app/…/evaluation/EvaluationCommitRunE2ETest.kt` 줄 수 | **482 / 482** |
+| `app/…/evaluation/DryRunCommitParityTest.kt` 줄 수 | **257 / 257** |
+| `app/…/evaluation/EvaluationCommitRunE2ETest.kt` 줄 수 | **493 / 493** |
+| `app/…/evaluation/EvaluationCommitRunnerTest.kt` 줄 수 | **97 / 97** |
+| `app/…/wiring/CollectionWiringTest.kt` 줄 수 | **411 / 411** |
+| `config/quality/architecture-policy.properties` 줄 수 | **2010 / 2010** |
+| `config/quality/gate-tests.properties` 줄 수 | **1102 / 1102** |
+| `docs/discovery/capability-map.md` 줄 수 | **4058 / 4058** |
 | `reports/evidence/m6/6e1/acceptance-trace.md` 줄 수 | **246 / 246** |
 | `workflow/…/collection/CollectAwardListUseCase.kt` 줄 수 | **300 / 300** |
 | `workflow/…/notificationinbox/NotificationInboxPorts.kt` 줄 수 | **189 / 189** |
 | `workflow/…/collection/CollectAwardListUseCaseTest.kt` 줄 수 | **475 / 475** |
 
-**보존은 등식이지 절대값이 아니다** — 두 수를 나란히 적는다. 줄 수 축은 공유 파일 **열 전부**이고,
+**보존은 등식이지 절대값이 아니다** — 두 수를 나란히 적는다. 줄 수 축은 공유 파일 **열다섯 전부**이고,
 이름 축은 다른 slice 가 **처음 들여온 이름**들이다. 둘 다 내 slice evidence 디렉터리를 제외하고 셌다
 (앞 판이 그 디렉터리를 포함해 세서 보존과 무관한 수가 섞였다 — v r2 L-3).
 
-공유 파일 열이 복원 목록 안이라 **그 열을 다시 만지면 재측정이다** — §4 가 그 술어를 든다.
+공유 파일 열다섯이 복원 목록 안이라 **그 열다섯을 다시 만지면 재측정이다** — §4 가 그 술어를 든다.
 
 ## 3. 코드를 되돌리지 않고 끄는 법
 
@@ -170,8 +183,8 @@ workflow/src/test/kotlin/bidvector/workflow/collection/CollectAwardListUseCaseTe
 evidence 커밋은 실측 뒤에 오므로 유효성은 **되돌림 대상이 그 사이에 움직였는가**로 본다:
 
 ```
-git diff --name-only 82564c72..<판정 SHA> -- \
-  $(git log --no-merges --format= --name-only 07140729..82564c72 \
+git diff --name-only df25a491..<판정 SHA> -- \
+  $(git log --no-merges --format= --name-only 22c77cbb..df25a491 \
       -- . ':(exclude)reports/evidence/m9/ops-code' | sort -u)
 ```
 
@@ -187,6 +200,11 @@ git diff --name-only 82564c72..<판정 SHA> -- \
 **앞 라운드 실측을 옮기지 않았다.** 9차 제출의 원천은 `bd2f450e`·실측 HEAD 는 `6b5b52bc` 였고
 다섯째 병합이 **원천을 옮겼다**. 복원 경로가 42 → **44** 로 늘고(병합이 강제한 낙찰 두 자리) 공유
 파일이 **열**이 된 것이 그 결과이며, 10차 제출의 수는 전부 **다시 잰** 것이다.
+
+**여섯째 병합(main `22c77cbb`, #141)이 또 원천을 옮겼다.** 복원 목록은 **44 로 그대로**(두 산출
+`comm` 양방향 빈 출력, 앞 라운드 목록과 `diff` 빈 출력)이고 공유 파일이 **열 → 열다섯**으로 늘었다 —
+그 slice 가 평가 커밋 경로에 `ReleaseIdentifier` 를 꿰며 내 다섯 파일을 함께 만졌다. ①~③′ · 표지
+계수 · 트리 해시(`731b8b41…`, 경로 48)를 **전부 다시** 실측했다(실측 HEAD `82564c72` → `df25a491`).
 
 **cr r7 수정 라운드에서 또 다시 쟀다.** 그 라운드가 `CollectAwardListUseCase.kt`·
 `CollectAwardListUseCaseTest.kt` 를 **다시 만졌고**, 둘은 복원 목록 안이라 앞 실측이 무효가 된다
