@@ -12,8 +12,8 @@
 | OPEN | 원 정의 자리 | base main 의 상태 | 이 slice 의 처분 |
 | --- | --- | --- | --- |
 | ① `OPEN-SCOPED-ROOTS-PARITY-REST` | `reports/evidence/m9/gates-build-followups/scope.md` 「OPEN」절 · `EvaluationAllowedRootsParityTest` KDoc · `architecture-policy.properties` 패키지 범위 축 주석 | **열려 있다** — 두 층 등식 단언이 있는 축은 `evaluation` 하나. 남은 일곱(`audit`·`notice`·`opening`·`profile`·`qualification`·`relay`·`strategy`)에 없다(실측) | **닫는다**(아래 처방) |
-| ② `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | `milestone-6.md` 6F-5 「신설해 인계하는 OPEN 셋 더」 · `PersistenceAdapterDependencyTest` KDoc · `gate-tests.properties` 주석 | **이미 닫혔다** — 술어가 `javap -p -v` 상수 풀 + 허용 뿌리 목록이고, 소스 import 정규식은 그 파일에 **0**. 양성·음성·세그먼트 경계 대조 셋이 같은 class 에 있다 | **등재만** — capability map §12.3 |
-| ③ `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | `CleanMigrationCheckTest` KDoc 넷 · `milestone-6.md` 6F-5 같은 절 · `reports/evidence/m6/6f5a/scope.md` D-6F5-22 | **이미 닫혔다** — 그 파일의 CHECK 단언이 전부 본문·본문 집합 `shouldBe` 이고 `any { contains }` 는 **단언에 0**(남은 넷은 그 변경을 설명하는 KDoc 산문). 함께 받은 0 행 자리도 명시 실패이고 중복 이름도 명시 실패다 | **등재만** — capability map §12.3 |
+| ② `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | `milestone-6.md` 6F-5 「신설해 인계하는 OPEN 셋 더」 · `PersistenceAdapterDependencyTest` KDoc · `gate-tests.properties` 주석 | **이미 닫혔다** — 술어가 상수 풀 허용 목록이고 소스 import 정규식은 0(실측은 `commands.md` §1) | **등재만** — capability map §12.3 |
+| ③ `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | `CleanMigrationCheckTest` KDoc 넷 · `milestone-6.md` 6F-5 같은 절 · `reports/evidence/m6/6f5a/scope.md` D-6F5-22 | **이미 닫혔다** — CHECK 단언이 전부 본문·집합 `shouldBe` 이고 존재 단언은 0(실측은 `commands.md` §1) | **등재만** — capability map §12.3 |
 | ④ `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | `milestone-6.md` 6F-5 같은 절 · `reports/evidence/m6/6f5a/scope.md` D-6F5-20 · 그 slice `checklist.md` | **열려 있다** — `LicenseVerdict` 의 subtype 셋이 `public data class` | **범위 밖 — 사유와 함께 유지**(아래) |
 
 ②·③ 을 닫은 것은 **M9/gates-tests, PR #134 머지 `97ed49c4`**(evidence `reports/evidence/m9/gates-tests/`).
@@ -49,6 +49,9 @@ testFixtures factory 로」다. 셋 다 이 slice 의 계약 밖이다.
   옛 경로도 pathspec 에 든다)
 - 남은 일곱 축의 `*AdapterDependencyTest.kt` 각 **한 단어**(`private val ALLOWED_ROOTS` → `internal val`):
   `audit` · `notice` · `opening` · `profile` · `qualification` · `relay` · `strategy`
+- `adapters/build.gradle.kts` · `adapters/src/test/.../evaluation/EvaluationAdapterDependencyTest.kt`
+  (**주석·KDoc 한 줄 치환 — in_scope 추가, 아래 계약 갱신 (5)**): 둘이 옛 class 이름을 부르고 있어 `git mv`
+  로 **거짓이 됐다**. 같은 줄 치환이라 더한 줄 0 이고 499 줄 파일은 **499 줄 그대로**다
 - `config/quality/gate-tests.properties`(등재 교체 — 정렬된 자리)
 - `config/quality/architecture-policy.properties`(**주석만** — 「남은 일곱 축은 아직 그 등식이 없다」가 거짓이 된다)
 - `docs/discovery/capability-map.md` §12.3 에 **이 slice 의 하위 절 하나**를 덧붙인다(기존 행 수정 0, §12 머리 집계 무변경)
@@ -132,9 +135,9 @@ CI `check` job 의 명령 그대로 — `./gradlew --no-daemon check`. 표적 �
 
 | ID | 결정 | 근거 |
 | --- | --- | --- |
-| **D-10C-1** | ②·③ 은 **PR #134(머지 `97ed49c4`)가 이미 닫았다**. 이 slice 는 구현하지 않고 capability map §12.3 에 등재한다 | base main 실측(②: 소스 import 정규식 0 · javap 상수 풀 술어 + 허용 목록 · 대조 셋. ③: CHECK 단언 전부 본문/집합 `shouldBe` · `any { contains }` 단언 0 · 0 행·중복 이름 명시 실패). 「이 절은 다시 판정하지 않는다」(§12.3 머리) — 적는 것은 어디서 닫혔는가다 |
+| **D-10C-1** | ②·③ 은 **PR #134(머지 `97ed49c4`)가 이미 닫았다**. 구현하지 않고 capability map §12.3 에 등재한다 | base main 실측(`commands.md` §1) + 「이 절은 다시 판정하지 않는다」(§12.3 머리) — 적는 것은 어디서 닫혔는가다 |
 | **D-10C-2** | ④ 는 **범위 밖 — 열린 채 유지**. 받는 자리는 testFixtures 개방 ADR slice | 위 「④ 를 범위 밖으로 판정하는 사유」 셋 + 팀장 2026-11-06 판정 |
-| **D-10C-3** | ① 의 처방은 **registry + keys 등식 + 축별 집합 등식 + 접두 비포함**이고, 일곱 축의 비용은 OPEN 이 적은 그대로 **축마다 한 단어**다 | OPEN 문면(「넓히는 비용은 축마다 한 단어(`private` → `internal`)」). 대안인 단일 출처화는 두 층의 독립성을 버리는 거래라 ADR 자리(OPEN 문면이 같이 적는다) |
+| **D-10C-3** | ① 의 처방은 **registry + keys 등식 + 축별 집합 등식 + 접두 비포함** | 비용은 OPEN 문면 그대로 축마다 한 단어. 대안인 단일 출처화는 두 층의 독립성을 버리는 거래라 ADR 자리(OPEN 문면이 같이 적는다) |
 | **D-10C-4** | 앞 판 `EvaluationAllowedRootsParityTest` 를 **일반판으로 대체**한다(`git mv` + 일반화). 축 하나짜리 class 를 남기고 여덟짜리를 더하지 않는다 | 중복 금지(CLAUDE.md §5). 일반판이 그 class 의 주장을 **전부 포함**한다(`evaluation` 축 등식 · 모집단 소속 · 비공허 둘). 패키지는 `bidvector.adapters.architecture` — 여덟 축에 걸친 판정이라 `evaluation` 패키지가 거짓이 되고, 그 자리는 `packageOwnershipGate` 가 허용한다(`bidvector.adapters` 아래) |
 | **D-10C-5** | `architecture-policy.properties` 편집은 **주석만**이고 `policy.version` 을 **올리지 않는다** | 그 판 이력은 「더한 키 · 바꾼 값」을 적는 장부다(v9~v14 전부 그 둘 가운데 하나를 가졌다). 이 편집은 키 0·값 0 이다. **누락이 아니라 판단임을 여기에 적는다** — v11 이 등재한 결함은 「값을 바꾸고도 조용히 빠진 bump」이고 이 편집은 그 모양이 아니다 |
 
@@ -149,11 +152,42 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <�
 **없다.** `CLAUDE.md`·`.claude/**` 커밋 **0**. 이 slice 가 만지는 정책 파일 둘(`gate-tests.properties`·
 `architecture-policy.properties`)은 **게이트 입력**이고 하네스 문서가 아니다.
 
-## 보고 항목 (팀장 판단 요청)
+## 계약 갱신 2026-11-11 (팀장 — 착수 보고 답)
 
-1. **②·③ 은 이미 닫혀 있다** — 계약의 「바꾼다」를 「등재한다」로 읽는다(D-10C-1). 이 읽기를 승인하는가.
-2. **④ 는 범위 밖**(D-10C-2). 완료 조건 2 의 「사유와 함께 유지」로 둔다.
-3. **이름 층 축 없는 여섯 패키지**(`event`·`extraction`·`koneps`·`ml`·`notification`·`persistence`)를 이
-   slice 에서 더할 것인가. 더하면 정책 키 여섯 신설 + 그 축들이 새로 붉어질 수 있어 **계약 갱신 사안**이다.
-   기본값은 **더하지 않는다**(out_scope).
-4. **`EvaluationAllowedRootsParityTest` 대체**(D-10C-4)가 in_scope 의 「등식을 단다」 읽기 안인가.
+착수 보고의 판단 넷이 모두 승인됐다. 아래는 그 답이 고정한 것이고 **사후 판정이 아니다** — 완료 조건 2 가
+요구하는 「착수 보고에 있는 사유」의 자리는 위 「④ 를 범위 밖으로 판정하는 사유」와 이 절이다.
+
+1. **②·③ 은 「바꾼다」가 아니라 「등재한다」**다 — 「PR #134 / `97ed49c4` 로 이미 닫힘(장부 공백)」으로
+   capability map **§12.3 (i)** 에 종결 등재만 한다. 완료 조건 2 의 근거 PR·SHA 는 그 좌표다.
+2. **④ 는 범위 밖 유지 확정** — 사유는 위 「④ 를 범위 밖으로 판정하는 사유」가 정본이고 그 넷을 **지금**
+   고정한다. 받는 자리는 그대로 **testFixtures 개방 ADR slice**다.
+3. **이름 층 축 없는 여섯은 이 slice 에서 더하지 않는다.** 새 OPEN **`OPEN-M10-SCOPED-PACKAGES-COVERAGE`**
+   를 발급해 §12.3 (i) 에 등재한다 — 여섯 축, `persistence` 는 #134 가 술어를 준 축이라 「여덟」이 낡았다는
+   사실, 받는 자리는 **정책 키 신설 계약 slice**.
+4. **`git mv` 일반화 승인** — 옛 경로도 pathspec 에 들고 등재 교체는 같은 커밋에서. `policy.version`
+   무변경 판단(D-10C-5)도 승인. 설계 검토의 우회표와 「안 막히는 둘」 등재는 그대로 둔다.
+
+### (5) in_scope 추가 — 옛 class 이름을 부르는 live 좌표 둘(구현 레인 판단, 보고 항목)
+
+`git mv` 가 끝난 뒤 `git grep` 으로 **옛 class 이름의 남은 참조 전수**를 셌다. evidence(이력)와 이 slice 가
+새로 쓴 산문을 빼면 **둘**이 남았고, 둘 다 **그 이름을 부르는 live 좌표**라 rename 이 그 문면을 거짓으로
+만들었다 — 하나는 `adapters/build.gradle.kts` 의 선언 입력 주석(「그 class 가 이 정책을 읽는다」), 하나는
+`EvaluationAdapterDependencyTest.kt` 의 KDoc 링크 `[옛 이름]`(이동 뒤 해석되지 않는다).
+
+**둘을 고쳤다.** 사유: 삭제된 class 를 가리키는 좌표를 남기는 것이 하네스의 「낡는 좌표 금지」에 정면으로
+걸리고, 그 거짓은 **내 rename 이 만든 것**이다. 비용: 둘 다 **같은 줄 치환**이라 더한 줄 **0**이고,
+`EvaluationAdapterDependencyTest.kt` 는 `sizeGate` 한도에 한 줄 남은 **499 줄 그대로**다(실측). KDoc 링크는
+새 class 가 **다른 패키지**라 전체 한정 이름을 써야 길이 한도에 닿으므로 백틱 산문으로 바꿨다 — 링크 하나를
+잃는 대신 그 줄이 참이 된다. `build.gradle.kts` 의 거동 변경 **0**(주석만, `inputs.file` 한 줄은 그대로).
+
+이 둘은 착수 보고의 in_scope 에 없었다 — **보고 항목으로 올린다**. 범위를 넓히지 말라는 판단이면 되돌리고
+「알려진 제한」으로 등재한다.
+
+## 산출물 커밋
+
+| SHA | 무엇 |
+| --- | --- |
+| `c038c124` | 이 계약(scope.md) |
+| `7b02b3cc` | 구현 — 일반판 등식 test(`git mv` + 일반화) · 일곱 축 `internal` · 등재 교체 · 정책 주석 |
+| `6787ba70` | capability map §12.3 (i) — 넷의 처분 + 신설 OPEN 하나 |
+| `ddba9277` | 옛 class 이름을 부르는 live 좌표 둘 — 같은 줄 치환(계약 갱신 (5)) |
