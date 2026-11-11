@@ -49,20 +49,38 @@
   → 0 · 인용이 있는 stem 은 둘이고 **최대 인용 줄이 내 첫 변경 줄보다 앞**이다(capability-map
   3457 < 3746 · 계약 문서 874 < 2703 — 양끝을 명령으로 냈다). 나머지 다섯 stem 은 인용 0.
 
-## rollback 재측정 (팀장 결정 커밋 뒤 — 그 커밋이 복원 목록 안 문서를 움직였다)
+## main 병합 라운드 (cr r0 H-1·H-2 · LOW 셋)
 
-- 되돌린 트리 전수 대조 `git diff --name-status <앞 실측 트리> <이 트리>` → 0 · 차이가 **evidence
-  네 파일뿐**(되돌리지 않기로 한 디렉터리) — ④⑤ 와 Kotlin 게이트를 트리 동일성으로 갈음한 근거
-- `./gradlew --no-daemon leakPatternGate --rerun`(되돌린 트리 — evidence 가 입력인 유일한 게이트)
-  → **0** · web 게이트 여덟(되돌린 트리, 실 디렉터리 설치) → 전부 **0**
-- 산출물 쪽 재실측 범위: 그 결정 커밋은 `docs/` 한 파일이고 **어느 게이트의 입력도 아니다**
-  (build-logic 에 `docs/` 입력 0 · Kotlin 의 그 문서 언급은 전부 KDoc 산문) — 전건 `check` 를 다시
-  돌리지 않았다. 마지막 HEAD 의 `leakPatternGate` 결과 정본은 verifier 와 PR 조치 코멘트다.
+- `git merge <고정 main SHA>` → **1** · `docs/discovery/capability-map.md` 한 파일 충돌(겹치는
+  경로가 그 하나 — `comm -12` 실측). 손 해소: (f) 앞, (h) 뒤
+- 병합 합집합 함정 셋 → 절 문자 (d)→(e)→(f)→(h) · (f) 행 **5** · (h) 행 **3**(종결 2 + 신설 1) ·
+  **어느 쪽 본문도 접히지 않았다**(충돌 파일을 뺀 내 경로가 내 head 와 0 줄 · main 경로가 원천과
+  0 줄)
+- `./gradlew --no-daemon testClasses`(병합 뒤 **컴파일 먼저**) → **0**
+- `./gradlew --no-daemon check` → **0** · BUILD SUCCESSFUL 36m 02s · 새 계약 test 결과 XML
+  tests **3** · skipped 0 · failures 0 · errors 0(음성 대조 하나가 늘었다)
+- web job W-2~W-11 → 전부 **0** · vitest 40 files / 857 tests · e2e 2 passed
+- cr r0 L-3 **RED 선행** — 대조 test 만 올린 트리에서
+  `:app:test --tests '…OpenApiBidCaseContractTest' --rerun` → **1**(3 tests, 1 failed: 그 대조만) ·
+  헬퍼를 고친 뒤 같은 명령 → **0**
+
+## rollback — 원천 교체 뒤 재측정
+
+- 셋째 단언(`git rev-parse -q --verify <sha>:<path> || echo ABSENT`, M·D 9 경로) → **여덟 같음 ·
+  하나 다름**(`capability-map.md` — 원천을 교체해야 하는 바로 그 이유)
+- `git rev-list --merges <원천>..HEAD` → 내 병합 커밋 **하나**
+- 복원 목록 양끝 = 원천·실측 HEAD → 13 경로, evidence 넷을 빼 **9**
+- ①②③ → exit **0** · D **1** · M **8** · 복원 9 경로 diff **0 줄**
+- 되돌린 트리 ↔ **원천 트리** 전수 대조 → 차이가 **내 evidence 네 파일(A)뿐** — ④⑤ 와 나머지
+  Kotlin 게이트를 트리 동일성으로 갈음한 근거(앵커는 그 main 커밋의 CI)
+- 되돌린 트리 `leakPatternGate --rerun` → **0** · web 게이트 여덟 → 전부 **0**
 
 ## 위생
 
 - `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m10/timeline-command-enum/`
-  → 1(매치 없음)
-- `git status --porcelain -- <in_scope 9 경로>` → 빈 출력 · 양성 대조 1회(비파괴 절삭)
-- 크기 게이트: `git diff --numstat <base>..HEAD -- . ':!reports/evidence'` 와 evidence `wc -l`
-  → evidence 가 산출물보다 작다
+  → 1(매치 없음) · 최종 HEAD 의 `leakPatternGate` 결과 정본은 verifier 와 PR 조치 코멘트다
+- `git status --porcelain -- <in_scope 10 경로>` → 빈 출력 · 양성 대조 1회(비파괴 절삭)
+- 크기 게이트 — **쓴 계량은 줄 수이고 두 수를 그대로 적는다**(cr r0 L-2):
+  `git diff --numstat <원천>..HEAD -- . ':!reports/evidence'` 가 **+240 / -72 = 312 바뀐 줄** ·
+  evidence 네 파일 `wc -l` 은 그 커밋에서 센다(지금 **323**). 판정은 **바뀐 줄** 기준이고 더한
+  줄만 세면 240 < 323 으로 갈린다. **지금은 초과**이고 사유·예외는 `checklist.md` §4 다.

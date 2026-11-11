@@ -73,8 +73,13 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree --`, �
 
 ## 하네스 레인 변경
 
-없다 — `git log --oneline <base>..HEAD -- CLAUDE.md .claude/` 가 빈 출력이다. CI 워크플로도
-만지지 않는다. 게이트 등록부 한 줄은 새 test 클래스의 **등재**이고 게이트 술어 변경이 아니다.
+**내 편집은 0** 이다 — `git log --oneline HEAD ^<병합한 main SHA> -- CLAUDE.md .claude/` 가 빈
+출력이다. CI 워크플로도 만지지 않는다. 게이트 등록부 한 줄은 새 test 클래스의 **등재**이고 게이트
+술어 변경이 아니다.
+
+`base..HEAD` range 에는 **main 이 가져온 하네스 커밋 아홉**이 있다(PR #147 계열 — evidence-pack
+rollback 절 · v2-slice-pipeline Phase 3·4 · `CLAUDE.md` 색인). **slice 산출물이 아니고 in_scope
+밖이며** 운영자 승인 아래 같은 range 에 있다. 리뷰 range 는 그대로 `base..HEAD` 다.
 
 ## 레인 사이 공유 경로
 
