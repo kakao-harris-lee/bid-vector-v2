@@ -7,6 +7,7 @@
  * **이 파일이 개찰 축 라우팅 술어의 한 자리다.** 오퍼레이션 이름·진행구분 어휘·행 모양이 여기
  * 하나에 있고, 출하 정본과의 등식은 `opening-axis.test.mjs` 가 잰다.
  */
+import { withoutKotlinComments } from '../../scripts/kotlin-source.mjs';
 
 /**
  * 개찰 축 오퍼레이션 경로 — **출하 기본값의 사본**이다
@@ -65,30 +66,14 @@ const NOT_OBSERVED = 'NOT_OBSERVED';
 const NOTICE_ROUND = '000';
 
 /**
- * Kotlin 원문에서 **주석을 걷는다**(v M-1). 아래 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제
- * 값을 가릴 수 있었다** — 재현: 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을
- * 집어 등식이 **초록으로 지나갔다**. 그 축은 조용한 404 로만 나타난다.
+ * **주석을 먼저 걷는 이유**(v M-1): 아래 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
+ * 가릴 수 있었다** — 재현: 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을 집어
+ * 등식이 **초록으로 지나갔다**. 그 축은 조용한 404 로만 나타난다.
  *
- * **문자열 안의 `//` 는 걷지 않는다** — 출하 파일의 base URL 이 `https://…` 라 거기서 줄을
- * 자르면 다른 추출이 엉뚱한 값을 본다(그 한 줄이 이 구현을 문자 단위로 만든 이유다).
+ * 걷기 자체는 **공유 한 자리**에 있다(M10/gates-web). 이 파일이 가졌던 줄 단위 구현은 교차언어
+ * 게이트의 것과 두 벌이었고 둘 다 부분 구현이었다 — 문자열 안의 주석 표지를 다루는 자리가
+ * 하나여야 한다.
  */
-function withoutKotlinComments(text) {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//gu, '')
-    .split('\n')
-    .map((line) => {
-      let quoted = false;
-      for (let at = 0; at < line.length; at += 1) {
-        if (line[at] === '"' && line[at - 1] !== '\\') {
-          quoted = !quoted;
-        } else if (!quoted && line[at] === '/' && line[at + 1] === '/') {
-          return line.slice(0, at);
-        }
-      }
-      return line;
-    })
-    .join('\n');
-}
 
 /**
  * 일치가 **정확히 하나**인 리터럴(v M-1). 첫 일치를 쓰면 가리는 줄이 조용히 이기고, 둘 이상은

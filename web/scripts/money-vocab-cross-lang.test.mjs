@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import { withoutKotlinComments } from './kotlin-source.mjs';
+
 /**
  * **wire 어휘를 손으로 복제한 자리들을 Kotlin 정본에 묶는다**(M9/web-followups —
  * `OPEN-M9-MONEY-VOCAB-CROSS-LANG`).
@@ -28,11 +30,6 @@ const repoRoot = resolve(webRoot, '..');
 
 const readRepo = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const readWeb = (relative) => readFileSync(resolve(webRoot, relative), 'utf8');
-
-/** 주석을 먼저 걷는다 — 주석 안의 같은 글자가 헤더 계수를 흔들지 않게. */
-function withoutKotlinComments(source) {
-  return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/\/\/[^\n]*/gu, '');
-}
 
 /** 균형 중괄호로 본문을 떼어 낸다 — 중첩 블록이 있는 enum 도 같은 기계로 읽는다. */
 function balancedBodyAfter(source, from, what) {

@@ -106,3 +106,8 @@ scripts/money-vocab-cross-lang.test.mjs
 # 이름 == 출하 기본값 · 진행구분 어휘 == 출하 정책 · fixture 둘의 교차). 「개찰 축을 다룬다」는
 # 선언과 **아홉 갈래를 낳는 것**은 다르고, 그 차이를 잠그는 술어가 이 파일에 있다.
 e2e/harness/opening-axis.test.mjs
+# M10/gates-web — Kotlin 원문 읽기의 **공유 한 자리**. 위 두 게이트가 Kotlin 정본을 텍스트로 읽는데
+# 주석 걷기가 **두 벌**이었고 둘 다 부분 구현이었다(`OPEN-M9-KOTLIN-COMMENT-STRIP-DUP`) — 한 벌은
+# 문자열 안 `//` 를 지워 base URL 상수를 절단하고, 다른 벌은 문자열 안 블록 주석 글자를 줄이고
+# raw string 을 절단했다. 「값을 조용히 바꾸지 않고, 다룰 수 없는 꼴은 던진다」가 그 술어다.
+scripts/kotlin-source.test.mjs
