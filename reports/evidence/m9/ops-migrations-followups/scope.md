@@ -101,7 +101,11 @@ cr M-2 는 두 자리(낙찰 runbook §1·§3 · 6E runbook 의 `bidvector.relea
    `initSql` 로 깔지만 리허설 호출자는 그것을 주지 않는다. 그 값은 **동시 잠금 대기의 상한**이고
    리허설은 자기 컨테이너 안에서 배타적으로 도므로 깎을 대기가 없다 — 거동 차이 0 이다. 셸 스크립트의
    그 인자를 고치는 것은 CI `container` job 에서만 실측되는 변경이라 이 slice 에서 **문면을 사실로
-   맞추는 쪽**을 골랐다(거동 무변경). 받는 자리: `OPEN-M9-REHEARSAL-FLYWAY-CONFIG-PARITY`.
+   맞추는 쪽**을 골랐다(거동 무변경). 그 축을 재는 test 는 이미 있다
+   (`MigrationLockBoundTest`·`MigrationLockTimeoutTest`). **OPEN id 를 새로 세우지 않았다** —
+   등재 자리는 capability map 이고 그 파일은 이 slice 의 in_scope 밖이다. 뒤에 올릴 후보 이름은
+   `OPEN-M9-REHEARSAL-FLYWAY-CONFIG-PARITY` 이며, 지금 그 이름을 가리키는 등재 행은 **없다**
+   (커밋 `4af8c96b` 의 메시지가 「등재」로 적은 것은 이 절을 가리킨 말이다).
 
 ② **EXCLUDE·트리거 `WHEN` 은 오늘 스키마에 0 이다.** 고정점 test 의 모집단을 넓힌 것은 「새 종류가
    들어오는 순간 함께 잰다」는 구조적 폐쇄이고, **오늘 그 종류를 재는 것은 상설 양성 대조**(심은
