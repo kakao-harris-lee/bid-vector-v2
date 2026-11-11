@@ -26,7 +26,7 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
 | 경로 | 사유 |
 | --- | --- |
 | `adapters/src/main/kotlin/bidvector/adapters/evaluation/EvaluationCommitRun.kt` | 평가의 **커밋 경로**(outbox 에 실제 행을 남기는 유일한 경로)가 알림 포트를 조립하는 자리다. NOTI-01 생산자가 production 에 서려면 그 조립에 포트가 들어가야 한다 |
-| `adapters/src/test/kotlin/bidvector/adapters/evaluation/**` | 그 경로의 test. **PR #127(Telegram, 미머지)이 갈라 둔 `EvaluationCommitRunE2ETest.kt`·`RelayFailureInjection.kt` 는 건드리지 않고 새 파일로** |
+| `adapters/src/test/kotlin/bidvector/adapters/evaluation/**` | 그 경로의 test. **PR #127(Telegram, 미머지)이 갈라 둔 `EvaluationCommitRunE2ETest.kt`·`RelayFailureInjection.kt` 는 건드리지 않고 새 파일로** (#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다) |
 | `adapters/src/main/kotlin/bidvector/adapters/notificationinbox/JdbcNotificationAudience.kt` + 청중 SQL | 청중(계정 전수) 질의의 어댑터. SQL 은 **별도 상수 홀더**에 둔다 — `NotificationInboxSqlPolicyTest` 의 문장 모집단을 흔들지 않는다 |
 | `app/src/main/kotlin/bidvector/app/wiring/NotificationInboxWiring.kt` | 청중 빈 하나. 쓰기 빈이 이미 한 자리로 모여 있는 그 조립에 붙인다 |
 | `workflow/src/main/kotlin/bidvector/workflow/collection/CollectNoticesUseCase.kt` | `TruncationCause.AccessBlocked` 신설이 절단 사유 → 다음 걸음 표의 소진 `when` 을 깬다. 차단은 `HALT_RUN`(401·403 은 슬롯의 사실이 아니라 자격의 사실이라 다음 슬롯도 같은 답이고, 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내며 승인 상한만 태운다 — 쿼터를 멈추게 한 D-6G-47 과 같은 근거) |
@@ -73,8 +73,8 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
 `app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt`(커밋 조립에 청중·알림함 포트 `@Import`) ·
 `app/src/test/kotlin/bidvector/app/evaluation/{DryRunCommitParityTest,EvaluationCommitRunE2ETest,EvaluationCommitRunnerTest}.kt`
 (생성자 인자 둘에 따른 조립). `app/…/EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다 — 늦게 머지되는 쪽이 맞춘다.
-**해소(2026-11-11)**: #127 은 2026-11-08 에 머지됐고 그 머지 커밋 `d38f7115` 가 복원 원천 `22c77cbb` 의
-조상이다 — 이 계약이 적은 「미머지」는 그때의 사실이고, 겹침은 여섯째 병합까지 끝났다.
+(#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다. 머지 커밋 `d38f7115` 가 복원 원천
+`22c77cbb` 의 조상이고, 이 계약이 적은 「미머지」는 그때의 사실이다.)
 
 **H-1 처방(v)** — 출하 정책 `KONEPS_HTTP_POLICY` 를 resolve 한 그 값 위에서 ① 403 한 번이면 호출 1회 ② 연속 호출 간격 ≥ 출하 `minimumCallInterval`(주입 시계)을 잰다. 상수 표로 만든 test 정책 위의 시나리오로 갈음하지 않는다. 변이 `minimumCallInterval=ZERO` · 출하 `statusRules` 에서 403 행 제거가 각각 RED.
 

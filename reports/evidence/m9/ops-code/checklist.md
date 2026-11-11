@@ -157,8 +157,9 @@ evidence 넷을 뺀 새 파일 **열셋** — 전부 in_scope 안이다. 목록�
 `DryRunCommitParityTest`)이고 하나는 그 배선 자신(`EvaluationCommitWiring.kt`, 청중·알림함 빈을
 명시 import 해 이 배선을 혼자 켰을 때의 숨은 의존을 없앴다). 이 라운드도 그 셋 가운데 하나를
 **한 줄** 고쳤다 — 청중 포트의 반환 타입이 바뀌어 그 대역의 값 하나가 따라 움직였다.
-`EvaluationCommitRunE2ETest.kt` 와 PR #127 의 겹침은 **끝났다** — #127 은 2026-11-08 에 머지됐고 그
-머지 커밋 `d38f7115` 가 복원 원천 `22c77cbb` 의 조상이다(실측).
+`EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다(늦게 머지되는 쪽이 맞춘다).
+(#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다. 머지 커밋 `d38f7115` 가 복원 원천
+`22c77cbb` 의 조상이다.)
 
 **병합 뒤 두 라운드는 새 파일을 하나도 만들지 않았다** — 원천이 `07140729` 로 옮긴 뒤에도 위 목록은
 그대로 열셋이고(기계 산출), 그래서 `gate-tests.properties` 등재도 움직이지 않았다(만진 test class 는
