@@ -190,13 +190,30 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
      * 여기 있다 ③ **제약 본문에 적힌 리터럴** — 본문만 아는 토큰(몰래 넓힌 어휘)까지 겨눈다. ③ 은
      * 후보를 **늘리는 데만** 쓰이므로 렌더링이 바뀌어도 단언은 흔들리지 않고, 그 수확이 비면 그
      * 사실로 실패한다(후보가 조용히 좁아지는 자리).
+     *
+     * **한계 — 후보 격자는 열거이고, 그 밖을 여는 확장은 이 방식으로 닫히지 않는다**(verifier r11
+     * L-1 · code-reviewer r11 L-6). 셋 다 같은 뿌리다.
+     * - **리터럴 없이 넓히는 식**: `OR (terminal_reason = lower(state))` 처럼 값을 계산으로 만드는
+     *   확장은 새 리터럴을 남기지 않아 ③ 에 걸리지 않고, 그 식이 여는 값(`'failed'` 류)은 ①②
+     *   밖이다 — 실측으로 **이 test 를 포함해 adapters 표적 전부가 초록**이었다. 문자열 공간을
+     *   전수로 시도할 수는 없으므로 **구조적 한계**다.
+     * - **수확 범위**: ③ 은 쌍 CHECK **본문만** 읽는다. 넓힘이 트리거 함수 안에 새 어휘로 살면 그
+     *   토큰이 후보에 들어오지 않는다.
+     * - **상태 축**: 상태 후보는 Kotlin 어휘에서 오므로 DB 쪽 `state` 어휘만 넓히는 변경은 이 격자
+     *   밖이다(그 축의 정본은 아래 `dbToken` 이 가리키는 V6 CHECK 다).
+     *
+     * 그래서 아래 기대 집합의 「그 밖의 조합은 거부된다」는 **후보 어휘 안에서** 읽어야 한다. 이
+     * 한계를 닫는 자리는 test 가 아니라 복원 지문·고정점 게이트처럼 **식 자체를 보는** 층이다.
      */
     @Test
     fun `저장 층이 받아들이는 (상태, 사유) 쌍 집합이 Kotlin 어휘 전수와 같다 — 전수 시도`() {
         acceptedStateReasonPairs() shouldBe expectedAcceptedPairs()
     }
 
-    /** 종단 쌍 일곱 + **사유 없는 비종단** 둘. 그 밖의 조합은 CHECK 또는 트리거가 거부한다. */
+    /**
+     * 종단 쌍 일곱 + **사유 없는 비종단** 둘. 후보 어휘 안의 그 밖의 조합은 CHECK 또는 트리거가
+     * 거부한다(어휘 밖은 위 KDoc 의 한계 절).
+     */
     private fun expectedAcceptedPairs(): Set<Pair<String, String?>> =
         OutboxTerminalReason.entries.map { it.terminalState.dbToken() to it.name }.toSet() +
             NON_TERMINAL_OUTBOX_STATES.map { it.dbToken() to null }

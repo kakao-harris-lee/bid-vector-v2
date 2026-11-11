@@ -149,6 +149,12 @@ class CheckConstraintRenderingFixpointTest : PersistenceTestSupport() {
      * 트리거 — 정의 전문에서 **이름 토큰만** 탐침 이름으로 바꿔 다시 세운다. 바꿔 끼울 자리를 찾지
      * 못하면(이름이 따옴표로 렌더링되는 판) **그 사실을 소견으로 낸다** — 원본 이름 그대로 세우면
      * 이름 충돌로 실패하고, 조용히 건너뛰면 모집단에서 빠진 것과 구별되지 않는다.
+     *
+     * **표 이름을 받는 방식이 제약 쪽과 다르다**(cr r11 L-7). 제약 쪽은 `conrelid::regclass::text` 로
+     * **필요한 따옴표가 이미 붙은** 렌더링을 받고, 여기는 `pg_class.relname` **원문**을 받아
+     * `?::regclass` 에 넣는다. 오늘 모든 표 이름이 소문자 snake_case 라 두 값이 같고, 어긋나는 이름이
+     * 생기면 탐침이 **실패해 소견으로 나온다**(조용한 통과가 아니라 오탐) — fail-closed 라서 거동을
+     * 바꾸지 않고 이 비대칭을 사실로만 적는다.
      */
     private fun triggerProbes(connection: Connection): List<Probe> =
         catalogRows(connection, TRIGGER_CATALOG).map { row ->
