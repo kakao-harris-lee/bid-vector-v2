@@ -95,7 +95,9 @@ PR #144 가 BEHIND 라 팀장 지시로 **SHA 를 고정해** 병합했다(`git 
 - 이 대조가 **술어 선택도 고친다**: 「class 해시 동일」을 썼다면 KDoc 한 줄만 더해도 붉어진다(줄 번호
   표가 바뀐다). 거동을 재는 자리는 해시가 아니라 명령 스트림이다.
 
-base 쪽 class 는 버릴 clone 을 base `6e6f953c` 로 체크아웃해 `:app:compileKotlin`(exit 0)으로 얻었다.
+base 쪽 class 는 버릴 clone 을 착수 base `6e6f953c` 로 체크아웃해 `:app:compileKotlin`(exit 0)으로
+얻었다. **병합으로 원천이 `c21adb2a` 로 바뀌어도 이 비교는 유효하다** — #143 은 그 파일을 만지지 않아
+두 원천의 blob 해시가 같다(`git rev-parse <둘>:<그 파일>` 동일).
 
 ## 6. 비밀값 스캔
 

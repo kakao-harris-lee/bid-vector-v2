@@ -1,11 +1,13 @@
 # M9 / ops-code-followups — E2E 파일 분할 · `awardExitCodeOf` KDoc · 원 evidence 문면 정정
-- base: main `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`
+- 착수 base: main `6e6f953c` · 브랜치 `chore/m9-ops-code-followups`. PR #144 수정 라운드에서 main
+  `c21adb2a`(#143)를 병합했다(`commands.md` §2a).
 - 유래: PR #140 의 팀장 처분 코멘트 셋(cr r7 의 M-2 네 번째 자리 · LOW-B 번호 정본 · LOW-C 행 문면). 원
   slice evidence 는 `reports/evidence/m9/ops-code/`.
-- rollback: in_scope 경로 한정 복원(원천 `6e6f953c`, 내 커밋만) — `rollback.md` 가 기계 산출 목록과 실측을 든다.
-- **하네스 레인 변경**: 없다. 술어는 `git diff --name-only 6e6f953c..HEAD -- .claude/ config/ build-logic/
-  .github/` 빈 출력이다(`commands.md` §4). 새 test class 가 생기지 않아 `gate-tests.properties` 등재도
-  늘지 않는다 — 그 사실도 같은 자리에서 잰다.
+- rollback: in_scope 경로 한정 복원(내 커밋만) — **원천은 `c21adb2a`** 다(병합한 main 의 고정 SHA,
+  착수 base 가 아니다). `rollback.md` 가 기계 산출 목록과 실측을 든다.
+- **하네스 레인 변경**: 없다. 술어는 `git diff --name-only c21adb2a..HEAD -- .claude/ config/ build-logic/
+  .github/` 빈 출력이다(`commands.md` §7). 새 test class 가 생기지 않아 `gate-tests.properties` 등재도
+  늘지 않는다 — 그 사실도 같은 자리에서 잰다(병합 뒤에도 `app` 등재 133 불변).
 
 ## 대상 (셋 — 전부 PR #140 이 후속으로 넘긴 것)
 | 항목 | 처분 |

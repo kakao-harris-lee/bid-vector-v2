@@ -74,7 +74,8 @@ fixture 쪽에 되살리면 **고를 수 없는 자리에서 되적는 목록**�
 ## 5. 새 파일 ↔ in_scope 대조
 
 evidence 넷(`scope`·`commands`·`checklist`·`rollback`)을 빼면 새 파일은 **하나**다. 목록은 손으로 세지
-않는다: `git log --no-merges --diff-filter=A --format= --name-only 6e6f953c..HEAD | sort -u`.
+않는다: `git log --no-merges --diff-filter=A --format= --name-only c21adb2a..HEAD | sort -u`
+(원천은 병합 뒤의 것 — `rollback.md`).
 
 | 새 파일 | in_scope 항목 |
 | --- | --- |
