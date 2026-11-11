@@ -395,6 +395,7 @@ fun truncationCodeOf(cause: TruncationCause): String =
         TruncationCause.MaxPages -> "MAX_PAGES"
         TruncationCause.RepeatedPage -> "REPEATED_PAGE"
         TruncationCause.QuotaExhausted -> "QUOTA_EXHAUSTED"
+        TruncationCause.AccessBlocked -> "ACCESS_BLOCKED"
         TruncationCause.Timeout -> "TIMEOUT"
         TruncationCause.TransportFailure -> "TRANSPORT_FAILURE"
         TruncationCause.ServerError -> "SERVER_ERROR"
@@ -478,5 +479,10 @@ private fun failureOf(cause: TruncationCause): AttemptOutcome =
         TruncationCause.StructureFailure,
         TruncationCause.RepeatedPage,
         TruncationCause.Unclassified,
+        // 차단(OPS-09)이 ③ 인 근거: ① 로 두면 재호출 상한이 세지 않아 차단된 축을 **끝없이**
+        // 다시 부른다(쿼터는 날이 바뀌며 스스로 풀려 그 모양이 무해했다). ② 로 두면 한 번의
+        // 403 으로 그 축을 영구히 버린다. 둘 사이에서 fail-safe 는 「상한 안에서 다시 보고,
+        // 상한이 영구 포기를 정한다」다.
+        TruncationCause.AccessBlocked,
         -> AttemptOutcome.Failed(truncationCodeOf(cause))
     }

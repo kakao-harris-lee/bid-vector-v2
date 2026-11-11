@@ -3,15 +3,19 @@ package bidvector.adapters.evaluation
 import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
+import bidvector.workflow.evaluation.InboxRecordingNotifications
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.evaluation.WatchSubjectPort
+import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
 import javax.sql.DataSource
@@ -40,7 +44,15 @@ import javax.sql.DataSource
  *
  * `Failed` 는 **버려지지 않는다** — `reach()` 가 그 값을 `CandidateEvaluation.Reached.
  * disposition` 에 실어 돌려주고, 러너가 그 계수로 종료 코드를 정한다.
+ *
+ * 인자가 **열셋**인 것을 **묶지 않는 이유**(cr r1 low): 전부 성질이 다른 협력자이고 꽂는 자리는 배선
+ * 한 곳이다. 묶는 타입을 만들면 그 타입의 유일한 일이 서명을 짧게 하는 것이 되고, dry-run·단건
+ * 경로는 **다른 부분집합**을 쓰므로 그 묶음을 공유하지도 못한다 — 자리만 하나 늘어난다. 기본값이
+ * 없다는 성질(빠뜨리면 컴파일이 깨진다)이 이 slice 가 지키려는 축이고 그것은 그대로다.
+ * (M9/ops-migrations 병합이 [release] 를 더해 열셋이 됐다. 앞 판의 「열셋」은 열둘일 때 적은
+ * 수였다 — 세어 고친 것이지 병합이 맞춰 준 것이 아니다.)
  */
+@Suppress("LongParameterList")
 class EvaluationCommitRun(
     dataSource: DataSource,
     private val strategies: StrategyRepository,
@@ -52,12 +64,36 @@ class EvaluationCommitRun(
     private val correlationIds: CorrelationIdFactory,
     private val clock: Clock,
     private val analysisBudget: Int?,
+    /**
+     * NOTI-01 — 가치 게이트를 통과한 후보를 운영자 **알림함**에도 남긴다. 둘 다 **기본값이
+     * 없다**: 이 경로가 `NEW_CANDIDATE` 의 유일한 생산자라, 조용히 빠지면 그 값이 production
+     * 에서 다시 0 이 된다. 빠뜨리면 컴파일이 깨진다.
+     *
+     * **dry-run·단건 경로에는 이 짝이 없다.** 그 둘은 `RecordingNotificationRequestPort` 를 쓰고
+     * 알림함에 닿지 않는다 — 「미리보기가 기록을 남긴다」가 술어가 아니라 구조로 불가능하다
+     * (그 분리를 실제로 잡은 게이트는 `AppHttpDependencyGateTest` 와 `ArchitectureGateTest` 다 —
+     * 단건 경로에 알림함 감싸기를 심은 변이를 그 둘이 RED 로 냈다).
+     */
+    private val notificationInbox: NotificationInboxPort,
+    private val audience: NotificationAudiencePort,
+    release: ReleaseIdentifier,
 ) {
+    /**
+     * **알림함 기록이 outbox 등록을 감싼다**(NOTI-01 「억제는 채널 억제이지 기록 억제가 아니다」).
+     * 기록이 먼저이므로 outbox 쓰기가 실패해도 알림함 항목은 남는다 — 그 순서가
+     * `InboxRecordingNotifications` 의 계약이고 거기 test 가 양방향으로 잠근다.
+     */
     private val notifications =
-        OutboxNotificationRequestPort(
-            JdbcOutboxPort(OwnTransactionConnectionSource(dataSource)),
-            JdbcEventIdFactory(),
-            clock,
+        InboxRecordingNotifications(
+            channel =
+                OutboxNotificationRequestPort(
+                    JdbcOutboxPort(OwnTransactionConnectionSource(dataSource), release),
+                    JdbcEventIdFactory(),
+                    clock,
+                ),
+            inbox = notificationInbox,
+            audience = audience,
+            clock = clock,
         )
 
     suspend fun evaluate(): List<CandidateEvaluation> =

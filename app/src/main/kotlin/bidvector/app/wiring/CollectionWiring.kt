@@ -5,6 +5,7 @@ import bidvector.adapters.koneps.ServiceKey
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionProperties
@@ -114,15 +115,15 @@ open class CollectionWiring {
     @Bean
     open fun collectNoticesUseCase(
         dataSource: DataSource,
-        properties: CollectionProperties,
         range: CollectionRange,
+        release: ReleaseIdentifier,
         clock: Clock,
     ): CollectNoticesUseCase {
         val fieldContracts = collectionPolicyAt(CollectionReferenceDate(range.to)).fieldContracts
         return CollectNoticesUseCase(
-            rawObservations = JdbcRawObservationStore(dataSource, fieldContracts, properties.releaseSha),
+            rawObservations = JdbcRawObservationStore(dataSource, fieldContracts, release),
             notices = JdbcNoticeRepository(dataSource),
-            runs = JdbcCollectionRunStore(dataSource),
+            runs = JdbcCollectionRunStore(dataSource, release),
             policyFor = ::collectionPolicyAt,
             clock = clock,
         )

@@ -22,6 +22,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "snapshot-extraction-e2e-release"
+
 /**
  * M6/6G D-6G-27 E2E — **적재도 출하 경로로 한다.** 수집 갈래 둘(공고 목록 · 개찰 축)을 가짜
  * transport 로 돌려 DB 를 채우고, 그 위에서 추출을 돌린다. 표에 직접 INSERT 하지 않는다 —
@@ -123,6 +126,9 @@ class SnapshotExtractionE2ETest {
                             "server.port" to "0",
                             "spring.profiles.active" to "collection-e2e",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,

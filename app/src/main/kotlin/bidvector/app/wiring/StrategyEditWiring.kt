@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.adapters.strategy.JdbcStrategyEditTransaction
 import bidvector.adapters.strategy.StrategyEditTransaction
@@ -39,12 +40,14 @@ open class StrategyEditWiring {
         transactionBoundary: TransactionBoundary,
         clock: Clock,
         resolvedStrategyPolicy: Resolution.Resolved<StrategyPolicyData>,
+        release: ReleaseIdentifier,
     ): StrategyEditTransaction =
         JdbcStrategyEditTransaction(
             transactions = transactionBoundary,
             strategyPolicy = resolvedStrategyPolicy,
             sessionPolicy = resolvedSessionPolicy(),
             clock = clock,
+            release = release,
         )
 
     @Bean

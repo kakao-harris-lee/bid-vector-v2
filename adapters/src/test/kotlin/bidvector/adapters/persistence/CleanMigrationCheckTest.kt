@@ -33,7 +33,9 @@ import org.junit.jupiter.api.Test
 class CleanMigrationCheckTest : PersistenceTestSupport() {
     private val expectedCheckCountByTable =
         mapOf(
-            "collection_run" to 13,
+            // M9/ops-migrations — **증분으로 읽는다**(병합이 계수로 합쳐지게): 기준선 13(M3/3D)
+            // + V27 릴리스 칸 공백 거부 1 = 14.
+            "collection_run" to 14,
             // D-6F4-1·8 — 신규(추가만). `notice_title`이 감시 키워드 매칭 입력이라
             // (기관 열 넷과 달리) 빈 문자열이 조용히 성립하지 않도록 CHECK 하나를 더 얹는다.
             // D-6F9-3 — 업무구분 새 칸 셋(V17, 추가만): 대분류 어휘 1 + 용역구분·주공종 공백류 2 → 16.
@@ -48,8 +50,9 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             "raw_observation" to 5,
             "rejected_write" to 1,
             "opening_reserve_price" to 6,
-            // 신규(추가만, D-4C2-2).
-            "outbox" to 11,
+            // 신규(추가만, D-4C2-2). M9/ops-migrations **증분**: 기준선 11(V6)
+            // + V26 사유↔상태 쌍 1 + V27 릴리스 칸 공백 거부 1 = 13.
+            "outbox" to 13,
             "inbox" to 1,
             // 신규(추가만, D-6B1-8). V8__edit_session.sql: id<>''·operator_id<>''·
             // state enum·session_version>=0·(state=EXPIRED)=(state_payload IS NULL) 짝 — 5.
@@ -144,7 +147,11 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
      * 같은 결함 클래스다. 그 둘과 같은 관례로 **표 범위 본문 집합 등식**으로 바꾼다.
      *
      * 집합 등식이 혼자 닫지 못하는 자리는 **같은 본문의 중복**이다(집합이 둘을 하나로 접는다) —
-     * 그 자리는 위 개수 축(`collection_run` to 13)이 진다. 둘이 함께 개수·존재·본문·소속을 닫는다.
+     * 그 자리는 위 개수 축(`collection_run` to 14)이 진다. 둘이 함께 개수·존재·본문·소속을 닫는다.
+     *
+     * **병합으로 하나가 늘었다**(M9/ops-migrations ← paper-bid): 이 집합은 main 이 세우고 V27 의
+     * 릴리스 칸 공백 거부가 뒤에 왔다. 개수 축(13 → 14)만 고치고 이 집합을 두면 집합 등식이
+     * 붉어진다 — 두 축이 **같은 마이그레이션을 각자 세어야** 한다는 것이 이 짝의 요지다.
      */
     @Test
     fun `축8 부가 — collection_run CHECK 본문 집합이 정확히 고정된다(COL-06 항등식·H-3 결합식 포함)`() {
@@ -165,6 +172,8 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
                 "CHECK ((received = ((normalized + duplicate) + dropped)))",
                 // H-3 결합 불변식.
                 "CHECK ((truncated = (truncation_cause IS NOT NULL)))",
+                // M9/OPS-10(V27) — 릴리스 칸은 **빈 문자열만** 거부한다(공백 하나·길이는 값 객체가 진다).
+                "CHECK (((release_sha IS NULL) OR (release_sha <> ''::text)))",
             )
         queryCheckBodiesForTable("collection_run").toSet() shouldBe expectedCheckBodies
     }

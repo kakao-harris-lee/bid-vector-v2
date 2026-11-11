@@ -2,8 +2,11 @@ package bidvector.app.evaluation
 
 import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.notificationinbox.JdbcNotificationAudience
+import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.persistence.JdbcNoticeRepository
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.app.BidVectorApplication
 import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
@@ -63,6 +66,11 @@ import org.testcontainers.utility.DockerImageName
 import java.time.Instant
 import java.time.LocalDate
 import javax.sql.DataSource
+
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값) — 속성과 저장소가 같은 값을 쓴다. */
+private const val TEST_RELEASE_LABEL = "evaluation-commit-run-e2e-release"
+
+private val TEST_RELEASE_ID = ReleaseIdentifier(TEST_RELEASE_LABEL)
 
 private const val POSTGRES_IMAGE = "postgres:16.4"
 private const val CANDIDATE_CAP = 100
@@ -144,6 +152,9 @@ class EvaluationCommitRunE2ETest {
                             "server.port" to "0",
                             "spring.main.web-application-type" to "none",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,
@@ -197,7 +208,7 @@ class EvaluationCommitRunE2ETest {
                     Instant.now(),
                 )
             val key =
-                JdbcRawObservationStore(dataSource(), fieldContracts, "commit-run-e2e-test").append(observation)
+                JdbcRawObservationStore(dataSource(), fieldContracts, TEST_RELEASE_ID).append(observation)
             val command =
                 NoticeCollected(
                     id = id,
@@ -242,6 +253,9 @@ class EvaluationCommitRunE2ETest {
      * 「변한 표 == {outbox}」가 D-6F7-11 의 「도메인 write 만 커밋되고 outbox 행이 없다」가 오늘
      * 성립하지 않는다는 사실의 측정이다 — 오늘 평가에는 outbox 밖 write 가 없다. 판정 기록 표가
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
+     *
+     * **M9/ops-code — 전제는 빈 청중이다.** 이 fixture 는 계정을 심지 않아 알림함 기록이 0 건이고
+     * 그래서 이 등식이 유효하다. 실제로 쓰는가는 `EvaluationCommitInboxProductionTest` 가 든다.
      *
      * **M6/6E-2a PR #66 — 표 목록은 admin 연결로 읽는다.** `information_schema.tables` 는 **권한으로
      * 걸러진 뷰**다. 최소 권한 역할로 읽으면 그 역할에 GRANT 가 없는 표가 **목록에서 사라지고**,
@@ -414,6 +428,9 @@ class EvaluationCommitRunE2ETest {
                 correlationIds = seedContext.getBean(CorrelationIdFactory::class.java),
                 clock = seedContext.getBean(Clock::class.java),
                 analysisBudget = null,
+                notificationInbox = JdbcNotificationInbox(dataSource()),
+                audience = JdbcNotificationAudience(dataSource()),
+                release = TEST_RELEASE_ID,
             )
         EvaluationCommitRunner(run, CANDIDATE_CAP, CollectionLog { commitLog += it }, termination)
             .run(DefaultApplicationArguments())
@@ -449,6 +466,7 @@ class EvaluationCommitRunE2ETest {
             target = RelayTarget(OperatorId(RELAY_OWNER), Channel.Telegram),
             environment = RuntimeEnvironment.Production,
             policy = resolution.value,
+            release = TEST_RELEASE_ID,
             channels = relayChannelSettings(),
             // 전규정 이름이다(cr L-8 를 되돌렸다) — 이 파일은 도메인 `Clock`
             // (`bidvector.workflow.strategy.Clock`)을 이미 import 해 쓰고 있어서

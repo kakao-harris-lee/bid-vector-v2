@@ -1,6 +1,7 @@
 package bidvector.adapters.event
 
 import bidvector.adapters.persistence.PersistenceTestSupport
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
@@ -37,10 +38,25 @@ private fun strategyUpdated(revision: Int) =
  * 유일한 획득 경로다.
  */
 class JdbcOutboxPortTest : PersistenceTestSupport() {
+    /**
+     * M9/OPS-10 — 등록 경로가 **자기 릴리스를 싣는다**. 이 표에는 관측을 가리키는 열이 없어
+     * 조인으로 되짚을 길이 없고, 그래서 열이 생겼다(V27).
+     */
+    @Test
+    fun `register 는 이 프로세스의 릴리스를 함께 싣는다`() {
+        val boundary = TransactionBoundary(dataSource())
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
+        val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(NOW))
+
+        boundary.inTransaction { sink.publish(strategyUpdated(31), ACTOR) }
+
+        outboxReleaseShaValues(dataSource()) shouldBe listOf(TEST_RELEASE.value)
+    }
+
     @Test
     fun `register 로 등록한 항목을 claim 이 봉투 필드 전부 그대로 되살린다`() {
         val boundary = TransactionBoundary(dataSource())
-        val outbox = JdbcOutboxPort(boundary)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(NOW))
         val event = strategyUpdated(11)
 
@@ -59,7 +75,7 @@ class JdbcOutboxPortTest : PersistenceTestSupport() {
     @Test
     fun `claim 은 등록 순서(inserted_at)대로 반환한다`() {
         val boundary = TransactionBoundary(dataSource())
-        val outbox = JdbcOutboxPort(boundary)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(NOW))
         val first = strategyUpdated(1)
         val second = strategyUpdated(2)
@@ -87,7 +103,7 @@ class JdbcOutboxPortTest : PersistenceTestSupport() {
 
         val claimed =
             boundary.inTransaction {
-                JdbcOutboxPort(boundary).claim(10, OutboxConsumerKind.StrategyUpdated)
+                JdbcOutboxPort(boundary, TEST_RELEASE).claim(10, OutboxConsumerKind.StrategyUpdated)
             }
 
         claimed.single().actor shouldBe null
@@ -111,7 +127,7 @@ class JdbcOutboxPortTest : PersistenceTestSupport() {
         val boundary = TransactionBoundary(dataSource())
 
         OutboxConsumerKind.entries.forEach { kind ->
-            boundary.inTransaction { JdbcOutboxPort(boundary).claim(10, kind) }.shouldBeEmpty()
+            boundary.inTransaction { JdbcOutboxPort(boundary, TEST_RELEASE).claim(10, kind) }.shouldBeEmpty()
         }
 
         outboxStateOf(dataSource(), "raw-bogus") shouldBe "PENDING"
@@ -134,14 +150,16 @@ class JdbcOutboxPortTest : PersistenceTestSupport() {
         val boundary = TransactionBoundary(dataSource())
 
         shouldThrow<IllegalStateException> {
-            boundary.inTransaction { JdbcOutboxPort(boundary).claim(10, OutboxConsumerKind.StrategyUpdated) }
+            boundary.inTransaction {
+                JdbcOutboxPort(boundary, TEST_RELEASE).claim(10, OutboxConsumerKind.StrategyUpdated)
+            }
         }
     }
 
     @Test
     fun `트랜잭션 경계 밖에서 register 를 호출하면 예외다 — 우회 3 양성 대조`() {
         val boundary = TransactionBoundary(dataSource())
-        val outbox = JdbcOutboxPort(boundary)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(NOW))
 
         shouldThrow<IllegalStateException> { sink.publish(strategyUpdated(99), ACTOR) }

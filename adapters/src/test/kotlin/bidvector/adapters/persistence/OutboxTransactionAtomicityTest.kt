@@ -70,8 +70,8 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
     @Test
     fun `raw append 와 outbox 등록이 같은 트랜잭션에서 실패하면 둘 다 0행이다`() {
         val boundary = TransactionBoundary(dataSource())
-        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE_SHA)
-        val outbox = JdbcOutboxPort(boundary)
+        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(FIXED_NOW))
         val event = strategyUpdated(21)
 
@@ -90,8 +90,8 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
     @Test
     fun `raw append 와 outbox 등록이 정상 커밋되면 둘 다 1행이다`() {
         val boundary = TransactionBoundary(dataSource())
-        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE_SHA)
-        val outbox = JdbcOutboxPort(boundary)
+        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(FIXED_NOW))
         val event = strategyUpdated(22)
 
@@ -107,7 +107,7 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
     @Test
     fun `경계 밖에서 raw append 를 호출해도 예외다 — ConnectionSource 참여자 공통 규율`() {
         val boundary = TransactionBoundary(dataSource())
-        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE_SHA)
+        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE)
 
         shouldThrow<IllegalStateException> { rawStore.append(rawObservation(3)) }
     }
@@ -115,8 +115,8 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
     @Test
     fun `crash-after-commit — 커밋된 행은 새 트랜잭션 경계에서도 남아 있고 claim 이 집는다`() {
         val boundary = TransactionBoundary(dataSource())
-        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE_SHA)
-        val outbox = JdbcOutboxPort(boundary)
+        val rawStore = JdbcRawObservationStore(boundary, testFieldContracts(), TEST_RELEASE)
+        val outbox = JdbcOutboxPort(boundary, TEST_RELEASE)
         val sink = OutboxEventSink(outbox, JdbcEventIdFactory(), FixedClock(FIXED_NOW))
         val event = strategyUpdated(23)
 
@@ -133,7 +133,7 @@ class OutboxTransactionAtomicityTest : PersistenceTestSupport() {
         val restarted = TransactionBoundary(dataSource())
         val claimed =
             restarted.inTransaction {
-                JdbcOutboxPort(restarted).claim(10, OutboxConsumerKind.StrategyUpdated)
+                JdbcOutboxPort(restarted, TEST_RELEASE).claim(10, OutboxConsumerKind.StrategyUpdated)
             }
         claimed.map { it.payload } shouldBe listOf(event)
     }

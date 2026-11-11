@@ -10,8 +10,8 @@ import javax.sql.DataSource
 
 /**
  * [RawObservationStore] JDBC 구현(①·②·③) — `ON CONFLICT (observation_key) DO NOTHING`으로
- * 재시도를 멱등하게 흡수한다. `releaseSha`는 구성 근이 주입한다(운영 배선은 M6 6C 소관,
- * 빈 문자열만 이 클래스가 거부한다).
+ * 재시도를 멱등하게 흡수한다. 릴리스 식별자는 구성 근이 주입한다 — 공백 거부는
+ * [ReleaseIdentifier] 가 지므로(M9 OPS-10, 값 객체로 통일) 이 클래스에 `init` 검사가 없다.
  *
  * **D-4C2-1 갈래 (b) 개조** — 주 생성자가 [ConnectionSource]를 받는다(`DataSource`가
  * 아니다). [TransactionBoundary]가 주는 [ConnectionSource]로 append하면 outbox 등록과 같은
@@ -23,17 +23,13 @@ import javax.sql.DataSource
 class JdbcRawObservationStore(
     private val connections: ConnectionSource,
     private val fieldContracts: KonepsFieldContractRegistry,
-    private val releaseSha: String,
+    private val release: ReleaseIdentifier,
 ) : RawObservationStore {
     constructor(
         dataSource: DataSource,
         fieldContracts: KonepsFieldContractRegistry,
-        releaseSha: String,
-    ) : this(DataSourceConnectionSource(dataSource), fieldContracts, releaseSha)
-
-    init {
-        require(releaseSha.isNotBlank()) { "releaseSha는 빈 문자열일 수 없다" }
-    }
+        release: ReleaseIdentifier,
+    ) : this(DataSourceConnectionSource(dataSource), fieldContracts, release)
 
     override fun append(
         observation: RawNoticeObservation,
@@ -56,7 +52,7 @@ class JdbcRawObservationStore(
                 statement.setString(index++, payload)
                 statement.setString(index++, payloadFields)
                 statement.setTimestamp(index++, Timestamp.from(observation.observedAt))
-                statement.setString(index, releaseSha)
+                statement.setString(index, release.value)
                 statement.executeUpdate()
             }
         }

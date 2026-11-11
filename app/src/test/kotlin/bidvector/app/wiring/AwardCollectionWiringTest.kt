@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.AwardCollectionRunner
 import bidvector.procurement.CallBudgetLedger
 import bidvector.workflow.strategy.Clock
@@ -20,6 +21,9 @@ import javax.sql.DataSource
 
 /** 저장소 밖 실행 상태 — 배선은 디렉터리가 **있는지**만 본다. */
 private val AWARD_WIRING_RUN_STATE: Path = Files.createTempDirectory("m9-award-wiring-run-state")
+
+/** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
+private val AWARD_WIRING_TEST_RELEASE = ReleaseIdentifier("award-wiring-test-release")
 
 /** relay 러너를 켜는 최소 설정 — 일회 러너가 둘이 되는 조합을 짓는 데만 쓴다. */
 private val RELAY_ON_FOR_AWARD =
@@ -65,6 +69,8 @@ class AwardCollectionWiringTest {
         context.register(AwardCollectionWiring::class.java)
         context.registerBean(Clock::class.java, Supplier { Clock { fixedNow } })
         context.registerBean(DataSource::class.java, Supplier { PGSimpleDataSource() })
+        // M9/OPS-10 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(출하는 `ReleaseWiring` 이 낸다).
+        context.registerBean(ReleaseIdentifier::class.java, Supplier { AWARD_WIRING_TEST_RELEASE })
         val failure = runCatching { context.refresh() }.exceptionOrNull()
         return Booted(context, failure)
     }

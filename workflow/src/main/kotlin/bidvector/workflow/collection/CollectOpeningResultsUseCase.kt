@@ -38,8 +38,9 @@ class OpeningCollectionSource(
 )
 
 /**
- * 실행이 멈춘 사실 — **예산과 쿼터를 구별한다.** 예산은 승인 범위를 다 쓴 것(내일 이어 돌 수 있다)이고
- * 쿼터는 KONEPS 가 거절한 것(더 부르면 거부만 쌓인다)이다. 하나로 접으면 다음 걸음을 정할 수 없다.
+ * 실행이 멈춘 사실 — **우리 예산과 원천의 거절을 구별한다.** 예산은 승인 범위를 다 쓴 것(내일 이어
+ * 돌 수 있다)이고, 원천의 거절은 쿼터 소진이거나 차단(401·403)이다(더 부르면 거부만 쌓인다). 하나로
+ * 접으면 다음 걸음을 정할 수 없다 — 그래서 사유 칸에는 **그 사유 자신**이 실린다.
  */
 data class OpeningCollectionHalt(
     val budgetLimit: BudgetLimit?,
@@ -57,7 +58,7 @@ data class OpeningCollectionHalt(
 ) {
     init {
         require((budgetLimit == null) != (truncationCause == null)) {
-            "멈춤 사유는 예산이거나 쿼터이지 둘 다이거나 둘 다 아닐 수 없다"
+            "멈춤 사유는 예산이거나 원천의 거절(쿼터·차단)이지 둘 다이거나 둘 다 아닐 수 없다"
         }
     }
 }
@@ -137,9 +138,10 @@ private fun DetailAxis.fetch(
  *
  * ③ **표본 공고마다 상세**: 예비가격 상세 · 개찰완료(참가자 전 행) · 공사면 A값.
  *
- * **멈춤은 둘**이다. 호출 예산([CallBudgetLedger])은 승인 범위를 다 쓴 것이고, 쿼터
- * ([TruncationCause.QuotaExhausted])는 KONEPS 가 거절한 것이다. 그 밖의 절단은 그 슬롯·그 공고만 접고
- * 이어 간다 — 한 공고의 상세가 실패했다고 표본 전체를 버리면 표본이 비뚤어진다.
+ * **멈추는 갈래는 둘**이다. 호출 예산([CallBudgetLedger])은 승인 범위를 다 쓴 것이고, **원천의 거절**은
+ * 쿼터([TruncationCause.QuotaExhausted])이거나 차단([TruncationCause.AccessBlocked])이다 — 뒤 둘은 더
+ * 불러도 거절만 쌓인다. 그 밖의 절단은 그 슬롯·그 공고만 접고 이어 간다 — 한 공고의 상세가 실패했다고
+ * 표본 전체를 버리면 표본이 비뚤어진다.
  *
  * canonical 승격을 하지 않는다 — 원문만 적재한다(D-6G-1 「새 표·마이그레이션 없음」). 투찰자 행은
  * raw 관측까지만 온다(D-6G-10).
@@ -423,16 +425,18 @@ private fun haltOf(
     cause: TruncationCause?,
     settledAny: Boolean,
 ): OpeningCollectionHalt? =
-    when (cause) {
-        is TruncationCause.BudgetExhausted -> {
-            OpeningCollectionHalt(cause.limit, null, notAttempted = 0, partialNotice = settledAny)
+    when (val directive = cause.openingDirective()) {
+        is OpeningWalkDirective.HaltBudget -> {
+            OpeningCollectionHalt(directive.limit, null, notAttempted = 0, partialNotice = settledAny)
         }
 
-        TruncationCause.QuotaExhausted -> {
-            OpeningCollectionHalt(null, TruncationCause.QuotaExhausted, notAttempted = 0, partialNotice = settledAny)
+        // 쿼터와 차단이 같은 갈래다 — 둘 다 **원천의 거절**이고 더 부르면 거절만 쌓인다. 회계에
+        // 실리는 사유는 각자 자기 값이라 「다 썼다」와 「차단당했다」가 섞이지 않는다.
+        is OpeningWalkDirective.HaltSource -> {
+            OpeningCollectionHalt(null, directive.cause, notAttempted = 0, partialNotice = settledAny)
         }
 
-        else -> {
+        OpeningWalkDirective.Continue -> {
             null
         }
     }

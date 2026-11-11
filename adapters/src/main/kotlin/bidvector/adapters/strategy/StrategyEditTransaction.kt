@@ -2,6 +2,7 @@ package bidvector.adapters.strategy
 
 import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyPolicyData
@@ -45,6 +46,7 @@ class JdbcStrategyEditTransaction(
     private val strategyPolicy: Resolution.Resolved<StrategyPolicyData>,
     private val sessionPolicy: EditSessionPolicyData,
     private val clock: Clock,
+    private val release: ReleaseIdentifier,
     private val eventIds: EventIdFactory = JdbcEventIdFactory(),
 ) : StrategyEditTransaction {
     override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T =
@@ -55,7 +57,7 @@ class JdbcStrategyEditTransaction(
             sessions = JdbcEditSessionRepository(transactions),
             strategies = JdbcStrategyRepository(transactions, strategyPolicy),
             clock = clock,
-            events = OutboxEventSink(JdbcOutboxPort(transactions), eventIds, clock),
+            events = OutboxEventSink(JdbcOutboxPort(transactions, release), eventIds, clock),
             strategyPolicy = strategyPolicy,
             sessionPolicy = sessionPolicy,
         )

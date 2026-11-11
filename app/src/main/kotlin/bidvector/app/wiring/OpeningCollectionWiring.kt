@@ -6,6 +6,7 @@ import bidvector.adapters.koneps.konepsOpeningResultSourceByNoticeDate
 import bidvector.adapters.persistence.JdbcCollectedAxisStore
 import bidvector.adapters.persistence.JdbcCollectionRunStore
 import bidvector.adapters.persistence.JdbcRawObservationStore
+import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.snapshot.RunStateDirectory
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -165,17 +166,17 @@ open class OpeningCollectionWiring {
     @Bean
     open fun collectOpeningResultsUseCase(
         dataSource: DataSource,
-        properties: OpeningCollectionProperties,
         range: CollectionRange,
         sampler: StratifiedSampler,
         collectedAxes: CollectedAxisStore,
         runState: RunStateDirectory,
+        release: ReleaseIdentifier,
         clock: Clock,
     ): CollectOpeningResultsUseCase {
         val policy = collectionPolicyAt(CollectionReferenceDate(range.to))
         return CollectOpeningResultsUseCase(
-            rawObservations = JdbcRawObservationStore(dataSource, policy.fieldContracts, properties.releaseSha),
-            runs = JdbcCollectionRunStore(dataSource),
+            rawObservations = JdbcRawObservationStore(dataSource, policy.fieldContracts, release),
+            runs = JdbcCollectionRunStore(dataSource, release),
             sampler = sampler,
             policyFor = ::collectionPolicyAt,
             gates = policy.detailFetchGates,

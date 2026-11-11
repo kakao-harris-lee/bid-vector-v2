@@ -8,6 +8,7 @@ import bidvector.adapters.notification.NoticeMessageRenderer
 import bidvector.adapters.notification.NoticeMessageSettings
 import bidvector.adapters.notification.TelegramScript
 import bidvector.adapters.notification.channelSettings
+import bidvector.adapters.persistence.TEST_RELEASE
 import bidvector.adapters.relay.NotificationRelayRun
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.notification.Channel
@@ -115,6 +116,7 @@ internal class PipelineTelegramDeliveryE2ETest : PipelineE2ESupport() {
             target = RelayTarget(E2E_OWNER, E2E_CHANNEL),
             environment = RuntimeEnvironment.Production,
             policy = deliveryPolicy(),
+            release = TEST_RELEASE,
             channels = channelSettings(telegramBaseUrl),
             clock = Clock.fixed(E2E_NOW, ZoneOffset.UTC),
         )

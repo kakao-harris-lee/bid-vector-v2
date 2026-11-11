@@ -269,14 +269,15 @@ class CollectNoticesUseCaseTest {
                     runCatching { subclass.getField("INSTANCE").get(null) as TruncationCause }
                         .getOrElse { TruncationCause.BudgetExhausted(BudgetLimit.TOTAL) }
                 }
-        // 쿼터·상한은 실행을 멈추고 MaxPages 는 같은 슬롯을 이어 간다 — 셋을 뺀 나머지를 잰다.
+        // 쿼터·상한·차단은 실행을 멈추고 MaxPages 는 같은 슬롯을 이어 간다 — 넷을 뺀 나머지를 잰다.
+        // 차단이 멈추는 쪽인 근거는 아래 전용 test 가 든다(OPS-09 — 자격의 사실이라 다음 슬롯도 같은 답이다).
         val nonHalting =
             allCauses.filterNot {
                 it == TruncationCause.QuotaExhausted || it == TruncationCause.MaxPages ||
-                    it is TruncationCause.BudgetExhausted
+                    it == TruncationCause.AccessBlocked || it is TruncationCause.BudgetExhausted
             }
         val nonQuota = nonHalting
-        nonQuota.size shouldBe allCauses.size - 3
+        nonQuota.size shouldBe allCauses.size - 4
         nonQuota.forEach { cause ->
             val source =
                 ScriptedSource { _, _ ->
@@ -292,6 +293,31 @@ class CollectNoticesUseCaseTest {
             source.calls.size shouldBe 2
             report.halted shouldBe null
         }
+    }
+
+    /**
+     * OPS-09 — **차단은 실행을 멈춘다.** 401·403 은 그 슬롯의 사실이 아니라 자격의 사실이라
+     * 다음 슬롯도 같은 답을 받는다. 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내고
+     * 승인 상한만 태운다(쿼터가 멈추는 것과 같은 근거, D-6G-47).
+     */
+    @Test
+    fun `차단은 실행을 멈춘다 — 남은 슬롯에 호출을 내지 않는다`() {
+        val fixture = CollectionFixture()
+        val blocked =
+            batchOf(emptyList(), sourceAccounting(normalized = 0, truncationCause = TruncationCause.AccessBlocked))
+        val a = ScriptedSource { _, _ -> blocked }
+        val b = ScriptedSource { date, _ -> batchOf(listOf(observation("B-$date"))) }
+
+        val report =
+            fixture.useCase.collect(
+                rangeOf("2026-09-01", "2026-09-02"),
+                listOf(CollectionSource(construction, a), CollectionSource(service, b)),
+            )
+
+        a.calls.size shouldBe 1
+        b.calls.size shouldBe 0
+        report.halted?.cause shouldBe TruncationCause.AccessBlocked
+        report.halted?.at shouldBe CollectionSlot(day1, construction)
     }
 
     @Test

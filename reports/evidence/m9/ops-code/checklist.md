@@ -1,0 +1,194 @@
+# M9/ops-code checklist
+
+판정 SHA **`df25a491`**(병합한 main `22c77cbb`). 계약의 acceptance 넷에 대한 대조표다.
+
+## 1. acceptance 대조
+
+| 계약 acceptance | 재는 자리 | 실측 |
+| --- | --- | --- |
+| 403/401 비재시도 | `KonepsStatusDispositionTest` — 본문에 **재시도 가능 코드**를 싣고 상태만 차단인 응답에서 서버 카운터 1. **출하 정책을 resolve 한 값 위에서** 같은 계수를 `KonepsShippedPolicyWireTest` 가 다시 잰다 | 충족 |
+| 간격 위반 없음(주입 시계) | **세 단계를 따로 잰다** — 기계는 `KonepsCallPacerTest`(거동 여덟, 과수면 포함), 출하 값과 상한 뒤 순서는 `KonepsShippedPolicyWireTest`, **배선이 그 값과 잠드는 함수를 넘기는지는** `CollectionWiringTest` 둘 | 충족 |
+| 평가 → 알림함 1건(실 DB) | `EvaluationCommitInboxProductionTest` — 계정·공고를 심고 production 조립을 직접 세워 돌린 뒤 `notification_inbox` 행을 되읽는다. **투찰 종류 열까지 읽는다**(M9/paper-bid V25 병합 — 새 후보는 `NONE`) | 충족 |
+| 각 바꿔치우기 변이 RED | `commands.md` §4 — 표의 **스물셋** 전부 RED 이고 통제군은 같은 run 에서 초록이다. 마지막 둘(cr r7)에는 **음성 대조**가 붙는다 — 같은 변이가 구판에서 초록이었음을 실행으로 확인했다. **초록으로 남은 시도 하나를 그 절이 사실로 적는다** — 쪽 넘김을 노린 첫 변이가 **거동 0** 이었다(봉투의 `totalCount` 가 받은 항목 수와 같아 한 쪽에서 끝났다). 바꿔치운 뒤 음성 대조가 붉어졌고, 앞 판들이 통과시킨 둘(버린 5인자 호출 · 개찰 자리)도 그 자리에 사실로 남아 있다 | 충족 |
+
+## 2. 왜 이 술어가 문자열이 아니라 구조인가
+
+| 축 | 구조로 닫은 자리 |
+| --- | --- |
+| 403 비재시도 | 처분마다 **raw step 타입이 갈린다**. 재시도 술어·사유 변환·최종 접기 셋이 `KonepsRawStep` 을 소진하는 `when` 이라 처분을 늘리면 **컴파일이 막는다**. 상태 코드를 문자열·주석으로 분류하지 않는다 |
+| 상태 → 처분 | **선언된 정책 데이터**(버전 붙은 전송 정책 안의 행 목록)이고 조회는 그 표 위에서만 돈다. 중복 상태 코드는 생성자 `require` 가 거부한다(어느 줄이 이기는지가 목록 순서에 숨지 않는다) |
+| 간격 | 관문이 `HttpClient` 를 쥔 **유일한** 자리다(D-6G-47, architecture test 가 그 구조를 잰다). 간격을 그 관문 안에 두었으므로 「간격을 비껴가는 경로」가 「관문을 비껴가는 경로」와 같다 — 규율이 아니라 의존 구조가 막는다 |
+| 간격의 증거 | **원장에서 읽는다.** 관문이 호출 전에 자기 시계로 `PENDING` 줄을 적으므로 그 줄들의 시각 간격이 곧 나간 호출들의 간격이다 — test 가 자기 계수를 세는 하네스가 아니라 production 이 남기는 기록을 읽는다 |
+| 가치 게이트 ↔ 알림함 | 가치 게이트 통과는 커널 안에서 **한 자리로** 관측된다(`Verdict.BidNow` 일 때만 알림 포트가 불린다). 그 자리를 감싸므로 「게이트를 통과했는가」를 다시 판정하는 둘째 술어가 없다 |
+| 미리보기가 기록을 남기지 않음 | dry-run·단건 조립은 `RecordingNotificationRequestPort` 를 쓰고 알림함 타입을 **받지 않는다**. 그 분리를 실제로 잡은 게이트는 `AppHttpDependencyGateTest` 와 `ArchitectureGateTest` 다 — 단건 경로에 알림함 감싸기를 심은 변이를 그 둘이 RED 로 냈다(앞 문면이 가리킨 dry-run 분리 게이트가 아니다) |
+| 조립이 구현을 고르지 않음 | 평가 어댑터 패키지의 허용 루트에 알림 **포트**만 더했다. 알림함 **어댑터** 루트는 없고, 그 금지를 양성 대조 한 줄이 잰다(바이트코드 상수 풀 — 소스 문법과 무관) |
+| 청중의 정직성 | 계정을 **표에서 읽는다**(설정값 아님) — 없는 계정 id 라는 상태가 표현되지 않는다. 질의는 id 열만 읽는다 |
+| 운반 단계 | 배선이 pacer 에 넘기는 **값**과 그 **기다림 함수**를 따로 잰다 — 벽시계 하나로는 못 가른다(계수 축 rate limiter 가 같은 크기의 지연을 만든다, 실측). 값은 기록기로, 기다림은 짧은 실제 수면으로 |
+| 처분이 나르는 값 | 걷기 처분이 **값 나르는 sealed** 라 소비 자리에 다운캐스트도 null 관례도 없다 — 표가 틀리면 컴파일이 막고, 운영 중 `ClassCastException` 이 설 자리가 없다 |
+| 사유 모집단 | 전수를 sealed 계층에서 뽑되 **쓰는 자리가 클래스 집합 등식을 먼저 잰다**(대표값 대체가 모집단을 바꿔치우는 것을 막는다 — `AxisLastObservedAtTest` 선례) |
+| 출하 값이 wire 에 닿음 | 처분 표와 간격을 재는 test 가 **출하 정책을 resolve 한 값** 위에서 돈다(`KonepsShippedPolicyWireTest`) — 좁힌 test 정책으로 갈음하지 않는다. 그래서 출하 표에서 403 행을 지우거나 간격을 `ZERO` 로 두는 변이가 **test 를 붉힌다** |
+| 새 후보의 투찰 종류 | **종류 전수 표가 정한다**(#137 `bidKindAxis`: `NEW_CANDIDATE` → `PER_NOTICE` → `NONE` 뿐). 생산자가 그 값을 지어내는 길이 없다 — `NotificationInboxRecord` 의 `require` 와 저장 층 짝 CHECK 가 두 겹이고, 축을 바꾸는 변이는 **생산자를 지나는 test 전부**를 붉힌다(단위 6/9 · 실 DB 2/3) |
+| 청중 장애 ↔ 빈 청중 | 두 사실이 **다른 값**이다(`NotificationAudience.Accounts` ↔ `Unavailable`) — 소비자가 소진 `when` 으로 받으므로 「조용히 0 건」이 표현되지 않고, 어댑터가 좁은 예외만 값으로 접어 평가 run 이 그 장애로 멈추지 않는다 |
+
+## 3. 우회 — 고안하고 막은 것
+
+| 우회 | 막는 것 |
+| --- | --- |
+| 403 본문에 재시도 가능 `resultCode` 를 실어 재시도를 얻는다 | 상태 처분이 **봉투보다 먼저** 돈다. 그 조합이 곧 이 slice 의 RED test 다 |
+| 상태 처분을 봉투 뒤로 옮긴다 | 옮기면 `BlockedStep` 을 만들 자리가 없어지고 소진 `when` 셋이 깨진다 |
+| 표에서 401·403 행을 지운다 | 「봉투를 건너뛰는 상태 전수」 집합 등식 test 가 붉어진다(부분집합 단언이 아니다) |
+| 표의 429 행을 차단으로 바꿔 「전부 비재시도」로 과잉 처방한다 | 통제군 test(429 재시도 회복)가 붉어진다 — 변이로 실측했다 |
+| 차단을 쿼터·비재시도 코드와 같은 사유로 접는다 | 셋이 **다른 다음 걸음**을 가진다(회계 갈래 · 재개 가능성 · 수집 실행 중단). `TruncationCause` 전수 게이트와 수집 use case 의 전수 test 가 잰다 |
+| 전송 정책을 주입으로 갈아 간격을 0 으로 만든다 | 간격은 **정책 표**의 값이고 주입 지점은 배선 한 자리다. legacy 가 명문화한 「주입은 '어떻게 가져오는가'만 바꾸며 '언제·몇 번·얼마나 기다려'는 못 바꾼다」를 지킨다 — 정책 표 자체를 고치는 길은 열려 있고(그것이 `rollback.md` §3 의 「끄는 법」) **그 표를 고치면 출하 값을 읽는 test 가 붉어진다**(변이로 실측). **배선에서 다른 값을 넘기거나 기다림 함수를 비우는 길**도 막혔다 — 배선이 만든 소스로 두 번 부르고 벽시계를 재는 단언이 그 둘을 각각 붉힌다(v r2 M-1, 변이로 실측) |
+| 관문을 거치지 않는 둘째 `HttpClient` 를 만든다 | 어댑터 의존 게이트가 `HttpClient` 보유를 관문 하나로 잠근다(이 slice 가 넓히지 않았다) |
+| 커밋 조립에서 알림함 감싸기를 뺀다 | 실 DB test 둘이 붉어진다 — **변이로 실측했다**(D-6F10 R1-H-1 이 겨눈 「조립이 커널을 안 쓴다」의 재현) |
+| 청중 질의를 아무 계정도 내지 않게 한다 | 같은 둘이 붉어진다 — 변이로 실측했다 |
+| 알림함 기록을 채널 뒤로 옮겨 채널 실패가 기록을 지우게 한다 | **두 대역이 호출 시점에 상대의 상태를 단언한다** — 채널은 기록이 이미 있음을, 알림함은 채널이 아직 안 불렸음을 본다. 결말만 보는 단언 둘(채널 실패에도 기록 1건 · 기록 실패에도 채널 1건)은 순서를 **잠그지 못했다**(뒤집는 변이가 초록이었다) |
+| 공고 갈래에서 차단을 흘려보낸다 | **의도한 처분은 `HALT_RUN`(실행 정지)이고 그것이 선 상태다** — 401·403 은 슬롯의 사실이 아니라 자격의 사실이라 다음 슬롯도 같은 답을 받고, 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내며 **개찰 갈래와 공유하는 승인 상한**만 태운다(쿼터를 멈추게 한 D-6G-47 과 같은 근거, 계약 갱신 1차 승인). 그 표는 `else` 없는 소진 `when` 이라 새 사유가 생기면 컴파일이 그 자리를 가리킨다 — **낙찰 갈래(PR #128)의 탐침이 그 강제를 확인했다**(교차 보고 2026-11-06) |
+| 개찰 갈래에서 차단을 흘려보낸다(남은 표본을 계속 부른다) | 절단 사유 → 다음 걸음 표가 **한 자리의 소진 `when`** 이고 두 소비 자리가 그 답을 읽는다 — `else` 가 없으니 새 사유가 생기면 컴파일이 그 자리를 가리킨다. 멈추는 사유 집합을 sealed 계층에서 뽑아 **전수 등식**으로 잰다(넓어지는 쪽도 붉어진다) |
+| 청중 질의 실패로 평가 run 을 멈춰 그 판정의 outbox 흔적까지 지운다 | 어댑터가 좁은 예외를 `Unavailable` 값으로 접고 생산자는 그 값에서 **기록 0 건으로 끝낸 뒤 채널 요청을 낸다**. 둘 다 test 가 든다(연결 장애 → `Unavailable` · `Unavailable` → 채널 1회) |
+| 배선이 출하 간격 대신 다른 값을 넘긴다 | 배선이 pacer 에 넘기는 **요청된 기다림**을 기록기로 보고 출하 간격과 대조한다 — 벽시계로 재면 계수 축이 같은 지연을 만들어 이 우회가 **초록으로 지나간다**(실측) |
+| 기다림 함수 자신이 잠들지 않는다 | 그 함수를 직접 짧게 불러 벽시계 하한을 본다 |
+| production 이 **다른** 기다림 함수를 넘긴다(기본값을 비우거나 · 호출 자리가 자기 것을 명시하거나 · 5인자 호출을 **버리고** 다른 전송을 쓰거나) | **호출자 클래스 전수 × 쓰이는 인스턴스**로 닫는다 — 클래스 전수는 상수 풀에서 도출해 탐침표와 대조하고, **각 클래스의 조립 메서드가 낸 소스**로 둘째 호출의 대기를 잰다. 변이 **다섯**(기본값 · 공고 자리 · 개찰 자리 · 낙찰 자리 · 버린 5인자 호출)이 각각 RED 다. 앞 판들이 통과시킨 둘이 여기 있다 — 참조 **형태**만 세던 판은 버린 호출을(v r4 L-1), 거동을 **한 자리**에서만 재던 판은 개찰 자리를(v r5 H-1) 놓쳤다. **이 행이 닫는 범위는 「등재되지 않은 다음 클래스」다** — 그 경계가 다섯째 병합에서 **실측됐다**(main 의 낙찰 배선이 탐침 없이 들어오자 집합 대조가 먼저 붉었다). 이미 등재된 **세** 클래스 **안**의 둘째 호출은 census 밖이다(알려진 제한 ⑬) |
+| 걷기 처분 표가 맞는데 소비 자리의 캐스트가 깨진다 | 처분이 **값을 나르므로** 꺼내는 캐스트가 없다 — 깨지는 날의 모양이 컴파일 실패다 |
+| 사유 전수 목록이 새 `data class` 사유를 조용히 놓친다 | 쓰는 자리가 **클래스 집합 등식**을 먼저 재므로 모집단이 어긋나면 붉어진다 |
+| 청중 장애의 사유를 알 수 없게 둔다 | 값이 **예외 클래스 이름**을 나르고 표지 줄에 그것이 실린다(메시지·SQLState 는 계속 버린다). 그 줄과 토큰을 배선 test 가 단언한다 |
+| 한 번 길어진 기다림이 다음 간격을 줄인다 | 다음 하한을 **기다림 뒤 시각**에서 센다 — 늦음이 한 번뿐인 판을 대역으로 지어 잰다 |
+| 상한이 거부한 호출에도 간격을 태워 벽시계를 소모한다 | 관문이 **상한 뒤·전송 앞**에서만 기다린다. 거부된 호출의 대기 0 을 단언한다 — 그 단언이 없던 동안 `awaitTurn` 을 앞으로 옮기는 변이가 초록이었다 |
+| 차단을 재개 가능 축으로 되돌려 같은 자리를 다시 걷게 한다 | 403 응답의 배치가 **이어 갈 cursor 를 내지 않는다**(`next == null`)는 것을 단언한다 |
+| 설정으로 없는 계정 id 를 주어 알림을 허공에 쓴다 | 청중을 표에서 읽으므로 그 설정 자리가 없다 |
+| HTTP 로 알림을 위조한다 | 쓰기 포트를 controller 가 받지 못하고(`app.http.denied-types`) 호출 쌍 허용 목록에 이 slice 가 **한 쌍도 더하지 않았다**(생산자는 `workflow` 안에서 포트를 부른다) |
+
+## 4. 알려진 제한
+
+1. **알림함 기록 실패가 평가 run 의 종료 코드에 세어지지 않는다.** 기록 실패를 채널 결말 어휘에
+   섞지 않기 때문이고(두 축을 한 값으로 읽지 않는다), 표지는 쓰기 포트 빈의 로그 한 줄이다
+   (D-7C3B-9 가 세운 자리). 7C③-b 의 같은 제한을 그대로 잇는다.
+2. **capability-map NOTI-01 의 둘째 acceptance 는 좁혀진 채다.** 그 문장은 「임계 미달이면 기록
+   1건, 채널 0건」인데 이 slice 는 「가치 게이트 통과 → 기록 1건」만 만든다. 미달 후보 전수에
+   기록을 남기는 것은 볼륨·운영 결정이라(팀장 승인) 후속이고, **그 사실을 capability-map 의
+   NOTI-01 블록에 등재했다**(「V2 구현 상태(M9/ops-code, 2026-11-06)」 문면). OPS-09 블록도 같은
+   방식으로 선 축과 남는 둘(`OPEN-OPS-01` 정책 질문 · 처분 표에 5xx 없음)을 적는다.
+3. **계정 수가 늘면 알림함 행이 그만큼 곱해진다.** 청중이 `account` 전수이고 단일 운영자를 전제
+   하기 때문이다(팀장 승인). 계정이 여럿인 날 필요한 것은 이 질의의 상한이 아니라 **「이 후보가
+   누구에게 관련 있는가」라는 판정**이고, 그것은 전략이 계정마다 갈리는 slice 의 몫이다.
+4. **PR CI 가 +40~60s 늘어난다**(`commands.md` §3 실측, 팀장 승인). 간격이 정책 값이라 실 컨텍스트
+   E2E 가 운영값을 쓴다.
+5. **`KonepsCallPacer` 는 스레드 안전을 주장하지 않는다.** 수집이 직렬이라는 계약(legacy 의 직렬
+   self-chaining — 동시 청크가 과거 429 를 유발했다) 위에 선다. 동시 호출이 생기는 날 필요한 것은
+   이 칸의 잠금이 아니라 **그 계약의 재검토**다.
+6. **상태 처분 표에 5xx 가 없다.** 5xx 는 오늘도 봉투 경로로 가 `StructureFailure` 로 접히고 걷기
+   안에서 재시도되지 않는다(회계상 일시 실패라 다음 실행이 다시 본다). 그 축을 바꾸는 것은 이
+   계약 밖이라 거동을 보존했다.
+7. **커밋 E2E 의 「변한 표 == {outbox}」는 이 fixture 가 계정을 심지 않기 때문에 유효하다.**
+   평가 커밋 경로에는 이제 `notification_inbox` write 가 있다 — `OPEN-6F10-EVALUATION-DOMAIN-WRITE`
+   가 예고한 자리이고, 그 단언을 **옮기는 대신** 전제를 문면으로 명시하고 기록 축의 측정을
+   `EvaluationCommitInboxProductionTest` 로 세웠다. 그 fixture 를 계정까지 심는 쪽으로 늘리면 그
+   class 의 표별 전후 등식들이 함께 움직여야 한다(그 작업은 그 slice 의 몫으로 남는다).
+8. **청중을 못 읽은 실행의 알림함 기록은 0 건이고, 그 0 의 표지는 조립의 로그 한 줄이다.**
+   평가 run 은 그 장애로 멈추지 않고(그래서 판정과 outbox 는 남는다) 종료 코드도 그것을 세지
+   않는다 — 제한 ①과 같은 축이고 같은 사유다. 운영자가 「알림이 왜 없었나」를 묻는 자리는 그
+   로그다.
+9. **청중 질의는 run 당 한 번이라, 그 한 번이 실패하면 그 실행의 알림함 기록이 전부 0 건이다.**
+   후보마다 다시 묻지 않는 선택의 뒷면이다(「One query, not N」) — 재시도는 **다음 실행**이고,
+   평가 자체는 그 실행에서도 정상으로 끝난다.
+10. **간격 보장이 프로세스 전역이라 소스가 여럿인 실행의 집계 속도가 1/간격으로 묶인다.**
+    rate limiter 는 소스 어댑터마다 하나인데 pacer 는 관문 하나에 있다. 실측은 `commands.md` §3
+    (통제군 대비 +20.9s/+4.9s)이고, 운영 규모에서는 개찰 상세가 공고당 1~35 호출이라 일 상한
+    1,000 을 다 쓰는 날의 **순수 간격 합이 약 17 분**이다. 기능 위험은 없다 — `CollectionTermination`
+    에 벽시계 기한이 없어 실행이 길어질 뿐이고, 상한·재개 회계는 그대로다.
+11. **청중 포트는 `app.http.denied-types`·`app.port-call.ports` 에 등재하지 않았다 — 사각이 아니다.**
+    verifier 가 두 우회를 실측했다(r2 L-4): controller 가 그 포트를 생성자로 받는 변이와 ② 층 조회기가
+    받는 변이 **둘 다** `AppHttpDependencyGateTest` 의 **양성 허용 목록 집합 등식**(주입 표면 · ② 층
+    workflow 정확 이름)이 바이트코드에서 RED 로 잡는다. `denied-types` 는 **이미 허용된 주입** 위에
+    덧대는 층이라, 허용 집합에 없는 타입은 그 목록에 없어도 HTTP 층이 얻을 길이 없다. 미등재로 열리는
+    것은 「app 의 다른 자리가 `accounts()` 를 부른다」 하나이고 그것은 HTTP 표면이 아니다. 등재는
+    후속 slice 의 선택으로 남기고, 그 선택이 바뀌어야 할 근거는 이 측정이 **아니다**.
+12. **`NotificationInboxRecord` 를 만드는 자리가 한 곳이다**(`InboxRecordingNotifications`) —
+   paper-bid(V25)가 그 타입에 투찰 종류 필수 인자를 더하는 중이라 병합 때 한 줄로 `NONE` 을 싣게
+   의도한 모양이다. 나중에 머지되는 쪽이 맞춘다.
+13. **전송 공장 census 가 세는 단위는 클래스이고, 같은 클래스 안의 둘째 호출은 그 밖이다**(v r6 M-1).
+   상수 풀이 같은 Methodref 를 **한 번만** 담기 때문이고, 탐침도 클래스마다 조립 메서드 하나만 잰다.
+   그래서 이미 키에 있는 **세** 클래스(`CollectionWiring`·`OpeningCollectionWiring`·
+   `AwardCollectionWiring`)에 `konepsTransportFor(..., sleeper = { })` 호출을 **하나 더** 두면 어느
+   게이트도 붉어지지 않는다(verifier 가 `:app:test` 전건으로 실측). **등재되지 않은 다음 클래스는
+   막히고, 그 경계가 이 라운드에 실측됐다** — 다섯째 병합이 들여온 `AwardCollectionWiring` 이
+   탐침 없이 전송을 만들자 집합 대조가 먼저 붉었다(`Some elements were unexpected`). 선언 파일
+   헬퍼로 비껴가도 자격 타입 게이트(D-6F8-4)가 받는다. **현존하는 세 호출은 전부 거동으로 잠겨
+   있고**(변이 MW3·MW4·MW4d·MWO·MWOd·MWA 전부 RED) 잠기지 않은 자리는 지금 없다. 명령 스트림
+   계수(`invokestatic` 수)로 닫는 길은 있으나 이 라운드에서 택하지 않았다 — 반례가 새 전송 생성
+   경로를 **더하는** 변경이라 diff 에 그 호출이 보인다.
+14. **`AwardCollectionRunner.awardExitCodeOf` KDoc 이 아직 「멈춤(예산·쿼터)」이다**(cr r7 M-2 의 네
+   번째 자리). 그 파일은 **in_scope 밖**이라 팀장 지시로 건드리지 않았다 — 종료 코드 거동은 그대로이고
+   (멈춤 여부만 보므로 차단도 같은 코드로 간다) 틀린 것은 문면 하나다. 다음에 그 파일을 여는 slice 가
+   고친다.
+16. **`EvaluationCommitRunE2ETest.kt` 가 한도와 같은 수다**(500/500, 게이트 술어는 `> limit`).
+   여섯째 병합의 **합집합**이 508 줄을 만들었고(기준 482 + main 11 + 내 15) 남의 줄은 건드리지 않고
+   내 문면만 줄여 500 으로 맞췄다. **여유가 0 이라 다음에 이 파일을 만지는 병합이 깬다.** 가르는
+   것이 구조적 답이지만 그것은 **새 test class 와 `gate-tests.properties` 등재를 낳으므로** 이
+   라운드 범위 밖이다 — 팀장 결정(2026-11-11)으로 지금처럼 두고 후속 slice 로 넘긴다.
+15. **`CollectAwardListUseCaseTest.kt` 의 남은 여유가 세 줄이다**(497/500). 이 라운드에 `sizeGate` 가
+   502 줄을 거부했고, 같은 `haltOf` 축이라 가르는 대신 겹치던 문면을 합쳤다(크기 회피용 분할 금지).
+   **다음에 이 파일에 더하는 변경은 관심사 경계를 보고 갈라야 한다** — 선례는 이 slice 가 간격 축을
+   `CollectionWiringSleeperTest` 로 가른 자리다(v r4 B-1).
+
+## 5. 새 파일 ↔ in_scope 대조
+
+evidence 넷을 뺀 새 파일 **열셋** — 전부 in_scope 안이다. 목록은 손으로 세지 않는다:
+`git log --no-merges --diff-filter=A --format= --name-only <복원 원천>..HEAD | sort -u`.
+
+| 새 파일 | in_scope 항목 |
+| --- | --- |
+| `adapters/…/koneps/KonepsStatusPolicy.kt` | `adapters/…/koneps/**` |
+| `adapters/…/koneps/KonepsCallPacer.kt` | 같음 |
+| `adapters/…/koneps/KonepsStatusDispositionTest.kt` | 「각 test」 |
+| `adapters/…/koneps/KonepsCallPacerTest.kt` | 같음 |
+| `adapters/…/koneps/KonepsShippedPolicyWireTest.kt` | 같음 — **출하 정책 값이 wire 에 닿는지**를 재는 자리(v H-1) |
+| `workflow/…/evaluation/InboxRecordingNotifications.kt` + test | `workflow/**/evaluation/**` |
+| `workflow/…/collection/OpeningAccessBlockedHaltTest.kt` | 계약 갱신 2차 — `workflow/src/test/…/collection/**`(cr HIGH · v M-1) |
+| `adapters/…/notificationinbox/JdbcNotificationAudience.kt` | 계약 갱신 — `notificationinbox` 청중 어댑터(별도 SQL 홀더) |
+| `adapters/…/notificationinbox/NotificationAudienceFailureTest.kt` | 같음 — 그 어댑터의 장애 접힘(cr MEDIUM · v M-2) |
+| `adapters/…/evaluation/EvaluationCommitInboxProductionTest.kt` | 계약 갱신 — `adapters/src/test/…/evaluation/**` |
+| `app/…/wiring/NotificationAudienceMarkerTest.kt` | 「각 test」 — 잃은 알림 표지가 실제로 남는지(v r2 L-1) |
+| `app/…/wiring/CollectionWiringSleeperTest.kt` | 「각 test」 — 간격 축 넷을 갈라 담는다(v r4 B-1: 원래 파일이 500 줄 한도를 넘겼다) |
+
+**컴파일이 강제한 app 경로 넷은 계약 갱신 2차가 사후 등재했다**(팀장 승인) — 셋은 커밋 조립의
+생성자·배선 메서드를 부르는 test(`EvaluationCommitRunE2ETest`·`EvaluationCommitRunnerTest`·
+`DryRunCommitParityTest`)이고 하나는 그 배선 자신(`EvaluationCommitWiring.kt`, 청중·알림함 빈을
+명시 import 해 이 배선을 혼자 켰을 때의 숨은 의존을 없앴다). 이 라운드도 그 셋 가운데 하나를
+**한 줄** 고쳤다 — 청중 포트의 반환 타입이 바뀌어 그 대역의 값 하나가 따라 움직였다.
+`EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다(늦게 머지되는 쪽이 맞춘다).
+(#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다. 머지 커밋 `d38f7115` 가 복원 원천
+`22c77cbb` 의 조상이다.)
+
+**병합 뒤 두 라운드는 새 파일을 하나도 만들지 않았다** — 원천이 `07140729` 로 옮긴 뒤에도 위 목록은
+그대로 열셋이고(기계 산출), 그래서 `gate-tests.properties` 등재도 움직이지 않았다(만진 test class 는
+전부 **이미 등재된** 것이다).
+
+**만진 파일은 기계 산출로 센다**(cr r7 LOW-1). **병합이 낀 구간에서는 range 가 기준이 될 수 없다** —
+`1d53dd6e..df25a491` 는 main 의 107 경로를 함께 세고, `--no-merges` 는 손 해소가 **병합 커밋 안**이라
+그것을 못 본다. 그래서 세 산출을 따로 든다.
+
+- **손 해소 여섯 파일 일곱 자리** — `git show --cc e2a8fafc` 가 내는 `diff --cc` 목록 그대로(§4e).
+- **병합 뒤 손으로 고친 둘** — `a8ccb0b9`(실 DB test 의 `release`) · `df25a491`(E2E 문면 축약).
+  각각 한 파일짜리 커밋이다.
+- **이 디렉터리의 evidence 넷.**
+
+이 slice 의 산출물 발자국 자체는 여전히 **복원 목록 44 경로**다(원천 `22c77cbb` 대비 기계 산출).
+앞 판의 「넷」은 산출물 셋에 `scope.md` 하나만 더한 수였다 — 같은 줄에서 두 기준을 섞었다.
+
+| 이 두 라운드가 만진 산출물 | in_scope 항목 |
+| --- | --- |
+| `workflow/…/collection/CollectAwardListUseCase.kt` | 계약 갱신 3차 |
+| `workflow/…/collection/CollectAwardListUseCaseTest.kt` | 같음 |
+| `app/…/wiring/CollectionWiringSleeperTest.kt` | 「각 test」(이미 in_scope) |
+| `adapters/…/evaluation/EvaluationCommitRun.kt` | 계약 갱신 1차(커밋 경로) — **여섯째 병합 해소** |
+| `adapters/…/evaluation/EvaluationCommitInboxProductionTest.kt` | 계약 갱신 1차(`adapters/src/test/…/evaluation/**`) — 병합이 컴파일로 강제 |
+| `app/…/wiring/EvaluationCommitWiring.kt` | 계약 갱신 2차 사후 등재 — 병합 해소 |
+| `app/…/evaluation/{DryRunCommitParityTest,EvaluationCommitRunnerTest,EvaluationCommitRunE2ETest}.kt` | 같음 — 병합 해소(E2E 는 sizeGate 로 문면 축약까지) |
+
+**여섯은 병합이 만진 자리이고 새로 등재할 경로가 없다** — 전부 앞선 계약 갱신이 이미 든 in_scope
+안이다.
+
+**이 라운드가 in_scope 밖에서 만진 파일은 없다** — 보고 항목으로 `git log --no-merges --format=
+--name-only <복원 원천>..HEAD | sort -u` 를 계약과 대조했다.

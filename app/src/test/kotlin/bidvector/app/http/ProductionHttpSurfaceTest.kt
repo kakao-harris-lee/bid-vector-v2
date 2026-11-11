@@ -24,6 +24,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
+/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값). */
+private const val TEST_RELEASE_LABEL = "production-http-surface-release"
+
 /** 경로 변수 자리에 넣는 고정 값 — 어느 세션도 가리키지 않는다(형식 판정만 본다). */
 private const val PATH_VARIABLE_PROBE = "surface-gate-probe"
 
@@ -82,6 +85,9 @@ class ProductionHttpSurfaceTest {
                             "server.port" to "0",
                             "management.server.port" to "0",
                             "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
+                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
+                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
+                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
                             "bidvector.persistence.username" to postgres.username,
                             "bidvector.persistence.credential" to postgres.password,
                             "operator.credential.value" to TEST_CREDENTIAL_VALUE,

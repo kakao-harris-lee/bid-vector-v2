@@ -65,9 +65,13 @@ val AWARD_COLLECTION_RANGE_POLICY: EffectiveDatedPolicy<CollectionRangePolicyDat
 private const val AWARD_MAX_SPAN_DAYS = 60
 
 /**
- * 스윕이 멈춘 사실 — **예산과 쿼터를 구별한다**(형제 갈래와 같은 축): 예산은 승인 범위를 다 쓴 것이고
- * 쿼터는 KONEPS 가 거절한 것이다. 멈춘 단위가 **슬롯**(개찰일 × 업무)인 것이 이 갈래의 차이다 —
- * 표본이 없으므로 「손대지 않은 표본 수」가 아니라 걷지 못한 슬롯 수가 다음 실행의 입력이다.
+ * 스윕이 멈춘 사실 — **예산과 원천의 거절을 구별한다**(형제 갈래와 같은 축): 예산은 승인 범위를 다
+ * 쓴 것이고, [truncationCause] 쪽은 원천이 거절한 것이다(쿼터 소진 · 403 계열 차단). 멈춘 단위가
+ * **슬롯**(개찰일 × 업무)인 것이 이 갈래의 차이다 — 표본이 없으므로 「손대지 않은 표본 수」가 아니라
+ * 걷지 못한 슬롯 수가 다음 실행의 입력이다.
+ *
+ * 두 칸을 **동시에 채우지 않는다**: 예산은 우리가 센 사실이고 거절은 원천이 말한 사실이라, 한 멈춤이
+ * 둘 다라고 적히면 운영 줄이 원인을 두 곳으로 가리킨다.
  */
 data class AwardCollectionHalt(
     val budgetLimit: BudgetLimit?,
@@ -76,7 +80,7 @@ data class AwardCollectionHalt(
 ) {
     init {
         require((budgetLimit == null) != (truncationCause == null)) {
-            "멈춤 사유는 예산이거나 쿼터이지 둘 다이거나 둘 다 아닐 수 없다"
+            "멈춤 사유는 예산이거나 원천의 거절(쿼터·차단)이지 둘 다이거나 둘 다 아닐 수 없다"
         }
     }
 }
@@ -124,9 +128,10 @@ data class AwardCollectionReport(
  * 러너가 계약 행이 선언한 슬롯을 읽어 채운다 — 이 갈래가 그 경로를 건드리지 않는 것이 「원문이 들어오면
  * 승격은 코드 변경 0 으로 따라온다」의 실물이다.
  *
- * 멈춤은 둘뿐이다(예산·쿼터). 그 밖에 끝내지 못한 슬롯은 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의
- * 전송 실패로 창 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다. 끝내지 못한 슬롯이 하나라도 있으면
- * 실행은 **미완**으로 끝난다(종료 코드는 러너가 [AwardCollectionReport] 에서 읽는다).
+ * 멈춤은 셋이다(예산·쿼터·403 계열 차단 — [haltOf] 가 그 표이고 전수 test 가 사유마다의 결정을
+ * 고정한다). 그 밖에 끝내지 못한 슬롯은 그 슬롯만 접고 다음 슬롯으로 간다 — 한 날의 전송 실패로 창
+ * 전체를 버리면 다시 걷는 호출이 그만큼 더 나간다. 끝내지 못한 슬롯이 하나라도 있으면 실행은
+ * **미완**으로 끝난다(종료 코드는 러너가 [AwardCollectionReport] 에서 읽는다).
  */
 class CollectAwardListUseCase(
     private val rawObservations: RawObservationStore,
@@ -161,7 +166,7 @@ class CollectAwardListUseCase(
      *
      * 끝난 것으로 보는 결말은 **둘**이다 — [AttemptOutcome.Succeeded] 와 [AttemptOutcome.Empty].
      * 빈 응답은 오류가 아니다(그 개찰일에 낙찰이 없었다). 나머지(일시 실패·확정 실패·관문 거부)는
-     * 전부 미완이고, 그중 예산·쿼터만 실행을 멈춘다([haltOf]).
+     * 전부 미완이고, 그중 예산·쿼터·차단만 실행을 멈춘다([haltOf]).
      *
      * **인프라 예외는 전파하고 그 슬롯의 회계는 남지 않는다**(형제 갈래와 같은 거동) — 포트나 원문
      * 저장이 던지면 `runs.record` 에 닿지 못한 채 `collect` 밖으로 나가고 러너가 사유 토큰으로 정제한다.
@@ -259,7 +264,7 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
     }
 
 /**
- * 멈출 사유인가 — 오늘은 예산·쿼터뿐이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
+ * 멈출 사유인가 — 예산·쿼터·차단 셋이다. 나머지 절단(전송 실패·구조 오류·반복 쪽)은 그 슬롯의 회계에
  * 원인으로 남고 실행은 다음 슬롯으로 간다. **짧은 걷기는 여기 오지 않는다** — 사유가 없으므로
  * 멈춤도 아니고, 미완 계수만 올린다([AwardCollectionReport.unfinishedSlots]).
  *
@@ -268,9 +273,11 @@ private fun finishedWith(accounting: CollectionAccounting): Boolean =
  * 사유가 새로 생기면 조용히 그 길로 간다. 소진 `when` 이면 새 [TruncationCause] 가 생기는 순간 컴파일이
  * 이 자리를 가리켜 결정을 강제한다 — 저장소의 `truncationCodeOf`·`failureOf` 와 같은 형태·같은 이유다.
  *
- * **다음에 이 자리를 깨우는 사유의 답은 정해져 있다**: 403 계열 차단(ops-code 가 들여올 `AccessBlocked`)은
- * **멈춤**이다 — 쿼터와 같은 자리(`AwardCollectionHalt(null, cause)`)로 보낸다. 차단된 키로 남은 슬롯을
- * 계속 부르면 승인 호출만 태우고 차단을 키운다. 오늘 이 브랜치에는 그 사유가 없어 그대로 컴파일된다.
+ * **그 자리가 깨어났다**(M9/ops-code 병합). 위 문단이 예고한 사유([TruncationCause.AccessBlocked])가
+ * 들어오며 이 `when` 이 컴파일을 멈췄고, 예고한 답 그대로 **멈춤**으로 — 쿼터와 같은 자리
+ * (`AwardCollectionHalt(null, cause)`)로 보낸다. 차단된 키로 남은 슬롯을 계속 부르면 승인 호출만 태우고
+ * 차단을 키운다. 두 변경이 **서로 다른 파일**이라 병합은 충돌 없이 지나갔고, 이 자리를 가리킨 것은
+ * 사람이 아니라 타입이다 — 세 갈래(공고·개찰·낙찰)가 이제 같은 답을 낸다.
  */
 private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
     when (cause) {
@@ -279,6 +286,8 @@ private fun haltOf(cause: TruncationCause?): AwardCollectionHalt? =
         is TruncationCause.BudgetExhausted -> AwardCollectionHalt(cause.limit, null)
 
         TruncationCause.QuotaExhausted -> AwardCollectionHalt(null, cause)
+
+        TruncationCause.AccessBlocked -> AwardCollectionHalt(null, cause)
 
         TruncationCause.MaxPages,
         TruncationCause.RepeatedPage,

@@ -8,6 +8,7 @@ import bidvector.procurement.CallSpend
 import bidvector.procurement.CollectionAttempt
 import bidvector.procurement.CollectionCallBudget
 import java.net.http.HttpClient
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
@@ -36,6 +37,11 @@ internal fun testCallGate(
     now: Instant = GATE_NOW,
     startDay: LocalDate = LocalDate.ofInstant(now, COLLECTION_BUDGET_ZONE),
     alreadySpent: CallSpend = CallSpend(total = 0, today = 0),
+    // 움직이는 시계가 필요한 test(간격 축)는 함수를 준다 — 기본은 고정 시각 그대로다.
+    nowSource: () -> Instant = { now },
+    // 간격은 **끈 상태가 기본**이다(간격 0): 전송 시나리오 test 는 고정 시계를 쓰므로 간격을 두면
+    // 둘째 호출부터 실제로 잠든다. 간격 축은 `KonepsCallPacerTest` 가 주입 시계로 잰다.
+    pacer: KonepsCallPacer = KonepsCallPacer(Duration.ZERO, nowSource, {}),
 ): KonepsCallGate =
     KonepsCallGate(
         httpClient = httpClient,
@@ -46,5 +52,6 @@ internal fun testCallGate(
                 alreadySpent,
             ),
         attempts = ledger,
-        now = { now },
+        now = nowSource,
+        pacer = pacer,
     )

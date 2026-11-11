@@ -54,6 +54,21 @@ sealed interface TruncationCause {
     /** HTTP 429 또는 `resultCode 22` — quota 신호(두 표면, D-3B-7)가 재시도를 소진시켰다. */
     data object QuotaExhausted : TruncationCause
 
+    /**
+     * 외부 포털이 **차단**했다(HTTP 401·403, OPS-09) — 재시도를 소진시킨 것이 아니라 처음부터
+     * 재시도하지 않았다.
+     *
+     * **[QuotaExhausted] 와 다른 값인 이유**: OPS-09 의 사용자 가치 문장이 가르는 둘이다 —
+     * 「한도를 다 썼다」는 날이 바뀌면 스스로 풀리고, 「차단당했다」는 자격·등록이 바뀌어야
+     * 풀린다. 운영자가 할 일이 다르므로 회계에서 같은 값이 되면 안 된다.
+     *
+     * **[NotRetryable] 로 접지 않는 이유**: 그 값은 봉투 `resultCode` 축의 판정이고 이것은
+     * 상태 코드 축이다. 또 `NotRetryable` 은 확정 실패(그 축을 영구히 버린다)인데 차단은
+     * 운영자가 등록을 고치면 풀리므로, 한 번의 403 으로 그 공고를 영구히 버리는 것은 표본의
+     * 조용한 축소다 — 영구 포기는 상한이 한다(`failureOf` 의 ③ 과 같은 근거).
+     */
+    data object AccessBlocked : TruncationCause
+
     /** 전송 timeout 이 재시도를 소진시켰다. */
     data object Timeout : TruncationCause
 
