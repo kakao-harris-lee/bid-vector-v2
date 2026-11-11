@@ -3777,7 +3777,7 @@ M9 이전 식별자를 인용만 한 것은 뺐다.
 
 | 무엇 | 처분 | 근거 |
 | --- | --- | --- |
-| `OPEN-M9-COMMAND-OPENAPI-ENUM` | **닫힘** — 계약이 타임라인 명령 칸을 Kotlin 어휘와 **같은 집합의 `enum`** 으로 선언하고 web 은 생성 타입에서 유니온을 끌어온다. 손 유니온과 **Kotlin 원문을 JS 에서 텍스트로 파싱하던 교차언어 게이트의 명령 축**이 함께 사라졌다 — 사슬이 DB CHECK → Kotlin → 계약 → 생성 타입 → web 표로 전부 컴파일·바이트 층이다. **wire 값은 바뀌지 않았다**(스키마 강화뿐 — 그 칸의 값은 전이 행의 열에서 오고 그 열 CHECK == Kotlin 어휘를 어댑터 통합 test 가 든다) | `reports/evidence/m10/timeline-command-enum/` · 판정 자리는 그 PR 코멘트 |
+| `OPEN-M9-COMMAND-OPENAPI-ENUM` | **닫힘** — 계약이 타임라인 명령 칸을 Kotlin 어휘와 **같은 집합의 `enum`** 으로 선언하고 web 은 생성 타입에서 유니온을 끌어온다. 손 유니온과 **Kotlin 원문을 JS 에서 텍스트로 파싱하던 교차언어 게이트의 명령 축**이 함께 사라졌다 — 사슬 DB CHECK → Kotlin → 계약 → 생성 타입 → web 표의 네 고리가 전부 **기계 검사**다 — 층은 고리마다 다르다(실 DB 통합 test · 계약 test · 바이트 등식 · 컴파일, v L-1 정정). web 쪽 전수성은 **별칭을 거치지 않는 타입 등식**이 든다(v M-1). **wire 값은 바뀌지 않았다**(스키마 강화뿐 — 그 칸의 값은 전이 행의 열에서 오고 그 열 CHECK == Kotlin 어휘를 어댑터 통합 test 가 든다) | `reports/evidence/m10/timeline-command-enum/` · 판정 자리는 그 PR 코멘트 |
 | `OPEN-M9-TIMELINE-COMMAND-WORDING` | **PR #132 에서 이미 닫혔다 — (b) 의 그 행이 낡았다.** (b) 는 2026-11-06 에 쓰였고 PR #132 는 그 뒤에 머지됐다. 10B 가 더한 것은 **그 종결의 방어 교체**다 — 표의 전수성이 손 유니온이 아니라 계약 유도에서 온다 | 종결: PR **#132** · `reports/evidence/m9/web-followups/checklist.md` §1. 방어 교체: 위 행과 같은 evidence |
 
 **신설 OPEN 하나** — 10B 가 범위 밖으로 판정한 축이다(팀장 결정 2026-11-11: 고치지 말고 등재한다).
