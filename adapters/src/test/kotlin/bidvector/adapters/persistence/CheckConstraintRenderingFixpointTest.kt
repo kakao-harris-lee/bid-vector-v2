@@ -263,4 +263,5 @@ class CheckConstraintRenderingFixpointTest : PersistenceTestSupport() {
     }
 }
 
-private fun firstLineOf(message: String?): String = message.orEmpty().lineSequence().firstOrNull().orEmpty()
+/** 예외 문면의 첫 줄 — PostgreSQL 은 뒤에 `Where:`·`Detail:` 를 여러 줄로 붙인다. */
+private fun firstLineOf(message: String?): String = message.orEmpty().substringBefore('\n')
