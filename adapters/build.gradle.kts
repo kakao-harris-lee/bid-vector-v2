@@ -118,6 +118,13 @@ tasks.test {
     inputs.file(contractPolicy).withPropertyName("contractPolicy")
     systemProperty("bidvector.contracts.testdata", contractsTestdata.asFile.absolutePath)
     systemProperty("bidvector.contracts.policy", contractPolicy.asFile.absolutePath)
+    // M9/gates-build-followups (cr L-3) — `EvaluationAllowedRootsParityTest` 가 이름 층 정책의 허용
+    // 뿌리를 읽어 이 모듈 test 의 바이트코드 층 목록과 집합 등식을 잰다. **선언 입력이 아니면 그 등식이
+    // 죽는다**: 정책만 고친 실행에서 이 task 가 UP-TO-DATE 로 건너뛰어 아무것도 돌지 않은 채 초록이 된다
+    // (build-logic `declarePolicyInputs`·app 의 `contractInput` 과 같은 사유·같은 형태).
+    val architecturePolicy = layout.settingsDirectory.file("config/quality/architecture-policy.properties")
+    inputs.file(architecturePolicy).withPropertyName("architecturePolicy")
+    systemProperty("bidvector.architecture.policy", architecturePolicy.asFile.absolutePath)
     // S-6, D-2D-3 (a) — 교차 언어 socket 스모크는 상시 게이트가 아니다. 일반 `test`
     // (따라서 `check`)는 이 class 를 이름으로 제외한다 — Python 서버 없이 도는 보통의
     // 실행에서 연결 실패로 죽지 않게 한다. 실행은 `crossLangSmokeTest`(아래)만 한다.
