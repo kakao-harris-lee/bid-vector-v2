@@ -1,6 +1,6 @@
 # M10 / gates-web — 되돌림
 
-실측 HEAD: `9a70b525`
+실측 HEAD: `87b87651`
 
 **전제**: 이 slice 는 **main 에 없다**(머지 전). 그래서 공유 파일의 복원 원천은 착수 base
 `8062dcd784cf81905c50a2c8706d8bbd3ea5263e` 다 — 움직이는 `origin/main` 을 쓰지 않는다. 단언 둘을
@@ -29,6 +29,9 @@ git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktre
   web/scripts/kotlin-source.test.mjs web/scripts/money-vocab-cross-lang.test.mjs
 ```
 
+목록은 라운드마다 재산출하고 **양방향으로 대조한다** — 이번 라운드의 재산출과 앞 목록이
+`comm` 양쪽 **0 줄**이다(머지 커밋 정정이 복원 대상을 늘리지 않았다).
+
 `A` 두 개는 원천에 없으므로 복원이 **지운다**(별도 `git rm` 이 필요 없다). **hunk 격리가 필요
 없다** — 공유 파일 둘(`capability-map.md`·`gate-tests.txt`)에 다른 slice 의 줄이 들어온 적이
 없다(main 병합 0 · 이 브랜치의 커밋만). 그래서 파일 단위 복원이 남의 줄을 떨어뜨릴 수 없다.
@@ -36,7 +39,7 @@ git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktre
 **되돌리지 않는 것**: 이 slice 의 evidence(`reports/evidence/m10/gates-web/`) · 하네스 경로
 (`CLAUDE.md`·`.claude/**`, 이 range 에 **없다**).
 
-## 실측 — 버릴 clone, `9a70b525`
+## 실측 — 버릴 clone, `87b87651`
 
 | 걸음 | 결과 |
 | --- | --- |
@@ -72,9 +75,9 @@ git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktre
 ## §4 술어 — 실측이 유효한가
 
 ```
-git diff --name-only 9a70b525..<판정 SHA> -- <위 여섯 경로>
+git diff --name-only 87b87651..<판정 SHA> -- <위 여섯 경로>
 ```
 
-**빈 출력이면 유효하다.** `9a70b525` 뒤에 오는 커밋은 evidence 뿐이고 evidence 는 복원 목록 밖이라
+**빈 출력이면 유효하다.** `87b87651` 뒤에 오는 커밋은 evidence 뿐이고 evidence 는 복원 목록 밖이라
 이 술어가 빈 출력으로 선다. 한 줄이라도 나오면 되돌림 대상이 움직인 것이므로 실측은 낡았고 그 절은
 통과가 아니라 **미검증**이다. 실측 HEAD 가 판정 SHA 의 조상이 아닌 경우도 미검증이다.
