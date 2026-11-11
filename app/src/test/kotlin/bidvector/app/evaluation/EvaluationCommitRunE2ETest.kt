@@ -4,39 +4,17 @@ import bidvector.adapters.evaluation.EvaluationCommitRun
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
-import bidvector.adapters.persistence.JdbcNoticeRepository
-import bidvector.adapters.persistence.JdbcRawObservationStore
-import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.relay.NotificationRelayRun
-import bidvector.app.BidVectorApplication
-import bidvector.app.PRODUCTION_DISPATCH_PROPERTIES
-import bidvector.app.adminDataSource
 import bidvector.app.collection.CollectionLog
 import bidvector.app.relay.NotificationRelayRunner
 import bidvector.app.relay.RelayExitCode
 import bidvector.app.wiring.RecordedExitCodes
-import bidvector.decision.MlUnavailableReason
-import bidvector.decision.PublishedFloorExclusion
-import bidvector.decision.UnitScore
-import bidvector.procurement.KONEPS_COLLECTION_POLICY
-import bidvector.procurement.NoticeCollected
-import bidvector.procurement.NoticeId
-import bidvector.procurement.NoticeNumber
-import bidvector.procurement.PersistOutcome
-import bidvector.procurement.RawKey
-import bidvector.procurement.RawNoticeObservation
-import bidvector.procurement.SourceEndpoint
-import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EVALUATION_LADDER_POLICY_VERSION
 import bidvector.workflow.evaluation.LicenseGatePort
-import bidvector.workflow.evaluation.MlAnalysisOutcome
-import bidvector.workflow.evaluation.MlAnalysisPort
-import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.workflow.evaluation.WatchSubjectPort
-import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notification.Channel
 import bidvector.workflow.notification.NOTIFICATION_DELIVERY_POLICY
 import bidvector.workflow.notification.RelayTarget
@@ -59,22 +37,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.boot.DefaultApplicationArguments
-import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.context.ConfigurableApplicationContext
-import org.testcontainers.postgresql.PostgreSQLContainer
-import org.testcontainers.utility.DockerImageName
-import java.time.Instant
 import java.time.LocalDate
-import javax.sql.DataSource
 
-/** M9/OPS-10 — 이 조립이 쓰는 행에 찍히는 릴리스 라벨(test 고정값) — 속성과 저장소가 같은 값을 쓴다. */
-private const val TEST_RELEASE_LABEL = "evaluation-commit-run-e2e-release"
-
-private val TEST_RELEASE_ID = ReleaseIdentifier(TEST_RELEASE_LABEL)
-
-private const val POSTGRES_IMAGE = "postgres:16.4"
 private const val CANDIDATE_CAP = 100
-private const val TEST_CREDENTIAL_VALUE = "evaluation-commit-e2e-test-fixture-credential"
 private const val MAX_ACTIVE_BIDS = 10
 private const val BLOCK_CONSTRAINT = "outbox_commit_run_blocked"
 
@@ -108,121 +73,26 @@ private const val NO_GRANT_TABLE = "flyway_schema_history"
  * 뒤 **러너를 직접 조립해** 돌린다. `mode=once` 로 띄우면 러너가 기동 중에 돌면서
  * `exitProcess` 를 불러 test JVM 을 죽인다 — 그래서 종료 자리를 [RecordedExitCodes] 로
  * 바꿔치운 조립을 손으로 세운다(배선 자체는 `EvaluationCommitWiringTest` 가 든다).
+ *
+ * 컨테이너·컨텍스트 수명과 seed 는 [CommitRunE2EFixture] 가, DB 를 들여다보는 질의는
+ * `CommitRunDbSupport` 가 든다 — 이 파일은 **무엇을 단언하는가**만 든다(파일 500줄 한도).
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class EvaluationCommitRunE2ETest {
     companion object {
-        private val postgres: PostgreSQLContainer =
-            PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
-                .withDatabaseName("bidvector_commit_run_test")
-                .withUsername("bidvector_admin")
-                .withPassword("bidvector_test_only")
-                .also { it.start() }
-
-        private lateinit var seedContext: ConfigurableApplicationContext
+        private val fixture = CommitRunE2EFixture(SEEDED_REVISION, MAX_ACTIVE_BIDS, CANDIDATE_CAP)
 
         @JvmStatic
         @BeforeAll
         fun migrateAndSeed() {
-            seedContext = boot()
-            insertStrategy()
-            insertNotice("20260101010", Instant.now().plusSeconds(86_400))
+            fixture.start()
         }
 
         @JvmStatic
         @AfterAll
         fun shutdown() {
-            seedContext.close()
-            postgres.stop()
-        }
-
-        /**
-         * **mode 를 켜지 않고** 띄운다 — Flyway 마이그레이션과 평가 port 싱글턴 배선만 쓴다.
-         * 러너는 아래에서 직접 조립한다: `mode=once` 로 띄우면 러너가 기동 중에 돌면서
-         * production 종료 자리(`exitProcess`)를 불러 **test JVM 을 죽인다**(실측 — Gradle 은
-         * 그것을 「초록 + 남은 test 건너뜀」으로 보고해 초록으로 보이는 실패가 된다).
-         * 배선 자체는 `EvaluationCommitWiringTest` 가 든다.
-         */
-        private fun boot(): ConfigurableApplicationContext =
-            SpringApplicationBuilder(BidVectorApplication::class.java)
-                .properties(
-                    PRODUCTION_DISPATCH_PROPERTIES +
-                        mapOf(
-                            "server.port" to "0",
-                            "spring.main.web-application-type" to "none",
-                            "bidvector.persistence.jdbc-url" to postgres.jdbcUrl,
-                            // M9/OPS-10 — `bidvector.release.sha` 는 기본값이 없다(`ReleaseWiring`).
-                            // 값을 주지 않으면 출하 조립이 바인딩 실패로 뜨지 않는다.
-                            "bidvector.release.sha" to TEST_RELEASE_LABEL,
-                            "bidvector.persistence.username" to postgres.username,
-                            "bidvector.persistence.credential" to postgres.password,
-                            "operator.credential.value" to TEST_CREDENTIAL_VALUE,
-                            "bidvector.evaluation.candidate-cap" to CANDIDATE_CAP.toString(),
-                        ),
-                ).run()
-
-        private fun dataSource(): DataSource = seedContext.getBean(DataSource::class.java)
-
-        /**
-         * `bidNowThreshold` 0.9 — fake ML 의 priority 0.9 가 확정 `BidNow` 를 낸다.
-         *
-         * **개정을 1 이 아닌 [SEEDED_REVISION] 으로 심는다(R2-H-1).** 1 은 여러 test 지원
-         * 함수의 기본값이라, 1 로 심으면 「개정을 상수 1 로 바꿔치우는」 변이가 우연히 같은
-         * 값을 내며 빠져나간다.
-         */
-        private fun insertStrategy() {
-            dataSource().connection.use { connection ->
-                connection
-                    .prepareStatement(
-                        "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
-                            "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
-                            "bid_now_threshold, review_threshold, max_active_bids) " +
-                            "VALUES (1, $SEEDED_REVISION, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    ).use { statement ->
-                        val empty = connection.createArrayOf("text", emptyArray<String>())
-                        statement.setArray(1, empty)
-                        statement.setArray(2, empty)
-                        statement.setArray(3, empty)
-                        statement.setArray(4, empty)
-                        statement.setArray(5, connection.createArrayOf("text", arrayOf("없는-문구")))
-                        statement.setBigDecimal(6, java.math.BigDecimal("0.9"))
-                        statement.setBigDecimal(7, java.math.BigDecimal("0.1"))
-                        statement.setInt(8, MAX_ACTIVE_BIDS)
-                        statement.executeUpdate()
-                    }
-            }
-        }
-
-        private fun insertNotice(
-            number: String,
-            deadline: Instant,
-        ): NoticeId {
-            val resolution = KONEPS_COLLECTION_POLICY.resolve(LocalDate.now())
-            val fieldContracts = (resolution as Resolution.Resolved).value.fieldContracts
-            val id = NoticeId(NoticeNumber.of(number), NoticeRound.of("000"))
-            val observation =
-                RawNoticeObservation.of(
-                    mapOf(RawKey("bidNtceNo") to id.number.value, RawKey("bidNtceOrd") to id.round.value),
-                    SourceEndpoint.NOTICE_LIST,
-                    Instant.now(),
-                )
-            val key =
-                JdbcRawObservationStore(dataSource(), fieldContracts, TEST_RELEASE_ID).append(observation)
-            val command =
-                NoticeCollected(
-                    id = id,
-                    businessCategory = null,
-                    baseAmount = null,
-                    estimatedAmount = null,
-                    allocatedBudget = null,
-                    floorRate = null,
-                    deadlineAt = deadline,
-                    openingScheduledAt = null,
-                    raw = observation,
-                )
-            JdbcNoticeRepository(dataSource()).persist(command, key) shouldBe PersistOutcome.Inserted
-            return id
+            fixture.stop()
         }
     }
 
@@ -242,8 +112,8 @@ class EvaluationCommitRunE2ETest {
      */
     @BeforeEach
     fun resetRunState() {
-        clearOutbox(adminDataSource(postgres))
-        setStrategyRevision(dataSource(), SEEDED_REVISION)
+        clearOutbox(fixture.adminDataSource())
+        setStrategyRevision(fixture.dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
 
@@ -266,7 +136,7 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(2)
     fun `커밋 run 은 outbox 행을 남기고 변한 표는 outbox 하나이며 종료 코드가 0 이다`() {
-        val before = rowCountsByTable(adminDataSource(postgres))
+        val before = rowCountsByTable(fixture.adminDataSource())
         // vr L-4 — **모집단이 소유자 뷰임을 이 자리에서 잠근다.** 아래 「변한 표 == {outbox}」는 모집단이
         // 역할로 걸러져도 참이 되므로, 읽는 연결을 production 빈으로 되돌리는 변이가 초록이었다. 역할이
         // 볼 수 없는 표가 이 집합에 **있어야** 한다고 요구하면 그 되돌림이 그 자리에서 붉다.
@@ -274,7 +144,7 @@ class EvaluationCommitRunE2ETest {
 
         val exitCodes = runCommitRunner()
 
-        val after = rowCountsByTable(adminDataSource(postgres))
+        val after = rowCountsByTable(fixture.adminDataSource())
         changedTables(before, after) shouldBe setOf("outbox")
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
@@ -285,7 +155,7 @@ class EvaluationCommitRunE2ETest {
         // `Analyzed.floorExclusion` → `Reached.floorExclusion` → `tallyOf` → 렌더링이 그 사슬이다.
         finishLine shouldContain "floorImplausible=1"
         finishLine shouldContain "floorOriginNotJudged=0"
-        val row = notificationRows(dataSource()).single()
+        val row = notificationRows(fixture.dataSource()).single()
         row.payloadType shouldBe "NotificationRequested"
         row.payload shouldContain "20260101010"
         // **값 축**(R2-H-1) — 판정이 지난 사다리 정책 식별자가 저장된 행에 축어로 있다.
@@ -311,10 +181,10 @@ class EvaluationCommitRunE2ETest {
     fun `전략 개정을 올리면 저장되는 payload 가 달라지고 되돌리면 같아진다`() {
         val first = runOnceAndTakePayload()
 
-        setStrategyRevision(dataSource(), RAISED_REVISION)
+        setStrategyRevision(fixture.dataSource(), RAISED_REVISION)
         val raised = runOnceAndTakePayload()
 
-        setStrategyRevision(dataSource(), SEEDED_REVISION)
+        setStrategyRevision(fixture.dataSource(), SEEDED_REVISION)
         val restored = runOnceAndTakePayload()
         // 다음 test 를 위한 복원은 `resetRunState` 가 진다 — 이 test 가 중간에 죽어도 선다.
 
@@ -343,7 +213,7 @@ class EvaluationCommitRunE2ETest {
     @Order(4)
     fun `커밋 run 이 남긴 행을 relay 러너가 집고 실패 줄에 집계를 싣는다`() {
         runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
-        notificationRows(dataSource()).size shouldBe 1
+        notificationRows(fixture.dataSource()).size shouldBe 1
         val relayLog = mutableListOf<String>()
         val termination = RecordedExitCodes()
 
@@ -360,7 +230,7 @@ class EvaluationCommitRunE2ETest {
         failure shouldContain "claimed=1"
         failure shouldContain "delivered=0"
         // 그 행은 `CLAIMED` 에 남는다(다음 run 의 고아 격리가 받는다).
-        outboxStates(dataSource()) shouldBe mapOf("CLAIMED" to 1)
+        outboxStates(fixture.dataSource()) shouldBe mapOf("CLAIMED" to 1)
     }
 
     /**
@@ -374,8 +244,8 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(5)
     fun `역할로 읽은 표 모집단은 GRANT 없는 표를 놓친다 — 그래서 변한 표 단언은 admin 으로 읽는다`() {
-        val asOwner = rowCountsByTable(adminDataSource(postgres)).keys
-        val asRole = rowCountsByTable(dataSource()).keys
+        val asOwner = rowCountsByTable(fixture.adminDataSource()).keys
+        val asRole = rowCountsByTable(fixture.dataSource()).keys
 
         asRole shouldNotContain NO_GRANT_TABLE
         asOwner shouldContain NO_GRANT_TABLE
@@ -393,8 +263,8 @@ class EvaluationCommitRunE2ETest {
     @Test
     @Order(3)
     fun `outbox 쓰기가 실패하면 판정은 남고 러너는 INCOMPLETE 2 로 끝난다`() {
-        blockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
-        val before = rowCountsByTable(adminDataSource(postgres))
+        blockNotificationInserts(fixture.adminDataSource(), BLOCK_CONSTRAINT)
+        val before = rowCountsByTable(fixture.adminDataSource())
         // vr L-4 — 같은 잠금을 여기에도 둔다. 한 자리만 잠그면 **다른 자리만 되돌리는** 변이가 초록이다.
         before.keys shouldContain NO_GRANT_TABLE
         try {
@@ -402,9 +272,9 @@ class EvaluationCommitRunE2ETest {
 
             exitCodes shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
             // 행이 하나도 안 생겼다 = 쓰기가 실제로 거부됐다(주입이 들었다는 증거).
-            changedTables(before, rowCountsByTable(adminDataSource(postgres))).shouldBeEmpty()
+            changedTables(before, rowCountsByTable(fixture.adminDataSource())).shouldBeEmpty()
         } finally {
-            unblockNotificationInserts(adminDataSource(postgres), BLOCK_CONSTRAINT)
+            unblockNotificationInserts(fixture.adminDataSource(), BLOCK_CONSTRAINT)
         }
     }
 
@@ -418,19 +288,19 @@ class EvaluationCommitRunE2ETest {
         val termination = RecordedExitCodes()
         val run =
             EvaluationCommitRun(
-                dataSource = dataSource(),
-                strategies = seedContext.getBean(StrategyRepository::class.java),
-                candidateSource = seedContext.getBean(CandidateSourcePort::class.java),
-                watchSubjects = seedContext.getBean(WatchSubjectPort::class.java),
-                licenseGate = seedContext.getBean(LicenseGatePort::class.java),
+                dataSource = fixture.dataSource(),
+                strategies = fixture.bean(StrategyRepository::class.java),
+                candidateSource = fixture.bean(CandidateSourcePort::class.java),
+                watchSubjects = fixture.bean(WatchSubjectPort::class.java),
+                licenseGate = fixture.bean(LicenseGatePort::class.java),
                 mlAnalysis = AlwaysBidNowMl(),
                 capacity = RequestCapacityPort(0, MAX_ACTIVE_BIDS),
-                correlationIds = seedContext.getBean(CorrelationIdFactory::class.java),
-                clock = seedContext.getBean(Clock::class.java),
+                correlationIds = fixture.bean(CorrelationIdFactory::class.java),
+                clock = fixture.bean(Clock::class.java),
                 analysisBudget = null,
-                notificationInbox = JdbcNotificationInbox(dataSource()),
-                audience = JdbcNotificationAudience(dataSource()),
-                release = TEST_RELEASE_ID,
+                notificationInbox = JdbcNotificationInbox(fixture.dataSource()),
+                audience = JdbcNotificationAudience(fixture.dataSource()),
+                release = fixture.release,
             )
         EvaluationCommitRunner(run, CANDIDATE_CAP, CollectionLog { commitLog += it }, termination)
             .run(DefaultApplicationArguments())
@@ -445,9 +315,9 @@ class EvaluationCommitRunE2ETest {
      * 시간순이 아니다(UUID) — 정렬로는 「그 run 의 행」을 고를 수 없다.
      */
     private fun runOnceAndTakePayload(): String {
-        clearOutbox(adminDataSource(postgres))
+        clearOutbox(fixture.adminDataSource())
         runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
-        return notificationRows(dataSource()).single().payload
+        return notificationRows(fixture.dataSource()).single().payload
     }
 
     /**
@@ -462,11 +332,11 @@ class EvaluationCommitRunE2ETest {
         val resolution = NOTIFICATION_DELIVERY_POLICY.resolve(LocalDate.now())
         check(resolution is Resolution.Resolved) { "알림 배달 정책이 해소되지 않았다: $resolution" }
         return NotificationRelayRun(
-            dataSource = FailAfterClaimDataSource(dataSource()),
+            dataSource = FailAfterClaimDataSource(fixture.dataSource()),
             target = RelayTarget(OperatorId(RELAY_OWNER), Channel.Telegram),
             environment = RuntimeEnvironment.Production,
             policy = resolution.value,
-            release = TEST_RELEASE_ID,
+            release = fixture.release,
             channels = relayChannelSettings(),
             // 전규정 이름이다(cr L-8 를 되돌렸다) — 이 파일은 도메인 `Clock`
             // (`bidvector.workflow.strategy.Clock`)을 이미 import 해 쓰고 있어서
@@ -474,27 +344,4 @@ class EvaluationCommitRunE2ETest {
             clock = java.time.Clock.systemUTC(),
         )
     }
-}
-
-/**
- * priority 0.9(전략의 `bidNowThreshold` 와 같은 값 — `VerdictLadder.priorityBidNowOutcome` 가
- * `>=` 로 승격한다)를 내는 fake. `BidNowFakeMlAnalysisTestConfiguration` 과 같은 형태지만 그쪽은
- * `@TestConfiguration` 이라 **명시 등록이 필요한** 배선용이고, 이 test 는 Spring 을 지나지 않고
- * 조립을 직접 세우므로 지역 fake 를 쓴다.
- */
-private class AlwaysBidNowMl : MlAnalysisPort {
-    override suspend fun analyze(
-        notice: bidvector.procurement.Notice,
-        correlationId: CorrelationId,
-    ): MlAnalysisOutcome =
-        MlAnalysisOutcome.Analyzed(
-            priorityScore = UnitScore(java.math.BigDecimal("0.9")),
-            probabilityScore = null,
-            matchedScore = null,
-            evidence = PredictionEvidence.NotPredicted(MlUnavailableReason.ScoreNotProvided),
-            // DEC-10(r1 CR H-1) — **non-null 로 둔다.** 이 값이 `Analyzed` → `Reached` → `tallyOf`
-            // → 마침 줄을 지나는지가 이 test 의 축 하나다. `null` 로 두면 그 세 고리가 전부
-            // 미측정이 된다(앞 판이 그랬다 — 전건 초록인데 가운데가 끊겨도 보이지 않았다).
-            floorExclusion = PublishedFloorExclusion.IMPLAUSIBLE,
-        )
 }
