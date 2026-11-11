@@ -19,9 +19,18 @@
 
 ## 2. acceptance — CI Kotlin job 의 명령 그대로
 
-`./gradlew --no-daemon check` (`bv-build.sh` 경유, 자리 하나) — **exit 0**,
-`BUILD SUCCESSFUL in 38m 2s`, 433 actionable(270 executed · 127 from cache · 36 up-to-date),
-로그에 `FAILED` **0 회**. 부분 게이트로 갈음하지 않았다.
+`./gradlew --no-daemon check` (`bv-build.sh` 경유, 자리 하나) — **exit 0**, 로그에 `FAILED` **0 회**.
+부분 게이트로 갈음하지 않았다. 두 번 돌았다:
+
+| 트리 | 결과 |
+| --- | --- |
+| `2719bb32`(첫 판정 대상의 코드 트리) | `BUILD SUCCESSFUL in 38m 2s` · 433 actionable(270 executed · 127 from cache · 36 up-to-date) |
+| `1b305dae`(병합 + PR #144 지적 반영) | `BUILD SUCCESSFUL in 33m 8s` · 433 actionable(158 executed · 6 from cache · **269 up-to-date**) |
+
+**up-to-date 가 많으므로 내 축이 실제로 돌았는지를 따로 본다**(초록인데 조용한 자리를 피한다):
+둘째 빌드에서 `:app:compileTestKotlin`·`:app:test`·`:app:sizeGate`·`:app:gateRegistrationGate`·
+`:app:gateExecutionGate` 가 **전부 상태 접미 없이**(= executed) 찍혔고, E2E 의 JUnit XML mtime 이 그
+빌드 창 안이다(로그 마지막 줄과 3초 차). 캐시 적중이나 UP-TO-DATE 로 갈음된 축이 없다.
 
 돈 것 가운데 이 slice 가 거는 축: 열한 모듈의 `sizeGate`·`gateRegistrationGate`·
 `gateExecutionGate`·`unusedImportGate`·`typeShapeGate`·`testShapeGate`, 그리고 `leakPatternGate`
@@ -105,5 +114,20 @@ base 쪽 class 는 버릴 clone 을 base `6e6f953c` 로 체크아웃해 `:app:co
   새 fixture 파일에 개행 하나를 붙이면 그 파일 한 줄이 나오고 `truncate -s <원래 바이트>` 로 되돌리면
   다시 빈 출력이며 바이트 수가 같다(비파괴 절삭, `checkout --` 를 쓰지 않았다 — 미커밋 산출물을 함께
   지운다).
-- `git diff --name-only 6e6f953c..HEAD -- .claude/ config/ build-logic/ .github/` **빈 출력**.
-  하네스·정책·빌드 로직·CI 를 건드리지 않았다.
+- `git diff --name-only c21adb2a..HEAD -- .claude/ config/ build-logic/ .github/` **빈 출력**.
+  하네스·정책·빌드 로직·CI 를 건드리지 않았다(병합이 들여온 #143 의 정책 두 파일은 **상류의 것**이고
+  §2a 가 축어 도착을 잰다).
+
+## 8. 크기 게이트(evidence ≤ 산출물) — 어느 계량으로 재는가
+
+**계량은 「산출물 변경 줄(추가+삭제)」이다.** 산출물 diff(`c21adb2a..HEAD -- app/
+reports/evidence/m9/ops-code/`)는 **추가 262 · 삭제 198 · 변경 460**이고, 이 디렉터리 evidence 는
+**이 커밋 시점 372 줄**이다 — 372 < 460 으로 통과한다.
+
+**추가 줄만 세는 계량(262)으로는 넘는다**(cr #144 LOW 가 그 갈림을 지적했다). 그 계량을 쓰지 않는
+이유는 이 slice 의 산출물이 **이동**이라는 것이다: 500 줄 파일을 347 + 201 로 가른 일은 add 와 delete
+양쪽으로 나타나고, 추가만 세면 재구성한 일이 구조적으로 절반 이하로 과소계상된다(삭제 198 이 전부
+실제 작업이다). 재작성·이동이 아닌 slice 라면 두 계량이 거의 같아 이 선택이 갈리지 않는다.
+
+뒤따르는 `rollback.md` 커밋이 이 수를 한 번 더 늘린다 — **마지막 HEAD 의 수 정본은 verifier 와 PR
+조치 코멘트**다(여기 넣으려는 시도가 커밋을 또 낳는다).
