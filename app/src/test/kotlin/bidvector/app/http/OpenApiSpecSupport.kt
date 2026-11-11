@@ -64,8 +64,11 @@ internal fun Map<String, Any?>.requiredKeys(schemaName: String): Set<String> =
  * 어휘를 다시 `type: string` 으로 내리는 변이가 정확히 그 길이고, 그 변이는 생성 타입을 거쳐
  * web 의 전수 검사까지 함께 공허하게 만든다(M10/10B). 그래서 선언 부재를 답이 아니라 실패로 둔다.
  *
- * 세 계약 test class 가 같은 모양의 `private` 사본을 갖고 있다 — **넷째 사본을 만들지 않도록**
- * 여기 둔다(v2-지침서 §5 「중복 금지」). 그 셋을 이 자리로 모으는 것은 별 정리다.
+ * 같은 모양의 `private` 사본이 **여럿** 있다(`["enum"]` 읽기 호출부를 찾아 센다) — **또 하나를
+ * 만들지 않도록** 여기 둔다(v2-지침서 §5 「중복 금지」). 그것들을 이 자리로 모으는 것은 별 정리다.
+ *
+ * 수를 적지 않는 이유는 위 머리말과 같다 — 하드코딩한 계수는 소비자가 늘면서 조용히 낡는다.
+ * 앞 판이 여기 「세」라고 적었고 실측과 어긋났다(cr r0 L-1).
  */
 @Suppress("UNCHECKED_CAST")
 internal fun Map<String, Any?>.propertyEnum(
