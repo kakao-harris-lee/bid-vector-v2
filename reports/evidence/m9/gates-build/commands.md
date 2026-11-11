@@ -583,3 +583,51 @@ archives=2 entries=693 judged=594 exempt=99 nestedJars=102 nestedOutside=0 bootA
 runtimeJars=109` · `classFiles=297 types=297 anonymousTypes=14 accesses=10141 denied=10 allowed=1
 violations=0`. 끝 판정을 등식에서 포함으로 넓힌 것이 **실제 배포물의 판정 수를 바꾸지 않는다**는
 뜻이다(배포물에 뒤로 붙인 포장이 없다). 변이 셋이 그 넓힘을 잠근다.
+
+## 여덟째 병합 (main `0c2fd7ae`, PR #140 + #141) — 합집합 검산 · 컴파일 먼저 · 게이트 전수
+
+겹친 경로 **열셋**. 충돌은 **하나**(`RetentionFixture.kt` 의 import 블록)이고, 손 해소 둘 모두
+**한쪽 거동을 버리지 않는다**.
+
+| 손 해소 | 무엇을 골랐나 |
+| --- | --- |
+| `RetentionFixture.kt` import | 내 쪽은 쓰이지 않는 import 셋을 지웠고 main 은 새 import 둘을 더했다. 병합 본문에서 main 의 둘은 **실제로 쓰이고**(6 회·2 회) 내가 지운 셋은 **main 판 본문에서도 0 회**다 → main 의 둘을 남기고 내 셋의 삭제를 유지 |
+| `gate-tests.properties` 의 `app` 블록 | main 의 새 항목이 정렬 밖 자리에 들어와 이 slice 의 등재 순서 단언이 깨질 자리였다 → 항목 집합을 그대로 두고 **자리만** 정렬(한 줄 이동) |
+
+**합집합 검산** — 충돌 표지 0 · 겹친 열셋 모두 양쪽 추가 줄 **유실 0/0**(줄 단위 다중도 대조) ·
+내 삭제의 부활 0 · 정책 키 **162/16** 로 내∪상대와 정확히 일치(유실·초과·중복 0) · 키별 **항목**
+union 유실 0 · `capability-map` 제목 160 중복 0 이고 표 접힘 계수가 양쪽과 같다(18) · KDoc 여닫기
+불일치로 뜬 둘은 **정규식 문자열 안의 `*/`** 오탐이었다.
+
+### 충돌 0 인데 게이트가 둘을 냈다 — 컴파일 먼저, 그 다음 게이트 전수
+
+컴파일(`classes testClasses` 전 모듈) exit 0. **그런데 게이트 전수에서 둘이 붉었다** — 충돌 밖
+파일이고, 자동 병합이 조용히 통과시킬 자리였다.
+
+| 붉은 게이트 | 무엇을 잡았나 | 처분 |
+| --- | --- | --- |
+| `unusedImportGate`(app·adapters) | main 이 들여온 쓰이지 않는 import 둘. 한쪽은 들여온 이름이 **주석 안에서만** 나온다 | 두 줄 삭제(별 커밋). 둘 다 main 만 건드린 파일 — 이 slice 가 닫은 OPEN 을 병합이 두 번째로 확인 |
+| `domainSourceReferenceGate`(adapters) | main 의 `EvaluationCommitRun` 이 알림함 포트 둘을 이름으로 받는데 이름 층 허용 뿌리에 그 뿌리가 없었다 | **정책이 좁은 쪽이다** — 아래 |
+
+**이름 층과 바이트코드 층이 갈린 자리였다.** main 은 같은 결정을 바이트코드 층에서 **먼저** 했다
+(`EvaluationAdapterDependencyTest.ALLOWED_ROOTS` 에 같은 뿌리 + 「알림함 **어댑터**는 여전히 거부」
+음성 단언). 이 정책 파일이 스스로 적어 둔 「알려진 한계 — 같은 뿌리 목록이 두 자리에 살아 어긋나면 두
+층의 범위가 갈린다」가 **실제로 일어난 첫 자리**다. 어긋남을 없애는 방향으로 뿌리 하나를 더했고(새
+술어 종류 0 · 값 한 줄), 넓어진 것이 **포트의 뿌리뿐**임을 양성 대조로 실측했다 — 같은 파일에
+어댑터 뿌리를 심으면 그 게이트가 RED 고, 되돌리면 다시 초록이다.
+
+### 전건 `check` — 병합 트리, 새 JDK
+
+`./gradlew --no-daemon check` **exit 0 · BUILD SUCCESSFUL in 32m 39s · 426 actionable · FAILED 0** ·
+`qualityBaseline` exit 0. 병합 트리의 수: `verified=301 archives=2 entries=701 judged=602 exempt=99
+nestedJars=102 nestedOutside=0 bootArchives=1 runtimeJars=109` · `classFiles=301 types=301
+anonymousTypes=16 accesses=10158 denied=10 allowed=1 violations=0` · 마이그레이션 25(main 이 V26·V27
+을 더했고 `migrationOrderGate` 초록 — 결번·중복·내림차순 0 과 소유 모듈 단언을 그 트리에서 다시 쟀다).
+
+**그 전건이 한 번 붉었고, 붉힌 것은 내 게이트였다** — `cpdReportPresenceGate` 가 「리포트가 잴 소스보다
+낡았다」를 냈다. 사유는 **양성 대조를 백업 사본 복사로 되돌린 것**이다: 내용은 HEAD 와 같지만 mtime 이
+올라가 리포트보다 새로워졌고, Gradle 은 내용 해시로 보니 CPD 를 다시 돌리지 않는다. 게이트는 자기
+정의대로 옳고(낡은 리포트가 「실행 안 함」을 가리는 것을 막는다) **fail-closed 방향**이다. CPD 를
+`--rerun` 으로 다시 돌린 뒤 전건이 초록이다. 기록해 둘 성질: **mtime 술어는 내용 동일한 touch 에도
+붉는다** — 미커밋 산출물을 지키려 `checkout --` 대신 사본 복사로 되돌리는 이 레인의 규율과 부딪히는
+자리이고, CI 는 새 체크아웃이라 늘 리포트가 더 새롭다.

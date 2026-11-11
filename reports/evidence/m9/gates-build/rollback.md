@@ -1,26 +1,26 @@
 # M9 / gates-build — 되돌리기
 
-**복원 원천은 고정된 main SHA `07140729`** 다 — 이 브랜치가 **실제로 병합한** 일곱째 main 커밋이고,
-그 SHA 에는 이 slice 가 없다(첫 산출물 커밋 `692af252` 가 `07140729` 의 조상이 **아님**을
+**복원 원천은 고정된 main SHA `0c2fd7ae`** 다 — 이 브랜치가 **실제로 병합한** 여덟째 main 커밋이고,
+그 SHA 에는 이 slice 가 없다(첫 산출물 커밋 `692af252` 가 `0c2fd7ae` 의 조상이 **아님**을
 `git merge-base --is-ancestor` 로 단언 — 실측 rc=1). 움직이는 `origin/main` 을 쓰지 않는다. 머지 뒤
 되돌림은 PR revert 다.
 
 착수 base `df4976cc` 는 **병합 뒤에는 경계로 쓸 수 없다**. 그 경계로 세면 병합이 들여온 남의 레인
-커밋까지 센다. 이 브랜치는 main 을 **일곱 번** 병합했고(`e12c0485` → `3ad4f3f6` → `97ed49c4` →
-`56bd33ea` → `3101035f` → `70406318` → `07140729`) 원천은 그때마다 옮긴다.
+커밋까지 센다. 이 브랜치는 main 을 **여덟 번** 병합했고(`e12c0485` → `3ad4f3f6` → `97ed49c4` →
+`56bd33ea` → `3101035f` → `70406318` → `07140729` → `0c2fd7ae`) 원천은 그때마다 옮긴다.
 
 ## 실측 자리와 유효성 술어 — 파일 이름을 열거하지 않는다
 
-**실측 HEAD: `29f695a3`**(수정 라운드 6 의 마지막 산출물 커밋 — 전건 `check` 가 낸 ktlint 를 고친
-커밋이다. 앞선 실측은 `c759ded9` 에서 했고, 그 뒤 산출물 커밋이 하나 더 생겨 **다시 쟀다** — 실측
-뒤에 복원 목록 안의 산출물을 또 커밋하면 그 실측은 낡는다). 실측 뒤에 오는 것은 evidence 커밋
+**실측 HEAD: `2f8b24b0`**(여덟째 병합 뒤의 마지막 산출물 커밋 — 이름 층 허용 뿌리를 바이트코드 층과
+맞춘 커밋이다. 원천이 옮겨지고 산출물 커밋이 더 생기면 앞 실측은 낡으므로 라운드마다 **다시 잰다**:
+이 slice 에서 `28f1128e` → `c759ded9` → `29f695a3` → `2f8b24b0` 네 번째다). 실측 뒤에 오는 것은 evidence 커밋
 뿐이고, evidence 커밋은 **언제나** 실측 뒤에 오므로 「실측 HEAD == 판정 SHA」는 성립할 수
 없다. 보아야 하는 것은 **그 사이에 되돌림 대상이 움직였는가**이고, 움직였어도 다음 전칭이 서면 실측은
 그대로 유효하다.
 
 ```
 D := git diff --name-only <실측 HEAD>..<판정 SHA> -- <복원 목록>
-∀ p ∈ D : git cat-file -e 07140729:p  →  실패        (p 가 원천에 없다)
+∀ p ∈ D : git cat-file -e 0c2fd7ae:p  →  실패        (p 가 원천에 없다)
 ```
 
 원천에 없는 경로는 복원이 **내용과 무관하게 지운다**. 그러니 그 경로의 뒤 편집은 복원 결과를 바꾸지
@@ -30,24 +30,25 @@ D := git diff --name-only <실측 HEAD>..<판정 SHA> -- <복원 목록>
 ## 복원 목록 — 기계 산출, 내 커밋만
 
 ```
-git log --no-merges --format= --name-only HEAD ^07140729 | sort -u
+git log --no-merges --format= --name-only HEAD ^0c2fd7ae | sort -u
 ```
 
-**90 경로**(추가 25 · 수정 65). 등식 확인: 위 목록과 `git diff --name-only 07140729..HEAD | sort -u`
+**92 경로**(추가 25 · 수정 67). 등식 확인: 위 목록과 `git diff --name-only 0c2fd7ae..HEAD | sort -u`
 의 `comm -23`·`comm -13` 이 **둘 다 빈 출력**이다(한쪽 방향만 보면 「내가 커밋하지 않아도 들어오는
 경로」를 못 본다). 라운드마다 재산출한다.
 
-**수정 라운드 6 은 새 파일을 하나도 만들지 않았다** — 경로 수는 **90 그대로**다(A 25 · M 65, 원천을
-일곱째 병합으로 옮기고 다시 센 수). 앞 라운드들: 1 이 다섯을 더했고 2·3 은 만들지 않았으며 4 가
+**수정 라운드 6 과 여덟째 병합은 새 파일을 하나도 만들지 않았다** — 경로 수가 **90 → 92** 인 것은
+병합이 들여온 위반을 고친 파일 둘(`unusedImportGate` 가 낸 쓰이지 않는 import)이고, 둘 다 「게이트가
+고쳐야 하는 기존 위반」이라 **in_scope 는 바뀌지 않는다**. 앞 라운드들: 1 이 다섯을 더했고 2·3 은 만들지 않았으며 4 가
 하나, 5 가 넷(`BootArchivePolicy.kt` · `NestedArchiveReader.kt` · `BootArchivePolicyTest.kt` ·
 `ArchiveFixtures.kt`, 전부 `build-logic/**` 안이라 in_scope 불변)을 더했다. **새 파일 ↔ in_scope
 대조는 라운드마다 다시 한다** — 그 대조를 빼먹는 것이 반복되는 사각이다.
 
 경로의 묶음은 다섯이다 — `build-logic/**` **38**(게이트 구현·판독기·convention plugin·나눈 배선·
 included build 스크립트·test 클래스) · `config/quality/**` **4**(정책 데이터) · **새 게이트가 찾은
-기존 위반을 고친 40 파일**(adapters·app·procurement·workflow 의 import 줄 삭제 — 목록은
-`checklist.md`) · `reports/evidence/m9/gates-build/**` **5** · 그 밖 **3**(`capability-map.md` 의 그
-절 · `open-inventory.md` 의 그 절 · `app/build.gradle.kts` 의 주석 한 문단).
+기존 위반을 고친 42 파일**(adapters·app·procurement·workflow 의 import 줄 삭제 — 목록은
+`checklist.md`. 여덟째 병합이 둘을 더했다) · `reports/evidence/m9/gates-build/**` **5** · 그 밖 **3**
+(`capability-map.md` 의 그 절 · `open-inventory.md` 의 그 절 · `app/build.gradle.kts` 의 주석 한 문단).
 
 `capability-map.md` 와 `open-inventory.md` 는 **공유 파일**이다 — 다른 레인도 덧붙인다. 복원 원천이
 고정 SHA 라 그 복원이 다른 레인의 뒤 편집을 지우지 않는다(머지 전 기준). 머지 뒤라면 PR revert 가
@@ -56,50 +57,58 @@ included build 스크립트·test 클래스) · `config/quality/**` **4**(정책
 ## 복원 명령 — range revert 가 아니라 경로 한정
 
 ```
-git log --no-merges --format= --name-only HEAD ^07140729 | sort -u \
-  | xargs git restore --source=07140729 --staged --worktree --
+git log --no-merges --format= --name-only HEAD ^0c2fd7ae | sort -u \
+  | xargs git restore --source=0c2fd7ae --staged --worktree --
 ```
 
 추가된 파일은 원천에 없으므로 이 명령이 **지운다**(별도 `rm` 이 필요 없다).
 
 ## 리허설 실측 — 버릴 clone, ①~⑥
 
-저장소 밖 임시 clone 에서 `29f695a3`(실측 HEAD)를 체크아웃하고 위 명령을 돌렸다. 아래 수치는 그
-자리의 것이고, 앞선 `c759ded9` 자리에서 잰 수치와 **모두 같다**(두 자리의 목록이 같은 90 이다).
+저장소 밖 임시 clone 에서 `2f8b24b0`(실측 HEAD)를 체크아웃하고 위 명령을 돌렸다.
 
 | # | 항목 | 결과 |
 | --- | --- | --- |
-| ① | 복원 목록 ↔ diff 등식 | `comm -23`·`comm -13` 둘 다 빈 출력 · 90 경로(A 25 · M 65) |
+| ① | 복원 목록 ↔ diff 등식 | `comm -23`·`comm -13` 둘 다 빈 출력 · 92 경로(A 25 · M 67) |
 | ② | 복원 명령 exit | 0 |
-| ③ | 복원 뒤 `git status --porcelain` 계수 | **D 25 · M 65**(= 추가 25 삭제 + 수정 65 되돌림), 합 90 |
-| ④ | **트리 동일성** | 복원한 트리의 `git write-tree` 가 `07140729^{tree}`(`f0eef6df…`)와 **같은 해시**다 · `git diff --cached 07140729` 경로 0 |
+| ③ | 복원 뒤 `git status --porcelain` 계수 | **D 25 · M 67**(= 추가 25 삭제 + 수정 67 되돌림), 합 92 |
+| ④ | **트리 동일성** | 복원한 트리의 `git write-tree` 가 `0c2fd7ae^{tree}`(`e91b280a…`)와 **같은 해시**다 · `git diff --cached 0c2fd7ae` 경로 0 |
 | ⑤ | compile | ④ 로 갈음 — 아래 |
 | ⑥ | test · 게이트 | ④ 로 갈음 — 아래 |
 
-**⑤⑥ 의 갈음은 「HEAD 초록」이 아니라 트리 동일성이다.** 복원된 트리는 `07140729` 의 트리와 해시가
-같다. 다만 **그 머지 커밋 자리의 CI 는 초록이 아니다** — 러너의 `install buf` 단계가 실패해
-`./gradlew --no-daemon check` 가 **아예 skipped** 였다(이 라운드의 실측. 「상시 붉은 게이트도, 안
-돌린 게이트도 아무것도 막지 못한다」가 그대로 보이는 자리다). 갈음이 가리키는 초록은 **같은 트리의
-다른 자리**다: 이 머지가 들여온 PR 의 head `555bf6c5` 의 tree 가 `f0eef6df…` 로 **글자 그대로 같은
-해시**이고, 그 자리에서 CI `check` job 이 `./gradlew --no-daemon check` 를 **success** 로 끝냈다. 즉
-되돌린 트리는 이미 전건으로 측정된 트리이고, 같은 트리에서 compile·test·게이트를 다시 도는 것은 그
-측정의 재탕이다. **갈음의 근거는 머지 커밋의 초록이 아니라 트리 해시의 동일성과 그 해시가 측정된
-자리**다 — 자리를 적어 두지 않으면 다음 라운드에 이 문장이 조용히 거짓이 된다.
+**⑤⑥ 의 갈음은 「HEAD 초록」이 아니라 트리 동일성이다.** 복원된 트리는 `0c2fd7ae` 의 트리와 해시가
+같고(`e91b280a…`), **그 SHA 자리에서 main 의 CI 가 다섯 job 전부 초록**이다(`check`·`web`·`container`·
+`ml-engine`·`mutation`). 즉 되돌린 트리는 이미 전건으로 측정된 트리이고, 같은 트리에서
+compile·test·게이트를 다시 도는 것은 그 측정의 재탕이다.
+
+**갈음의 근거는 「머지 커밋이니까 초록」이 아니라 트리 해시의 동일성과 그 해시가 측정된 자리**다 —
+앞 원천(`07140729`)에서 그 둘이 갈렸다: 그 머지 커밋의 CI `check` 는 러너의 `install buf` 단계가
+실패해 **아예 skipped** 였고, 초록은 같은 tree 해시를 가진 PR head 자리에만 있었다. 그래서 라운드마다
+**원천 SHA 의 CI 결론을 직접 확인한다**(이번 원천은 그 자리가 초록이라 한 자리로 끝난다).
 
 **「내 표지 0 · 남의 표지 보존」 계수** — 복원 뒤 이 slice 가 만든 파일(`BootArchivePolicy` ·
 `NestedArchiveReader` · `EnvironmentAccessGateTask` · `MigrationOrderGateTask` · `PolicyGateWiring` ·
 `BootArchivePolicyTest` · `ArchiveFixtures`)이 **0** 개 남고, 정책에서 이 slice 의 키 넷
 (`jar.boot-start-class` · `jar.boot-archive-module` · `jar.nested-lib-roots` ·
-`bytecode.env-access.allowed-callers`)도 **0** 회 나온다. 남의 표지는 **항목 집합으로** 센다(어휘
-grep 이 아니다 — 상류가 같은 이름을 채택하면 어휘는 조용히 공허해진다): 일곱째 병합이 들여온 추가
-파일 **16 개가 16 개 모두** 복원 트리에 남는다(`git diff --name-status 70406318..07140729` 의 A 행
-전수 대조). 완료를 종료 코드가 아니라 이 두 계수로 본다.
+`bytecode.env-access.allowed-callers`)도 **0** 회 나온다. 이름 축의 허용 뿌리 키
+(`source.scoped-allowed-roots.*`)도 **8 → 0** 이다 — 그 축 자체가 이 slice 의 것이다.
+
+**표지는 어휘 grep 이 아니라 항목 집합으로 센다.** 이 라운드가 그 함정을 실제로 밟았다: 여덟째 병합이
+더한 허용 뿌리 하나(`bidvector.workflow.notificationinbox`)를 파일 전체 grep 으로 세면 복원 트리에서도
+**23 회** 나온다 — 그 이름을 main 의 다른 정책 키들이 이미 쓰기 때문이다. 어휘가 아니라 **그 키의 항목
+목록**을 보면 복원 트리에는 그 키가 아예 없다. 상류가 같은 이름을 채택하면 어휘 표지는 조용히 공허해진다.
+
+남의 표지는 보존된다 — 일곱째 원천과 여덟째 원천 사이에 main 이 더한 파일 **31 개가 31 개 모두** 복원
+트리에 남고(`git diff --name-status 07140729..0c2fd7ae` 의 A 행 전수 대조), 그 안에 이번 병합이 들여온
+마이그레이션 둘(V26·V27)이 **둘 다** 있다. 완료를 종료 코드가 아니라 이 계수들로 본다.
 
 **되돌림이 실제로 무엇을 되돌리는지**: 복원된 트리에서 app 의 아카이브 판정은 `jar` 하나만 보는 앞 판
-으로 돌아가고, 이 slice 의 HEAD 에서는 배포물까지 포함한 `archives=2 entries=693 judged=594
-nestedJars=102 nestedOutside=0 bootArchives=1` 이다. 배포 경로 축(manifest 속성 여섯 · classpath
-index 등식)과 환경 축은 복원 뒤 그 게이트 자체가 사라지고, adapters 의 소스 참조 축은 판정 없이
-통과하던 앞 판으로 돌아간다.
+으로 돌아가고, 이 slice 의 HEAD 에서는 배포물까지 포함한 `archives=2 entries=701 judged=602
+nestedJars=102 nestedOutside=0 bootArchives=1` 이다(여덟째 병합이 class 넷을 들여와 앞 판의
+`entries=693 judged=594` 에서 늘었다 — 판정되지 않는 엔트리의 수는 그대로다). 배포 경로 축(manifest
+속성 여섯 · classpath index 등식)과 환경 축은 복원 뒤 그 게이트 자체가 사라지고, adapters 의 소스
+참조 축은 판정 없이 통과하던 앞 판으로 돌아간다 — 그 축은 이번 병합이 들여온 포트 참조를 **실제로
+받아 냈다**(`commands.md` 여덟째 병합 절).
 
 ## 축별 부분 비활성화 (전면 되돌림 없이)
 
@@ -133,5 +142,5 @@ index 등식)과 환경 축은 복원 뒤 그 게이트 자체가 사라지고, 
 
 ## 예상 복구 시간
 
-위 복원 명령 하나로 1 분 이내(트리 조작만). 복원된 트리는 `07140729` 와 같은 트리라 재빌드 없이
-**그 트리가 초록으로 측정된 자리**(`555bf6c5`, 같은 tree 해시)의 CI 결과가 그대로 적용된다.
+위 복원 명령 하나로 1 분 이내(트리 조작만). 복원된 트리는 `0c2fd7ae` 와 같은 트리라 재빌드 없이
+**그 자리에서 초록으로 측정된** CI 결과가 그대로 적용된다.

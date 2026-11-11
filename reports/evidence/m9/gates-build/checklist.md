@@ -18,7 +18,8 @@ base `df4976cc`. 계약 `scope.md`, 설계 검토 `design-review.md`, 실측 `co
 ## 새 게이트가 찾은 기존 위반과 그 시정
 
 **쓰이지 않는 import 169 줄 · 40 파일**(`unusedImportGate` 최초 실행). 모듈별: adapters 95 ·
-workflow 45 · app 27 · procurement 2 · 그 밖 모듈·build-logic·느슨한 스크립트 0.
+workflow 45 · app 27 · procurement 2 · 그 밖 모듈·build-logic·느슨한 스크립트 0. **여덟째 병합이 둘을
+더해 42 파일이 됐다**(아래 마지막 항목).
 
 - adapters main 8 파일(`access/JdbcBrowserSessionStore` · `bidding/JdbcNoticeDeadlineQuery` ·
   `koneps/KonepsPageUriBuilder` · `notificationinbox/JdbcNotificationInbox` ·
@@ -37,6 +38,10 @@ workflow 45 · app 27 · procurement 2 · 그 밖 모듈·build-logic·느슨한
   `notification/RelayOutboxNotificationsTest`)
 - 그 밖에 **내 리팩터가 남긴 셋**(`build-logic/.../SourceReferences.kt`)을 같은 게이트가 잡았고 ktlint 는
   같은 줄에 침묵했다 — 이 OPEN 의 문면을 현장에서 다시 확인한 자리다.
+- **여덟째 병합(main `0c2fd7ae`)이 둘을 더 들여왔다** — app test 의 `wiring/CollectionWiringTest`
+  (들여온 이름이 **주석 안에서만** 나온다)와 adapters test 의 `relay/RelayVocabularyDatabaseTest`
+  (import 줄 밖 사용 0). 둘 다 **main 만 건드린 파일**이고 main 의 ktlint 는 같은 줄에 침묵한다 —
+  이 OPEN 의 문면을 **병합이 두 번째로 현장에서 확인**한 자리다(라운드 4 의 임계 0 축에 이어).
 
 **거동 중립의 근거**: import 줄 삭제가 필요한 줄을 지웠으면 컴파일이 깨진다. 전 모듈
 `compileKotlin`·`compileTestKotlin` exit 0 이고 네 모듈·build-logic 의 ktlint·detekt 가 초록이다.
