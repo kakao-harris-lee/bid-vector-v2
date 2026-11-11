@@ -26,7 +26,7 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
 | 경로 | 사유 |
 | --- | --- |
 | `adapters/src/main/kotlin/bidvector/adapters/evaluation/EvaluationCommitRun.kt` | 평가의 **커밋 경로**(outbox 에 실제 행을 남기는 유일한 경로)가 알림 포트를 조립하는 자리다. NOTI-01 생산자가 production 에 서려면 그 조립에 포트가 들어가야 한다 |
-| `adapters/src/test/kotlin/bidvector/adapters/evaluation/**` | 그 경로의 test. **PR #127(Telegram, 미머지)이 갈라 둔 `EvaluationCommitRunE2ETest.kt`·`RelayFailureInjection.kt` 는 건드리지 않고 새 파일로** (#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다) |
+| `adapters/src/test/kotlin/bidvector/adapters/evaluation/**` | 그 경로의 test. **PR #127(Telegram, 미머지)이 갈라 둔 `EvaluationCommitRunE2ETest.kt`·`RelayFailureInjection.kt` 는 건드리지 않고 새 파일로** (#127 은 2026-11-08 머지 — 이 slice 가 늦은 쪽으로 맞췄다) · **정정(2026-11-11, cr r7 LOW-C)**: 이 행이 드는 두 파일은 **이 경로가 아니라 `app/src/test/kotlin/bidvector/app/evaluation/`** 에 있고, `EvaluationCommitRunE2ETest.kt` 는 이 slice 가 **실제로 편집했다** — 그 승인은 아래 「사후 등재」 문단이 그 파일을 이름으로 들어 한 것이고, in_scope 준수는 깨지지 않았다. 어긋난 것은 **읽히는 순서**뿐이다 |
 | `adapters/src/main/kotlin/bidvector/adapters/notificationinbox/JdbcNotificationAudience.kt` + 청중 SQL | 청중(계정 전수) 질의의 어댑터. SQL 은 **별도 상수 홀더**에 둔다 — `NotificationInboxSqlPolicyTest` 의 문장 모집단을 흔들지 않는다 |
 | `app/src/main/kotlin/bidvector/app/wiring/NotificationInboxWiring.kt` | 청중 빈 하나. 쓰기 빈이 이미 한 자리로 모여 있는 그 조립에 붙인다 |
 | `workflow/src/main/kotlin/bidvector/workflow/collection/CollectNoticesUseCase.kt` | `TruncationCause.AccessBlocked` 신설이 절단 사유 → 다음 걸음 표의 소진 `when` 을 깬다. 차단은 `HALT_RUN`(401·403 은 슬롯의 사실이 아니라 자격의 사실이라 다음 슬롯도 같은 답이고, 넘어가면 남은 슬롯마다 거절될 호출을 한 번씩 더 내며 승인 상한만 태운다 — 쿼터를 멈추게 한 D-6G-47 과 같은 근거) |

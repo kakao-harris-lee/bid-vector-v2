@@ -46,8 +46,11 @@ import java.io.File
  * 주입도 같은 자리에서 받는다. 넓어진 것은 **포트 둘의 루트**이고 알림함 **어댑터**
  * (`bidvector.adapters.notificationinbox`)는 이 목록에 **없다** — 조립은 포트만 받고 구현은 배선이
  * 고른다. 그 어댑터 이름이 이 패키지의 상수 풀에 나타나면 이 게이트가 RED 다.
+ * 같은 목록이 이름 층 정책에도 사는 한(그 파일의 「알려진 한계」) 둘의 어긋남을 재는 자리가 있어야
+ * 한다 — [EvaluationAllowedRootsParityTest] 가 집합 등식을 잰다. 목록을 세 번째로 적지 않으려고
+ * 이 집합이 `internal` 이다(cr L-3).
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
         "bidvector.workflow.event",

@@ -122,15 +122,27 @@
    번째 자리). 그 파일은 **in_scope 밖**이라 팀장 지시로 건드리지 않았다 — 종료 코드 거동은 그대로이고
    (멈춤 여부만 보므로 차단도 같은 코드로 간다) 틀린 것은 문면 하나다. 다음에 그 파일을 여는 slice 가
    고친다.
+   **정정(2026-11-11, `reports/evidence/m9/ops-code-followups/`)**: 그 slice 가 고쳤다 —
+   「멈춤(예산·쿼터·차단)」이고, 「사유의 수를 이 술어가 보지 않는다」는 구조도 같은 KDoc 에 적혔다.
+15. **`CollectAwardListUseCaseTest.kt` 의 남은 여유가 세 줄이다**(497/500). 이 라운드에 `sizeGate` 가
+   502 줄을 거부했고, 같은 `haltOf` 축이라 가르는 대신 겹치던 문면을 합쳤다(크기 회피용 분할 금지).
+   **다음에 이 파일에 더하는 변경은 관심사 경계를 보고 갈라야 한다** — 선례는 이 slice 가 간격 축을
+   `CollectionWiringSleeperTest` 로 가른 자리다(v r4 B-1).
 16. **`EvaluationCommitRunE2ETest.kt` 가 한도와 같은 수다**(500/500, 게이트 술어는 `> limit`).
    여섯째 병합의 **합집합**이 508 줄을 만들었고(기준 482 + main 11 + 내 15) 남의 줄은 건드리지 않고
    내 문면만 줄여 500 으로 맞췄다. **여유가 0 이라 다음에 이 파일을 만지는 병합이 깬다.** 가르는
    것이 구조적 답이지만 그것은 **새 test class 와 `gate-tests.properties` 등재를 낳으므로** 이
    라운드 범위 밖이다 — 팀장 결정(2026-11-11)으로 지금처럼 두고 후속 slice 로 넘긴다.
-15. **`CollectAwardListUseCaseTest.kt` 의 남은 여유가 세 줄이다**(497/500). 이 라운드에 `sizeGate` 가
-   502 줄을 거부했고, 같은 `haltOf` 축이라 가르는 대신 겹치던 문면을 합쳤다(크기 회피용 분할 금지).
-   **다음에 이 파일에 더하는 변경은 관심사 경계를 보고 갈라야 한다** — 선례는 이 slice 가 간격 축을
-   `CollectionWiringSleeperTest` 로 가른 자리다(v r4 B-1).
+   **정정(2026-11-11, `reports/evidence/m9/ops-code-followups/`)**: 그 slice 가 갈랐고, **새 test
+   class 는 생기지 않았다** — 가른 선이 class 가 아니라 **전제를 세우는 자리**(컨테이너·컨텍스트
+   수명과 seed)여서다. class 를 가르면 `@Order` 로 고정한 「행을 남기는 test 가 먼저」 결합과 컨테이너
+   하나가 함께 깨진다. 그래서 `gate-tests.properties` 등재도 늘지 않았다.
+
+**번호 정정(2026-11-11, ops-code-followups)** — 앞 판의 원문은 E2E 항목을 `16.` 으로, 그 뒤에
+`CollectAwardListUseCaseTest` 항목을 `15.` 로 적었다. GFM 이 순서 목록을 **원문 순서대로 재번호**하므로
+화면에서는 둘이 뒤바뀌어 보였다(cr r7 LOW-B). 정본은 PR #140 의 팀장 처분 코멘트다 — **⑯ = E2E
+500/500**, **⑮ = `CollectAwardListUseCaseTest` 497/500**. 이 라운드가 고친 것은 **두 항목의 원문
+순서**뿐이고 각 항목의 문면은 그대로다.
 
 ## 5. 새 파일 ↔ in_scope 대조
 
