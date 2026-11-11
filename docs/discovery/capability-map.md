@@ -3280,7 +3280,11 @@ scout 노트에 있다.)
 
 ## 12. OPEN 결정 목록
 
-**활성 51건** (G1 3 / G2 **7** / G3 **15** / G4 **8** / G5 7 / G6 **5** / M6 잔여·메뉴 **6**).
+**활성 54건**(행 수 — `OPEN-STR-12` 와 `-INTERACTIVE` 는 같은 미결의 두 행이라 결정 단위로는 53 · G1 3 / G2 **7** / G3 **16** / G4 **8** / G5 7 / G6 **7** / M6 잔여·메뉴 **6**).
+> **M9 종결(2026-11-11) 재계산 51 → 54** — 아래 adr07-pitest 의 G6 +2 와 M9/STR12 의
+> `OPEN-STR-12-INTERACTIVE`(G3 +1, 2026-11-05 신설)가 머리에 합산되지 않은 채 머지돼 있었다.
+> 기계로 셌다 — G 절 표의 첫 칸이 `OPEN` 이고 취소선이 아닌 행(G1 3 · G2 7 · G3 16 · G4 8 · G5 7 · G6 7)
+> \+ M6 잔여·메뉴 6(M9 가 그 여섯을 닫거나 더하지 않았다). M9 가 이 집계에서 닫은 것은 0 이다.
 > **M6/G1-SET01(2026-10-21) +1** — G3 에 `OPEN-SET01-AWARD-NAME-INGEST` 를 신설했다(45 → 46).
 > **M7/7B(2026-10-21) −1** — `OPEN-ADR-14` 가 닫혀 G6 가 6 → 5 다(46 → 45, 2026-10-24 `998b59dd` 위 rebase 에서 합집합으로 셈).
 > **M6/G1-DEC05(2026-10-21 · 10-24) +4** — G3 OPEN 묶음 둘(`OPEN-M6-RESIDUAL-OPS` ·
@@ -3743,6 +3747,27 @@ M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 �
 열하나로 대조하니 **아홉이 「종결 어휘 있음」 쪽에 잘못 들어갔다**. 전수 재고는 별 조사 레인으로 남는다
 (`reports/evidence/m6/closure/open-inventory.md` §1 · §4 후속 ①). **이 절도 그 재고가 아니다** — 여기 선
 것은 M9 머지분이 실제로 닫은 것과 M9 가 새로 만든 것뿐이다.
+
+#### (f) M9 종결 등재 — ledger 뒤 slice 가 낳고 registry 에 행이 없던 다섯 (2026-11-11)
+
+(b) 는 ledger 시점(2026-11-06)의 등재다. 그 뒤 머지된 slice 가 이름을 지었지만 **자기 evidence 에만** 적었다.
+이 문서가 in_scope 밖이었기 때문이다. 그런 OPEN 이 evidence 에서 넷 나왔다. 다섯째(`OPEN-M9-KOTLIN-COMMENT-STRIP-DUP`)는 evidence 가 아니라 PR 코멘트에서만 이름이 났다(verifier M-1). registry 만 읽는 쪽에는 이 넷이 없는 것으로
+보이므로 (a) 의 「등재 누락 정정」과 같은 처분으로 행을 세운다.
+
+모집단은 기계로 뽑았다: `reports/evidence/m9/**` 에 나오는 `OPEN-` 식별자 가운데 이 문서에 0 회인 것이고,
+M9 이전 식별자를 인용만 한 것은 뺐다.
+
+활성 집계에는 들어가지 않는다(이 절 머리 규칙). 어느 것도 머지를 막지 않는다.
+
+| ID | 무엇 | 받는 자리 | 신설 근거 |
+| --- | --- | --- | --- |
+| `OPEN-M9-COMMAND-OPENAPI-ENUM` | openapi 의 타임라인 `command` 칸만 `type: string` 이다(형제 `actorKind` 는 `enum`). 그래서 web 이 손 유니온과 Kotlin 원문 텍스트 파싱 게이트를 따로 지고 있다. enum 으로 올리면 둘 다 사라진다 | `openapi/**` 를 만지는 다음 계약 slice. `OPEN-M9-TIMELINE-COMMAND-WORDING` 과 같은 자리 | PR **#132** cr OQ · `reports/evidence/m9/web-followups/checklist.md` §5 |
+| `OPEN-SCOPED-ROOTS-PARITY-REST` | adapters 범위 축 여덟 가운데 **일곱**(`audit`·`notice`·`opening`·`profile`·`qualification`·`relay`·`strategy`)에 이름 층 ↔ 바이트코드 층 허용 뿌리의 동치 단언이 없다. 오늘은 여덟 축 모두 일치한다(실측). 그 일치를 지키는 장치는 evaluation 축 하나뿐이다. 하위 패키지 축이 생기면 최장 접두 선택(`scopeOf`) 때문에 등식이 그 하위 축을 보지 못하는 사각도 있다(오늘 0) | 다음 adapters 게이트 slice — 축마다 `private` → `internal` 한 단어, 또는 단일 출처 ADR | PR **#143** · `reports/evidence/m9/gates-build-followups/scope.md` · 사각은 #143 verifier L-1 |
+| `OPEN-ROLLBACK-PREDICATE-WORDING` | `CLAUDE.md` 요약과 evidence-pack 의 §4 유효성 술어는 「빈 출력」이다. 몇 slice 의 `rollback.md` 는 「나오는 경로가 모두 원천에 없으면 유효」라는 전칭 확장을 쓴다. 확장 자체는 트리 동일성으로 건전하다(#138 verifier). 같은 자리의 후보로 rollback 원천 교체 시 셋째 검사가 있다 — 「복원 대상 blob 이 착수 base 와 새 원천에서 같다」(#145 cr r2) | 다음 하네스 편집(`.claude/skills/evidence-pack` rollback 절) | PR **#138** v L-2 · cr OQ-2 · PR **#143** scope · PR **#145** 처분 코멘트 |
+| `OPEN-M9-REHEARSAL-FLYWAY-CONFIG-PARITY` | `tools/db-rehearsal.sh` 의 Flyway 설정이 출하 설정과 하나 다르다 — migration 연결의 잠금 상한 `initSql` 이다. 리허설은 배타 실행이라 거동 차이는 0 이고, 그 축을 재는 test 는 따로 있다. 문면으로만 닫혀 있다 | 그 스크립트를 다음에 만지는 slice. 인자 변경은 CI `container` job 에서만 실측된다 | PR **#145** · `reports/evidence/m9/ops-migrations-followups/scope.md` 알려진 제한 ① |
+| `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | Kotlin 원문의 주석 걷기가 두 벌이다. #132 판(`money-vocab-cross-lang.test.mjs` 의 `withoutKotlinComments`, 정규식 한 줄)은 문자열 안 `//` 를 보존하지 않는다. URL 리터럴이 든 파일을 읽는 날 조용히 빗나간다. #135 판은 보존한다. web 게이트 등록부는 한 방향이라 등재 누락을 보지 못한다 | M10/10D `gates-web` — 공유 한 자리로 모으고 URL 리터럴 표본으로 RED 선행 | PR **#135** 조치 코멘트 「팀장 등재 후보」 · 이 종결의 verifier M-1(모집단 밖) |
+
+**(b) 의 둘은 이미 닫혔다** — `OPEN-CVE-APT-RETRY` · `OPEN-CVE-APT-RUNBOOK-BRANCH` 는 PR **#131**(cve-followups) 머지로 닫혔다(`reports/evidence/m9/cve-followups/checklist.md` 의 두 체크). (b) 는 그 머지 전 시점의 문면이라 여기에 종결을 적는다.
 
 ---
 
