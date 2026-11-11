@@ -3744,6 +3744,21 @@ M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 �
 (`reports/evidence/m6/closure/open-inventory.md` §1 · §4 후속 ①). **이 절도 그 재고가 아니다** — 여기 선
 것은 M9 머지분이 실제로 닫은 것과 M9 가 새로 만든 것뿐이다.
 
+#### (i) M10/10C `gates-adapters` — adapters·domain test 술어 넷
+
+계약 `milestone-10.md` 10C 행이 든 넷의 처분이다. **셋이 닫히고 하나가 사유와 함께 유지된다.** 정본은
+`reports/evidence/m10/gates-adapters/{scope,commands,checklist,rollback}.md` 이고 **이 절은 다시 판정하지
+않는다**. 둘(②·③)은 이 slice 가 아니라 **선행 머지가 이미 닫은 것**인데 장부에 등재되지 않아 여기가 처음
+적는 자리다 — 위 (d) 는 그보다 앞선 시점에서 그 둘을 「손대지 않은 여섯」에 세고 있다.
+
+| ID | 처분 | 무엇이 그것을 닫는가 (근거) |
+| --- | --- | --- |
+| `OPEN-SCOPED-ROOTS-PARITY-REST` | **닫힘(구조)** — M10/10C | 두 층 허용 뿌리 등식이 축 **하나에서 축 전부로** 넓어졌다. 앞 판은 축 하나를 손으로 적은 **열거**라 아홉째 축이 생기면 조용했고, 이 판은 축 → 바이트코드 층 `ALLOWED_ROOTS` 표 하나를 두고 **그 key 집합과 `source.scoped-packages` 를 집합 등식**으로 묶는다(표의 값은 문자열이 아니라 **컴파일되는 심볼 참조**라 축의 목록을 지우거나 이름을 바꾸면 컴파일이 깨진다). 일곱 축의 비용은 OPEN 이 적은 그대로 **축마다 한 단어**(`private` → `internal`)였다. 계약이 지목한 **최장 접두 사각**은 「축끼리 패키지 접두가 아니다」 단언이 닫는다 — `scopeOf` 가 최장 접두를 고르므로 하위 축을 더하면 그 목록이 상위 축의 것을 **가리고** 상위 축의 등식은 조용히 초록으로 남는다. **변이 일곱으로 양쪽을 실측했다**: 구현 전 음성 대조(이름 층만 넓힌 변이가 그 정책 키를 읽는 자리 **전수**에서 초록) ↔ 구현 뒤 같은 변이가 **그 등식 하나만** 붉다 · 모집단 축(아홉째 축 추가·축 제거·중첩 축) 셋 · 바꿔치우기 둘 · **등재된 중첩 축**(두 등식을 만족시킨 뒤 접두 비포함만 깨는 변이) · 선언 입력을 뺀 UP-TO-DATE 거짓 초록과 그 양성 쌍. 근거 커밋 `7b02b3cc`(구현), 판정 SHA·CI 좌표는 이 slice 의 PR 조치 코멘트 |
+| `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | **닫힘 — 선행 머지(장부 공백 보충)** | **PR #134 머지 `97ed49c4`**(M9/gates-tests, 정본 `reports/evidence/m9/gates-tests/`)가 `PersistenceAdapterDependencyTest` 의 술어를 **소스 텍스트 import 정규식에서 `javap -p -v` 상수 풀 허용 목록으로** 이식했다. 10C 가 base main 에서 재확인한 것: 그 파일에 소스 import 정규식 **0**, 양성·허용·세그먼트 경계 대조 셋이 같은 class 에 있다. 그 slice 가 남긴 잔여는 이 OPEN 이 아니라 **허용된 형제 패키지를 경유하는 간접 참조**(형제 여덟이 공유, 식별자 미발급) |
+| `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | **닫힘 — 선행 머지(장부 공백 보충)** | 같은 PR·같은 evidence. `CleanMigrationCheckTest` 의 CHECK 단언이 전부 **본문·본문 집합 `shouldBe`** 이고 `any { contains }` 는 **단언에 0**(남은 언급은 그 변경을 설명하는 KDoc 산문). 함께 받은 자리도 닫혔다 — 제약 조회가 0 행이면 명시 실패, 같은 이름이 둘 이상이면 명시 실패 |
+| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 범위 밖 유지**(팀장 확정 2026-11-11, 착수 보고) | 처방(D-6F5-20)이 10C 의 축 밖이다 — ⓐ `LicenseVerdict` subtype 생성자를 `internal` 로 내리는 것은 **production domain 커널의 가시성 변경**이고 10C 는 adapters·domain **test 술어** 축이다 ⓑ 처방의 둘째 절반(「test 조립은 testFixtures factory 로」)이 **저장소 전역 차단**에 막혀 있다(`java-test-fixtures` 전 모듈 거부 · `module.expected-source-sets=main,test` · 그 게이트 test), 그 자리가 `OPEN-1BC-TESTFIXTURES-GATE`(「면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다」)를 가리켜 ADR 없이 여는 것은 **그 OPEN 의 우회**다 ⓒ `qualification` 모듈 **밖**에서 그 생성자를 부르는 test 파일이 **18**(adapters 4 · app 10 · workflow 4 — M9/gates-tests 가 센 16 에서 둘 늘었다). **받는 자리는 그대로 testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행)이고, 팀장 2026-11-06 판정과 같다 |
+| `OPEN-M10-SCOPED-PACKAGES-COVERAGE`(신설) | **열린 채 — 받는 쪽 정책 키 신설 계약 slice** | `source.scoped-packages` 의 값이 **`ALLOWED_ROOTS` 를 가진 어댑터 축 전부가 아니다**. `event`·`extraction`·`koneps`·`ml`·`notification`·`persistence` **여섯**이 같은 바이트코드 술어를 쓰면서 이름 층 모집단에 없고, 그래서 그 축들에는 `const val` 인라인 사각을 덮는 **두 번째 층이 없다**. 특히 `persistence` 는 **PR #134 가 그 술어를 준 축**이라 「여덟」이라는 수가 그 머지로 낡았다. 10C 가 더하지 않은 이유는 **게이트의 판정 모집단 확장**이라는 것이다 — 정책 키 여섯 신설이고 그 축들이 새로 붉어질 수 있어 계약 갱신 사안이다(팀장 결정 2026-11-11). 위 첫 행의 모집단 등식은 **이 여섯을 요구하지 않는다** — 그 등식이 묶는 것은 「이름 층이 판정하는 축」과 「표에 든 축」이고, 어느 축을 판정할지는 이 OPEN 이 받는다 |
+
 ---
 
 ## 13. 하류 인계
