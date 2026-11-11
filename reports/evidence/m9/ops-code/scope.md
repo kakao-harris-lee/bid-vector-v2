@@ -73,6 +73,8 @@ in_scope 에 **일곱 경로**를 더한다. 셋은 구현이 요구했고(NOTI-
 `app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt`(커밋 조립에 청중·알림함 포트 `@Import`) ·
 `app/src/test/kotlin/bidvector/app/evaluation/{DryRunCommitParityTest,EvaluationCommitRunE2ETest,EvaluationCommitRunnerTest}.kt`
 (생성자 인자 둘에 따른 조립). `app/…/EvaluationCommitRunE2ETest.kt` 는 PR #127 과 겹칠 수 있다 — 늦게 머지되는 쪽이 맞춘다.
+**해소(2026-11-11)**: #127 은 2026-11-08 에 머지됐고 그 머지 커밋 `d38f7115` 가 복원 원천 `22c77cbb` 의
+조상이다 — 이 계약이 적은 「미머지」는 그때의 사실이고, 겹침은 여섯째 병합까지 끝났다.
 
 **H-1 처방(v)** — 출하 정책 `KONEPS_HTTP_POLICY` 를 resolve 한 그 값 위에서 ① 403 한 번이면 호출 1회 ② 연속 호출 간격 ≥ 출하 `minimumCallInterval`(주입 시계)을 잰다. 상수 표로 만든 test 정책 위의 시나리오로 갈음하지 않는다. 변이 `minimumCallInterval=ZERO` · 출하 `statusRules` 에서 403 행 제거가 각각 RED.
 
