@@ -8,6 +8,7 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
+import java.sql.Connection
 import java.sql.SQLException
 
 /**
@@ -166,7 +167,7 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
                 .forEach { mismatched ->
                     shouldThrow<SQLException> {
                         setStateAndReason(entryId, mismatched, reason.name)
-                    }.message.orEmpty() shouldContain "outbox_terminal_reason_state_check"
+                    }.message.orEmpty() shouldContain PAIR_CHECK
                 }
 
             setStateAndReason(entryId, reason.terminalState.dbToken(), reason.name)
@@ -175,26 +176,86 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
     }
 
     /**
-     * **집합 등식** — 거부 실측(위 test)은 아는 토큰만 겨누므로, CHECK 가 **모르는 쌍을 하나
-     * 더 받아들이게** 넓어져도 초록이다. 그래서 제약 본문에서 쌍을 뽑아 Kotlin 어휘 전수와
-     * 같은지 본다(본문 문자열 자체를 고정하지 않는다 — 그 형태는 PostgreSQL 이 정한다).
+     * **집합 등식 — 받아들여지는 쌍을 거동으로 센다**(verifier r10 M-2). 거부 실측(위 test)은 아는
+     * 토큰만 겨누므로 저장 층이 **모르는 쌍을 하나 더 받아들이게** 넓어져도 초록이다. 앞 판은 그
+     * 구멍을 제약 **본문의 정규식 토큰**을 둘씩 짝지어 닫으려 했는데, 그 술어는 렌더링 텍스트와
+     * 토큰 순서에 걸려 있어 **토큰을 늘리지 않는 확장**을 통과시켰다 — `OR state = terminal_reason`
+     * 한 줄은 `(FAILED, 'FAILED')` 를 받아들이면서 그 test 를 초록으로 지난다(verifier 변이 BD2).
+     *
+     * 그래서 여기서는 **전수 UPDATE 를 실제로 시도하고 savepoint 로 되돌려** 받아들여진 집합을
+     * 센다. 단언에 들어오는 것은 통과한 쌍뿐이고 렌더링 모양도 토큰 순서도 들어오지 않는다. 재는
+     * 집합은 CHECK 와 트리거를 **함께 지난** 것이다 — 운영 경로가 만나는 관문이 그 둘의 합이다.
+     *
+     * 후보 사유 어휘는 셋의 합집합이다. ① Kotlin 사유 어휘 ② 상태 토큰 — 동일성 확장이 여는 쌍이
+     * 여기 있다 ③ **제약 본문에 적힌 리터럴** — 본문만 아는 토큰(몰래 넓힌 어휘)까지 겨눈다. ③ 은
+     * 후보를 **늘리는 데만** 쓰이므로 렌더링이 바뀌어도 단언은 흔들리지 않고, 그 수확이 비면 그
+     * 사실로 실패한다(후보가 조용히 좁아지는 자리).
      */
     @Test
-    fun `CHECK 가 허용하는 (상태, 사유) 쌍 집합이 Kotlin 어휘 전수와 같다`() {
-        val definition = constraintDefinition("outbox_terminal_reason_state_check")
+    fun `저장 층이 받아들이는 (상태, 사유) 쌍 집합이 Kotlin 어휘 전수와 같다 — 전수 시도`() {
+        acceptedStateReasonPairs() shouldBe expectedAcceptedPairs()
+    }
 
-        val tokens = Regex("'([A-Z_]+)'::text").findAll(definition).map { it.groupValues[1] }.toList()
-        // 토큰이 홀수면 **그 사실로** 실패한다(cr L-1) — 구조 분해에 맡기면 `component2()` 의
-        // `IndexOutOfBoundsException` 이 되어 「CHECK 가 바뀌었다」가 아닌 사유로 붉어진다.
-        val pairs =
-            tokens
-                .chunked(2)
-                .map { pair ->
-                    require(pair.size == 2) { "쌍이 아닌 토큰이 남았다(제약 렌더링이 바뀌었다): $tokens" }
-                    pair[0] to pair[1]
-                }.toSet()
+    /** 종단 쌍 일곱 + **사유 없는 비종단** 둘. 그 밖의 조합은 CHECK 또는 트리거가 거부한다. */
+    private fun expectedAcceptedPairs(): Set<Pair<String, String?>> =
+        OutboxTerminalReason.entries.map { it.terminalState.dbToken() to it.name }.toSet() +
+            NON_TERMINAL_OUTBOX_STATES.map { it.dbToken() to null }
 
-        pairs shouldBe OutboxTerminalReason.entries.map { it.terminalState.dbToken() to it.name }.toSet()
+    private fun acceptedStateReasonPairs(): Set<Pair<String, String?>> {
+        insertPendingOutboxRow(dataSource(), entryId = PAIRS_ENTRY, idempotencyKey = "t-pairs-key")
+        executeUpdate(EventSql.MARK_CLAIMED, PAIRS_ENTRY)
+        val reasons = candidateReasonTokens()
+        val accepted = mutableSetOf<Pair<String, String?>>()
+        dataSource().connection.use { connection ->
+            connection.autoCommit = false
+            try {
+                probeStateTokens().forEach { state ->
+                    reasons.filter { accepts(connection, state, it) }.forEach { accepted += state to it }
+                }
+            } finally {
+                connection.rollback()
+            }
+        }
+        return accepted
+    }
+
+    /**
+     * 한 조합을 **실제로 시도하고 되돌린다** — 영향 행 1 이 수용의 정의다. savepoint 로 감싸는
+     * 이유는 거부가 트랜잭션을 실패 상태로 밀기 때문이다(그러면 뒤 조합이 전부 같은 사유로
+     * 거부돼 「아무것도 받아들이지 않는다」가 된다).
+     */
+    private fun accepts(
+        connection: Connection,
+        state: String,
+        reason: String?,
+    ): Boolean {
+        val savepoint = connection.setSavepoint("pair_probe")
+        return try {
+            connection.prepareStatement(SET_STATE_AND_REASON).use { statement ->
+                statement.setString(1, state)
+                statement.setString(2, reason)
+                statement.setString(3, PAIRS_ENTRY)
+                statement.executeUpdate() == 1
+            }
+        } catch (_: SQLException) {
+            false
+        } finally {
+            connection.rollback(savepoint)
+            connection.releaseSavepoint(savepoint)
+        }
+    }
+
+    /** 상태 어휘 전수 — 종단 셋은 사유 어휘가 정하고 비종단 둘이 그 여집합이다. */
+    private fun probeStateTokens(): List<String> =
+        (OutboxTerminalReason.entries.map { it.terminalState } + NON_TERMINAL_OUTBOX_STATES)
+            .distinct()
+            .map { it.dbToken() }
+
+    private fun candidateReasonTokens(): List<String?> {
+        val literals =
+            Regex("'([^']*)'").findAll(constraintDefinition(PAIR_CHECK)).map { it.groupValues[1] }.toList()
+        check(literals.isNotEmpty()) { "제약 본문에 리터럴이 없다 — 후보 어휘 ③ 이 조용히 비었다" }
+        return (OutboxTerminalReason.entries.map { it.name } + probeStateTokens() + literals).distinct() + null
     }
 
     @Test
@@ -203,7 +264,7 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
 
         val failure = shouldThrow<SQLException> { setStateAndReason("t-vocab-1", "FAILED", "DELIVERY_TIMED_OUT") }
 
-        failure.message.orEmpty() shouldContain "outbox_terminal_reason_state_check"
+        failure.message.orEmpty() shouldContain PAIR_CHECK
     }
 
     @Test
@@ -295,15 +356,23 @@ class OutboxTransitionSqlTest : PersistenceTestSupport() {
         reason: String?,
     ) {
         dataSource().connection.use { connection ->
-            connection
-                .prepareStatement("UPDATE outbox SET state = ?, terminal_reason = ? WHERE entry_id = ?")
-                .use { statement ->
-                    statement.setString(1, state)
-                    statement.setString(2, reason)
-                    statement.setString(3, entryId)
-                    statement.executeUpdate()
-                }
+            connection.prepareStatement(SET_STATE_AND_REASON).use { statement ->
+                statement.setString(1, state)
+                statement.setString(2, reason)
+                statement.setString(3, entryId)
+                statement.executeUpdate()
+            }
         }
+    }
+
+    private companion object {
+        /** 쌍 CHECK 의 이름 — 거부 문면 대조와 본문 수확이 같은 자리를 가리킨다. */
+        const val PAIR_CHECK = "outbox_terminal_reason_state_check"
+
+        /** 전수 시도가 돌려 쓰는 행 하나 — `CLAIMED` · 사유 `NULL` 에서 매 조합이 출발한다. */
+        const val PAIRS_ENTRY = "t-pairs-1"
+
+        const val SET_STATE_AND_REASON = "UPDATE outbox SET state = ?, terminal_reason = ? WHERE entry_id = ?"
     }
 }
 
@@ -316,3 +385,10 @@ private fun OutboxEntryState.dbToken(): String =
         OutboxEntryState.Failed -> "FAILED"
         OutboxEntryState.Isolated -> "ISOLATED"
     }
+
+/**
+ * 비종단 상태 — 종단 셋은 [OutboxTerminalReason] 이 정하므로 그 여집합이 여기 둘이다. 상태 어휘가
+ * 늘면 위 [dbToken] 의 소진 `when` 이 깨져 **이 파일로** 오게 된다(그 자리에서 이 목록도 본다).
+ */
+private val NON_TERMINAL_OUTBOX_STATES =
+    listOf(OutboxEntryState.Pending, OutboxEntryState.Claimed)
