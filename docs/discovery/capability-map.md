@@ -3771,6 +3771,10 @@ M9 이전 식별자를 인용만 한 것은 뺐다.
 
 #### (h) M10/10B — timeline-command-enum
 
+**이 절이 받는 행은 둘이다** — `OPEN-M9-COMMAND-OPENAPI-ENUM` 은 **(f) 가 「`openapi/**` 를 만지는
+다음 계약 slice」로 받는 자리를 지정한 그 행**이고(그 slice 가 10B 다), `-WORDING` 은 (b) 의 행이다.
+(f)·(b) 의 행은 그 시점의 사실이라 고치지 않는다 — 처분은 뒤에 오는 이 절이 적는다.
+
 | 무엇 | 처분 | 근거 |
 | --- | --- | --- |
 | `OPEN-M9-COMMAND-OPENAPI-ENUM` | **닫힘** — 계약이 타임라인 명령 칸을 Kotlin 어휘와 **같은 집합의 `enum`** 으로 선언하고 web 은 생성 타입에서 유니온을 끌어온다. 손 유니온과 **Kotlin 원문을 JS 에서 텍스트로 파싱하던 교차언어 게이트의 명령 축**이 함께 사라졌다 — 사슬이 DB CHECK → Kotlin → 계약 → 생성 타입 → web 표로 전부 컴파일·바이트 층이다. **wire 값은 바뀌지 않았다**(스키마 강화뿐 — 그 칸의 값은 전이 행의 열에서 오고 그 열 CHECK == Kotlin 어휘를 어댑터 통합 test 가 든다) | `reports/evidence/m10/timeline-command-enum/` · 판정 자리는 그 PR 코멘트 |
