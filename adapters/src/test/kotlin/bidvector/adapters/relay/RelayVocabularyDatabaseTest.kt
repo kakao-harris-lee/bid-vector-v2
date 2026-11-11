@@ -6,7 +6,6 @@ import bidvector.adapters.notification.TelegramScript
 import bidvector.adapters.notification.channelSettings
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.persistence.TEST_RELEASE
-import bidvector.workflow.notification.RelayAborted
 import bidvector.workflow.notification.RelayReport
 import bidvector.workflow.notification.RelaySkipReason
 import bidvector.workflow.notification.RelayTarget
