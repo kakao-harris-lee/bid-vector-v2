@@ -66,22 +66,29 @@ V26 의 쌍 CHECK 본문에 동일성 절 하나를 더해 **토큰을 늘리지
 
 | 실측 | 결과 |
 | --- | --- |
-| `./gradlew --no-daemon check` (1회차) | **exit 1** — `:adapters:ktlintTestSourceSetCheck` 가 네 번 이어진 호출 체인 한 줄을 막았다(`Expected newline before '.'`) |
+| `./gradlew --no-daemon check` (처음) | **exit 1** — `:adapters:ktlintTestSourceSetCheck` 가 네 번 이어진 호출 체인 한 줄을 막았다(`Expected newline before '.'`) |
 | 같은 실행의 `./gradlew --no-daemon qualityBaseline` | exit 0 |
 | 체인을 한 호출로 고친 뒤 `:adapters:ktlintTestSourceSetCheck` · `:app:ktlintTestSourceSetCheck` · 두 모듈 `detekt` | exit 0 |
-| **`./gradlew --no-daemon check`**(2회차, `54211baa`) | **exit 0** · 36m40s · 433 task(226 실행 · 112 cache · 95 up-to-date) |
-| **`./gradlew --no-daemon qualityBaseline`**(같은 HEAD) | **exit 0** |
+| `./gradlew --no-daemon check` @ `54211baa` | **exit 0** · 36m40s · 433 task(226 실행 · 112 cache · 95 up-to-date) |
+| **`./gradlew --no-daemon check`** @ **`83d97128`**(마지막 산출물 커밋) | **exit 0** · 4m35s · 424 task(51 실행 · 373 up-to-date) — 바뀐 모듈의 `:adapters:test` 는 **실행**, `:app:test` 는 app 입력이 안 바뀌어 up-to-date |
+| **`./gradlew --no-daemon qualityBaseline`** @ 같은 HEAD | **exit 0** |
+| 그 앞의 표적 lint(`ktlint` 둘 · `detekt` 둘) | exit 0 — 전건 한 회차를 ktlint 한 줄로 날리지 않기 위해 먼저 돌린다 |
 
 CI 워크플로 Kotlin job 의 명령 **그대로**다(부분 게이트로 줄이지 않았다). 변경이 닿은 job 이 그
 하나뿐이라 Python·web·container job 은 돌리지 않았다 — 워크플로가 job 사이 소스 독립을 선언한다.
 단, `tools/db-rehearsal.sh` 는 `container` job 이 쓰므로 그 파일에 **거동 변경이 없음**을 따로 쟀다
 (아래 §5).
 
+**마지막 evidence 커밋의 게이트 결과는 이 표에 없다.** evidence 는 자기 마지막 커밋의 post-state 를
+담을 수 없다 — 그 줄을 적으려면 커밋이 하나 더 필요하고 그 커밋이 다시 같은 줄을 요구한다. 그 자리의
+정본은 **verifier 와 PR 조치 코멘트**다. 위 전건 두 줄은 **산출물 층**(그 HEAD 에 evidence 편집이
+섞이지 않은 상태)을 덮고, evidence 문면이 건드리는 유일한 게이트인 누출 스캔은 §5 가 직접 쟀다.
+
 ## 5. 그 밖의 실측
 
 | 실측 | 결과 |
 | --- | --- |
-| 비밀값 스캔 — 참조형(`-f config/quality/leak-patterns.txt`), 대상은 evidence 디렉터리 | **매치 없음**(exit 1) → 허용 목록 편집 0 |
+| 비밀값 스캔 — 참조형(`-f config/quality/leak-patterns.txt`), 대상은 evidence 디렉터리 | **매치 없음**(exit 1) → 허용 목록 편집 0. 라운드 1 에서 **키 이름 하나를 runbook 에 새로 적었으므로**(계정 비밀 문구 leaf) 그 이름과 편집한 runbook 둘을 같은 스캔으로 따로 확인했다 — 역시 매치 0(그 이름은 스캔 어휘를 피해 고른 것이라는 코드 KDoc 의 주장이 실측으로 선다) |
 | clean-tree 게이트 — `git status --porcelain --` 산출물 경로 **개별 인자** 여섯 | **0 줄** |
 | 같은 게이트의 **양성 대조** | 한 파일에 한 줄을 심으면 **1 줄**, 비파괴 절삭(`head -n <원래 줄수>`)으로 되돌리면 다시 0 줄 · 파일은 `git diff` 가 빈 것으로 동일성 확인 · 실행 비트 보존(`checkout --` 를 쓰지 않았다) |
 | `tools/db-rehearsal.sh` — 거동 무변경 | `bash -n` exit 0 · 스크립트가 생성하는 Flyway 호출자 Java 파일을 heredoc 에서 그대로 꺼내 **Flyway 스텁과 함께 `javac --release 21` 로 컴파일** exit 0(주석만 바뀌었고 그 주석이 한글이어도 컴파일된다는 사실까지 재서, `container` job 에서야 알게 되는 길을 피했다) |
