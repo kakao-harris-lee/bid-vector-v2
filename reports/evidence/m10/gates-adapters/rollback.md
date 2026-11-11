@@ -36,8 +36,9 @@ docs/discovery/capability-map.md
 (`evaluation/…EvaluationAllowedRootsParityTest.kt`). 한쪽만 주면 복원이 반쪽이 된다.
 
 **목록이 12 에서 14 로 늘었다.** 계약 갱신 (5) 의 좌표 치환 둘(`adapters/build.gradle.kts` ·
-`EvaluationAdapterDependencyTest.kt`)이 뒤 라운드에 들어왔고, 그 커밋이 **마지막 산출물 커밋을 옮겼다** —
-그래서 앞 라운드의 실측을 옮기지 않고 **새 HEAD 에서 다시 쟀다**.
+`EvaluationAdapterDependencyTest.kt`)이 뒤 라운드에 들어왔다. 그 뒤 capability map 정정 둘이 더 들어왔고,
+세 커밋 모두 **마지막 산출물 커밋을 옮겼다** — 목록은 14 에서 더 늘지 않았지만 **실측 자리는 그때마다
+옮겨졌으므로 매번 다시 쟀다**(이 파일이 싣는 것은 마지막 측정뿐이다).
 
 **이 slice 의 장부 넷은 목록에서 뺐다.** 그래야 측정 뒤의 장부 커밋이 복원 목록 안 파일을 또 움직이지
 않는다(그러면 재측정이다). 좁은 목록으로도 유효하다 — 장부는 되돌릴 거동을 담지 않는다.
@@ -61,35 +62,25 @@ range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다.
 
 ## ①~⑥ 실측
 
-**실측 HEAD: `ddba9277`**(이 slice 의 **마지막 산출물 커밋**). 버릴 clone(`--no-hardlinks`)에서 돌렸다.
+**실측 HEAD: `ccbe98ff`**(이 slice 의 **마지막 산출물 커밋**). 버릴 clone(`--no-hardlinks`)에서 돌렸다.
+**이 라운드가 세 번째 측정이다** — 산출물을 고치는 커밋이 두 번 더 들어와(좌표 치환 둘 · 수와 묶음 정정 둘) 그때마다 마지막 산출물 커밋이 옮겨졌다. **앞 라운드의 실측을 옮기지 않았다**: 앞의 둘은 버리고 이 HEAD 에서 ①~⑥ 을 다시 돌렸다(앞 라운드가 쓴 트리 동일성 갈음도 함께 버렸다 — 이번에는 **갈음 없이 직접 실행**이다).
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 종료 코드 | **0** |
 | ② | 복원이 움직인 것의 D/M 계수 | **14** = `A` 1(옛 class 되살아남) + `D` 1(새 class 사라짐) + `M` 12. 복원 목록과 수가 같다 |
 | ③ | 복원 뒤 `git diff <원천> -- <14 경로>` | **빈 출력** — 그 경로들의 트리가 원천과 **동일**하다 |
-| ④ | 복원 트리 컴파일 | ⑥ 의 실행 안에서 돌았다(`:adapters:compileTestKotlin` 은 **FROM-CACHE** — 복원 트리의 입력이 원천과 같으니 적중이 맞다) |
-| ⑤ | 복원 트리 test | 같은 실행 — `:adapters:test`·`:app:test`·`:build-logic:test` **실행**(`:workflow:test` 는 FROM-CACHE). 복원 트리에 `ScopedAllowedRootsParityTest` 언급 **0**, 옛 class 가 그 자리에 있다 |
-| ⑥ | 복원 트리 **게이트** | `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(36m 10s · 433 actionable 중 **278 executed** · 게이트 task **172** 실행 · `FAILED`/`FAILURE` **0**) |
+| ④ | 복원 트리 컴파일 | ⑥ 의 실행 안에서 돌았다 — 네 모듈의 `compileTestKotlin` 이 **FROM-CACHE**(복원 트리의 컴파일 입력이 원천과 같으니 적중이 맞다. 적중은 실행이 아니므로 ⑤⑥ 쪽에서 실행을 따로 센다) |
+| ⑤ | 복원 트리 test | 같은 실행 — `:adapters:test`·`:app:test`·`:build-logic:test` **실행**(`:workflow:test` 만 FROM-CACHE). 로그에 `ScopedAllowedRootsParityTest` 언급 **0** — 복원 트리에는 그 class 가 없고 옛 class 가 그 자리에 있다 |
+| ⑥ | 복원 트리 **게이트** | `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(35m 36s · 433 actionable 중 **278 executed** · 게이트 task **172** 실행 · `FAILED`/`FAILURE` **0** · `leakPatternGate`·루트 `:check` 실행) |
 
-### ④⑤⑥ 의 갈음 — 트리 동일성 (「HEAD 초록」이 아니다)
+### 왜 `check` 를 복원 트리에서 다시 돌렸는가
 
-전건 `check` 는 앞 HEAD(`6787ba70`)에서 만든 **첫 clone** 의 복원 트리에서 돌았다. 그것으로 `ddba9277` 의
-복원 트리를 갈음할 수 있는 근거는 **두 복원 트리가 같은 트리라는 실측**이다 — 추측이 아니다.
-
-| 축 | 명령 | 결과 |
-| --- | --- | --- |
-| index 수준 | `diff <(clone1: git ls-files -s \| sort) <(clone2: 같은 명령)` | **빈 출력** — 추적 파일의 **blob SHA 와 모드가 전수 일치** |
-| 작업 트리 내용 | `diff -rq --exclude=.git --exclude=build --exclude=.gradle <clone1> <clone2>` | **빈 출력** — 파일 내용도 전수 일치 |
-
-둘이 같아지는 이유는 우연이 아니다 — **첫 clone 은 계약 갱신 (5) 의 좌표 치환 둘이 커밋되기 전에
-떠졌고**, 그 두 파일은 그 clone 에서 이미 원천 내용이었다. 그래서 12 경로 복원과 14 경로 복원이 **같은
-트리**에 도달한다. 갈음의 근거는 「앞 HEAD 가 초록이었다」가 **아니라** 「되돌린 트리의 파일이 이미 실측한
-트리와 같다」다.
-
-**`reports/evidence/**` 는 `check` 안 task 의 선언 입력이다**(`leakPatternGate`, 루트 `check` 가 의존).
-그래서 두 트리의 동일성은 `reports/` 까지 포함해야 성립하는데, 위 두 축이 **추적 파일 전수**를 보므로
-그 조건이 함께 확인됐다. 같은 사실 때문에 **최종 acceptance 는 장부 커밋 뒤의 마지막 HEAD 에서** 돈다.
+앞 라운드는 ④⑤⑥ 을 **트리 동일성**으로 갈음했다(앞 clone 의 복원 트리와 blob SHA·파일 내용이 전수 일치).
+그 갈음은 **이 라운드에서 성립하지 않는다** — 그 뒤 장부가 바뀌어 복원 트리의 `reports/evidence/**` 내용이
+달라졌고, 그 트리는 `check` 안 task 의 **선언 입력**이다(`leakPatternGate`, 루트 `check` 가 의존). 트리가
+같지 않으면 갈음의 근거가 없으므로 **전건 `check` 를 다시 실행했다**. 「HEAD 가 초록이었다」로 갈음하지
+않는다는 규율이 가리키는 자리가 바로 이것이다.
 
 ### 「내 표지 0 · 남의 표지 보존」 계수
 
@@ -101,9 +92,9 @@ range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다.
 | 내 — `internal val ALLOWED_ROOTS` 를 가진 파일 | 8 | **1**(evaluation 만, 원천 상태) | 일곱이 `private` 로 돌아감 |
 | 내 — `OPEN-M10-SCOPED-PACKAGES-COVERAGE` | 1 | **0** | 사라짐 |
 | 내 — capability map `(i) M10/10C` | 1 | **0** | 사라짐 |
-| 내 — `ScopedAllowedRootsParityTest` 를 담은 파일 전수 | 4 | **1** | 남은 하나는 **이 slice 의 장부**(scope.md)이고 복원 대상이 아니다 — 아래 「되돌림 뒤 남는 것」 |
+| 내 — `ScopedAllowedRootsParityTest` 를 담은 파일 전수 | 7 | **3** | 남은 셋은 **이 slice 의 장부**(scope·commands·rollback)이고 복원 대상이 아니다 — 아래 「되돌림 뒤 남는 것」 |
 | 남 — 옛 class `evaluation/…ParityTest.kt` | 0 | **1** | 되살아남 |
-| 남 — capability map 줄 수 | 4105 | **4090**(= 원천) | 남의 본문 보존 |
+| 남 — capability map 줄 수 | 4105 | **4090**(= 원천) | 남의 본문 보존(정정 둘을 거친 뒤에도 같다) |
 | 남 — capability map `(d) 하네스·6G 잔여` 절 | 1 | **1** | 보존 |
 | 남 — `gate.tests.adapters` 등재 항목 수 | 209 | **209**(= 원천) | 내 항목 하나가 빠지고 옛 항목 하나가 돌아와 같다 |
 | 남 — `EvaluationAdapterDependencyTest.kt` 줄 수 | 499 | **499** | `sizeGate` 한도에 한 줄 남은 그 파일이 양쪽에서 같다(치환이라 줄이 움직이지 않는다) |
@@ -114,7 +105,7 @@ verifier 가 대조할 것은 「실측 HEAD == 판정 SHA」가 **아니다**(�
 것은 그 사이에 **복원 목록 안의 경로가 움직였는가**다.
 
 ```
-git diff --name-only ddba9277..<판정 SHA> -- <위 14 경로를 개별 인자로>
+git diff --name-only ccbe98ff..<판정 SHA> -- <위 14 경로를 개별 인자로>
 ```
 
 → 빈 출력이면 이 실측은 유효하다. 이 slice 의 장부 커밋은 그 12 경로를 **건드리지 않는다**(장부를 목록에서

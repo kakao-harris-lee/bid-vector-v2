@@ -11,7 +11,7 @@
 | 둘을 닫은 자리 | `git log --merges --ancestry-path <그 evidence 첫 커밋>..HEAD` | **PR #134 머지 `97ed49c4`** |
 | 장부 공백 | `grep -c gates-tests docs/discovery/capability-map.md` | **0** — 그 종결이 어디에도 등재되지 않았다 |
 | ④ 오늘 상태 | `git grep 'data class (Eligible\|Ineligible\|Uncertain)' -- qualification/src/main` | subtype 셋이 **`public data class`** |
-| ④ 영향 모집단 | `git grep -ln 'LicenseVerdict\.\(Eligible\|Ineligible\|Uncertain\)(' -- '*.kt' \| grep -v '^qualification/' \| wc -l` | **18**(adapters 4 · app 10 · workflow 4) — M9/gates-tests 가 센 16 에서 둘 늘었다 |
+| ④ 영향 모집단 | 같은 매치에서 **주석 줄(`*`·`//`·`/*`)을 뺀** 뒤 남은 줄이 있는 파일만 센다(`qualification/` 제외) | **17**(adapters 3 · app 10 · workflow 4) = M9/gates-tests 의 **16** + m9/ops-code 의 하나. **파일 단위 `git grep -ln` 은 18 을 내고 그것은 과다 계수다** — KDoc 언급까지 세기 때문이고, 그 차이 하나가 `QualificationAdapterDependencyTest`(match 둘 다 KDoc 줄, 컴파일 영향 0)다. 팀장 정정 · PR #148 cr r1 |
 
 ## 2. ① 의 착수 실측 — 두 층의 오늘
 
@@ -21,7 +21,7 @@
 | 축별 두 층 집합 비교(정책 unfold ↔ 각 축 `ALLOWED_ROOTS`) | **여덟 축 모두 일치**, 차 **0**(audit 1 · evaluation 10 · notice 5 · opening 7 · profile 7 · qualification 6 · relay 8 · strategy 7) |
 | 등식 단언이 있는 축 | **1**(evaluation) — 나머지 일곱의 집합은 `private val` 이라 다른 파일에서 읽히지 않는다 |
 | 중첩 축 쌍 | **0** |
-| `ALLOWED_ROOTS` 를 가진 어댑터 dependency test | **14** — 그 가운데 이름 층 축이 **없는 여섯**: `event`·`extraction`·`koneps`·`ml`·`notification`·`persistence` |
+| 어댑터 dependency test 전수 ↔ 이름 층 축 | dependency test **14** · `source.scoped-packages` **8** · 축이 **없는 여섯**: `event`·`extraction`·`koneps`·`ml`·`notification`·`persistence`. 그 여섯을 **술어 종류로 갈라 셌다** — 바이트코드 **둘**(`notification`·`persistence`) · 소스 텍스트 **넷**(`event`·`extraction`·`koneps`·`ml`). 허용 목록 심볼도 하나가 아니다(`ALLOWED_ROOTS` 11 · `OUT_OF_LAYER_DOMAIN_ROOTS` 2 · `ALLOWED_DOMAIN_ROOTS` 1) — **「`ALLOWED_ROOTS` 를 가진 14」는 틀린 묶음이었다**(자기 정정) |
 | 최장 접두 선택 | `SourceReferencePolicy.scopeOf` 가 `maxByOrNull { scope.length }` — **최장 접두가 이긴다**(구현 확인) |
 | 정책 키를 읽는 자리 **전수** | 셋 — `SourceReferencePolicy`(→ `domainSourceReferenceGate`, 모듈 **열**) · build-logic 의 그 정책 술어 test · evaluation 축 등식 test |
 
@@ -81,8 +81,10 @@
 
 <!-- 최종 HEAD 에서의 실측. 이 파일을 또 고치면 그 HEAD 가 움직이므로, 정본은 verifier 보고와 PR 조치 코멘트다. -->
 
-- **rollback 복원 트리**(임시 clone, 14 경로 복원 뒤): `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**
-  (36m 10s · 433 actionable 중 278 executed · 게이트 task 172 · 실패 0). 되돌린 트리가 초록이다.
+- **rollback 복원 트리**(임시 clone, 14 경로 복원 뒤, 실측 HEAD `ccbe98ff`): `./gradlew --no-daemon check`
+  → **BUILD SUCCESSFUL**(35m 36s · 433 actionable 중 278 executed · 게이트 task 172 · 실패 0). 되돌린 트리가
+  초록이다. **이 측정은 세 번째다** — 산출물을 고치는 커밋이 두 번 더 들어와 실측 자리가 그때마다 옮겨졌고,
+  앞의 둘(과 앞 라운드가 쓴 트리 동일성 갈음)은 버렸다. 사유는 `rollback.md`.
 - **최종 HEAD**: `./gradlew --no-daemon check` → 결과는 **verifier 보고와 PR 조치 코멘트**가 정본이다.
   이 파일을 고치는 것이 `leakPatternGate` 의 선언 입력(`reports/evidence/**`)을 바꿔 HEAD 를 또 움직이므로,
   마지막 HEAD 의 수치를 이 파일에 적지 않는다. 구현 레인이 잰 값은 인계 보고에 싣는다.

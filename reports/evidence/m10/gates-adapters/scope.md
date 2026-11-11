@@ -33,9 +33,13 @@ testFixtures factory 로」다. 셋 다 이 slice 의 계약 밖이다.
    `TestFixturesGateTest`) 그 자리가 `OPEN-1BC-TESTFIXTURES-GATE`(「면제·순수성 규칙을 ADR 로 먼저 정한
    뒤에 연다」, ADR 0007)를 가리킨다. ADR 없이 여는 것은 **그 OPEN 의 우회**다.
 3. **영향 범위가 모듈 셋에 걸친다.** 오늘 `qualification` 모듈 밖에서 subtype 생성자를 부르는 test 파일은
-   **18**(모집단 술어는 `git grep -ln 'LicenseVerdict\.\(Eligible\|Ineligible\|Uncertain\)(' -- '*.kt'` 에서
-   `qualification/` 제외 — `adapters` 넷 · `app` 열 · `workflow` 넷). M9/gates-tests 가 센 16 에서 둘이
-   늘었다.
+   **17** — `adapters` **셋** · `app` **열** · `workflow` **넷**. M9/gates-tests 가 센 **16** 에 m9/ops-code 가
+   더한 하나(`EvaluationCommitInboxProductionTest`, 실제 코드 호출)다.
+   **모집단 술어는 파일 단위 grep 이 아니다**(팀장 정정, PR #148 cr r1): `git grep -ln` 은 **KDoc 언급까지
+   세므로** 과다 계수한다 — `QualificationAdapterDependencyTest` 의 match 둘은 모두 KDoc 줄이라 생성자에
+   대해 **컴파일되지 않는다**(그 slice 도 같은 이유로 세지 않았다). 쓰는 술어는 **주석 줄을 뺀 계수**다:
+   `LicenseVerdict.(Eligible|Ineligible|Uncertain)(` 매치 줄에서 `*`·`//`·`/*` 로 시작하는 줄을 빼고
+   남은 줄이 하나 이상인 파일. 이 축을 받는 slice 가 이 목록을 입력으로 쓴다.
 
 **팀장은 2026-11-06 에 같은 판정을 이미 내렸다**(M9/gates-tests 계약 갱신 ①: 「이 slice 에서 뺀다」, 받는 자리는
 **testFixtures 개방 ADR slice**). 이 slice 는 그 판정을 뒤집을 입력을 갖고 있지 않다. 처분: **열린 채 유지**,
@@ -63,9 +67,11 @@ testFixtures factory 로」다. 셋 다 이 slice 의 계약 밖이다.
 - `EvaluationAdapterDependencyTest.kt` — **499/500 줄**이라 한 줄도 더하지 않는다(그 축의 `ALLOWED_ROOTS` 는
   이미 `internal` 이어서 더할 것이 없다). 그 파일 분리는 M9/gates-tests 가 남긴 선행 작업이고 다른 결정이다.
 - **이름 층 축이 없는 여섯 패키지** — `event`·`extraction`·`koneps`·`ml`·`notification`·`persistence` 는
-  바이트코드 dependency test(`javap` + `ALLOWED_ROOTS`)를 갖지만 `source.scoped-packages` 에 없다. 더하는 것은
-  **게이트의 판정 모집단 확장**(새 정책 키 여섯 + 그 축이 새로 붉어질 수 있다)이고 이 OPEN 의 문면 밖이다.
-  아래 「보고 항목」으로 올린다.
+  dependency test 를 갖지만 `source.scoped-packages` 에 없다. **그 여섯의 결여는 한 가지가 아니다**(실측):
+  `notification`·`persistence` 는 여덟과 같은 **바이트코드** 술어라 이름 층 짝이 없고,
+  `event`·`extraction`·`koneps`·`ml` 은 **소스 텍스트** import 정규식이라 바이트코드 층이 없다. 어느 쪽이든
+  더하는 것은 **게이트의 판정 모집단 확장 또는 술어 종류 변경**이고 이 OPEN 의 문면 밖이다. 처분은
+  `OPEN-M10-SCOPED-PACKAGES-COVERAGE`.
 - ④ 의 처방 전부(위 사유 셋) · testFixtures 개방 ADR.
 - `milestone-6.md`·`milestone-10.md`·다른 slice 의 evidence — 팀장 레인이 받는다.
 
