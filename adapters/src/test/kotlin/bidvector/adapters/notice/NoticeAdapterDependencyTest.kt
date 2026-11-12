@@ -17,7 +17,7 @@ import java.io.File
  * 그 금지를 넓히는 대신 축마다 자기 패키지를 갖는 관례(`evaluation`·`strategy`·`qualification`
  * …)를 따랐다. 두 게이트는 서로를 받치고 어느 쪽도 느슨해지지 않았다.
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.notice",
         "bidvector.procurement",

@@ -44,6 +44,7 @@ import {
   runnerLine,
   shippedDetailAxisCounts,
 } from './opening-axis.mjs';
+import { readKotlinSource } from '../../scripts/kotlin-source.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -133,12 +134,8 @@ const OPENING_DESIGN = openingAxisDesign(
  * 리터럴로 두면 이 slice 가 업종 목록에서 닫은 드리프트를 다시 만든다.
  */
 const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN, {
-  detailAxesPerNotice: shippedDetailAxisCounts(
-    readFileSync(
-      resolve(repoRoot, 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt'),
-      'utf8',
-    ),
-  ),
+  // 경로를 여기서 알지 않는다(r2 — verifier r1 M-2): 키를 넘기고 걷힌 텍스트를 받는다.
+  detailAxesPerNotice: shippedDetailAxisCounts(readKotlinSource('detailAxes')),
 });
 
 /**

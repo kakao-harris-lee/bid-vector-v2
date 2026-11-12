@@ -2701,6 +2701,13 @@ components:
           type: string
         command:
           type: string
+          enum: [ADD_TO_BID_BOX, DEFER, RESUME, RECEIVE_PRICE_MENU, DRAFT_BID, RECORD_BID, AWAIT_OPENING, RECORD_OPENING_FIRST, RECORD_OPENING_OUT_OF_RANK, ENTER_QUALIFICATION_REVIEW, RECORD_OUTCOME, CORRECT_OUTCOME, SKIP, MARK_DEADLINE_PASSED, REVOKE_DEADLINE_PASSED]
+          description: >-
+            전이표의 열 키 열넷 + **건을 여는 명령 하나**(`ADD_TO_BID_BOX`). 여는 명령은 출발
+            상태가 없어 전이표의 행이 될 수 없고 `fromState = null` 인 생성 전이로 남는다.
+            **명령을 상태별로 쪼개지 않는다** — 「초안 만들기」와 「초안 수정」, 「제출함」과
+            「기록 갱신」과 「소급 확인」은 한 동작이고, 무엇이 달랐는지는 같은 줄의 출발
+            상태가 적는다.
         actorKind:
           type: string
           enum: [USER, SYSTEM]

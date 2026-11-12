@@ -3280,7 +3280,11 @@ scout 노트에 있다.)
 
 ## 12. OPEN 결정 목록
 
-**활성 51건** (G1 3 / G2 **7** / G3 **15** / G4 **8** / G5 7 / G6 **5** / M6 잔여·메뉴 **6**).
+**활성 54건**(행 수 — `OPEN-STR-12` 와 `-INTERACTIVE` 는 같은 미결의 두 행이라 결정 단위로는 53 · G1 3 / G2 **7** / G3 **16** / G4 **8** / G5 7 / G6 **7** / M6 잔여·메뉴 **6**).
+> **M9 종결(2026-11-11) 재계산 51 → 54** — 아래 adr07-pitest 의 G6 +2 와 M9/STR12 의
+> `OPEN-STR-12-INTERACTIVE`(G3 +1, 2026-11-05 신설)가 머리에 합산되지 않은 채 머지돼 있었다.
+> 기계로 셌다 — G 절 표의 첫 칸이 `OPEN` 이고 취소선이 아닌 행(G1 3 · G2 7 · G3 16 · G4 8 · G5 7 · G6 7)
+> \+ M6 잔여·메뉴 6(M9 가 그 여섯을 닫거나 더하지 않았다). M9 가 이 집계에서 닫은 것은 0 이다.
 > **M6/G1-SET01(2026-10-21) +1** — G3 에 `OPEN-SET01-AWARD-NAME-INGEST` 를 신설했다(45 → 46).
 > **M7/7B(2026-10-21) −1** — `OPEN-ADR-14` 가 닫혀 G6 가 6 → 5 다(46 → 45, 2026-10-24 `998b59dd` 위 rebase 에서 합집합으로 셈).
 > **M6/G1-DEC05(2026-10-21 · 10-24) +4** — G3 OPEN 묶음 둘(`OPEN-M6-RESIDUAL-OPS` ·
@@ -3744,6 +3748,27 @@ M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 �
 (`reports/evidence/m6/closure/open-inventory.md` §1 · §4 후속 ①). **이 절도 그 재고가 아니다** — 여기 선
 것은 M9 머지분이 실제로 닫은 것과 M9 가 새로 만든 것뿐이다.
 
+#### (f) M9 종결 등재 — ledger 뒤 slice 가 낳고 registry 에 행이 없던 다섯 (2026-11-11)
+
+(b) 는 ledger 시점(2026-11-06)의 등재다. 그 뒤 머지된 slice 가 이름을 지었지만 **자기 evidence 에만** 적었다.
+이 문서가 in_scope 밖이었기 때문이다. 그런 OPEN 이 evidence 에서 넷 나왔다. 다섯째(`OPEN-M9-KOTLIN-COMMENT-STRIP-DUP`)는 evidence 가 아니라 PR 코멘트에서만 이름이 났다(verifier M-1). registry 만 읽는 쪽에는 이 넷이 없는 것으로
+보이므로 (a) 의 「등재 누락 정정」과 같은 처분으로 행을 세운다.
+
+모집단은 기계로 뽑았다: `reports/evidence/m9/**` 에 나오는 `OPEN-` 식별자 가운데 이 문서에 0 회인 것이고,
+M9 이전 식별자를 인용만 한 것은 뺐다.
+
+활성 집계에는 들어가지 않는다(이 절 머리 규칙). 어느 것도 머지를 막지 않는다.
+
+| ID | 무엇 | 받는 자리 | 신설 근거 |
+| --- | --- | --- | --- |
+| `OPEN-M9-COMMAND-OPENAPI-ENUM` | openapi 의 타임라인 `command` 칸만 `type: string` 이다(형제 `actorKind` 는 `enum`). 그래서 web 이 손 유니온과 Kotlin 원문 텍스트 파싱 게이트를 따로 지고 있다. enum 으로 올리면 둘 다 사라진다 | `openapi/**` 를 만지는 다음 계약 slice. `OPEN-M9-TIMELINE-COMMAND-WORDING` 과 같은 자리 | PR **#132** cr OQ · `reports/evidence/m9/web-followups/checklist.md` §5 |
+| `OPEN-SCOPED-ROOTS-PARITY-REST` | adapters 범위 축 여덟 가운데 **일곱**(`audit`·`notice`·`opening`·`profile`·`qualification`·`relay`·`strategy`)에 이름 층 ↔ 바이트코드 층 허용 뿌리의 동치 단언이 없다. 오늘은 여덟 축 모두 일치한다(실측). 그 일치를 지키는 장치는 evaluation 축 하나뿐이다. 하위 패키지 축이 생기면 최장 접두 선택(`scopeOf`) 때문에 등식이 그 하위 축을 보지 못하는 사각도 있다(오늘 0) | 다음 adapters 게이트 slice — 축마다 `private` → `internal` 한 단어, 또는 단일 출처 ADR | PR **#143** · `reports/evidence/m9/gates-build-followups/scope.md` · 사각은 #143 verifier L-1 |
+| `OPEN-ROLLBACK-PREDICATE-WORDING` | `CLAUDE.md` 요약과 evidence-pack 의 §4 유효성 술어는 「빈 출력」이다. 몇 slice 의 `rollback.md` 는 「나오는 경로가 모두 원천에 없으면 유효」라는 전칭 확장을 쓴다. 확장 자체는 트리 동일성으로 건전하다(#138 verifier). 같은 자리의 후보로 rollback 원천 교체 시 셋째 검사가 있다 — 「복원 대상 blob 이 착수 base 와 새 원천에서 같다」(#145 cr r2) | **닫힘(2026-11-11, PR #147 하네스 정리)** — `evidence-pack` rollback 절에 §4 예외 하나(전칭식만 · 열거는 verifier) · 병합 뒤 실측 자리와 `rev-list --merges` 대조 · 원천 교체 셋째 단언(M·D 모집단 · `-q --verify`)을 정본으로 세우고 `CLAUDE.md` 색인을 맞췄다 | PR **#138** v L-2 · cr OQ-2 · PR **#143** scope · PR **#145** 처분 코멘트 |
+| `OPEN-M9-REHEARSAL-FLYWAY-CONFIG-PARITY` | `tools/db-rehearsal.sh` 의 Flyway 설정이 출하 설정과 하나 다르다 — migration 연결의 잠금 상한 `initSql` 이다. 리허설은 배타 실행이라 거동 차이는 0 이고, 그 축을 재는 test 는 따로 있다. 문면으로만 닫혀 있다 | 그 스크립트를 다음에 만지는 slice. 인자 변경은 CI `container` job 에서만 실측된다 | PR **#145** · `reports/evidence/m9/ops-migrations-followups/scope.md` 알려진 제한 ① |
+| `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | Kotlin 원문의 주석 걷기가 두 벌이다. #132 판(`money-vocab-cross-lang.test.mjs` 의 `withoutKotlinComments`, 정규식 한 줄)은 문자열 안 `//` 를 보존하지 않는다. URL 리터럴이 든 파일을 읽는 날 조용히 빗나간다. #135 판은 보존한다. web 게이트 등록부는 한 방향이라 등재 누락을 보지 못한다 | M10/10D `gates-web` — 공유 한 자리로 모으고 URL 리터럴 표본으로 RED 선행 | PR **#135** 조치 코멘트 「팀장 등재 후보」 · 이 종결의 verifier M-1(모집단 밖) |
+
+**(b) 의 둘은 이미 닫혔다** — `OPEN-CVE-APT-RETRY` · `OPEN-CVE-APT-RUNBOOK-BRANCH` 는 PR **#131**(cve-followups) 머지로 닫혔다(`reports/evidence/m9/cve-followups/checklist.md` 의 두 체크). (b) 는 그 머지 전 시점의 문면이라 여기에 종결을 적는다.
+
 #### (g) M10/10A 종결 — 공고 목록 갈래의 총수 최댓값 보호 (2026-11-12)
 
 (b) 가 등재한 `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` 을 M10 slice **10A** 가 닫는다. (b) 가 적은 두 고치는
@@ -3754,6 +3779,78 @@ M6 종결은 204 건을 **건별로 다시 재지 않고** 「받는 자리」 �
 | ID | 처분 | 근거 |
 | --- | --- | --- |
 | `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` | **닫힘** — 공고 목록 슬롯 걷기가 배치마다 본 총수의 **최댓값**을 쥐고 회계에 실어, 재개 첫 쪽의 「없음」(0)이 앞 배치의 총수를 덮지 못한다. 최댓값 함수는 낙찰 갈래에서 **옮겨** 두 갈래가 같은 한 자리를 부르므로, 공유 누산기를 최댓값으로 올리는 날 걷을 자리도 하나다. 남는 축은 **한 배치 안**에서 뒤 쪽이 총수를 줄이는 경우이고 낙찰 갈래와 **같은** 열린 판이다 — 닫히는 범위는 배치 경계뿐이다 | `reports/evidence/m10/notice-resume-total/`(D-1·D-2·D-5) · 브랜치 `feature/m10-notice-resume-total` |
+
+#### (h) M10/10B — timeline-command-enum
+
+**이 절이 받는 행은 둘이다** — `OPEN-M9-COMMAND-OPENAPI-ENUM` 은 **(f) 가 「`openapi/**` 를 만지는
+다음 계약 slice」로 받는 자리를 지정한 그 행**이고(그 slice 가 10B 다), `-WORDING` 은 (b) 의 행이다.
+(f)·(b) 의 행은 그 시점의 사실이라 고치지 않는다 — 처분은 뒤에 오는 이 절이 적는다.
+
+| 무엇 | 처분 | 근거 |
+| --- | --- | --- |
+| `OPEN-M9-COMMAND-OPENAPI-ENUM` | **닫힘** — 계약이 타임라인 명령 칸을 Kotlin 어휘와 **같은 집합의 `enum`** 으로 선언하고 web 은 생성 타입에서 유니온을 끌어온다. 손 유니온과 **Kotlin 원문을 JS 에서 텍스트로 파싱하던 교차언어 게이트의 명령 축**이 함께 사라졌다 — 사슬 DB CHECK → Kotlin → 계약 → 생성 타입 → web 표의 네 고리가 전부 **기계 검사**다 — 층은 고리마다 다르다(실 DB 통합 test · 계약 test · 바이트 등식 · 컴파일, v L-1 정정). web 쪽 전수성은 **별칭을 거치지 않는 타입 등식**이 든다(v M-1). **wire 값은 바뀌지 않았다**(스키마 강화뿐 — 그 칸의 값은 전이 행의 열에서 오고 그 열 CHECK == Kotlin 어휘를 어댑터 통합 test 가 든다) | `reports/evidence/m10/timeline-command-enum/` · 판정 자리는 그 PR 코멘트 |
+| `OPEN-M9-TIMELINE-COMMAND-WORDING` | **PR #132 에서 이미 닫혔다 — (b) 의 그 행이 낡았다.** (b) 는 2026-11-06 에 쓰였고 PR #132 는 그 뒤에 머지됐다. 10B 가 더한 것은 **그 종결의 방어 교체**다 — 표의 전수성이 손 유니온이 아니라 계약 유도에서 온다 | 종결: PR **#132** · `reports/evidence/m9/web-followups/checklist.md` §1. 방어 교체: 위 행과 같은 evidence |
+
+**신설 OPEN 하나** — 10B 가 범위 밖으로 판정한 축이다(팀장 결정 2026-11-11: 고치지 말고 등재한다).
+
+| ID | 무엇 | 신설 근거 |
+| --- | --- | --- |
+| `OPEN-M10-TIMELINE-STATE-OPENAPI-ENUM` | 타임라인의 **상태 두 칸**(출발·도착)이 계약에서 `type: string` 이다 — 명령 칸과 **같은 꼴의 공백**이고 화면이 같은 우회(표에 없으면 서버가 준 코드 그대로)를 쓴다. 건 스키마 쪽 상태 칸에는 이미 `enum` 이 있어 **한 응답 안에서 두 칸의 선언이 갈려 있다**. 받는 자리는 다음에 그 칸들을 만지는 계약 slice 이고, **10B 의 전방 호환 판단을 그대로 물려받는다**(아래) | M10/10B 착수 보고 — 대상 OPEN 둘 다 그 축을 말하지 않아 범위 밖으로 판정했고, 팀장 결정으로 등재만 한다 |
+
+**열린 칸을 닫는 데 전방 호환 창이 없다 — 받는 자리가 물려받는 판단**(팀장 결정 2026-11-11,
+PR #148 cr r2 이월 · 10B 가 명령 칸에서 실제로 쓴 근거). 셋이 **함께** 서야 성립한다: ① 그 칸의
+클라이언트가 **저장소 안 web 하나**다(외부 소비자 0) ② 생성 타입을 **같은 PR 에서 재생성**하므로
+계약과 번들이 한 커밋에서 함께 움직인다 ③ **Kotlin 어휘 ↔ enum 등식 test** 가 어휘 추가 시 계약
+갱신을 강제한다(Kotlin 에만 더하면 `check` 가 붉다). 그래서 「서버가 enum 밖 값을 내는」 창이
+없다. 런타임 조회가 자유 문자열을 계속 받는 것은 그 창 때문이 아니라 **배포 비틀림**(계약·번들이
+함께 움직였어도 브라우저가 옛 번들을 쥔 경우) 때문이고, 그 처리는 유지한다. **셋 중 하나라도
+깨지면**(외부 소비자가 생김 · 생성이 다른 PR 로 갈림 · 등식이 없음) 이 판단은 그 slice 에서
+다시 서야 한다.
+
+#### (i) M10/10C `gates-adapters` — adapters·domain test 술어 넷
+
+계약 `milestone-10.md` 10C 행이 든 넷의 처분이다. **셋이 닫히고 하나가 사유와 함께 유지된다.** 정본은
+`reports/evidence/m10/gates-adapters/{scope,commands,checklist,rollback}.md` 이고 **이 절은 다시 판정하지
+않는다**. 둘(②·③)은 이 slice 가 아니라 **선행 머지가 이미 닫은 것**인데 장부에 등재되지 않아 여기가 처음
+적는 자리다 — 위 (d) 는 그보다 앞선 시점에서 그 둘을 「손대지 않은 여섯」에 세고 있다.
+
+| ID | 처분 | 무엇이 그것을 닫는가 (근거) |
+| --- | --- | --- |
+| `OPEN-SCOPED-ROOTS-PARITY-REST` | **닫힘(구조)** — M10/10C | 두 층 허용 뿌리 등식이 축 **하나에서 축 전부로** 넓어졌다. 앞 판은 축 하나를 손으로 적은 **열거**라 아홉째 축이 생기면 조용했고, 이 판은 축 → 바이트코드 층 `ALLOWED_ROOTS` 표 하나를 두고 **그 key 집합과 `source.scoped-packages` 를 집합 등식**으로 묶는다(표의 값은 문자열이 아니라 **컴파일되는 심볼 참조**라 축의 목록을 지우거나 이름을 바꾸면 컴파일이 깨진다). 일곱 축의 비용은 OPEN 이 적은 그대로 **축마다 한 단어**(`private` → `internal`)였다. 계약이 지목한 **최장 접두 사각**은 「축끼리 패키지 접두가 아니다」 단언이 닫는다 — `scopeOf` 가 최장 접두를 고르므로 하위 축을 더하면 그 목록이 상위 축의 것을 **가리고** 상위 축의 등식은 조용히 초록으로 남는다. **네 번째 단언이 key 자신을 묶는다**(D-10C-6) — 표의 key 집합이 **그 값 심볼들이 선언된 패키지 집합**과 같은지 재고, 그 패키지는 산문이 아니라 **자기 class 파일 상수 풀의 `getALLOWED_ROOTS` 소유 class**(각 축 file facade)에서 얻는다. 앞 판은 key 가 문자열이라 **별칭 바꿔치기**(한 축 자리에 다른 축 집합을 별칭으로 끼우고 그 축 정책을 그 집합으로 넓힘)와 **유령 축 개명**(정책 축 이름과 key 를 함께 `…audits` 로)이 둘 다 초록이었다. **변이 아홉으로 양쪽을 실측했다**: 구현 전 음성 대조(이름 층만 넓힌 변이가 그 정책 키를 읽는 자리 **전수**에서 초록) ↔ 구현 뒤 같은 변이가 **그 등식 하나만** 붉다 · 모집단 축(아홉째 축 추가·축 제거·중첩 축) 셋 · 바꿔치우기 둘 · **등재된 중첩 축**(두 등식을 만족시킨 뒤 접두 비포함만 깨는 변이) · 선언 입력을 뺀 UP-TO-DATE 거짓 초록과 그 양성 쌍 · 별칭 바꿔치기와 유령 축 개명(처방 전 초록 ↔ 처방 뒤 **그 네 번째 단언만** RED). **남은 우회는 등재했다** — 그 표의 정본은 이 slice evidence 의 설계 검토 (2) 이고 계수도 거기가 센다. 그 가운데 네 번째 단언이 받지 못하는 셋: ⓐ 표의 **값 식**으로 메꾸기 — `"…audit" to AUDIT_ROOTS + NOTICE_ROOTS` 한 토큰과 정책 한 줄이면 초록이고 별칭 바꿔치기도 필요 없다. 술어가 「그 패키지의 getter 를 **부른다**」만 보고 「표의 값이 그 호출 결과 **그 자체**인가」는 보지 않는다(처방 후보: 리플렉션으로 그 getter 를 불러 `===` 동일성) ⓑ 같은 패키지의 **다른 보유자**(`internal object AuditWide { val ALLOWED_ROOTS = … }`) — 술어가 **패키지**에 묶이고 심볼에 묶이지 않아 ⓐ 의 처방으로도 닫히지 않는다 ⓒ 접두가 같은 **별도 파일**(`ownClassFiles` 가 바깥 class 이름 **접두**로 모으므로 `…ParityTestFillKt` 도 읽힌다). 근거 커밋 `7b02b3cc`(구현)·`854a2e12`(네 번째 단언), 판정 SHA·CI 좌표는 이 slice 의 PR 조치 코멘트 |
+| `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` | **닫힘 — 선행 머지(장부 공백 보충)** | **PR #134 머지 `97ed49c4`**(M9/gates-tests, 정본 `reports/evidence/m9/gates-tests/`)가 `PersistenceAdapterDependencyTest` 의 술어를 **소스 텍스트 import 정규식에서 `javap -p -v` 상수 풀 허용 목록으로** 이식했다. 10C 가 base main 에서 재확인한 것: 그 파일에 소스 import 정규식 **0**, 양성·허용·세그먼트 경계 대조 셋이 같은 class 에 있다. 그 slice 가 남긴 잔여는 이 OPEN 이 아니라 **허용된 형제 패키지를 경유하는 간접 참조**(형제 여덟이 공유, 식별자 미발급) |
+| `OPEN-CHECK-BODY-PRESENCE-ASSERTIONS` | **닫힘 — 선행 머지(장부 공백 보충)** | 같은 PR·같은 evidence. `CleanMigrationCheckTest` 의 CHECK 단언이 전부 **본문·본문 집합 `shouldBe`** 이고 `any { contains }` 는 **단언에 0**(남은 언급은 그 변경을 설명하는 KDoc 산문). 함께 받은 자리도 닫혔다 — 제약 조회가 0 행이면 명시 실패, 같은 이름이 둘 이상이면 명시 실패 |
+| `OPEN-VERDICT-CONSTRUCTION-VISIBILITY` | **열린 채 — 범위 밖 유지**(팀장 확정 2026-11-11, 착수 보고) | 처방(D-6F5-20)이 10C 의 축 밖이다 — ⓐ `LicenseVerdict` subtype 생성자를 `internal` 로 내리는 것은 **production domain 커널의 가시성 변경**이고 10C 는 adapters·domain **test 술어** 축이다 ⓑ 처방의 둘째 절반(「test 조립은 testFixtures factory 로」)이 **저장소 전역 차단**에 막혀 있다(`java-test-fixtures` 전 모듈 거부 · `module.expected-source-sets=main,test` · 그 게이트 test), 그 자리가 `OPEN-1BC-TESTFIXTURES-GATE`(「면제·순수성 규칙을 ADR 로 먼저 정한 뒤에 연다」)를 가리켜 ADR 없이 여는 것은 **그 OPEN 의 우회**다 ⓒ `qualification` 모듈 **밖**에서 그 생성자를 부르는 test 파일이 **17**(adapters 3 · app 10 · workflow 4 — M9/gates-tests 가 센 **16** 에 m9/ops-code 가 더한 하나). 모집단 술어는 `git grep -ln` 이 아니라 **주석 줄을 뺀** 계수다 — 파일 단위 grep 은 KDoc 언급까지 세고, `QualificationAdapterDependencyTest` 는 match 가 KDoc 두 줄뿐이라 컴파일 영향이 없다(그 slice 도 같은 이유로 세지 않았다 · PR #148 cr r1 실측). **받는 자리는 그대로 testFixtures 개방 ADR slice**(`OPEN-1BC-TESTFIXTURES-GATE` 선행)이고, 팀장 2026-11-06 판정과 같다 |
+| `OPEN-M10-SCOPED-PACKAGES-COVERAGE`(신설) | **열린 채 — 받는 쪽 정책 키 신설 계약 slice** | `source.scoped-packages` 는 adapters 의 dependency test **열넷** 가운데 **여덟**만 든다. 남은 **여섯**은 두 갈래로 갈리고 **결여가 서로 반대다**(실측 — 술어 종류와 허용 목록 심볼을 축마다 셌다): ⓐ `notification`·`persistence` 는 여덟과 **같은 `javap` 상수 풀 술어**인데 이름 층 짝이 없어 **`const val` 인라인 사각이 덮이지 않는다** — 특히 `persistence` 는 **PR #134 가 소스 텍스트에서 그 술어로 옮긴 축**이라, 그 머지가 「여덟」이라는 수를 낡게 만든 동시에 그 축에서 **이름 쪽 가시성을 없앴다** ⓑ `event`·`extraction`·`koneps`·`ml` 은 반대로 **소스 텍스트 import 정규식**만 있어 이름은 보지만 **import 없는 전체 한정 참조를 못 본다** — `OPEN-PERSISTENCE-GATE-PREDICATE-TYPE` 이 persistence 에서 닫은 그 사각이 이 넷에 남아 있다(심볼 모양도 다르다: `extraction`·`koneps` 는 `OUT_OF_LAYER_DOMAIN_ROOTS`, `ml` 은 `ALLOWED_DOMAIN_ROOTS`). 10C 가 더하지 않은 이유는 **게이트의 판정 모집단 확장**이라는 것이다 — ⓐ 는 정책 키 둘 신설이고 ⓑ 는 **술어 종류 변경**이라 둘이 다른 작업이며, 그 축들이 새로 붉어질 수 있어 계약 갱신 사안이다(팀장 결정 2026-11-11). 위 첫 행의 모집단 등식은 **이 여섯을 요구하지 않는다** — 그 등식이 묶는 것은 「이름 층이 판정하는 축」과 「표에 든 축」이고, 어느 축을 판정할지는 이 OPEN 이 받는다 |
+
+#### (j) M10/10D `gates-web` — web 게이트 축 넷의 처분
+
+**셋은 장부 공백이었다.** 위 (b) 행 셋은 2026-11-06 판이고, **PR #132**(M9/web-followups, 머지
+`e12c0485`)가 그 셋을 이미 닫았는데 §12.3 에 그 처분이 등재되지 않았다. 그래서 이 slice 는 **코드를
+바꾸지 않고** 닫힘을 등재하고, 등재 근거로 **바꿔치우기 변이 재측정**을 든다(문서를 근거로 삼지
+않는다 — 더하기만 한 변이는 초록이 되므로 세지 않았다). 넷째만 실제 구현이다.
+
+| ID | 처분 | 근거 (PR · 머지 커밋 · 재측정) |
+| --- | --- | --- |
+| `OPEN-M9-CLOCK-LINT-SCOPE` | **닫힘** — 대상이 「`Date` 라는 이름」이 아니라 **지금을 낼 수 있는 표면**이고, 제외 디렉터리 둘이 금지 안으로 들어왔다 | PR **#132** 머지 `e12c0485` · M10/10D 재측정: 탐침 열하나(`Intl` 의 인자 없는 서식 · props 서식기 · `Temporal` · `performance` 둘 · 계산 접근 · 구조 분해 · 빈 인자 서식 · 맨 네트워크 전역 · 제외였던 두 디렉터리)가 **14 error**. 목록 자체도 게이트 test 가 잠근다 — 시계 이름을 하나로 좁히면 **4 failed**, 두 디렉터리를 제외로 되돌리면 **1 failed** |
+| `OPEN-M9-SCREEN-COVERAGE-SYMBOL-GRAPH` | **닫힘** — 모집단 판정이 호출 지점의 이름이 아니라 **해소된 선언**이다(TS 심볼 그래프) | 같은 PR·머지 · 재측정: 별칭 import 로 어휘를 부르는 카드를 실제 화면 디렉터리에 두면 의무 집합이 자라 등식이 **1 failed**. **잔여는 아래 신설 ID 로 옮긴다** |
+| `OPEN-M9-MONEY-VOCAB-CROSS-LANG` | **닫힘** — 손으로 복제한 자리들(web 표·유니온 · e2e 라벨 표 둘)의 키 집합이 Kotlin 정본과 등식으로 묶였다 | 같은 PR·머지 · 재측정: Kotlin 정본 열거에 값 하나를 더하면 **1 failed**. **「하나의 출처」(openapi `enum`)는 범위 밖** — 그 칸이 응답 스키마에 스물넷이고 M10/10B 와 같은 파일이며, `enum` 은 네 벌 가운데 web 유니온 하나만 지운다(e2e 축어 라벨은 관례상 산출물에서 끌어오지 않는다). OPEN 이 named 한 해악(degrade)은 위 등식이 닫았고 남은 것은 복제 **수**다 |
+| `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | **닫힘** — Kotlin 원문 읽기의 주석 걷기가 **공유 한 자리**의 단일 패스 주사기로 모였다. 다룰 수 없는 꼴(raw string · **템플릿 식 안의 따옴표·주석 표지** · 닫히지 않은 문자열·문자 리터럴·블록 주석·**백틱 식별자**·**템플릿 식**)은 **던진다** | PR **#135** 조치 코멘트가 신설 · **이 slice** 가 닫는다 · `reports/evidence/m10/gates-web/`. 두 벌이 **둘 다 부분 구현**이었다(줄 단위 정규식 판은 문자열 안 `//` 를 지워 base URL 상수를 절단 · 보존판은 문자열 안 블록 주석 글자를 줄이고 raw string 을 절단). **r1 이 축 셋을 더했다**(cr r0 HIGH 1 · LOW 2 · **verifier r1 M-1**) — **문자열 템플릿 식**(r0 판은 `"${f("//")}"` 도 `"${base ?: "https://x"}/p"` 도 앞 두 판과 **똑같이 절단했다**. 뒤의 꼴이 M-1 이고 **r1 이 닫았다** — 같은 축이 입력 하나로 닫히지 않음을 보이므로 둘 다 축어로 둔다) · **백틱 식별자**(r0 판만 던졌다 — 앞 두 판은 우연히 옳았다) · **CRLF 줄끝 보존**. 축별 측정은 `design-review.md` §2b |
+
+**신설 — `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS`**
+
+| ID | 무엇 | 받는 자리 | 신설 근거 |
+| --- | --- | --- | --- |
+| `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` | web 의 Kotlin 원문 읽기 게이트가 **막지 못하는 다섯**을 한 ID 로 묶는다. ⑤ **여는 행위를 런타임에 재는 층이 없다**(그 층이 들어오면 아래 넷이 함께 닫힌다) · ⑥ 단언 전수의 **데이터 흐름이 한 홉**이다(두 홉 이상·별칭·메서드 피호출자·`.trim()`·감싼 선언·spread·콜백, 그리고 기존 이름 감싼 재선언·선언자 이동·죽은 `assertStrippedKotlin('')`) · ⑧ **추적되는 심볼릭 링크**가 Kotlin 원문을 가리키면 코드에 토큰이 남지 않는다 · ⑨ **대소문자**(`.KT` + `i` 플래그) · ⑩ **데이터 파일**에서 막는 것은 `이름.kt` 꼴뿐이고 확장자 단독 값·별표/중괄호 glob 은 지나간다 | **다음 web 게이트 slice**. ⑩ 의 처방은 이미 측정돼 있다 — 데이터 파일 본문에서 **`#` 로 시작하는 줄을 빼고 allowlist 값을 차감한 뒤** 단어 토큰을 적용하면 **오탐 0 으로 P6·P7·P7b·P7c 가 RED** 다(verifier r6 실측). ⑤ 는 vitest setup 에서 `fs` 읽기·glob 을 감싸 `.kt` 를 연 호출자가 소유 모듈이 아니면 실패시키는 꼴 | M10/10D r1~r7 · PR **#151** 의 verifier r1~r6 · code-reviewer r0~r4 · `reports/evidence/m10/gates-web/design-review.md` §4 (3) 미달 ⑤⑥⑧⑨⑩ 이 각각의 실측과 처방 포인터를 든다 |
+
+**신설 — `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER`**
+
+| ID | 무엇 | 신설 근거 |
+| --- | --- | --- |
+| `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER` | 화면 카드 모집단이 **그 컴포넌트 서브트리만** 본다 — 내보낸 겉이 어휘를 부르는 **비공개 속**을 그리면 그 파일이 의무를 하나도 내지 않는다. 같은 성질의 잔여가 다섯 더 있다(감싸 내보내기 `memo`·`forwardRef` · 개명 재수출 · 클래스 컴포넌트 · 함수 **참조** 전달 · 새 어휘 함수). 앞 ID 가 named 한 축(재수출·별칭)과 **다른 축**이고, 닫는 길은 파일 안 호출 그래프를 한 겹 따라가는 것인데 그러면 의무 집합이 마운트 가능성과 어긋나기 시작한다. 받는 자리는 **다음 화면 slice** 다 | M10/10D 실측 — 간접 렌더 꼴을 실제 화면 디렉터리에 두면 게이트가 **16 passed**(조용한 초록)로 지나간다. 잔여 여섯의 전수와 「오늘 그 꼴이 0」은 PR #132 의 `design-review.md` §③ 「남는 자리」 표에 있다 |
+
+**이 절의 OPEN 은 §12 머리의 활성 집계에 들어가지 않는다**(이 §12.3 머리말의 규약 — slice 가 신설한
+구현 잔여이고 G1~G6 의 「결정 필요 사항」이 아니다). 그래서 닫힌 넷도 신설 하나도 머리의 수를
+움직이지 않는다.
 
 ---
 

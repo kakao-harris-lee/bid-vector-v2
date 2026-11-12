@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { components } from '../api/generated/operator-api';
+
 import {
   BID_CASE_STATE_DISPLAY,
   BID_COMMAND_DISPLAY,
@@ -8,6 +10,7 @@ import {
   TIMELINE_ACTOR_DISPLAY,
   commandDisplayOf,
   nextActionOf,
+  type BidCommandToken,
 } from './caseDisplay';
 import { displayOrUnknown } from './stateDisplay';
 
@@ -65,6 +68,9 @@ describe('입찰 건 상태 표시 표 — 계약 enum 전수', () => {
  *
  * 전수 열다섯 = 전이표의 열 키 열넷 + **건을 여는 명령 하나**. 여는 명령은 출발 상태가 없어
  * 전이표의 행이 될 수 없고 타임라인에는 생성 전이로 남는다 — 그 어휘가 `ADD_TO_BID_BOX` 다.
+ *
+ * M10/10B 로 표의 전수성이 **계약에서 온다**(`satisfies Record<BidCommandToken, …>` 의 유니온이
+ * 생성 타입 유도다 — 상태 축과 같은 꼴). 아래 목록은 그 유도와 **독립인 명세**로 남긴다.
  */
 describe('타임라인 명령 어휘 — 전수 열다섯', () => {
   it('전이 명령 열넷과 여는 명령 하나가 전부 표에 있다', () => {
@@ -87,6 +93,43 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
         'REVOKE_DEADLINE_PASSED',
       ].sort(),
     );
+  });
+
+  /**
+   * **계약이 이 칸의 어휘를 닫고 있다**(M10/10B). 표의 전수는 `satisfies Record<BidCommandToken, …>`
+   * 이 지는데, 계약이 그 칸을 다시 `type: string` 으로 내리면 `BidCommandToken` 이 `string` 으로
+   * 넓어지고 그 전수 검사는 **아무것도 막지 않으면서 초록**이 된다 — 생성 타입 유도가 그 변이를
+   * 조용히 통과시키는 유일한 길이다. 그 길을 타입으로 닫는다: `string` 이 들어오는 순간 아래
+   * 별칭이 `never` 가 되어 **컴파일되지 않는다**(W-3).
+   *
+   * `@ts-expect-error` 로는 쓸 수 없다 — eslint 가 `src/**` 에서 세 형태를 전부 막는다(W-2).
+   */
+  it('명령 어휘가 `string` 보다 좁다 — 계약이 어휘를 닫고 있다', () => {
+    type NarrowerThanString<T extends string> = string extends T ? never : T;
+    const closedVocabulary: NarrowerThanString<BidCommandToken> = 'ADD_TO_BID_BOX';
+
+    expect(closedVocabulary).toBe('ADD_TO_BID_BOX');
+  });
+
+  /**
+   * **전수성을 별칭이 아니라 계약에 묶는다**(v M-1). 표의 전수는 `satisfies Record<BidCommandToken, …>`
+   * 이 지는데, 그 별칭이 **생성 타입 유도라는 사실을 잠그는 구조가 없었다**: 별칭을 리터럴 손
+   * 유니온으로 되돌리면 lint·typecheck·W-5·W-6 이 전부 초록이고(실측), 그 뒤 계약에 명령이 늘면
+   * web 이 그것을 「알 수 없는 상태」로 **조용히 degrade** 한다 — 10B 가 걷은 교차언어 명령 축이
+   * 메우던 바로 그 구멍이 별칭 한 줄 뒤에 남아 있었다.
+   *
+   * 그래서 **별칭을 거치지 않고** 생성 타입 경로에서 바로 뽑아 표의 키 집합과 맞댄다. 등식은
+   * **양방향**이다 — 한쪽 포함만 재면 반대쪽이 줄어든 것을 보지 못한다. 튜플로 감싸는 것은
+   * 맨 `extends` 가 유니온을 갈래별로 분배해 판정하는 것을 막기 위해서다.
+   */
+  it('표의 키 집합이 계약의 명령 어휘와 **같다** — 별칭을 거치지 않는다', () => {
+    type ContractCommand = components['schemas']['BidTimelineEntry']['command'];
+    type TableKey = keyof typeof BID_COMMAND_DISPLAY;
+    type MutuallySame<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+    const sameSet: MutuallySame<TableKey, ContractCommand> = true;
+
+    expect(sameSet).toBe(true);
   });
 
   /** 문면이 **토큰과 다른 글자**여야 이 표에 뜻이 있다 — 같으면 원문을 그린 것과 구별되지 않는다. */
@@ -116,7 +159,10 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
     expect(BID_COMMAND_DISPLAY.DRAFT_BID.why).toBeDefined();
   });
 
-  /** 계약이 이 칸을 `string` 으로 내므로 키 좁힘은 한 자리다 — 표 밖 값은 **보이게** 낸다. */
+  /**
+   * 계약이 어휘를 닫은 뒤에도 조회는 **런타임의 자유 문자열**을 받는다 — 번들이 아직 모르는 값이
+   * 닿는 경로(배포 비틀림)가 남아 있다. 표 밖 값은 **보이게** 낸다.
+   */
   it('표 밖 토큰은 보이는 미지 상태로 낸다 — 조용한 빈칸이 아니다', () => {
     const unknown = commandDisplayOf('MINT_MONEY');
 
@@ -128,8 +174,8 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
    * **`Object.prototype` 의 키도 표 밖이다**(PR #132 cr L-3). 맨 색인 읽기(`table[value]`)는
    * `toString`·`constructor`·`__proto__` 에서 **프로토타입의 값**을 내고, 그것이 폴백을 삼켜
    * `label`·`tone` 이 `undefined` 인 「상태」가 화면까지 간다 — 배지가 아무것도 그리지 않는
-   * **조용한 빈 자리**가 그 입력에서 되살아난다. 계약이 이 칸을 `type: string` 으로 내므로
-   * 자유 문자열이 닿는 자리이기도 하다(형제 칸 `actorKind` 에는 enum 이 있다).
+   * **조용한 빈 자리**가 그 입력에서 되살아난다. 조회가 런타임의 자유 문자열을 받는 자리라
+   * 계약이 어휘를 닫은 뒤에도 이 입력은 그대로 닿는다.
    */
   it('프로토타입 키도 보이는 미지 상태로 낸다', () => {
     for (const key of ['toString', 'constructor', 'valueOf', 'hasOwnProperty', '__proto__']) {

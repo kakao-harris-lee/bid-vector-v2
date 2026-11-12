@@ -22,7 +22,7 @@ import java.io.File
  * **어느 class 가 그 좌표를 지녀도 되는지는 이 test 가 정하지 않는다** — `adapters` 모듈 전체에
  * 걸리는 `BusinessProfileIsolationGateTest` 가 `SourceFile` 속성으로 그 자리를 정한다(r2 F5 처분).
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
         "bidvector.workflow.profile",
