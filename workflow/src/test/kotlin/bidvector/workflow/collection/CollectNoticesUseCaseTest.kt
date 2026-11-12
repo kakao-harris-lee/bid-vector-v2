@@ -348,6 +348,64 @@ class CollectNoticesUseCaseTest {
         fixture.runs.recorded.size shouldBe 1
     }
 
+    /**
+     * **원천이 한 번 말한 총수는 뒤 배치가 지우지 못한다**([widerTotalOf] · OPEN-M9-NOTICE-LIST-RESUME-TOTAL).
+     * 어댑터는 배치마다 새 누산기라 재개 첫 쪽이 총수를 말하지 않으면 **0** 을 낸다 — 그 0 이 앞 배치의
+     * 총수를 덮으면 회계 행이 「받은 수 ≥ 총수」가 되어 덜 받은 슬롯이 다 받은 것처럼 적히고, 운영 판독
+     * (`received < source_total`)이 서는 자리가 무너진다.
+     *
+     * 최댓값이지 **「첫 값 고정」이 아니다** — 뒤 배치가 **더 큰** 총수를 말하면 그 값이 남는다(원천이
+     * 재개 중에 더 많이 있다고 말한 것이라 앞 값으로 덮으면 같은 판독이 반대 방향으로 무너진다).
+     */
+    @Test
+    fun `쪽 상한 재개는 배치마다 말한 총수의 최댓값을 남긴다 — 「없음」이 앞 총수를 지우지 않고 더 큰 총수는 이긴다`() {
+        val erasing =
+            ScriptedSource { _, cursor ->
+                if (cursor == null) {
+                    batchOf(
+                        listOf(observation("W1"), observation("W2")),
+                        claimedTotalAccounting(
+                            received = 2,
+                            sourceTotal = 7,
+                            truncationCause = TruncationCause.MaxPages,
+                        ),
+                        next = PageCursor("51"),
+                    )
+                } else {
+                    batchOf(emptyList(), claimedTotalAccounting(received = 0, sourceTotal = 0))
+                }
+            }
+        val widening =
+            ScriptedSource { _, cursor ->
+                if (cursor == null) {
+                    batchOf(
+                        listOf(observation("G1")),
+                        claimedTotalAccounting(
+                            received = 1,
+                            sourceTotal = 7,
+                            truncationCause = TruncationCause.MaxPages,
+                        ),
+                        next = PageCursor("51"),
+                    )
+                } else {
+                    batchOf(listOf(observation("G2")), claimedTotalAccounting(received = 1, sourceTotal = 9))
+                }
+            }
+        val erased = CollectionFixture()
+        val widened = CollectionFixture()
+
+        erased.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, erasing)))
+        widened.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, widening)))
+
+        val erasedRow = erased.runs.recorded.single().first
+        erasedRow.sourceTotal shouldBe 7
+        // 그 행이 「덜 받았다」로 읽혀야 한다 — 총수가 0 으로 덮이면 이 비교가 뒤집힌다.
+        erasedRow.received shouldBe 2
+        widened.runs.recorded
+            .single()
+            .first.sourceTotal shouldBe 9
+    }
+
     @Test
     fun `이어 읽기가 진전이 없으면(같은 커서·커서 없음) 멈추고 절단으로 기록한다 — 무한 호출 방지`() {
         val sameCursor =
