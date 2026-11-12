@@ -1,17 +1,21 @@
 # M10 / gates-web — 되돌림
 
-실측 HEAD: `7758e17f` — **r3 에서 낡았다. 재실측은 main 병합 뒤 한 번에 한다**(팀장 지시
-2026-11-12). r3 가 복원 대상을 움직였고(아래 목록이 아홉에서 자란다), 동시에 PR 이
-`CONFLICTING` 이다 — main 이 base 이후 복원 목록 안의 `capability-map.md` 를 바꿨다(#147·#148,
-verifier r2 L-2). 충돌 해소로 main 을 병합하는 순간 **원천 교체 · blob 동일성(셋째 단언) · ①~⑥**
-이 함께 필요하므로, 병합 전에 재실측하면 그 값이 두 번 낡는다. 그래서 이 절은 **미검증 상태로
-선언해 둔다** — 아래 ①~⑥ 과 계수는 `7758e17f` 시점의 값이고 **판정 SHA 의 값이 아니다**.
+실측 HEAD: `90044035` (main `67ff54b1` 병합 커밋 — 되돌림이 적용되는 트리가 그것이다)
 
-**전제**: 이 slice 는 **main 에 없다**(머지 전). 그래서 공유 파일의 복원 원천은 착수 base
-`8062dcd784cf81905c50a2c8706d8bbd3ea5263e` 다 — 움직이는 `origin/main` 을 쓰지 않는다. 단언 둘을
-명령으로 쟀다: base 가 HEAD 의 **조상**이다 · base 가 이 slice 의 **첫 산출물 커밋을 포함하지
-않는다**. 머지 **뒤**의 되돌림은 이 절차가 아니라 그 PR 의 **머지 커밋 revert** 다(머지 순간 같은
-복원은 아무것도 지우지 않으면서 exit 0 을 낸다).
+**원천을 교체했다.** 10B(#149)가 먼저 머지돼 main `67ff54b1` 을 병합했으므로, 복원 원천은 착수
+base 가 아니라 **`67ff54b1`**(고정 기재 — 움직이는 `origin/main` 을 쓰지 않는다)이다.
+
+**셋째 단언을 쟀다** — 복원 대상 아홉이 착수 base 와 새 원천에서 blob 동일한가:
+- **같다 넷** — `gate-tests.txt` · `journey-up.mjs` · `opening-axis.mjs` · `opening-axis.test.mjs`.
+- **원천에 없다 셋** — 내가 신설한 `kotlin-source.mjs`·`kotlin-source.test.mjs`·
+  `kotlin-source-ownership.test.mjs`(base 에도 `67ff54b1` 에도 없다 → 복원이 **지운다**).
+- **다르다 둘** — `capability-map.md` · `money-vocab-cross-lang.test.mjs` 를 **10B 가 만졌다**.
+  그래서 이 둘은 새 원천 기준으로 다시 셌다(아래 계수).
+
+**그래도 hunk 격리가 필요 없다.** 근거는 blob 동일성이 아니라 **원천에 내 것이 없다**는 것이다 —
+이 slice 의 산출물 커밋 여섯이 `67ff54b1` 의 조상인지 전수로 물어 **전부 미포함**이고, `67ff54b1`
+에 내 표지(capability map `(j)` 절 · 등록부의 공유 읽기 줄)가 **0** 이다. 즉 파일 단위 복원이
+**내 줄만** 지우고 10B 의 줄은 그 원천에 그대로 들어 있다(계수로 확인했다).
 
 ## 복원 목록 (기계 산출 — 손으로 쓰지 않는다)
 
@@ -50,29 +54,33 @@ git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktre
 **되돌리지 않는 것**: 이 slice 의 evidence(`reports/evidence/m10/gates-web/`) · 하네스 경로
 (`CLAUDE.md`·`.claude/**`, 이 range 에 **없다**).
 
-## 실측 — 버릴 clone, `7758e17f`
+## 실측 — 버릴 clone, `90044035` (원천 `67ff54b1`)
 
 | 걸음 | 결과 |
 | --- | --- |
 | ① 복원 명령 | **exit 0** |
 | ② D/M 수 | **D 3 · M 6** (목록과 같다) |
-| ③ base 대비 diff | **0 줄** |
+| ③ **원천** 대비 diff | **0 줄** |
 | ④ 컴파일(web `typecheck`) | **exit 0** |
-| ⑤ test(`vitest run`) | **40 files · 857 tests passed** — 이 slice 가 더한 **2 files · 43 tests** 가 정확히 빠진 수다 |
-| ⑥ 게이트 | web job 여덟(`lint`·`typecheck`·`gate:src-tree`·`api:types:check`·`test`·`gate:tests`·`build`·`gate:boundary-canary`) **전부 exit 0** · Kotlin `leakPatternGate` **exit 0**(`--rerun` 으로 실행 — 캐시 적중 아님) |
+| ⑤ test(`vitest run`) | **40 files · 858 tests passed** — 병합 뒤 판정 SHA 가 42 files · 909 tests 이므로 이 slice 가 더한 **2 files · 51 tests** 가 정확히 빠진 수다 |
+| ⑥ 게이트 | web job 여덟(`lint`·`typecheck`·`gate:src-tree`·`api:types:check`·`test`·`gate:tests`·`build`·`gate:boundary-canary`) **전부 exit 0** · Kotlin `leakPatternGate` 는 **미측정**(아래) |
 
-clone 에서 `npm ci` 로 **실제 설치**했다 — 심볼릭 링크로 걸면 `gate:src-tree` 의 「`web/` 안
-심볼릭 링크 0」 술어에 걸려 ⑥ 이 **거짓으로** 붉어진다(앞 라운드에서 한 번 밟은 자리다).
+clone 에서 `npm ci` 로 **실제 설치**했다 — 심볼릭 링크는 `gate:src-tree` 를 거짓으로 붉힌다.
 
-**완료는 종료 코드가 아니라 계수로 판정한다**(공유 파일 둘).
+**⑥ 의 Kotlin 몫은 아직 재지 않았다.** 판정 SHA 의 Kotlin `check` 전건이 호스트 경쟁(다른 레인의
+전건 빌드와 동시)으로 길어져 그 뒤에 돌 차례였다. **미측정은 초록이 아니다** — 그 두 수치(판정 SHA
+의 `check`, 복원 트리의 `leakPatternGate`)는 **PR 조치 코멘트**가 진다.
+
+**완료는 종료 코드가 아니라 계수로 판정한다**(공유 파일 둘 — 이번엔 10B 의 줄이 실제로 들어 있다).
 
 | 계수 | 결과 |
 | --- | --- |
-| capability map 의 **내** 하위 절 | **0** (내 표지 사라짐) |
-| capability map 의 **남의** 절 `(a)`~`(e)` | **5** (보존) |
+| capability map 의 **내** 하위 절 `(j)` | **0** (내 표지 사라짐) |
+| capability map 의 **남의** 절 `(a)`~`(h)` | **7** (10B 의 `(f)`·`(h)` 포함, 보존) |
+| 10B `(h)` 절 본문 표지 | **2** (보존) |
 | 등록부의 **내** 줄 | **0** |
-| 등록부 항목 전수 | **37** == base 의 **37** (남의 줄 보존) |
-| evidence 디렉터리 | 남아 있다(목록 밖) — 그 상태로 `leakPatternGate` 가 초록이다 |
+| 등록부 항목 전수 | **37** == 원천의 **37** |
+| `money-vocab` 의 `it(` 수 | **18** == 원천의 **18** (내가 더한 한 줄만 빠졌다) |
 
 ## 원천을 교체해야 하는 조건
 
