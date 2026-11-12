@@ -33,7 +33,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..');
 
 /** Kotlin 원문의 확장자. 자기 술어를 피하려 **조립해서** 든다(미달 ①). */
-const KT = `.${'kt'}`;
+const KT = `.${'k'}${'t'}`;
 
 /** 읽기를 소유하는 자리 — 이 파일만 Kotlin 경로를 안다. */
 const OWNER = 'scripts/kotlin-source.mjs';
@@ -91,15 +91,19 @@ const parse = (source, fileName) =>
   ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, false);
 
 /**
- * **경로 축은 토큰 술어다**(r5 — verifier r4 H-1). 「확장자로 끝난다」·「`/` 를 담는다」·「노드
- * 종류가 무엇이다」를 **전부 버렸다** — 그 셋이 각각 B4(파일 이름만) · B5(뒤에 파이프가 붙어
+ * **경로 축은 단어 토큰 술어다**(r6 — verifier r5 H-1). r5 는 「**점 바로 뒤**의 kt」를 봤고,
+ * 그래서 `*.{kt,kts}`(점 다음이 `{`) · `/\.(?:kt|kts)$/` · `[.]kt` · `split('.').pop() === 'kt'` ·
+ * 데이터 파일의 `".kt"`·glob 이 전부 지나갔다 — **r4 가 닫았던 N10 이 다시 열린 것**이 그 증거다.
+ * 이제 **단어 꼴**(`\bkts?\b`)로 본다: 점에 기대지 않으므로 그 여섯이 함께 닫힌다.
+ *
+ * r5 문면이 적었던 「확장자로 끝난다」·「`/` 를 담는다」·「노드 종류가 무엇이다」는 이미 버렸고 — 그 셋이 각각 B4(파일 이름만) · B5(뒤에 파이프가 붙어
  * 끝이 아니다) · B6(정규식 리터럴) · B11(중괄호 자리가 다른 glob) 을 열었다. 확장자 토큰이
  * **어디에 있든** 경로로 친다.
  *
  * 술어의 정규식은 **조립해서** 만든다 — 통째로 적으면 이 파일이 자기 술어에 걸린다(미달 ①).
  */
-const KT_TOKEN = new RegExp(`\\.${'kts'}?\\b`, 'u');
-const KT_FILE_TOKEN = new RegExp(`\\b[\\w-]+\\.${'kts'}?\\b`, 'gu');
+const KT_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'u');
+const KT_FILE_TOKEN = new RegExp(`\\b[\\w-]+\\.${'k'}${'t'}s?\\b`, 'gu');
 
 /** 노드에서 **리터럴 텍스트**를 낸다 — 문자열·템플릿 조각·정규식 리터럴·식별자. */
 function literalTexts(node) {
@@ -222,6 +226,11 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       '셸 파이프(B5)': `execSync('cat ../a/Basis${KT} | tr -d x');`,
       '정규식 리터럴(B6)': `const f = readdirSync(d).find((n) => /\\${KT}$/u.test(n));`,
       '중괄호 자리 다른 glob(B11)': `const g = globSync('a/Basis{${KT},${KT}s}');`,
+      // **상설 양성 대조**(r6): r4 가 닫았던 이 꼴이 r5 의 「점 뒤 kt」 술어에서 **조용히 회귀**했다.
+      '중괄호 glob N10(회귀 감시)': `const g = globSync('a/*.{${'k'}${'t'},${'k'}${'t'}s}');`,
+      '두 확장자 정규식(P2)': `const f = d.find((n) => /\\.(?:${'k'}${'t'}|${'k'}${'t'}s)$/u.test(n));`,
+      '문자 클래스(P3)': `const r = /[.]${'k'}${'t'}$/u;`,
+      '점 없는 확장자(P5)': `const ok = n.split('.').pop() === '${'k'}${'t'}';`,
     };
 
     for (const [name, source] of Object.entries(planted)) {
@@ -323,21 +332,33 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
   const KOTLIN_SINKS = (() => {
     const sinks = new Set();
     for (const relative of files.filter(isAstFile)) {
-      const visit = (node) => {
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-          const feedsKotlin = node.arguments.some(
-            (arg) =>
-              ts.isCallExpression(arg) &&
-              ts.isIdentifier(arg.expression) &&
-              arg.expression.text === 'readKotlinSource',
-          );
-          if (feedsKotlin) {
-            sinks.add(node.expression.text);
+      const tree = parse(read(relative), relative);
+      // **한 단계 중간 변수**까지 따라간다(r6 — verifier r5 M-1 C6·C1). 실제 호출 열여덟 가운데
+      // 여덟이 이 꼴이고, r4 에서 RED 였던 `shippedProgressLabels` 가 이 꼴로 바뀌며 회귀했다.
+      // 두 단계 이상·별칭·메서드·`.trim()`·감싼 선언·spread·콜백은 **미달로 등재**한다(고치지 않음).
+      const kotlinVars = new Set();
+      const collectVars = (node) => {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
+          const init = node.initializer;
+          if (ts.isCallExpression(init) && ts.isIdentifier(init.expression) && init.expression.text === 'readKotlinSource') {
+            kotlinVars.add(node.name.text);
           }
+        }
+        ts.forEachChild(node, collectVars);
+      };
+      collectVars(tree);
+
+      const carriesKotlin = (arg) =>
+        (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression) && arg.expression.text === 'readKotlinSource') ||
+        (ts.isIdentifier(arg) && kotlinVars.has(arg.text));
+
+      const visit = (node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.arguments.some(carriesKotlin)) {
+          sinks.add(node.expression.text);
         }
         ts.forEachChild(node, visit);
       };
-      visit(parse(read(relative), relative));
+      visit(tree);
     }
     return sinks;
   })();
