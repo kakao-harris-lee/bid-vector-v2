@@ -139,7 +139,7 @@ class CollectAwardListUseCaseTest {
                     // 총수 3 을 말한 쪽에서 둘만 받고 걷기가 끝났다 — 절단 사유는 없다.
                     awardBatch(
                         listOf(awardObservation("S1"), awardObservation("S2")),
-                        accounting = shortWalkAccounting(received = 2, sourceTotal = 3),
+                        accounting = claimedTotalAccounting(received = 2, sourceTotal = 3),
                     )
                 } else {
                     awardBatch(listOf(awardObservation("F1")))
@@ -195,7 +195,7 @@ class CollectAwardListUseCaseTest {
                     awardBatch(
                         listOf(awardObservation("R1"), awardObservation("R2")),
                         accounting =
-                            shortWalkAccounting(
+                            claimedTotalAccounting(
                                 received = 2,
                                 sourceTotal = 5,
                                 truncationCause = TruncationCause.MaxPages,
@@ -203,7 +203,7 @@ class CollectAwardListUseCaseTest {
                         next = PageCursor("51"),
                     )
                 } else {
-                    awardBatch(emptyList(), accounting = shortWalkAccounting(received = 0, sourceTotal = 0))
+                    awardBatch(emptyList(), accounting = claimedTotalAccounting(received = 0, sourceTotal = 0))
                 }
             }
 
@@ -431,28 +431,6 @@ private fun awardBatch(
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
     next: PageCursor? = null,
 ): SourceBatch<RawNoticeObservation> = SourceBatch(items, accounting, next, COLLECTION_NOW)
-
-/**
- * **총수와 받은 수가 어긋난** 회계 — 공유 helper(`sourceAccounting`)는 총수를 받은 수로 두므로 이
- * 모양을 지을 수 없다. 짧은 걷기가 사유 **없이** 끝난다는 것이 이 모양의 요점이다.
- */
-private fun shortWalkAccounting(
-    received: Int,
-    sourceTotal: Int,
-    truncationCause: TruncationCause? = null,
-): CollectionAccounting =
-    CollectionAccounting(
-        received = received,
-        normalized = received,
-        duplicate = 0,
-        dropped = 0,
-        dropReasons = emptyMap(),
-        sourceTotal = sourceTotal,
-        pagesFetched = 1,
-        truncated = truncationCause != null,
-        unknownFields = 0,
-        truncationCause = truncationCause,
-    )
 
 /**
  * **다 받고도 덜 적재한** 회계 — 총수는 받은 수와 같고(끝낸 슬롯이다) 그 안에서 중복·드롭이 갈린다.

@@ -232,30 +232,6 @@ private class AwardTotals {
     ): AwardCollectionReport = AwardCollectionReport(slots, received, stored, duplicates, dropped, unfinished, halted)
 }
 
-/**
- * **원천이 한 번 말한 총수는 뒤 쪽이 지우지 못한다**(v r3 L-1) — 쪽 상한으로 이어 돌 때 공유 누산기는
- * 마지막 배치의 총수를 쓰는데(`source.sourceTotal ?: sourceTotal`), 어댑터는 배치마다 새 누산기라
- * 재개 첫 쪽이 `NoData` 면 총수 **0** 을 낸다. 그러면 「받은 수 ≥ 총수」가 되어 덜 받은 슬롯이 완료로
- * 적힌다.
- *
- * **닫히는 범위는 배치 경계뿐이다**(v r4 M-1). 이 함수가 보는 것은 `fetchNotices` 호출마다 오는 배치의
- * 총수라, 쪽 상한 재개로 배치가 둘 이상인 슬롯에서만 최댓값이 뜻을 갖는다. **한 배치 안**에서 뒤 쪽이
- * 총수를 줄이면 어댑터 누산기가 마지막 값을 쥐고 이 함수는 그 결과만 받는다 — 쪽 상한 50 을 넘지 않는
- * 정상 슬롯은 배치가 하나이므로 그 판은 **열려 있다**(runbook §3.2 · 알려진 제한 13).
- *
- * 공유 누산기를 고치지 않는 이유는 범위다 — 그 타입은 형제 공고 목록 갈래도 쓰고 이 slice 의
- * in_scope 밖이다(그 갈래의 거동을 바꾸지 않는다).
- */
-private fun widerTotalOf(
-    seen: Int?,
-    batch: Int?,
-): Int? =
-    when {
-        seen == null -> batch
-        batch == null -> seen
-        else -> maxOf(seen, batch)
-    }
-
 /** 그 슬롯이 다 받았는가 — 저장소 단일 출처([attemptOutcomeOf])의 정착 결말 둘만 참이다. */
 private fun finishedWith(accounting: CollectionAccounting): Boolean =
     when (attemptOutcomeOf(accounting)) {
