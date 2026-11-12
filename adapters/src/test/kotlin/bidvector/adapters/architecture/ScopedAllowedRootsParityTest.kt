@@ -35,7 +35,9 @@ import bidvector.adapters.strategy.ALLOWED_ROOTS as STRATEGY_ROOTS
  *
  * 등식이 **공허해지는 길들도 함께 막는다** — ① 축이 `source.scoped-packages` 모집단에서 빠지면 이름 층은
  * 그 패키지를 아예 판정하지 않으므로 등식이 「판정하지 않는 목록」에 대한 참이 된다 ② 어느 한쪽이 비면
- * 「둘 다 비었다」가 등식을 만족시킨다 ③ 모집단 자체가 비면 아무 범위도 잠기지 않는다.
+ * 「둘 다 비었다」가 등식을 만족시킨다 ③ 모집단 자체가 비면 아무 범위도 잠기지 않는다 ④ key 가 실재하지
+ * 않는 패키지를 가리키거나 값이 **다른 축의** 집합이면 등식이 **딴 축에 대한 참**이 된다 — 그 길은 아래
+ * 네 번째 단언이 닫는다(verifier F-2 가 ①~③ 만으로 ④ 가 열린다는 반례 둘을 냈다).
  *
  * 술어 자체의 동치(`fqn == 뿌리 || fqn.startsWith("뿌리.")`)는 이 test 가 아니라 두 층의 술어 test 가 든다 —
  * 바이트코드 층은 각 축 dependency test 의 양성 대조, 이름 층은 build-logic 의 `SourceReferencePolicyTest`다.
@@ -88,6 +90,32 @@ class ScopedAllowedRootsParityTest {
         nested shouldBe emptyList()
     }
 
+    /**
+     * **표의 key 가 그 값 심볼의 선언 패키지와 묶여 있지 않으면 위 등식들이 딴 축에 대한 참이 된다**
+     * (verifier F-2). 컴파일은 심볼의 **존재**만 잠그고 **어느 패키지에서 왔는지**는 잠그지 않아 두 우회가
+     * 열려 있었다 — ① **별칭 바꿔치기**: 한 축의 자리에 다른 축의 집합을 별칭으로 끼우고 그 축의 정책을
+     * 그 집합으로 넓힌다 ② **유령 축 개명**: 정책의 축 이름과 key 를 함께 바꾸면 이름 층이 실재하는
+     * 패키지를 **더는 판정하지 않는데** 모집단·축별 등식은 그대로 성립한다. 둘 다 처방 전 초록이었다.
+     *
+     * 그래서 key 를 산문이 아니라 **컴파일 산출물**에서 얻는다 — 이 test 자신의 class 파일 상수 풀에 남는
+     * `ALLOWED_ROOTS` getter 호출의 **소유 class**(각 축 file facade)가 그 값이 선언된 패키지다. ① 은 그
+     * 축의 facade 참조가 사라져 뽑힌 집합이 작아지고, ② 는 key 가 가리키는 패키지가 그 집합에 없다. 둘 다
+     * 우회에는 게이트 자신을 바꾸는 편집이 필요하다(CLAUDE.md 「게이트 술어는 문자열이 아니라 구조로
+     * 닫는다」). 읽는 class 출력은 `:adapters:test` 의 **선언 입력**이라 표를 고치면 task 가 다시 돈다.
+     *
+     * **남는 꼴은 등재했다** — 표에 쓰지 않는 참조를 같은 파일에 더해 패키지 집합을 메꾸는 것, 그리고
+     * 실재하지 않는 production 패키지 이름으로 test 파일까지 만드는 것(`scope.md` 설계 검토 (2)).
+     */
+    @Test
+    fun `표의 key 는 그 값 심볼이 선언된 패키지다 — 별칭 바꿔치기·유령 축`() {
+        val declaringPackages = rootsDeclaringPackages()
+
+        // 추출이 조용히 아무것도 못 뽑으면 이 등식이 공허해진다 — 추출 층의 양성 대조.
+        declaringPackages.shouldNotBeEmpty()
+
+        declaringPackages shouldBe BYTECODE_LAYER_ROOTS.keys
+    }
+
     private companion object {
         const val SCOPED_PACKAGES = "source.scoped-packages"
         const val SCOPED_ROOTS_PREFIX = "source.scoped-allowed-roots."
@@ -136,5 +164,67 @@ class ScopedAllowedRootsParityTest {
                 .split(',')
                 .map(String::trim)
                 .filter(String::isNotEmpty)
+
+        /**
+         * [BYTECODE_LAYER_ROOTS] 의 값들이 **실제로 선언된** 패키지 집합. `internal` top-level `val` 은
+         * 다른 파일에서 **file facade 의 static getter 호출**로 읽히므로 그 호출의 소유 class 가 선언
+         * 패키지를 그대로 짊어진다 — 별칭으로 가려도 상수 풀은 그 자리를 바꾸지 않는다.
+         */
+        fun rootsDeclaringPackages(): Set<String> =
+            ownClassFiles()
+                .flatMap { classFile ->
+                    ROOTS_GETTER_OWNER.findAll(javapOutput(classFile)).map { match -> match.groupValues[1] }
+                }.map { owner -> owner.substringBeforeLast('/').replace('/', '.') }
+                .toSet()
+
+        /**
+         * 이 test 자신의 class 파일 전수 — 경로를 적지 않고 class loader 에게 묻는다(작업 디렉터리 상대
+         * 경로에 기대면 실행 위치가 바뀔 때 조용히 깨진다). 표의 초기화가 바깥 class 의 `<clinit>` 에서
+         * 일어나든 `Companion` 에서 일어나든 둘이 같은 디렉터리에 있어 양쪽을 다 읽는다.
+         */
+        fun ownClassFiles(): List<File> {
+            val anchor = ScopedAllowedRootsParityTest::class.java
+            val own =
+                anchor.getResource("${anchor.simpleName}.class")
+                    ?: error("자기 class 파일을 class loader 가 주지 않았다 — 이 술어는 컴파일 산출물을 읽는다")
+            val directory = File(own.toURI()).parentFile
+            val files =
+                directory
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.isFile && it.name.startsWith(anchor.simpleName) && it.extension == "class" }
+            check(files.isNotEmpty()) { "class 파일을 찾지 못했다: ${directory.absolutePath}" }
+            return files
+        }
     }
+}
+
+/**
+ * `javap -p -v` 출력에서 `ALLOWED_ROOTS` getter 호출의 **소유 class 내부 이름**. 상수 풀 항목
+ * (`Methodref … // owner.getALLOWED_ROOTS:()…`)과 본문 주석(`// Method owner.getALLOWED_ROOTS:()…`)
+ * 양쪽을 받는다. 소유자 없는 `NameAndType` 항목은 `bidvector/` 로 시작하지 않아 걸리지 않는다.
+ */
+private val ROOTS_GETTER_OWNER = Regex("""// (?:Method )?(bidvector/[A-Za-z0-9_/]+)\.getALLOWED_ROOTS""")
+
+/**
+ * `javap` 를 OS `PATH` 의 이름 조회가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다(형제
+ * dependency test 들과 같은 이유 — CI 의 JDK 21 과 다른 `javap` 를 부를 여지를 없앤다). 그 형제들의 같은
+ * helper 는 전부 **파일 `private`** 이라 패키지를 넘어 공유되지 않는다 — 하나를 `internal` 로 여는 쪽은
+ * 크기 한도에 닿은 그 파일들을 만지는 다른 결정이다.
+ */
+private val javapExecutable: String by lazy {
+    val javaHome = System.getProperty("java.home")
+    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
+}
+
+private fun javapOutput(classFile: File): String {
+    val process =
+        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
+            .redirectErrorStream(true)
+            .start()
+    val output = process.inputStream.bufferedReader().readText()
+    val exitCode = process.waitFor()
+    check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
+    return output
 }
