@@ -19,7 +19,53 @@
  * 바로 이 모듈이 없애려던 절단이 그대로 재발한다 — `"${f("//")}"` 가 `"${f("` 가 된다(cr r0
  * HIGH). 식은 중괄호 깊이로 훑어 통째로 넘기고, 깊이 계수가 깨지는 꼴(식 안의 따옴표·주석
  * 표지)은 거절한다. 따옴표 없는 평범한 식은 읽기 집합에 실제로 있으므로 일률 거절하지 않는다.
+ *
+ * **이 모듈이 읽기까지 소유한다**(r2 — verifier r1 M-2). 걷기만 공유 자리에 두면 소비자가 원문을
+ * 쥔 채 **자기 사본**을 들일 수 있고, 그 변이 둘(별칭 import + `replaceAll` · 별칭 import +
+ * `indexOf('//')` 줄 절단)이 r1 의 텍스트 술어를 **초록으로** 지나갔다. 그래서 경로 표를 이
+ * 모듈의 **비공개**로 두고 소비자에게는 **키**만 받는다 — 원문이 없으면 걷을 것이 없다.
  */
+
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * **읽기 집합 — `web/` 안에서 `.kt` 경로를 아는 유일한 자리다.**
+ *
+ * 비공개다. 내보내면 소비자가 그 경로로 원문을 다시 열 수 있어 사본의 길이 그대로 남는다.
+ * 여기 전수로 서는 덕에 「읽기 집합 여덟이 전부 읽힌다」를 게이트 test 가 들 수 있다 — r1 까지
+ * 그 여덟은 어디에도 전수로 없었고, 확인하려면 손으로 목록을 만들어야 했다.
+ */
+const KOTLIN_SOURCES = {
+  basis: 'shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt',
+  provenance: 'procurement/src/main/kotlin/bidvector/procurement/ResolvedBaseAmount.kt',
+  provenanceWire: 'app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt',
+  command: 'bidding/src/main/kotlin/bidvector/bidding/BidCommand.kt',
+  openingEndpoints: 'app/src/main/kotlin/bidvector/app/collection/OpeningCollectionProperties.kt',
+  noticeEndpoints: 'app/src/main/kotlin/bidvector/app/collection/CollectionProperties.kt',
+  detailAxes: 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt',
+  progressPolicy: 'workflow/src/main/kotlin/bidvector/workflow/opening/OpeningProgressPolicyData.kt',
+};
+
+/** 읽기 집합의 **키 전수** — 경로가 아니라 키다(위 표를 내보내지 않는 사유와 같다). */
+export const KOTLIN_SOURCE_KEYS = Object.keys(KOTLIN_SOURCES);
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * 읽기 집합의 키 하나를 **걷힌 텍스트**로 읽는다. 소비자가 Kotlin 원문을 얻는 유일한 길이다.
+ *
+ * @throws 읽기 집합에 없는 키면 — 조용히 빈 문자열을 내면 호출자의 모든 등식이 공허해진다.
+ * @throws 걷기가 다룰 수 없는 꼴을 만나면(`withoutKotlinComments` 의 계약 그대로).
+ */
+export function readKotlinSource(key) {
+  const relative = KOTLIN_SOURCES[key];
+  if (relative === undefined) {
+    throw new Error(`읽기 집합에 없는 키다: ${key} — 아는 키는 ${KOTLIN_SOURCE_KEYS.join('·')}`);
+  }
+  return withoutKotlinComments(readFileSync(resolve(repoRoot, relative), 'utf8'));
+}
 
 /** 주사기의 상태 — Kotlin 에서 `//` 가 주석인지 값인지를 가르는 자리가 이 다섯이다. */
 const CODE = 'code';

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { withoutKotlinComments } from './kotlin-source.mjs';
+import { readKotlinSource, withoutKotlinComments } from './kotlin-source.mjs';
 
 /**
  * **wire 어휘를 손으로 복제한 자리들을 Kotlin 정본에 묶는다**(M9/web-followups —
@@ -26,9 +26,7 @@ import { withoutKotlinComments } from './kotlin-source.mjs';
  * 내는 길(= 모든 등식이 공허해지는 길)을 두지 않고, 그 성질 자체를 합성 원문으로 대조한다.
  */
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const repoRoot = resolve(webRoot, '..');
 
-const readRepo = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 const readWeb = (relative) => readFileSync(resolve(webRoot, relative), 'utf8');
 
 /** 균형 중괄호로 본문을 떼어 낸다 — 중첩 블록이 있는 enum 도 같은 기계로 읽는다. */
@@ -223,20 +221,15 @@ export function tsUnionMembers(text, name, path = 'module.ts') {
   return members;
 }
 
-const KOTLIN = {
-  basis: 'shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt',
-  provenance: 'procurement/src/main/kotlin/bidvector/procurement/ResolvedBaseAmount.kt',
-  provenanceWire: 'app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt',
-  command: 'bidding/src/main/kotlin/bidvector/bidding/BidCommand.kt',
-};
-
-const basisKt = readRepo(KOTLIN.basis);
-const commandKt = readRepo(KOTLIN.command);
+// Kotlin 정본의 **경로를 여기서 알지 않는다**(r2 — verifier r1 M-2). 넘기는 것은 키이고 돌아오는
+// 것은 이미 걷힌 텍스트다 — 원문이 없으면 걷기 사본이 되살아날 자리도 없다.
+const basisKt = readKotlinSource('basis');
+const commandKt = readKotlinSource('command');
 
 const kotlinBasis = kotlinEnumEntries(basisKt, 'Basis');
 const kotlinCurrency = kotlinEnumEntries(basisKt, 'Currency');
 const kotlinVat = kotlinEnumEntries(basisKt, 'VatTreatment');
-const kotlinProvenance = kotlinEnumEntries(readRepo(KOTLIN.provenance), 'ProvenanceKind');
+const kotlinProvenance = kotlinEnumEntries(readKotlinSource('provenance'), 'ProvenanceKind');
 const kotlinCommand = [
   ...kotlinEnumEntries(commandKt, 'BidCommandTag'),
   kotlinStringConst(commandKt, 'OPEN_CASE_COMMAND'),
@@ -274,7 +267,7 @@ describe('금액 어휘의 키 집합 == Kotlin 정본 (OPEN-M9-MONEY-VOCAB-CROS
    */
   it('provenance — wire 리터럴과 `ProvenanceKind` 가 같고, web·e2e 가 그것과 같다', () => {
     const expected = sorted(kotlinProvenance);
-    const wire = sorted(new Set(kotlinFunctionStringLiterals(readRepo(KOTLIN.provenanceWire), 'provenanceLabel')));
+    const wire = sorted(new Set(kotlinFunctionStringLiterals(readKotlinSource('provenanceWire'), 'provenanceLabel')));
 
     expect(wire, 'wire 리터럴과 ProvenanceKind 가 갈렸다').toStrictEqual(expected);
     expect(sorted(tsTableKeys(moneyTs, 'AMOUNT_PROVENANCE_DISPLAY'))).toStrictEqual(expected);

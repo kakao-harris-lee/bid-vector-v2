@@ -18,6 +18,7 @@ import {
   shippedDetailAxisCounts,
   shippedProgressLabels,
 } from './opening-axis.mjs';
+import { readKotlinSource } from '../../scripts/kotlin-source.mjs';
 
 /**
  * 개찰 축 하네스의 **게이트 술어**(M9/opening-harness) — 등식 넷을 잠근다.
@@ -39,15 +40,16 @@ const repoRoot = resolve(webRoot, '..');
 
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-/** 출하 기본값의 정본 — 개찰 축 엔드포인트 표가 여기 하나다. */
-const SHIPPED_ENDPOINTS = 'app/src/main/kotlin/bidvector/app/collection/OpeningCollectionProperties.kt';
+// Kotlin 정본의 **경로를 여기서 알지 않는다**(r2 — verifier r1 M-2). 아래 넷은 읽기 집합의
+// **키**이고, 경로 표와 읽기는 공유 모듈이 소유한다 — 원문을 쥘 수 없으면 걷기 사본도 살 수 없다.
+/** 출하 기본값의 정본 — 개찰 축 엔드포인트 표. */
+const SHIPPED_ENDPOINTS = 'openingEndpoints';
 /** 공고 목록 오퍼레이션 표의 정본. */
-const SHIPPED_NOTICE_ENDPOINTS = 'app/src/main/kotlin/bidvector/app/collection/CollectionProperties.kt';
+const SHIPPED_NOTICE_ENDPOINTS = 'noticeEndpoints';
 /** 상세 축 열거의 정본 — 공고 하나가 받는 축 수(공사 넷 · 용역 셋)가 여기서 나온다. */
-const SHIPPED_DETAIL_AXES =
-  'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt';
+const SHIPPED_DETAIL_AXES = 'detailAxes';
 /** 진행구분 라벨 → 상태 정책의 정본. */
-const SHIPPED_POLICY = 'workflow/src/main/kotlin/bidvector/workflow/opening/OpeningProgressPolicyData.kt';
+const SHIPPED_POLICY = 'progressPolicy';
 /**
  * 계약 열거의 **런타임 운반체**. 이 표는 `satisfies Record<OpeningResultState, StateDisplay>` 라
  * 전수를 `tsc` 가 강제한다 — 계약이 열을 더하면 typecheck 가 먼저 붉어지고 이 등식이 이어 붉어진다.
@@ -104,7 +106,7 @@ describe('ⓐ 설계 집합 == 계약 열거 아홉', () => {
 
 describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   it('fake 가 섬기는 개찰 축 경로가 출하 기본 표와 같다(업무 배정까지)', () => {
-    expect(shippedOpeningOperationPaths(read(SHIPPED_ENDPOINTS))).toStrictEqual(OPENING_AXIS_OPERATIONS);
+    expect(shippedOpeningOperationPaths(readKotlinSource(SHIPPED_ENDPOINTS))).toStrictEqual(OPENING_AXIS_OPERATIONS);
   });
 
   it('출하 기본값을 찾지 못하면 통과가 아니라 거부다', () => {
@@ -117,7 +119,7 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
    * 나타난다). 이제 주석을 걷고 일치 수가 하나임을 요구한다.
    */
   it('주석이 실제 값을 가리지 못한다 — 가리는 줄이 있어도 주석 쪽을 집지 않는다', () => {
-    const shipped = read(SHIPPED_ENDPOINTS);
+    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
     const shadowed = shipped.replace(
       'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
       '// 옛 이름: val openingCompletePath: String = "getOpengResultListInfoOpengCompt"\n' +
@@ -133,7 +135,7 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   });
 
   it('같은 선언이 **두 자리에** 있으면 어느 것이 정본인지 서지 않으므로 거부한다', () => {
-    const twice = read(SHIPPED_ENDPOINTS).replace(
+    const twice = readKotlinSource(SHIPPED_ENDPOINTS).replace(
       'val bidPriceFormulaAPath: String =',
       'val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo"\n' +
         '    val bidPriceFormulaAPath: String =',
@@ -143,7 +145,7 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   });
 
   it('문자열 안의 `//` 는 주석이 아니다 — base URL 에서 줄이 잘리면 추출이 엉뚱한 값을 본다', () => {
-    const shipped = read(SHIPPED_ENDPOINTS);
+    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
 
     expect(shipped, '출하 파일에 base URL 리터럴이 없다 — 이 대조가 공허하다').toContain('https://');
     expect(shippedOpeningOperationPaths(shipped)).toStrictEqual(OPENING_AXIS_OPERATIONS);
@@ -152,7 +154,7 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
 
 describe('ⓕ 상세 축 수 == 출하 열거', () => {
   it('공사가 용역보다 많다 — A값이 공사 전용인 비대칭을 출하 본문에서 센다', () => {
-    const counts = shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES));
+    const counts = shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES));
 
     // 손으로 적으면 그 비대칭이 리터럴로 굳는다(업종 목록에서 닫은 드리프트와 같은 꼴).
     expect(counts.construction).toBeGreaterThan(counts.service);
@@ -164,7 +166,7 @@ describe('ⓕ 상세 축 수 == 출하 열거', () => {
   });
 
   it('수집 걸음의 기대가 그 수에서 나온다 — 상세 축을 **실제로 불렀는가**가 등식 안이다', () => {
-    const counts = shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES));
+    const counts = shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES));
     const expectation = promotionExpectation(design, { detailAxesPerNotice: counts });
 
     for (const [division, one] of Object.entries(expectation.divisions)) {
@@ -182,7 +184,7 @@ describe('ⓕ 상세 축 수 == 출하 열거', () => {
 
 describe('ⓒ 진행구분 어휘 == 출하 정책', () => {
   it('하네스가 쓰는 라벨 → 상태 표가 출하 정책과 같다', () => {
-    expect(shippedProgressLabels(read(SHIPPED_POLICY))).toStrictEqual(OPENING_PROGRESS_LABELS);
+    expect(shippedProgressLabels(readKotlinSource(SHIPPED_POLICY))).toStrictEqual(OPENING_PROGRESS_LABELS);
   });
 
   it('설계가 선언한 기대 상태는 그 라벨 표에서 유도된 값과 같다', () => {
@@ -241,7 +243,7 @@ describe('ⓓ fixture 둘의 교차 등식', () => {
   });
 
   it('공고 목록 fixture 의 오퍼레이션이 **출하 기본 표 안**이다', () => {
-    const shipped = shippedNoticeListOperations(read(SHIPPED_NOTICE_ENDPOINTS));
+    const shipped = shippedNoticeListOperations(readKotlinSource(SHIPPED_NOTICE_ENDPOINTS));
 
     // 개찰 축과 같은 사유의 등식이다 — `02` 개편이 이 이름을 바꿨을 때 fixture 는 옛 이름을
     // 들고 있었고 fake 가 404 를 내 수집이 **조용히 0건**이었다(PR #130).
@@ -392,7 +394,7 @@ describe('라우팅 표와 행 생성', () => {
 
 describe('러너 계수 등식', () => {
   const expectation = promotionExpectation(design, {
-    detailAxesPerNotice: shippedDetailAxisCounts(read(SHIPPED_DETAIL_AXES)),
+    detailAxesPerNotice: shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES)),
   });
 
   it('업무마다 표본틀·표본 크기가 설계의 공고 수와 같다', () => {

@@ -11,12 +11,15 @@ in_scope:
   - web/scripts/kotlin-source.test.mjs           # 신설 — 그 읽기 술어의 게이트 test
   - web/scripts/money-vocab-cross-lang.test.mjs  # 10B 와 공유 — §공유 파일
   - web/e2e/harness/opening-axis.mjs
+  - web/e2e/harness/opening-axis.test.mjs        # r2 추가 — `.kt` 경로 리터럴 넷을 키로 바꾼다
+  - web/e2e/harness/journey-up.mjs               # r2 추가 — 게이트가 찾아낸 **셋째** 소비자
+  - web/scripts/kotlin-source-ownership.test.mjs # r2 신설 — 읽기 소유권의 AST 게이트
   - web/config/gate-tests.txt
   - docs/discovery/capability-map.md             # §12.3 하위 절 (j) 만
   - reports/evidence/m10/gates-web/
 out_of_scope:
   - openapi/bidvector-operator-api.yaml    # 10B 의 편집 대상 — §③
-  - web/eslint.config.js                   # ① 은 이미 닫혀 있다
+  - web/eslint.config.js                   # ① 은 이미 닫혀 있다 · r2 도 건드리지 않는다(§r2 계약 갱신)
   - web/scripts/screen-card-coverage.mjs   # ② 의 named 축은 이미 닫혀 있다
   - web/src/**                             # 출하 코드를 바꾸지 않는다
   - adapters/**/*AdapterDependencyTest.kt  # Kotlin 쪽 원문 정규식 게이트 — 10C ②
@@ -74,3 +77,29 @@ Kotlin 원문 읽기가 함께 사라진다). 머지 순서는 **10B → 10D**. 
 - 2026-11-11 팀장 답 고정 — ①②③ 의 「#132 머지 `e12c0485` 에서 닫힘(장부 공백) + 이 slice 의
   재측정」 등재 꼴 승인 · ③ 범위 밖 승인 · ② 잔여 ID 신설 · §12.3 하위 절은 **(j)** · 10B 공유
   파일 편집 계획 등재 · 설계 승인.
+
+### r2 계약 갱신 — verifier r1 M-2 (구조로 닫기)
+
+M-2 가 「복제 금지 술어가 텍스트다」를 **변이 둘의 초록으로** 실증했다. 구조로 닫으려면 공유
+모듈이 **읽기 자체**를 소유해야 하고, 그래서 **경로 리터럴을 쥐고 있던 소비자 파일**이 범위에
+들어온다. 추가 둘:
+
+- `web/e2e/harness/opening-axis.test.mjs` — `.kt` 경로 리터럴 **넷**이 여기 있다(r1 까지 이 파일은
+  in_scope 밖이었고, 그래서 M-2 의 우회가 **계약상 보이지 않는 자리**에 있었다).
+- `web/scripts/kotlin-source-ownership.test.mjs` — 신설. AST 소유권 술어와 그 **양성 대조**.
+  만드는 커밋에서 `web/config/gate-tests.txt` 에 **같이** 등재한다.
+
+**`web/eslint.config.js` 는 out_of_scope 로 남긴다.** 팀장 처방은 ESLint AST 규칙이었고 그쪽이
+lint 시점 피드백을 주지만, ① 그 파일은 계약상 범위 밖이고 ② flat config 는 **블록을 더하면 앞
+블록의 같은 규칙 옵션이 사라진다**(이 호스트의 등재된 함정) — 범위 밖 파일에서 그 위험을 지는
+것보다, **같은 AST 층**을 게이트 test 로 세우는 쪽을 골랐다. 선례가 있다 — 이 레인의 소비자
+(`money-vocab-cross-lang.test.mjs`)가 이미 `typescript` 를 직접 들여 AST 를 읽는다. 강제력은
+둘 다 CI 전건이다(lint = W-2 · 이 test = W-6·W-7). **팀장이 ESLint 쪽을 원하면 그 파일을 in_scope
+로 올리는 계약 갱신이 먼저다.**
+
+**추가 하나는 게이트가 찾아냈다 — 소비자는 둘이 아니라 셋이었다.** 새 AST 술어를 처음 돌리자
+`web/e2e/harness/journey-up.mjs` 가 걸렸다. 이 파일이 Kotlin 정본 하나(`CollectOpeningResultsUseCase`)
+를 **자기 `readFileSync` 로 열어** 상세 축 수를 세고 있었다. r1 까지의 텍스트 술어는 소비자를
+`CONSUMERS` **배열로 열거**했고 그 배열에 이 파일이 없었다 — 즉 r1 의 「구현이 하나 · 소비자 둘이
+그것을 쓴다」는 **세 번째 자리를 보지 못한 채** 초록이었다. 열거를 glob 으로 바꾼 첫 실행이
+그것을 드러낸 것이고, M-2 가 「구조로 닫으라」고 한 이유가 이 한 줄에 그대로 있다.
