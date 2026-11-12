@@ -232,12 +232,12 @@ glob → JSON 데이터 파일). 그래서 r4 는 **막는 것과 막지 않는 
 | `readKotlinSource(key)` | **키 → 모듈 비공개 경로 표** → 파일시스템. `web/` 안에서 `.kt` 를 여는 **유일한** 자리이고 반환은 **걷힌 텍스트**다 |
 | `KOTLIN_SOURCE_KEYS` | 비공개 표의 **키만**(경로를 내보내지 않는다) |
 | `assertStrippedKotlin(text)` — r3 신설 | **인자뿐**. 걷힌 텍스트를 다시 걸어 **같으면 그대로 돌려주고, 망가져 있으면 던진다**. 소비자가 재걷기 자리에서 부르는 **유일한** 표면이고, 이름이 곧 사유라 「중복이니 정리」로 조용히 사라지지 않는다 |
-| `withoutKotlinComments(source)` | **인자뿐**. r3 부터 **소비자가 import 하지 않는다** — 소유 모듈과 그 **단위 test** 만 부른다(import 그래프 단언) |
+| `withoutKotlinComments(source)` | **공개 표면이 아니다**(r4 — 내부 모듈). 그 **이름이 어느 리터럴에든** 나타나는 파일은 소유 모듈과 그 단위 test 둘뿐이다(r5 — 이름 토큰 술어) |
 | (경계로 처리) 소비자의 `.ts` 읽기 | 남는다. 대상이 **Kotlin 원문**이고 `.ts` 는 web 자기 산출물이라 걷기가 필요 없다 |
 
-**export 집합은 넷으로 고정된다** — `Object.keys(await import('./kotlin-source.mjs')).sort()` 가
-정확히 `['KOTLIN_SOURCE_KEYS', 'assertStrippedKotlin', 'readKotlinSource', 'withoutKotlinComments']`
-여야 한다. 경로 표나 원문 reader 를 더하면 그 등식이 깨진다.
+**export 집합은 셋으로 고정된다** — `Object.keys(await import('./kotlin-source.mjs')).sort()` 가
+정확히 `['KOTLIN_SOURCE_KEYS', 'assertStrippedKotlin', 'readKotlinSource']` 여야 한다(걷기는 r4 부터
+**내부 모듈**이다). 경로 표나 원문 reader 를 더하면 그 등식이 깨진다.
 
 ### (3) 과잉·미달
 

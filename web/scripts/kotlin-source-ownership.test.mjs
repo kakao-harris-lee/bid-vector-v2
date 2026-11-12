@@ -313,87 +313,121 @@ describe('소유권 — 읽기 표면이 셋으로 고정된다', () => {
 
 describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
   /**
-   * **cr r2 MEDIUM② 가 선 자리.** 호출 자리는 일곱인데 걷히지 않은 원문을 먹이는 test 는 **둘**
-   * 뿐이었고, 나머지 **다섯은 단언 호출을 지워도 전건이 초록**이었다. 그 다섯은 `readKotlinSource`
-   * 로만 불리기 때문이다. 그런데 §4 (2) 10 이 막겠다고 적은 것이 정확히 「입력이 이미 걷혔으니
-   * 중복이라며 조용히 지우는」 길이다. 그래서 **열거가 아니라 export 전수**로 센다.
+   * **모집단을 이름이 아니라 데이터 흐름에서 뽑는다**(r5 보충 — cr r3 HIGH②). 앞 판은 소비자
+   * 파일을 **손 목록**으로 들고 함수를 **이름 접두**(`kotlin`·`shipped`)로 골랐다. 그래서 단언을
+   * 지우고 **접두 밖 이름으로 개명**하면 모집단에서 빠져 조용히 초록이었다.
+   *
+   * 모집단 = **`readKotlinSource(...)` 의 결과가 인자로 흘러드는 호출의 피호출자 전부**. 개명하면
+   * 호출부도 같이 개명되므로 모집단이 **따라온다** — 이름에 의존하지 않는다.
    */
-  const CONSUMER_MODULES = ['e2e/harness/opening-axis.mjs', 'scripts/money-vocab-cross-lang.test.mjs'];
-
-  /** 원문에서 **export 된 함수 선언**의 이름과 그 본문의 호출 이름들을 낸다. */
-  const exportedFunctionCalls = (source, fileName) => {
-    const out = new Map();
-    // `export { a, b }` 로 뒤늦게 내보내는 이름들을 먼저 모은다.
-    const exportedNames = new Set();
-    const collect = (node) => {
-      if (ts.isExportDeclaration(node) && node.exportClause !== undefined && ts.isNamedExports(node.exportClause)) {
-        for (const el of node.exportClause.elements) {
-          exportedNames.add((el.propertyName ?? el.name).text);
-        }
-      }
-      ts.forEachChild(node, collect);
-    };
-    collect(parse(source, fileName));
-    const visit = (node) => {
-      // **export 꼴 전수**(verifier r4 M-1): `export function` 만 세면 화살표(B8a)와
-      // 선언 + `export { … }`(B8b) 가 지나간다. 셋 다 같은 자리로 모은다.
-      const isExported = (n) => (n.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      let named;
-      if (ts.isFunctionDeclaration(node) && node.name !== undefined && isExported(node)) {
-        named = node.name.text;
-      } else if (ts.isVariableStatement(node) && isExported(node)) {
-        const decl = node.declarationList.declarations[0];
-        if (decl !== undefined && ts.isIdentifier(decl.name)) {
-          named = decl.name.text;
-        }
-      } else if (ts.isFunctionDeclaration(node) && node.name !== undefined && exportedNames.has(node.name.text)) {
-        named = node.name.text;
-      } else if (ts.isVariableStatement(node)) {
-        const decl = node.declarationList.declarations[0];
-        if (decl !== undefined && ts.isIdentifier(decl.name) && exportedNames.has(decl.name.text)) {
-          named = decl.name.text;
-        }
-      }
-      if (named !== undefined) {
-        const calls = new Set();
-        const inner = (child) => {
-          if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) {
-            calls.add(child.expression.text);
+  const KOTLIN_SINKS = (() => {
+    const sinks = new Set();
+    for (const relative of files.filter(isAstFile)) {
+      const visit = (node) => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+          const feedsKotlin = node.arguments.some(
+            (arg) =>
+              ts.isCallExpression(arg) &&
+              ts.isIdentifier(arg.expression) &&
+              arg.expression.text === 'readKotlinSource',
+          );
+          if (feedsKotlin) {
+            sinks.add(node.expression.text);
           }
-          ts.forEachChild(child, inner);
-        };
-        ts.forEachChild(node, inner);
-        out.set(named, calls);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(parse(source, fileName));
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(parse(read(relative), relative));
+    }
+    return sinks;
+  })();
+
+  /** 이름 → 그 함수 본문이 부르는 이름들. **export 세 꼴**(선언·arrow·`export {}`)을 모두 든다. */
+  const declaredCalls = () => {
+    const out = new Map();
+    for (const relative of files.filter(isAstFile)) {
+      const source = read(relative);
+      const visit = (node) => {
+        let name;
+        let body;
+        if (ts.isFunctionDeclaration(node) && node.name !== undefined) {
+          name = node.name.text;
+          body = node;
+        } else if (ts.isVariableStatement(node)) {
+          const decl = node.declarationList.declarations[0];
+          if (
+            decl !== undefined &&
+            ts.isIdentifier(decl.name) &&
+            decl.initializer !== undefined &&
+            (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))
+          ) {
+            name = decl.name.text;
+            body = decl.initializer;
+          }
+        }
+        if (name !== undefined && body !== undefined) {
+          const calls = new Set();
+          const inner = (child) => {
+            if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) {
+              calls.add(child.expression.text);
+            }
+            ts.forEachChild(child, inner);
+          };
+          ts.forEachChild(body, inner);
+          out.set(name, { relative, calls });
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(parse(source, relative));
+    }
     return out;
   };
 
-  it('Kotlin 원문을 받는 export 추출 함수 전수가 입력 자리에서 단언을 부른다', () => {
+  it('Kotlin 원문이 흘러드는 함수 전수가 입력 자리에서 단언을 부른다', () => {
+    const declared = declaredCalls();
     const missing = [];
-    for (const relative of CONSUMER_MODULES) {
-      for (const [name, calls] of exportedFunctionCalls(read(relative), relative)) {
-        // Kotlin 원문을 받는 함수만 대상이다 — 그 표지는 단언 또는 걷기를 부르는 것이다.
-        const takesKotlin = calls.has('assertStrippedKotlin') || calls.has('withoutKotlinComments');
-        if (calls.has('withoutKotlinComments')) {
-          missing.push(`${relative}:${name} 가 걷기를 직접 부른다`);
-        } else if (!takesKotlin && /^(kotlin|shipped)/u.test(name)) {
-          missing.push(`${relative}:${name} 가 단언을 부르지 않는다`);
-        }
+
+    expect(KOTLIN_SINKS.size, '모집단이 비었다 — 술어가 공허하다').toBeGreaterThan(2);
+
+    for (const name of [...KOTLIN_SINKS].sort()) {
+      const found = declared.get(name);
+      if (found === undefined) {
+        continue; // 공유 모듈 자신의 표면(`assertStrippedKotlin` 등)은 이 축이 아니다.
+      }
+      if (found.calls.has('withoutKotlinComments')) {
+        missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
+      } else if (!found.calls.has('assertStrippedKotlin')) {
+        missing.push(`${found.relative}:${name} 가 단언을 부르지 않는다`);
       }
     }
 
     expect(missing, '추출 함수가 걷힌 상태 단언을 거치지 않는다').toStrictEqual([]);
   });
 
-  /** 양성 대조 — 단언 호출을 지운 합성 추출 함수를 술어가 잡는다. */
-  it('술어가 단언 없는 추출 함수를 잡는다', () => {
-    const planted = 'export function kotlinProbe(source) {\n  return source.trim();\n}\n';
-    const calls = exportedFunctionCalls(planted, 'scripts/probe.mjs');
+  /** 양성 대조 — arrow 꼴이고 이름이 접두 밖이어도 모집단에 들고 단언 부재를 잡는다. */
+  it('술어가 arrow·접두 밖 이름의 단언 부재를 잡는다', () => {
+    const planted = [
+      "export const readPolicyTable = (source) => source.trim();",
+      "const t = readPolicyTable(readKotlinSource('progressPolicy'));",
+    ].join('\n');
+    const tree = parse(planted, 'scripts/probe.mjs');
 
-    expect(calls.get('kotlinProbe')?.has('assertStrippedKotlin')).toBe(false);
+    let sink;
+    const visit = (node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.arguments.some(
+          (a) => ts.isCallExpression(a) && ts.isIdentifier(a.expression) && a.expression.text === 'readKotlinSource',
+        )
+      ) {
+        sink = node.expression.text;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(tree);
+
+    expect(sink, '데이터 흐름에서 모집단을 못 뽑는다').toBe('readPolicyTable');
   });
 });
 

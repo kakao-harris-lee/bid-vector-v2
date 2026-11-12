@@ -130,6 +130,14 @@ tanstack query 의 지연 notify 타이머가 발화해 `ReferenceError: window 
 **r1**(cr r0 HIGH·MEDIUM·LOW 셋 · verifier r1 M-1) — **새 파일 0**. 고친 일곱 파일이 전부 이미
 in_scope 안이라 계약 갱신이 없었다(기계 대조: 변경 경로 집합에서 in_scope 패턴 밖이 **0**).
 
+**r4·r5** — r4 가 **새 파일 하나**(내부 걷기 모듈 `kotlin-comment-strip.mjs`)를 만들어 `scope.md`
+in_scope 에 넣었다(게이트 test 가 아니라 **모듈**이므로 등록부 대상은 아니다). r5 는 새 파일 0.
+복원 목록은 그래서 아홉 → **열**이다(cr r3 HIGH① · verifier r4 M-4).
+
+**훑기가 `git ls-files` 라 생기는 성질 하나**(cr r3 LOW): **스테이징 전 새 파일은 훑기에 들지
+않는다**. 그래서 로컬에서 심은 파일은 `git add` 뒤에 재야 하고(변이 하네스가 그렇게 한다), CI 는
+추적 파일만 체크아웃하므로 거기서는 이 성질이 공백을 만들지 않는다.
+
 **r3**(verifier r2 H-1~H-3·M-1·M-2·L-1 · cr r1 MEDIUM①② · LOW③④) — **새 파일 0**. 고친 여섯
 파일이 전부 이미 in_scope 안이라 계약 갱신이 없었다(기계 대조: 변경 경로 집합에서 in_scope 패턴
 밖이 **0**).
