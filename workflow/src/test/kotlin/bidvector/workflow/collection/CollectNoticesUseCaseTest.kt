@@ -1,6 +1,7 @@
 package bidvector.workflow.collection
 
 import bidvector.procurement.BudgetLimit
+import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionDropReason
 import bidvector.procurement.NoticeCollected
 import bidvector.procurement.NoticeTitle
@@ -359,51 +360,37 @@ class CollectNoticesUseCaseTest {
      */
     @Test
     fun `쪽 상한 재개는 배치마다 말한 총수의 최댓값을 남긴다 — 「없음」이 앞 총수를 지우지 않고 더 큰 총수는 이긴다`() {
-        val erasing =
-            ScriptedSource { _, cursor ->
-                if (cursor == null) {
-                    batchOf(
-                        listOf(observation("W1"), observation("W2")),
-                        claimedTotalAccounting(
-                            received = 2,
-                            sourceTotal = 7,
-                            truncationCause = TruncationCause.MaxPages,
-                        ),
-                        next = PageCursor("51"),
-                    )
-                } else {
-                    batchOf(emptyList(), claimedTotalAccounting(received = 0, sourceTotal = 0))
+        // 첫 배치가 총수 7 을 말하고 쪽 상한으로 잘린다 — 재개 배치는 비어 있고 말하는 총수만 다르다.
+        fun resumedWith(secondTotal: Int): CollectionAccounting {
+            val source =
+                ScriptedSource { _, cursor ->
+                    if (cursor == null) {
+                        batchOf(
+                            listOf(observation("W1"), observation("W2")),
+                            claimedTotalAccounting(
+                                received = 2,
+                                sourceTotal = 7,
+                                truncationCause = TruncationCause.MaxPages,
+                            ),
+                            next = PageCursor("51"),
+                        )
+                    } else {
+                        batchOf(emptyList(), claimedTotalAccounting(received = 0, sourceTotal = secondTotal))
+                    }
                 }
-            }
-        val widening =
-            ScriptedSource { _, cursor ->
-                if (cursor == null) {
-                    batchOf(
-                        listOf(observation("G1")),
-                        claimedTotalAccounting(
-                            received = 1,
-                            sourceTotal = 7,
-                            truncationCause = TruncationCause.MaxPages,
-                        ),
-                        next = PageCursor("51"),
-                    )
-                } else {
-                    batchOf(listOf(observation("G2")), claimedTotalAccounting(received = 1, sourceTotal = 9))
-                }
-            }
-        val erased = CollectionFixture()
-        val widened = CollectionFixture()
+            val fixture = CollectionFixture()
+            fixture.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, source)))
+            val (accounting, _) = fixture.runs.recorded.single()
+            return accounting
+        }
 
-        erased.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, erasing)))
-        widened.useCase.collect(rangeOf("2026-09-01", "2026-09-01"), listOf(CollectionSource(construction, widening)))
+        val erased = resumedWith(secondTotal = 0)
+        val widened = resumedWith(secondTotal = 9)
 
-        val erasedRow = erased.runs.recorded.single().first
-        erasedRow.sourceTotal shouldBe 7
+        erased.sourceTotal shouldBe 7
         // 그 행이 「덜 받았다」로 읽혀야 한다 — 총수가 0 으로 덮이면 이 비교가 뒤집힌다.
-        erasedRow.received shouldBe 2
-        widened.runs.recorded
-            .single()
-            .first.sourceTotal shouldBe 9
+        erased.received shouldBe 2
+        widened.sourceTotal shouldBe 9
     }
 
     @Test
