@@ -14,6 +14,20 @@
 | W-6 `test` | exit 0 — **41 files · 878 tests** | W-13 `test:e2e:journey` | exit 0 — **12 passed · flaky 0 · 건너뜀 0** |
 | W-7 `gate:tests` | exit 0 — 등록부 전수 수집·skipped/todo/failed 0 | `./gradlew check` | `checklist.md` 「전건」 |
 
+## r3 acceptance — ci.yml web job 전건 (판정 SHA)
+
+| step | 결과 | step | 결과 |
+| --- | --- | --- | --- |
+| W-2 `lint` | exit 0 | W-8 `build` | exit 0 |
+| W-3 `typecheck` | exit 0 | W-9 `gate:boundary-canary` | exit 0 |
+| W-4 `gate:src-tree` | exit 0 | W-10 `playwright install` | exit 0 |
+| W-5 `api:types:check` | exit 0 | W-11 `test:e2e` | exit 0 — 2 passed |
+| W-6 `test` | exit 0 — **42 files · 908 tests** | W-12 `:app:bootJar` | exit 0 (빌드 자리 경유) |
+| W-7 `gate:tests` | exit 0 | W-13 `test:e2e:journey` | exit 0 — **12 통과 · flaky 0 · 건너뜀 0 · spec 4/4** |
+
+Kotlin `check` 전건과 `leakPatternGate --rerun` 은 **evidence 커밋 뒤의 HEAD** 에서 재실측하고,
+그 결과의 정본은 **PR 조치 코멘트**다(`checklist.md` §6 과 같은 사유).
+
 ## 착수 실측 — 대상 셋이 이미 닫혔는가 (코드로 재측정)
 
 바꿔치우기 변이다. 탐침·변이는 전부 되돌렸고 트리는 clean 이다.
@@ -83,6 +97,43 @@ verifier r1 M-2 가 **초록으로 통과시킨 바로 그 둘**을 버릴 clone
 
 이 게이트는 vitest 가 돌리므로 **캐시 적중이라는 자리가 없다**(gradle 의 `UP-TO-DATE`·`FROM-CACHE`
 에 해당하는 것이 없고, 위 네 줄은 전부 실제 실행이다 — 통제군의 초록도 실행된 초록이다).
+
+## r3 변이 실측 — 지적의 **원형 그대로** 재생했는가
+
+verifier r2 의 V 계열과 cr r1 의 두 꼴을 **원형 그대로** 심었다(r2 의 표는 ⓐⓑ 에 `readFileSync` 를
+**더해** 심어서 경로 술어의 RED 를 사본 술어의 RED 로 착각했다 — 그 자체가 등재할 사실이다).
+케이스마다 트리를 되돌리고 **적용 여부를 untracked 까지 보는 porcelain 으로** 단언했다.
+
+| 변이(원형) | 결과 | 깨진 단언 |
+| --- | --- | --- |
+| **통제군** — 주석 한 줄만 | **908 passed · lint 0** | 없음(거동 0) |
+| V8 `.js` 모듈에 완전한 경로 | 1 failed | 경로 조각이 공유 모듈 밖 |
+| V10 `web/config/` 에 완전한 경로 | 1 failed | 같은 단언 |
+| V11 `.mts` 모듈에 완전한 경로 | 1 failed | 같은 단언 |
+| V2 파일 이름만(`resolve` 다중 인자) | 1 failed · **lint 1** | 같은 단언 |
+| V4 확장자 변수 | 1 failed · **lint 1** | 같은 단언 |
+| V12 소유 모듈이 경로 표 export | 1 failed | **export 집합이 정확히 넷** |
+| V13 소유 모듈이 원문 reader 추가 | 1 failed | 같은 단언 |
+| **V14** ⓑ 원형(별칭 import + `indexOf` 절단) | **3 failed** | import 그래프 · 걷히지 않은 원문 거부 · 완화 층 |
+| **V15** ⓐ 원형(별칭 import + `replaceAll`) | **3 failed** | 같은 셋 |
+| 미달② 지역 사본 — **줄 끊는 꼴**(표기까지 숨김) | **5 failed** | 걷히지 않은 원문 거부 · **문자열 안 `//` 보존** · 가리는 줄 · 중복 선언 거부 · fake 경로 등식 |
+| 미달② 지역 사본 — **줄 안 끊는 치환**(표기까지 숨김) | **1 failed** | 걷히지 않은 원문 거부 |
+| M-2 깊이 판정 `=== 0` → `<= 1` | 1 failed | 중첩 중괄호 안 따옴표를 던진다 |
+| L-1 홀로 선 CR 을 줄끝에서 뺌 | 1 failed | CR 에서 줄 주석이 멈춘다 |
+
+**미적용 변이 0.** 두 축이 깔끔하게 갈린다 — V14·V15 는 표기를 숨기지 않아 **완화 층도** 걸리고,
+미달② 둘은 표기를 `String.fromCharCode` 로 숨겨 **완화 층은 조용하고 구조 층만** 걸린다. 그래서
+「구조로 닫힌 것」과 「표기 하나로 열리는 층」이 같은 표에서 구별된다.
+
+**첫 배치는 버렸다 — 측정 하네스의 결함이었다.** 케이스 사이 되돌림을 `git checkout -- .` 로만
+해서 **untracked 로 심은 파일이 지워지지 않고** 뒤 케이스로 새어 들어갔다(그래서 뒤 케이스의
+failed 수가 부풀었고 V8·V10·V11 은 「파일 변화 0」으로 **미적용**이 됐다 — 초록이 아니라 미측정이다).
+`git clean -fdq` 를 더하고 적용 단언을 porcelain 으로 바꿔 **전건 재측정**한 값이 위 표다.
+
+**한 줄은 예상과 달랐고 그대로 적는다.** 「줄 안 끊는 치환」은 설계상 **조용할 것**으로 적었는데
+1 failed 다. 다만 그 RED 는 **값이 망가진 것을 잡은 것이 아니다** — 사본이 입력의 `//` 를 먹어
+「걷히지 않은 원문은 거부된다」 test 의 전제가 깨져서 붉어졌다. 값 손상(`https://…` → `https:…`)
+자체를 드는 단언은 **여전히 없다**. 그래서 미달 ② 는 닫히지 않았고, 설계 검토가 그렇게 적는다.
 
 ## 게이트 자신의 양성 대조
 
