@@ -16,7 +16,7 @@ import java.io.File
  * 여는 함수). 그 셋을 **새로 짓지 않고 재사용**하는 것이 이 slice 의 결정이고, 그래서 이 루트
  * 목록이 그 사실을 진술한다.
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.opening",
         "bidvector.procurement",

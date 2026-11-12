@@ -47,7 +47,7 @@ import java.io.File
  * (`bidvector.adapters.notificationinbox`)는 이 목록에 **없다** — 조립은 포트만 받고 구현은 배선이
  * 고른다. 그 어댑터 이름이 이 패키지의 상수 풀에 나타나면 이 게이트가 RED 다.
  * 같은 목록이 이름 층 정책에도 사는 한(그 파일의 「알려진 한계」) 둘의 어긋남을 재는 자리가 있어야
- * 한다 — [EvaluationAllowedRootsParityTest] 가 집합 등식을 잰다. 목록을 세 번째로 적지 않으려고
+ * 한다 — `ScopedAllowedRootsParityTest` 가 집합 등식을 잰다. 목록을 세 번째로 적지 않으려고
  * 이 집합이 `internal` 이다(cr L-3).
  */
 internal val ALLOWED_ROOTS =

@@ -30,7 +30,7 @@ import java.io.File
  * 늘어난 간선은 **조립 → 구현** 한 방향뿐이다: 반대 방향은 `NotificationAdapterDependencyTest`
  * 가 막는다(그 허용 루트에 `adapters.event`·`adapters.relay` 가 없다).
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.event",
         "bidvector.workflow.notification",
