@@ -11,31 +11,84 @@
  * 「조용히 빗나간 값」과 「던진 읽기」 사이에 제3의 결과가 없다.
  *
  * 그래서 표기를 **열거하지 않는다**(「URL 안의 `//`」·「raw string 안의 `//`」마다 정규식을 더하는
- * 꼴 — 그 목록은 다음 꼴에서 또 뒤처진다). 상태 넷을 지나는 **단일 패스 주사기**로 짓고, 주석
+ * 꼴 — 그 목록은 다음 꼴에서 또 뒤처진다). 상태 다섯을 지나는 **단일 패스 주사기**로 짓고, 주석
  * 술어와 문자열 술어가 한 자리에서 갈리게 둔다. 읽기 집합에 없는 꼴(raw string)은 읽기를 넓히지
  * 않고 거절한다 — 그 꼴이 생기는 날 RED 로 사람을 부르는 쪽이 이 층의 성질이다.
+ *
+ * **문자열 안에도 코드가 있다**(템플릿 식 `${…}`). 그 구간의 따옴표를 문자열의 끝으로 읽으면
+ * 바로 이 모듈이 없애려던 절단이 그대로 재발한다 — `"${f("//")}"` 가 `"${f("` 가 된다(cr r0
+ * HIGH). 식은 중괄호 깊이로 훑어 통째로 넘기고, 깊이 계수가 깨지는 꼴(식 안의 따옴표·주석
+ * 표지)은 거절한다. 따옴표 없는 평범한 식은 읽기 집합에 실제로 있으므로 일률 거절하지 않는다.
  */
 
-/** 주사기의 상태 — Kotlin 에서 `//` 가 주석인지 값인지를 가르는 자리가 이 넷이다. */
+/** 주사기의 상태 — Kotlin 에서 `//` 가 주석인지 값인지를 가르는 자리가 이 다섯이다. */
 const CODE = 'code';
 const STRING = 'string';
 const CHAR = 'char';
 const BLOCK = 'block';
+const BACKTICK = 'backtick';
 
-const CLOSER = { [STRING]: '"', [CHAR]: "'" };
+/** 여는 글자 → 상태. 분기 사슬 대신 표로 둔다 — 꼴이 늘어도 갈림이 한 줄씩만 는다. */
+const OPENER = { '"': STRING, "'": CHAR, '`': BACKTICK };
+const CLOSER = { [STRING]: '"', [CHAR]: "'", [BACKTICK]: '`' };
 const UNCLOSED = {
   [STRING]: '문자열이 닫히지 않았다',
   [CHAR]: '문자 리터럴이 닫히지 않았다',
   [BLOCK]: '블록 주석이 닫히지 않았다',
+  [BACKTICK]: '백틱 식별자가 닫히지 않았다',
 };
+
+/** 템플릿 식 안에서 이 층이 다루지 못하는 꼴 — 따옴표와 주석 표지. */
+const TEMPLATE_UNHANDLED = /["']|\/\/|\/\*/u;
+
+/** 줄끝이 시작하는 자리인가 — `\r\n` 은 `\r` 에서 시작하고, 그 `\r` 도 값이다. */
+function isLineBreakAt(source, at) {
+  return source[at] === '\n' || (source[at] === '\r' && source[at + 1] === '\n');
+}
+
+/**
+ * 문자열 템플릿 식(`${…}`)의 **끝 다음 자리**를 중괄호 깊이로 찾는다. 첫 `}` 에서 끊으면
+ * 중첩된 식의 뒤가 값으로 샌다.
+ *
+ * @throws 식 안에 따옴표·주석 표지가 있으면 — 그 안에서 깊이 계수가 깨지고, 깨진 계수는
+ *   문자열의 끝을 옮겨 **값을 조용히 절단한다**. 읽기 집합의 `${…}` 는 전부 따옴표가 없다.
+ * @throws 식이 닫히기 전에 줄이나 원문이 끝나면.
+ */
+function templateExpressionEnd(source, start) {
+  let depth = 0;
+  let at = start + 1;
+
+  while (at < source.length && source[at] !== '\n') {
+    const ch = source[at];
+    if (ch === '{') {
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        if (TEMPLATE_UNHANDLED.test(source.slice(start, at + 1))) {
+          throw new Error('템플릿 식 안의 따옴표·주석 표지는 읽지 않는다 — 깊이 계수가 깨진다');
+        }
+        return at + 1;
+      }
+    }
+    at += 1;
+  }
+
+  throw new Error('템플릿 식이 닫히지 않았다');
+}
 
 /**
  * Kotlin 원문에서 주석을 걷는다. **문자열·문자 리터럴 안의 주석 표지는 값이므로 남긴다.**
  *
- * 줄바꿈은 걷어 낸 자리에도 남긴다 — 줄 구조가 바뀌면 호출자의 다른 읽기가 엉뚱한 줄을 본다.
+ * 줄끝은 걷어 낸 자리에도 남긴다(CRLF 의 `\r` 까지) — 줄 구조가 바뀌면 호출자의 다른 읽기가
+ * 엉뚱한 줄을 보고, 줄끝이 섞이는 것 자체가 조용한 값 변경이다.
+ *
+ * 백틱 식별자(`` `can't resolve` ``)는 한 상태로 지난다 — 그 안의 `'` 는 문자 리터럴을 열지
+ * 않는다. 모르면 정당한 Kotlin 이 통째로 던져진다.
  *
  * @throws raw string(`"""`)을 만나면 — 읽기 집합에 없는 꼴이고 절단이 조용하기 때문이다.
- * @throws 문자열·문자 리터럴·블록 주석이 닫히지 않으면.
+ * @throws 템플릿 식 안에 따옴표·주석 표지가 있으면 — 깊이 계수가 깨져 값이 절단된다.
+ * @throws 문자열·문자 리터럴·블록 주석·백틱 식별자·템플릿 식이 닫히지 않으면.
  */
 export function withoutKotlinComments(source) {
   let state = CODE;
@@ -56,8 +109,8 @@ export function withoutKotlinComments(source) {
         at += 2;
         state = depth === 0 ? CODE : BLOCK;
       } else {
-        // 주석 본문은 버리고 줄바꿈만 남긴다.
-        out += ch === '\n' ? ch : '';
+        // 주석 본문은 버리고 줄끝만 남긴다 — CRLF 의 `\r` 도 줄끝의 일부다.
+        out += ch === '\n' || ch === '\r' ? ch : '';
         at += 1;
       }
       continue;
@@ -73,20 +126,28 @@ export function withoutKotlinComments(source) {
           depth = 1;
           at += 2;
         } else {
-          while (at < source.length && source[at] !== '\n') {
+          // 줄끝 **앞**에서 멈춘다 — `\r\n` 의 `\r` 까지 먹으면 줄끝이 조용히 바뀐다.
+          while (at < source.length && !isLineBreakAt(source, at)) {
             at += 1;
           }
         }
         continue;
       }
-      state = ch === '"' ? STRING : ch === "'" ? CHAR : CODE;
+      state = OPENER[ch] ?? CODE;
       out += ch;
       at += 1;
       continue;
     }
 
-    // STRING · CHAR — 안의 `//` 와 블록 주석 표지는 **값이다**.
-    if (ch === '\\') {
+    // STRING · CHAR · BACKTICK — 안의 `//` 와 블록 주석 표지는 **값이다**.
+    if (state === STRING && ch === '$' && next === '{') {
+      // 템플릿 식은 통째로 넘긴다 — 그 안의 따옴표를 문자열의 끝으로 읽는 것이 절단의 자리다.
+      const end = templateExpressionEnd(source, at);
+      out += source.slice(at, end);
+      at = end;
+      continue;
+    }
+    if (state !== BACKTICK && ch === '\\') {
       // escape 는 **두 글자**다. 바로 앞 글자만 보면 `"a\\"` 의 닫는 따옴표를 escape 로 읽는다.
       out += ch + (next ?? '');
       at += 2;

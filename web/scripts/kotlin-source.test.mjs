@@ -58,6 +58,81 @@ describe('주석 걷기 — 문자열 안의 `//` 는 주석이 아니다', () =
   it('escape 된 따옴표 문자 리터럴도 같다', () => {
     expect(withoutKotlinComments("val c = '\\'' // 꼬리")).toBe("val c = '\\'' ");
   });
+
+  /**
+   * **백틱 식별자 안의 `'` 는 문자 리터럴을 열지 않는다**(cr r0 LOW). 백틱 구간을 모르면
+   * `` `can't resolve` `` 의 아포스트로피가 CHAR 를 열어 **원문 끝까지 닫히지 않고**, 읽기가
+   * 통째로 던져진다 — 값이 틀리진 않지만 정당한 Kotlin 을 읽지 못한다.
+   */
+  it('백틱 식별자 안의 아포스트로피는 문자 리터럴이 아니다', () => {
+    expect(withoutKotlinComments("fun `can't resolve`() = 1 // 꼬리")).toBe("fun `can't resolve`() = 1 ");
+  });
+
+  it('백틱 식별자 안의 `//` 도 값이다', () => {
+    expect(withoutKotlinComments('fun `a//b`() = 1 // 꼬리')).toBe('fun `a//b`() = 1 ');
+  });
+});
+
+/**
+ * **문자열 템플릿 식**(`${…}`) — cr r0 HIGH. 앞 판은 템플릿 안의 따옴표를 **문자열을 닫는**
+ * 따옴표로 읽어, `"${f("//")}"` 에서 그 뒤를 줄 주석으로 지웠다(`val s = "${f("` 로 절단).
+ * 절단은 조용했고, 그것이 이 모듈이 없애려던 바로 그 결함의 재발이다.
+ *
+ * 처분은 **일률 거절이 아니다** — 읽기 집합(`ResolvedBaseAmount.kt`)에 따옴표 없는 평범한
+ * `${…}` 가 둘 있고 그것까지 던지면 이 층은 쓸 수 없다. 중괄호 깊이로 식을 훑고, **그 구간에
+ * 이 층이 다루지 못하는 글자가 있을 때만** 던진다.
+ */
+describe('주석 걷기 — 문자열 템플릿 식', () => {
+  const q = '"';
+
+  it('템플릿 안의 따옴표를 만나면 던진다 — 절단하지 않는다', () => {
+    expect(() => withoutKotlinComments(`val s = ${q}\${f(${q}//${q})}${q} + ${q}TAIL${q}\n`)).toThrow(
+      /템플릿/u,
+    );
+  });
+
+  /** **통제군** — 따옴표 없는 평범한 템플릿은 그대로 지나가고 꼬리 주석만 걷힌다. */
+  it('따옴표 없는 템플릿은 그대로 지나간다', () => {
+    expect(withoutKotlinComments(`val s = ${q}a \${amount.provenance} b${q} // 꼬리`)).toBe(
+      `val s = ${q}a \${amount.provenance} b${q} `,
+    );
+  });
+
+  /** 중괄호가 중첩돼도 식의 끝을 깊이로 찾는다 — 첫 `}` 에서 끊으면 뒤가 값으로 샌다. */
+  it('중첩 중괄호 템플릿도 그대로 지나간다', () => {
+    expect(withoutKotlinComments(`val s = ${q}\${ if (x) { 1 } else { 2 } }${q} // 꼬리`)).toBe(
+      `val s = ${q}\${ if (x) { 1 } else { 2 } }${q} `,
+    );
+  });
+
+  /**
+   * 템플릿 안의 **문자 리터럴**은 앞 판에서 우연히 통과했다(STRING 에서 `'` 가 무력이라).
+   * 중괄호 깊이로 훑으면 `'}'` 의 `}` 가 식을 일찍 끊어 같은 구멍이 다시 열리므로 **던진다.**
+   */
+  it('템플릿 안의 문자 리터럴은 던진다 — 중괄호 계수가 깨진다', () => {
+    expect(() => withoutKotlinComments(`val s = ${q}\${c == '}'}${q} // 꼬리`)).toThrow(/템플릿/u);
+  });
+
+  it('닫히지 않은 템플릿 식은 던진다', () => {
+    expect(() => withoutKotlinComments(`val s = ${q}\${f(\n`)).toThrow(/닫히지 않았다/u);
+  });
+
+  it('escape 된 달러는 템플릿을 열지 않는다', () => {
+    expect(withoutKotlinComments(`val s = ${q}\\\${not} //x${q} // 꼬리`)).toBe(
+      `val s = ${q}\\\${not} //x${q} `,
+    );
+  });
+
+  /**
+   * **verifier r1 M-1 의 입력** — 같은 축의 다른 꼴이다. 기본값을 템플릿 **안에서** 주는 모양은
+   * 읽기 집합에 실제로 생길 수 있고, r0 판은 이것을 `val u = "${base ?: "https:` 로 **무성
+   * 절단**했다. 이 OPEN 이 처음 지목한 base URL 절단과 **같은 해악**이라 축어로 든다.
+   */
+  it('템플릿 안 기본값 문자열도 절단하지 않고 던진다 (v r1 M-1)', () => {
+    expect(() => withoutKotlinComments(`val u = ${q}\${base ?: ${q}https://x${q}}/p${q}`)).toThrow(
+      /템플릿/u,
+    );
+  });
 });
 
 describe('주석 걷기 — 주석은 실제로 걷는다', () => {
@@ -87,6 +162,23 @@ describe('주석 걷기 — 주석은 실제로 걷는다', () => {
 
   it('여러 줄 블록 주석의 줄바꿈은 남긴다 — 줄 구조를 바꾸지 않는다', () => {
     expect(withoutKotlinComments('val a = 1\n/* 두\n줄 */\nval b = 2')).toBe('val a = 1\n\n\nval b = 2');
+  });
+
+  /**
+   * **CRLF 원문의 `\r` 도 값이다**(cr r0 LOW). 앞 판은 줄 주석을 `\n` 까지 건너뛰어 그 앞의
+   * `\r` 을 **함께 지웠다** — 같은 파일 안에서 줄끝이 섞이고, 그것은 이 층이 금지한 「조용한
+   * 값 변경」이다(줄 수는 그대로라 아무 대조도 붉어지지 않는다).
+   */
+  it('CRLF 줄 주석을 걷어도 줄끝은 그대로다', () => {
+    expect(withoutKotlinComments('val a = 1 // 꼬리\r\nval b = 2\r\n')).toBe(
+      'val a = 1 \r\nval b = 2\r\n',
+    );
+  });
+
+  it('CRLF 블록 주석의 줄끝도 그대로다', () => {
+    expect(withoutKotlinComments('val a = 1 /* 두\r\n줄 */\r\nval b = 2')).toBe(
+      'val a = 1 \r\n\r\nval b = 2',
+    );
   });
 
   /**
@@ -165,5 +257,21 @@ describe('주석 걷기 구현이 저장소에 하나다', () => {
    */
   it('공유 모듈은 걷기를 선언한다 — 위 단언이 공허하지 않다', () => {
     expect(read(SHARED)).toMatch(/function withoutKotlinComments/u);
+  });
+
+  /**
+   * **`STRIP_REGEX` 자신의 양성 대조**(cr r0 MEDIUM). 앞 판의 양성 대조는 선언 술어
+   * (`function withoutKotlinComments`)만 덮었다 — 정작 사본의 성질을 지는 `STRIP_REGEX` 는
+   * 어디에도 **걸리는 것이 없어** `not.toMatch` 가 공허해질 수 있었다(정규식이 드리프트하면
+   * 두 소비자 단언이 조용히 아무것도 재지 않는다). 사본의 꼴을 **합성 입력**으로 넣어 술어가
+   * 실제로 거기 걸리는지 잰다 — 저장소에 그 꼴이 하나도 없는 것이 정상 상태이므로, 양성 대조는
+   * 파일이 아니라 합성 입력이어야 한다.
+   */
+  it('사본 술어가 공허하지 않다 — 걷기 사본의 꼴을 합성 입력에서 잡는다', () => {
+    const lineCopy = String.raw`const t = source.replace(/\/\/.*$/gmu, '');`;
+    const blockCopy = String.raw`const t = source.replace(/\/\*[\s\S]*?\*\//gu, '');`;
+
+    expect(lineCopy).toMatch(STRIP_REGEX);
+    expect(blockCopy).toMatch(STRIP_REGEX);
   });
 });
