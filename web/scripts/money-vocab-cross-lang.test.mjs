@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { readKotlinSource, withoutKotlinComments } from './kotlin-source.mjs';
+import { assertStrippedKotlin, readKotlinSource } from './kotlin-source.mjs';
 
 /**
  * **wire 어휘를 손으로 복제한 자리들을 Kotlin 정본에 묶는다**(M9/web-followups —
@@ -90,7 +90,7 @@ const ENUM_ENTRY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
  * 내고 **등식**이 갈린 것을 말한다(읽기가 어휘 정책을 겸하면 그 둘이 한 자리에서 섞인다).
  */
 export function kotlinEnumEntries(source, name) {
-  const stripped = withoutKotlinComments(source);
+  const stripped = assertStrippedKotlin(source);
   const header = new RegExp(String.raw`\benum\s+class\s+${name}\b`, 'gu');
   const matches = [...stripped.matchAll(header)];
   if (matches.length !== 1) {
@@ -118,7 +118,7 @@ export function kotlinEnumEntries(source, name) {
 
 /** Kotlin `const val <name>: String = "…"` 의 값. 없으면 던진다. */
 export function kotlinStringConst(source, name) {
-  const stripped = withoutKotlinComments(source);
+  const stripped = assertStrippedKotlin(source);
   const found = new RegExp(String.raw`\bconst\s+val\s+${name}\s*:\s*String\s*=\s*"([^"]+)"`, 'u').exec(stripped);
   if (found === null) {
     throw new Error(`const val ${name}: String 을 찾지 못했다 — 꼴이 바뀌었다`);
@@ -131,7 +131,7 @@ export function kotlinStringConst(source, name) {
  * `when` 으로 내는 자리를 읽는다 — 실제로 wire 에 실리는 것은 그 리터럴이다.
  */
 export function kotlinFunctionStringLiterals(source, name) {
-  const stripped = withoutKotlinComments(source);
+  const stripped = assertStrippedKotlin(source);
   const header = new RegExp(String.raw`\bfun\s+${name}\s*\(`, 'gu');
   const matches = [...stripped.matchAll(header)];
   if (matches.length !== 1) {
@@ -314,14 +314,24 @@ describe('타임라인 명령 어휘의 키 집합 == Kotlin 정본', () => {
  * 길이다 — 그 길이 **예외**임을 여기서 잰다.
  */
 describe('Kotlin 읽기의 양성·음성 대조', () => {
-  it('한 줄 열거·뒤 쉼표·주석 섞인 꼴을 읽는다', () => {
+  it('한 줄 열거와 뒤 쉼표 꼴을 읽는다', () => {
     const oneLine = 'enum class Probe { A, B, C }';
     const trailing = 'enum class Probe {\n    A,\n    B,\n}\n';
-    const commented = 'enum class Probe {\n    // 주석의 B\n    A,\n    /* 블록 */ B,\n}\n';
 
     expect(kotlinEnumEntries(oneLine, 'Probe')).toStrictEqual(['A', 'B', 'C']);
     expect(kotlinEnumEntries(trailing, 'Probe')).toStrictEqual(['A', 'B']);
-    expect(kotlinEnumEntries(commented, 'Probe')).toStrictEqual(['A', 'B']);
+  });
+
+  /**
+   * **r3 에서 계약이 바뀌었다**(verifier r2 H-3). 추출 함수는 이제 **걷힌 텍스트만** 받는다 —
+   * 걷기는 읽기(`readKotlinSource`)가 하고, 소비자는 걷기 함수를 import 하지 않는다. 그래서
+   * 주석이 든 원문은 여기서 **거부된다**. 「주석을 섞어도 읽는다」는 성질은 사라진 것이 아니라
+   * **걷기 쪽으로 옮겨 갔고**(`kotlin-source.test.mjs`), 그 결과 주석이 추출에 닿을 길 자체가 없다.
+   */
+  it('걷히지 않은 원문은 거부한다 — 주석은 추출에 닿지 않는다', () => {
+    const commented = 'enum class Probe {\n    // 주석의 B\n    A,\n    /* 블록 */ B,\n}\n';
+
+    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
   it('본문에 멤버 선언이 있는 꼴도 열거만 읽는다', () => {
@@ -379,10 +389,11 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
     expect(() => kotlinEnumEntries('enum class Probe', 'Probe')).toThrow(/중괄호/u);
   });
 
-  it('주석 안의 헤더는 세지 않는다 — 계수를 흔들지 않는다', () => {
+  /** 주석 안의 헤더가 계수를 흔드는 길은 **걷기가 먼저 닫는다** — 여기선 거부로 선다. */
+  it('주석 안의 헤더가 든 원문도 거부한다', () => {
     const commented = '// enum class Probe { X }\nenum class Probe { A }\n';
 
-    expect(kotlinEnumEntries(commented, 'Probe')).toStrictEqual(['A']);
+    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
   it('문자열 상수와 함수 리터럴도 못 찾으면 던진다', () => {

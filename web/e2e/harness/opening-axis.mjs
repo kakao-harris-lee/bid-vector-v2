@@ -7,7 +7,7 @@
  * **이 파일이 개찰 축 라우팅 술어의 한 자리다.** 오퍼레이션 이름·진행구분 어휘·행 모양이 여기
  * 하나에 있고, 출하 정본과의 등식은 `opening-axis.test.mjs` 가 잰다.
  */
-import { withoutKotlinComments } from '../../scripts/kotlin-source.mjs';
+import { assertStrippedKotlin } from '../../scripts/kotlin-source.mjs';
 
 /**
  * 개찰 축 오퍼레이션 경로 — **출하 기본값의 사본**이다
@@ -98,7 +98,7 @@ function soleLiteral(text, pattern, what) {
  * 뒤바뀐 경우를 지나보낸다.
  */
 export function shippedOpeningOperationPaths(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const categories = Object.keys(DIVISION_TOKENS);
   const divisions = {};
   for (const [index, category] of categories.entries()) {
@@ -158,7 +158,7 @@ export function shippedOpeningOperationPaths(source) {
  * 걸음의 `detailCalls` 기대가 **이름 붙은 실패**로 그 사실을 말한다.
  */
 export function shippedDetailAxisCounts(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const open = text.indexOf('fun detailAxesFor');
   if (open < 0) {
     throw new Error('출하 본문에서 상세 축 열거 함수를 찾지 못했다 — 정본의 모양이 바뀌었다');
@@ -187,7 +187,7 @@ export function shippedDetailAxisCounts(source) {
 
 /** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
 export function shippedNoticeListOperations(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const found = {};
   for (const match of text.matchAll(
     /"(\w+)" to KonepsOperationProperties\(\s*"([^"]+)",\s*BusinessDivision\.(\w+),?\s*\)/gu,
@@ -206,7 +206,7 @@ export function shippedNoticeListOperations(source) {
 
 /** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
 export function shippedProgressLabels(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const labels = {};
   for (const match of text.matchAll(/"([^"]+)" to OpeningProgress\.(\w+)/gu)) {
     // 같은 라벨이 두 번 등재되면 **뒤가 조용히 이긴다** — 어느 것이 정본인지 서지 않으므로 거부한다.

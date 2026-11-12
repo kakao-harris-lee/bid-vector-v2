@@ -1,7 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it } from 'vitest';
 
 import { withoutKotlinComments } from './kotlin-source.mjs';
@@ -20,10 +16,6 @@ import { withoutKotlinComments } from './kotlin-source.mjs';
  * 그래서 아래 대조는 두 묶음이다 — **보존·걷기의 전수**와 **던지는 꼴의 전수**. 앞 판들이 조용히
  * 틀렸던 자리가 전부 첫 묶음에 있다(설계 검토 §2b 의 표가 그 전수다).
  */
-
-const here = dirname(fileURLToPath(import.meta.url));
-const webRoot = resolve(here, '..');
-const read = (relative) => readFileSync(resolve(webRoot, relative), 'utf8');
 
 describe('주석 걷기 — 문자열 안의 `//` 는 주석이 아니다', () => {
   /**
@@ -124,6 +116,18 @@ describe('주석 걷기 — 문자열 템플릿 식', () => {
   });
 
   /**
+   * **깊이 계수를 고정한다**(verifier r2 M-2). `depth === 0` 을 `depth <= 1` 로 느슨하게 바꾸면
+   * 중첩 중괄호 안의 따옴표가 식의 끝을 **첫 닫는 중괄호**로 보이게 만들어 이 입력이 `val a = "${ m { x } + "`
+   * 로 **조용히 절단된다**(실측). 기존 「중첩 중괄호 템플릿도 그대로 지나간다」 test 는 두 판을
+   * 가르지 못한다 — 어느 쪽이든 식 텍스트를 그대로 복사하기 때문이다.
+   */
+  it('중첩 중괄호 안의 따옴표도 던진다 — 깊이 계수가 느슨해지면 절단된다', () => {
+    expect(() => withoutKotlinComments(`val a = ${q}\${ m { x } + ${q}//${q} }${q} // c`)).toThrow(
+      /템플릿/u,
+    );
+  });
+
+  /**
    * **verifier r1 M-1 의 입력** — 같은 축의 다른 꼴이다. 기본값을 템플릿 **안에서** 주는 모양은
    * 읽기 집합에 실제로 생길 수 있고, r0 판은 이것을 `val u = "${base ?: "https:` 로 **무성
    * 절단**했다. 이 OPEN 이 처음 지목한 base URL 절단과 **같은 해악**이라 축어로 든다.
@@ -175,6 +179,15 @@ describe('주석 걷기 — 주석은 실제로 걷는다', () => {
     );
   });
 
+  /**
+   * **홀로 선 `\r` 도 줄끝이다**(verifier r2 L-1). Kotlin 의 `NL` 은 `'\n' | '\r' '\n'?` 이라
+   * 단독 CR 뒤에 선언이 올 수 있다. 그 자리를 줄끝으로 세지 않으면 줄 주석이 `\r` 를 넘어
+   * **다음 선언을 먹고**, `\n` 기준 줄 수는 그대로라 아무 대조도 붉어지지 않는다.
+   */
+  it('홀로 선 CR 에서 줄 주석이 멈춘다 — 다음 선언을 먹지 않는다', () => {
+    expect(withoutKotlinComments('val a = 1 // 꼬리\rval b = 2\n')).toBe('val a = 1 \rval b = 2\n');
+  });
+
   it('CRLF 블록 주석의 줄끝도 그대로다', () => {
     expect(withoutKotlinComments('val a = 1 /* 두\r\n줄 */\r\nval b = 2')).toBe(
       'val a = 1 \r\n\r\nval b = 2',
@@ -220,58 +233,31 @@ describe('주석 걷기 — 다룰 수 없는 꼴은 던진다 (조용히 틀리
 });
 
 /**
- * **사본이 되살아나는 축**(설계 검토 §2 우회 3·7). 공유 자리를 두어도 소비자가 자기 사본을 다시
- * 들이면 이 slice 는 아무것도 하지 않은 것이 된다. 그래서 「저장소에 주석 걷기 구현이 하나」와
- * 「두 소비자가 그 하나를 쓴다」를 함께 센다.
- *
- * 이 술어는 **텍스트**다(설계 검토 §3 의 등재된 미달) — 구조로 닫는 길은 「Kotlin 원문을 읽는
- * 파일」 자체가 경로 문자열 판정이라 한 겹 안쪽에서 같은 성질로 돌아온다. 의도적 우회는 리뷰
- * 소관이라는 네트워크·시계 금지의 같은 자리다.
+ * **가리는 선언** — 옛 이름을 주석으로 남기고 새 값을 아래에 두는 꼴은 출하 파일에 실제로 생긴다.
+ * 걷기가 그 줄을 지우므로 **추출이 보는 것은 실제 값 하나**다. 이 성질은 r3 까지 소비자 test 에
+ * 있었는데(추출 함수에 주석 든 원문을 먹였다) 그 자리는 이제 계약상 **거부**다 — 성질 자체는
+ * 사라지지 않고 걷기 쪽인 여기로 옮겨 왔다.
  */
-describe('주석 걷기 구현이 저장소에 하나다', () => {
-  const CONSUMERS = ['scripts/money-vocab-cross-lang.test.mjs', 'e2e/harness/opening-axis.mjs'];
-  const SHARED = 'scripts/kotlin-source.mjs';
-  /** 줄 주석·블록 주석을 **정규식으로** 걷는 꼴. 사본의 성질 자체가 이 텍스트다. */
-  const STRIP_REGEX = /replace\(\s*\/\\\/[\\/*]/u;
+describe('주석 걷기 — 가리는 선언을 지운다', () => {
+  it('주석으로 가린 옛 선언은 걷히고 실제 값만 남는다', () => {
+    const shadowed = [
+      '// 옛 이름: val p: String = "old"',
+      '    val p: String = "new"',
+    ].join('\n');
 
-  it('소비자 둘이 공유 모듈에서 읽기를 끌어온다', () => {
-    for (const relative of CONSUMERS) {
-      expect(read(relative), `${relative} 가 공유 읽기를 쓰지 않는다`).toMatch(
-        /import \{[^}]*withoutKotlinComments[^}]*\} from '[^']*kotlin-source\.mjs'/u,
-      );
-    }
-  });
+    const stripped = withoutKotlinComments(shadowed);
 
-  it('소비자 둘에 자기 주석 걷기가 없다', () => {
-    for (const relative of CONSUMERS) {
-      expect(read(relative), `${relative} 에 사본이 되살아났다`).not.toMatch(STRIP_REGEX);
-      expect(read(relative), `${relative} 가 자기 걷기를 선언한다`).not.toMatch(
-        /function withoutKotlinComments/u,
-      );
-    }
-  });
-
-  /**
-   * **술어 자신의 양성 대조** — 위 두 단언이 공허하지 않음을 잰다. 찾는 꼴이 공유 모듈에는
-   * 실제로 있어야 하고, 없으면 `not.toMatch` 는 아무것도 재지 않는다.
-   */
-  it('공유 모듈은 걷기를 선언한다 — 위 단언이 공허하지 않다', () => {
-    expect(read(SHARED)).toMatch(/function withoutKotlinComments/u);
-  });
-
-  /**
-   * **`STRIP_REGEX` 자신의 양성 대조**(cr r0 MEDIUM). 앞 판의 양성 대조는 선언 술어
-   * (`function withoutKotlinComments`)만 덮었다 — 정작 사본의 성질을 지는 `STRIP_REGEX` 는
-   * 어디에도 **걸리는 것이 없어** `not.toMatch` 가 공허해질 수 있었다(정규식이 드리프트하면
-   * 두 소비자 단언이 조용히 아무것도 재지 않는다). 사본의 꼴을 **합성 입력**으로 넣어 술어가
-   * 실제로 거기 걸리는지 잰다 — 저장소에 그 꼴이 하나도 없는 것이 정상 상태이므로, 양성 대조는
-   * 파일이 아니라 합성 입력이어야 한다.
-   */
-  it('사본 술어가 공허하지 않다 — 걷기 사본의 꼴을 합성 입력에서 잡는다', () => {
-    const lineCopy = String.raw`const t = source.replace(/\/\/.*$/gmu, '');`;
-    const blockCopy = String.raw`const t = source.replace(/\/\*[\s\S]*?\*\//gu, '');`;
-
-    expect(lineCopy).toMatch(STRIP_REGEX);
-    expect(blockCopy).toMatch(STRIP_REGEX);
+    expect(stripped).not.toContain('old');
+    expect(stripped).toContain('"new"');
   });
 });
+
+/**
+ * **복제 금지 술어는 이 파일에 없다**(r3 — verifier r1 M-2 · r2 H-3 · cr r1 MEDIUM②).
+ *
+ * r1·r2 는 여기서 소비자를 `CONSUMERS` **배열로 열거**하고 걷기 사본을 **정규식 텍스트**로 찾았다.
+ * 그 열거는 소비자가 넷으로 늘어도 둘에 머물렀고(실측), 그 술어는 표기를 바꾼 사본 둘을 **초록으로**
+ * 지나갔다. 둘 다 `scripts/kotlin-source-ownership.test.mjs` 로 옮겼다 — 뿌리 훑기 + AST 로
+ * 「경로를 아는 자리」·「걷기를 import 하는 자리」·「export 집합」을 들고, 표기를 찾는 텍스트 층은
+ * **완화**라고 이름 붙여 2 차로 둔다.
+ */

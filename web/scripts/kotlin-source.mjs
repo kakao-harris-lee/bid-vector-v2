@@ -67,6 +67,31 @@ export function readKotlinSource(key) {
   return withoutKotlinComments(readFileSync(resolve(repoRoot, relative), 'utf8'));
 }
 
+/**
+ * **받은 텍스트가 걷힌 그대로인지 단언하고 그대로 돌려준다.** 소비자 추출 함수가 입력 자리에서
+ * 부르는 **유일한** 걷기 표면이다(걷기 함수 자체는 소비자가 import 하지 않는다).
+ *
+ * 이 함수가 있는 이유는 중복 걷기가 아니라 **방어**다(cr r1 LOW④ 가 실측한 자리). 걷힌 텍스트에도
+ * 문자열 안의 `//` 는 설계상 남으므로, 소비자가 받은 텍스트에 **걷기 사본을 덧씌우는** 길이 남는다.
+ * 그 사본이 줄을 끊는 꼴이면 문자열의 균형이 깨지고, 그 순간 이 단언이 **던진다**. 이름을 「다시
+ * 걷는다」가 아니라 「걷힌 상태를 단언한다」로 둔 것도 그래서다 — 다음 라운드가 「입력이 이미
+ * 걷혔으니 중복」이라며 조용히 지우지 못하게 사유를 이름에 박았다.
+ *
+ * **막지 못하는 것**: 줄을 끊지 않는 치환(`replaceAll` 로 주석 표지만 지우는 꼴)은 걷힌 상태를
+ * 유지하므로 이 단언을 지나간다 — 값은 망가지는데 조용하다. 설계 검토 §4 (3) 미달 ② 가 그 자리다.
+ *
+ * @throws 입력이 걷힌 텍스트가 아니면 — 주석이 남아 있거나, 사본이 값을 바꿔 걷기 결과가 달라지면.
+ * @throws 걷기가 다룰 수 없는 꼴을 만나면(`withoutKotlinComments` 의 계약 그대로).
+ */
+export function assertStrippedKotlin(text) {
+  if (withoutKotlinComments(text) !== text) {
+    throw new Error(
+      '걷힌 Kotlin 텍스트가 아니다 — 읽기를 거치지 않았거나 사본이 값을 바꿨다',
+    );
+  }
+  return text;
+}
+
 /** 주사기의 상태 — Kotlin 에서 `//` 가 주석인지 값인지를 가르는 자리가 이 다섯이다. */
 const CODE = 'code';
 const STRING = 'string';
@@ -87,9 +112,13 @@ const UNCLOSED = {
 /** 템플릿 식 안에서 이 층이 다루지 못하는 꼴 — 따옴표와 주석 표지. */
 const TEMPLATE_UNHANDLED = /["']|\/\/|\/\*/u;
 
-/** 줄끝이 시작하는 자리인가 — `\r\n` 은 `\r` 에서 시작하고, 그 `\r` 도 값이다. */
+/**
+ * 줄끝이 시작하는 자리인가. Kotlin 의 줄끝은 `'\n' | '\r' '\n'?` 이므로 **홀로 선 `\r` 도 줄끝**
+ * 이다(verifier r2 L-1) — 그 자리를 줄끝으로 세지 않으면 줄 주석이 `\r` 를 넘어 **다음 선언을
+ * 먹고**, `\n` 기준 줄 수는 그대로라 어느 대조도 붉어지지 않는다.
+ */
 function isLineBreakAt(source, at) {
-  return source[at] === '\n' || (source[at] === '\r' && source[at + 1] === '\n');
+  return source[at] === '\n' || source[at] === '\r';
 }
 
 /**
@@ -199,7 +228,8 @@ export function withoutKotlinComments(source) {
       at += 2;
       continue;
     }
-    if (ch === '\n') {
+    if (ch === '\n' || ch === '\r') {
+      // 홀로 선 `\r` 도 Kotlin 의 줄끝이다 — 문자열·문자 리터럴·백틱은 줄을 넘지 못한다.
       throw new Error(`${UNCLOSED[state]} — 줄이 끝났다`);
     }
     out += ch;

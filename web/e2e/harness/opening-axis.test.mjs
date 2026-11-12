@@ -118,12 +118,17 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
    * 값을 바로 위 주석에 두면 그 주석을 집어 **등식이 초록으로 지나갔다**(그 축은 조용한 404 로만
    * 나타난다). 이제 주석을 걷고 일치 수가 하나임을 요구한다.
    */
-  it('주석이 실제 값을 가리지 못한다 — 가리는 줄이 있어도 주석 쪽을 집지 않는다', () => {
+  /**
+   * **r3 에서 계약이 바뀌었다**(verifier r2 H-3) — 추출은 **걷힌 텍스트만** 받는다. 가리는 주석이
+   * 든 원문이 걷힌 뒤의 모습은 「주석은 사라지고 실제 값만 남은 것」이므로, 재현 원문도 그 모습으로
+   * 만든다. 주석이 실제 값을 가리지 못한다는 성질 자체는 **걷기 쪽**에서 잠근다
+   * (`scripts/kotlin-source.test.mjs` — 가리는 선언을 걷으면 실제 값만 남는다).
+   */
+  it('가리는 줄이 걷힌 뒤에도 실제 값을 집는다', () => {
     const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
     const shadowed = shipped.replace(
       'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
-      '// 옛 이름: val openingCompletePath: String = "getOpengResultListInfoOpengCompt"\n' +
-        '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
+      '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
     );
 
     expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
@@ -132,6 +137,13 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
       'getOpengResultListInfoOpengCompt02',
     );
     expect(shippedOpeningOperationPaths(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
+  });
+
+  /** 걷히지 않은 원문은 추출 자리에서 **거부된다** — 주석이 값을 가릴 기회가 오지 않는다. */
+  it('걷히지 않은 원문은 거부된다', () => {
+    const unstripped = `// 가리는 줄\n${readKotlinSource(SHIPPED_ENDPOINTS)}`;
+
+    expect(() => shippedOpeningOperationPaths(unstripped)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
   it('같은 선언이 **두 자리에** 있으면 어느 것이 정본인지 서지 않으므로 거부한다', () => {
