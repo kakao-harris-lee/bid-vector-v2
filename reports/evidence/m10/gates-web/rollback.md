@@ -19,7 +19,7 @@ base 가 아니라 **`67ff54b1`**(고정 기재 — 움직이는 `origin/main` �
 
 ## 복원 목록 (기계 산출 — 손으로 쓰지 않는다)
 
-`git diff --name-status 67ff54b1..HEAD` 에서 **자기 evidence 를 뺀** **열**이다(r4 가 내부 걷기 모듈 하나를 더했다 — verifier r4 M-4).
+`git diff --name-status 6c4fbe94..HEAD` 에서 **자기 evidence 를 뺀** **열**이다(r4 가 내부 걷기 모듈 하나를 더했다 — verifier r4 M-4).
 
 ```
 M docs/discovery/capability-map.md
@@ -35,7 +35,7 @@ M web/scripts/money-vocab-cross-lang.test.mjs
 ```
 
 ```
-git restore --source=67ff54b1f349ea917e50137b91ded8df73a491f1 --staged --worktree -- \
+git restore --source=6c4fbe94 --staged --worktree -- \
   docs/discovery/capability-map.md web/config/gate-tests.txt \
   web/e2e/harness/journey-up.mjs web/e2e/harness/opening-axis.mjs \
   web/e2e/harness/opening-axis.test.mjs web/scripts/kotlin-source-ownership.test.mjs \
@@ -64,33 +64,32 @@ git restore --source=67ff54b1f349ea917e50137b91ded8df73a491f1 --staged --worktre
 | 걸음 | 결과 |
 | --- | --- |
 | ① 복원 명령 | **exit 0** |
-| ② D/M 수 | **D 3 · M 6** (목록과 같다) |
+| ② D/M 수 | **D 4 · M 6** (목록 열과 같다) |
 | ③ **원천** 대비 diff | **0 줄** |
 | ④ 컴파일(web `typecheck`) | **exit 0** |
-| ⑤ test(`vitest run`) | **40 files · 858 tests passed** — 병합 뒤 판정 SHA 가 42 files · 909 tests 이므로 이 slice 가 더한 **2 files · 51 tests** 가 정확히 빠진 수다 |
-| ⑥ 게이트 | web job 여덟(`lint`·`typecheck`·`gate:src-tree`·`api:types:check`·`test`·`gate:tests`·`build`·`gate:boundary-canary`) **전부 exit 0** · Kotlin `leakPatternGate` 는 **미측정**(아래) |
+| ⑤ test(`vitest run`) | **40 files · 858 tests passed** — 판정 SHA 가 42 files · 913 tests 이므로 이 slice 가 더한 **2 files · 55 tests** 가 정확히 빠진 수다 |
+| ⑥ 게이트 | web job 여덟(`lint`·`typecheck`·`gate:src-tree`·`api:types:check`·`test`·`gate:tests`·`build`·`gate:boundary-canary`) **전부 exit 0** |
 
 clone 에서 `npm ci` 로 **실제 설치**했다 — 심볼릭 링크는 `gate:src-tree` 를 거짓으로 붉힌다.
 
-**⑥ 의 Kotlin 몫은 아직 재지 않았다.** 판정 SHA 의 Kotlin `check` 전건이 호스트 경쟁(다른 레인의
-전건 빌드와 동시)으로 길어져 그 뒤에 돌 차례였다. **미측정은 초록이 아니다** — 그 두 수치(판정 SHA
-의 `check`, 복원 트리의 `leakPatternGate`)는 **PR 조치 코멘트**가 진다.
+판정 SHA 의 Kotlin `check` 전건과 `leakPatternGate --rerun` 은 **본 worktree 에서** 따로 쟀다 —
+그 결과의 정본은 **PR 조치 코멘트**다(evidence 에 넣으면 그 편집이 커밋을 또 낳는다).
 
 **완료는 종료 코드가 아니라 계수로 판정한다**(공유 파일 둘 — 이번엔 10B 의 줄이 실제로 들어 있다).
 
 | 계수 | 결과 |
 | --- | --- |
 | capability map 의 **내** 하위 절 `(j)` | **0** (내 표지 사라짐) |
-| capability map 의 **남의** 절 `(a)`~`(h)` | **7** (10B 의 `(f)`·`(h)` 포함, 보존) |
-| 10B `(h)` 절 본문 표지 | **2** (보존) |
+| capability map 의 **남의** 절 `(a)`~`(i)` | **8** (10B 의 `(f)`·`(h)` 와 10C 의 `(i)` 포함, 보존) |
+| 10C `(i)` 절 본문 표지 | **2** (보존) |
 | 등록부의 **내** 줄 | **0** |
 | 등록부 항목 전수 | **37** == 원천의 **37** |
 | `money-vocab` 의 `it(` 수 | **18** == 원천의 **18** (내가 더한 한 줄만 빠졌다) |
 
 ## 원천을 교체해야 하는 조건
 
-10B(`feature/m10-timeline-command-enum`)가 먼저 머지되고 이 브랜치가 main 을 병합하면, 공유 파일에
-**남의 줄이 들어온다**. 그때 원천을 **그 병합한 main 커밋 SHA**(고정 기재 — `origin/main` 금지)로
+**이 조건은 이미 두 번 발동했고 더는 없다**(10B `#149` · 10C `#150`). 또 다른 slice 가 먼저
+머지되면 공유 파일에 **남의 줄이 들어온다**. 그때 원천을 **그 병합한 main 커밋 SHA**(고정 기재 — `origin/main` 금지)로
 바꾸고 ①~⑥ 과 위 계수를 **다시** 낸다. 교체 시 단언을 하나 더 잰다: **원천의 내 복원 대상 아홉이
 착수 base 와 blob 동일**(그 사이 남의 slice 가 내 복원 대상을 만지지 않았음) — 그것이 hunk 격리
 불필요의 근거다. 실측 자리도 **그 병합 커밋**이 된다(되돌림이 적용되는 트리가 그것이다).
