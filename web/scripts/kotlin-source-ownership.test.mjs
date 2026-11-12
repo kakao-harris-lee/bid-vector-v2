@@ -227,7 +227,11 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       '정규식 리터럴(B6)': `const f = readdirSync(d).find((n) => /\\${KT}$/u.test(n));`,
       '중괄호 자리 다른 glob(B11)': `const g = globSync('a/Basis{${KT},${KT}s}');`,
       // **상설 양성 대조**(r6): r4 가 닫았던 이 꼴이 r5 의 「점 뒤 kt」 술어에서 **조용히 회귀**했다.
-      '중괄호 glob N10(회귀 감시)': `const g = globSync('a/*.{${'k'}${'t'},${'k'}${'t'}s}');`,
+      // **brace glob 세 꼴 상설**(cr r4 HIGH①): r4 가 닫은 꼴이 r5 에서 회귀했고, 변이 재생을
+      // B 계열로만 줄인 것이 그 회귀를 놓친 원인이다. 세 꼴을 모두 여기 둔다.
+      '중괄호 glob 두 확장자(N10)': `const g = globSync('a/X.{${'k'}${'t'},${'k'}${'t'}s}');`,
+      '중괄호 glob 섞인 확장자': `const g = globSync('a/*.{${'k'}${'t'},java}');`,
+      '중괄호 glob 하나': `const g = globSync('a/X.{${'k'}${'t'}});`,
       '두 확장자 정규식(P2)': `const f = d.find((n) => /\\.(?:${'k'}${'t'}|${'k'}${'t'}s)$/u.test(n));`,
       '문자 클래스(P3)': `const r = /[.]${'k'}${'t'}$/u;`,
       '점 없는 확장자(P5)': `const ok = n.split('.').pop() === '${'k'}${'t'}';`,
@@ -263,8 +267,9 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
    */
   it('내부 걷기 모듈을 참조하는 파일은 소유 모듈과 그 단위 test 둘뿐이다', () => {
     const referrers = files
-      .filter(isAstFile)
-      .filter((relative) => mentionsStripModule(read(relative), relative))
+      // 데이터 파일도 본다(cr r4 MEDIUM) — `package.json` 의 `imports` 별칭이나 JSON 지정자로
+      // 가리키는 길이 AST 필터 밖에 있었다. 오늘 데이터 파일 쪽 적중은 0 이다.
+      .filter((relative) => (isAstFile(relative) ? mentionsStripModule(read(relative), relative) : read(relative).includes(STRIP_BASENAME)))
       .sort();
 
     expect(referrers, '이 파일들이 걷기 본체를 쥔다 — 사본을 덧씌울 수 있다').toStrictEqual(
@@ -395,7 +400,7 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
             ts.forEachChild(child, inner);
           };
           ts.forEachChild(body, inner);
-          out.set(name, { relative, calls });
+          out.set(`${relative}:${name}`, { relative, name, calls });
         }
         ts.forEachChild(node, visit);
       };
@@ -408,17 +413,28 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
     const declared = declaredCalls();
     const missing = [];
 
-    expect(KOTLIN_SINKS.size, '모집단이 비었다 — 술어가 공허하다').toBeGreaterThan(2);
+    // **크기 하한이 아니라 정확한 집합**(cr r4 HIGH②): 하한이면 동작이 같은 리팩터로 모집단이
+    // 줄어도 조용하다. 줄거나 늘면 이 줄이 먼저 붉어지고, 사람이 그 변화를 보고 판단한다.
+    expect([...KOTLIN_SINKS].sort(), '모집단이 바뀌었다 — 줄었는지 늘었는지 보고 판단하라').toStrictEqual([
+      'expect',
+      'kotlinEnumEntries',
+      'kotlinFunctionStringLiterals',
+      'shippedDetailAxisCounts',
+      'shippedNoticeListOperations',
+      'shippedOpeningOperationPaths',
+      'shippedProgressLabels',
+    ]);
 
     for (const name of [...KOTLIN_SINKS].sort()) {
-      const found = declared.get(name);
-      if (found === undefined) {
-        continue; // 공유 모듈 자신의 표면(`assertStrippedKotlin` 등)은 이 축이 아니다.
-      }
-      if (found.calls.has('withoutKotlinComments')) {
-        missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
-      } else if (!found.calls.has('assertStrippedKotlin')) {
-        missing.push(`${found.relative}:${name} 가 단언을 부르지 않는다`);
+      // **파일 단위 키**(cr r4 MEDIUM): 전역 이름 Map 은 같은 이름이 두 파일에 있으면 뒤가
+      // 앞을 덮어 한쪽이 조용히 빠진다. 같은 이름의 선언을 **전부** 본다.
+      const matches = [...declared.values()].filter((entry) => entry.name === name);
+      for (const found of matches) {
+        if (found.calls.has('withoutKotlinComments')) {
+          missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
+        } else if (!found.calls.has('assertStrippedKotlin')) {
+          missing.push(`${found.relative}:${name} 가 단언을 부르지 않는다`);
+        }
       }
     }
 

@@ -19,7 +19,7 @@ base 가 아니라 **`67ff54b1`**(고정 기재 — 움직이는 `origin/main` �
 
 ## 복원 목록 (기계 산출 — 손으로 쓰지 않는다)
 
-`git diff --name-status 8062dcd7..HEAD` 에서 **자기 evidence 를 뺀** **열**이다(r4 가 내부 걷기 모듈 하나를 더했다 — verifier r4 M-4).
+`git diff --name-status 67ff54b1..HEAD` 에서 **자기 evidence 를 뺀** **열**이다(r4 가 내부 걷기 모듈 하나를 더했다 — verifier r4 M-4).
 
 ```
 M docs/discovery/capability-map.md
@@ -49,9 +49,12 @@ git restore --source=67ff54b1f349ea917e50137b91ded8df73a491f1 --staged --worktre
 `kotlin-source-ownership.test.mjs`), 빠진 것 **0**. 셋 가운데 하나는 **게이트가 찾아낸 소비자**이고
 (`scope.md` §r2), 목록을 손으로 들고 있었다면 그 파일은 되돌림에서 **빠진 채** 남았을 것이다.
 
-`A` 셋은 원천에 없으므로 복원이 **지운다**(별도 `git rm` 이 필요 없다). **hunk 격리가 필요 없다**
+`A` **넷**(r4 의 내부 걷기 모듈 포함)은 원천에 없으므로 복원이 **지운다**(별도 `git rm` 이 필요 없다). **hunk 격리가 필요 없다**
 — 공유 파일 둘(`capability-map.md`·`gate-tests.txt`)에 다른 slice 의 줄이 들어온 적이 없다
-(main 병합 0 · 이 브랜치의 커밋만). 그래서 파일 단위 복원이 남의 줄을 떨어뜨릴 수 없다.
+**정정**(cr r4 MEDIUM): 이 단락은 「main 병합 0」을 전제로 적혀 있었는데 **지금은 main
+(`67ff54b1`)이 병합돼 있다**. hunk 격리가 필요 없는 근거는 그 전제가 아니라 **원천에 내 것이 하나도
+없다**는 것이다 — 산출물 커밋 전수가 `67ff54b1` 의 조상이 아니고 그 트리에 내 표지가 0 이다(머리말
+의 단언). 그래서 파일 단위 복원이 **내 줄만** 지우고 10B 의 줄은 원천에 그대로 있다.
 
 **되돌리지 않는 것**: 이 slice 의 evidence(`reports/evidence/m10/gates-web/`) · 하네스 경로
 (`CLAUDE.md`·`.claude/**`, 이 range 에 **없다**).
