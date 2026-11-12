@@ -3810,6 +3810,12 @@ PR #148 cr r2 이월 · 10B 가 명령 칸에서 실제로 쓴 근거). 셋이 *
 | `OPEN-M9-MONEY-VOCAB-CROSS-LANG` | **닫힘** — 손으로 복제한 자리들(web 표·유니온 · e2e 라벨 표 둘)의 키 집합이 Kotlin 정본과 등식으로 묶였다 | 같은 PR·머지 · 재측정: Kotlin 정본 열거에 값 하나를 더하면 **1 failed**. **「하나의 출처」(openapi `enum`)는 범위 밖** — 그 칸이 응답 스키마에 스물넷이고 M10/10B 와 같은 파일이며, `enum` 은 네 벌 가운데 web 유니온 하나만 지운다(e2e 축어 라벨은 관례상 산출물에서 끌어오지 않는다). OPEN 이 named 한 해악(degrade)은 위 등식이 닫았고 남은 것은 복제 **수**다 |
 | `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP` | **닫힘** — Kotlin 원문 읽기의 주석 걷기가 **공유 한 자리**의 단일 패스 주사기로 모였다. 다룰 수 없는 꼴(raw string · **템플릿 식 안의 따옴표·주석 표지** · 닫히지 않은 문자열·문자 리터럴·블록 주석·**백틱 식별자**·**템플릿 식**)은 **던진다** | PR **#135** 조치 코멘트가 신설 · **이 slice** 가 닫는다 · `reports/evidence/m10/gates-web/`. 두 벌이 **둘 다 부분 구현**이었다(줄 단위 정규식 판은 문자열 안 `//` 를 지워 base URL 상수를 절단 · 보존판은 문자열 안 블록 주석 글자를 줄이고 raw string 을 절단). **r1 이 축 셋을 더했다**(cr r0 HIGH 1 · LOW 2 · **verifier r1 M-1**) — **문자열 템플릿 식**(r0 판은 `"${f("//")}"` 도 `"${base ?: "https://x"}/p"` 도 앞 두 판과 **똑같이 절단했다**. 뒤의 꼴이 M-1 이고 **r1 이 닫았다** — 같은 축이 입력 하나로 닫히지 않음을 보이므로 둘 다 축어로 둔다) · **백틱 식별자**(r0 판만 던졌다 — 앞 두 판은 우연히 옳았다) · **CRLF 줄끝 보존**. 축별 측정은 `design-review.md` §2b |
 
+**신설 — `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS`**
+
+| ID | 무엇 | 받는 자리 | 신설 근거 |
+| --- | --- | --- | --- |
+| `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` | web 의 Kotlin 원문 읽기 게이트가 **막지 못하는 다섯**을 한 ID 로 묶는다. ⑤ **여는 행위를 런타임에 재는 층이 없다**(그 층이 들어오면 아래 넷이 함께 닫힌다) · ⑥ 단언 전수의 **데이터 흐름이 한 홉**이다(두 홉 이상·별칭·메서드 피호출자·`.trim()`·감싼 선언·spread·콜백, 그리고 기존 이름 감싼 재선언·선언자 이동·죽은 `assertStrippedKotlin('')`) · ⑧ **추적되는 심볼릭 링크**가 Kotlin 원문을 가리키면 코드에 토큰이 남지 않는다 · ⑨ **대소문자**(`.KT` + `i` 플래그) · ⑩ **데이터 파일**에서 막는 것은 `이름.kt` 꼴뿐이고 확장자 단독 값·별표/중괄호 glob 은 지나간다 | **다음 web 게이트 slice**. ⑩ 의 처방은 이미 측정돼 있다 — 데이터 파일 본문에서 **`#` 로 시작하는 줄을 빼고 allowlist 값을 차감한 뒤** 단어 토큰을 적용하면 **오탐 0 으로 P6·P7·P7b·P7c 가 RED** 다(verifier r6 실측). ⑤ 는 vitest setup 에서 `fs` 읽기·glob 을 감싸 `.kt` 를 연 호출자가 소유 모듈이 아니면 실패시키는 꼴 | M10/10D r1~r7 · PR **#151** 의 verifier r1~r6 · code-reviewer r0~r4 · `reports/evidence/m10/gates-web/design-review.md` §4 (3) 미달 ⑤⑥⑧⑨⑩ 이 각각의 실측과 처방 포인터를 든다 |
+
 **신설 — `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER`**
 
 | ID | 무엇 | 신설 근거 |

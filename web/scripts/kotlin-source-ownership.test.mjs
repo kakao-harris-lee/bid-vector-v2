@@ -25,8 +25,10 @@ import { KOTLIN_SOURCE_KEYS, readKotlinSource } from './kotlin-source.mjs';
  * 3. **export 집합 전수**와 **import 그래프**를 단언한다. 전자는 경로 표·원문 reader 가 조용히
  *    늘어나는 길을, 후자는 소비자가 걷기 함수를 다시 쥐는 길을 막는다.
  *
- * 닫히지 **않는** 것은 `design-review.md` §4 (3) 미달 ①② 에 적는다 — 글자 단위 조립과
- * import 없는 지역 사본이고, 뒤쪽은 **줄을 끊는 꼴만** 안쪽 재걷기가 던진다(측정).
+ * **층마다 범위가 다르다**(r7 — verifier r6 H-1): JS/TS 는 경로 표기 전부를, **데이터 파일은
+ * `이름.kt` 꼴만** 본다(확장자 단독 값·별표/중괄호 glob 은 지나간다). 걷기 이름 축만 **전 파일**
+ * 이다. 닫히지 않는 것은 `design-review.md` §4 (3) 미달 ①②⑤⑥⑧⑨⑩ 과 capability map §12.3 (j)
+ * 의 `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` 가 든다.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -156,7 +158,8 @@ export function mentionsStripModule(source, fileName = 'probe.mjs') {
 }
 
 /**
- * 데이터 파일(JSON·txt 등)용 술어 — **경로 꼴**을 든다. 디렉터리 구분자를 요구하는 이유는 산문의
+ * 데이터 파일(JSON·txt 등)용 술어 — **`이름.kt` 꼴만** 든다(확장자 단독 값과 별표/중괄호 glob 은
+ * 지나간다 — 미달 ⑩. 다음 slice 처방은 `#` 줄 제외 + allowlist 차감 뒤 단어 토큰이다). 디렉터리 구분자를 요구하는 이유는 산문의
  * 확장자 언급(「`.kt` 경로 리터럴」 같은 설명)이 경로가 아니기 때문이다. 데이터 파일에는 조립할
  * 코드가 없으므로 경로는 **통째로** 적히고, 그래서 이 술어로 구조가 성립한다.
  */
@@ -231,7 +234,7 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       // B 계열로만 줄인 것이 그 회귀를 놓친 원인이다. 세 꼴을 모두 여기 둔다.
       '중괄호 glob 두 확장자(N10)': `const g = globSync('a/X.{${'k'}${'t'},${'k'}${'t'}s}');`,
       '중괄호 glob 섞인 확장자': `const g = globSync('a/*.{${'k'}${'t'},java}');`,
-      '중괄호 glob 하나': `const g = globSync('a/X.{${'k'}${'t'}});`,
+      '중괄호 glob 하나': `const g = globSync('a/X.{${'k'}${'t'}}');`,
       '두 확장자 정규식(P2)': `const f = d.find((n) => /\\.(?:${'k'}${'t'}|${'k'}${'t'}s)$/u.test(n));`,
       '문자 클래스(P3)': `const r = /[.]${'k'}${'t'}$/u;`,
       '점 없는 확장자(P5)': `const ok = n.split('.').pop() === '${'k'}${'t'}';`,
