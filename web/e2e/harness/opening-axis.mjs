@@ -7,6 +7,7 @@
  * **이 파일이 개찰 축 라우팅 술어의 한 자리다.** 오퍼레이션 이름·진행구분 어휘·행 모양이 여기
  * 하나에 있고, 출하 정본과의 등식은 `opening-axis.test.mjs` 가 잰다.
  */
+import { assertStrippedKotlin } from '../../scripts/kotlin-source.mjs';
 
 /**
  * 개찰 축 오퍼레이션 경로 — **출하 기본값의 사본**이다
@@ -65,30 +66,14 @@ const NOT_OBSERVED = 'NOT_OBSERVED';
 const NOTICE_ROUND = '000';
 
 /**
- * Kotlin 원문에서 **주석을 걷는다**(v M-1). 아래 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제
- * 값을 가릴 수 있었다** — 재현: 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을
- * 집어 등식이 **초록으로 지나갔다**. 그 축은 조용한 404 로만 나타난다.
+ * **주석을 먼저 걷는 이유**(v M-1): 아래 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
+ * 가릴 수 있었다** — 재현: 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을 집어
+ * 등식이 **초록으로 지나갔다**. 그 축은 조용한 404 로만 나타난다.
  *
- * **문자열 안의 `//` 는 걷지 않는다** — 출하 파일의 base URL 이 `https://…` 라 거기서 줄을
- * 자르면 다른 추출이 엉뚱한 값을 본다(그 한 줄이 이 구현을 문자 단위로 만든 이유다).
+ * 걷기 자체는 **공유 한 자리**에 있다(M10/gates-web). 이 파일이 가졌던 줄 단위 구현은 교차언어
+ * 게이트의 것과 두 벌이었고 둘 다 부분 구현이었다 — 문자열 안의 주석 표지를 다루는 자리가
+ * 하나여야 한다.
  */
-function withoutKotlinComments(text) {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//gu, '')
-    .split('\n')
-    .map((line) => {
-      let quoted = false;
-      for (let at = 0; at < line.length; at += 1) {
-        if (line[at] === '"' && line[at - 1] !== '\\') {
-          quoted = !quoted;
-        } else if (!quoted && line[at] === '/' && line[at + 1] === '/') {
-          return line.slice(0, at);
-        }
-      }
-      return line;
-    })
-    .join('\n');
-}
 
 /**
  * 일치가 **정확히 하나**인 리터럴(v M-1). 첫 일치를 쓰면 가리는 줄이 조용히 이기고, 둘 이상은
@@ -113,7 +98,7 @@ function soleLiteral(text, pattern, what) {
  * 뒤바뀐 경우를 지나보낸다.
  */
 export function shippedOpeningOperationPaths(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const categories = Object.keys(DIVISION_TOKENS);
   const divisions = {};
   for (const [index, category] of categories.entries()) {
@@ -173,7 +158,7 @@ export function shippedOpeningOperationPaths(source) {
  * 걸음의 `detailCalls` 기대가 **이름 붙은 실패**로 그 사실을 말한다.
  */
 export function shippedDetailAxisCounts(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const open = text.indexOf('fun detailAxesFor');
   if (open < 0) {
     throw new Error('출하 본문에서 상세 축 열거 함수를 찾지 못했다 — 정본의 모양이 바뀌었다');
@@ -202,7 +187,7 @@ export function shippedDetailAxisCounts(source) {
 
 /** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
 export function shippedNoticeListOperations(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const found = {};
   for (const match of text.matchAll(
     /"(\w+)" to KonepsOperationProperties\(\s*"([^"]+)",\s*BusinessDivision\.(\w+),?\s*\)/gu,
@@ -221,7 +206,7 @@ export function shippedNoticeListOperations(source) {
 
 /** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
 export function shippedProgressLabels(source) {
-  const text = withoutKotlinComments(source);
+  const text = assertStrippedKotlin(source);
   const labels = {};
   for (const match of text.matchAll(/"([^"]+)" to OpeningProgress\.(\w+)/gu)) {
     // 같은 라벨이 두 번 등재되면 **뒤가 조용히 이긴다** — 어느 것이 정본인지 서지 않으므로 거부한다.
