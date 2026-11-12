@@ -42,7 +42,8 @@ git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktre
   web/scripts/money-vocab-cross-lang.test.mjs
 ```
 
-**목록이 자랐다 — 여섯에서 아홉으로.** 라운드마다 재산출하는 이유가 이것이다. 재산출을 앞 목록과
+**목록은 r2 에서 여섯 → 아홉이 되고 그 뒤로는 자라지 않았다**(verifier r3 L-1 정정 — r3·r4 의 새
+파일은 복원 목록 **안**이다. 낡은 것은 목록이 아니라 **①~⑥ 실측값과 계수**다). 재산출을 앞 목록과
 **양방향으로 대조**했다: 새로 들어온 것 **셋**(`journey-up.mjs` · `opening-axis.test.mjs` ·
 `kotlin-source-ownership.test.mjs`), 빠진 것 **0**. 셋 가운데 하나는 **게이트가 찾아낸 소비자**이고
 (`scope.md` §r2), 목록을 손으로 들고 있었다면 그 파일은 되돌림에서 **빠진 채** 남았을 것이다.

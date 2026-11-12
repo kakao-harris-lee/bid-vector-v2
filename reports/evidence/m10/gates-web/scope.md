@@ -8,6 +8,7 @@ head_sha: 리뷰 시점의 PR head      # 숫자를 적지 않는다 — 이 파
                                   # 안에 적을 수 없고, 라운드마다 바뀐다(m1 계열과 같은 관례).
 in_scope:
   - web/scripts/kotlin-source.mjs                # 신설 — Kotlin 원문 읽기의 공유 한 자리
+  - web/scripts/kotlin-comment-strip.mjs         # r4 신설 — 걷기 본체(내부 모듈, 공개 표면 밖)
   - web/scripts/kotlin-source.test.mjs           # 신설 — 그 읽기 술어의 게이트 test
   - web/scripts/money-vocab-cross-lang.test.mjs  # 10B 와 공유 — §공유 파일
   - web/e2e/harness/opening-axis.mjs

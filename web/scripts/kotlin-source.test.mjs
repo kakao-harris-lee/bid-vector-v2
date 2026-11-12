@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { withoutKotlinComments } from './kotlin-source.mjs';
+// 걷기 본체는 내부 모듈이다(r4) — 이 단위 test 가 그것을 참조하는 **유일한** 소비자다.
+import { withoutKotlinComments } from './kotlin-comment-strip.mjs';
 
 /**
  * **Kotlin 원문 읽기의 공유 한 자리를 잠근다**(M10/gates-web — `OPEN-M9-KOTLIN-COMMENT-STRIP-DUP`).
@@ -103,6 +104,22 @@ describe('주석 걷기 — 문자열 템플릿 식', () => {
    */
   it('템플릿 안의 문자 리터럴은 던진다 — 중괄호 계수가 깨진다', () => {
     expect(() => withoutKotlinComments(`val s = ${q}\${c == '}'}${q} // 꼬리`)).toThrow(/템플릿/u);
+  });
+
+  /**
+   * **줄끝을 보는 자리는 넷이다**(cr r2 LOW · verifier r3). r3 은 둘만 고쳤고 나머지 둘 —
+   * `templateExpressionEnd` 의 루프 가드와 **escape 분기** — 가 남아 있었다. escape 는 `\`+줄끝을
+   * 두 글자로 먹어 문자열이 **줄을 넘었고**, 그 줄의 주석이 걷히지 않은 채 추출에 닿았다(경계
+   * 문장의 반례). 넷 모두 같은 술어(`isLineBreakAt`)로 닫고 그 입력을 여기서 든다.
+   */
+  it('줄을 넘는 템플릿 식은 LF·CR 양쪽에서 던진다', () => {
+    expect(() => withoutKotlinComments(`val a = ${q}\${ f\nval b = 2 }${q}\n`)).toThrow(/닫히지 않았다/u);
+    expect(() => withoutKotlinComments(`val a = ${q}\${ f\rval b = 2 }${q}\n`)).toThrow(/닫히지 않았다/u);
+  });
+
+  it('escape 는 줄끝을 넘지 못한다 — LF·CR 양쪽에서 던진다', () => {
+    expect(() => withoutKotlinComments(`val a = ${q}x\\\nval b = 1 // c${q}`)).toThrow(/줄이 끝났다/u);
+    expect(() => withoutKotlinComments(`val a = ${q}x\\\rval b = 1 // c${q}`)).toThrow(/줄이 끝났다/u);
   });
 
   it('닫히지 않은 템플릿 식은 던진다', () => {
