@@ -50,9 +50,16 @@
 | ⓔ 중첩 축을 모집단에만 더함 | 더함 | **RED 1/66** — 붉은 것은 **모집단 등식**이고 접두 비포함은 아니다(가려진다) |
 | ⓔ′ 중첩 축을 **등재까지 하고** 더함 | 더함 + registry 항목 | **RED 1/3** — 두 등식을 **만족시킨 뒤** 접두 비포함만 붉다. 실패 문면: `"bidvector.adapters.notice < bidvector.adapters.notice.jdbc"` |
 
+| ⓗ **registry 별칭 바꿔치기** — audit 자리에 `notice.ALLOWED_ROOTS` 를 별칭으로 + audit 정책을 notice 집합으로 | 바꿔치우기 | **처방 전 초록 66/66** ↔ **처방 뒤 RED 1/67**(exit 1) — 붉은 것은 key ↔ 선언 패키지 등식 **하나**. 실패 문면이 audit 가 빠진 일곱 집합을 낸다. verifier F-2 M7 |
+| ⓘ **유령 축 개명** — 정책 `scoped-packages`·roots 키·registry key 를 함께 `…audits` 로 | 바꿔치우기 | **처방 전 초록 66/66** ↔ **처방 뒤 RED 1/67**(exit 1) — 같은 등식 하나. 개명 뒤에도 모집단·축별 등식은 성립한다(그래서 ①~③ 만으로는 열려 있었다). verifier F-2 M8 |
+
 **ⓔ′ 를 따로 잰 이유**: ⓔ 만으로는 접두 비포함 단언이 **한 번도 발화하지 않는다** — 모집단 등식이 먼저
 붉어 그 단언이 죽은 분기로 보일 수 있다. 실제 우회 경로는 「중첩 축을 **제대로 등재하고** 더하는 것」이고,
 ⓔ′ 가 그 경로에서 이 단언이 유일한 방어임을 보인다.
+
+**ⓗ·ⓘ 의 「처방 전」은 인용이 아니라 같은 작업 트리에서 직접 돌린 값**이다(66/67 의 차이가 신설 단언
+하나다). 되돌림은 **구현을 커밋한 뒤** `git checkout --` 로 했고, 처방 뒤 통제군은 `--rerun` 으로 돌려
+결과 XML 이 `tests=4 failures=0`(신설 class) · 묶음 전체 `tests=67 failures=0` 임을 확인했다.
 
 ## 5. 선언 입력 음성 대조 — UP-TO-DATE 거짓 초록과 그 양성 쌍
 
@@ -71,7 +78,8 @@
 
 | 무엇 | 명령 | 결과 |
 | --- | --- | --- |
-| 통제군(변이 없음) | `:adapters:ktlintCheck :adapters:test --tests '*ScopedAllowedRootsParityTest' --tests '*AdapterDependencyTest' :build-logic:test --tests '*SourceReferencePolicyTest'` | **BUILD SUCCESSFUL** · 새 class 의 결과 XML 에 `tests=3 failures=0 skipped=0 errors=0` (단언 셋이 **실제로 돌았다** — exit 0 만으로 세지 않는다) |
+| 통제군(변이 없음) | `:adapters:ktlintCheck :adapters:detekt :adapters:test --tests '*ScopedAllowedRootsParityTest' --tests '*AdapterDependencyTest' --rerun` | **BUILD SUCCESSFUL** · 새 class 의 결과 XML 에 `tests=4 failures=0 skipped=0 errors=0` (단언 넷이 **실제로 돌았다** — exit 0 만으로 세지 않는다) · 묶음 전체 **67/0** |
+| main 병합 뒤 통제군 | `:app:compileTestKotlin` + 같은 표적(`--rerun`) | **BUILD SUCCESSFUL** · 병합 전 단언 셋 기준 **66/0** · app test 컴파일 **FROM-CACHE**(병합 입력이 main 의 성공 입력과 같다) |
 | 낡은 `.class` | `find adapters/build -name '*EvaluationAllowedRootsParityTest*'` | 남은 것은 HTML 리포트 디렉터리 하나뿐 · **`.class` 0**(이동한 class 의 가짜 RED 자리가 없다) |
 | 등재 | `grep -c` 두 이름 | 새 이름 **2**(목록 1 + 산문 1) · 옛 이름 **1**(걷었음을 적는 산문 한 줄) · 목록의 옛 항목 **0** |
 | 정책 편집의 성질 | `git diff -U0` 에서 주석 아닌 `+`/`-` 줄 계수 | **0** — 주석만. `policy.version` 자리 diff **0**(D-10C-5) |
@@ -81,10 +89,9 @@
 
 <!-- 최종 HEAD 에서의 실측. 이 파일을 또 고치면 그 HEAD 가 움직이므로, 정본은 verifier 보고와 PR 조치 코멘트다. -->
 
-- **rollback 복원 트리**(임시 clone, 14 경로 복원 뒤, 실측 HEAD `ccbe98ff`): `./gradlew --no-daemon check`
-  → **BUILD SUCCESSFUL**(35m 36s · 433 actionable 중 278 executed · 게이트 task 172 · 실패 0). 되돌린 트리가
-  초록이다. **이 측정은 세 번째다** — 산출물을 고치는 커밋이 두 번 더 들어와 실측 자리가 그때마다 옮겨졌고,
-  앞의 둘(과 앞 라운드가 쓴 트리 동일성 갈음)은 버렸다. 사유는 `rollback.md`.
+- **rollback 복원 트리**(임시 clone, 14 경로를 **병합한 main 커밋**에서 복원한 뒤, 실측 HEAD `854a2e12`):
+  `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(37m 9s · 433 actionable 중 278 executed · 게이트 task
+  172 · 실패 0). 되돌린 트리가 초록이다. 계수와 전제 셋은 `rollback.md`.
 - **최종 HEAD**: `./gradlew --no-daemon check` → 결과는 **verifier 보고와 PR 조치 코멘트**가 정본이다.
   이 파일을 고치는 것이 `leakPatternGate` 의 선언 입력(`reports/evidence/**`)을 바꿔 HEAD 를 또 움직이므로,
   마지막 HEAD 의 수치를 이 파일에 적지 않는다. 구현 레인이 잰 값은 인계 보고에 싣는다.

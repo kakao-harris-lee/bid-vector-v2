@@ -112,12 +112,20 @@ CI `check` job 의 명령 그대로 — `./gradlew --no-daemon check`. 표적 �
 | 축을 `scoped-packages` 에서 뺀다(이름 층이 그 패키지를 아예 판정하지 않게) | 막힘 — registry keys 등식 |
 | 아홉째 축을 `scoped-packages` 에 더한다 | 막힘 — registry 에 항목이 없어 keys 등식이 깨진다 |
 | **중첩 축**을 더해 최장 접두로 좁은 축의 등식을 가린다(계약이 지목한 「최장 접두 사각」) | 막힘 — 축 접두 비포함 단언 |
-| 정책 파일을 `:adapters:test` 의 **선언 입력**에서 뺀다 | 막힘 — 정책만 고친 뒤 `UP-TO-DATE` 로 건너뛰는 거짓 초록을 그 자리가 막는다(앞 판이 세운 축, 음성 대조로 실측한다) |
+| 정책 파일을 `:adapters:test` 의 **선언 입력**에서 뺀다 | **안 막힘 — 등재**(cr MEDIUM 정정). 그 한 줄이 **있으면** 정책 변이가 보이고 **없으면** `UP-TO-DATE` 거짓 초록이 된다는 것을 음성 대조로 실측했는데, **그 줄을 지키는 게이트는 없다** — build-logic 의 게이트 task 가운데 「정책 파일이 그 test task 의 선언 입력인가」를 재는 축이 없고 `declarePolicyInputs` 는 build-logic 자기 test task 전용이다. 비용: `adapters/build.gradle.kts` 의 그 한 줄을 지우는 편집이라 diff·리뷰가 보는 자리. 실측은 `commands.md` 「선언 입력 음성 대조」 |
 | test class 를 등재에서 뺀다 · 파일을 지운다 | 막힘 — `gateRegistrationGate` 양방향 등식 + registry 심볼의 컴파일 실패 |
 | 축의 `ALLOWED_ROOTS` 를 `internal` 에서 `private` 로 되돌린다 | 막힘 — 컴파일 실패 |
 | 양쪽 목록을 **함께** 넓힌다 | **안 막힘 — 구조적으로 열려 있다.** 게이트/정책을 바꾸는 편집이라 리뷰가 받는다 |
 | dependency test 가 쓰는 집합을 그 파일 안에서 **다른 심볼로 바꾸고** `ALLOWED_ROOTS` 는 장식으로 남긴다 | **안 막힘** — registry 는 옛 심볼을 보고 그 test 는 새 집합으로 판정한다. 등재한다(비용은 「게이트 파일을 고치는」 편집이고 한 파일 안에 쓰이지 않는 집합이 남아 리뷰·ktlint 가 보는 자리다) |
 | 이름 층 축이 **없는** 여섯 패키지로 코드를 옮겨 거기서 층 밖에 닿는다 | 이 축의 모집단 밖 — out_scope 의 그 항목 |
+| **registry 별칭 바꿔치기** — 한 축의 자리에 다른 축의 `ALLOWED_ROOTS` 를 별칭으로 끼우고(`import …notice.ALLOWED_ROOTS as AUDIT_ROOTS`) 그 축 정책을 그 집합으로 넓힌다 | **막힘 — 이 라운드가 닫았다**(verifier F-2 M7). key ↔ **값 심볼의 선언 패키지** 등식. 바꿔치운 축의 facade 참조가 상수 풀에서 사라져 뽑힌 집합이 작아진다 |
+| **유령 축 개명** — 정책의 축 이름(`scoped-packages`·roots 키)과 registry key 를 **함께** `…audits` 로 바꿔 이름 층이 실재하는 패키지를 더는 판정하지 않게 한다 | **막힘 — 이 라운드가 닫았다**(verifier F-2 M8). 같은 등식 — key 가 가리키는 패키지가 상수 풀에서 뽑힌 집합에 없다 |
+| 위 「별칭 바꿔치기」를 한 뒤 **표에 쓰지 않는 참조**를 같은 파일에 더해 패키지 집합을 메꾼다 | **안 막힘 — 등재.** 술어가 「이 class 가 참조하는 패키지」라 표 밖의 참조도 센다. 다만 **import 를 놀려둘 수는 없다** — `unusedImportGate` 의 등식(「도입 이름 ∖ 본문 식별자 == ∅」, ktlint 쪽은 `OPEN-KTLINT-UNUSED-IMPORTS-SILENT` 로 조용하다)이 그 자리를 잡으므로 그 참조는 **실제로 쓰여야** 하고, 결과는 게이트 파일에 뜻 없는 사용 한 줄이 남는 것이다(위 「다른 심볼로 바꾸고 장식으로 남긴다」 행과 같은 비용) |
+| **유령 축 + 그 패키지의 test 파일 신설** — 실재하지 않는 production 패키지 이름으로 test 파일을 만들어 그 안에 `ALLOWED_ROOTS` 를 두고 정책 둘·registry·등재를 함께 더한다 | **안 막힘 — 등재.** 닫는 처방은 「key 마다 adapters **main** 출력에 그 패키지 class ≥ 1」(verifier 후속 후보)이고 **이 라운드에 하지 않는다** — 위 둘이 한 줄 편집인 것과 달리 이것은 새 파일 + 등재 + 정책 둘 + registry 넷 자리의 편집이라 리뷰가 평면으로 보는 꼴이다. 받는 자리는 `OPEN-M10-SCOPED-PACKAGES-COVERAGE` 와 같은 정책 키 slice |
+
+**안 막히는 것은 다섯이다** — 「양쪽을 함께 넓힌다」·「판정 집합을 다른 심볼로 옮긴다」·「선언 입력에서
+뺀다」·「쓰지 않는 참조로 메꾼다」·「유령 축 + test 파일 신설」. 다섯 모두 이 표에 등재돼 있고, 「모집단 밖」
+한 행은 열려 있는 것이 아니라 **다른 OPEN 이 받는 축**이다.
 
 ### (2b) 값 획득 축 — 새 표면 전수
 
@@ -127,6 +135,7 @@ CI `check` job 의 명령 그대로 — `./gradlew --no-daemon check`. 표적 �
 | 신설 test class 하나 | 없음 — 판정만 한다 | `@Test` 뿐, production 심볼 0 |
 | `object` 커널 주입 자리 | **없다** — production 소스 0 줄, 새 배선 클래스 0 | architecture-policy tier·`EXPECTED_EXEMPT_COUNT` 무변경(새 배선 없음) |
 | 「경계로 처리」 행의 실측 | 이름 층 축 없는 여섯을 **열거로 확인했다**(위 out_scope) | 산문이 아니라 기계 산출 |
+| 신설 단언이 읽는 것: **자기 class 파일**(`javap -p -v`) | 없음 — 읽기만 한다. 새 public 표면 0, production 심볼 0 | `javap` 는 OS `PATH` 가 아니라 실행 중 JVM 의 `java.home` 에서 해석한다(형제 관례). 읽는 class 출력은 `:adapters:test` 자신의 **선언 입력**이라 registry 를 고치면 task 가 다시 돈다 — 이 축에는 UP-TO-DATE 거짓 초록이 없다 |
 
 ### (3) 과잉·미달
 
@@ -144,13 +153,15 @@ CI `check` job 의 명령 그대로 — `./gradlew --no-daemon check`. 표적 �
 | **D-10C-1** | ②·③ 은 **PR #134(머지 `97ed49c4`)가 이미 닫았다**. 구현하지 않고 capability map §12.3 에 등재한다 | base main 실측(`commands.md` §1) + 「이 절은 다시 판정하지 않는다」(§12.3 머리) — 적는 것은 어디서 닫혔는가다 |
 | **D-10C-2** | ④ 는 **범위 밖 — 열린 채 유지**. 받는 자리는 testFixtures 개방 ADR slice | 위 「④ 를 범위 밖으로 판정하는 사유」 셋 + 팀장 2026-11-06 판정 |
 | **D-10C-3** | ① 의 처방은 **registry + keys 등식 + 축별 집합 등식 + 접두 비포함** | 비용은 OPEN 문면 그대로 축마다 한 단어. 대안인 단일 출처화는 두 층의 독립성을 버리는 거래라 ADR 자리(OPEN 문면이 같이 적는다) |
-| **D-10C-4** | 앞 판 `EvaluationAllowedRootsParityTest` 를 **일반판으로 대체**한다(`git mv` + 일반화). 축 하나짜리 class 를 남기고 여덟짜리를 더하지 않는다 | 중복 금지(CLAUDE.md §5). 일반판이 그 class 의 주장을 **전부 포함**한다(`evaluation` 축 등식 · 모집단 소속 · 비공허 둘). 패키지는 `bidvector.adapters.architecture` — 여덟 축에 걸친 판정이라 `evaluation` 패키지가 거짓이 되고, 그 자리는 `packageOwnershipGate` 가 허용한다(`bidvector.adapters` 아래) |
+| **D-10C-4** | 앞 판 `EvaluationAllowedRootsParityTest` 를 **일반판으로 대체**한다(`git mv` + 일반화). 축 하나짜리 class 를 남기고 여덟짜리를 더하지 않는다 | 중복 금지(CLAUDE.md §5). 일반판이 그 class 의 주장을 **전부 포함**한다(`evaluation` 축 등식 · 모집단 소속 · 비공허 둘). 패키지는 `bidvector.adapters.architecture` — 여덟 축에 걸친 판정이라 `evaluation` 패키지가 거짓이 되고, 그 자리는 `packageOwnershipGate` 의 **모집단 밖**이다(cr LOW 정정 — 그 게이트의 `classDirectories` 배선이 「test 출력은 뺀다 — fixture 는 일부러 `bidvector.archfixture` 에 산다」로 test source set 을 제외한다. 결론은 같다: 새 test 패키지가 막히지 않는다) |
+| **D-10C-6** | verifier F-2 의 우회 둘(별칭 바꿔치기·유령 축 개명)을 **구조로 닫는다** — key 를 산문이 아니라 **자기 class 파일 상수 풀에서 뽑은 「값 심볼의 선언 패키지」**와 집합 등식으로 묶는다 | 둘의 공통 뿌리가 「key(문자열)와 값 심볼의 실제 패키지가 묶이지 않음」이고, 컴파일은 심볼의 **존재**만 잠근다. 대안 후보(「key 마다 adapters main 출력에 그 패키지 class ≥ 1」)는 유령 축만 닫고 **별칭 바꿔치기를 못 닫아**, 둘을 한 단언으로 닫는 쪽을 골랐다. `internal` top-level `val` 은 다른 파일에서 facade static getter 호출로 읽히므로 그 호출의 소유 class 가 선언 패키지를 짊어진다 — 별칭은 그 자리를 바꾸지 못한다. 남는 꼴 둘은 위 우회표에 등재 |
 | **D-10C-5** | `architecture-policy.properties` 편집은 **주석만**이고 `policy.version` 을 **올리지 않는다** | 그 판 이력은 「더한 키 · 바꾼 값」을 적는 장부다(v9~v14 전부 그 둘 가운데 하나를 가졌다). 이 편집은 키 0·값 0 이다. **누락이 아니라 판단임을 여기에 적는다** — v11 이 등재한 결함은 「값을 바꾸고도 조용히 빠진 bump」이고 이 편집은 그 모양이 아니다 |
 
 ## rollback
 
-in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <경로들>`. 원천은 base main
-`8062dcd7`(이 slice 의 커밋이 그 SHA 에 없음을 첫 산출물 커밋 미포함으로 단언한다). 목록·전제·①~⑥ 실측은
+in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <경로들>`. 원천은 **이 브랜치가 병합한
+main 커밋 `67ff54b1`**(고정 — 움직이는 `origin/main` 이 아니다). 착수 base `8062dcd7` 에서 원천을 바꿨으므로
+**셋째 단언**(복원 대상 blob 이 두 원천에서 같은가)을 함께 잰다. 목록·전제·셋째 단언·①~⑥ 실측은
 `rollback.md` — 마지막 산출물 커밋에서 임시 clone 으로 돌리고 `실측 HEAD:` 를 적는다.
 
 ## 하네스 레인 변경
@@ -189,6 +200,18 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <�
 이 둘은 착수 보고의 in_scope 에 없었다 — **보고 항목으로 올린다**. 범위를 넓히지 말라는 판단이면 되돌리고
 「알려진 제한」으로 등재한다.
 
+## 계약 갱신 2026-11-12 (팀장 — 병합 신호와 F-2 처분)
+
+1. **main 을 병합한다**(병합 커밋 하나, 충돌은 capability map §12.3 하나). 병합 뒤 rollback 원천을 그 병합
+   커밋 SHA 로 바꾸고 셋째 단언을 더해 다시 잰다.
+2. **verifier F-2(M7·M8)를 「안 막힘」 등재로 받지 않고 구조로 닫는다** — CLAUDE.md 「게이트 술어는 문자열이
+   아니라 구조로 닫는다」. 처분은 D-10C-6. **in_scope 는 넓어지지 않았다**: 신설 단언이 이미 in_scope 인
+   `ScopedAllowedRootsParityTest.kt` 안에 들고, 이 라운드가 만든 **새 파일은 0** 이다(Phase 3 대조).
+3. **cr MEDIUM 둘·LOW 넷과 F-3~F-5 는 장부층 일괄**이다 — 우회표 「안 막힘」 계수, 복원 목록 수, 크기 비,
+   `packageOwnershipGate` 근거 문면, F-5 체크 근거. cr LOW 「`scoped-packages` 비공허를 build-logic 에서
+   구조로」는 `build-logic/**` 무접촉 계약 밖이라 **등재만** 한다(`checklist.md` 알려진 제한).
+4. **게이트 술어를 바꾼 라운드**이므로 종결 뒤 verifier 표적 재검증이 붙는다(`v2-slice-pipeline` Phase 4 예외).
+
 ## 산출물 커밋
 
 | SHA | 무엇 |
@@ -197,3 +220,5 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <�
 | `7b02b3cc` | 구현 — 일반판 등식 test(`git mv` + 일반화) · 일곱 축 `internal` · 등재 교체 · 정책 주석 |
 | `6787ba70` | capability map §12.3 (i) — 넷의 처분 + 신설 OPEN 하나 |
 | `ddba9277` | 옛 class 이름을 부르는 live 좌표 둘 — 같은 줄 치환(계약 갱신 (5)) |
+| `a7314559` | **main 병합**(원천 `67ff54b1`) — 충돌 하나, 합집합 계수는 그 커밋 메시지가 싣는다 |
+| `854a2e12` | **마지막 산출물 커밋** — key ↔ 값 심볼의 선언 패키지 등식(D-10C-6, verifier F-2) |
