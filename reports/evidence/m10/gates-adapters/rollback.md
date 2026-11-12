@@ -52,7 +52,7 @@ docs/discovery/capability-map.md
    문서가 기계 산출을 베껴 적은 것이 아니라 **같은 집합**임을 뜻한다.
 2. **「내가 커밋 안 해도 경로가 들어오는가」**: `git log --no-merges --format= --name-only <원천>..<마지막
    산출물 커밋> | sort -u`(장부 제외) ↔ 같은 diff 집합 → `comm -3` **빈 출력**, 양쪽 **14**. 그 범위의 내
-   커밋은 **아홉**이고 병합 커밋은 **하나**(`--no-merges` 가 뺀다 — 그 병합이 원천을 들여온 커밋이다). 내
+   커밋은 **열둘**이고 병합 커밋은 **하나**(`--no-merges` 가 뺀다 — 그 병합이 원천을 들여온 커밋이다). 내
    커밋 밖에서 들어온 경로가 없으므로 이 목록은 「되돌릴 것」과 「내가 만든 것」이 같다.
 3. **복원이 목록 밖을 건드렸는가**: 복원 뒤 clone 의 `git status --porcelain --untracked-files=no` 가 낸
    **14 경로** ↔ 위 목록 → `comm -3` **빈 출력**.
@@ -67,7 +67,7 @@ range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다.
 
 ## ①~⑥ 실측
 
-**실측 HEAD: `854a2e12`**(이 slice 의 **마지막 산출물 커밋**). 버릴 clone(`--no-hardlinks`)에서 돌렸다.
+**실측 HEAD: `171f8949`**(이 slice 의 **마지막 산출물 커밋**). 버릴 clone(`--no-hardlinks`)에서 돌렸다.
 main 병합은 그 커밋보다 **앞**에 있으므로 실측 자리는 병합 커밋이 아니라 이 커밋이다.
 
 | # | 무엇 | 결과 |
@@ -75,9 +75,24 @@ main 병합은 그 커밋보다 **앞**에 있으므로 실측 자리는 병합 
 | ① | 복원 명령 종료 코드 | **0** |
 | ② | 복원이 움직인 것의 계수 | **14** = `D` 1(새 class 사라짐) + `A` 1(옛 class 되살아남) + `M` 12. 복원 목록과 수가 같고 **목록 밖은 0**(위 등식 3) |
 | ③ | 복원 뒤 `git diff <원천> -- <14 경로>` | **빈 출력(0 바이트)** — 그 경로들의 트리가 원천과 **동일**하다 |
-| ④ | 복원 트리 컴파일 | ⑥ 의 실행 안에서 돌았다 — **열한 모듈의 `compileTestKotlin` 이 전부 FROM-CACHE**(복원 트리의 컴파일 입력이 원천과 같으니 적중이 맞다. 적중은 실행이 아니므로 실행은 ⑤⑥ 쪽에서 따로 센다) |
-| ⑤ | 복원 트리 test | 같은 실행 — `:adapters:test`·`:app:test`·`:build-logic:test` **실행**(나머지 여덟 모듈은 FROM-CACHE). 로그에 `ScopedAllowedRootsParityTest` 언급 **0** — 복원 트리에는 그 class 가 없고 옛 class 가 그 자리에 있다 |
-| ⑥ | 복원 트리 **게이트** | `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(37m 9s · 433 actionable 중 **278 executed** · 게이트 task **172** 실행 · `FAILED`/`FAILURE` **0** · `leakPatternGate`·루트 `:check` 실행) |
+| ④ | 복원 트리 컴파일 | ⑥ 의 실행 안에서 **FROM-CACHE**(복원 트리의 컴파일 입력이 원천과 같으니 적중이 맞다). **적중은 실행이 아니다** — 아래 절이 그 자리를 받는다 |
+| ⑤ | 복원 트리 test | 같은 실행에서 **열한 모듈 test task 가 전부 FROM-CACHE**. 로그에 `ScopedAllowedRootsParityTest` 언급 **0** — 복원 트리에는 그 class 가 없고 옛 class 가 그 자리에 있다 |
+| ⑥ | 복원 트리 **게이트** | `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(40s · 433 actionable 중 **255 executed** · 178 from cache · **게이트 task 172 가 전부 실행**, 그 축의 캐시 적중 **0** · `FAILED`/`FAILURE` **0** · `leakPatternGate`·루트 `:check` 실행) |
+
+### ④⑤ 의 적중을 무엇이 받는가 — 트리 동일성 하나뿐이다
+
+이 라운드의 복원 트리에서 compile·test 가 **실행되지 않고 적중**했다. 적중을 실행으로 셈하지 않으므로 그
+자리를 받는 것은 **트리 동일성** 하나이고, 기계로 재는 등식은 이것이다 —
+
+```
+git diff --name-only <앞 라운드 실측 HEAD>..<이번 실측 HEAD> | grep -vxF -f <복원 목록 14 경로>
+```
+
+→ 출력은 **이 slice 의 장부 네 파일뿐**이다. 복원 목록 안의 경로는 양쪽 모두 **원천으로 덮이므로**(③ 이
+그것을 0 바이트로 보인다) 두 복원 트리의 차이는 그 넷이 전부고, 그것은 **어느 compile·test task 의 선언
+입력도 아니다**. 앞 라운드에는 같은 트리에서 `:adapters:test`·`:app:test`·`:build-logic:test` 가 **실제로
+실행돼 실패 0** 이었다. 그 네 파일을 **읽는** 축은 `leakPatternGate` 하나이고 이 라운드에 그것은 적중이
+아니라 **실행**됐다. 그래서 적중으로 비는 자리가 없다 — 「HEAD 가 초록이었다」 류의 갈음은 쓰지 않았다.
 
 ## 「내 표지 0 · 남의 표지 보존」 계수
 

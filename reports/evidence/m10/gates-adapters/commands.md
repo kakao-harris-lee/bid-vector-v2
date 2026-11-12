@@ -89,9 +89,10 @@
 
 <!-- 최종 HEAD 에서의 실측. 이 파일을 또 고치면 그 HEAD 가 움직이므로, 정본은 verifier 보고와 PR 조치 코멘트다. -->
 
-- **rollback 복원 트리**(임시 clone, 14 경로를 **병합한 main 커밋**에서 복원한 뒤, 실측 HEAD `854a2e12`):
-  `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(37m 9s · 433 actionable 중 278 executed · 게이트 task
-  172 · 실패 0). 되돌린 트리가 초록이다. 계수와 전제 셋은 `rollback.md`.
+- **rollback 복원 트리**(임시 clone, 14 경로를 **병합한 main 커밋**에서 복원한 뒤, 실측 HEAD `171f8949`):
+  `./gradlew --no-daemon check` → **BUILD SUCCESSFUL**(40s · 433 actionable 중 255 executed · **게이트 task
+  172 전부 실행** · 실패 0). 되돌린 트리가 초록이다. compile·test 의 캐시 적중을 무엇이 받는지(트리 동일성
+  하나)와 계수·전제 셋은 `rollback.md`.
 - **최종 HEAD**: `./gradlew --no-daemon check` → 결과는 **verifier 보고와 PR 조치 코멘트**가 정본이다.
   이 파일을 고치는 것이 `leakPatternGate` 의 선언 입력(`reports/evidence/**`)을 바꿔 HEAD 를 또 움직이므로,
   마지막 HEAD 의 수치를 이 파일에 적지 않는다. 구현 레인이 잰 값은 인계 보고에 싣는다.
