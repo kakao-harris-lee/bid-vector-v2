@@ -19,7 +19,7 @@ base 가 아니라 **`67ff54b1`**(고정 기재 — 움직이는 `origin/main` �
 
 ## 복원 목록 (기계 산출 — 손으로 쓰지 않는다)
 
-`git diff --name-status 8062dcd7..HEAD` 에서 **자기 evidence 를 뺀** 아홉이다.
+`git diff --name-status 8062dcd7..HEAD` 에서 **자기 evidence 를 뺀** **열**이다(r4 가 내부 걷기 모듈 하나를 더했다 — verifier r4 M-4).
 
 ```
 M docs/discovery/capability-map.md
@@ -27,6 +27,7 @@ M web/config/gate-tests.txt
 M web/e2e/harness/journey-up.mjs
 M web/e2e/harness/opening-axis.mjs
 M web/e2e/harness/opening-axis.test.mjs
+A web/scripts/kotlin-comment-strip.mjs
 A web/scripts/kotlin-source-ownership.test.mjs
 A web/scripts/kotlin-source.mjs
 A web/scripts/kotlin-source.test.mjs
@@ -34,12 +35,12 @@ M web/scripts/money-vocab-cross-lang.test.mjs
 ```
 
 ```
-git restore --source=8062dcd784cf81905c50a2c8706d8bbd3ea5263e --staged --worktree -- \
+git restore --source=67ff54b1f349ea917e50137b91ded8df73a491f1 --staged --worktree -- \
   docs/discovery/capability-map.md web/config/gate-tests.txt \
   web/e2e/harness/journey-up.mjs web/e2e/harness/opening-axis.mjs \
   web/e2e/harness/opening-axis.test.mjs web/scripts/kotlin-source-ownership.test.mjs \
   web/scripts/kotlin-source.mjs web/scripts/kotlin-source.test.mjs \
-  web/scripts/money-vocab-cross-lang.test.mjs
+  web/scripts/kotlin-comment-strip.mjs web/scripts/money-vocab-cross-lang.test.mjs
 ```
 
 **목록은 r2 에서 여섯 → 아홉이 되고 그 뒤로는 자라지 않았다**(verifier r3 L-1 정정 — r3·r4 의 새

@@ -32,11 +32,18 @@ import { KOTLIN_SOURCE_KEYS, readKotlinSource } from './kotlin-source.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..');
 
+/** Kotlin 원문의 확장자. 자기 술어를 피하려 **조립해서** 든다(미달 ①). */
+const KT = `.${'kt'}`;
+
 /** 읽기를 소유하는 자리 — 이 파일만 Kotlin 경로를 안다. */
 const OWNER = 'scripts/kotlin-source.mjs';
 
-/** 걷기 본체가 사는 **내부 모듈** — 공개 표면에 없다. */
-const STRIP_INTERNAL = 'scripts/kotlin-comment-strip.mjs';
+/**
+ * 걷기 본체가 사는 **내부 모듈** — 공개 표면에 없다. 이름을 **조립**해 든다: 통째로 적으면 이
+ * 파일이 아래 이름 술어에 걸려 예외 목록에 자기를 넣어야 하고, 그러면 그 목록이 구멍이 된다.
+ */
+const STRIP_BASENAME = `kotlin-${'comment'}-strip`;
+const STRIP_INTERNAL = `scripts/${STRIP_BASENAME}.mjs`;
 
 /** 그 내부 모듈을 참조해도 되는 자리 — 소유 모듈과 그 **단위 test** 둘이다. */
 const STRIP_REF_ALLOWED = [OWNER, 'scripts/kotlin-source.test.mjs'];
@@ -47,7 +54,18 @@ const STRIP_REF_ALLOWED = [OWNER, 'scripts/kotlin-source.test.mjs'];
  * 목록으로 두는 것은 열거이고 그 약점을 안다(새 fixture 가 같은 꼴을 쓰면 여기 한 줄이 늘어난다).
  * **여는 행위 축은 이 목록이 지지 않는다** — 그 자리는 `design-review.md` §4 (3) 미달 ⑤ 다.
  */
-const PROVENANCE_DATA_ALLOWED = new Set(['e2e/harness/fixtures/opening-axis.json']);
+const PROVENANCE_DATA_ALLOWED = new Map([
+  // 파일 전체가 아니라 **그 자리의 값 전수**를 적는다(verifier r4 M-2) — 파일 단위로 허용하면
+  // 그 파일에 **새 경로**를 더하는 것까지 먹는다(B7b). 여기 적힌 값 밖은 RED 다.
+  [
+    'e2e/harness/fixtures/opening-axis.json',
+    new Set(
+      ['KonepsOpeningAxisFieldContracts', 'KonepsOpeningCompleteFieldContracts', 'MockOpeningKonepsHttp'].map(
+        (stem) => `${stem}${KT}`,
+      ),
+    ),
+  ],
+]);
 
 /**
  * **훑기 대상은 `git ls-files web` — 추적 파일 전수**다(r4 — verifier r3 H-2·M-2).
@@ -65,10 +83,7 @@ const trackedWebFiles = () =>
     .split('\0')
     .filter((relative) => relative.length > 0);
 
-/** Kotlin 원문의 확장자. 이 파일이 자기 술어에 걸리지 않도록 **조립해서** 든다(미달 ①). */
-const KT = `.${'kt'}`;
-
-/** JS/TS 는 AST 로 본다. 그 밖의 추적 파일은 **텍스트**로 본다(조립할 코드가 없으므로 충분하다). */
+/** JS/TS 는 AST 로, 그 밖의 추적 파일은 **텍스트**로 본다(데이터 파일에는 조립할 코드가 없다). */
 const AST_SUFFIXES = new Set(ts.getSupportedExtensions({ allowJs: true }).flat());
 const isAstFile = (relative) => [...AST_SUFFIXES].some((suffix) => relative.endsWith(suffix));
 
@@ -76,89 +91,64 @@ const parse = (source, fileName) =>
   ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, false);
 
 /**
- * 원문에서 **Kotlin 원문의 경로가 될 수 있는 문자열 조각**을 낸다 — 글자 검색이 아니라 AST 다.
- * 주석·산문의 같은 글자는 리터럴이 아니므로 들지 않는다.
+ * **경로 축은 토큰 술어다**(r5 — verifier r4 H-1). 「확장자로 끝난다」·「`/` 를 담는다」·「노드
+ * 종류가 무엇이다」를 **전부 버렸다** — 그 셋이 각각 B4(파일 이름만) · B5(뒤에 파이프가 붙어
+ * 끝이 아니다) · B6(정규식 리터럴) · B11(중괄호 자리가 다른 glob) 을 열었다. 확장자 토큰이
+ * **어디에 있든** 경로로 친다.
  *
- * `/` 를 요구하지 **않는다**(verifier r2 M-1 · cr r1 MEDIUM①): `resolve(dir, 'X.kt')` 처럼 파일
- * 이름만 쓴 꼴도 경로이고, 확장자 토큰 하나도 변수에 담으면 그대로 경로가 된다. 템플릿의
- * **조각**까지 같은 자리에서 든다.
+ * 술어의 정규식은 **조립해서** 만든다 — 통째로 적으면 이 파일이 자기 술어에 걸린다(미달 ①).
  */
-export function kotlinPathLiterals(source, fileName = 'probe.mjs') {
-  const found = [];
-  const hit = (text) => {
-    // `.kt` 로 끝나거나, **brace glob 안**에 확장자가 든 꼴(`X.{kt,kts}`)도 경로다
-    // (verifier r3 M-3 — glob 은 조립이 아니라 평범한 관용구다).
-    if (text.endsWith(KT) || /\.\{[^}]*\bkts?\b[^}]*\}$/u.test(text)) {
-      found.push(text);
-    }
-  };
+const KT_TOKEN = new RegExp(`\\.${'kts'}?\\b`, 'u');
+const KT_FILE_TOKEN = new RegExp(`\\b[\\w-]+\\.${'kts'}?\\b`, 'gu');
+
+/** 노드에서 **리터럴 텍스트**를 낸다 — 문자열·템플릿 조각·정규식 리터럴·식별자. */
+function literalTexts(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return [node.text];
+  }
+  if (ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+    return [node.text];
+  }
+  if (ts.isRegularExpressionLiteral(node) || ts.isIdentifier(node)) {
+    return [node.text];
+  }
+  return [];
+}
+
+const walkLiterals = (source, fileName, take) => {
   const visit = (node) => {
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      hit(node.text);
-    } else if (ts.isTemplateExpression(node)) {
-      hit(node.head.text);
-      for (const span of node.templateSpans) {
-        hit(span.literal.text);
-      }
+    for (const text of literalTexts(node)) {
+      take(text);
     }
     ts.forEachChild(node, visit);
   };
   visit(parse(source, fileName));
+};
+
+/** AST 의 어느 리터럴에든 확장자 토큰이 있으면 경로다. 주석은 리터럴이 아니라 들지 않는다. */
+export function kotlinPathTokens(source, fileName = 'probe.mjs') {
+  const found = [];
+  walkLiterals(source, fileName, (text) => {
+    if (KT_TOKEN.test(text)) {
+      found.push(text);
+    }
+  });
   return found;
 }
 
 /**
- * 원문이 **참조하는 모듈 지정자 전수**를 **해석된 경로**로 낸다 — 이름이 아니라 **지정자**가 키다
- * (r4 — verifier r3 H-1 · cr r2 HIGH).
- *
- * r3 은 `ImportDeclaration` 이고 바인딩이 `NamedImports` 일 때만 셌다. 그래서 `import * as` ·
- * `await import()` · `createRequire(...)(...)` · `export … from` · `export *` · `?v=1` 쿼리가 전부
- * 지나갔다. 전부 **평범한 관용구**다(경계 (0) — 우발적 이탈은 막는다).
- *
- * 지정자를 **해석·정규화**한다: 쿼리·프래그먼트를 떼고, 호출 파일 기준 상대 경로를 `web/` 기준
- * 상대 경로로 통일한다. 그래서 `'./x.mjs'`·`'../../scripts/x.mjs'`·`'./x.mjs?v=1'` 이 **같은 키**다.
+ * **걷기 획득 축은 이름 술어다**(verifier r4 H-2). r4 는 `import()`/`require` 의 **첫 인자가
+ * `StringLiteral`** 일 때만 지정자를 들었다. 그래서 백틱(B1) · `new URL(...).href`(B2) ·
+ * `import.meta.resolve`(B3) · 상수에 담아 넘기기(B3b) 가 전부 지나갔다 — 전부 평범한 관용구다.
+ * 지정자 수집을 버리고 **이름이 어느 리터럴에든 나타나는지**를 센다 — 어떤 API 로 부르든 모듈을
+ * 가리키려면 그 이름을 적어야 한다.
  */
-export function referencedModules(source, fileName) {
-  const fromDir = dirname(fileName);
-  const out = new Set();
-  const add = (raw) => {
-    if (typeof raw !== 'string' || !raw.startsWith('.')) {
-      return; // 패키지 지정자는 이 축이 아니다.
-    }
-    const bare = raw.split('?')[0].split('#')[0];
-    out.add(resolve('/', fromDir, bare).slice(1));
-  };
-  const visit = (node) => {
-    // 정적 import 전부 — named·default·namespace·side-effect 를 가리지 않는다.
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      add(node.moduleSpecifier.text);
-    }
-    // 재수출 사슬 — `export { … } from` · `export * from` · `export * as ns from`.
-    if (
-      (ts.isExportDeclaration(node) || ts.isExportAssignment(node)) &&
-      node.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      add(node.moduleSpecifier.text);
-    }
-    // 동적 `import(...)` 와 `require(...)`/`createRequire(...)(...)`.
-    if (ts.isCallExpression(node) && node.arguments.length > 0) {
-      const target = node.arguments[0];
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
-      // `createRequire(import.meta.url)('…')` — 호출 결과를 다시 호출하는 꼴.
-      const isCreatedRequire =
-        ts.isCallExpression(node.expression) &&
-        ts.isIdentifier(node.expression.expression) &&
-        node.expression.expression.text === 'createRequire';
-      if ((isDynamicImport || isRequire || isCreatedRequire) && ts.isStringLiteral(target)) {
-        add(target.text);
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(parse(source, fileName));
-  return [...out].sort();
+export function mentionsStripModule(source, fileName = 'probe.mjs') {
+  let found = false;
+  walkLiterals(source, fileName, (text) => {
+    found ||= text.includes(STRIP_BASENAME);
+  });
+  return found;
 }
 
 /**
@@ -167,8 +157,10 @@ export function referencedModules(source, fileName) {
  * 코드가 없으므로 경로는 **통째로** 적히고, 그래서 이 술어로 구조가 성립한다.
  */
 export function kotlinPathsInText(text) {
-  return [...text.matchAll(/[\w.-]+(?:\/[\w.-]+)+\.kts?\b/gu)].map((m) => m[0]);
+  // 데이터 파일 — **파일 이름 토큰**을 든다(B4 의 `{"basis":"Basis.kt"}` 가 이 자리다).
+  return [...text.matchAll(KT_FILE_TOKEN)].map((m) => m[0]);
 }
+
 
 const files = trackedWebFiles();
 const read = (relative) => readFileSync(resolve(webRoot, relative), 'utf8');
@@ -199,15 +191,13 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
 
   it('Kotlin 경로는 공유 모듈 밖의 어느 추적 파일에도 없다', () => {
     const offenders = files
-      .filter((relative) => relative !== OWNER && !PROVENANCE_DATA_ALLOWED.has(relative))
+      .filter((relative) => relative !== OWNER)
       .map((relative) => {
         const text = read(relative);
-        return {
-          relative,
-          literals: isAstFile(relative)
-            ? kotlinPathLiterals(text, relative)
-            : kotlinPathsInText(text),
-        };
+        const allowed = PROVENANCE_DATA_ALLOWED.get(relative) ?? new Set();
+        const literals = (isAstFile(relative) ? kotlinPathTokens(text, relative) : kotlinPathsInText(text))
+          .filter((token) => !allowed.has(token.split('/').pop()));
+        return { relative, literals };
       })
       .filter(({ literals }) => literals.length > 0);
 
@@ -220,7 +210,7 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
    * **술어 자신의 양성 대조** — 위 단언은 저장소가 깨끗하면 아무것도 재지 않는다. verifier r2 가
    * 초록으로 통과시킨 꼴들을 **합성 원문**으로 먹여 이제 걸리는지 잰다.
    */
-  it('술어가 r2 의 반례 꼴을 전부 잡는다', () => {
+  it('술어가 r2~r4 의 반례 꼴을 전부 잡는다', () => {
     const planted = {
       '완전한 경로': `const p = 'workflow/src/main/kotlin/X${KT}';`,
       '조립(V1)': `const p = 'X' + '${KT}';`,
@@ -228,10 +218,14 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       '확장자 변수(V4)': `const ext = '${KT}';`,
       '파일 이름만(V2)': `const p = resolve(repoRoot, 'workflow', 'X${KT}');`,
       '걸러내기(V5)': `const f = readdirSync(d).find((n) => n.endsWith('${KT}'));`,
+      '파일 이름만(B4)': `const t = { basis: 'Basis${KT}' };`,
+      '셸 파이프(B5)': `execSync('cat ../a/Basis${KT} | tr -d x');`,
+      '정규식 리터럴(B6)': `const f = readdirSync(d).find((n) => /\\${KT}$/u.test(n));`,
+      '중괄호 자리 다른 glob(B11)': `const g = globSync('a/Basis{${KT},${KT}s}');`,
     };
 
     for (const [name, source] of Object.entries(planted)) {
-      expect(kotlinPathLiterals(source).length, `${name} 이 술어를 지나간다`).toBeGreaterThan(0);
+      expect(kotlinPathTokens(source).length, `${name} 이 술어를 지나간다`).toBeGreaterThan(0);
     }
   });
 
@@ -243,12 +237,12 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       "const moneyTs = readFileSync('src/display/moneyDisplay.ts', 'utf8');",
     ].join('\n');
 
-    expect(kotlinPathLiterals(clean)).toStrictEqual([]);
+    expect(kotlinPathTokens(clean)).toStrictEqual([]);
   });
 
   /** 주석·산문 안의 같은 글자는 리터럴이 아니다 — AST 술어라 그것을 들지 않는다. */
   it('주석 안의 확장자는 걸리지 않는다 — 글자 검색이 아니다', () => {
-    expect(kotlinPathLiterals(`// 정본은 Basis${KT} 다\n/* Other${KT} */\n`)).toStrictEqual([]);
+    expect(kotlinPathTokens(`// 정본은 Basis${KT} 다\n/* Other${KT} */\n`)).toStrictEqual([]);
   });
 });
 
@@ -261,7 +255,7 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
   it('내부 걷기 모듈을 참조하는 파일은 소유 모듈과 그 단위 test 둘뿐이다', () => {
     const referrers = files
       .filter(isAstFile)
-      .filter((relative) => referencedModules(read(relative), relative).includes(STRIP_INTERNAL))
+      .filter((relative) => mentionsStripModule(read(relative), relative))
       .sort();
 
     expect(referrers, '이 파일들이 걷기 본체를 쥔다 — 사본을 덧씌울 수 있다').toStrictEqual(
@@ -269,41 +263,35 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
     );
   });
 
-  /** 양성 대조 — r3 을 지나간 **여섯 꼴 전부**를 합성 원문에서 잡는다. */
-  it('술어가 import 꼴 여섯을 전부 잡는다', () => {
+  /** 양성 대조 — r3·r4 를 지나간 **꼴 전부**를 합성 원문에서 잡는다(표기 축이 닫혔는가). */
+  it('술어가 걷기 획득 꼴 전부를 잡는다', () => {
+    const m = STRIP_INTERNAL;
     const forms = {
-      'named(N0)': "import { withoutKotlinComments } from './kotlin-comment-strip.mjs';",
-      '별칭': "import { withoutKotlinComments as s } from './kotlin-comment-strip.mjs';",
-      'namespace(N1)': "import * as ks from './kotlin-comment-strip.mjs';",
-      'dynamic(N2)': "const { x } = await import('./kotlin-comment-strip.mjs');",
-      'createRequire(N3)': "const m = createRequire(import.meta.url)('./kotlin-comment-strip.mjs');",
-      're-export(N4)': "export { withoutKotlinComments as strip } from './kotlin-comment-strip.mjs';",
-      'export *(N5)': "export * from './kotlin-comment-strip.mjs';",
-      'query(N6)': "import * as k from './kotlin-comment-strip.mjs?v=1';",
-      'require': "const m = require('./kotlin-comment-strip.mjs');",
+      'named': `import { withoutKotlinComments } from './${STRIP_BASENAME}.mjs';`,
+      'namespace(N1)': `import * as ks from './${STRIP_BASENAME}.mjs';`,
+      'dynamic(N2)': `const x = await import('./${STRIP_BASENAME}.mjs');`,
+      'createRequire(N3)': `const r = createRequire(import.meta.url)('./${STRIP_BASENAME}.mjs');`,
+      're-export(N4)': `export { withoutKotlinComments as s } from './${STRIP_BASENAME}.mjs';`,
+      'export *(N5)': `export * from './${STRIP_BASENAME}.mjs';`,
+      'query(N6)': `import * as k from './${STRIP_BASENAME}.mjs?v=1';`,
+      '백틱(B1)': `const x = await import(\`../${m}\`);`,
+      'new URL(B2)': `const x = await import(new URL('../${m}', import.meta.url).href);`,
+      'import.meta.resolve(B3)': `const x = await import(import.meta.resolve('../${m}'));`,
+      '상수 경유(B3b)': `const MOD = '../${m}';\nconst x = await import(MOD);`,
     };
 
     for (const [name, source] of Object.entries(forms)) {
-      expect(
-        referencedModules(source, 'scripts/probe.mjs'),
-        `${name} 이 술어를 지나간다`,
-      ).toContain(STRIP_INTERNAL);
+      expect(mentionsStripModule(source, 'scripts/probe.mjs'), `${name} 이 술어를 지나간다`).toBe(true);
     }
   });
 
-  /** 음성 대조 — 공유 모듈만 부르는 소비자는 걸리지 않는다(일률 거절이 아니다). */
+  /** 음성 대조 — 공개 표면만 쓰는 소비자는 걸리지 않는다(일률 거절이 아니다). */
   it('공개 표면만 쓰는 소비자는 걸리지 않는다', () => {
     const clean = "import { assertStrippedKotlin, readKotlinSource } from './kotlin-source.mjs';";
 
-    expect(referencedModules(clean, 'scripts/probe.mjs')).toStrictEqual(['scripts/kotlin-source.mjs']);
+    expect(mentionsStripModule(clean, 'scripts/probe.mjs')).toBe(false);
   });
 
-  /** 상대 경로 깊이가 달라도 **같은 키**로 선다 — 하네스는 두 칸 위에서 부른다. */
-  it('다른 깊이의 상대 경로도 같은 키다', () => {
-    expect(referencedModules("import x from '../../scripts/kotlin-comment-strip.mjs';", 'e2e/harness/h.mjs')).toStrictEqual(
-      [STRIP_INTERNAL],
-    );
-  });
 });
 
 describe('소유권 — 읽기 표면이 셋으로 고정된다', () => {
@@ -335,12 +323,38 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
   /** 원문에서 **export 된 함수 선언**의 이름과 그 본문의 호출 이름들을 낸다. */
   const exportedFunctionCalls = (source, fileName) => {
     const out = new Map();
+    // `export { a, b }` 로 뒤늦게 내보내는 이름들을 먼저 모은다.
+    const exportedNames = new Set();
+    const collect = (node) => {
+      if (ts.isExportDeclaration(node) && node.exportClause !== undefined && ts.isNamedExports(node.exportClause)) {
+        for (const el of node.exportClause.elements) {
+          exportedNames.add((el.propertyName ?? el.name).text);
+        }
+      }
+      ts.forEachChild(node, collect);
+    };
+    collect(parse(source, fileName));
     const visit = (node) => {
-      const exported =
-        ts.isFunctionDeclaration(node) &&
-        node.name !== undefined &&
-        (node.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (exported) {
+      // **export 꼴 전수**(verifier r4 M-1): `export function` 만 세면 화살표(B8a)와
+      // 선언 + `export { … }`(B8b) 가 지나간다. 셋 다 같은 자리로 모은다.
+      const isExported = (n) => (n.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+      let named;
+      if (ts.isFunctionDeclaration(node) && node.name !== undefined && isExported(node)) {
+        named = node.name.text;
+      } else if (ts.isVariableStatement(node) && isExported(node)) {
+        const decl = node.declarationList.declarations[0];
+        if (decl !== undefined && ts.isIdentifier(decl.name)) {
+          named = decl.name.text;
+        }
+      } else if (ts.isFunctionDeclaration(node) && node.name !== undefined && exportedNames.has(node.name.text)) {
+        named = node.name.text;
+      } else if (ts.isVariableStatement(node)) {
+        const decl = node.declarationList.declarations[0];
+        if (decl !== undefined && ts.isIdentifier(decl.name) && exportedNames.has(decl.name.text)) {
+          named = decl.name.text;
+        }
+      }
+      if (named !== undefined) {
         const calls = new Set();
         const inner = (child) => {
           if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) {
@@ -349,7 +363,7 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
           ts.forEachChild(child, inner);
         };
         ts.forEachChild(node, inner);
-        out.set(node.name.text, calls);
+        out.set(named, calls);
       }
       ts.forEachChild(node, visit);
     };
