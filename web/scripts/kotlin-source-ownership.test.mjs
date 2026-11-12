@@ -266,8 +266,10 @@ describe('소유권 — 읽기 표면이 넷으로 고정된다', () => {
 });
 
 describe('읽기 집합 — 한 자리에 전수로 선다', () => {
-  it('읽기 집합은 여덟이고 키 전수가 읽힌다', () => {
-    expect(KOTLIN_SOURCE_KEYS).toHaveLength(8);
+  it('읽기 집합은 일곱이고 키 전수가 읽힌다', () => {
+    // 착수 때 여덟이었다. 명령 축은 10B(#149)의 openapi `enum` 승격으로 web 에서 읽지 않는다 —
+    // 수를 줄인 것이 아니라 **읽지 않는 파일을 표에서 뺀** 것이다.
+    expect(KOTLIN_SOURCE_KEYS).toHaveLength(7);
 
     for (const key of KOTLIN_SOURCE_KEYS) {
       expect(() => readKotlinSource(key), `${key} 를 읽지 못한다`).not.toThrow();

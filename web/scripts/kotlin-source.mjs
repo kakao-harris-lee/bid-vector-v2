@@ -34,14 +34,16 @@ import { fileURLToPath } from 'node:url';
  * **읽기 집합 — `web/` 안에서 `.kt` 경로를 아는 유일한 자리다.**
  *
  * 비공개다. 내보내면 소비자가 그 경로로 원문을 다시 열 수 있어 사본의 길이 그대로 남는다.
- * 여기 전수로 서는 덕에 「읽기 집합 여덟이 전부 읽힌다」를 게이트 test 가 들 수 있다 — r1 까지
- * 그 여덟은 어디에도 전수로 없었고, 확인하려면 손으로 목록을 만들어야 했다.
+ * 여기 전수로 서는 덕에 「읽기 집합 전부가 읽힌다」를 게이트 test 가 들 수 있다 — 앞 판까지
+ * 그 목록은 어디에도 전수로 없었고, 확인하려면 손으로 적어야 했다.
+ *
+ * **일곱이다.** 착수 때는 여덟이었고 그중 명령 축(`BidCommand.kt`)은 10B(#149)가 openapi `enum`
+ * 으로 올려 web 이 더 이상 읽지 않는다 — 읽지 않는 파일을 표에 남기면 「읽기 집합」이 거짓이 된다.
  */
 const KOTLIN_SOURCES = {
   basis: 'shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt',
   provenance: 'procurement/src/main/kotlin/bidvector/procurement/ResolvedBaseAmount.kt',
   provenanceWire: 'app/src/main/kotlin/bidvector/app/http/StrategyReadController.kt',
-  command: 'bidding/src/main/kotlin/bidvector/bidding/BidCommand.kt',
   openingEndpoints: 'app/src/main/kotlin/bidvector/app/collection/OpeningCollectionProperties.kt',
   noticeEndpoints: 'app/src/main/kotlin/bidvector/app/collection/CollectionProperties.kt',
   detailAxes: 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt',

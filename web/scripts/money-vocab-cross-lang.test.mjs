@@ -11,11 +11,16 @@ import { assertStrippedKotlin, readKotlinSource } from './kotlin-source.mjs';
  * **wire 어휘를 손으로 복제한 자리들을 Kotlin 정본에 묶는다**(M9/web-followups —
  * `OPEN-M9-MONEY-VOCAB-CROSS-LANG`).
  *
- * 등재된 사실: 금액 basis·provenance·통화·과세와 타임라인 명령의 어휘는 Kotlin 이 정본이고
- * (`Basis`·`ProvenanceKind`·`Currency`·`VatTreatment`·`BidCommandTag`), openapi 가 그 칸들을
- * `string` 으로 내므로 web 은 생성 타입에서 유니온을 끌어올 수 없다. 그래서 web 의 표와 e2e 의
- * 라벨 표가 **그것을 따라 적는다** — 그리고 **Kotlin 에 값이 늘면 web 은 어디서도 붉어지지
- * 않았다**(「알 수 없는 상태(…)」로 degrade 했다). 이 파일이 그 등식을 든다.
+ * 등재된 사실: 금액 basis·provenance·통화·과세의 어휘는 Kotlin 이 정본이고
+ * (`Basis`·`ProvenanceKind`·`Currency`·`VatTreatment`), openapi 가 그 칸들을 `string` 으로 내므로
+ * web 은 생성 타입에서 유니온을 끌어올 수 없다. 그래서 web 의 표와 e2e 의 라벨 표가 **그것을
+ * 따라 적는다** — 그리고 **Kotlin 에 값이 늘면 web 은 어디서도 붉어지지 않았다**(「알 수 없는
+ * 상태(…)」로 degrade 했다). 이 파일이 그 등식을 든다.
+ *
+ * **타임라인 명령 축은 여기 있었고 M10/10B 가 걷었다**(`OPEN-M9-COMMAND-OPENAPI-ENUM`). 계약이
+ * 그 칸을 `enum` 으로 올린 뒤로 web 은 생성 타입에서 유니온을 끌어오고, Kotlin 어휘와의 등식은
+ * 계약 test 층이 든다 — 이 파일이 메우던 공백이 **구성상 사라졌다**. 금액 네 축은 아직 그 공백에
+ * 있어 남는다.
  *
  * **문면은 대상이 아니다.** e2e 의 한국어 라벨은 **일부러** 산출물에서 끌어오지 않는다(표에서
  * 뽑으면 그 표가 틀려도 대조가 초록이다 — `vat-label-source.test.mjs` 와 같은 관례). 여기서
@@ -116,16 +121,6 @@ export function kotlinEnumEntries(source, name) {
   return entries;
 }
 
-/** Kotlin `const val <name>: String = "…"` 의 값. 없으면 던진다. */
-export function kotlinStringConst(source, name) {
-  const stripped = assertStrippedKotlin(source);
-  const found = new RegExp(String.raw`\bconst\s+val\s+${name}\s*:\s*String\s*=\s*"([^"]+)"`, 'u').exec(stripped);
-  if (found === null) {
-    throw new Error(`const val ${name}: String 을 찾지 못했다 — 꼴이 바뀌었다`);
-  }
-  return found[1];
-}
-
 /**
  * Kotlin 함수 본문의 **문자열 리터럴 전수**. `provenanceLabel` 처럼 wire 로 나가는 글자를
  * `when` 으로 내는 자리를 읽는다 — 실제로 wire 에 실리는 것은 그 리터럴이다.
@@ -221,34 +216,27 @@ export function tsUnionMembers(text, name, path = 'module.ts') {
   return members;
 }
 
-// Kotlin 정본의 **경로를 여기서 알지 않는다**(r2 — verifier r1 M-2). 넘기는 것은 키이고 돌아오는
-// 것은 이미 걷힌 텍스트다 — 원문이 없으면 걷기 사본이 되살아날 자리도 없다.
+// Kotlin 정본의 **경로를 여기서 알지 않는다**(verifier r1 M-2). 넘기는 것은 키이고 돌아오는
+// 것은 이미 걷힌 텍스트다. 명령 축은 10B(#149)가 openapi `enum` 으로 올려 **여기서 읽지 않는다**.
 const basisKt = readKotlinSource('basis');
-const commandKt = readKotlinSource('command');
 
 const kotlinBasis = kotlinEnumEntries(basisKt, 'Basis');
 const kotlinCurrency = kotlinEnumEntries(basisKt, 'Currency');
 const kotlinVat = kotlinEnumEntries(basisKt, 'VatTreatment');
 const kotlinProvenance = kotlinEnumEntries(readKotlinSource('provenance'), 'ProvenanceKind');
-const kotlinCommand = [
-  ...kotlinEnumEntries(commandKt, 'BidCommandTag'),
-  kotlinStringConst(commandKt, 'OPEN_CASE_COMMAND'),
-];
 
 const moneyTs = readWeb('src/display/moneyDisplay.ts');
-const caseTs = readWeb('src/display/caseDisplay.ts');
 const journeyTs = readWeb('e2e/journey/shared.ts');
 const resultsTs = readWeb('e2e/journey/results.spec.ts');
 
 const sorted = (values) => [...values].sort();
 
 describe('Kotlin 정본을 실제로 읽었다 — 빈 읽기는 모든 등식을 공허하게 만든다', () => {
-  it('다섯 열거가 전부 비어 있지 않다', () => {
+  it('네 열거가 전부 비어 있지 않다', () => {
     expect(kotlinBasis.length).toBeGreaterThan(1);
     expect(kotlinCurrency.length).toBeGreaterThan(0);
     expect(kotlinVat.length).toBeGreaterThan(1);
     expect(kotlinProvenance.length).toBeGreaterThan(1);
-    expect(kotlinCommand.length).toBeGreaterThan(1);
   });
 });
 
@@ -293,19 +281,6 @@ describe('금액 어휘의 키 집합 == Kotlin 정본 (OPEN-M9-MONEY-VOCAB-CROS
 
     expect(sorted(tsTableKeys(moneyTs, 'VAT_TREATMENT_DISPLAY'))).toStrictEqual(expected);
     expect(sorted(tsTableKeys(resultsTs, 'VAT_LABEL'))).toStrictEqual(expected);
-  });
-});
-
-/**
- * 명령 어휘도 같은 자리에서 든다(`OPEN-M9-TIMELINE-COMMAND-WORDING` 의 재발 방지). `satisfies` 는
- * 표와 유니온을 **함께** 줄이는 변이를 지나가므로, 그 축을 이 등식이 받는다.
- */
-describe('타임라인 명령 어휘의 키 집합 == Kotlin 정본', () => {
-  it('web 표 · web 유니온이 `BidCommandTag` + 여는 명령과 같다', () => {
-    const expected = sorted(kotlinCommand);
-
-    expect(sorted(tsTableKeys(caseTs, 'BID_COMMAND_DISPLAY'))).toStrictEqual(expected);
-    expect(sorted(tsUnionMembers(caseTs, 'BidCommandToken'))).toStrictEqual(expected);
   });
 });
 
@@ -396,8 +371,7 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
     expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
-  it('문자열 상수와 함수 리터럴도 못 찾으면 던진다', () => {
-    expect(() => kotlinStringConst('val X: String = "a"', 'X')).toThrow(/찾지 못했다/u);
+  it('함수 리터럴도 못 찾으면 던진다', () => {
     expect(() => kotlinFunctionStringLiterals('fun f(x: Int): String = x.toString()', 'f')).toThrow(/중괄호/u);
   });
 });

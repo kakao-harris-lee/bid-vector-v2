@@ -58,31 +58,16 @@ export const TIMELINE_ACTOR_DISPLAY = {
  * 타임라인에 남는 **명령 어휘**(`OPEN-M9-TIMELINE-COMMAND-WORDING`). 앞 판은 이 칸만 서버가 준
  * 토큰 원문이었다 — 상태·주체·부가 사실은 이미 표를 지났고 명령이 마지막 원문 축이었다.
  *
- * **계약이 이 칸을 `string` 으로 선언하므로**(`BidTimelineEntry.command`) 생성 타입에서 유니온을
- * 끌어올 수 없다 — `moneyDisplay` 의 basis·provenance 와 같은 자리다. 그래서 어휘를 여기
- * 선언하고 `satisfies` 로 전수를 잠그되, 그 유니온이 **Kotlin 정본과 어긋나는 것**은
- * `scripts/money-vocab-cross-lang.test.mjs` 의 집합 등식이 잡는다(유니온까지 함께 줄이는 변이가
- * `satisfies` 를 지나가기 때문이다).
+ * **유니온을 손으로 적지 않는다**(M10/10B — `OPEN-M9-COMMAND-OPENAPI-ENUM`). 그 앞 판은 계약이 이
+ * 칸을 `string` 으로 선언해서 리터럴 열다섯을 여기 적었고, 그 손 유니온은 **표와 유니온을 함께
+ * 줄이는** 변이를 지나갔다 — 그래서 Kotlin 원문을 텍스트로 파싱하는 교차언어 게이트가 그 공백을
+ * 임시로 메웠다. 계약이 그 칸을 `enum` 으로 올린 뒤로 전수성의 출처는 **생성 타입**이고, 형제 칸
+ * `actorKind` 와 같은 자리가 됐다 — Kotlin 어휘와의 등식은 계약 test 층이 든다.
  *
  * 열다섯 = 전이표의 열 키 열넷 + **건을 여는 명령 하나**. 여는 명령은 출발 상태가 없어 전이표의
  * 행이 될 수 없고, 타임라인에는 `fromState = null` 인 생성 전이로 남는다.
  */
-export type BidCommandToken =
-  | 'ADD_TO_BID_BOX'
-  | 'DEFER'
-  | 'RESUME'
-  | 'RECEIVE_PRICE_MENU'
-  | 'DRAFT_BID'
-  | 'RECORD_BID'
-  | 'AWAIT_OPENING'
-  | 'RECORD_OPENING_FIRST'
-  | 'RECORD_OPENING_OUT_OF_RANK'
-  | 'ENTER_QUALIFICATION_REVIEW'
-  | 'RECORD_OUTCOME'
-  | 'CORRECT_OUTCOME'
-  | 'SKIP'
-  | 'MARK_DEADLINE_PASSED'
-  | 'REVOKE_DEADLINE_PASSED';
+export type BidCommandToken = components['schemas']['BidTimelineEntry']['command'];
 
 export const BID_COMMAND_DISPLAY = {
   ADD_TO_BID_BOX: { label: '입찰함에 담음', why: '건이 열린 전이라 출발 상태가 없다', tone: 'neutral' },
@@ -114,8 +99,10 @@ export const BID_COMMAND_DISPLAY = {
 } as const satisfies Record<BidCommandToken, StateDisplay>;
 
 /**
- * 명령 칸을 읽는 **한 자리**. 계약이 `string` 이라 키 좁힘을 여기 한 번만 둔다 — 표 밖 값은
- * `displayOrUnknown` 이 **보이게** 낸다(`moneyDisplay` 의 네 조회와 같은 관례).
+ * 명령 칸을 읽는 **한 자리**. 인자를 `string` 으로 받는다 — 계약이 어휘를 닫은 뒤에도 **번들이
+ * 아직 모르는 값**이 닿을 수 있고(계약이 늘었는데 배포가 비틀린 경우), 그때 조용한 빈 자리는
+ * 「서버가 안 보낸 것」으로 읽힌다. 표 밖 값은 `displayOrUnknown` 이 **보이게** 낸다
+ * (`moneyDisplay` 의 네 조회와 같은 관례).
  */
 export function commandDisplayOf(token: string): StateDisplay {
   return displayOrUnknown<string>(BID_COMMAND_DISPLAY, token);
