@@ -361,8 +361,8 @@ class CollectNoticesUseCaseTest {
     @Test
     fun `쪽 상한 재개는 배치마다 말한 총수의 최댓값을 남긴다 — 「없음」이 앞 총수를 지우지 않고 더 큰 총수는 이긴다`() {
         val oneDay = rangeOf("2026-09-01", "2026-09-01")
+        val resumePage = listOf(observation("W3")) // 재개 배치도 항목을 나른다 — 총수만 달리 말한다.
 
-        // 첫 배치가 총수 7 을 말하고 쪽 상한으로 잘린다 — 재개 배치는 비어 있고 말하는 총수만 다르다.
         fun resumedWith(secondTotal: Int?): Pair<CollectionAccounting, CollectionAccounting> {
             val source =
                 ScriptedSource { _, cursor ->
@@ -377,7 +377,7 @@ class CollectNoticesUseCaseTest {
                             next = PageCursor("51"),
                         )
                     } else {
-                        batchOf(emptyList(), claimedTotalAccounting(received = 0, sourceTotal = secondTotal))
+                        batchOf(resumePage, claimedTotalAccounting(received = 1, sourceTotal = secondTotal))
                     }
                 }
             val fixture = CollectionFixture()
@@ -390,7 +390,7 @@ class CollectNoticesUseCaseTest {
 
         erased.sourceTotal shouldBe 7
         // 그 행이 「덜 받았다」로 읽혀야 한다 — 총수가 0 으로 덮이면 이 비교가 뒤집힌다.
-        erased.received shouldBe 2
+        erased.received shouldBe 3
         // 수집 줄이 나르는 값도 같은 행이어야 한다 — 보고가 누산기 값을 그대로 쓰면 둘이 갈린다(v r1 V-2).
         erasedReported.sourceTotal shouldBe 7
         // 총수 칸을 아예 비운 재개 배치(null) — 0 과 다른 꼴이고 같은 보호를 받아야 한다(v r1 V-1).

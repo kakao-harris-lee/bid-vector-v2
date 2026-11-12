@@ -3771,14 +3771,22 @@ M9 이전 식별자를 인용만 한 것은 뺐다.
 
 #### (g) M10/10A 종결 — 공고 목록 갈래의 총수 최댓값 보호 (2026-11-12)
 
-(b) 가 등재한 `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` 을 M10 slice **10A** 가 닫는다. (b) 가 적은 두 고치는
-자리 가운데 **use case 쪽 한 자리**를 골랐다 — 공유 누산기(`SourceAccountingTally`)를 최댓값으로 올리는
-쪽은 두 수집 갈래의 거동을 함께 바꾸므로 이 slice 의 승인 경계 밖이다. 활성 집계에 들어가지 않는다(이 절
-머리 규칙). PR 번호·머지 커밋은 이 행을 쓰는 시점에 없다 — 머지 뒤 장부 slice 가 채운다.
+(b) 가 등재한 `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` 을 M10 slice **10A** 가 닫고, 같은 결함의 **셋째 갈래**를
+새 OPEN 으로 세운다. (b) 가 적은 두 고치는 자리 가운데 **use case 쪽 한 자리**를 골랐다 — 공유 누산기
+(`SourceAccountingTally`)를 최댓값으로 올리는 쪽은 그 누산기로 걷는 **세** 갈래의 거동을 함께 바꾸므로 이
+slice 의 승인 경계 밖이다. 활성 집계에 들어가지 않는다(이 절 머리 규칙). PR 번호·머지 커밋은 이 행을 쓰는
+시점에 없다 — 머지 뒤 장부 slice 가 채운다.
+
+**착수 실측이 갈래를 둘로 셌다(cr r1 HIGH).** 모집단을 「최댓값 함수를 부르는 자리」로 잡아 둘이 나왔는데,
+옳은 모집단은 「`SourceAccountingTally` 로 배치를 걷고 `MaxPages` 로 재개하는 자리」이고 그것은 **셋**이다.
+개찰결과 갈래가 쪽 커서나 누산기를 안 쓴다고 적은 적은 없다 — 세지 않았을 뿐이고, 그 누산기의 KDoc 이
+이미 개찰결과 갈래를 소비자로 **이름까지 적어** 두고 있었다. 축을 「누가 그 함수를 부르는가」로 잡은 것이
+빗나간 지점이다.
 
 | ID | 처분 | 근거 |
 | --- | --- | --- |
-| `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` | **닫힘** — 공고 목록 슬롯 걷기가 배치마다 본 총수의 **최댓값**을 쥐고 회계에 실어, 재개 첫 쪽의 「없음」(0)이 앞 배치의 총수를 덮지 못한다. 최댓값 함수는 낙찰 갈래에서 **옮겨** 두 갈래가 같은 한 자리를 부르므로, 공유 누산기를 최댓값으로 올리는 날 걷을 자리도 하나다. 남는 축은 **한 배치 안**에서 뒤 쪽이 총수를 줄이는 경우이고 낙찰 갈래와 **같은** 열린 판이다 — 닫히는 범위는 배치 경계뿐이다 | `reports/evidence/m10/notice-resume-total/`(D-1·D-2·D-5) · 브랜치 `feature/m10-notice-resume-total` |
+| `OPEN-M9-NOTICE-LIST-RESUME-TOTAL` | **닫힘** — 공고 목록 슬롯 걷기가 배치마다 본 총수의 **최댓값**을 쥐고 회계에 실어, 재개 첫 쪽의 「없음」(`0` 과 `null` 둘 다)이 앞 배치의 총수를 덮지 못한다. 최댓값 함수는 낙찰 갈래에서 **옮겨** 두 갈래가 같은 한 자리를 부르므로, 공유 누산기를 최댓값으로 올리는 날 걷을 자리도 하나다. 남는 축은 **한 배치 안**에서 뒤 쪽이 총수를 줄이는 경우이고 낙찰 갈래와 **같은** 열린 판이다 — 닫히는 범위는 배치 경계뿐이다 | `reports/evidence/m10/notice-resume-total/`(D-1·D-2·D-5) · 브랜치 `feature/m10-notice-resume-total` |
+| `OPEN-M10-OPENING-LIST-RESUME-TOTAL` | **신설** — 개찰결과 목록 갈래(`OpeningSampleFramer`, `OPENING_RESULT_LIST`)에 **같은 결함이 남는다.** 같은 `SourceAccountingTally` 로 걷고, 같은 `MaxPages` + `batch.next` 로 재개하며, 포트의 무자료 경로가 `sourceTotal ?: 0` 으로 **0** 을 낸다 — 그 0 이 누산기의 `?:` 를 통과해 앞 배치의 총수를 덮는다. 이 slice 는 **고치지 않는다**(in_scope 밖 · 승인 경계). 처방은 이 slice 가 세운 자리를 그대로 쓰는 것이다 — 슬롯 걷기가 `widerTotalOf` 로 배치별 총수의 최댓값을 쥐고 `toSourceAccounting()` 결과에 실으면 된다 | 받는 자리: **다음 수집 갈래 slice**. PR **#152** cr r1 HIGH · `reports/evidence/m10/notice-resume-total/checklist.md` |
 
 #### (h) M10/10B — timeline-command-enum
 
