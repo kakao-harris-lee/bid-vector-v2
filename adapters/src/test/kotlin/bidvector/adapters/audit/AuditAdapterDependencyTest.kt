@@ -14,7 +14,7 @@ import java.io.File
  * `adapters.persistence`조차 참조하지 않는다(SQL 문 자신을 `ApiAuditSql`이 직접 갖는다 —
  * `Sql.kt`를 동시에 늘리지 않기 위해서다).
  */
-private val ALLOWED_ROOTS = setOf("bidvector.adapters.audit")
+internal val ALLOWED_ROOTS = setOf("bidvector.adapters.audit")
 
 private fun isDisallowed(importedPackage: String): Boolean =
     importedPackage.startsWith("bidvector.") &&

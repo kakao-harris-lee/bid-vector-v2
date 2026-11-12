@@ -20,7 +20,7 @@ import java.io.File
  * 별개다). `bidvector.adapters.qualification` 자신은 이 패키지의 클래스끼리 서로 참조할 수
  * 있어야 하므로 포함한다.
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.evaluation",
         "bidvector.qualification",

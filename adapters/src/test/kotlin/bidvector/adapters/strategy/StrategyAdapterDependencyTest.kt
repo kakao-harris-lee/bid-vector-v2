@@ -24,7 +24,7 @@ import java.io.File
  * 못하고(D-6A3-17(a)③), 그 게이트를 넓히는 것보다 이 패키지의 허용 루트를 둘 넓히는
  * 편이 좁다(`app` 은 아홉 모듈 전체를 배선하는 층이고 이 패키지는 전략·세션 저장 한 축이다).
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.strategy",
         "bidvector.strategy",
