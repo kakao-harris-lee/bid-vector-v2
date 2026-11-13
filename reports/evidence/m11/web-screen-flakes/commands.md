@@ -46,15 +46,11 @@ TOTAL=52 A=5 B=5 OTHER_FAIL=0 OTHER_EXIT=0 GREEN=42
 
 ## 수정 뒤 재측정 — 같은 횟수 52회
 
-### 중간 판(A 를 `beforeAll` 로) — **고친 것이 아니라 예산 자리를 옮긴 것이었다**
+### 중간 판(A 를 `beforeAll` 로) — 예산 **자리**를 옮긴 것이었다
 
-```
-TOTAL=52 A=0 B=0 OTHER_FAIL=1 OTHER_EXIT=0 GREEN=51
-```
-
-그 1건이 같은 결함이다 — `Hook timed out in 10000ms` · `Test Files 1 failed` ·
-**그 파일의 35 칸 전부 skipped**. 칸 예산(5000ms)에서 hook 예산(10000ms)으로 옮겨 9.6% → 1.9%
-가 됐을 뿐이고, 게이트의 얼굴은 더 나빠진다(실패한 칸 하나가 아니라 **게이트 전체가 미측정**).
+`TOTAL=52 A=0 B=0 OTHER_FAIL=1 GREEN=51` — 그 1 건이 같은 결함이다(`Hook timed out in 10000ms` ·
+**그 파일의 35 칸 전부 skipped**). 9.6% → 1.9% 로 줄었을 뿐이고 얼굴은 더 나쁘다(실패한 칸
+하나가 아니라 **게이트 전체가 미측정**).
 
 ### 최종 판(A 를 모듈 적재 단계로)
 
@@ -136,13 +132,15 @@ Tests  7 failed | 17 passed (24)
 | 예열을 기각된 `beforeAll` 1안으로 되돌린다 | **1** — r0 단언은 이 변이에 **초록**이었다(F4) |
 | `setScheduler` 만 지운다 | **1** — r0 단언은 **초록**이었다(F5) |
 
-**cr 라운드의 변이 다섯**(같은 규율)
+**cr 라운드의 변이**(같은 규율 — 치환 · 적용 단언 선행 · 되돌림 뒤 `porcelain` 0)
 
 | 변이 | 붉은 칸 |
 | --- | --- |
 | 등재 등식을 **꼴 열거**로 되돌린다(cr F-1) | **1** — 커링 양성 대조 |
 | 무명 기본 선언의 자리를 되돌린다(cr F-2) | **1** |
 | 「앞 칸이 돌았다」 단언을 뺀다(cr F-9) | 뒤 칸만 돌릴 때 **초록**(= 공허). 단언이 있으면 같은 조건에서 **1 failed** |
+| 기본 내보내기 이름을 파일 한정에서 되돌린다(v R2 · cr N-2) | **5** — 기본 내보내기 넷 + 「파일마다 다르다」 |
+| 예열을 hook 으로 옮긴다, 전제 줄은 그대로(v R3) | **1** — 전제가 수라 상수로 바꿔치울 수 없다 |
 
 **서명 B 의 두 갈래 — 어느 쪽이 하중을 지는가**(cr F-8). 각각 26회.
 
@@ -173,7 +171,7 @@ ci.yml `web` job 전건을 그 job 의 명령 그대로 `web/` 에서 돌린다.
 | step | 명령 | exit |
 | --- | --- | --- |
 | W-1~W-5 | `npm ci` · `lint` · `typecheck` · `gate:src-tree` · `api:types:check` | 0 · 0 · 0 · 0 · 0 |
-| W-6~W-9 | `test` · `gate:tests` · `build` · `gate:boundary-canary` | 0 · 0 · 0 · 0 — 42 파일 **936 칸**(base 913 → ② 5 · ① 18) |
+| W-6~W-9 | `test` · `gate:tests` · `build` · `gate:boundary-canary` | 0 · 0 · 0 · 0 — 42 파일 **937 칸**(base 913 → ② 5 · ① 19) |
 | W-10~W-11 | `playwright install chromium` · `test:e2e` | 0 · 0 — 스모크 2 passed |
 | W-12~W-13 | `./gradlew --no-daemon :app:bootJar` · `test:e2e:journey` | 0 · 0 — 여정 **12 passed · flaky 0 · 건너뜀 0 · spec 4/4** |
 
