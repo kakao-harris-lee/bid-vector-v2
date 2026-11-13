@@ -102,8 +102,8 @@ class CollectNoticesUseCase(
      * (`source.sourceTotal ?: sourceTotal`), 어댑터는 배치마다 새 누산기라 쪽 상한 재개의 첫 쪽이
      * 총수를 말하지 않으면 **0** 을 낸다. 그 0 이 앞 배치의 총수를 덮으면 회계 행이 「받은 수 ≥ 총수」가
      * 되어 덜 받은 슬롯이 다 받은 것으로 적힌다. 그래서 배치마다 본 총수의 최댓값([widerTotalOf] —
-     * 낙찰 갈래와 **같은** 한 자리)을 여기서 쥐고 회계에 싣는다. 누산기 자체를 고치지 않는 것은
-     * 범위다 — 그 타입을 두 갈래가 공유하므로 거동이 함께 바뀐다.
+     * 형제 두 갈래와 **같은** 한 자리)을 여기서 쥐고 회계에 싣는다. 누산기 자체를 고치지 않는 것은
+     * 범위다 — 그 타입을 **세** 갈래가 공유하므로 거동이 함께 바뀐다.
      */
     private fun collectSlot(planned: PlannedSlot): CollectionSlotReport {
         val referenceDate = CollectionReferenceDate(planned.slot.referenceDate)
