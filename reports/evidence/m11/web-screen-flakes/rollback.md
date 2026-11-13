@@ -46,6 +46,14 @@ git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktre
   `git diff --name-only 94ee445b..origin/main` 이 `README.md`·`milestone-10.md`·`milestone-11.md`
   셋뿐이다.
 
+## 실측 HEAD 와 판정 SHA 사이
+
+evidence 커밋은 언제나 실측 뒤에 오므로 **실측 HEAD == 판정 SHA 가 되는 일은 없다**. 봐야 하는
+것은 그 사이에 **되돌림 대상이 움직였는가**이고, 여기서 움직인 것은 전부 다음 전칭식에 든다 —
+**실측 HEAD 이후에 변경된 복원 대상은 모두 복원 원천에 없는 신설 파일이다**(그래서 복원이 그것을
+지우는 동작은 실측 당시와 같다). 열거와 「원천에 없음」 확인은 verifier 가 한다.
+`git rev-list --merges <실측 HEAD>..<판정 SHA>` 도 **빈 출력**이다(이 브랜치는 병합을 담지 않는다).
+
 ## 실측 — 버릴 clone 에서 ①~⑥
 
 `--no-hardlinks` clone(`feature/m11-web-screen-flakes`, HEAD = 실측 HEAD)에서 복원을 끝까지
