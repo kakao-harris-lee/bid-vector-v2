@@ -114,15 +114,27 @@ internal fun disallowedCoordinates(
     }
     val classFiles = BytecodeConstantPool.classFilesUnder(classesDir)
     check(classFiles.isNotEmpty()) { "class 파일을 찾지 못했다: ${classesDir.absolutePath}" }
-    return BytecodeConstantPool
-        .chunksOf(classFiles)
-        .flatMap { chunk ->
-            SELF_COORDINATE
-                .findAll(chunk.body)
-                .map { it.value.replace('/', '.') }
-                .filter { isOutsideRoots(it, allowedRoots) }
-                .map { "${chunk.classFile.name}: $it" }
-                .toList()
-        }.distinct()
-        .sorted()
+
+    var extracted = 0
+    val violations =
+        BytecodeConstantPool
+            .chunksOf(classFiles)
+            .flatMap { chunk ->
+                val found = SELF_COORDINATE.findAll(chunk.body).map { it.value.replace('/', '.') }.toList()
+                extracted += found.size
+                found
+                    .filter { isOutsideRoots(it, allowedRoots) }
+                    .map { "${chunk.classFile.name}: $it" }
+            }.distinct()
+            .sorted()
+
+    // **추출 층의 비공허 단언**(cr M-2). 위 세 겹(디렉터리·파일·헤더 계수)은 **읽었는가**만 재고
+    // **뽑았는가**는 재지 않았다 — 정규식이 조용히 좁아지면 `emptyList()` 가 그대로 통과해 이 게이트가
+    // 공허하게 초록이 된다(실측: 좌측 경계를 과하게 조인 변이가 여섯 축 **전부에서 위반 0 그대로**였다).
+    // 어느 축이든 자기 패키지 좌표만으로 수백 개를 남기므로(최소 197, 실측) 0 은 술어가 망가진 것이다.
+    check(extracted > 0) {
+        "상수 풀에서 자기 좌표를 하나도 뽑지 못했다: ${classesDir.absolutePath} — " +
+            "`SELF_COORDINATE` 가 좁아졌는지 본다(「위반 0」과 「추출 0」은 다른 말이다)"
+    }
+    return violations
 }
