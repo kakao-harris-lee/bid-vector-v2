@@ -26,21 +26,33 @@
 - 계약 갱신 둘째의 요구 재측정: 목록 질의 상태 param → **`enum` 이고 값 열넷** · 집합·차례가
   도메인 열거와 **같다**(양끝을 명령으로 냈다)
 
-## GREEN — 판정 대상 트리에서 CI 명령 그대로
+## 병합 — 공유 파일 하나, 충돌 0 이라 계수로 확인
+
+- `git merge <고정 main SHA>` → **0** · **충돌 0**(겹치는 경로가 §12.3 하나이고 자동 병합됐다)
+- 합집합 함정 대조 → 절 수 **13** · 글자 중복 **0** · 남의 두 절(11A·11E) 본문 해시가 **원천과
+  같음** · 내 본문은 **머리 한 줄만** 달라짐. **자동 병합이 내 절을 `(j)` 뒤에 놓았다**(= 남의 두
+  절 **앞**) — 끝으로 옮기고 글자를 `(m)` 으로 정한 뒤 남의 절 본문 해시를 **다시** 대조했다
+
+## GREEN — 판정 대상 트리(병합 커밋)에서 CI 명령 그대로
 
 web job:
 
 - `npm ci`(W-1) / `lint`(W-2) / `typecheck`(W-3) / `gate:src-tree`(W-4) / `api:types:check`(W-5)
   → 0 / 0 / 0 / 0 / 0 · W-5 는 생성 타입이 계약과 바이트까지 같다
-- `npm run test`(W-6) → 0 · 42 files, 920 tests passed
+- `npm run test`(W-6) → 0 · 42 files, **945 tests passed**
 - `gate:tests`(W-7) / `build`(W-8) / `gate:boundary-canary`(W-9) → 0 / 0 / 0
 - `npx playwright install chromium`(W-10) / `npm run test:e2e`(W-11) → 0 / 0 · 2 passed
 
 check job:
 
-- `./gradlew --no-daemon check` → **0** · BUILD SUCCESSFUL 41m 13s · 424 actionable
-  (63 executed) · `FAILED` 0 건 · 상태 축 계약 test 가 그 실행에 있다(결과 XML: tests 6 ·
-  skipped 0 · failures 0 · errors 0)
+- `./gradlew --no-daemon check` → **0** · BUILD SUCCESSFUL 33m 11s · 433 actionable
+  (97 executed · 15 from cache) · `FAILED` 0 건
+- `./gradlew --no-daemon :app:test --rerun` → **0** · 강제 실행 한 번(문서·web 이 많이 들어와
+  up-to-date 가 나오는 자리다) · 로그에 `FROM-CACHE` 0 건
+
+**병합 전 판정 트리에서도 같은 전건을 돌렸다** — `check` 0(41m 13s · 424 actionable · `FAILED`
+0 건 · 상태 축 계약 test 가 그 실행에 있다: 결과 XML `tests 6 · skipped 0 · failures 0 ·
+errors 0`) · web job 11 단계 0(920 tests).
 
 **중단된 선행 실행 하나를 기록한다** — 같은 명령이 11A 레인의 전건 빌드와 경쟁하던 중 adapters 의
 재시도·timeout test 하나가 `expected:<2> but was:<1>` 로 떨어졌다(내 in_scope 밖 · 원천과 바이트가
@@ -87,5 +99,6 @@ scratch 로 피신시킨 뒤). 적용 단언은 앵커 유일성 + 치환 후 �
   → **1**(매치 없음) · 최종 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트다
 - `git status --porcelain -- <in_scope 개별 인자>` → 산출물 경로는 **빈 출력**
 - 크기 게이트 — **쓴 계량은 줄 수이고 두 수를 그대로 적는다**:
-  `git diff --numstat <원천>..<실측 HEAD> -- . ':!reports/evidence'` 가 **+386 / −27 = 413 바뀐
-  줄** · evidence 네 파일 `wc -l` 은 그 커밋에서 센다. 판정은 **바뀐 줄** 기준이다
+  `git diff --numstat <원천>..<실측 HEAD> -- . ':!reports/evidence'` 가 **+446 / −30 = 476 바뀐
+  줄** · evidence 네 파일 `wc -l` 은 그 커밋에서 센다. 판정은 **바뀐 줄** 기준이고, 더한 줄만
+  세면 446 으로 갈린다 — 어느 수를 썼는지 적는 이유다
