@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
@@ -56,6 +56,16 @@ const STRIP_INTERNAL = `scripts/${STRIP_BASENAME}.mjs`;
 
 /** 그 내부 모듈을 참조해도 되는 자리 — 소유 모듈과 그 **단위 test** 둘이다. */
 const STRIP_REF_ALLOWED = [OWNER, 'scripts/kotlin-source.test.mjs'];
+
+/**
+ * **추출 커널 — 동일성 단언을 거치지 않는 입구다**(M11 — 팀장 조건 1).
+ *
+ * 공개 입구(`shipped…` 넷)는 받은 텍스트가 읽기가 내준 그것인지를 단언하고 커널로 넘긴다. 커널을
+ * 직접 부르면 그 단언이 없으므로, 소비자가 커널을 쥐는 순간 ⑥ 이 다시 열린다. 그래서 참조자를
+ * **소유 파일과 그 단위 test 둘**로 고정한다 — 걷기 본체를 같은 꼴로 묶어 둔 선례를 잇는다.
+ */
+const EXTRACT_KERNEL = 'e2e/harness/opening-axis-extract.mjs';
+const EXTRACT_REF_ALLOWED = ['e2e/harness/opening-axis.mjs', 'e2e/harness/opening-axis.test.mjs'];
 
 /**
  * 데이터 파일 가운데 Kotlin 경로를 **출처 주석으로** 담는 자리. 여는 데 쓰이지 않고 「이 fixture 가
@@ -162,6 +172,46 @@ export function mentionsStripModule(source, fileName = 'probe.mjs') {
     found ||= text.includes(STRIP_BASENAME);
   });
   return found;
+}
+
+/**
+ * **해석된 import 대상 전수**(M11 — 팀장 조건 1: 문자열 grep 이 아니라 **import 그래프**).
+ *
+ * 정적 import · 재수출(`export … from`) · `export *` · 리터럴 동적 import 를 모두 들고, 지정자를
+ * **그 파일 기준으로 해석**한다. 그래서 별칭(`import { x as y }`)·재수출·쿼리(`?v=1`)·다른
+ * 디렉터리에서 오는 긴 상대 경로가 **같은 대상 하나로 접힌다** — 표기를 세지 않는다.
+ *
+ * 비리터럴 지정자(런타임 조립)는 해석되지 않는다 — 의도적 은닉이고 경계 밖이다.
+ */
+export function resolvedImports(source, fileName) {
+  const fromDir = dirname(resolve(webRoot, fileName));
+  const targets = new Set();
+  const take = (specifier) => {
+    if (specifier === undefined || !specifier.startsWith('.')) {
+      return;
+    }
+    const withoutQuery = specifier.split('?')[0];
+    targets.add(relative(webRoot, resolve(fromDir, withoutQuery)));
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      const specifier = node.moduleSpecifier;
+      if (specifier !== undefined && ts.isStringLiteral(specifier)) {
+        take(specifier.text);
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] !== undefined &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      take(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parse(source, fileName));
+  return [...targets];
 }
 
 /**
@@ -316,6 +366,54 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
     expect(mentionsStripModule(clean, 'scripts/probe.mjs')).toBe(false);
   });
 
+});
+
+/**
+ * **추출 커널을 쥐는 자리가 둘이다**(M11 — 팀장 조건 1). 술어는 **해석된 import 그래프**이므로
+ * 별칭·재수출·쿼리·동적 import·다른 디렉터리의 긴 상대 경로가 전부 같은 대상으로 접힌다.
+ */
+describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
+  it('커널을 import 하는 파일은 소유 파일과 그 단위 test 둘뿐이다', () => {
+    const referrers = files
+      .filter(isAstFile)
+      .filter((relativePath) => resolvedImports(read(relativePath), relativePath).includes(EXTRACT_KERNEL))
+      .sort();
+
+    expect(referrers, '이 파일들이 단언을 거치지 않는 입구를 쥔다').toStrictEqual(
+      [...EXTRACT_REF_ALLOWED].sort(),
+    );
+  });
+
+  /** 양성 대조 — 제3 파일이 어떤 표기로 가리든 든다. 표기를 세지 않는 것이 이 술어의 성질이다. */
+  it('술어가 제3 파일의 획득 꼴 전부를 잡는다', () => {
+    const forms = {
+      named: "import { openingOperationPathsOf } from '../e2e/harness/opening-axis-extract.mjs';",
+      별칭: "import { openingOperationPathsOf as f } from '../e2e/harness/opening-axis-extract.mjs';",
+      namespace: "import * as kernel from '../e2e/harness/opening-axis-extract.mjs';",
+      재수출: "export { openingOperationPathsOf } from '../e2e/harness/opening-axis-extract.mjs';",
+      'export *': "export * from '../e2e/harness/opening-axis-extract.mjs';",
+      동적: "const kernel = await import('../e2e/harness/opening-axis-extract.mjs');",
+      쿼리: "import * as kernel from '../e2e/harness/opening-axis-extract.mjs?v=1';",
+      '정규화가 필요한 경로': "import * as k from '../e2e/./harness/../harness/opening-axis-extract.mjs';",
+    };
+
+    for (const [name, source] of Object.entries(forms)) {
+      expect(resolvedImports(source, 'scripts/probe.mjs'), `${name} 이 술어를 지나간다`).toContain(
+        EXTRACT_KERNEL,
+      );
+    }
+  });
+
+  /** 음성 대조 — 공개 입구만 쓰는 소비자는 걸리지 않는다(여정 하네스가 그 자리다). */
+  it('공개 입구만 쓰는 소비자는 걸리지 않는다', () => {
+    const clean = [
+      "import { shippedDetailAxisCounts } from './opening-axis.mjs';",
+      "import { readKotlinSource } from '../../scripts/kotlin-source.mjs';",
+      "import ts from 'typescript';",
+    ].join('\n');
+
+    expect(resolvedImports(clean, 'e2e/harness/probe.mjs')).not.toContain(EXTRACT_KERNEL);
+  });
 });
 
 describe('소유권 — 읽기 표면이 셋으로 고정된다', () => {

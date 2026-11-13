@@ -18,6 +18,10 @@ import {
   shippedDetailAxisCounts,
   shippedProgressLabels,
 } from './opening-axis.mjs';
+// **추출 술어 자신의 대조는 커널을 직접 잰다**(M11 — 팀장 판정 (ㄱ)). 공개 입구는 받은 텍스트가
+// 읽기가 내준 그것인지를 단언하므로, 합성 Kotlin 조각은 술어가 돌기 전에 거부된다. 그래서 술어를
+// 재는 대조는 커널로, 출처를 재는 대조는 입구로 간다 — 아래 두 묶음이 그것이다.
+import { detailAxisCountsOf, openingOperationPathsOf } from './opening-axis-extract.mjs';
 import { readKotlinSource } from '../../scripts/kotlin-source.mjs';
 
 /**
@@ -110,7 +114,7 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   });
 
   it('출하 기본값을 찾지 못하면 통과가 아니라 거부다', () => {
-    expect(() => shippedOpeningOperationPaths('val 아무것도 없다')).toThrow(/출하 기본값/u);
+    expect(() => openingOperationPathsOf('val 아무것도 없다')).toThrow(/출하 기본값/u);
   });
 
   /**
@@ -133,10 +137,10 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
 
     expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
     // 주석이 아니라 **실제 값**을 집는다 → 하네스 사본과 갈려 등식이 붉어질 값이다.
-    expect(shippedOpeningOperationPaths(shadowed).shared.openingCompletePath).toBe(
+    expect(openingOperationPathsOf(shadowed).shared.openingCompletePath).toBe(
       'getOpengResultListInfoOpengCompt02',
     );
-    expect(shippedOpeningOperationPaths(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
+    expect(openingOperationPathsOf(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
   });
 
   /** 걷히지 않은 원문은 추출 자리에서 **거부된다** — 주석이 값을 가릴 기회가 오지 않는다. */
@@ -153,7 +157,26 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
         '    val bidPriceFormulaAPath: String =',
     );
 
-    expect(() => shippedOpeningOperationPaths(twice)).toThrow(/정확히 하나/u);
+    expect(() => openingOperationPathsOf(twice)).toThrow(/정확히 하나/u);
+  });
+
+  /**
+   * **입구는 여전히 거부한다**(M11 — 팀장 조건 3). 위 셋을 커널로 옮기면서 단언이 약해지지
+   * 않았음을 같은 자리에서 잰다 — 손댄 텍스트도, 합성 조각도 **공개 입구**에서 멈춘다.
+   */
+  it('공개 입구는 손댄 텍스트와 합성 조각을 거부한다', () => {
+    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
+    const shadowed = shipped.replace(
+      'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
+      '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
+    );
+
+    expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
+    expect(() => shippedOpeningOperationPaths(shadowed)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(() => shippedOpeningOperationPaths('val 아무것도 없다')).toThrow(
+      /걷힌 Kotlin 텍스트가 아니다/u,
+    );
+    expect(() => shippedDetailAxisCounts('아무것도 없다')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
   it('문자열 안의 `//` 는 주석이 아니다 — base URL 에서 줄이 잘리면 추출이 엉뚱한 값을 본다', () => {
@@ -174,7 +197,7 @@ describe('ⓕ 상세 축 수 == 출하 열거', () => {
   });
 
   it('열거 함수를 찾지 못하면 통과가 아니라 거부다', () => {
-    expect(() => shippedDetailAxisCounts('아무것도 없다')).toThrow(/상세 축 열거/u);
+    expect(() => detailAxisCountsOf('아무것도 없다')).toThrow(/상세 축 열거/u);
   });
 
   it('수집 걸음의 기대가 그 수에서 나온다 — 상세 축을 **실제로 불렀는가**가 등식 안이다', () => {

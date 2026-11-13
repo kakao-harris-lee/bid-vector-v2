@@ -95,7 +95,15 @@ const ENUM_ENTRY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
  * 내고 **등식**이 갈린 것을 말한다(읽기가 어휘 정책을 겸하면 그 둘이 한 자리에서 섞인다).
  */
 export function kotlinEnumEntries(source, name) {
-  const stripped = assertStrippedKotlin(source);
+  return enumEntriesOf(assertStrippedKotlin(source), name);
+}
+
+/**
+ * 그 술어의 **커널** — 텍스트만 받는다(M11 — 팀장 판정 (ㄱ)). 위 입구가 「읽기가 내준 텍스트인가」를
+ * 단언하므로, 술어 자신의 양성·음성 대조(합성 Kotlin 조각)는 여기로 들어온다. 둘 다 이 파일 안
+ * 함수이고 **어느 추적 파일도 이 파일을 import 하지 않으므로** 새 공개 표면이 0 이다(실측).
+ */
+function enumEntriesOf(stripped, name) {
   const header = new RegExp(String.raw`\benum\s+class\s+${name}\b`, 'gu');
   const matches = [...stripped.matchAll(header)];
   if (matches.length !== 1) {
@@ -126,7 +134,11 @@ export function kotlinEnumEntries(source, name) {
  * `when` 으로 내는 자리를 읽는다 — 실제로 wire 에 실리는 것은 그 리터럴이다.
  */
 export function kotlinFunctionStringLiterals(source, name) {
-  const stripped = assertStrippedKotlin(source);
+  return functionStringLiteralsOf(assertStrippedKotlin(source), name);
+}
+
+/** 그 술어의 **커널** — 텍스트만 받는다(위와 같은 사유). */
+function functionStringLiteralsOf(stripped, name) {
   const header = new RegExp(String.raw`\bfun\s+${name}\s*\(`, 'gu');
   const matches = [...stripped.matchAll(header)];
   if (matches.length !== 1) {
@@ -293,8 +305,8 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
     const oneLine = 'enum class Probe { A, B, C }';
     const trailing = 'enum class Probe {\n    A,\n    B,\n}\n';
 
-    expect(kotlinEnumEntries(oneLine, 'Probe')).toStrictEqual(['A', 'B', 'C']);
-    expect(kotlinEnumEntries(trailing, 'Probe')).toStrictEqual(['A', 'B']);
+    expect(enumEntriesOf(oneLine, 'Probe')).toStrictEqual(['A', 'B', 'C']);
+    expect(enumEntriesOf(trailing, 'Probe')).toStrictEqual(['A', 'B']);
   });
 
   /**
@@ -312,11 +324,11 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
   it('본문에 멤버 선언이 있는 꼴도 열거만 읽는다', () => {
     const withMembers = 'enum class Probe {\n    A,\n    B;\n\n    fun label(): String = name\n}\n';
 
-    expect(kotlinEnumEntries(withMembers, 'Probe')).toStrictEqual(['A', 'B']);
+    expect(enumEntriesOf(withMembers, 'Probe')).toStrictEqual(['A', 'B']);
   });
 
   it('인자를 받는 엔트리는 머리만 읽는다', () => {
-    expect(kotlinEnumEntries('enum class Probe { A(1), B(2) }', 'Probe')).toStrictEqual(['A', 'B']);
+    expect(enumEntriesOf('enum class Probe { A(1), B(2) }', 'Probe')).toStrictEqual(['A', 'B']);
   });
 
   /**
@@ -325,7 +337,7 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
    * 시끄러운 오탐이지만, 같은 접두사 읽기가 아래의 **조용한 누락**을 만든다.
    */
   it('인자 목록 안의 쉼표로 유령 항목을 만들지 않는다', () => {
-    expect(kotlinEnumEntries('enum class Probe { A(FOO, BAR), B(BAZ) }', 'Probe')).toStrictEqual(['A', 'B']);
+    expect(enumEntriesOf('enum class Probe { A(FOO, BAR), B(BAZ) }', 'Probe')).toStrictEqual(['A', 'B']);
   });
 
   /**
@@ -334,7 +346,7 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
    * 등식은 초록으로 남는다 — 이 게이트가 막으려는 바로 그 꼴이 게이트 안에 있었다.
    */
   it('소문자로 시작하는 항목도 그대로 읽는다 — 절삭하거나 버리지 않는다', () => {
-    expect(kotlinEnumEntries('enum class Probe { krw, Won, A }', 'Probe')).toStrictEqual(['krw', 'Won', 'A']);
+    expect(enumEntriesOf('enum class Probe { krw, Won, A }', 'Probe')).toStrictEqual(['krw', 'Won', 'A']);
   });
 
   /**
@@ -347,21 +359,21 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
     const quoted = 'enum class Probe {\n    `NEW_CMD`,\n    A,\n}\n';
     const entryBody = 'enum class Probe {\n    A { override fun f() = 1 },\n    B,\n}\n';
 
-    expect(() => kotlinEnumEntries(annotated, 'Probe')).toThrow(/읽지 못했다/u);
-    expect(() => kotlinEnumEntries(quoted, 'Probe')).toThrow(/읽지 못했다/u);
-    expect(() => kotlinEnumEntries(entryBody, 'Probe')).toThrow(/읽지 못했다/u);
+    expect(() => enumEntriesOf(annotated, 'Probe')).toThrow(/읽지 못했다/u);
+    expect(() => enumEntriesOf(quoted, 'Probe')).toThrow(/읽지 못했다/u);
+    expect(() => enumEntriesOf(entryBody, 'Probe')).toThrow(/읽지 못했다/u);
   });
 
   it('인자 목록의 괄호가 맞지 않으면 던진다', () => {
-    expect(() => kotlinEnumEntries('enum class Probe { A(1 }', 'Probe')).toThrow(/괄호/u);
+    expect(() => enumEntriesOf('enum class Probe { A(1 }', 'Probe')).toThrow(/괄호/u);
   });
 
   /** **음성 대조 넷** — 조용한 초록이 아니라 **예외**가 된다. */
   it('찾지 못하거나 비었거나 둘이면 던진다', () => {
-    expect(() => kotlinEnumEntries('class Probe', 'Probe')).toThrow(/0 번/u);
-    expect(() => kotlinEnumEntries('enum class Probe {\n}\n', 'Probe')).toThrow(/비었다/u);
-    expect(() => kotlinEnumEntries('enum class Probe { A }\nenum class Probe { B }', 'Probe')).toThrow(/2 번/u);
-    expect(() => kotlinEnumEntries('enum class Probe', 'Probe')).toThrow(/중괄호/u);
+    expect(() => enumEntriesOf('class Probe', 'Probe')).toThrow(/0 번/u);
+    expect(() => enumEntriesOf('enum class Probe {\n}\n', 'Probe')).toThrow(/비었다/u);
+    expect(() => enumEntriesOf('enum class Probe { A }\nenum class Probe { B }', 'Probe')).toThrow(/2 번/u);
+    expect(() => enumEntriesOf('enum class Probe', 'Probe')).toThrow(/중괄호/u);
   });
 
   /** 주석 안의 헤더가 계수를 흔드는 길은 **걷기가 먼저 닫는다** — 여기선 거부로 선다. */
@@ -372,7 +384,7 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
   });
 
   it('함수 리터럴도 못 찾으면 던진다', () => {
-    expect(() => kotlinFunctionStringLiterals('fun f(x: Int): String = x.toString()', 'f')).toThrow(/중괄호/u);
+    expect(() => functionStringLiteralsOf('fun f(x: Int): String = x.toString()', 'f')).toThrow(/중괄호/u);
   });
 });
 
