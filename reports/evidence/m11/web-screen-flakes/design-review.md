@@ -78,8 +78,7 @@
 | `vocabularyComponentsOf(program, source)` | **의미 변경**(시그니처 동일) | 소비자가 자기 훑기를 쓰는 길 — 이 모듈의 소비자는 게이트 test 하나이고 그 파일이 in_scope 다 | 그대로 |
 | `collectScreenVocabulary(webRoot, overlay)` | 기존 | — | 그대로 |
 | `VOCABULARY_MODULE_EXCLUSIONS` | **신설** | 제외를 늘려 새 함수를 조용히 통과시키는 길 | **열거이고 diff 에 남는다** — 경계 밖(「게이트 파일 자체를 고치는 저자」). 다만 종류 `INTERNAL_ASSEMBLER` 는 구조 의무가 붙어 사유가 거짓이면 붉다 |
-| `unclassifiedVocabularyModuleExports(program, webRoot)` | **신설** | 어휘 모듈 **밖**에 새 어휘 함수를 두는 길(`display/newThing.ts`) | **실측했다** — 오늘 어휘 호출은 `src/screens/**`·`src/display/**` 밖에 0 이고, 새 표시 모듈을 만드는 것은 ①의 축이 아니라 모집단 축이다. 위 9 번과 같은 신설 OPEN 에 든다 |
-| `vocabularyExclusionLeaks(program, webRoot)` | **신설** | 제외 함수를 화면이 **간접으로** 부르는 길(표시층 다른 함수를 지나) | **의도다** — 표시층 내부에서 조립되는 것이 그 함수의 일이고, 그 조립 결과를 내는 함수(`amountDisplayOf`)는 이미 등재돼 있다 |
+| `vocabularyRegistryGaps(program, webRoot)` → `{unclassified, stale, leaked}` | **신설** | ⓐ 어휘 모듈 **밖**에 새 어휘 함수를 두는 길(`display/newThing.ts`) ⓑ 제외 함수를 화면이 **간접으로** 부르는 길(표시층 다른 함수를 지나) | ⓐ **실측했다** — 오늘 어휘 호출은 `src/screens/**`·`src/display/**` 밖에 0 이고, 새 표시 모듈을 만드는 것은 ①의 축이 아니라 모집단 축이다(위 9 번과 같은 신설 OPEN). ⓑ **의도다** — 표시층 내부에서 조립되는 것이 그 함수의 일이고, 그 조립 결과를 내는 함수(`amountDisplayOf`)는 이미 등재돼 있다 |
 | `screenProgram` · `mountedCardsOf` · `missingVocabularyDeclarations` · `screenFilesIn` | 기존 | — | 그대로 |
 
 ## (3) 과잉·미달
@@ -125,5 +124,6 @@
 | 순환 참조 | 던지지 않고 유한하게 끝난다 |
 | 어휘를 안 쓰는 비공개 컴포넌트를 그리는 내보내기 | `[]`(음성 대조) |
 | 비공개 컴포넌트 **자신**은 이름에 없다 | 의무는 내보낸 이름뿐(음성 대조) |
-| 어휘 모듈에 분류 안 된 내보낸 함수 하나 | `unclassifiedVocabularyModuleExports` 가 그것을 낸다 |
-| `INTERNAL_ASSEMBLER` 제외를 화면이 참조 | `vocabularyExclusionLeaks` 가 그것을 낸다 |
+| 어휘 모듈에 분류 안 된 내보낸 함수 하나 | `unclassified` 가 그것을 낸다 |
+| 제외 목록에 **이제 없는 함수**가 남아 있다 | `stale` 이 그것을 낸다 |
+| `INTERNAL_ASSEMBLER` 제외를 화면이 직접 참조 | `leaked` 이 그것을 낸다 |
