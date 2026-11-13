@@ -1,15 +1,16 @@
 # M11 / opening-resume-total — 되돌리는 방법과 그 실측
 
-**실측 HEAD: `0e08d6e3cec0e4fa7da7e26284ed1d0a588b73a1`**(이 slice 의 마지막 산출물 커밋 — 이 파일을
-담은 커밋은 그 뒤에 온다).
+**실측 HEAD: `f873670a6058431a03be366fee7ff1cd65145d8f`**(r1 의 마지막 산출물 커밋 — 이 파일을 담은
+커밋은 그 뒤에 온다). r0 의 실측은 **버린다**: r1 이 KDoc 두 파일을 in_scope 로 들였으므로 되돌림
+대상이 움직였고, 그러면 앞 실측은 미검증이다.
 
 ## 복원 원천
 
 고정 SHA **`32dead40`**(main 에 병합된 커밋 · PR #153). 움직이는 `origin/main` 을 쓰지 않는다. 공유 파일
 (`capability-map.md`·`gate-tests.properties`)이 복원 목록에 있으므로 원천은 **머지된 main 의 고정 SHA** 다.
 
-**전제 — 그 SHA 에 이 slice 가 없다.** 이 slice 의 **일곱 커밋 전부**(첫 산출물 커밋 `b7bfda4c` 포함)가
-`32dead40` 의 조상이 아니다(`git merge-base --is-ancestor` 가 일곱 번 거짓). 그래서 이 복원은 머지 순간에
+**전제 — 그 SHA 에 이 slice 가 없다.** 이 slice 의 커밋 **전부**(첫 산출물 커밋 `b7bfda4c` 포함)가
+`32dead40` 의 조상이 아니다(`git merge-base --is-ancestor` 가 전부 거짓). 그래서 이 복원은 머지 순간에
 아무것도 지우지 않는다.
 
 **셋째 단언 — 원천을 바꿨으므로 쟀다.** 복원 대상 blob 이 착수 base `94ee445b` 와 새 원천 `32dead40` 에서
@@ -21,26 +22,29 @@
 range revert 가 아니라 **in_scope 경로 한정 복원**이다.
 
 ```
-git restore --source=32dead40 --staged --worktree -- \
-  config/quality/gate-tests.properties \
-  docs/discovery/capability-map.md \
-  workflow/src/main/kotlin/bidvector/workflow/collection/ClaimedSourceTotal.kt \
-  workflow/src/main/kotlin/bidvector/workflow/collection/OpeningSampleFramer.kt \
-  workflow/src/test/kotlin/bidvector/workflow/collection/OpeningListResumeTotalTest.kt \
-  reports/evidence/m11/opening-resume-total
+git restore --source=32dead40 --staged --worktree -- $(git diff --name-only 32dead40..HEAD)
 ```
+
+**목록을 손으로 적지 않는다.** r0 판은 경로를 축어로 나열했고, r1 이 KDoc 두 파일을 in_scope 로 들였을 때
+그 목록이 따라가지 못해 ③ 이 **부분집합만** 검사했다(그 라운드에서 잡아 고쳤다). 지금은 복원 목록이
+`git diff --name-only` 유도이고, 아래 ③′ 이 **전체 트리**로 다시 받는다.
+
+이 라운드의 유도 결과는 **11 경로**다 — 수정 여섯(`gate-tests.properties`·`capability-map.md`·
+`ClaimedSourceTotal.kt`·`CollectNoticesUseCase.kt`·`OpeningSampleFramer.kt`·`SourceAccountingTally.kt`)과
+신설 다섯(test 하나 + 장부 넷).
+
 
 배선 변경이 없어 **비활성화 스위치는 없다** — 되돌리면 개찰결과 목록 슬롯이 공유 누산기의 「마지막 값」
 거동으로 돌아가고, 재개 첫 쪽의 `0` 이 다시 앞 배치의 총수를 덮는다.
 
 ## 목록 등식
 
-목록은 **기계 산출**이다 — `git diff --name-status 32dead40..HEAD` 가 여덟 경로를 낸다(M 넷 · A 넷).
-`comm -23 <변경 경로> <복원 목록>` **빈 출력**: 변경된 경로가 복원 목록에서 빠진 것이 없다.
+목록이 **유도**이므로 「변경 경로 ⊄ 복원 목록」은 구성상 불가능하다 — 등식은 자동으로 선다. 그래서 이
+문서가 재는 것은 등식이 아니라 **그 유도가 옳은 집합을 가리키는가**이고, 그 답은 아래 ③′ 이다.
 
-**빈 등식만으로는 건전하지 않다**(「내가 커밋하지 않아도 경로가 들어오는가」). 그래서 반대 방향도 봤다 —
-병합(`e19e7eda`)이 들여온 셋(`README.md`·`milestone-10.md`·`milestone-11.md`)은 원천 자신의 내용이라 이
-범위에 **나타나지 않고**, 복원 목록에도 없다(내가 쓴 것이 아니므로 없어야 맞다).
+**빈 등식만으로는 건전하지 않다**(「내가 커밋하지 않아도 경로가 들어오는가」). 반대 방향도 봤다 —
+병합(`e19e7eda`)이 들여온 셋(`README.md`·`milestone-10.md`·`milestone-11.md`)은 원천 자신의 내용이라
+`32dead40..HEAD` 에 **나타나지 않고**, 따라서 복원 목록에도 없다(내가 쓴 것이 아니므로 없어야 맞다).
 
 ## ①~⑥ 실측 (버릴 clone)
 
@@ -49,11 +53,12 @@ git restore --source=32dead40 --staged --worktree -- \
 | 단계 | 재는 것 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 종료 코드 | **0** |
-| ② | 복원 뒤 상태 계수 | **`D` 4 · `M` 4** — 신설 넷(test 하나 + 장부 셋)이 지워지고 수정 넷이 되돌려졌다 |
+| ② | 복원 뒤 상태 계수 | **`D` 5 · `M` 6** — 신설 다섯(test 하나 + 장부 넷)이 지워지고 수정 여섯이 되돌려졌다 |
 | ③ | **트리 동일성** — 그 경로들이 원천과 같은가 | `git diff 32dead40 -- <경로들>` **빈 출력** |
-| ④ | compile | 전건 안에서 **초록 · 그러나 실행은 아니다** — compile task 23 개가 전부 `FROM-CACHE`/`UP-TO-DATE` 이고 **접미 없이 실행된 compile 은 0 개**다. cache 적중은 「이 입력이 이미 컴파일된 적 있다」는 뜻이라 ③ 의 결과(원천과 바이트 같은 트리)와 **같은 사실**이고, 그 이상은 아니다 |
-| ⑤ | test | **실행했다** — 전건에서는 `:workflow:test` 도 `FROM-CACHE` 였으므로 같은 clone 에서 `:workflow:test --rerun` 을 따로 돌려 **접미 없이 실행**시켰다. exit 0 · workflow **85 클래스 762 통과·실패 0** |
-| ⑥ | 게이트 | `./gradlew --no-daemon check` **exit 0 · `FAILED` 0 줄** · 433 task 중 **278 실행** — 부분 게이트로 갈음하지 않았다 |
+| ③′ | **전체 트리** — 원천과 다른 경로가 하나라도 남는가 | `git diff --name-only 32dead40` **빈 출력**. ③ 은 복원 목록 안만 보므로 목록이 틀리면 함께 틀린다 — ③′ 은 목록 밖에서 받는다 |
+| ④ | compile | 전건 안에서 **초록 · 그러나 실행은 아니다**(compile task 전부 cache/UP-TO-DATE). cache 적중은 「이 입력이 이미 컴파일된 적 있다」는 뜻이라 ③′ 과 **같은 사실**이고 그 이상은 아니다 |
+| ⑤ | test | **실행했다** — 전건에서는 `:workflow:test` 가 `FROM-CACHE` 였으므로 같은 clone 에서 `--rerun` 을 따로 돌려 **접미 없이 실행**시켰다. exit 0 · workflow **85 클래스 762 통과·실패 0** |
+| ⑥ | 게이트 | `./gradlew --no-daemon check` **exit 0 · `FAILED` 0 줄** — 부분 게이트로 갈음하지 않았다 |
 
 **조용한 초록을 초록으로 적지 않는다.** ④ 와 ⑤ 는 전건에서 둘 다 cache 적중이었고, 그 가운데 거동을
 재는 ⑤ 만 강제 실행으로 바꿨다. ④ 를 실행으로 바꾸지 않은 이유는 그 축이 ⑤ 의 전제라는 것이다 — test 가
@@ -68,10 +73,12 @@ git restore --source=32dead40 --staged --worktree -- \
 | --- | --- | --- |
 | 내 것 — capability map 의 이 slice 절 제목 | 0 | **0** |
 | 내 것 — `gate-tests.properties` 의 이 slice test 등재 | 0 | **0** |
+| 내 것 — 공유 누산기 KDoc 의 이 slice 문면 둘 | 0 | **0** (원천 문면 「두 수집 갈래가 공유한다」가 **1** 로 돌아왔다) |
 | 내 것 — 신설 test 파일 존재 | 0 | **0** |
 | 남의 것 — capability map 의 M10/10D 절 제목 | 보존 | **2** |
 | 남의 것 — `gate-tests.properties` 의 형제 갈래 등재 | 보존 | **1** |
 | 남의 것 — 형제 갈래 test 파일 존재 | 보존 | **1** |
+| 남의 것 — 공유 누산기 **파일** 존재(내 것이 아니다) | 보존 | **1** |
 | 계수 차 — workflow test **클래스·test 수** | 판정 트리보다 각 1 적다 | **85 / 762**(판정 트리 **86 / 763**) |
 
 「내 표지 0」과 「남의 표지 보존」을 **둘 다** 셌다. 표지는 어휘 grep 이 아니라 **항목**(절 제목·등재 키·
@@ -81,6 +88,12 @@ git restore --source=32dead40 --staged --worktree -- \
 그 하나가 이 slice 의 것이다(그 결과 XML 이 복원 트리에 **없다**). 파일 존재 계수와 달리 이것은
 **게이트가 실제로 돌려 센 수**라, 등재를 지우고 파일만 남기는 식의 반쪽 복원과 구별된다.
 
+**표지 하나가 거짓 통과를 냈고 그것도 적는다.** 공유 누산기 KDoc 표지를 처음에 `grep -c "세** 수집 …"`
+으로 쟀는데, 문면의 굵게 표시 `**` 가 **정규식으로 읽혀** 복원 트리에서 `1` 이 나왔다 — 「내 표지가 남았다」로
+보이는 값이었다. 고정 문자열(`grep -cF`)로 다시 재서 내 문면 둘이 `0`, 원천 문면이 `1` 임을 확인했다.
+표지를 **어휘 grep** 으로 재면 이렇게 조용히 틀린다는 선례가 하나 더 선 셈이고, 이 판의 진짜 근거는
+표지가 아니라 ③′ 의 전체 트리 동일성이다.
+
 ## 이 실측의 유효성 술어
 
 실측 HEAD 와 판정 SHA 는 **영원히 다르다**(장부 커밋이 언제나 뒤에 온다). 그래서 대조하는 것은 둘의
@@ -88,7 +101,8 @@ git restore --source=32dead40 --staged --worktree -- \
 
 - `git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 복원 목록>` 이 **빈 출력**이면 유효하다.
 - 한 줄이라도 나오면 미검증이다. **예외는 하나뿐이다** — 나온 경로가 전부 **복원 원천에 없는 신설 파일**일
-  때다. 이 slice 에서 그 사이에 오는 커밋은 **이 파일을 담은 장부 커밋 하나**이고, 그 파일은 원천
-  `32dead40` 에 **없다**. 열거와 원천 부재 확인은 verifier 가 한다(이 문서는 전칭식만 적는다).
+  때다. 그 사이에 오는 것은 **신설 장부 커밋**뿐이고 그것이 움직이는 경로는 원천 `32dead40` 에 **없는
+  신설 장부**다. **계수를 여기 적지 않는다** — r0 판이 「커밋 하나」라 적었다가 뒤에 커밋이 하나 더 와서
+  틀렸다(v r1 등재). 라운드마다 달라지는 수라 전칭식만 적고, 열거와 원천 부재 확인은 verifier 가 한다.
 - `git rev-list --merges <실측 HEAD>..<판정 SHA>` 도 **빈 출력**이어야 한다. main 병합(`e19e7eda`)은 실측
   **앞**에 두었으므로 이 술어가 선다.
