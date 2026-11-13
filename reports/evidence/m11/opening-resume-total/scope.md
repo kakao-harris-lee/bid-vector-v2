@@ -49,7 +49,8 @@
 - `workflow/src/main/kotlin/bidvector/workflow/collection/ClaimedSourceTotal.kt` — **KDoc 만**(D-2, 거동 0)
 - `workflow/src/test/kotlin/bidvector/workflow/collection/OpeningListResumeTotalTest.kt` — **새 파일**, RED(D-3)
 - `config/quality/gate-tests.properties` — 그 test 클래스 등재(D-3)
-- `docs/discovery/capability-map.md` — §12.3 에 이 slice 의 하위 절 **(k)**
+- `docs/discovery/capability-map.md` — §12.3 **끝에 이 slice 의 하위 절 하나를 덧붙임**(절 글자는
+  병합 순서가 정한다 — 팀장 계약 변경 2026-11-13)
 - `reports/evidence/m11/opening-resume-total/**`
 
 ## out_scope

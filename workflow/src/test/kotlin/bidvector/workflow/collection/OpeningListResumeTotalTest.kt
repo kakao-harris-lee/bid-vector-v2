@@ -64,7 +64,11 @@ class OpeningListResumeTotalTest {
                 if (cursor == null) {
                     openingListBatch(
                         listOf(openingListRow("W1"), openingListRow("W2")),
-                        claimedTotalAccounting(received = 2, sourceTotal = 7, truncationCause = TruncationCause.MaxPages),
+                        claimedTotalAccounting(
+                            received = 2,
+                            sourceTotal = 7,
+                            truncationCause = TruncationCause.MaxPages,
+                        ),
                         next = PageCursor("51"),
                     )
                 } else {

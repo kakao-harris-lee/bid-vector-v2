@@ -9,7 +9,8 @@ package bidvector.workflow.collection
  *
  * **같은 누산기로 걷는 수집 갈래는 셋이고, 이제 셋이 다 이 자리를 부른다** — 공고 목록
  * ([CollectNoticesUseCase])·낙찰 목록([CollectAwardListUseCase])·개찰결과 목록([OpeningSampleFramer]).
- * 셋째는 M11/11A 가 받았다(`OPEN-M10-OPENING-LIST-RESUME-TOTAL` 닫힘 · capability map §12.3 (k)).
+ * 셋째는 M11/11A 가 받았다(`OPEN-M10-OPENING-LIST-RESUME-TOTAL` 닫힘 · capability map §12.3 의 그 절 —
+ * **절 글자는 병합 순서가 정하므로 적지 않는다**).
  * 복제하지 않는 것은 중복 금지 규율이기도 하지만, 공유 누산기를 최댓값으로 올리는 날 **걷을 자리가
  * 하나**여야 하기 때문이다.
  *
