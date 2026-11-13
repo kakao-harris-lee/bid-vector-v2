@@ -46,6 +46,74 @@ export const VOCABULARY_DECLARATIONS = [
   'display/timeDisplay.ts#instantDisplayOf',
 ];
 
+/**
+ * 어휘 모듈이 내보내는 함수 가운데 **어휘가 아닌 것**과 그 사유.
+ *
+ * [VOCABULARY_DECLARATIONS] 는 손목록이고, 그것이 앞 판의 마지막 구멍이었다 — 표시 모듈에 어휘
+ * 함수를 더해 그것만 쓰면 목록 밖이라 의무가 안 난다. 목록을 「표시 모듈의 내보낸 함수 전부」로
+ * 넓히는 길은 M9 에서 실측됐고 의무 집합이 5 → 13 이 되며 질의 목이 필요한 패널·훅을 삼킨다.
+ *
+ * 그래서 **집합을 넓히지 않고 목록이 뒤처지는 축만** 등식으로 막는다 — 어휘 모듈의 내보낸 함수
+ * 전수 == 등재 ∪ 이 표. 새 함수는 분류될 때까지 붉다.
+ *
+ * **이 등식의 모집단은 [VOCABULARY_MODULES] 셋뿐이다**(r1 F1). `src/display/` 에는 표시 모듈이
+ * 열넷 있고, 나머지 열하나에 어휘를 감싼 함수를 더해 화면이 그것을 그리면 이 등식도 의무 집합도
+ * 그것을 보지 못한다 — 그 축은 `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB` 로 **경계 등재**했다
+ * (닫는 길은 파일 사이 폐포이고, 실측하면 오늘의 마운트 목록 밖에 의무 둘을 낳아 승인 경계에
+ * 걸린다).
+ *
+ * 이 표 자신이 다시 열거이므로 종류 하나에는 **구조 의무**가 붙는다([INTERNAL_ASSEMBLER]):
+ * 화면이 그것을 **직접** 참조하면 사유가 거짓이 되고 게이트가 붉어진다. 「직접」이 그 의무의
+ * 범위다 — 표시층 다른 모듈을 지나는 경로는 위 OPEN 의 축이고 이 게이트 밖이다.
+ */
+export const INTERNAL_ASSEMBLER = 'INTERNAL_ASSEMBLER';
+export const OTHER_AXIS = 'OTHER_AXIS';
+
+export const VOCABULARY_MODULE_EXCLUSIONS = [
+  {
+    key: 'display/moneyDisplay.ts#currencyUnitOf',
+    kind: INTERNAL_ASSEMBLER,
+    why: '통화 코드 → 단위 글자. 표시층이 금액 글자를 조립할 때 쓰는 속이고 화면이 직접 부르지 않는다(그 사실만 구조로 잰다)',
+  },
+  {
+    key: 'display/moneyDisplay.ts#amountTextOf',
+    kind: INTERNAL_ASSEMBLER,
+    // **화면이 직접 부르지 않는다는 것이 「화면에 닿지 않는다」는 뜻은 아니다**(r1 F1 실측):
+    // `editSessionDisplay` 의 비공개 `budgetView` 가 이 함수로 금액 글자를 만들고, 그 글자가
+    // `STRATEGY_FIELD_VALUE` 를 지나 `screens/strategyEdit.tsx` 에 그려진다. 그 화면 파일은
+    // 오늘 의무도 화면 바구니도 아니다 — 그 축이 위 머리 주석의 OPEN 이다.
+    why: '숫자와 단위를 한 글자로. 위와 같은 속이고 화면이 직접 부르지 않는다. 표시층 다른 모듈을 지나 화면에 닿는 경로는 이 게이트 밖이다',
+  },
+  {
+    key: 'display/noticeDisplay.ts#noticeStatusDisplayOf',
+    kind: OTHER_AXIS,
+    why: '공고 상태 축 — 이 게이트가 금지하는 어휘(금액 토큰·명령 토큰·시각 원문)가 아니다',
+  },
+  {
+    key: 'display/timeDisplay.ts#daysUntil',
+    kind: OTHER_AXIS,
+    why: '달력일 차를 수로 낸다. 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/timeDisplay.ts#dayCountText',
+    kind: OTHER_AXIS,
+    why: 'D-day 문면. 시각 원문을 그리는 자리가 아니다',
+  },
+  {
+    key: 'display/timeDisplay.ts#localInputToIso',
+    kind: OTHER_AXIS,
+    why: '쓰기 입력 → ISO 변환. 화면 글자가 아니라 요청 본문으로 간다',
+  },
+  {
+    key: 'display/timeDisplay.ts#readClock',
+    kind: OTHER_AXIS,
+    why: '지금을 얻는 승인된 한 입구. 값을 그리지 않는다(D-1)',
+  },
+];
+
+/** 어휘 선언과 제외가 사는 모듈 — 등식의 모집단이다. */
+const VOCABULARY_MODULES = [...new Set(VOCABULARY_DECLARATIONS.map((one) => one.split('#')[0]))];
+
 const SRC_MARKER = '/src/';
 
 /**
@@ -93,8 +161,26 @@ function isExported(node) {
   return (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0;
 }
 
-/** 그 선언의 **자리** — `<src 기준 상대경로>#<이름>`. 이름이 없으면 어휘일 수 없다. */
+/**
+ * 그 선언의 **자리** — `<src 기준 상대경로>#<이름>`.
+ *
+ * `export default <식>` 은 이름이 없지만 **파일당 하나**라 자리를 갖는다(r1 F2). 앞 판은 그
+ * 선언이 `ExportAssignment` 여서 자리를 내지 못했고, 그래서 React 의 표준 꼴
+ * (`export default memo(Card)`)이 의무를 하나도 내지 않았다 — 「심볼 경유는 내보내기의 꼴을
+ * 묻지 않는다」가 그 꼴에 대해 거짓이었다. `export =` 은 모듈 꼴이 달라 대상이 아니다.
+ */
 function declarationKeyOf(declaration) {
+  if (ts.isExportAssignment(declaration)) {
+    return declaration.isExportEquals === true ? undefined : relativeKeyOf(declaration, 'default');
+  }
+  // `export default function (…) {}` · `export default class {}` — 이름이 없어도 **기본
+  // 내보내기는 파일당 하나**라 같은 자리를 쓴다(r1 cr F-2).
+  if (
+    declaration.name === undefined &&
+    (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Default) !== 0
+  ) {
+    return relativeKeyOf(declaration, 'default');
+  }
   const named =
     (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) &&
     declaration.parent !== undefined &&
@@ -102,85 +188,289 @@ function declarationKeyOf(declaration) {
       ? declaration.parent
       : declaration;
   const name = named.name !== undefined && ts.isIdentifier(named.name) ? named.name.text : undefined;
-  if (name === undefined) {
-    return undefined;
-  }
-  const fileName = declaration.getSourceFile().fileName;
+  return name === undefined ? undefined : relativeKeyOf(declaration, name);
+}
+
+function relativeKeyOf(node, name) {
+  const fileName = node.getSourceFile().fileName;
   const marker = fileName.lastIndexOf(SRC_MARKER);
   return marker < 0 ? undefined : `${fileName.slice(marker + SRC_MARKER.length)}#${name}`;
 }
 
 /**
- * 이 호출이 **닿는 선언들**. 시그니처 해소가 먼저다 — 그것이 별칭 변수·네임스페이스 접근·
- * 재수출을 전부 지나 원 선언을 낸다. 해소가 서지 않는 자리(타입 오류가 있는 합성 원문 등)는
- * 심볼의 알리아스 사슬로 한 번 더 본다.
+ * 이 노드가 **참조**로 읽히는 자리면 심볼을 물을 노드, 아니면 `undefined`.
+ *
+ * 원소 접근은 **리터럴 키일 때만** 참조다(r1 F3). 접근식 자체에서는 심볼이 나오지 않고
+ * (`getSymbolAtLocation` 이 `undefined` — 실측) 그 리터럴 자리에서 속성 심볼이 나온다. 계산된
+ * 키는 해소되지 않으며 그것은 위협 모델 경계 밖이다(이름을 런타임에 조립하는 저자).
  */
-function calledDeclarations(checker, call) {
-  const found = [];
-  const signature = checker.getResolvedSignature(call);
-  if (signature !== undefined && signature.declaration !== undefined) {
-    found.push(signature.declaration);
+function referenceNodeOf(node) {
+  if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+    return node;
   }
-  let symbol = checker.getSymbolAtLocation(call.expression);
-  if (symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0) {
-    symbol = checker.getAliasedSymbol(symbol);
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+    return node.argumentExpression;
   }
-  for (const declaration of symbol?.declarations ?? []) {
-    found.push(declaration);
-  }
+  return undefined;
+}
+
+function aliasResolved(checker, symbol) {
+  return symbol !== undefined && (symbol.flags & ts.SymbolFlags.Alias) !== 0
+    ? checker.getAliasedSymbol(symbol)
+    : symbol;
+}
+
+/**
+ * 이 노드가 `wanted` 의 선언에 **닿는가** — 두 길을 함께 본다.
+ *
+ * ⓐ 호출의 **해소된 시그니처**: 별칭 변수·네임스페이스 접근·재수출·지역 변수 경유를 전부 지나
+ * 원 선언을 낸다. ⓑ 맨 **참조**: `ats.map(instantDisplayOf)` 처럼 **부르지 않고 넘기는** 자리는
+ * 해소할 호출이 없으므로 ⓐ 가 보지 못한다(앞 판의 잔여 하나).
+ *
+ * import 선언은 걷지 않는다 — 걷는 시작점이 언제나 **최상위 선언 하나**이고 import 는 그 안에
+ * 없다. 그래서 「들여온 것」이 아니라 「쓰는 것」만 센다.
+ */
+function touchesAnyOf(checker, node, wanted) {
+  let found = false;
+  const hits = (declarations) =>
+    declarations.some((one) => {
+      const key = declarationKeyOf(one);
+      return key !== undefined && wanted.has(key);
+    });
+  const walk = (child) => {
+    if (found) {
+      return;
+    }
+    if (ts.isCallExpression(child)) {
+      const signature = checker.getResolvedSignature(child);
+      if (signature?.declaration !== undefined && hits([signature.declaration])) {
+        found = true;
+        return;
+      }
+    }
+    const reference = referenceNodeOf(child);
+    if (reference !== undefined) {
+      if (hits(aliasResolved(checker, checker.getSymbolAtLocation(reference))?.declarations ?? [])) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(child, walk);
+  };
+  walk(node);
   return found;
 }
 
 /**
- * 한 파일에서 **내보낸 함수 선언** 가운데 표시 어휘를 쓰는 것의 이름.
+ * 이 파일의 **최상위 선언** — 함수·클래스·변수·기본 내보내기·구조분해 바인딩. 자리를 키로 든다.
  *
- * 화살표 함수를 `export const` 로 내보내는 꼴도 받는다 — 이 저장소의 화면 파일은 함수 선언을
- * 쓰지만, 규약 하나에 기대면 그 규약을 벗는 날 게이트가 조용해진다.
+ * 구조분해 바인딩이 노드인 사유(r1 F3): `const { instantDisplayOf: fmt } = display` 뒤에 `fmt` 를
+ * **넘기면** 그 참조가 닿는 선언은 바인딩이고, 바인딩이 그래프에 없으면 거기서 끊겼다. 바인딩
+ * 자신은 어휘를 직접 쥐므로 노드가 되는 순간 닿기가 선다.
  */
-export function vocabularyComponentsOf(program, source) {
-  const checker = program.getTypeChecker();
-  const wanted = new Set(VOCABULARY_DECLARATIONS);
-  const found = [];
-  const consider = (name, node) => {
-    if (name === undefined) {
+function topLevelDeclarationsOf(source) {
+  const byKey = new Map();
+  const register = (declaration) => {
+    const key = declarationKeyOf(declaration);
+    if (key !== undefined) {
+      byKey.set(key, declaration);
+    }
+  };
+  const registerBindings = (name) => {
+    if (ts.isIdentifier(name)) {
       return;
     }
-    let uses = false;
-    const walk = (child) => {
-      if (!uses && ts.isCallExpression(child)) {
-        for (const declaration of calledDeclarations(checker, child)) {
-          const key = declarationKeyOf(declaration);
-          if (key !== undefined && wanted.has(key)) {
-            uses = true;
-            break;
-          }
-        }
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) {
+        register(element);
+        registerBindings(element.name);
       }
-      ts.forEachChild(child, walk);
-    };
-    walk(node);
-    if (uses) {
-      found.push(name);
     }
   };
   ts.forEachChild(source, (node) => {
-    if (ts.isFunctionDeclaration(node) && isExported(node)) {
-      consider(node.name?.text, node);
+    if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+      // 이름이 없어도 **기본 내보내기**면 자리가 나온다 — [declarationKeyOf] 가 판정한다.
+      register(node);
       return;
     }
-    if (ts.isVariableStatement(node) && isExported(node)) {
-      for (const declaration of node.declarationList.declarations) {
-        if (
-          ts.isIdentifier(declaration.name) &&
-          declaration.initializer !== undefined &&
-          (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
-        ) {
-          consider(declaration.name.text, declaration);
+    if (ts.isExportAssignment(node)) {
+      register(node);
+      return;
+    }
+    if (ts.isVariableStatement(node)) {
+      for (const one of node.declarationList.declarations) {
+        if (ts.isIdentifier(one.name)) {
+          register(one);
+        } else {
+          registerBindings(one.name);
         }
       }
     }
   });
-  return found;
+  return byKey;
+}
+
+/** 이 선언이 가리키는 **같은 파일의 다른 최상위 선언** — 그래프의 변이다(JSX 태그도 식별자다). */
+function localEdgesOf(checker, declaration, source, byKey) {
+  const edges = new Set();
+  const selfKey = declarationKeyOf(declaration);
+  const walk = (child) => {
+    if (ts.isIdentifier(child)) {
+      for (const one of aliasResolved(checker, checker.getSymbolAtLocation(child))?.declarations ?? []) {
+        const key = one.getSourceFile() === source ? declarationKeyOf(one) : undefined;
+        if (key !== undefined && key !== selfKey && byKey.has(key)) {
+          edges.add(key);
+        }
+      }
+    }
+    ts.forEachChild(child, walk);
+  };
+  walk(declaration);
+  return edges;
+}
+
+/**
+ * 어휘에 닿는 최상위 선언 — 직접이거나, **같은 파일의 다른 선언을 지나** 닿는다.
+ *
+ * 깊이 상수를 두지 않고 **고정점**까지 간다(M11/11E, 팀장 결정 2026-11-13). 「한 겹」은 오늘
+ * 실재하는 유일한 간접 렌더를 닫지 못한다 — 그 사슬이 화면 → 행 묶음 → 행 → 어휘로 **두 겹**
+ * 이다. 상호 재귀가 있어도 끝난다(이미 든 것은 다시 세지 않는다).
+ */
+function reachingVocabulary(checker, source, byKey, wanted) {
+  const edges = new Map();
+  const reaching = new Set();
+  for (const [key, declaration] of byKey) {
+    edges.set(key, localEdgesOf(checker, declaration, source, byKey));
+    if (touchesAnyOf(checker, declaration, wanted)) {
+      reaching.add(key);
+    }
+  }
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [key, next] of edges) {
+      if (!reaching.has(key) && [...next].some((one) => reaching.has(one))) {
+        reaching.add(key);
+        grew = true;
+      }
+    }
+  }
+  return reaching;
+}
+
+/**
+ * 의무로 나는 **이름**. 보통은 내보낸 이름 그대로인데, **기본 내보내기만 파일로 한정한다**
+ * (r1 v R2 · cr N-2).
+ *
+ * 사유: 의무 집합과 화면 바구니는 **이름으로** 중복을 없앤다. 기본 내보내기의 이름은 파일마다
+ * `default` 로 같으므로, 그대로 두면 첫 카드는 게이트를 붉혀 결정을 강제하지만 **둘째부터는
+ * 집합에서 접혀 조용해진다**(실측 — 두 파일에 심어도 의무가 하나였다). 자리는 이미 유일하므로
+ * (`declarationKeyOf` 가 파일당 하나의 `#default` 를 낸다) 그것을 이름으로 쓴다.
+ *
+ * 그 밖의 이름은 바꾸지 않는다 — `GATE_MOUNTED_CARDS` 와의 등식이 오늘 쓰는 이름 공간이고,
+ * 오늘 `src/` 의 기본 내보내기는 **0 건**이라 이 한정은 그 등식을 움직이지 않는다.
+ */
+function obligationNameOf(exported, declaration) {
+  return exported.getName() === 'default'
+    ? (relativeKeyOf(declaration, 'default') ?? 'default')
+    : exported.getName();
+}
+
+/**
+ * 한 파일에서 **내보낸 이름** 가운데 표시 어휘를 그리는 것.
+ *
+ * 내보내기를 **심볼로** 받는다(`getExportsOfModule`) — 앞 판은 `export` 수식자가 붙은 함수 선언·
+ * 화살표 초기값만 열거했고, 그래서 감싸 내보내기(`memo`·`forwardRef` — 초기값이 호출이다) ·
+ * 개명 재수출(`export { Inner as Card }`) · 클래스 컴포넌트가 전부 의무를 내지 않았다. 심볼
+ * 경유는 내보내기의 **꼴을 묻지 않는다**.
+ *
+ * 나는 이름은 **내보낸 이름**이다 — DOM 게이트가 마운트할 이름이 그것이고, 개명 재수출에서
+ * 선언의 이름과 갈린다.
+ *
+ * 비공개 선언 자신은 목록에 들지 않는다(마운트 대상이 아니다). 바뀐 것은 「그것을 그리는 겉이
+ * 의무가 되는가」이고, 그 답이 이제 예다.
+ */
+export function vocabularyComponentsOf(program, source) {
+  const checker = program.getTypeChecker();
+  const byKey = topLevelDeclarationsOf(source);
+  const reaching = reachingVocabulary(checker, source, byKey, new Set(VOCABULARY_DECLARATIONS));
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  const names = new Set();
+  for (const exported of moduleSymbol === undefined ? [] : checker.getExportsOfModule(moduleSymbol)) {
+    for (const declaration of aliasResolved(checker, exported).declarations ?? []) {
+      const key = declaration.getSourceFile() === source ? declarationKeyOf(declaration) : undefined;
+      if (key !== undefined && reaching.has(key)) {
+        names.add(obligationNameOf(exported, declaration));
+      }
+    }
+  }
+  return [...names];
+}
+
+/**
+ * 그 어휘 모듈이 내보내는 **부를 수 있는 것**의 자리 전수.
+ *
+ * **꼴이 아니라 타입을 묻는다**(r1 cr F-1). 앞 판은 「함수 선언 또는 화살표·함수 표현식 초기값」
+ * 이라는 **열거**였고, 그래서 `export const f = build('x')` 같은 커링·감싸기가 등식 밖으로 샜다
+ * (통제군이 서는 실측 — 화살표 꼴은 잡히고 커링은 안 잡혔다). 그것은 이 slice 가 화면 쪽에서
+ * 바로 지운 조건이라 같은 자리에 남겨 둘 수 없다. 호출 시그니처가 하나라도 있으면 「부를 수
+ * 있는 것」이고, `memo(…)`·커링·`as` 단언 꼴이 함께 들어온다.
+ */
+function exportedFunctionKeysOf(checker, program, webRoot, relative) {
+  const source = program.getSourceFile(resolve(webRoot, 'src', relative));
+  if (source === undefined) {
+    // 모듈이 프로그램에 없으면 등식이 **공허하게** 통과한다 — 그 길을 두지 않는다.
+    throw new Error(`TS 프로그램에 어휘 모듈이 없다: ${relative}`);
+  }
+  const moduleSymbol = checker.getSymbolAtLocation(source);
+  const keys = [];
+  for (const exported of moduleSymbol === undefined ? [] : checker.getExportsOfModule(moduleSymbol)) {
+    const type = checker.getTypeOfSymbolAtLocation(aliasResolved(checker, exported), source);
+    if (type.getCallSignatures().length > 0) {
+      keys.push(`${relative}#${exported.getName()}`);
+    }
+  }
+  return keys;
+}
+
+/**
+ * 등재 표의 **구멍 셋**(M11/11E — 새 어휘 함수 축).
+ *
+ * `unclassified` 어휘 모듈이 내보내는 함수인데 등재도 제외도 아닌 것 — 새 어휘 함수가 조용히
+ * 의무 밖에 서는 자리다. `stale` 제외 표에 적혀 있는데 이제 그 모듈의 내보낸 함수가 아닌 것 —
+ * 사유가 가리키는 대상이 사라진 자리다. `leaked` [INTERNAL_ASSEMBLER] 로 제외한 것을 화면이
+ * **직접 참조**하는 자리 — 「표시층 속이라 화면이 안 쓴다」는 사유가 거짓이 된 자리다.
+ *
+ * 화면 훑기를 **프로그램에서** 받는다(파일시스템이 아니라) — 합성 원문으로 양성 대조를 세울 수
+ * 있어야 하고, 둘이 어긋나지 않는 것은 [collectScreenVocabulary] 가 던져서 지킨다.
+ */
+export function vocabularyRegistryGaps(program, webRoot) {
+  const checker = program.getTypeChecker();
+  const classified = new Set([...VOCABULARY_DECLARATIONS, ...VOCABULARY_MODULE_EXCLUSIONS.map((one) => one.key)]);
+  const exported = new Set(
+    VOCABULARY_MODULES.flatMap((relative) => exportedFunctionKeysOf(checker, program, webRoot, relative)),
+  );
+  const assemblers = new Set(
+    VOCABULARY_MODULE_EXCLUSIONS.filter((one) => one.kind === INTERNAL_ASSEMBLER).map((one) => one.key),
+  );
+  const screensDir = resolve(webRoot, 'src', 'screens');
+  const leaked = [];
+  for (const source of program.getSourceFiles()) {
+    if (!source.fileName.startsWith(`${screensDir}/`) || /\.test\.tsx?$/u.test(source.fileName)) {
+      continue;
+    }
+    for (const declaration of topLevelDeclarationsOf(source).values()) {
+      if (touchesAnyOf(checker, declaration, assemblers)) {
+        leaked.push(source.fileName.slice(screensDir.length + 1));
+      }
+    }
+  }
+  return {
+    unclassified: [...exported].filter((one) => !classified.has(one)).sort(),
+    stale: VOCABULARY_MODULE_EXCLUSIONS.map((one) => one.key)
+      .filter((one) => !exported.has(one))
+      .sort(),
+    leaked: [...new Set(leaked)].sort(),
+  };
 }
 
 /** 게이트가 마운트한다고 **선언한** 목록을 AST 로 읽는다(문자열 grep 은 주석 한 줄로 열린다). */

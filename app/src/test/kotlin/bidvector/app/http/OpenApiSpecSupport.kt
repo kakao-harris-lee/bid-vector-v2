@@ -27,8 +27,10 @@ internal fun loadOpenApiSpec(): Map<String, Any?> {
  * **중복 키를 거부한다**(code-review r3 Q3 · 계약 D-7D-6). SnakeYAML 의 기본값은
  * `allowDuplicateKeys = true` 라, 같은 키가 둘 있으면 **뒤 값이 조용히 이긴다**.
  *
- * 그 침묵은 이 로더를 쓰는 **세 계약 test 의 집합 등식**을 비대칭으로 만든다: 중복이 목록을
+ * 그 침묵은 이 로더를 쓰는 **계약 test 들의 집합 등식**을 비대칭으로 만든다: 중복이 목록을
  * 좁히면 등식이 RED 로 떨어지지만(fail-closed), 넓히거나 원래 선언을 살리면 **초록이다**.
+ * (수를 적지 않는 이유는 이 파일 머리말과 같다 — 하드코딩한 계수는 소비자가 늘면서 조용히
+ * 낡는다. 앞 판이 여기 「세」라고 적었고 실측과 어긋났다.)
  * 수정 r2 의 변이 M27 이 정확히 그 경우였다 — 이미 `security:` 를 가진 operation 에 둘째
  * `security:` 를 더했는데 원래 선언이 이겨 문서가 바뀌지 않았고, 변이가 초록이 됐다. 그래서
  * 그 라운드는 「문서에 선언을 **더하는** 변이는 판정 근거로 쓰지 않는다」는 **우회책**을 적었다.
@@ -70,29 +72,115 @@ internal fun Map<String, Any?>.requiredKeys(schemaName: String): Set<String> =
  * 수를 적지 않는 이유는 위 머리말과 같다 — 하드코딩한 계수는 소비자가 늘면서 조용히 낡는다.
  * 앞 판이 여기 「세」라고 적었고 실측과 어긋났다(cr r0 L-1).
  */
-@Suppress("UNCHECKED_CAST")
 internal fun Map<String, Any?>.propertyEnum(
     schemaName: String,
     property: String,
 ): List<String> {
+    val subject = propertySubject(schemaName, property)
+    return declaredEnum(subject, propertyDefinition(schemaName, property)).asVocabulary(subject)
+}
+
+/**
+ * `null` 을 **어휘에 함께 싣는** 칸의 읽기(M11/11B — 타임라인의 출발 상태). 돌려주는 것은
+ * `null` 을 뺀 어휘다 — 집합 등식의 반대쪽(도메인 열거)에 그 값과 맞댈 원소가 없다.
+ *
+ * `nullable: true` 와 열거의 `null` 원소는 **함께** 서야 한다. 하나만 있으면 선언이 실제로
+ * 나가는 값과 어긋난다 — 원소가 없으면 엄격한 검증기가 나가는 `null` 을 거부하고, `nullable`
+ * 이 없으면 선언이 나르지 않는 값을 어휘가 허용한다. 그래서 둘을 **함께** 요구한다.
+ */
+internal fun Map<String, Any?>.nullablePropertyEnum(
+    schemaName: String,
+    property: String,
+): List<String> {
+    val subject = propertySubject(schemaName, property)
+    val definition = propertyDefinition(schemaName, property)
+    val declared = declaredEnum(subject, definition)
+    require(declared.any { it == null }) {
+        "$subject: enum 이 null 을 싣지 않았다 — 실제로 나가는 null 을 엄격한 검증기가 거부한다"
+    }
+    require(definition["nullable"] == true) {
+        "$subject: nullable 선언이 없다 — 어휘가 실은 null 을 선언이 나르지 않는다"
+    }
+    return declared.filterNotNull().asVocabulary(subject)
+}
+
+/**
+ * **질의 인자**의 닫힌 어휘(M11/11B — 건 목록의 상태 탭). 응답 스키마 쪽 [propertyEnum] 과 같은
+ * fail-closed 성질을 쓴다: 인자가 하나로 선언되지 않았거나 `schema`·`enum` 이 없거나 열거가 비었
+ * 거나 문자가 아니면 **던진다**. 읽기가 빈 목록을 답으로 내면 그 칸을 쓰는 집합 등식이 공허하게
+ * 초록이 된다.
+ *
+ * **이것도 사본을 지우지는 않는다**(cr r1 LOW). 같은 모양의 `private` 사본이 여럿 있고
+ * (`["parameters"]` 읽기 호출부를 찾아 센다) 이 함수는 그것들을 대신하지 않으므로 구현은 한 벌
+ * 늘었다 — **공용 자리에** 두어 호출자가 자기 사본을 또 쓰지 않게 하는 것이 여기 두는 이유다
+ * (v2-지침서 §5 「중복 금지」). 기존 사본을 이 자리로 모으는 것은 별 정리로 남는다(응답 쪽 어휘
+ * 읽기와 같은 처지이고 evidence 의 알려진 제한에 등재돼 있다).
+ */
+@Suppress("UNCHECKED_CAST")
+internal fun Map<String, Any?>.queryParameterEnum(
+    path: String,
+    method: String,
+    name: String,
+): List<String> {
+    // 탐색의 세 홉도 fail-closed 다(cr r1 LOW) — 맨 캐스트는 경로·method 가 없을 때 읽을 수 없는
+    // 캐스트 오류를 내고, 그 실패는 「문서가 그 자리를 잃었다」를 말해 주지 않는다.
+    val paths = requireNotNull(this["paths"] as? Map<String, Any?>) { "문서에 paths 가 없다" }
+    val pathItem = requireNotNull(paths[path] as? Map<String, Any?>) { "문서에 경로 $path 가 없다" }
+    val operation = requireNotNull(pathItem[method] as? Map<String, Any?>) { "$path 에 $method 이 없다" }
+    val declaredAt = "$method $path"
+    val parameter =
+        requireNotNull(
+            (operation["parameters"] as? List<Map<String, Any?>>)
+                .orEmpty()
+                .filter { it["in"] == "query" }
+                .singleOrNull { it["name"] == name },
+        ) { "$declaredAt 의 질의 인자 $name 이 하나로 선언되지 않았다" }
+    val subject = "$declaredAt 의 질의 인자 $name"
+    val schema = requireNotNull(parameter["schema"] as? Map<String, Any?>) { "$subject: schema 가 없다" }
+    return declaredEnum(subject, schema).asVocabulary(subject)
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun Map<String, Any?>.propertyDefinition(
+    schemaName: String,
+    property: String,
+): Map<String, Any?> {
     val properties = schema(schemaName)["properties"] as Map<String, Any?>
-    val definition =
-        requireNotNull(properties[property] as? Map<String, Any?>) {
-            "$schemaName 의 $property 칸이 선언되지 않았다"
-        }
-    val declared =
-        requireNotNull(definition["enum"] as? List<*>) {
-            "$schemaName 의 $property 칸이 enum 을 선언하지 않았다 — 닫힌 어휘가 열린 string 으로 돌아갔다"
-        }
-    require(declared.isNotEmpty()) { "$schemaName 의 $property 칸 enum 이 비었다" }
-    // 소거 때문에 `as? List<String>` 은 비문자 열거(`enum: [1, 2]`)도 통과시킨다 — 그러면 집합
-    // 등식이 Int 와 String 을 비교해 읽을 수 없는 실패를 낸다(cr r0 L-3). 여기서 가른다.
-    return declared.map { element ->
-        requireNotNull(element as? String) {
-            "$schemaName 의 $property 칸 enum 에 문자열이 아닌 값이 있다: $element"
-        }
+    return requireNotNull(properties[property] as? Map<String, Any?>) {
+        "$schemaName 의 $property 칸이 선언되지 않았다"
     }
 }
+
+/**
+ * 실패 문면의 **주체**. 응답 스키마의 칸과 질의 인자는 선언 꼴이 달라 같은 낱말로 부를 수 없다
+ * (cr r1 LOW — 질의 인자를 「칸」이라고 부르면 문서에서 그 자리를 못 찾는다). 아래 읽기들은 이
+ * 주체 문구를 받아 쓰고, 자기가 낱말을 고르지 않는다.
+ */
+private fun propertySubject(
+    schemaName: String,
+    property: String,
+): String = "$schemaName 의 $property 칸"
+
+private fun declaredEnum(
+    subject: String,
+    definition: Map<String, Any?>,
+): List<*> {
+    val declared =
+        requireNotNull(definition["enum"] as? List<*>) {
+            "$subject: enum 을 선언하지 않았다 — 닫힌 어휘가 열린 string 으로 돌아갔다"
+        }
+    require(declared.isNotEmpty()) { "$subject: enum 이 비었다" }
+    return declared
+}
+
+// 소거 때문에 `as? List<String>` 은 비문자 열거(`enum: [1, 2]`)도 통과시킨다 — 그러면 집합
+// 등식이 Int 와 String 을 비교해 읽을 수 없는 실패를 낸다(cr r0 L-3). 여기서 가른다.
+private fun List<*>.asVocabulary(subject: String): List<String> =
+    map { element ->
+        requireNotNull(element as? String) {
+            "$subject: enum 에 문자열이 아닌 값이 있다 ($element)"
+        }
+    }
 
 /**
  * D-6A3-20 — `paths.<path>.<method>.responses` 의 상태

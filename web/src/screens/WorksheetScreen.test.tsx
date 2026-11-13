@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { stateDisplayOf } from '../display/caseDisplay';
 
 import { WorksheetScreen } from './WorksheetScreen';
 
@@ -770,5 +771,76 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     const timeline = await screen.findByTestId('timeline');
     expect(timeline.textContent).toContain('입찰함에 담음');
     expect(timeline.textContent, '명령 토큰 원문이 그대로 섰다').not.toContain('ADD_TO_BID_BOX');
+  });
+
+  /**
+   * **상태 문면도 표시 모듈의 공용 조회를 지난다**(M11/11B D-11B-3). 앞 판은 이 화면만 자기
+   * 폴백을 적어, 표 밖 값에 서버가 준 코드를 문면 자리에 **그대로** 세웠다 — 그러면 화면이
+   * 계약에 없는 상태를 아는 것처럼 보인다.
+   *
+   * 표 밖 값은 계약이 어휘를 닫은 뒤로 **타입으로 만들 수 없다**(그것이 닫은 요점이다). 그래서
+   * `string` 에서 좁혀 세운다 — 그 값이 닿는 경로는 배포 비틀림 하나다. 기댓값을 공용 조회에서
+   * 끌어오므로 이 단언은 **「두 자리가 같은 문면을 낸다」**를 재고, 화면이 자기 폴백으로 되돌아
+   * 가면 그 자리에서 멈춘다.
+   */
+  it('표 밖 상태는 공용 조회의 문면으로 선다 — 코드 원문이 아니다', async () => {
+    const outOfVocabulary: string = 'ON_HOLD';
+    mocked.readTimeline.mockResolvedValue([
+      {
+        caseVersion: 0,
+        fromState: null,
+        toState: outOfVocabulary as queries.BidTimelineEntry['toState'],
+        command: 'ADD_TO_BID_BOX',
+        actorKind: 'USER',
+        retroactive: false,
+        occurredAt: '2026-10-29T05:00:00Z',
+      },
+    ]);
+    renderScreen();
+
+    const timeline = await screen.findByTestId('timeline');
+    expect(timeline.textContent, '타임라인이 공용 조회 자리를 지나지 않았다').toContain(
+      stateDisplayOf(outOfVocabulary).label,
+    );
+  });
+
+  /**
+   * **화살표 줄의 두 조회도 같은 자리를 지난다**(v M-1 · cr MEDIUM-1). 위 단언은 머리의 도착
+   * 상태 하나만 보았고, 출발 → 도착 줄은 **생성 전이가 아닐 때만** 그려지므로 그 두 조회가
+   * 잠기지 않은 채였다 — 승인된 표시 변경(D-11B-3)의 잠금이 세 자리 가운데 한 자리에만 서 있었다.
+   *
+   * 두 줄로 **양쪽을 따로** 가른다: 표 안 출발 + 표 밖 도착 · 표 밖 출발 + 표 안 도착. 한 줄로
+   * 양쪽을 표 밖으로 두면 한 조회만 되돌려도 다른 조회의 문면이 남아 단언이 통과할 수 있다.
+   *
+   * 기댓값은 **화살표로 이은 통째**다 — 조각으로 재면 머리 줄의 같은 문면이 그 포함을 만족시킨다.
+   * 표본은 도메인이 명시적으로 거부한 어휘 둘이다(「보류」는 어휘에 없다 — 「나중에」와 「건너뜀」
+   * 으로 갈렸다 · 「후보(제안됨/검색됨)」도 이 집합에 없다 — 담는 순간 건이 태어난다). 상류가 그
+   * 이름을 채택해 음성 대조가 조용히 공허해지는 자리를 피한다.
+   */
+  it('화살표 줄의 출발 · 도착도 공용 조회의 문면으로 선다', async () => {
+    const outOfVocabularyTo: string = 'ON_HOLD';
+    const outOfVocabularyFrom: string = 'PROPOSED';
+    const row = (caseVersion: number, fromState: string, toState: string): queries.BidTimelineEntry => ({
+      caseVersion,
+      fromState: fromState as queries.BidTimelineEntry['fromState'],
+      toState: toState as queries.BidTimelineEntry['toState'],
+      command: 'RECORD_BID',
+      actorKind: 'USER',
+      retroactive: false,
+      occurredAt: '2026-10-29T05:00:00Z',
+    });
+    mocked.readTimeline.mockResolvedValue([
+      row(1, 'WATCHING', outOfVocabularyTo),
+      row(2, outOfVocabularyFrom, 'WATCHING'),
+    ]);
+    renderScreen();
+
+    const rows = within(await screen.findByTestId('timeline')).getAllByRole('listitem');
+    expect(rows[0]?.textContent, '도착 쪽 조회가 공용 자리를 지나지 않았다').toContain(
+      `${stateDisplayOf('WATCHING').label} → ${stateDisplayOf(outOfVocabularyTo).label}`,
+    );
+    expect(rows[1]?.textContent, '출발 쪽 조회가 공용 자리를 지나지 않았다').toContain(
+      `${stateDisplayOf(outOfVocabularyFrom).label} → ${stateDisplayOf('WATCHING').label}`,
+    );
   });
 });
