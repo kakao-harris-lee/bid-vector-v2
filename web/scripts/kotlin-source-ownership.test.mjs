@@ -426,6 +426,9 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
     // **크기 하한이 아니라 정확한 집합**(cr r4 HIGH②): 하한이면 동작이 같은 리팩터로 모집단이
     // 줄어도 조용하다. 줄거나 늘면 이 줄이 먼저 붉어지고, 사람이 그 변화를 보고 판단한다.
     expect([...KOTLIN_SINKS].sort(), '모집단이 바뀌었다 — 줄었는지 늘었는지 보고 판단하라').toStrictEqual([
+      // M11 — 동일성 단언 대조가 내준 텍스트를 이 표면에 직접 넘기므로 모집단에 든다. 소유
+      // 모듈의 선언은 아래 루프가 건너뛴다(단언 함수에게 자기를 부르라고 요구하는 꼴이 된다).
+      'assertStrippedKotlin',
       'expect',
       'kotlinEnumEntries',
       'kotlinFunctionStringLiterals',
@@ -438,7 +441,11 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
     for (const name of [...KOTLIN_SINKS].sort()) {
       // **파일 단위 키**(cr r4 MEDIUM): 전역 이름 Map 은 같은 이름이 두 파일에 있으면 뒤가
       // 앞을 덮어 한쪽이 조용히 빠진다. 같은 이름의 선언을 **전부** 본다.
-      const matches = [...declared.values()].filter((entry) => entry.name === name);
+      const matches = [...declared.values()].filter(
+        // **소유 모듈은 소비자가 아니다**(M11). 보증이 사는 자리라 「단언을 부르는가」를 묻는
+        // 대상이 아니고, 묻으면 단언 함수 자신이 자기를 부르라는 요구가 된다.
+        (entry) => entry.name === name && entry.relative !== OWNER,
+      );
       for (const found of matches) {
         if (found.calls.has('withoutKotlinComments')) {
           missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
@@ -539,11 +546,11 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
  */
 describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
   it('내준 텍스트는 그대로 지나가고 같은 값을 돌려준다', () => {
-    const basis = readKotlinSource('basis');
-    const provenance = readAliased('provenance');
+    const basisText = readKotlinSource('basis');
+    const provenanceText = readAliased('provenance');
 
-    expect(assertStrippedKotlin(basis)).toBe(basis);
-    expect(assertStrippedKotlin(provenance)).toBe(provenance);
+    expect(assertStrippedKotlin(basisText)).toBe(basisText);
+    expect(assertStrippedKotlin(provenanceText)).toBe(provenanceText);
   });
 
   /**
@@ -552,9 +559,11 @@ describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
    */
   it('줄을 끊지 않는 사본도 던진다', () => {
     const marker = `/${'/'}`;
-    const copied = readKotlinSource('basis').replaceAll(marker, '');
+    // 읽기 집합에서 **그 표지를 실제로 담은** 키를 쓴다 — 담지 않은 키로 치환하면 값이
+    // 그대로라 대조가 공허해진다(이 자리에서 한 번 그렇게 됐다).
+    const copied = readKotlinSource('openingEndpoints').replaceAll(marker, '');
 
-    expect(copied, '이 입력이 원문과 같다 — 대조가 공허하다').not.toBe(readKotlinSource('basis'));
+    expect(copied, '이 입력이 원문과 같다 — 대조가 공허하다').not.toBe(readKotlinSource('openingEndpoints'));
     expect(() => assertStrippedKotlin(copied)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
   });
 
@@ -571,17 +580,17 @@ describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
    */
   it('손댄 텍스트는 흐름의 꼴과 무관하게 던진다', () => {
     const marker = `/${'/'}`;
-    const source = readKotlinSource('basis');
+    const endpointsText = readKotlinSource('openingEndpoints');
     const shapes = {
       '두 홉 이상': () => {
-        const first = source;
+        const first = endpointsText;
         const second = first.replaceAll(marker, '');
         return second;
       },
-      '별칭 import': () => readAliased('basis').replaceAll(marker, ''),
-      '다듬기': () => `${source} `,
-      'spread': () => [source.replaceAll(marker, '')].at(0),
-      '콜백': () => [source].map((text) => text.replaceAll(marker, '')).at(0),
+      '별칭 import': () => readAliased('openingEndpoints').replaceAll(marker, ''),
+      '다듬기': () => `${endpointsText} `,
+      'spread': () => [endpointsText.replaceAll(marker, '')].at(0),
+      '콜백': () => [endpointsText].map((text) => text.replaceAll(marker, '')).at(0),
     };
 
     for (const [name, make] of Object.entries(shapes)) {
@@ -593,16 +602,16 @@ describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
 
   /** **음성 대조** — 손대지 않은 텍스트는 어떤 꼴로 와도 지나간다(일률 거절이 아니다). */
   it('손대지 않은 텍스트는 어떤 꼴로 와도 지나간다', () => {
-    const source = readKotlinSource('provenance');
+    const provenanceText = readKotlinSource('provenance');
     const twoHops = (() => {
-      const first = source;
+      const first = provenanceText;
       const second = first;
       return second;
     })();
 
-    expect(assertStrippedKotlin(twoHops)).toBe(source);
-    expect(assertStrippedKotlin([source].map((text) => text).at(0))).toBe(source);
-    expect(assertStrippedKotlin(readAliased('provenance'))).toBe(source);
+    expect(assertStrippedKotlin(twoHops)).toBe(provenanceText);
+    expect(assertStrippedKotlin([provenanceText].map((text) => text).at(0))).toBe(provenanceText);
+    expect(assertStrippedKotlin(readAliased('provenance'))).toBe(provenanceText);
   });
 });
 
