@@ -267,6 +267,50 @@ const PROBES = {
       return <PlainLeaf title={title} />;
     }
   `,
+  // ── r1 F2 — **기본 내보내기**. 선언이 `ExportAssignment` 라 자리가 없었고, 그래서 React 의
+  // 표준 꼴(`export default memo(Card)`)이 의무를 하나도 내지 않았다. 「심볼 경유는 내보내기의
+  // 꼴을 묻지 않는다」가 이 꼴에 대해 거짓이었다.
+  'defaultMemo.tsx': `
+    import { memo } from 'react';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    function DefaultInner({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+    export default memo(DefaultInner);
+  `,
+  'defaultAnonymous.tsx': `
+    import { memo } from 'react';
+    import { currencyDisplayOf } from '../../display/moneyDisplay';
+    export default memo(function ({ code }: { readonly code: string }) {
+      return <span>{currencyDisplayOf(code).label}</span>;
+    });
+  `,
+  'defaultArrow.tsx': `
+    import { vatTreatmentDisplayOf } from '../../display/moneyDisplay';
+    export default ({ vat }: { readonly vat: string }) => <span>{vatTreatmentDisplayOf(vat).label}</span>;
+  `,
+  // **음성 대조** — 기본 내보내기가 어휘를 쓰지 않으면 의무가 아니다.
+  'defaultPlain.tsx': `
+    import { memo } from 'react';
+    export default memo(function ({ title }: { readonly title: string }) {
+      return <span>{title}</span>;
+    });
+  `,
+  // ── r1 F3 — 참조 축의 구멍 둘. **구조분해한 뒤 넘기기**와 **리터럴 원소 접근으로 넘기기**.
+  // 구조분해한 뒤 **부르면** 앞 판도 잡았다 — 넘기는 쪽만 빠져 있었다.
+  'destructuredPass.tsx': `
+    import * as display from '../../display/timeDisplay';
+    const { instantDisplayOf: fmt } = display;
+    export function DestructuredPassCard({ ats }: { readonly ats: readonly string[] }) {
+      return <ul>{ats.map(fmt).map((one) => <li key={one.text}>{one.text}</li>)}</ul>;
+    }
+  `,
+  'elementAccessPass.tsx': `
+    import * as display from '../../display/timeDisplay';
+    export function ElementAccessPassCard({ ats }: { readonly ats: readonly string[] }) {
+      return <ul>{ats.map(display['instantDisplayOf']).map((one) => <li key={one.text}>{one.text}</li>)}</ul>;
+    }
+  `,
   // **음성 대조** — 타입만 내보내는 자리는 의무를 내지 않는다(마운트할 것이 없다).
   'typeOnly.tsx': `
     import { instantDisplayOf } from '../../display/timeDisplay';
@@ -370,6 +414,38 @@ describe('간접 렌더와 그 잔여 (M11/11E)', () => {
 
   it('타입만 내보내는 자리는 의무를 내지 않는다', () => {
     expect(componentsIn('typeOnly.tsx')).toStrictEqual([]);
+  });
+});
+
+/**
+ * **r1 수정 라운드 — verifier F2·F3.** 「심볼 경유는 꼴을 묻지 않는다」가 **기본 내보내기**에
+ * 대해 거짓이었고(선언이 `ExportAssignment` 라 자리가 없었다), 참조 축에 구멍 둘이 남아 있었다.
+ * 오늘 `src/` 에 기본 내보내기는 0 건이고 구조분해·원소 접근 전달도 0 건이라 닫아도 아무것도
+ * 붉어지지 않는다.
+ */
+describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
+  it('`export default memo(지역 컴포넌트)` 가 의무를 낸다', () => {
+    expect(componentsIn('defaultMemo.tsx')).toStrictEqual(['default']);
+  });
+
+  it('이름 없는 함수를 감싼 기본 내보내기도 낸다', () => {
+    expect(componentsIn('defaultAnonymous.tsx')).toStrictEqual(['default']);
+  });
+
+  it('화살표 기본 내보내기도 낸다', () => {
+    expect(componentsIn('defaultArrow.tsx')).toStrictEqual(['default']);
+  });
+
+  it('어휘를 안 쓰는 기본 내보내기는 의무가 아니다', () => {
+    expect(componentsIn('defaultPlain.tsx')).toStrictEqual([]);
+  });
+
+  it('최상위에서 구조분해한 어휘를 **넘기는** 꼴을 집는다', () => {
+    expect(componentsIn('destructuredPass.tsx')).toStrictEqual(['DestructuredPassCard']);
+  });
+
+  it('리터럴 원소 접근으로 **넘기는** 꼴을 집는다', () => {
+    expect(componentsIn('elementAccessPass.tsx')).toStrictEqual(['ElementAccessPassCard']);
   });
 });
 

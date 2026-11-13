@@ -49,6 +49,17 @@ const warmedUp = await (async () => {
   return true;
 })();
 
+/**
+ * **적재 단계에서 이미 더워져 있었는가.** 이 한 줄이 기각된 1안과 채택한 길을 가르는 단언의
+ * 입력이다(r1 F4). 앞 판의 단언은 `warmedUp` 을 **칸이 돌 때** 읽었고, 그래서 예열을 `beforeAll`
+ * 로 되돌려도(`let` + hook 안에서 참 대입) 초록이었다 — 즉 기각된 1안을 가르지 못했다. 이 값은
+ * **모듈 평가가 끝나는 자리**에서 고정되므로, 예열이 hook 으로 옮겨가면 거짓이 된다.
+ *
+ * suite 가 잴 수 없는 나머지 절반(「예산이 **없다**」)은 예열에 지연을 심는 대조로만 선다. 그
+ * 대조는 15s 를 쓰므로 suite 에 두지 않고 evidence 에 둔다.
+ */
+const warmedUpAtModuleEvaluation = warmedUp;
+
 const CLOCK_FRAGMENT = 'readClock()';
 const RAW_INSTANT_FRAGMENT = 'instantDisplayOf()';
 const NETWORK_FRAGMENT = 'openapi-fetch';
@@ -58,8 +69,11 @@ describe('이 파일의 전제 (M11/11E 서명 A)', () => {
    * 예열을 지우는 변이는 **다음 실행 52번 가운데 다섯 번**만 보인다 — 그런 결함은 단언이 없으면
    * 조용히 되돌아온다. 그래서 「칸이 돌기 전에 린터가 이미 더워져 있다」를 결과로 고정한다.
    */
-  it('ESLint 콜드 기동은 첫 칸이 돌기 전에 끝나 있다', () => {
-    expect(warmedUp, '예열이 돌지 않았다 — 콜드 기동이 어느 예산 안에 있다').toBe(true);
+  it('ESLint 콜드 기동은 **적재 단계에서** 끝나 있다', () => {
+    expect(
+      warmedUpAtModuleEvaluation,
+      '적재가 끝날 때 린터가 식어 있었다 — 콜드 기동이 칸이나 hook 예산 안에 있다',
+    ).toBe(true);
   });
 });
 

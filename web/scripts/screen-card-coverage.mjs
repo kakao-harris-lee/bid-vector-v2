@@ -150,8 +150,18 @@ function isExported(node) {
   return (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0;
 }
 
-/** 그 선언의 **자리** — `<src 기준 상대경로>#<이름>`. 이름이 없으면 어휘일 수 없다. */
+/**
+ * 그 선언의 **자리** — `<src 기준 상대경로>#<이름>`.
+ *
+ * `export default <식>` 은 이름이 없지만 **파일당 하나**라 자리를 갖는다(r1 F2). 앞 판은 그
+ * 선언이 `ExportAssignment` 여서 자리를 내지 못했고, 그래서 React 의 표준 꼴
+ * (`export default memo(Card)`)이 의무를 하나도 내지 않았다 — 「심볼 경유는 내보내기의 꼴을
+ * 묻지 않는다」가 그 꼴에 대해 거짓이었다. `export =` 은 모듈 꼴이 달라 대상이 아니다.
+ */
 function declarationKeyOf(declaration) {
+  if (ts.isExportAssignment(declaration)) {
+    return declaration.isExportEquals === true ? undefined : relativeKeyOf(declaration, 'default');
+  }
   const named =
     (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) &&
     declaration.parent !== undefined &&
@@ -159,12 +169,30 @@ function declarationKeyOf(declaration) {
       ? declaration.parent
       : declaration;
   const name = named.name !== undefined && ts.isIdentifier(named.name) ? named.name.text : undefined;
-  if (name === undefined) {
-    return undefined;
-  }
-  const fileName = declaration.getSourceFile().fileName;
+  return name === undefined ? undefined : relativeKeyOf(declaration, name);
+}
+
+function relativeKeyOf(node, name) {
+  const fileName = node.getSourceFile().fileName;
   const marker = fileName.lastIndexOf(SRC_MARKER);
   return marker < 0 ? undefined : `${fileName.slice(marker + SRC_MARKER.length)}#${name}`;
+}
+
+/**
+ * 이 노드가 **참조**로 읽히는 자리면 심볼을 물을 노드, 아니면 `undefined`.
+ *
+ * 원소 접근은 **리터럴 키일 때만** 참조다(r1 F3). 접근식 자체에서는 심볼이 나오지 않고
+ * (`getSymbolAtLocation` 이 `undefined` — 실측) 그 리터럴 자리에서 속성 심볼이 나온다. 계산된
+ * 키는 해소되지 않으며 그것은 위협 모델 경계 밖이다(이름을 런타임에 조립하는 저자).
+ */
+function referenceNodeOf(node) {
+  if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+    return node;
+  }
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+    return node.argumentExpression;
+  }
+  return undefined;
 }
 
 function aliasResolved(checker, symbol) {
@@ -201,8 +229,9 @@ function touchesAnyOf(checker, node, wanted) {
         return;
       }
     }
-    if (ts.isIdentifier(child) || ts.isPropertyAccessExpression(child)) {
-      if (hits(aliasResolved(checker, checker.getSymbolAtLocation(child))?.declarations ?? [])) {
+    const reference = referenceNodeOf(child);
+    if (reference !== undefined) {
+      if (hits(aliasResolved(checker, checker.getSymbolAtLocation(reference))?.declarations ?? [])) {
         found = true;
         return;
       }
@@ -213,7 +242,13 @@ function touchesAnyOf(checker, node, wanted) {
   return found;
 }
 
-/** 이 파일의 **최상위 선언** — 함수·클래스·변수. 자리를 키로 든다. */
+/**
+ * 이 파일의 **최상위 선언** — 함수·클래스·변수·기본 내보내기·구조분해 바인딩. 자리를 키로 든다.
+ *
+ * 구조분해 바인딩이 노드인 사유(r1 F3): `const { instantDisplayOf: fmt } = display` 뒤에 `fmt` 를
+ * **넘기면** 그 참조가 닿는 선언은 바인딩이고, 바인딩이 그래프에 없으면 거기서 끊겼다. 바인딩
+ * 자신은 어휘를 직접 쥐므로 노드가 되는 순간 닿기가 선다.
+ */
 function topLevelDeclarationsOf(source) {
   const byKey = new Map();
   const register = (declaration) => {
@@ -222,8 +257,23 @@ function topLevelDeclarationsOf(source) {
       byKey.set(key, declaration);
     }
   };
+  const registerBindings = (name) => {
+    if (ts.isIdentifier(name)) {
+      return;
+    }
+    for (const element of name.elements) {
+      if (ts.isBindingElement(element)) {
+        register(element);
+        registerBindings(element.name);
+      }
+    }
+  };
   ts.forEachChild(source, (node) => {
     if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name !== undefined) {
+      register(node);
+      return;
+    }
+    if (ts.isExportAssignment(node)) {
       register(node);
       return;
     }
@@ -231,6 +281,8 @@ function topLevelDeclarationsOf(source) {
       for (const one of node.declarationList.declarations) {
         if (ts.isIdentifier(one.name)) {
           register(one);
+        } else {
+          registerBindings(one.name);
         }
       }
     }
