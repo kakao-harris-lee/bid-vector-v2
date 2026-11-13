@@ -117,3 +117,8 @@ scripts/kotlin-source.test.mjs
 # 「`.kt` 경로 리터럴이 공유 모듈 밖에 없다」를 뿌리 훑기로 센다 — 목록이 아니라 glob 이라 새
 # 소비자가 조용히 빠지지 않는다(이 술어가 실제로 셋째 소비자를 찾아냈다).
 scripts/kotlin-source-ownership.test.mjs
+# M11/gates-web-read — **「여는 행위」를 런타임에 재는 층**(⑤). 앞 판의 게이트는 적힌 토큰만 보아
+# 추적되는 심볼릭 링크(⑧)·대소문자(⑨)·데이터 파일의 확장자 단독 값과 glob(⑩)이 지나갔다. 이 층은
+# 해석된 실경로를 보고 소유 모듈 밖의 호출자를 던진다 — 그 양성·음성 대조와 확장자 술어가 이 파일에
+# 있고, `vite.config.ts` 의 setupFiles 등재를 지우면 양성 묶음이 RED 다.
+scripts/kotlin-read-guard.test.mjs
