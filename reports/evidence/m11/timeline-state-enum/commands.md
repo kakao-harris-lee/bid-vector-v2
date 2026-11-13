@@ -7,9 +7,11 @@
 
 - `:app:test --tests '…OpenApiBidCaseContractTest'` → **1** · 5 tests, 2 failed —
   「toState 칸이 enum 을 선언하지 않았다」 · 「`null`↔`nullable` 결합 음성 대조가 던지지 않았다」
-- `npm run typecheck`(W-3, 생성 타입이 아직 `string`) → **2** · 오류 **넷** — 좁음 가드 둘이
-  `never`(도착·출발) · 양방향 등식 둘이 `false`. 건 상태 칸의 등식 줄은 그때도 초록이다
-  (그 칸은 이미 `enum` 이었다 — 이 slice 가 더하는 것은 Kotlin 쪽 등식이다)
+- `npm run typecheck`(W-3, 생성 타입이 아직 `string`) → **2** · 오류 **넷 / 한 파일**
+  (`caseDisplay.test`) — 좁음 가드 둘이 `never`(도착·출발) · 양방향 등식 둘이 `false`. 건 상태
+  칸의 등식 줄은 그때도 초록이다(그 칸은 이미 `enum` 이었다 — 이 slice 가 더하는 것은 Kotlin 쪽
+  등식이다). 아래 M1 의 「넷 / 세 파일」과 **수가 같고 자리가 다른 별개 측정**이다(cr r1 LOW 가
+  가리킨 혼동) — 여기는 어휘가 아직 열린 트리라 fixture 가 좁은 유니온을 만나지 않는다
 - `npx vitest run src/screens/WorksheetScreen.test.tsx`(렌더 잠금) → **1** · 1 failed,
   49 passed — 타임라인이 표 밖 상태에 **코드 원문**을 세웠다
 - 질의 인자 축(계약 갱신 둘째)의 등식 줄은 **태생이 초록**이다(그 param 이 이미 `enum` 이고
@@ -64,6 +66,10 @@ scratch 로 피신시킨 뒤). 적용 단언은 앵커 유일성 + 치환 후 �
 - M7b 거기에 계약 어휘를 늘려 재생성 → W-3 **1** · 양방향 등식이 drift 를 본다
 - M8 목록 질의 param 한 값 바꿔치움 → 계약 test **1** · 6 tests, 1 failed
 - M9 목록 질의 param 이름 바꿔치움 → 계약 test **1** ·「하나로 선언되지 않았다」
+- M10 화살표 줄의 **두 조회를 함께** 옛 폴백으로 되돌림 → W-3 **0** · W-6 **1**(그 잠금만)
+- M10a **출발 쪽만** 되돌림 → W-6 **1** · 둘째 줄의 단언에서 멈춘다
+- M10b **도착 쪽만** 되돌림 → W-6 **1** · 첫째 줄의 단언에서 멈춘다. M10a·M10b 가 따로 붉으므로
+  **두 줄이 각자 한 조회를 든다**(한 줄로 양쪽을 표 밖에 두면 한쪽만 되돌려도 통과할 수 있다)
 - 통제군(변이 없는 같은 트리, `--rerun`) → 계약 test **0** · 그 로그에 `FROM-CACHE` **0 건**
   (통제군이 실제로 실행됐다) · web `typecheck` **0** · 표적 vitest **0**(76 passed)
 
