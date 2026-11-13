@@ -231,11 +231,30 @@ CI `web` job 의 명령 그대로 + `./gradlew check`. **판정 대상은 main �
 | 단계 | 결과 |
 | --- | --- |
 | W-1 `npm ci` · W-2 lint · W-3 typecheck · W-4 gate:src-tree | exit **0** |
-| W-5 api:types:check · W-6 test · W-7 gate:tests | exit **0** · vitest **44 파일 · 942 passed** |
+| W-5 api:types:check | exit **0** |
+| W-6 test · W-7 gate:tests | **r1 정정** — 아래 「서명 A」 절 |
 | W-8 build · W-9 gate:boundary-canary | exit **0** |
 | W-10 playwright install · W-11 스모크 | exit **0** · 2 passed |
 | W-12 `:app:bootJar` · W-13 여정 e2e | exit **0** · 12 passed |
 | `./gradlew check` | **아직 돌지 않았다** — 머지 차례에 병합 커밋에서 돈다. 이 slice 는 Kotlin 무편집이고, 이 명령이 acceptance 에 드는 이유는 evidence 가 누출 게이트의 스캔 뿌리에 들기 때문이다. 그 참조형 스캔은 이 트리에서 **매치 0** 이다 |
+
+### W-6·W-7 — 서명 A 를 이 slice 가 하나 더 만들었다가 닫았다 (r1 — cr H-1)
+
+앞 판의 표는 `W-6 test · W-7 gate:tests | exit 0 · 942 passed` 라고 적었다. **그 행이 틀렸다** —
+조용한 호스트 단독 실행의 값이었다. 새 lint 게이트 test 의 첫 칸이 `ESLint` **콜드 기동**을 칸 안에서
+치르는 바람에(그 칸만 1108ms · 나머지 3~16ms) 부하가 걸린 전건에서 5000ms 예산을 넘겼고,
+**이 호스트 전건 3/3 실패**였다(W-7 이 그 실패를 받아 exit ≠ 0).
+
+처방은 계약이 서명 A 에 대해 적은 쪽이다 — timeout 을 올리지 않는다. 콜드 비용을 **모듈 적재
+단계**(top-level await)로 옮기고 여덟 자리를 **칸마다** 나눴다. `beforeAll` 은 고르지 않았다:
+11E 가 그것이 **예산을 hook 으로 옮길 뿐**임을 실측했다(PR #154).
+
+| 조건 | 결과 |
+| --- | --- |
+| 수정 전 · 전건 3회 (이 호스트, 다른 레인 빌드와 함께) | **3/3 실패** |
+| 수정 뒤 · 전건 3회 (같은 조건) | **0/3 실패** · 44 파일 **950 passed** |
+| 그중 3회차 | 전부 통과인데 **exit 1** — `AppRoot.test.tsx` 의 jsdom teardown 뒤 `window is not defined`. **서명 B** 이고 **11E 소관**이라 건드리지 않는다 |
+| 수정 뒤 단독 실행 | 17 passed · **1.39s**(적재 83%) |
 
 **하네스 레인 변경**: `git log 94ee445b..HEAD --no-merges -- CLAUDE.md .claude/` — **0 줄**(재산출).
 

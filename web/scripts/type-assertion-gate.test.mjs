@@ -21,6 +21,19 @@ const eslint = new ESLint({ cwd: webRoot });
 
 const RULE = '@typescript-eslint/consistent-type-assertions';
 
+/**
+ * **콜드 기동 비용을 모듈 적재 단계에서 치른다**(r1 — cr H-1).
+ *
+ * 첫 `lintText` 호출이 설정 해석 전체를 탄다(단독 계측: 그 호출만 1108ms · 나머지 칸은 3~16ms).
+ * 그 비용이 **칸 안에** 있으면 부하가 걸린 호스트에서 5000ms 예산을 넘긴다 — 등재된 **서명 A** 가
+ * 정확히 그 성질이고, 이 파일이 그 인스턴스를 하나 더 만들었다(이 호스트 전건 3/3 실패).
+ *
+ * `beforeAll` 로 옮기지 않는다 — 11E 가 그것이 **예산을 hook 으로 옮길 뿐**임을 실측했다(PR #154).
+ * top-level await 는 **적재 단계**라 어느 칸의 예산도 쓰지 않는다. timeout 을 올리는 쪽은 계약이
+ * 서명 A 에 대해 고르지 말라고 적은 자리다.
+ */
+await eslint.lintText('export const warm = 1;\n', { filePath: resolve(webRoot, 'src/display/warm.ts') });
+
 /** 그 파일 경로로 린트한 뒤 **이 항목의 규칙** 메시지만 센다. */
 async function assertionMessages(filePath, code) {
   const [result] = await eslint.lintText(code, { filePath: resolve(webRoot, filePath) });
@@ -30,24 +43,25 @@ async function assertionMessages(filePath, code) {
 const TABLE = 'type Tone = "A" | "B";\ntype Row = Record<Tone, string>;\n';
 
 describe('표 선언의 타입 단언은 RED 다 (항목 7)', () => {
-  /** 어휘 표가 사는 자리 전부에서 선다 — 한 디렉터리만 보면 표를 옆으로 옮기는 길이 남는다. */
-  it('객체 리터럴 단언은 표가 사는 어느 자리에서도 RED 다', async () => {
-    const places = [
-      'src/display/planted.ts',
-      'src/screens/Planted.tsx',
-      'src/components/Planted.tsx',
-      'src/planted.ts',
-      'src/api/client.ts',
-      'src/display/planted.test.ts',
-      'e2e/journey/planted.ts',
-      'playwright.planted.ts',
-    ];
+  /**
+   * 어휘 표가 사는 자리 전부에서 선다 — 한 디렉터리만 보면 표를 옆으로 옮기는 길이 남는다.
+   *
+   * **칸을 나눈다**(r1 — cr H-1): 여덟 자리를 한 칸에서 돌리면 그 칸 하나가 여덟 번의 lint 를
+   * 지고, 어느 자리가 붉었는지도 이름에 남지 않는다.
+   */
+  it.each([
+    'src/display/planted.ts',
+    'src/screens/Planted.tsx',
+    'src/components/Planted.tsx',
+    'src/planted.ts',
+    'src/api/client.ts',
+    'src/display/planted.test.ts',
+    'e2e/journey/planted.ts',
+    'playwright.planted.ts',
+  ])('객체 리터럴 단언은 %s 에서 RED 다', async (place) => {
+    const messages = await assertionMessages(place, `${TABLE}export const T = { A: "1", B: "2" } as Row;\n`);
 
-    for (const place of places) {
-      const messages = await assertionMessages(place, `${TABLE}export const T = { A: "1", B: "2" } as Row;\n`);
-
-      expect(messages.length, `${place} 에서 초록이다`).toBe(1);
-    }
+    expect(messages.length, `${place} 에서 초록이다`).toBe(1);
   });
 
   /** 각괄호 꼴도 RED 다 — 표기를 바꿔 같은 단언을 쓰는 길을 닫는다. */
