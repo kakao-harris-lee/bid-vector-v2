@@ -225,6 +225,33 @@ export default tseslint.config(
   // (`plugins` 가 배열)이라 flat config 에서 설정 오류(exit 2)를 낸다. 실측으로 가린 자리다.
   reactHooks.configs.flat['recommended-latest'],
   {
+    // M11/gates-web-read — **표 선언에 타입 단언을 직접 붙이지 못한다**(받는 항목 7).
+    //
+    // 화면 어휘의 표는 `{…} as const satisfies Record<계약 enum, …>` 꼴이고 그 `satisfies` 가
+    // **전수성을 컴파일에서** 든다. 같은 표를 `{…} as Record<계약 enum, …>` 로 바꾸면 단언이
+    // **선언 타입만** 보게 되어 누락이 조용해진다(PR #149 v r2 M-2). 규칙은 `as const` 를
+    // 면제하므로 **오늘의 표가 하나도 붉지 않는다**(실측: 전수 위반 0).
+    //
+    // **대상이 `src` 보다 넓다**(팀장 판정 2026-11-13): 표를 `e2e/` 나 뿌리 설정으로 옮기는 길을
+    // 닫는다. 오늘 어디에도 위반이 0 이라 비용이 없다. `.mjs` 는 타입 단언이 **없는 문법**이라
+    // 넣지 않는다(넣어도 공허하다).
+    //
+    // **열거를 지운다**(r1 — cr LOW). 앞 판은 네 패턴을 적었고 오늘은 빈틈이 없었지만,
+    // `src/` 밖의 `.tsx` 와 앞으로 생길 `scripts/**/*.ts` 가 그 목록 밖이었다. 범위를 「TS 전부」로
+    // 두면 그 자리가 사라진다 — 넓혀서 줄이는 쪽을 이미 골랐으므로 일관된다.
+    //
+    // **이 층의 범위**: 리터럴에 **직접** 붙인 단언까지다. 변수를 거친 단언과 `as unknown as` 는
+    // 규칙 밖이고(실측 초록), 닫으려면 타입 서비스가 필요해 lint 레인 전체의 비용 축이 된다 —
+    // 알려진 제한에 등재하고 `scripts/type-assertion-gate.test.mjs` 가 그 **초록을 측정으로** 든다.
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'as', objectLiteralTypeAssertions: 'never' },
+      ],
+    },
+  },
+  {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
     languageOptions: { globals: globals.browser },
     rules: {
