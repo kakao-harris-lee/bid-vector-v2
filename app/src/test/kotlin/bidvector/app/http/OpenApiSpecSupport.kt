@@ -70,29 +70,71 @@ internal fun Map<String, Any?>.requiredKeys(schemaName: String): Set<String> =
  * 수를 적지 않는 이유는 위 머리말과 같다 — 하드코딩한 계수는 소비자가 늘면서 조용히 낡는다.
  * 앞 판이 여기 「세」라고 적었고 실측과 어긋났다(cr r0 L-1).
  */
-@Suppress("UNCHECKED_CAST")
 internal fun Map<String, Any?>.propertyEnum(
     schemaName: String,
     property: String,
+): List<String> =
+    declaredEnum(schemaName, property, propertyDefinition(schemaName, property))
+        .asVocabulary(schemaName, property)
+
+/**
+ * `null` 을 **어휘에 함께 싣는** 칸의 읽기(M11/11B — 타임라인의 출발 상태). 돌려주는 것은
+ * `null` 을 뺀 어휘다 — 집합 등식의 반대쪽(도메인 열거)에 그 값과 맞댈 원소가 없다.
+ *
+ * `nullable: true` 와 열거의 `null` 원소는 **함께** 서야 한다. 하나만 있으면 선언이 실제로
+ * 나가는 값과 어긋난다 — 원소가 없으면 엄격한 검증기가 나가는 `null` 을 거부하고, `nullable`
+ * 이 없으면 선언이 나르지 않는 값을 어휘가 허용한다. 그래서 둘을 **함께** 요구한다.
+ */
+internal fun Map<String, Any?>.nullablePropertyEnum(
+    schemaName: String,
+    property: String,
 ): List<String> {
+    val definition = propertyDefinition(schemaName, property)
+    val declared = declaredEnum(schemaName, property, definition)
+    require(declared.any { it == null }) {
+        "$schemaName 의 $property 칸 enum 이 null 을 싣지 않았다 — 실제로 나가는 null 을 엄격한 검증기가 거부한다"
+    }
+    require(definition["nullable"] == true) {
+        "$schemaName 의 $property 칸에 nullable 선언이 없다 — 어휘가 실은 null 을 선언이 나르지 않는다"
+    }
+    return declared.filterNotNull().asVocabulary(schemaName, property)
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun Map<String, Any?>.propertyDefinition(
+    schemaName: String,
+    property: String,
+): Map<String, Any?> {
     val properties = schema(schemaName)["properties"] as Map<String, Any?>
-    val definition =
-        requireNotNull(properties[property] as? Map<String, Any?>) {
-            "$schemaName 의 $property 칸이 선언되지 않았다"
-        }
+    return requireNotNull(properties[property] as? Map<String, Any?>) {
+        "$schemaName 의 $property 칸이 선언되지 않았다"
+    }
+}
+
+private fun declaredEnum(
+    schemaName: String,
+    property: String,
+    definition: Map<String, Any?>,
+): List<*> {
     val declared =
         requireNotNull(definition["enum"] as? List<*>) {
             "$schemaName 의 $property 칸이 enum 을 선언하지 않았다 — 닫힌 어휘가 열린 string 으로 돌아갔다"
         }
     require(declared.isNotEmpty()) { "$schemaName 의 $property 칸 enum 이 비었다" }
-    // 소거 때문에 `as? List<String>` 은 비문자 열거(`enum: [1, 2]`)도 통과시킨다 — 그러면 집합
-    // 등식이 Int 와 String 을 비교해 읽을 수 없는 실패를 낸다(cr r0 L-3). 여기서 가른다.
-    return declared.map { element ->
+    return declared
+}
+
+// 소거 때문에 `as? List<String>` 은 비문자 열거(`enum: [1, 2]`)도 통과시킨다 — 그러면 집합
+// 등식이 Int 와 String 을 비교해 읽을 수 없는 실패를 낸다(cr r0 L-3). 여기서 가른다.
+private fun List<*>.asVocabulary(
+    schemaName: String,
+    property: String,
+): List<String> =
+    map { element ->
         requireNotNull(element as? String) {
             "$schemaName 의 $property 칸 enum 에 문자열이 아닌 값이 있다: $element"
         }
     }
-}
 
 /**
  * D-6A3-20 — `paths.<path>.<method>.responses` 의 상태

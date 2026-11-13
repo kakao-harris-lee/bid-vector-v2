@@ -2696,9 +2696,18 @@ components:
         fromState:
           type: string
           nullable: true
+          # M11/11B — 생성 전이의 `null` 을 **어휘에 함께 싣는다**. 엄격한 검증기가 실제로
+          # 나가는 값을 거부하지 않도록 한다(`EditSessionResponse.field` 와 같은 꼴). 대조
+          # test 는 `null` 을 뺀 집합으로 Kotlin 상태 전수와 등식을 잰다.
+          enum: [null, WATCHING, DEFERRED, PRICE_RECEIVED, BID_PLANNED, BID_RECORDED, AWAITING_OPENING, OPENED_PROVISIONAL_FIRST, OPENED_OUT_OF_RANK, UNDER_QUALIFICATION_REVIEW, WON, LOST, FAILED_OR_REBID, SKIPPED, DEADLINE_PASSED_UNRECORDED]
           description: 생성 전이만 null 이다(출발 상태가 없다).
         toState:
           type: string
+          enum: [WATCHING, DEFERRED, PRICE_RECEIVED, BID_PLANNED, BID_RECORDED, AWAITING_OPENING, OPENED_PROVISIONAL_FIRST, OPENED_OUT_OF_RANK, UNDER_QUALIFICATION_REVIEW, WON, LOST, FAILED_OR_REBID, SKIPPED, DEADLINE_PASSED_UNRECORDED]
+          description: >-
+            건 스키마의 상태 칸과 **같은 집합**이다(M11/11B). 두 칸의 값은 전이 행의 열에서
+            오고 그 열의 CHECK 가 도메인 열거와 같다는 것을 어댑터 통합 test 가 실 DB 위에서
+            든다 — 문서는 그 집합을 **선언**한다.
         command:
           type: string
           enum: [ADD_TO_BID_BOX, DEFER, RESUME, RECEIVE_PRICE_MENU, DRAFT_BID, RECORD_BID, AWAIT_OPENING, RECORD_OPENING_FIRST, RECORD_OPENING_OUT_OF_RANK, ENTER_QUALIFICATION_REVIEW, RECORD_OUTCOME, CORRECT_OUTCOME, SKIP, MARK_DEADLINE_PASSED, REVOKE_DEADLINE_PASSED]

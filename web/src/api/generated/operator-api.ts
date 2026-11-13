@@ -909,9 +909,16 @@ export interface components {
         };
         BidTimelineEntry: {
             caseVersion: number;
-            /** @description 생성 전이만 null 이다(출발 상태가 없다). */
-            fromState?: string | null;
-            toState: string;
+            /**
+             * @description 생성 전이만 null 이다(출발 상태가 없다).
+             * @enum {string|null}
+             */
+            fromState?: null | "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
+            /**
+             * @description 건 스키마의 상태 칸과 **같은 집합**이다(M11/11B). 두 칸의 값은 전이 행의 열에서 오고 그 열의 CHECK 가 도메인 열거와 같다는 것을 어댑터 통합 test 가 실 DB 위에서 든다 — 문서는 그 집합을 **선언**한다.
+             * @enum {string}
+             */
+            toState: "WATCHING" | "DEFERRED" | "PRICE_RECEIVED" | "BID_PLANNED" | "BID_RECORDED" | "AWAITING_OPENING" | "OPENED_PROVISIONAL_FIRST" | "OPENED_OUT_OF_RANK" | "UNDER_QUALIFICATION_REVIEW" | "WON" | "LOST" | "FAILED_OR_REBID" | "SKIPPED" | "DEADLINE_PASSED_UNRECORDED";
             /**
              * @description 전이표의 열 키 열넷 + **건을 여는 명령 하나**(`ADD_TO_BID_BOX`). 여는 명령은 출발 상태가 없어 전이표의 행이 될 수 없고 `fromState = null` 인 생성 전이로 남는다. **명령을 상태별로 쪼개지 않는다** — 「초안 만들기」와 「초안 수정」, 「제출함」과 「기록 갱신」과 「소급 확인」은 한 동작이고, 무엇이 달랐는지는 같은 줄의 출발 상태가 적는다.
              * @enum {string}
