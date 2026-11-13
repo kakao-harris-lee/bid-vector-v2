@@ -53,16 +53,29 @@ export function isKotlinSourcePath(candidate) {
 const realpathSync = fs.realpathSync;
 
 /**
- * 인자에서 **경로로 읽히는 값**을 낸다. 파일 서술자(수)·옵션 객체·콜백은 경로가 아니다.
+ * **경로는 `PATH_MAX` 를 넘을 수 없다**(r1 — cr M-1). 이보다 긴 값은 경로가 아니라 **내용**이다 —
+ * `writeFileSync(path, data)`·`readSync(fd, buffer, …)` 처럼 내용이 인자인 표면에서 그 값을
+ * 디코딩하고 `path.resolve` 에 태우면 비용이 **내용 크기에 비례**한다(실측: 8MB 버퍼 쓰기 20회가
+ * 통제군 314ms → 층 설치 2327ms, 약 7.4배). 길이 하한 한 줄이 그 비례를 없앤다 — 표면을
+ * 열거하지 않는다.
+ */
+const PATH_MAX = 4096;
+
+/**
+ * 인자에서 **경로로 읽히는 값**을 낸다. 파일 서술자(수)·옵션 객체·콜백은 경로가 아니고,
+ * `PATH_MAX` 를 넘는 문자열·버퍼도 경로가 아니다.
  */
 function asPath(value) {
   if (typeof value === 'string') {
-    return value;
+    return value.length > PATH_MAX ? undefined : value;
   }
   if (value instanceof URL) {
     return value.pathname;
   }
-  return Buffer.isBuffer(value) ? value.toString('utf8') : undefined;
+  if (!Buffer.isBuffer(value) || value.length > PATH_MAX) {
+    return undefined;
+  }
+  return value.toString('utf8');
 }
 
 /**
