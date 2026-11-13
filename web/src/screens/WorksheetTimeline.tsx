@@ -4,6 +4,7 @@ import {
   BID_CASE_STATE_DISPLAY,
   TIMELINE_ACTOR_DISPLAY,
   commandDisplayOf,
+  stateDisplayOf,
   type BidCaseState,
 } from '../display/caseDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -12,18 +13,13 @@ import { instantDisplayOf } from '../display/timeDisplay';
 import { InstantText } from './InstantText';
 
 /**
- * 상태 문면은 상태 표에서 찾는다. **타임라인의 `toState` 는 계약이 `type: string`** 이라
- * 상태 어휘 밖의 값이 올 수 있으므로, 표에 없으면 **서버가 준 코드를 그대로** 보인다(문면을
- * 지어내지 않는다 — `noticeStatus` 와 같은 관례).
- */
-function stateLabelOf(state: string): string {
-  const known = (BID_CASE_STATE_DISPLAY as Readonly<Record<string, { readonly label: string } | undefined>>)[state];
-  return known?.label ?? state;
-}
-
-/**
  * 건별 타임라인(§6.2 C 6) — **모든 전이가 시각·주체와 함께** 남는다. 순서는 서버가 준 순서
  * 그대로다(화면이 다시 정렬하지 않는다).
+ *
+ * 상태·명령 문면은 **표시 모듈의 공용 조회**를 지난다(M11/11B). 앞 판은 상태 칸만 이 파일이
+ * 자기 조회를 적었다 — 계약이 그 칸을 `type: string` 으로 두던 때의 자리이고, 표 밖 값에
+ * 서버가 준 코드를 문면인 척 세웠다. 계약이 어휘를 닫은 지금도 **배포 비틀림**으로 번들이
+ * 모르는 값이 닿을 수 있고, 그 값은 공용 자리가 「보이는 미지 상태」로 낸다.
  */
 export function WorksheetTimeline({ entries }: { readonly entries: readonly BidTimelineEntry[] }) {
   return (
@@ -33,7 +29,7 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
         {entries.map((entry) => (
           <li key={entry.caseVersion} className="border-l-2 border-line pl-3">
             <p className="flex flex-wrap items-center gap-2 text-sm">
-              <span>{stateLabelOf(entry.toState)}</span>
+              <span>{stateDisplayOf(entry.toState).label}</span>
               <StateBadge display={displayOrUnknown(TIMELINE_ACTOR_DISPLAY, entry.actorKind)} />
               {entry.retroactive ? <span className="text-xs text-unjudged-ink">소급</span> : null}
             </p>
@@ -46,7 +42,7 @@ export function WorksheetTimeline({ entries }: { readonly entries: readonly BidT
               <StateBadge display={commandDisplayOf(entry.command)} />
               {entry.fromState === null || entry.fromState === undefined
                 ? ''
-                : ` · ${stateLabelOf(entry.fromState)} → ${stateLabelOf(entry.toState)}`}
+                : ` · ${stateDisplayOf(entry.fromState).label} → ${stateDisplayOf(entry.toState).label}`}
             </p>
             {entry.reason === null || entry.reason === undefined ? null : (
               <p className="text-xs text-ink-soft">사유: {entry.reason}</p>
