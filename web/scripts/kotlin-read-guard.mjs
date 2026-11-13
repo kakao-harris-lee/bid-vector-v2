@@ -136,31 +136,50 @@ function refusal(caller, target) {
   );
 }
 
+/** 거부해야 하면 그 오류를, 아니면 `undefined` 를 낸다. 호출·생성 트랩이 같은 판정을 쓴다. */
+function refusalFor(args) {
+  const target = kotlinTargetOf(args);
+  if (target === undefined) {
+    return undefined;
+  }
+  const caller = callerOutside(undefined);
+  return caller === OWNER ? undefined : refusal(caller, target);
+}
+
 /**
- * 감싼 함수. **원래 함수의 실패 계약을 바꾸지 않는다** — 동기 표면은 던지고 `fs.promises` 표면은
- * **거절된 promise** 를 낸다. 층이 그 계약을 바꾸면 정당한 호출자의 `catch` 사슬이 거부를 놓친다.
+ * 감싼 표면. **원래 함수의 계약을 바꾸지 않는다** — 실패 계약(동기는 던지고 `fs.promises` 는
+ * **거절된 promise**)도, **생성·동일성 계약**도 그대로다.
+ *
+ * **`Proxy` 로 두는 이유**(r1 — cr H-2). 앞 판은 래퍼를 평범한 함수로 짓고 속성을
+ * `Object.keys` 로 옮겼다. 그래서 `fs` 의 **함수 값에 섞인 생성자**가 깨졌다(실측, node v24):
+ * `statSync(…) instanceof fs.Stats` 가 **거짓**이 되고, `new fs.Dirent(…)` 가
+ * 「Class constructor … cannot be invoked without 'new'」로 **던졌다**. 원인 둘 — ES class 는
+ * `apply` 로 부를 수 없고, `prototype` 은 non-enumerable 이라 복사 루프가 지나쳤다.
+ *
+ * `Proxy` 는 `name`·`prototype`·붙은 속성(`realpathSync.native`)을 원본에서 그대로 비추고
+ * `apply`·`construct` 두 자리에서 같은 판정을 건다 — **생성자 분류를 열거하지 않고** 전수 감싸기를
+ * 유지하는 길이다. 앞 판의 `defineProperty` 와 복사 루프는 함께 사라진다.
  */
-function guarded(surface, key, original, rejectsInstead) {
-  const wrapper = function guardedFsCall(...args) {
-    const target = kotlinTargetOf(args);
-    if (target !== undefined) {
-      const caller = callerOutside(undefined);
-      if (caller !== OWNER) {
-        const error = refusal(caller, target);
+function guarded(surface, original, rejectsInstead) {
+  return new Proxy(original, {
+    apply(target, _thisArg, args) {
+      const error = refusalFor(args);
+      if (error !== undefined) {
         if (rejectsInstead) {
           return Promise.reject(error);
         }
         throw error;
       }
-    }
-    return original.apply(surface, args);
-  };
-  Object.defineProperty(wrapper, 'name', { value: key });
-  // `realpathSync.native` 처럼 함수에 붙은 속성을 잃으면 호출자가 깨진다.
-  for (const property of Object.keys(original)) {
-    wrapper[property] = original[property];
-  }
-  return wrapper;
+      return Reflect.apply(target, surface, args);
+    },
+    construct(target, args, newTarget) {
+      const error = refusalFor(args);
+      if (error !== undefined) {
+        throw error;
+      }
+      return Reflect.construct(target, args, newTarget);
+    },
+  });
 }
 
 /** 층이 자기 해석기를 다시 감싸지 않도록 두 이름만 비운다 — 그 밖은 전수다. */
@@ -176,7 +195,7 @@ function patch(surface, rejectsInstead = false) {
       continue;
     }
     try {
-      surface[key] = guarded(surface, key, value, rejectsInstead);
+      surface[key] = guarded(surface, value, rejectsInstead);
     } catch {
       // 쓸 수 없는 속성은 감쌀 수 없다 — 그 자리는 정적 술어가 받는다.
     }

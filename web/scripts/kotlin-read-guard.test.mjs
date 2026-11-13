@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import {
+  Dirent,
+  Stats,
   closeSync,
   createReadStream,
   globSync,
@@ -7,7 +9,9 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { readFileSync as aliasedRead } from 'fs';
 import { readFile } from 'node:fs/promises';
@@ -117,6 +121,35 @@ describe('여는 행위 — 음성 대조', () => {
   /** 저장소 밖과 `node_modules` 는 실경로 해석을 건너뛴다 — 그 범위를 문면이 아니라 측정으로 든다. */
   it('저장소 밖 경로는 층의 대상이 아니다', () => {
     expect(() => readFileSync(resolve(webRoot, 'package-lock.json'), 'utf8')).not.toThrow();
+  });
+});
+
+/**
+ * **층이 원래 계약을 바꾸지 않는다**(r1 — cr H-2). `fs` 의 함수 값에는 **생성자**가 섞여 있어,
+ * 앞 판처럼 평범한 함수로 감싸면 `instanceof` 가 거짓이 되고 ES class 는 `new` 가 던졌다. 그
+ * 깨짐은 **오늘의 전건이 밟지 않는 잠복**이라 초록으로 지나갔다 — 그래서 그 자리를 test 로 든다.
+ */
+describe('여는 행위 — 감싸기가 생성·동일성 계약을 바꾸지 않는다', () => {
+  it('`instanceof` 가 유지된다', () => {
+    const stats = statSync(resolve(webRoot, 'package.json'));
+
+    expect(stats instanceof Stats, 'statSync 결과가 Stats 가 아니다').toBe(true);
+  });
+
+  it('ES class 를 `new` 로 부를 수 있다', () => {
+    const entry = new Dirent('x', 1, '/tmp');
+
+    expect(entry instanceof Dirent).toBe(true);
+    expect(entry.name).toBe('x');
+  });
+
+  it('함수에 붙은 속성이 보존된다', () => {
+    expect(typeof realpathSync.native).toBe('function');
+  });
+
+  /** 그 셋이 통과하는 동안에도 **거부는 그대로 발화한다** — 계약 보존이 층을 끄는 것이 아니다. */
+  it('계약을 지키면서도 거부는 발화한다', () => {
+    expect(() => readFileSync(shippedKotlinFile(), 'utf8')).toThrow(/kotlin-read-guard/u);
   });
 });
 
