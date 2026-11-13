@@ -153,6 +153,25 @@ describe('여는 행위 — 감싸기가 생성·동일성 계약을 바꾸지 �
   });
 });
 
+/**
+ * **공개 표면이 셋으로 고정된다**(r1 — cr MEDIUM). 층이 자라면서 내보내는 것이 늘면 그만큼
+ * 「밖에서 쓸 수 있는 것」이 늘고, 그 증가는 문면으로만 두면 **조용히** 일어난다. 공유 읽기 모듈이
+ * 같은 자리에서 그렇게 열렸던 선례가 있어(그 모듈의 export 집합 등식) 같은 꼴을 여기에도 둔다.
+ *
+ * 늘리거나 줄이면 이 줄이 먼저 붉어지고, 사람이 그 표면이 무엇을 내주는지 보고 판단한다.
+ */
+describe('여는 행위 — 공개 표면이 셋으로 고정된다', () => {
+  it('export 집합이 정확히 셋이다', async () => {
+    const namespace = await import('./kotlin-read-guard.mjs');
+
+    expect(Object.keys(namespace).sort(), '층의 공개 표면이 바뀌었다 — 늘었는지 줄었는지 보고 판단하라').toStrictEqual([
+      'callerOutside',
+      'installKotlinReadGuard',
+      'isKotlinSourcePath',
+    ]);
+  });
+});
+
 describe('여는 행위 — 확장자 술어는 실경로를 대소문자 무시로 본다 (⑨)', () => {
   it('Kotlin 확장자는 표기와 무관하게 참이다', () => {
     const extension = `${'k'}${'t'}`;
