@@ -11,7 +11,7 @@ git restore --source=fdb4b24cc84f88f238e93e75344dcaa0cc5d7c1a --staged --worktre
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-status <base>..HEAD` 의 기계 산출이고 **라운드마다 재산출한다**. r1 에서 **열**
+`git diff --name-status fdb4b24c..HEAD`(**원천**..HEAD)의 기계 산출이고 **라운드마다 재산출한다**. r1 에서 **열**
 이 됐다 — r0 의 여덟에 그때는 아직 없던 evidence 둘(`checklist.md`·`rollback.md`)이 들어왔다
 (verifier r1 장부층 지적).
 
@@ -56,7 +56,8 @@ evidence 커밋은 언제나 실측 뒤에 오므로 **실측 HEAD == 판정 SHA
 것은 그 사이에 **되돌림 대상이 움직였는가**이고, 여기서 움직인 것은 전부 다음 전칭식에 든다 —
 **실측 HEAD 이후에 변경된 복원 대상은 모두 복원 원천에 없는 신설 파일이다**(그래서 복원이 그것을
 지우는 동작은 실측 당시와 같다). 열거와 「원천에 없음」 확인은 verifier 가 한다.
-`git rev-list --merges <실측 HEAD>..<판정 SHA>` 도 **빈 출력**이다(이 브랜치는 병합을 담지 않는다).
+`git rev-list --merges <실측 HEAD>..<판정 SHA>` 도 **빈 출력**이다 — 이 브랜치는 병합 커밋
+`e71ad4de`(= `fdb4b24c` 병합)를 담지만 **그것이 실측 HEAD 앞**에 있으므로 이 range 밖이다.
 
 ## 실측 — 버릴 clone 에서 ①~⑥
 

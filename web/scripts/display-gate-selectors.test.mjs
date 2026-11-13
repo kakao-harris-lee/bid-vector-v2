@@ -24,8 +24,12 @@ let lintCalls = 0;
 
 /** 그 파일 경로로 린트한 뒤 **이 slice 의 규칙** 메시지만 센다. */
 async function lintAs(filePath, code) {
-  lintCalls += 1;
   const [result] = await eslint.lintText(code, { filePath: resolve(webRoot, filePath) });
+  // **센 뒤가 아니라 끝난 뒤에 올린다**(r1 v N-R3). 부르는 순간 올리면 이 수는 「린트를 **걸었다**」
+  // 를 세고, 그러면 예열을 기다리지 않는 꼴(`await` 를 `void` 로)이 적재 단계에서 이미 1 이라
+  // 전제 칸을 지난다 — r1 의 불리언 판이 잡던 축이 거기서 후퇴한다. 이 자리에서 올리면 수가
+  // 「린트가 **끝났다**」를 세고, 기다리지 않은 예열은 0 으로 남는다.
+  lintCalls += 1;
   return result.messages.filter((one) => one.ruleId === 'no-restricted-syntax');
 }
 
