@@ -3,18 +3,11 @@
 `git revert` range 가 아니라 **in_scope 경로 한정 복원**이다.
 
 ```
-git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktree -- <아래 목록>
+git restore --source=fdb4b24cc84f88f238e93e75344dcaa0cc5d7c1a --staged --worktree -- <아래 목록>
 ```
 
-실측 HEAD: **이 문서를 담은 커밋**(머지 차례의 마지막 산출물 커밋 직전 자리 — 아래 §실측 HEAD
-가 SHA 를 든다). r0 의 실측은 `1457e9fe` 에서 했고 ①~⑥ 과
-보완 경로가 아래 표에 있다 — 그 측정은 r1 편집 **앞**이고 원천도 착수 base 였다. 최종 실측은
-병합 뒤 **마지막 산출물 커밋**에서 하고, 원천은 병합한 `origin/main` 의 **고정 SHA** 이며
-**셋째 단언**(복원 대상 blob 이 착수 base 와 새 원천에서 같은가)을 함께 잰다. `capability-map.md`
-는 앞 레인들이 §12.3 에 절을 더하므로 **두 원천에서 다를 전망**이고, 그때 그 파일 기준 계수를
-새 원천에서 다시 센다 — 복원이 「내 절만 지우고 남의 절은 남기는가」를 둘 다 세는 것이 그
-자리다(원천 = base 였던 r0 에서는 전수 트리 동일성이 갈음이었지만, 공유 파일에 남의 내용이
-들어오면 그 갈음을 더는 쓸 수 없다).
+원천은 **병합한 `origin/main` 의 고정 SHA** 다 — 움직이는 `origin/main` 도 아니고 **내 병합
+커밋도 아니다**(그것은 이 slice 를 담고 있어 복원이 no-op 이 된다).
 
 ## 복원 목록 — 기계 산출
 
@@ -47,15 +40,15 @@ git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktre
 
 ## 복원 원천의 전제
 
-- **조상**: `git merge-base --is-ancestor 94ee445b 1457e9fe` 가 참이다.
-- **그 SHA 에 이 slice 가 없다**: 첫 산출물 커밋(`e0b121a0`)이 base 의 후손이고 base 에 포함되지
-  않는다.
-- **원천을 바꾸면 다시 센다**: 이 브랜치는 main 을 병합하지 않았으므로 원천은 착수 base 그대로다.
-  머지 전에 main 을 병합하면 그 **병합 커밋 SHA**(고정 — 움직이는 `origin/main` 이 아니다)가
-  원천이 되고, 그때 **셋째 단언**을 잰다(복원 대상 blob 이 두 원천에서 같은가). 지금 측정으로는
-  `origin/main`(`32dead40`)이 복원 대상 열 가운데 **어느 것도 건드리지 않았다** —
-  `git diff --name-only 94ee445b..origin/main` 이 `README.md`·`milestone-10.md`·`milestone-11.md`
-  셋뿐이다.
+- **조상**: `git merge-base --is-ancestor fdb4b24c HEAD` 가 참이다(병합했다).
+- **그 SHA 에 이 slice 가 없다**: 첫 산출물 커밋이 `fdb4b24c` 의 조상이 아니다.
+- **셋째 단언 — 쟀고 하나가 다르다.** 복원 대상 열의 blob 이 착수 base `94ee445b` 와 새 원천
+  `fdb4b24c` 에서 같은가. 아홉은 같고(신설 다섯은 양쪽에 없다) **`docs/discovery/capability-map.md`
+  하나가 다르다** — 11A 가 §12.3 끝에 (k) 절을 더했다. 그래서 그 파일은 **새 원천 기준으로**
+  센다: 복원이 **내 (l) 절을 지우고 11A 의 (k) 절은 남겨야** 한다.
+- r0 과 갈리는 자리가 여기다. 원천이 착수 base 였을 때는 전수 트리 동일성이 갈음이었지만, 공유
+  파일에 **남의 내용**이 들어온 뒤로는 그 갈음을 쓸 수 없다 — 「내 표지 0」과 「남의 표지 보존」을
+  **둘 다** 센다.
 
 ## 실측 HEAD 와 판정 SHA 사이
 
