@@ -185,8 +185,33 @@ verifier r1 도 같은 축을 **변이 트리에서** 재서 같은 답을 얻�
 | 변이 | 처방 전 | 처방 뒤 |
 | --- | --- | --- |
 | **과한 경계**(`(?<![A-Za-z0-9_/.$])`) | 여섯 축 **전부 위반 0 그대로** — 아무 단언도 붉지 않는다 | **RED 2** — `BytecodeConstantPoolTest` 의 「서술자·배열·제네릭 꼴을 뽑는다」와 「두 경계안이 갈리는 자리」 |
-| **아무것도 안 뽑는 정규식** | `emptyList()` 가 그대로 통과 | **RED 4** — 네 축 전부, `disallowedCoordinates` 의 추출 비공허 단언이 명시 실패를 낸다 |
+| **아무것도 안 뽑는 정규식** | `emptyList()` 가 그대로 통과 | **RED 6** — `BytecodeConstantPoolTest` **2** + 네 축의 추출 비공허 명시 실패 **4** |
 
 둘째 변이의 실패 문면은 「상수 풀에서 자기 좌표를 하나도 뽑지 못했다: …/event — `SELF_COORDINATE` 가
 좁아졌는지 본다(「위반 0」과 「추출 0」은 다른 말이다)」이다.
+
+**이 표의 앞 판은 「RED 4」였고 그것은 변이가 아니라 내 `--tests` 필터가 만든 수였다**(v r1 지적).
+그 실행의 표적에 `BytecodeConstantPoolTest` 가 없어 그 class 의 RED 둘이 세어지지 않았다. 같은
+변이를 **표적에 BCPTest 를 넣어** 다시 돌려 **6**(BCPTest 2 + 네 축 4)을 얻었다. 교훈은 메모리의
+「표적 실행은 그 게이트를 안 돌린다」와 같은 계열이다 — **변이의 RED 계수는 표적 집합에 따라 달라지므로
+표적을 함께 적는다.**
+
+## 14. r1 재검증이 낸 새 우회 하나 — 등재 (v r1 L-A)
+
+**허용 밖 뿌리만 골라 빼는 정규식 축소**가 r1 이 세운 두 대조를 **둘 다 통과한다**.
+
+| 실행 | 결과 |
+| --- | --- |
+| 변이(`bidvector[/.](?!decision\|bidding\|settlement\|qualification\|app[/.])…`) + koneps production 탐침 | **exit 0 · 30/0** |
+| 통제군(탐침만 심음) | **exit 1** — `VProbeKonepsKt.class: bidvector.decision.AssessmentBand` |
+
+통제군이 붉다는 것이 **탐침이 실제로 잡히는 꼴**임을 보이므로, 변이의 초록은 축소가 그것을 가렸다는 뜻이다.
+
+**원인 둘** — ① `BytecodeConstantPoolTest` 의 양성 표본이 **손으로 적은 유한 열거**(procurement·strategy·
+sharedkernel·workflow·adapters)라 **빠진 뿌리를 묻지 않는다** ② 추출 비공허는 **자기 패키지 좌표만으로** 늘
+만족돼 허용 밖 뿌리의 실종을 보지 못한다.
+
+**처분: 안 막힘 — 등재**(팀장 판정). 게이트 파일을 알고 고치는 꼴이라 위협 모델 (0) 경계 밖이다. 처방
+후보(양성 표본을 `settings.gradle.kts` 의 모듈 → 패키지 뿌리에서 **구성**으로 뽑기)는
+`OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` ⑤ 가 받는다.
 
