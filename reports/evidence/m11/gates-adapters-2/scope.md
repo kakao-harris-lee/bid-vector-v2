@@ -42,17 +42,19 @@
 ⓑ 넷에 형제 축의 javap 술어를 그대로 이식하면 어떻게 되는지를 컴파일 산출물에서 쟀다
 (`:adapters:compileKotlin` 뒤 class 파일 전수 · 형제와 같은 정규식 `bidvector[/.][A-Za-z0-9_/.$]+`).
 
+세는 단위는 **허용 밖 좌표(distinct)** 다(test 가 내는 `class: 좌표` 쌍은 더 많다 — `ml` 의 경우 474).
+
 | 축 | class 수 | 형제 정규식(오늘 꼴) | 경계 고정 정규식 |
 | --- | --- | --- | --- |
 | `event` | 13 | 0 | 0 |
 | `extraction` | 88 | 0 | 0 |
 | `koneps` | 87 | 0 | 0 |
-| **`ml`** | 72 | **193** | **0** |
+| **`ml`** | 72 | **308** | **0** |
 
 **보정 대조**(술어 이식 전에 먼저 쟀다 — 탐침이 오늘 초록인 축을 초록으로 재는가): 오늘 그 술어를 **실제로
 쓰는** 두 축 `notification`(34 class)·`persistence`(41 class)가 두 꼴 모두 **0**. 탐침은 건전하다.
 
-`ml` 의 193 은 **층을 넘는 참조가 아니다.** 이 패키지는 contracts 모듈의 생성 proto 타입을 쓰고, 그 JVM
+`ml` 의 308 은 **층을 넘는 참조가 아니다.** 이 패키지는 contracts 모듈의 생성 proto 타입을 쓰고, 그 JVM
 패키지가 `contract.bidvector.ml.v1` 이다. 형제 정규식은 **경계를 고정하지 않아** 그 내부 이름
 (`contract/bidvector/ml/v1/…`)의 **가운데 토막**을 `bidvector/ml/v1/…` 로 뽑는다. 뽑힌 좌표는 어느 허용
 뿌리에도 들지 않으므로 전부 위반이 된다. 같은 참조를 **이름 층**은 완전수식 FQN 으로 보므로
@@ -90,13 +92,19 @@
 
 - `adapters/src/test/kotlin/bidvector/adapters/architecture/ScopedAllowedRootsParityTest.kt`
   (표에 여섯 축 추가 · ⓐ 리플렉션 동일성 단언 · ⓒ 접두 필터 좁히기)
+- `adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPool.kt`(**신설** —
+  일괄 javap · 세그먼트 경계 정규식 · 허용 뿌리 술어. 계약 갱신 (5))
+- `adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPoolTest.kt`(**신설** —
+  추출 층 양성 대조, cr r1 M-2. 계약 갱신 (5))
+- `build-logic/src/test/kotlin/bidvector/buildlogic/SourceReferencePolicyTest.kt`(**표본 한 줄** —
+  out_scope 접촉, 계약 갱신 (6))
 - 여섯 축의 dependency test — `event` · `extraction` · `koneps` · `ml`(술어 이식 + deny→allow 전환 둘) ·
   `notification` · `persistence`(`ALLOWED_ROOTS` 를 `internal` 로 여는 한 단어)
 - `config/quality/architecture-policy.properties`(정책 키 신설 — `source.scoped-packages` 값 + 축별
   `source.scoped-allowed-roots.*` 여섯 · 주석)
 - `config/quality/gate-tests.properties`(**주석만** — 「`EventAdapterDependencyTest` 는 여전히 소스 텍스트」가
   거짓이 된다. 여섯 class 는 이미 등재돼 있어 등재 줄 변경 0)
-- `docs/discovery/capability-map.md` §12.3 에 **이 slice 의 하위 절 (m)** 을 덧붙인다(기존 행 수정 0,
+- `docs/discovery/capability-map.md` §12.3 에 **이 slice 의 하위 절**을 덧붙인다(글자는 D-11C-8 대로 마지막 main 병합 시점에 정한다 — 현재 판은 **(k)**, 브리프의 (m) 배정은 계약 변경으로 폐기됐다)(기존 행 수정 0,
   §12 머리 집계 무변경)
 - `reports/evidence/m11/gates-adapters-2/**`
 
@@ -123,6 +131,28 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <�
 병합하게 되면 원천을 그 병합 커밋 SHA 로 바꾸고 **셋째 단언**(복원 대상 blob 이 두 원천에서 같은가)을 함께
 잰다. 목록은 `git diff --name-status <원천>..HEAD` 기계 산출이고 라운드마다 재산출한다. ①~⑥ 실측은
 **마지막 산출물 커밋**에서 임시 clone 으로 돌리고 `실측 HEAD:` 를 `rollback.md` 에 적는다.
+
+## 계약 갱신 2026-11-13 (팀장 — 착수·설계 검토 답과 수정 라운드 r1)
+
+1. **`ml` 은 (나)** — 그 축에서만 좌측 경계를 고정하고 형제 열 축의 잠복은 신설 OPEN 이 받는다.
+2. **`extraction`·`koneps` 의 deny→allow 전환 승인** — 두 층 등식의 반대쪽 항을 세우려면 필요하고 오늘
+   초록이라는 실측이 근거다. 전환 전후 판정 집합을 변이로 쟀다.
+3. **ⓑ 는 닫는 안(보유자 단일성) 승인.** 다만 r1 에서 **닫는 범위가 좁혀졌다** — 같은 이름의 둘째
+   보유자만 닫고 「다른 이름의 판정 심볼」은 열린 채 등재한다(`checklist.md` 알려진 제한 9).
+4. **javap 호출 꼴은 (B)** — 새 네 축만 일괄, 기존 두 축은 무접촉. 약 100초 비용은 신설 OPEN 이 받고,
+   **일괄 귀속이 per-file 과 같은 답을 내는 대조**를 남겼다(`commands.md` §12).
+5. **수정 라운드 새 파일 ↔ in_scope** — 아래 둘을 in_scope 에 더한다(팀장 승인).
+   `adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPool.kt`(일괄 javap ·
+   세그먼트 경계 정규식 · 허용 뿌리 술어, 다섯 자리가 쓴다 — 「복제 넷보다 공유 하나가 맞다」) ·
+   `adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPoolTest.kt`(추출 층
+   양성 대조, cr r1 M-2 — 만드는 커밋에서 `gate-tests.properties` 에 등재했다). 둘 다 rollback 복원
+   목록에 든다.
+6. **out_scope 접촉 — 표본 한 줄, 주장 무변경**(팀장 승인). 착수 계약의 `build-logic/**` 무접촉이
+   깨졌다: 모집단 확장이 `SourceReferencePolicyTest` 의 「범위 축 밖 패키지」 표본
+   (`bidvector.adapters.persistence`)을 거짓으로 만들었다. 표본을 `bidvector.adapters.snapshot` 으로
+   바꿨고 **단언의 주장은 그대로**다. 모집단 확장이 낳은 필연이다. rollback 복원 목록에 든다.
+7. **§12.3 글자는 마지막 main 병합 시점에 정한다**(D-11C-8). 현재 판은 **(k)** 이고, 앞선 PR 이 먼저
+   머지되면 그 시점에 다시 센다 — 그때 main 재병합 · acceptance · rollback 을 한 라운드로 다시 잰다.
 
 ## 하네스 레인 변경
 

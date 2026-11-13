@@ -19,10 +19,12 @@
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-only 32dead40..b4fb3117 | grep -v '^reports/evidence/m11/gates-adapters-2/'` → **12 경로**.
+`git diff --name-only 32dead40..<마지막 산출물 커밋> | grep -v '^reports/evidence/m11/gates-adapters-2/'`
+→ **13 경로**(r1 이 `BytecodeConstantPoolTest.kt` 를 더했다).
 
 ```
 adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPool.kt
+adapters/src/test/kotlin/bidvector/adapters/architecture/BytecodeConstantPoolTest.kt
 adapters/src/test/kotlin/bidvector/adapters/architecture/ScopedAllowedRootsParityTest.kt
 adapters/src/test/kotlin/bidvector/adapters/event/EventAdapterDependencyTest.kt
 adapters/src/test/kotlin/bidvector/adapters/extraction/ExtractionAdapterDependencyTest.kt
@@ -59,7 +61,17 @@ git restore --source=32dead40 --staged --worktree -- <위 12 경로를 개별 �
 range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다. 신설 파일(`BytecodeConstantPool.kt`)은 원천에
 없으므로 같은 명령이 **삭제**로 처리한다(아래 ② 의 `D` 하나).
 
-## ①~⑥ 실측
+## ①~⑥ 실측 — **r1 이 복원 목록을 바꿔 재측정 대기다**
+
+> **이 절의 수는 r0 의 12 경로에 대한 것이고 현재 목록은 13 경로다.** r1 이
+> `BytecodeConstantPoolTest.kt` 를 더했으므로 ② 의 계수(`D 1 + M 11`)가 더는 맞지 않는다
+> (새 목록에서는 `D 2 + M 11`이 된다). **재측정은 머지 차례에 한 라운드로 한다**(팀장 지시:
+> 11A 가 먼저 머지되면 main 병합 · §12.3 글자 재배정 · 전건 `check`(test 층 강제) · rollback
+> 재측정을 함께). 아래는 **그때 버릴 값**이고, 재측정 전까지 이 절은 **미검증**이다.
+>
+> 바뀌지 않는 것 셋: 원천(`32dead40`) · 전제 1·3 · 복원 명령의 꼴. r1 이 더한 경로는 원천에 없는
+> **신설 파일**이라 같은 명령이 삭제로 처리한다.
+
 
 **실측 HEAD: `b4fb31179dfe991f21cbd13f93e3616906ed3a6f`**(이 slice 의 **마지막 산출물 커밋**).
 버릴 clone(`--no-hardlinks`)에서 돌렸다. main 병합(`1406f85d`)은 그 커밋보다 **앞**에 있으므로 실측

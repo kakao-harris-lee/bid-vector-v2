@@ -75,16 +75,19 @@ internal object BytecodeConstantPool {
  *
  * 고정하지 않으면 **중첩 네임스페이스의 가운데 토막**을 자기 좌표로 읽는다: `ml` 축이 쓰는 생성 proto
  * 타입의 JVM 패키지가 `contract.bidvector.ml.v1` 이고, 고정 없는 정규식은 그 내부 이름
- * `contract/bidvector/ml/v1/…` 에서 `bidvector/ml/v1/…` 를 뽑아 **오탐 193**을 낸다(실측). 틀리는
+ * `contract/bidvector/ml/v1/…` 에서 `bidvector/ml/v1/…` 를 뽑아 **허용 밖 좌표(distinct) 308**을 낸다
+ * (실측 — 세는 단위가 다르면 수가 다르다: test 가 내는 `class: 좌표` 쌍으로는 **474**다). 틀리는
  * 방향은 막는 쪽이라 미탐이 아니지만, 그 축을 이 층으로 옮기는 순간 게이트가 거짓으로 붉는다.
  *
  * 형제 열 축은 이 경계가 없고 오늘 그 꼴을 만나는 축이 **0** 이다(`contract.bidvector.*` 를 쓰는
  * adapters 패키지는 `ml` 하나, 전수) — 그 잠복은 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 가 받는다.
  *
- * **경계는 `/` 와 `.` 둘만 배제한다 — 식별자 글자를 배제하면 양성까지 잃는다.** JVM 서술자는
- * `Lbidvector/procurement/Notice;` 꼴이라 좌표 앞 글자가 `L` 이다. 앞 글자를 「식별자 아님」으로
- * 요구하면 그 서술자 전부가 빠지고, 그러면 **오탐도 0 이고 양성도 0** 인 조용한 초록이 된다(이
- * slice 가 실측으로 잡았다: 그 과한 판은 persistence 에서 뽑는 좌표가 677 → 675 로 줄었다).
+ * **경계는 `/` 와 `.` 둘만 배제한다 — 식별자 글자를 배제하면 서술자에만 나타나는 좌표를 잃는다.**
+ * JVM 서술자는 `Lbidvector/procurement/Notice;` 꼴이라 좌표 앞 글자가 `L` 이다. 앞 글자를 「식별자
+ * 아님」으로 요구하면 그 꼴이 빠진다 — 손실은 **서술자에만 나타나는 좌표**이고 실측으로
+ * `persistence` **2** · `ml` **3**, 나머지 네 축 **0** 이다(뽑는 좌표의 대부분은 다른 꼴로도 나타나
+ * 살아남는다: persistence 677 → 675). 수가 작아도 그 판을 버리는 이유는 **오탐이 0 인 것만 보면 두
+ * 판이 구별되지 않기 때문**이다 — 양성을 잃는 변화를 위반 수가 감추는 자리다(cr r1 L-1 정정).
  * 가리려는 꼴은 「`bidvector` 가 수식 이름의 **첫 세그먼트가 아닌** 자리」이므로 `/`·`.` 만 본다.
  */
 internal val SELF_COORDINATE = Regex("""(?<![/.])bidvector[/.][A-Za-z0-9_/.$]+""")
