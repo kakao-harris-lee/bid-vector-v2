@@ -63,3 +63,26 @@
 이 마일스톤 안의 결정 지점은 추천안으로 진행한다(전역 규칙). 거동을 바꾸는 선택은 멈추고 보고한다. 10A 의
 공유 누산기 변경, 10B 의 API 응답 값 변경이 여기에 든다. 외부 effect 가 필요해지는 경우와 Flyway 마이그레이션이
 필요해지는 경우도 마찬가지다.
+
+## 종결 (2026-11-13)
+
+**M10 종결.** slice 넷이 각자 PR 로 머지됐다. 외부 effect 는 0 이다(새 KONEPS 호출·실 DB·실 발송 없음).
+
+| slice | PR | 머지 커밋 | 판정 |
+| --- | --- | --- | --- |
+| 10B `timeline-command-enum` | #149 | `67ff54b1` | verifier ready-for-review · code-reviewer approve · CI 5/5 |
+| 10C `gates-adapters` | #150 | `6c4fbe94` | verifier ready-for-review · code-reviewer approve · CI 5/5 |
+| 10D `gates-web` | #151 | `ff867b5c` | **재작업 상한 5/5 도달 뒤 운영자 예외 두 번**(2026-11-12: r5 토큰 술어 한 라운드 · r6 마이크로 수정과 「또 high 면 범위 축소로 머지」). r6 의 남은 high 는 계약 문면이 실측보다 넓다는 것이었고, 문면을 실측 범위로 좁혀 닫았다. 막지 못하는 다섯은 `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` 로 등재했다 · CI 5/5 |
+| 10A `notice-resume-total` | #152 | `94ee445b` | verifier ready-for-review(표적 재검증 r2) · code-reviewer approve(r2) · CI 5/5 |
+
+- **완료 조건 1** — 10B·10C·10A 는 조건대로 충족했다. **10D 는 충족하지 않았다** — 마지막 verifier 판정은
+  `not-ready`(v r6), 마지막 code-reviewer 판정은 `request_changes`(r4)이고, 위 표의 운영자 예외(2026-11-12)와 팀장 조치
+  코멘트로 범위를 줄여 종결했다. 조건 1 의 예외는 그 운영자 결정이 근거다.
+- **완료 조건 2·3** — OPEN 열하나의 처분(닫힘 넷 · 이미 닫힘 여섯 · 범위 밖 유지 하나)은 `docs/discovery/capability-map.md`
+  §12.3 (g)~(j) 에 각 slice 가 자기 머지에서 등재했다. 위 「착수 실측」 표 밖의 사후 범위 밖 판정은 없다.
+- **신설 OPEN 다섯** — `OPEN-M10-TIMELINE-STATE-OPENAPI-ENUM`(h) · `OPEN-M10-SCOPED-PACKAGES-COVERAGE`(i) ·
+  `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS`(j — 착수 표에 없던 것. 10D 가 r1~r7 에서 범위를 줄이며 세웠다) · `OPEN-M10-SCREEN-COVERAGE-INDIRECT-RENDER`(j) ·
+  `OPEN-M10-OPENING-LIST-RESUME-TOTAL`(g — 착수 표에 없던 것. 10A cr r1 이 착수 계수 오류로 찾았다). 착수 표의 셋에 이 둘을 더해 다섯이다.
+  다섯 모두 외부 effect 없이 닫을 수 있고, **M11(`milestone-11.md`)이 받는다.**
+- **10D 에서 얻은 교훈** — 「사본 없음」류 게이트는 위협 모델 경계를 착수 때 고정하지 않으면 라운드마다 꼴 열거가
+  되풀이된다(r0~r7). M11 의 web 게이트 slice 는 계약에서 경계를 먼저 고정한다.
