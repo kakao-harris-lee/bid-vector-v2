@@ -102,6 +102,39 @@ internal fun Map<String, Any?>.nullablePropertyEnum(
     return declared.filterNotNull().asVocabulary(schemaName, property)
 }
 
+/**
+ * **질의 인자**의 닫힌 어휘(M11/11B — 건 목록의 상태 탭). 응답 스키마 쪽 [propertyEnum] 과 같은
+ * fail-closed 성질을 쓴다: 인자가 하나로 선언되지 않았거나 `schema`·`enum` 이 없거나 열거가 비었
+ * 거나 문자가 아니면 **던진다**. 읽기가 빈 목록을 답으로 내면 그 칸을 쓰는 집합 등식이 공허하게
+ * 초록이 된다.
+ *
+ * 같은 모양의 `private` 사본이 **여럿** 있다(`["parameters"]` 읽기 호출부를 찾아 센다) — **또
+ * 하나를 만들지 않도록** 여기 둔다(v2-지침서 §5 「중복 금지」). 그것들을 이 자리로 모으는 것은
+ * 별 정리다(응답 쪽 어휘 읽기와 같은 처지다).
+ */
+@Suppress("UNCHECKED_CAST")
+internal fun Map<String, Any?>.queryParameterEnum(
+    path: String,
+    method: String,
+    name: String,
+): List<String> {
+    val paths = this["paths"] as Map<String, Any?>
+    val operation = (paths[path] as Map<String, Any?>)[method] as Map<String, Any?>
+    val declaredAt = "$method $path"
+    val parameter =
+        requireNotNull(
+            (operation["parameters"] as? List<Map<String, Any?>>)
+                .orEmpty()
+                .filter { it["in"] == "query" }
+                .singleOrNull { it["name"] == name },
+        ) { "$declaredAt 의 질의 인자 $name 이 하나로 선언되지 않았다" }
+    val schema =
+        requireNotNull(parameter["schema"] as? Map<String, Any?>) {
+            "$declaredAt 의 질의 인자 $name 에 schema 가 없다"
+        }
+    return declaredEnum(declaredAt, name, schema).asVocabulary(declaredAt, name)
+}
+
 @Suppress("UNCHECKED_CAST")
 private fun Map<String, Any?>.propertyDefinition(
     schemaName: String,

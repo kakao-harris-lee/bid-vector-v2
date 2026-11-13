@@ -45,24 +45,57 @@ class OpenApiBidCaseContractTest {
     }
 
     /**
-     * **상태 축의 세 선언이 한 집합이다**(M11/11B). 앞 판은 한 응답 계열 안에서 선언이 갈려 있었다
+     * **상태 축의 선언 넷이 한 집합이다**(M11/11B). 앞 판은 한 응답 계열 안에서 선언이 갈려 있었다
      * — 건 스키마의 상태 칸은 `enum` 인데 타임라인의 출발·도착 칸은 `type: string` 이었다. 그래서
-     * 같은 어휘를 나르는 칸들이 서로 달라질 수 있었고, 건 칸은 **Kotlin 등식 밖**이기까지 했다
-     * (어휘 사본 가운데 등식을 가진 것은 대사 쪽 기록 상태 칸 하나였다 — 착수 실측).
+     * 같은 어휘를 나르는 칸들이 서로 달라질 수 있었고, **등식을 가진 사본은 하나뿐**이었다(대사 쪽
+     * 기록 상태 칸 — 착수 실측).
      *
-     * 세 칸을 한 단언에 둔다. 셋이 같은 식의 오른쪽을 보므로 **한 칸만 늘어난 상태**가 설 수 없다.
+     * 넷째는 **목록 질의의 상태 탭 param** 이다. 그 칸은 선언이 모자란 것이 아니라(이미 `enum`
+     * 이다) **등식이 없었다** — Kotlin 에 상태가 늘면 응답 쪽은 붉어지는데 그 param 만 조용히
+     * 뒤처진다. 선언 꼴이 응답 칸과 달라 읽기는 다르지만 **맞댈 오른쪽은 같다**.
+     *
+     * 넷을 한 단언에 둔다. 같은 식의 오른쪽을 보므로 **한 자리만 늘어난 상태**가 설 수 없다.
      *
      * **wire 값은 바뀌지 않는다.** 두 상태 칸의 값은 포트의 `BidStateTag`(출발은 nullable)에서
      * `.name` 으로만 나온다 — 어휘 밖 값이 나갈 창이 **타입으로 이미** 닫혀 있고, 여기서 더하는
      * 것은 **문서가 그 집합을 선언하게 하는 것**뿐이다. 명령 칸보다 한 겹 더 닫힌 자리다.
      */
     @Test
-    fun `상태 어휘 세 칸이 Kotlin 전수와 같다 — 타임라인 출발 · 도착과 건 상태`() {
+    fun `상태 어휘 네 자리가 Kotlin 전수와 같다 — 타임라인 출발 · 도착 · 건 상태 · 목록 질의 탭`() {
         val states = BidStateTag.entries.map { it.name }
 
         spec.propertyEnum("BidTimelineEntry", "toState") shouldContainExactlyInAnyOrder states
         spec.nullablePropertyEnum("BidTimelineEntry", "fromState") shouldContainExactlyInAnyOrder states
         spec.propertyEnum("BidCase", "state") shouldContainExactlyInAnyOrder states
+        spec.queryParameterEnum("/api/bid-cases", "get", "state") shouldContainExactlyInAnyOrder states
+    }
+
+    /**
+     * **질의 인자 읽기도 fail-closed 다.** 인자를 못 찾으면 빈 어휘를 답으로 내서는 안 된다 —
+     * 그러면 위 등식의 넷째 줄이 **공허하게 초록**이 되고, 그 param 이 이름을 바꾸거나 사라져도
+     * 아무것도 붉어지지 않는다. 열거 자신의 부재·빈 목록·비문자는 응답 쪽 읽기와 **같은 코드**가
+     * 보므로(아래 음성 대조 둘이 그 자리다) 여기서 재는 것은 **탐색**의 방향이다.
+     */
+    @Test
+    fun `없는 질의 인자를 빈 어휘로 답하지 않는다 — 탐색이 던진다`() {
+        val withoutStateParameter =
+            parseOpenApiSpec(
+                """
+                paths:
+                  /api/bid-cases:
+                    get:
+                      parameters:
+                        - name: kind
+                          in: query
+                          schema:
+                            type: string
+                            enum: [REAL, PAPER]
+                """.trimIndent(),
+            )
+
+        shouldThrow<IllegalArgumentException> {
+            withoutStateParameter.queryParameterEnum("/api/bid-cases", "get", "state")
+        }.message.orEmpty() shouldContain "하나로 선언되지 않았다"
     }
 
     /**
