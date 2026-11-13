@@ -65,8 +65,8 @@ vitest setup·eslint 설정 자체를 고치는 것. 이것은 등재로 답하�
 | 11B | 전방 호환 세 조건 성립. 승인: 건 스키마 상태 칸도 같은 등식에(계약 갱신) · 타임라인 상태 조회를 공용 자리로(표 밖 상태의 표시 문면이 바뀐다 — 배포 비틀림 때만 닿고 API 응답 값은 그대로). 목록 질의 상태 param 은 **이미 `enum`** 이고 잔여는 Kotlin 등식 부재뿐이라(code-reviewer 실측) 범위 밖 판정을 거두고 **같은 등식에 넣는다**(단언 한 줄) |
 | 11D | ⑤⑧⑨⑩·(7) 닫힘 전망 인정(⑤ 원형 전건 오탐 0 · (7) 위반 0). ⑥ 은 ⑤ 가 닫지 않는다 — 소비자 흐름 추적(고정점) 대신 **출처 쪽 단언**으로 닫는다: ⑤ 뒤에는 Kotlin 원문을 얻는 길이 소유 모듈 하나뿐이므로 그 모듈이 내주는 텍스트를 단언된 것으로 만든다. 그래서 `web/scripts/kotlin-source.mjs` 가 in_scope 에 든다. 남는 꼴은 설계 검토 뒤 팀장이 판정한다. §12.3 (j) 의 「⑤ 가 넷을 함께 닫는다」는 느슨한 문면이었다(정정은 이 slice 의 등재 절) |
 | 11E | 간접 렌더 추적은 한 겹이 아니라 **파일 안 전이 폐포**(계약보다 넓다). 범위 밖 유지: `src/components/**` 에 둔 카드(모집단 디렉터리 축, 오늘 실재 0) → 신설 OPEN |
-| 11C | `ml` 축의 바이트코드 오탐(193→ 실측 308, `contract/bidvector/ml/v1` 가운데 토막)은 production 위반이 아니라 이식 술어의 꼴 — `ml` 의 새 술어에서만 좌측 경계 고정, 형제 여덟은 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 등재. 승인: `extraction`·`koneps` deny→allow · ⓐ 리플렉션 동일성 · ⓑ 보유자 단일성(닫는 안) · ⓒ 접두 좁히기 · 네 축만 일괄 javap(기존 두 축 호출 꼴 무접촉, 약 100초 비용은 그 OPEN 에) · 공유 헬퍼 `BytecodeConstantPool.kt` 신설 · `build-logic` `SourceReferencePolicyTest` 표본 한 줄 교체(주장 무변경). 범위 밖 유지: 두 층 단일 출처화(ADR 자리). **verifier r0 뒤 판정**: 「다른 이름의 판정 심볼」 꼴(V-dec·V-call)은 게이트를 알고 꾸민 꼴이라 경계 밖 → 「안 막힘 — 등재」, 구조 처방은 같은 OPEN 으로 · `MutableSet` 캐스팅 · 뿌리 겨냥 lookahead 축소도 등재 |
-| 11D (설계 검토·r0 뒤) | 앞 행의 ⑥ 출처 쪽 단언이 합성 입력 대조 13 자리를 깨자 **래퍼/코어 분리** 승인(e2e 하네스 두 파일 in_scope · 코어 획득 제한은 구조로). 경계 밖 등재 다섯 승인(`vi.mock`·층 제거 · stack 조작·글자 조립 · 단언 뒤 사본 · `eslint-disable` · vitest 밖 프로세스). (7) 범위를 `e2e/**/*.ts`·뿌리 `*.ts` 로 확장. **verifier r0 뒤 판정**: 코어 입구는 지정자 열거가 아니라 **호출자 프레임** 단언으로 · `fs` 표면 밖 다섯 꼴(grep·git grep·cpSync·worker_threads·`import.meta.glob`)은 `OPEN-M11-KOTLIN-READ-GATE-RESIDUALS-2` 등재 |
+| 11C | `ml` 축의 바이트코드 오탐(193→ 실측 308, `contract/bidvector/ml/v1` 가운데 토막)은 production 위반이 아니라 이식 술어의 꼴 — `ml` 의 새 술어에서만 좌측 경계 고정, 형제 축의 비경계 정규식은 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 등재. 승인: `extraction`·`koneps` deny→allow · ⓐ 리플렉션 동일성 · ⓑ 보유자 단일성(닫는 안) · ⓒ 접두 좁히기 · 네 축만 일괄 javap(기존 두 축 호출 꼴 무접촉, 약 100초 비용은 그 OPEN 에) · 공유 헬퍼 `BytecodeConstantPool.kt` 신설 · `build-logic` `SourceReferencePolicyTest` 표본 한 줄 교체(주장 무변경). 범위 밖 유지: 두 층 단일 출처화(ADR 자리). **verifier r0 뒤 판정**: 「다른 이름의 판정 심볼」 꼴(V-dec·V-call)은 게이트를 알고 꾸민 꼴이라 경계 밖 → 「안 막힘 — 등재」, 구조 처방은 같은 OPEN 으로 · `MutableSet` 캐스팅도 등재 · **r1 뒤 판정**: 뿌리 겨냥 lookahead 축소(L-A)도 경계 밖 등재 |
+| 11D (설계 검토·r0 뒤) | 앞 행의 ⑥ 출처 쪽 단언이 합성 입력 대조 13 자리를 깨자 **래퍼/코어 분리** 승인(e2e 하네스 두 파일 in_scope · 코어 획득 제한은 구조로). 경계 밖 등재 승인(`vi.mock`·층 제거 · stack 조작·글자 조립 · 단언 뒤 사본 · `eslint-disable` 넷)과 **경계 안의 미달 등재** 하나(vitest 밖 프로세스 — 정적 층만 받는다). (7) 범위를 `e2e/**/*.ts`·뿌리 `*.ts` 로 확장. **verifier r0 뒤 판정**: 코어 입구는 지정자 열거가 아니라 **호출자 프레임** 단언으로 · `fs` 표면 밖 다섯 꼴(grep·git grep·cpSync·worker_threads·`import.meta.glob` — v M-1 ∪ cr M-2)은 새 층이 필요한 **경계 안의 미달**로 `OPEN-M11-KOTLIN-READ-GATE-RESIDUALS-2` ⓑ 등재 |
 
 ## 완료 조건
 
@@ -86,7 +86,7 @@ vitest setup·eslint 설정 자체를 고치는 것. 이것은 등재로 답하�
 
 ## 종결 (2026-11-14)
 
-**M11 종결.** slice 다섯이 각자 PR 로 머지됐다. 외부 effect 는 0 이다. 각 PR 은 verifier `ready-for-review` · code-reviewer(sonnet) approve(또는 차단 0) · head CI 5/5 를 거쳤고, 판정과 조치는 PR 코멘트에 있다.
+**M11 종결.** slice 다섯이 각자 PR 로 머지됐다. 외부 effect 는 0 이다. 각 PR 은 verifier `ready-for-review` · code-reviewer approve(또는 차단 0) · head CI 5/5 를 거쳤고(code-reviewer 는 `model: sonnet` 으로 띄웠으나 #154·#156·#157 의 코멘트는 자기 모델을 Opus 5 로 적었다 — 저자와 다른 패스라는 조건은 선다), 판정과 조치는 PR 코멘트에 있다.
 
 | slice | PR | 머지 커밋 | 재작업 | 비고 |
 | --- | --- | --- | --- | --- |
@@ -97,9 +97,10 @@ vitest setup·eslint 설정 자체를 고치는 것. 이것은 등재로 답하�
 | 11D `gates-web-read` | #157 | `8562b610` | 2/5 | 첫 CI 의 `web` 은 여정 ③ 타임라인 항목 수 경합(아래 후속) — 실패 job 재실행 |
 | 11C `gates-adapters-2` | #156 | `8d6bc55b` | 1/5 | 차단 high(「다른 이름의 판정 심볼」을 닫힘으로 적음)는 재등재로 처분 |
 
-- **완료 조건 2 — 받는 항목 아홉.** 닫힘: 1 · 2 · 3 · 7 · 8 · 9(서명 A·B 각각). 부분 닫힘 + 잔여 등재: 4(ⓐⓒ 닫힘 · ⓑ 는 같은 이름의 둘째 보유자만 닫힘), 5(⑤⑥⑧⑨⑩ 닫힘 — ⑤ 는 vitest 프로세스의 `fs` 표면까지), 6(간접 렌더 잔여 다섯 닫힘 · 파일 사이 어휘 도달은 등재). 범위 밖 판정은 위 「착수 판정」 절이 전부다(이 절을 쓰는 시점 기준).
-- **완료 조건 3** — 처분이 capability map §12.3 (k) 11A · (l) 11E · (m) 11B · (n) 11D · (o) 11C 에 머지 순서대로 붙었다. 절 글자를 머지 순서에 묶자 가운데 삽입은 0 이었고, 대신 자동 병합이 뒤 절을 앞 절 **앞에** 끼우거나 글자를 겹친 일이 둘(11B·11D) 있었다 — 둘 다 절 수·글자 집합·본문 해시 계수로 잡았다.
-- **신설 OPEN 다섯** — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`(l) · `OPEN-M11-SCREEN-COVERAGE-POPULATION-DIR`(l) · `OPEN-M11-GATE-TEST-WARMUP-BUDGET`(l) · `OPEN-M11-KOTLIN-READ-GATE-RESIDUALS-2`(n) · `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED`(o — 받는 것 다섯이 같은 파일들을 만지므로 한 slice 가 한 번에 받는다).
+- **완료 조건 2 — 받는 항목 아홉.** 닫힘: 1 · 2 · 3 · 7 · 8 · 9(서명 A·B 각각). 닫힘 + 잔여 등재: 4(ⓐⓒ 닫힘 — ⓐ 의 `MutableSet` 캐스팅은 등재 · ⓑ 는 같은 이름의 둘째 보유자만 닫힘), 5(⑤⑥⑧⑨⑩ 닫힘 — ⑤ 는 vitest 프로세스의 `fs` 표면까지), 6(간접 렌더 잔여 다섯 닫힘 · 파일 사이 어휘 도달은 등재). 범위 밖 판정은 위 「착수 판정」 절이 전부다(이 절을 쓰는 시점 기준).
+- **완료 조건 3** — ID 없는 항목(4·7·8·9)의 처분은 각 slice evidence 에 있다: 11C·11E·11B 는 `checklist.md`, 11D 는 `checklist.md` 가 없어 항목 7 처분이 `scope.md` 계약 갱신 (7) 행과 §12.3 (n) 에 있다. ID 있는 처분은 처분이 capability map §12.3 (k) 11A · (l) 11E · (m) 11B · (n) 11D · (o) 11C 에 머지 순서대로 붙었다. 절 글자를 머지 순서에 묶자 가운데 삽입은 0 이었고, 대신 자동 병합이 뒤 절을 앞 절 **앞에** 끼우거나 글자를 겹친 일이 둘(11B·11D) 있었다 — 둘 다 절 수·글자 집합·본문 해시 계수로 잡았다.
+- **완료 조건 4·5** — 외부 effect 0(새 KONEPS 호출·실 DB·실 발송 없음 — 각 slice scope.md 의 out_scope 와 acceptance 가 로컬·CI 뿐). 이 절이 조건 5 다. 위 「착수 판정」 11C 행과 11D 후속 행은 이 절과 같은 커밋에서 더했다.
+- **신설 OPEN 다섯**(받는 자리는 각 OPEN 행이 정본, 마일스톤 수준 배정은 다음 계획이 한다) — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`(l) · `OPEN-M11-SCREEN-COVERAGE-POPULATION-DIR`(l) · `OPEN-M11-GATE-TEST-WARMUP-BUDGET`(l) · `OPEN-M11-KOTLIN-READ-GATE-RESIDUALS-2`(n) · `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED`(o — 받는 것 다섯이 같은 파일들을 만지므로 한 slice 가 한 번에 받는다).
 - **OPEN 없는 후속 하나** — 여정 e2e ③ 이 화면 타임라인 항목 수를 **먼저 받아 둔 API 응답**의 길이와 비교한다(`journey.spec.ts`). 응답 캡처 뒤 화면이 한 번 더 조회하면 수가 어긋난다(PR #157 첫 CI: 화면 3 ↔ 응답 2). 다음에 그 spec 을 만지는 slice 가 받는다.
 - **운영 교훈 둘** — ① 레인이 긴 배경 작업의 끝을 놓쳐 idle 로 멈춘 일이 여러 번(11A·11B·11D)이었다. 팀장이 로그 끝줄과 프로세스 종료를 직접 감시해 깨웠다. ② 충돌 0 자동 병합이 공유 파일 합집합을 보증하지 않았다 — 계수 확인이 매번 일을 했다.
 
