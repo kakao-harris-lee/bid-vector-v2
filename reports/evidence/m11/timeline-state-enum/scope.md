@@ -65,7 +65,9 @@ Kotlin 등식 밖이다(어휘 사본 가운데 등식을 가진 것은 대사 �
   하나(새 사본을 만들지 않는다) · 항목 8 의 KDoc 한 줄
 - `web/src/api/generated/operator-api.ts` — 저장소 절차(`npm run api:types`)의 산출물
 - `web/src/display/caseDisplay.ts` · `web/src/display/caseDisplay.test.ts`
-- `web/src/screens/WorksheetTimeline.tsx` — 표 밖 조회 자리(D-11B-3)
+- `web/src/screens/WorksheetTimeline.tsx` — 표 밖 조회 자리(D-11B-3) ·
+  `web/src/screens/WorksheetScreen.test.tsx` — 그 거동 변경의 렌더 층 잠금(기존 파일 · 게이트
+  등록부에 이미 있다)
 - `docs/discovery/capability-map.md` §12.3 의 새 하위 절 (l)(행을 고치지 않고 덧붙인다)
 - `reports/evidence/m11/timeline-state-enum/**`
 
