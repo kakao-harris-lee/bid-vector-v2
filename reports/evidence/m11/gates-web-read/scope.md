@@ -11,9 +11,9 @@ in_scope:
   - web/scripts/kotlin-source-ownership.test.mjs # 데이터 파일 술어를 측정된 처방으로 (⑩)
   - web/scripts/type-assertion-gate.test.mjs     # 신설 — (7) 양성·음성 대조 + 덮어쓰기 측정
   - web/eslint.config.js                         # (7) consistent-type-assertions
-  - web/vite.config.ts                           # setupFiles 등재 (⑤ 층의 입구)
-  - web/config/gate-tests.txt                    # 새 게이트 test 둘 등재
-  - docs/discovery/capability-map.md             # §12.3 하위 절 (n) 만
+  - web/vite.config.ts                           # `test:` 블록에 setupFiles 등재 — §공유 파일
+  - web/config/gate-tests.txt                    # 새 게이트 test 둘 등재 — §공유 파일
+  - docs/discovery/capability-map.md             # §12.3 의 새 하위 절 하나 — §절 글자
   - reports/evidence/m11/gates-web-read/
 out_of_scope:
   - web/src/**                             # 출하 코드를 바꾸지 않는다 — (7) 오늘 위반 0 실측
@@ -39,7 +39,7 @@ rollback: rollback.md
 | ⑥ 단언 전수의 데이터 흐름이 한 홉 | 모집단 수집이 `readKotlinSource(…)` 를 **직접 인자**로 받는 호출과 **한 단계 중간 변수**까지다 | **⑤ 가 닫지 않는다** — 아래 §⑥ |
 | ⑧ 추적되는 심볼릭 링크 | 링크를 실제로 걸어 재니 ⑤ 층이 **던진다**(해석된 실경로를 본다) | **닫힘(⑤ 가 함께)** |
 | ⑨ 대소문자 | ⑤ 층의 확장자 판정은 **해석된 실경로 + 대소문자 무시**라 표기 축이 사라진다 | **닫힘(⑤ 가 함께)** |
-| ⑩ 데이터 파일 | 처방(`#` 줄 제외 + allowlist 차감 + 단어 토큰)을 오늘 트리에 돌려 **오탐 0** · P6·P7·P7b·P7c 는 각각 1·1·2·2 매치 | **닫힘** |
+| ⑩ 데이터 파일 | ⑤ 는 **vitest 안에서만** 덮는다(§⑩). 처방(`#` 줄 제외 + allowlist 차감 + 단어 토큰)은 오늘 트리에서 **오탐 0** · P6·P7·P7b·P7c 는 각각 1·1·2·2 매치 | **두 층으로 닫힘** |
 | (7) `as Record<…>` 우회 | 규칙을 얹어 `src/**` 전수를 재니 **위반 0** · `as const satisfies` 는 **0**(대조군) · `{…} as Record<…>` 는 **1** | **닫힘** |
 
 수치의 정본은 `commands.md` 「착수 실측」이다.
@@ -76,11 +76,38 @@ Kotlin 소스는 한 줄도 만지지 않는다. 그런데도 `check` 가 accept
 `LeakPatternGateTask` 의 스캔 루트**(`reports/evidence/`)**에 들기 때문**이다 — 그 task 는
 `check` 에 배선돼 있고 baseline 밖의 새 매치를 실패시킨다. 선례는 M10/gates-web 의 같은 줄이다.
 
-## 공유 파일 — `display-gate-selectors.test.mjs` (11E 와 겹친다)
+## ⑩ — ⑤ 가 덮는 범위를 실측했다 (팀장 지시 (3))
+
+세 칸을 쟀다(수치는 `commands.md`). 데이터 파일이 **별표 glob** 을 들고 코드에는 확장자 토큰이
+0 인 꼴을 같은 모듈로 두고 **프로세스만 바꿨다**.
+
+| 자리 | ⑤ 가 덮는가 |
+| --- | --- |
+| vitest 안(`npm run test`·`gate:tests`) | **덮는다** — 던진다 |
+| vitest 밖(`node` 직접 — playwright spec·여정 하네스·게이트 스크립트가 그 자리다) | **못 본다** — 읽혔다 |
+| 오늘의 정적 데이터 파일 술어 | 그 glob 값을 **지나간다** |
+
+**남는 꼴이 있으므로 처방을 더한다.** ⑤ 는 프로세스 층이고 정적 술어는 **추적 파일** 층이라
+덮는 집합이 다르다 — 이 slice 의 web 게이트 가운데 Kotlin 을 읽는 자리가 vitest 밖에도
+실재한다(여정 하네스가 그 꼴이다).
+
+## 공유 파일 — 11E 와 겹치는 셋
 
 (7) 의 lint 게이트 test 는 **새 파일**(`scripts/type-assertion-gate.test.mjs`)로 짓는다. 기존
-lint 게이트 test 를 늘리는 쪽이 싸지만 그 파일이 **11E 의 서명 A 대상**이라(첫 칸 5초 timeout)
-같은 파일을 두 레인이 만진다. 새 파일은 만드는 커밋에서 `web/config/gate-tests.txt` 에 등재한다.
+lint 게이트 test(`display-gate-selectors.test.mjs`)를 늘리는 쪽이 싸지만 그 파일이 **11E 의
+서명 A 대상**이라(첫 칸 5초 timeout) 같은 파일을 두 레인이 만진다 — 그래서 out_of_scope 다.
+
+| 공유 자리 | 이 slice 의 편집 | 병합 때 확인 |
+| --- | --- | --- |
+| `web/vite.config.ts` 의 `test:` 블록 | `setupFiles` **한 키** 신설(오늘 0 건). 설정 파일을 나누지 않는다 — 그 블록의 주석이 분리를 금한다 | `test:` 블록의 **키 수**와 `setupFiles` 원소 수를 센다. 11E 는 teardown 을 test 파일 안에서 고치는 것이 1안이라 오늘은 충돌이 없지만, 충돌 0 자동 병합이 같은 본문을 접는 선례가 있다 |
+| `web/config/gate-tests.txt` | 새 test **둘**을 끝에 더한다 | 병합 뒤 **줄 수**와 `npm run gate:tests` 의 판정으로 센다(등록부 전수를 실행 결과로 단언하는 게이트다) |
+| `docs/discovery/capability-map.md` §12.3 | 새 하위 절 하나 | §절 글자 |
+
+## §12.3 절 글자 — slice 에 고정하지 않는다 (팀장 지시 (1))
+
+브리프의 `(n)` 배정은 **폐기**다. 이 PR 이 main 을 **마지막으로 병합할 때** 그 시점 §12.3 의
+마지막 하위 절 **다음 글자**로 절을 **끝에 덧붙인다**. 그래서 글자는 머지 순서가 정하고, 이
+문서는 글자를 적지 않는다.
 
 ## 하네스 레인 변경
 
@@ -90,3 +117,7 @@ lint 게이트 test 를 늘리는 쪽이 싸지만 그 파일이 **11E 의 서�
 ## 갱신 이력
 
 - 2026-11-13 초판(착수 보고와 함께).
+- 2026-11-13 r1 — 팀장 계약 변경(`7817bd4f`) 반영. ① §12.3 절 글자를 머지 순서에 맡긴다
+  ② `vite.config.ts` 의 `test:` 블록과 `gate-tests.txt` 를 11E 와의 공유 자리로 등재하고 병합
+  확인을 **계수**로 적는다 ③ ⑩ 은 ⑤ 의 덮는 범위를 실측해 **남는 꼴이 있음**을 확인하고 처방을
+  더한다 ④ 경계 밖 등재·범위 밖 판정은 설계 검토 뒤 구현 전에 보고한다.
