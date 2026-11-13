@@ -2,6 +2,7 @@ package bidvector.workflow.collection
 
 import bidvector.procurement.BudgetLimit
 import bidvector.procurement.COLLECTION_BUDGET_ZONE
+import bidvector.procurement.CollectionAccounting
 import bidvector.procurement.CollectionReferenceDate
 import bidvector.procurement.CollectionRunMeta
 import bidvector.procurement.CollectionRunStore
@@ -39,6 +40,32 @@ internal class Candidate(
      */
     val openingAnchor: OpeningAnchor,
 )
+
+/**
+ * 슬롯 걷기 하나의 누적 — 공유 누산기([SourceAccountingTally])에 **총수만 따로** 얹는다.
+ *
+ * 그 누산기는 마지막 배치의 총수를 쓰는데(`source.sourceTotal ?: sourceTotal`), 어댑터는 무자료 경로에서
+ * 그 칸을 **0** 으로 채운다. 쪽 상한으로 이어 돌 때 재개 첫 쪽이 「없음」이면 그 0 이 `?:` 를 통과해 앞
+ * 배치의 총수를 덮고, 그러면 슬롯 회계 행이 「받은 수 ≥ 총수」가 되어 덜 받은 슬롯이 다 받은 것으로
+ * 적힌다. 그래서 배치마다 본 총수의 최댓값([widerTotalOf] — 형제 두 갈래와 **같은** 한 자리)을 여기서
+ * 쥐고 회계에 싣는다. 누산기 자체를 고치지 않는 것은 범위다 — 그 타입을 세 갈래가 공유하므로 거동이
+ * 함께 바뀐다.
+ *
+ * 형제 갈래는 이 값을 슬롯 걷기 **지역 변수**로 쥔다. 여기서 타입이 되는 것은 배치를 받는 자리가 걷기
+ * 루프에서 두 프레임 아래이기 때문이고(쪽 하나를 읽는 함수), 그 자리까지 누산기와 **함께** 내려가야
+ * 두 값이 갈릴 수 없다.
+ */
+private class SlotWalkTally {
+    private val source = SourceAccountingTally()
+    private var claimedTotal: Int? = null
+
+    fun absorb(accounting: CollectionAccounting) {
+        source.absorb(accounting)
+        claimedTotal = widerTotalOf(claimedTotal, accounting.sourceTotal)
+    }
+
+    fun toAccounting(): CollectionAccounting = source.toSourceAccounting().copy(sourceTotal = claimedTotal)
+}
 
 /** 슬롯 하나의 끝 — 멈춤 사유와 「끝까지 읽었는가」. 둘은 다른 축이다(절단은 멈춤이 아니다). */
 private class SlotOutcome(
@@ -98,12 +125,12 @@ internal class OpeningSampleFramer(
     ): SlotOutcome {
         val referenceDate = CollectionReferenceDate(noticeDate)
         val startedAt = clock.now()
-        val tally = SourceAccountingTally()
+        val tally = SlotWalkTally()
         var walk: PageWalk = PageWalk.Next(null)
         while (walk is PageWalk.Next) {
             walk = framePage(referenceDate, source, into, tally, walk.cursor)
         }
-        val accounting = tally.toSourceAccounting()
+        val accounting = tally.toAccounting()
         runs.record(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_RESULT_LIST, startedAt, clock.now()),
@@ -116,7 +143,7 @@ internal class OpeningSampleFramer(
         referenceDate: CollectionReferenceDate,
         source: OpeningCollectionSource,
         into: MutableList<Candidate>,
-        tally: SourceAccountingTally,
+        tally: SlotWalkTally,
         cursor: PageCursor?,
     ): PageWalk {
         // 상한은 **관문이** 센다(D-6G-47) — 여기서 한 번 더 세면 같은 호출을 두 번 계상하고,
@@ -128,7 +155,7 @@ internal class OpeningSampleFramer(
         referenceDate: CollectionReferenceDate,
         source: OpeningCollectionSource,
         into: MutableList<Candidate>,
-        tally: SourceAccountingTally,
+        tally: SlotWalkTally,
         cursor: PageCursor?,
     ): PageWalk {
         val batch = source.port.fetchOpeningResults(referenceDate, cursor)
