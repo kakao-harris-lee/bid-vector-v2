@@ -6,7 +6,14 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { KOTLIN_SOURCE_KEYS, readKotlinSource } from './kotlin-source.mjs';
+// `readAliased` 는 **별칭 import** 다 — ⑥ 의 꼴 하나이고, 아래 동일성 대조가 「흐름의 꼴이
+// 답을 바꾸지 않는다」를 재는 자리라 그 꼴을 축어로 들여온다.
+import {
+  KOTLIN_SOURCE_KEYS,
+  assertStrippedKotlin,
+  readKotlinSource,
+  readKotlinSource as readAliased,
+} from './kotlin-source.mjs';
 
 /**
  * **Kotlin 원문 읽기의 소유권을 구조로 잠근다**(M10/gates-web — verifier r1 M-2 · r2 H-1~H-3·M-1).
@@ -516,6 +523,86 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
 
     expect(callsStripInsideReader, 'readKotlinSource 가 공유 걷기를 호출하지 않는다').toBe(true);
     expect(readKotlinSource('provenance')).not.toContain('/**');
+  });
+});
+
+/**
+ * **출처 쪽 단언 — 소비자 흐름을 쫓지 않는다**(팀장 판정 2026-11-13 (c)).
+ *
+ * 앞 판의 단언은 「다시 걸어 같은가」였고, 그 성질은 **걷힌 상태를 유지하는 사본**을 지나보냈다
+ * (M10 미달 ② 표의 「단언 앞 · 줄을 끊지 않는 꼴」 칸). 그래서 방어가 「추출 함수 전수가 단언을
+ * 부르는가」라는 **모집단 추적**에 걸렸고, 그 추적이 보지 못하는 꼴을 세는 일이 ⑥ 이었다.
+ *
+ * ⑤ 층 뒤에는 Kotlin 원문을 얻는 길이 **소유 모듈 하나**다. 그러니 단언의 기준을 성질이 아니라
+ * **내준 텍스트와의 동일성**으로 올린다 — 손댄 텍스트는 **어떤 흐름의 꼴로 와도** 같은 자리에서
+ * 던지므로, 꼴을 세는 축이 사라진다. 아래가 그 「꼴이 답을 바꾸지 않는다」의 실측이다.
+ */
+describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
+  it('내준 텍스트는 그대로 지나가고 같은 값을 돌려준다', () => {
+    const basis = readKotlinSource('basis');
+    const provenance = readAliased('provenance');
+
+    expect(assertStrippedKotlin(basis)).toBe(basis);
+    expect(assertStrippedKotlin(provenance)).toBe(provenance);
+  });
+
+  /**
+   * **줄을 끊지 않는 사본** — 걷힌 상태가 유지되므로 앞 판의 성질 단언은 **조용히 지나갔다**.
+   * 동일성은 값이 달라진 것을 본다.
+   */
+  it('줄을 끊지 않는 사본도 던진다', () => {
+    const marker = `/${'/'}`;
+    const copied = readKotlinSource('basis').replaceAll(marker, '');
+
+    expect(copied, '이 입력이 원문과 같다 — 대조가 공허하다').not.toBe(readKotlinSource('basis'));
+    expect(() => assertStrippedKotlin(copied)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+  });
+
+  /** **죽은 단언**(⑥ 의 꼴) — 호출 계수만 맞추는 자리가 더는 서지 않는다. */
+  it('내주지 않은 텍스트는 빈 문자열이어도 던진다', () => {
+    expect(() => assertStrippedKotlin('')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(() => assertStrippedKotlin('val x = 1\n')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+  });
+
+  /**
+   * **⑥ 이 열거하던 꼴 전부가 같은 답을 낸다.** 두 홉 이상·별칭 import·다듬기·spread·콜백으로
+   * **손댄** 텍스트를 넘겨도 전부 같은 자리에서 던진다 — 모집단 추적이 그 꼴을 보든 말든 답이
+   * 같으므로 이 축에서 꼴을 세는 일이 끝난다.
+   */
+  it('손댄 텍스트는 흐름의 꼴과 무관하게 던진다', () => {
+    const marker = `/${'/'}`;
+    const source = readKotlinSource('basis');
+    const shapes = {
+      '두 홉 이상': () => {
+        const first = source;
+        const second = first.replaceAll(marker, '');
+        return second;
+      },
+      '별칭 import': () => readAliased('basis').replaceAll(marker, ''),
+      '다듬기': () => `${source} `,
+      'spread': () => [source.replaceAll(marker, '')].at(0),
+      '콜백': () => [source].map((text) => text.replaceAll(marker, '')).at(0),
+    };
+
+    for (const [name, make] of Object.entries(shapes)) {
+      expect(() => assertStrippedKotlin(make()), `${name} 이 단언을 지나간다`).toThrow(
+        /걷힌 Kotlin 텍스트가 아니다/u,
+      );
+    }
+  });
+
+  /** **음성 대조** — 손대지 않은 텍스트는 어떤 꼴로 와도 지나간다(일률 거절이 아니다). */
+  it('손대지 않은 텍스트는 어떤 꼴로 와도 지나간다', () => {
+    const source = readKotlinSource('provenance');
+    const twoHops = (() => {
+      const first = source;
+      const second = first;
+      return second;
+    })();
+
+    expect(assertStrippedKotlin(twoHops)).toBe(source);
+    expect(assertStrippedKotlin([source].map((text) => text).at(0))).toBe(source);
+    expect(assertStrippedKotlin(readAliased('provenance'))).toBe(source);
   });
 });
 
