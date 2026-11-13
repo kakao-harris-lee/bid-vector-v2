@@ -65,7 +65,18 @@ const STRIP_REF_ALLOWED = [OWNER, 'scripts/kotlin-source.test.mjs'];
  * **소유 파일과 그 단위 test 둘**로 고정한다 — 걷기 본체를 같은 꼴로 묶어 둔 선례를 잇는다.
  */
 const EXTRACT_KERNEL = 'e2e/harness/opening-axis-extract.mjs';
-const EXTRACT_REF_ALLOWED = ['e2e/harness/opening-axis.mjs', 'e2e/harness/opening-axis.test.mjs'];
+
+/**
+ * **쥐는 자리와 부르는 자리의 허용이 다르다**(r1). 아래 import 그래프 술어는 「누가 **쥐는가**」를
+ * 보고, 커널 쪽 호출자 프레임 판정은 「누가 **부르는가**」를 본다 — 부르는 자리는 소유자와 그 단위
+ * test **둘**이고, 쥐는 자리에는 이 파일이 하나 더 든다. 이 파일이 커널을 쥐는 이유가 바로
+ * **쥐어도 부를 수 없음을 재는 것**이라, 그 비대칭 자체가 구조 층의 증거다.
+ */
+const EXTRACT_REF_ALLOWED = [
+  'e2e/harness/opening-axis.mjs',
+  'e2e/harness/opening-axis.test.mjs',
+  'scripts/kotlin-source-ownership.test.mjs',
+];
 
 /**
  * 데이터 파일 가운데 Kotlin 경로를 **출처 주석으로** 담는 자리. 여는 데 쓰이지 않고 「이 fixture 가
@@ -423,11 +434,16 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
 });
 
 /**
- * **추출 커널을 쥐는 자리가 둘이다**(M11 — 팀장 조건 1). 술어는 **해석된 import 그래프**이므로
- * 별칭·재수출·쿼리·동적 import·다른 디렉터리의 긴 상대 경로가 전부 같은 대상으로 접힌다.
+ * **추출 커널을 쥐는 자리가 둘이다.** 술어는 **해석된 import 그래프**이므로 별칭·재수출·쿼리·
+ * 리터럴 동적 import·다른 디렉터리의 긴 상대 경로가 전부 같은 대상으로 접힌다.
+ *
+ * **이 층은 보조다**(r1 — verifier H-1). 주장은 「**지정자로 적힌** 획득」까지이고, 확장자 없는
+ * 정적 import·`createRequire`·템플릿 `import()`·`vi.importActual` 은 이 술어 밖이다. 그 축을 닫는
+ * 것은 커널 쪽 **호출자 프레임** 판정이고(아래 묶음), 이 층은 그보다 이른 시점에 **이름으로**
+ * 알려 주는 값 때문에 남긴다.
  */
 describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
-  it('커널을 import 하는 파일은 소유 파일과 그 단위 test 둘뿐이다', () => {
+  it('커널을 쥐는 파일은 허용 목록뿐이다', () => {
     const referrers = files
       .filter(isAstFile)
       .filter((relativePath) => resolvedImports(read(relativePath), relativePath).includes(EXTRACT_KERNEL))
@@ -455,6 +471,33 @@ describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
       expect(resolvedImports(source, 'scripts/probe.mjs'), `${name} 이 술어를 지나간다`).toContain(
         EXTRACT_KERNEL,
       );
+    }
+  });
+
+  /**
+   * **구조 층 — 부르는 순간 호출자 프레임이 선다**(r1 — verifier H-1). 위 import 그래프 술어는
+   * **지정자 문자열**을 보는 보조 층이라 평범한 획득 꼴 넷(확장자 없는 정적 import · `createRequire` ·
+   * 템플릿 `import()` · `vi.importActual`)이 지나갔다. 획득 꼴을 더 열거하지 않고 **호출자**를 묻는다 —
+   * 이 test 파일은 허용 둘이 아니므로, **어떤 꼴로 얻었든** 부르면 거부된다.
+   *
+   * 이 단언 자체가 그 증거다: 이 파일은 커널을 평범한 정적 import 로 얻었고, 그래도 거부된다.
+   */
+  it('허용 밖 파일이 커널을 부르면 거부된다 — 획득 꼴과 무관하다', async () => {
+    const viaStatic = await import('../e2e/harness/opening-axis-extract.mjs');
+    const viaTemplate = await import(`../e2e/harness/opening-axis-extract.${'mjs'}`);
+    const viaNoExtension = await import('../e2e/harness/opening-axis-extract');
+
+    for (const [name, namespace] of [
+      ['정적 import', viaStatic],
+      ['템플릿 import()', viaTemplate],
+      ['확장자 없는 import', viaNoExtension],
+    ]) {
+      expect(() => namespace.openingOperationPathsOf('val x = 1'), `${name} 이 거부되지 않는다`).toThrow(
+        /직접 불렀다/u,
+      );
+      expect(() => namespace.detailAxisCountsOf('val x = 1')).toThrow(/직접 불렀다/u);
+      expect(() => namespace.noticeListOperationsOf('val x = 1')).toThrow(/직접 불렀다/u);
+      expect(() => namespace.progressLabelsOf('val x = 1')).toThrow(/직접 불렀다/u);
     }
   });
 

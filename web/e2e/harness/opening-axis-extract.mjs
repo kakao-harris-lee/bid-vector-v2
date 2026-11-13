@@ -2,10 +2,15 @@
  * 출하 Kotlin 본문에서 개찰 축 표를 **읽어 내는 순수 커널**(M11/gates-web-read — 팀장 판정 (ㄱ)).
  *
  * **내부 모듈이다.** 공개 입구는 `opening-axis.mjs` 의 `shipped…` 넷이고, 그 넷이 **동일성 단언**을
- * 거친 뒤 여기로 넘긴다. 그래서 이 모듈의 함수는 **단언을 거치지 않는 입구**다 — 소비자가 여기를
- * 직접 부르면 손댄 텍스트가 그대로 들어온다(그 자리가 ⑥ 을 다시 여는 곳이고,
- * `kotlin-source-ownership.test.mjs` 의 **import 그래프 술어**가 참조자를 소유 파일과 그 단위
- * test 둘로 고정한다 — 걷기 본체를 같은 꼴로 묶어 둔 선례를 잇는다).
+ * 거친 뒤 여기로 넘긴다. 그래서 이 모듈의 함수는 **단언을 거치지 않는 입구**이고, 소비자가 여기를
+ * 직접 부르면 손댄 텍스트가 그대로 들어온다 — 그 자리가 ⑥ 을 다시 여는 곳이다.
+ *
+ * **그 자리를 호출 시점의 호출자 동일성으로 닫는다**(r1 — verifier H-1). 앞 판은 **import 그래프**
+ * 술어 하나로 막았는데, 그것은 **지정자 문자열**을 보는 층이라 평범한 획득 꼴 넷이 지나갔다:
+ * 확장자 없는 정적 import(이 저장소의 관용이다) · `createRequire` · 템플릿 `import()` ·
+ * `vi.importActual`. 꼴을 더 열거하는 길은 끝나지 않으므로, **누가 불렀는가**를 프레임으로 묻는다 —
+ * 획득 표기가 프레임에 남지 않으므로 그 축이 통째로 사라진다. 정적 import 그래프 술어는 **보조로
+ * 남긴다**(lint·test 시점에 이름으로 알려 주는 값이 있고, 그 주장은 「지정자로 적힌 획득」까지다).
  *
  * **왜 갈랐나**: 단언이 「내준 텍스트와 동일한가」로 올라가면서, 추출 술어의 양성·음성 대조가
  * 쓰던 **합성 Kotlin 조각**이 공개 입구에서 술어가 돌기 전에 거부됐다(열세 자리 RED). 술어를 재는
@@ -13,6 +18,30 @@
  *
  * 파일도 서버도 열지 않는다 — 인자로 받은 텍스트뿐이다.
  */
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { callerOutside } from '../../scripts/kotlin-read-guard.mjs';
+
+const SELF = fileURLToPath(import.meta.url);
+const HERE = dirname(SELF);
+
+/** 커널을 **부를 수 있는** 자리 — 공개 입구와 그 단위 test 둘이다. */
+const CALL_ALLOWED = new Set([resolve(HERE, 'opening-axis.mjs'), resolve(HERE, 'opening-axis.test.mjs')]);
+
+/**
+ * 호출자가 그 둘 가운데 하나인지 단언한다. **획득 꼴을 보지 않는다** — 어떤 구문으로 이 모듈을
+ * 얻었든 부르는 순간 프레임이 선다.
+ */
+function assertOwnedCaller(what) {
+  const caller = callerOutside(SELF);
+  if (!CALL_ALLOWED.has(caller)) {
+    throw new Error(
+      `[opening-axis-extract] ${caller} 가 추출 커널(${what})을 직접 불렀다 — ` +
+        '출하 본문은 opening-axis.mjs 의 shipped… 입구로만 읽는다(그 입구가 동일성을 단언한다)',
+    );
+  }
+}
 
 /** 업무 키 → 출하 대분류 토큰. 이 표가 두 자리의 배정 등식의 기준이다. */
 export const DIVISION_TOKENS = { construction: 'CONSTRUCTION', service: 'SERVICE' };
@@ -39,6 +68,7 @@ function soleLiteral(text, pattern, what) {
  * 뒤바뀐 경우를 지나보낸다.
  */
 export function openingOperationPathsOf(text) {
+  assertOwnedCaller('openingOperationPathsOf');
   const categories = Object.keys(DIVISION_TOKENS);
   const divisions = {};
   for (const [index, category] of categories.entries()) {
@@ -97,6 +127,7 @@ export function openingOperationPathsOf(text) {
  * 두면 업종 목록에서 닫은 바로 그 드리프트를 다시 만든다.
  */
 export function detailAxisCountsOf(text) {
+  assertOwnedCaller('detailAxisCountsOf');
   const open = text.indexOf('fun detailAxesFor');
   if (open < 0) {
     throw new Error('출하 본문에서 상세 축 열거 함수를 찾지 못했다 — 정본의 모양이 바뀌었다');
@@ -125,6 +156,7 @@ export function detailAxisCountsOf(text) {
 
 /** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
 export function noticeListOperationsOf(text) {
+  assertOwnedCaller('noticeListOperationsOf');
   const found = {};
   for (const match of text.matchAll(
     /"(\w+)" to KonepsOperationProperties\(\s*"([^"]+)",\s*BusinessDivision\.(\w+),?\s*\)/gu,
@@ -143,6 +175,7 @@ export function noticeListOperationsOf(text) {
 
 /** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
 export function progressLabelsOf(text) {
+  assertOwnedCaller('progressLabelsOf');
   const labels = {};
   for (const match of text.matchAll(/"([^"]+)" to OpeningProgress\.(\w+)/gu)) {
     // 같은 라벨이 두 번 등재되면 **뒤가 조용히 이긴다** — 어느 것이 정본인지 서지 않으므로 거부한다.

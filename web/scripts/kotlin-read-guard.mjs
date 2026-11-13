@@ -66,10 +66,15 @@ function asPath(value) {
 }
 
 /**
- * 호출자 파일 — **구조화된 프레임**으로 읽는다(문자열 스택을 만들면 호출마다 서식 비용이 든다).
- * 이 모듈과 node 내부 프레임을 지나 처음 나오는 사용자 파일이 호출자다.
+ * **호출자 파일을 낸다** — 구조화된 프레임으로 읽는다(문자열 스택을 만들면 호출마다 서식 비용이
+ * 든다). 이 모듈과 node 내부 프레임, 그리고 `ownFile` 을 지나 처음 나오는 사용자 파일이 호출자다.
+ *
+ * **표기에 면역이다**: 호출자가 어떤 구문으로 모듈을 얻었는지(확장자 없는 import · `createRequire` ·
+ * 템플릿 `import()` · `vi.importActual`)가 프레임에 남지 않는다. 그래서 「누가 불렀는가」를 묻는
+ * 층은 획득 꼴을 **열거하지 않는다**. `ownFile` 을 받는 것은 이 판정을 **자기 모듈 안에서** 쓰는
+ * 소유자(추출 커널)가 자기 프레임을 건너뛰어야 하기 때문이다.
  */
-function callerFile() {
+export function callerOutside(ownFile) {
   const prepare = Error.prepareStackTrace;
   const limit = Error.stackTraceLimit;
   Error.prepareStackTrace = (_error, frames) => frames;
@@ -84,7 +89,7 @@ function callerFile() {
       continue;
     }
     const plain = file.startsWith('file:') ? fileURLToPath(file) : file;
-    if (plain === import.meta.filename) {
+    if (plain === import.meta.filename || plain === ownFile) {
       continue;
     }
     return plain;
@@ -139,7 +144,7 @@ function guarded(surface, key, original, rejectsInstead) {
   const wrapper = function guardedFsCall(...args) {
     const target = kotlinTargetOf(args);
     if (target !== undefined) {
-      const caller = callerFile();
+      const caller = callerOutside(undefined);
       if (caller !== OWNER) {
         const error = refusal(caller, target);
         if (rejectsInstead) {
