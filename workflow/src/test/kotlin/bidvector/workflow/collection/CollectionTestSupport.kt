@@ -73,6 +73,32 @@ internal fun sourceAccounting(
         quotaExceeded = quotaExceeded,
     )
 
+/**
+ * **총수를 받은 수와 따로 말하는** 회계 — 공유 helper([sourceAccounting])는 둘을 같게 두므로 이 모양을
+ * 지을 수 없다. 두 수집 갈래 test 가 같은 모양을 쓴다: 낙찰 갈래는 사유 **없이** 짧게 끝난 걷기를,
+ * 공고 목록 갈래는 쪽 상한 재개 배치의 총수를 이 helper 로 짓는다.
+ *
+ * `sourceTotal` 이 **nullable** 인 것은 「총수를 말하지 않는 배치」가 **0 을 말하는 배치와 다른 꼴**이기
+ * 때문이다 — 계약이 그 칸을 `Int?` 로 두고, 재개 보호는 두 꼴을 모두 지켜야 한다.
+ */
+internal fun claimedTotalAccounting(
+    received: Int,
+    sourceTotal: Int?,
+    truncationCause: TruncationCause? = null,
+): CollectionAccounting =
+    CollectionAccounting(
+        received = received,
+        normalized = received,
+        duplicate = 0,
+        dropped = 0,
+        dropReasons = emptyMap(),
+        sourceTotal = sourceTotal,
+        pagesFetched = 1,
+        truncated = truncationCause != null,
+        unknownFields = 0,
+        truncationCause = truncationCause,
+    )
+
 internal fun batchOf(
     items: List<RawNoticeObservation>,
     accounting: CollectionAccounting = sourceAccounting(normalized = items.size),
