@@ -215,3 +215,32 @@ sharedkernel·workflow·adapters)라 **빠진 뿌리를 묻지 않는다** ② �
 후보(양성 표본을 `settings.gradle.kts` 의 모듈 → 패키지 뿌리에서 **구성**으로 뽑기)는
 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` ⑤ 가 받는다.
 
+## 15. 머지 차례 — 최종 acceptance (원천 `8562b610`, 병합 `3e6d042e`)
+
+| 실행 | 종료 | 계수 |
+| --- | --- | --- |
+| `./gradlew --no-daemon check` | **0** | 32분 47초 · 424 중 **102 executed** · 19 from cache · 303 up-to-date |
+| `:adapters:test --rerun`(강제) | **0** | 3분 56초 · **test 1442 · 실패+오류 0** |
+| `:build-logic:test --rerun`(강제) | **0** | 32초 |
+
+전건 안에서 `:adapters:test`·`:build-logic:test`·`:app:test` 가 **실제로 실행**됐다(`:workflow:test` 는
+up-to-date — 앞선 slice 의 production 변경이 이미 빌드돼 있었다). 그래도 test 층을 **따로 강제**한 것은
+「exit 0」을 up-to-date 추론으로 떠받치지 않기 위해서다.
+
+이 slice 가 만진 축: parity **6** · `BytecodeConstantPoolTest` **3** · `event` 4 · `extraction` 4 ·
+`koneps` 4 · `ml` 6 · `notification` 6 · `persistence` 4.
+
+## 16. 병합 합집합 — 계수로 확인했다
+
+`docs/discovery/capability-map.md` 는 **충돌**(양쪽이 파일 끝에 절을 붙였다), `gate-tests.properties` 는
+**충돌 없이 자동 병합**됐다. 조용히 접히는 쪽은 후자라 둘 다 세었다.
+
+| 축 | 원천 `8562b610` | 내 쪽 | 병합 뒤 | 판정 |
+| --- | --- | --- | --- | --- |
+| §12.3 절 수 | 14 ((a)~(n)) | 11 ((a)~(k)) | **15** | 글자 중복 **0** · (k)~(n) 보존 · 내 절이 **끝**이고 **(o)** |
+| `gate-tests` 등재 수 | 557 | 557 | **558** | 중복 **0** · 두 이름(`BytecodeConstantPoolTest`·`OpeningListResumeTotalTest`) 모두 존재 |
+
+**수만 보지 않고 이름으로 확인한 이유**: 서로 다른 항목을 하나씩 더했으므로 558 이 기대값인데, 하나가
+접히고 다른 하나가 남아도 **557 이 아니라 558 이 되는 경우는 없지만** 반대로 수가 맞아도 접힌 쪽이
+있을 수 있는 꼴(같은 줄에 둘이 합쳐지는 등)을 가르려면 이름이 필요하다.
+
