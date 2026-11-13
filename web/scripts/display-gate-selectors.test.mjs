@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * **게이트 술어 자신의 측정**(M9/screen-display D-4). lint 규칙은 「돌았다」만으로는 아무것도
@@ -25,9 +25,39 @@ function messagesMatching(messages, fragment) {
   return messages.filter((one) => one.message.includes(fragment));
 }
 
+/**
+ * **콜드 기동을 어느 칸의 예산에도 싣지 않는다**(M11/11E 서명 A).
+ *
+ * `new ESLint(…)` 는 아무것도 읽지 않는다 — flat config 해석과 파서·플러그인 적재는 **첫
+ * `lintText`** 에서 일어난다. 그 비용이 1.3s(한가한 호스트) ~ 2s+(부하)이고, 앞 판에서는 그것이
+ * **이 파일 첫 `it` 하나의 5초 예산 안**에 들어 있었다 — 부하가 그 예산을 먹는 날 이 게이트가
+ * 자기 주장과 무관한 이유로 붉어졌다(베이스라인 52회 중 5회, 전부 같은 칸).
+ *
+ * 고치는 길은 **예산을 늘리는 것이 아니다**(늘려도 「첫 칸이 파일 전체의 기동 비용을 진다」는
+ * 꼴은 그대로다). 비용을 칸 밖으로 옮긴다.
+ */
+let warmedUp = false;
+
+beforeAll(async () => {
+  // 첫 칸과 **같은 꼴의 경로**로 예열한다 — flat config 는 경로로 블록을 고르므로, 다른 자리로
+  // 예열하면 첫 칸이 쓰는 블록의 파서·플러그인이 그대로 식은 채 남는다.
+  await lintAs('src/screens/__warmup__.tsx', 'export const warm = 1;\n');
+  warmedUp = true;
+});
+
 const CLOCK_FRAGMENT = 'readClock()';
 const RAW_INSTANT_FRAGMENT = 'instantDisplayOf()';
 const NETWORK_FRAGMENT = 'openapi-fetch';
+
+describe('이 파일의 전제 (M11/11E 서명 A)', () => {
+  /**
+   * 예열을 지우는 변이는 **다음 실행 52번 가운데 다섯 번**만 보인다 — 그런 결함은 단언이 없으면
+   * 조용히 되돌아온다. 그래서 「칸이 돌기 전에 린터가 이미 더워져 있다」를 결과로 고정한다.
+   */
+  it('ESLint 콜드 기동은 첫 칸이 돌기 전에 끝나 있다', () => {
+    expect(warmedUp, '예열 hook 이 돌지 않았다 — 콜드 기동이 어느 칸의 예산 안에 있다').toBe(true);
+  });
+});
 
 describe('벽시계 금지는 화면·표시 파일에서 선다 (D-1)', () => {
   it('화면 파일의 `new Date()` 는 RED 다', async () => {
