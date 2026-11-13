@@ -123,7 +123,13 @@ function kotlinTargetOf(args) {
       continue;
     }
     const absolute = path.resolve(given);
-    if (!absolute.startsWith(repoRoot) || absolute.includes(`${path.sep}node_modules${path.sep}`)) {
+    // 접두에 **구분자를 붙인다**(r1 — cr LOW): 붙이지 않으면 형제 디렉터리(`<repo>-m11-…` 같은
+    // 다른 worktree)가 저장소 안으로 읽힌다. 넓어지는 쪽이라 놓치는 축은 없지만, 층의 범위를
+    // 문면과 같게 둔다.
+    if (
+      !absolute.startsWith(`${repoRoot}${path.sep}`) ||
+      absolute.includes(`${path.sep}node_modules${path.sep}`)
+    ) {
       continue;
     }
     // **해석되지 않는 경로는 대상이 아니다.** 없는 파일은 아무것도 열지 않고, 적힌 글자를 그대로
