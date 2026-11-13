@@ -4,6 +4,7 @@ import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.lang.reflect.Modifier
 import java.util.Properties
 import bidvector.adapters.audit.ALLOWED_ROOTS as AUDIT_ROOTS
 import bidvector.adapters.evaluation.ALLOWED_ROOTS as EVALUATION_ROOTS
@@ -144,8 +145,9 @@ class ScopedAllowedRootsParityTest {
 
         val notIdentical =
             BYTECODE_LAYER_ROOTS.keys
-                .filterNot { scope -> invokeRootsGetter(owners.getValue(scope)) === BYTECODE_LAYER_ROOTS.getValue(scope) }
-                .sorted()
+                .filterNot { scope ->
+                    invokeRootsGetter(owners.getValue(scope)) === BYTECODE_LAYER_ROOTS.getValue(scope)
+                }.sorted()
 
         notIdentical shouldBe emptyList()
     }
@@ -272,7 +274,16 @@ class ScopedAllowedRootsParityTest {
             val getter =
                 runCatching { loaded.getDeclaredMethod("getALLOWED_ROOTS") }
                     .getOrElse { error("소유 class 에 getALLOWED_ROOTS 가 없다: $binaryName — $it") }
-            return getter.invoke(null) ?: error("getALLOWED_ROOTS 가 null 을 돌려줬다: $binaryName")
+            // top-level `internal val` 은 file facade 의 **static** getter 다. static 이 아니면 소유자가
+            // facade 가 아니라 인스턴스 보유자(`object` 등)이고, 그 꼴은 아래 보유자 단일성 단언이 받는다 —
+            // 여기서는 `invoke(null)` 의 NPE 가 아니라 그 사실을 말하는 실패를 낸다.
+            check(Modifier.isStatic(getter.modifiers)) {
+                "허용 뿌리 getter 가 static 이 아니다: $binaryName — 표의 값이 top-level `val` 이 아니라 " +
+                    "인스턴스 보유자에 산다(보유자 단일성 단언을 함께 읽어라)"
+            }
+            return runCatching { getter.invoke(null) }
+                .getOrElse { error("허용 뿌리 getter 호출이 실패했다: $binaryName — $it") }
+                ?: error("getALLOWED_ROOTS 가 null 을 돌려줬다: $binaryName")
         }
 
         /**
