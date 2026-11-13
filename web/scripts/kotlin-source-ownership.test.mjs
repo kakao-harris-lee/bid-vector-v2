@@ -122,7 +122,12 @@ const parse = (source, fileName) =>
  * 술어의 정규식은 **조립해서** 만든다 — 통째로 적으면 이 파일이 자기 술어에 걸린다(미달 ①).
  */
 const KT_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'u');
-const KT_FILE_TOKEN = new RegExp(`\\b[\\w-]+\\.${'k'}${'t'}s?\\b`, 'gu');
+/**
+ * 데이터 파일용 — **확장자 토큰 자체**를 든다(M11, ⑩). 파일 이름을 요구하던 앞 판은 확장자 단독
+ * 값과 별표/중괄호 glob 을 지나보냈다. 앞의 이름을 요구하지 않는 대신 **`#` 줄 제외 + allowlist
+ * 차감**이 오탐을 0 으로 유지한다(그 둘이 한 묶음의 처방이다).
+ */
+const KT_FILE_OR_EXTENSION_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'gu');
 
 /** 노드에서 **리터럴 텍스트**를 낸다 — 문자열·템플릿 조각·정규식 리터럴·식별자. */
 function literalTexts(node) {
@@ -215,14 +220,27 @@ export function resolvedImports(source, fileName) {
 }
 
 /**
- * 데이터 파일(JSON·txt 등)용 술어 — **`이름.kt` 꼴만** 든다(확장자 단독 값과 별표/중괄호 glob 은
- * 지나간다 — 미달 ⑩. 다음 slice 처방은 `#` 줄 제외 + allowlist 차감 뒤 단어 토큰이다). 디렉터리 구분자를 요구하는 이유는 산문의
- * 확장자 언급(「`.kt` 경로 리터럴」 같은 설명)이 경로가 아니기 때문이다. 데이터 파일에는 조립할
- * 코드가 없으므로 경로는 **통째로** 적히고, 그래서 이 술어로 구조가 성립한다.
+ * 데이터 파일(JSON·txt 등)용 술어 — **확장자 토큰**을 든다(M11 — ⑩ 을 닫는다).
+ *
+ * 앞 판은 `이름.kt` 꼴만 보았다. 그래서 확장자 단독 값(`{"ext": ".kt"}`)·별표 glob(`*.kt`)·중괄호
+ * glob(`X.{kt,kts}`)·확장자 목록 값이 전부 지나갔다 — 앞에 단어 문자가 없어 파일 이름 꼴이 아니기
+ * 때문이다. 처방은 **측정된 것**이다(verifier r6): 본문에서 **`#` 로 시작하는 줄을 빼고 allowlist
+ * 값을 차감한 뒤** 단어 토큰을 적용하면 **오탐 0 이면서** 그 네 꼴이 RED 다.
+ *
+ * `#` 줄을 빼는 것이 이 처방의 핵심이다 — 이 저장소의 데이터 파일은 등록부처럼 **주석에 산문을
+ * 담고**, 그 산문이 확장자를 언급한다(빼지 않으면 오탐 1). allowlist 는 **토큰을 걸러내는 것이
+ * 아니라 값을 차감한다** — 단어 토큰은 파일 이름을 남기지 않으므로 뒤에서 걸러낼 수 없다.
  */
-export function kotlinPathsInText(text) {
-  // 데이터 파일 — **파일 이름 토큰**을 든다(B4 의 `{"basis":"Basis.kt"}` 가 이 자리다).
-  return [...text.matchAll(KT_FILE_TOKEN)].map((m) => m[0]);
+export function kotlinPathsInText(text, allowedValues = new Set()) {
+  const withoutComments = text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+  let body = withoutComments;
+  for (const value of allowedValues) {
+    body = body.split(value).join('');
+  }
+  return [...body.matchAll(KT_FILE_OR_EXTENSION_TOKEN)].map((match) => match[0]);
 }
 
 
@@ -259,8 +277,11 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       .map((relative) => {
         const text = read(relative);
         const allowed = PROVENANCE_DATA_ALLOWED.get(relative) ?? new Set();
-        const literals = (isAstFile(relative) ? kotlinPathTokens(text, relative) : kotlinPathsInText(text))
-          .filter((token) => !allowed.has(token.split('/').pop()));
+        const literals = isAstFile(relative)
+          ? kotlinPathTokens(text, relative).filter((token) => !allowed.has(token.split('/').pop()))
+          : // 데이터 파일은 allowlist 를 **차감으로** 받는다 — 단어 토큰이 파일 이름을 남기지
+            // 않으므로 뒤에서 걸러낼 수 없다(처방의 둘째 조각).
+            kotlinPathsInText(text, allowed);
         return { relative, literals };
       })
       .filter(({ literals }) => literals.length > 0);
@@ -316,6 +337,39 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
   /** 주석·산문 안의 같은 글자는 리터럴이 아니다 — AST 술어라 그것을 들지 않는다. */
   it('주석 안의 확장자는 걸리지 않는다 — 글자 검색이 아니다', () => {
     expect(kotlinPathTokens(`// 정본은 Basis${KT} 다\n/* Other${KT} */\n`)).toStrictEqual([]);
+  });
+
+  /**
+   * **데이터 파일 술어 — 확장자 단독 값과 glob 까지 든다**(M11 — ⑩). 앞 판은 `이름.kt` 꼴만 보아
+   * 네 꼴이 지나갔다(P6·P7·P7b·P7c). 처방은 측정된 것이다: 본문에서 **`#` 로 시작하는 줄을 빼고
+   * allowlist 값을 차감한 뒤** 단어 토큰을 적용한다 — 그래야 산문의 확장자 언급이 오탐이 되지
+   * 않는다(그 한 줄이 `#` 제외가 하는 일이고, 빼면 오탐 1 이다).
+   */
+  it('데이터 파일 술어가 확장자 단독 값과 glob 을 든다', () => {
+    const extension = `${'k'}${'t'}`;
+    const planted = {
+      '이름 꼴(기존)': `{"basis": "Basis.${extension}"}`,
+      'P6 확장자 단독 값': `{"ext": ".${extension}"}`,
+      'P7 별표 glob': `{"glob": "../**/*.${extension}"}`,
+      'P7b 중괄호 glob': `{"glob": "a/X.{${extension},${extension}s}"}`,
+      'P7c 확장자 목록 값': `{"ext": ["${extension}", "${extension}s"]}`,
+    };
+
+    for (const [name, text] of Object.entries(planted)) {
+      expect(kotlinPathsInText(text).length, `${name} 이 술어를 지나간다`).toBeGreaterThan(0);
+    }
+  });
+
+  /** **음성 대조** — `#` 로 시작하는 줄의 산문과 allowlist 값은 들지 않는다(일률 거절이 아니다). */
+  it('주석 줄의 산문과 allowlist 값은 데이터 파일 술어를 지나간다', () => {
+    const extension = `${'k'}${'t'}`;
+    const prose = `# 「.${extension} 경로 리터럴이 공유 모듈 밖에 없다」\nscripts/x.mjs\n`;
+    const allowed = new Set([`KonepsOpeningAxisFieldContracts.${extension}`]);
+
+    expect(kotlinPathsInText(prose)).toStrictEqual([]);
+    expect(kotlinPathsInText(`{"from": "KonepsOpeningAxisFieldContracts.${extension}"}`, allowed)).toStrictEqual(
+      [],
+    );
   });
 });
 

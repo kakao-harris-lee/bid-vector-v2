@@ -122,16 +122,16 @@ describe('여는 행위 — 음성 대조', () => {
 
 describe('여는 행위 — 확장자 술어는 실경로를 대소문자 무시로 본다 (⑨)', () => {
   it('Kotlin 확장자는 표기와 무관하게 참이다', () => {
-    const kt = `${'k'}${'t'}`;
-    for (const suffix of [kt, kt.toUpperCase(), `${kt}s`, `${kt.toUpperCase()}S`, `K${kt.slice(1)}`]) {
+    const extension = `${'k'}${'t'}`;
+    for (const suffix of [extension, extension.toUpperCase(), `${extension}s`, `${extension.toUpperCase()}S`, `K${extension.slice(1)}`]) {
       expect(isKotlinSourcePath(`/a/b/X.${suffix}`), `.${suffix} 를 놓친다`).toBe(true);
     }
   });
 
   /** 음성 대조 — 비슷한 글자는 Kotlin 원문이 아니다(일률 참이 아니다). */
   it('Kotlin 확장자가 아닌 것은 거짓이다', () => {
-    const kt = `${'k'}${'t'}`;
-    for (const path of [`/a/X.${kt}x`, `/a/X.txt`, `/a/${kt}`, `/a/X.${kt}.bak`, '/a/X.mjs']) {
+    const extension = `${'k'}${'t'}`;
+    for (const path of [`/a/X.${extension}x`, `/a/X.txt`, `/a/${extension}`, `/a/X.${extension}.bak`, '/a/X.mjs']) {
       expect(isKotlinSourcePath(path), `${path} 를 Kotlin 원문으로 본다`).toBe(false);
     }
   });
