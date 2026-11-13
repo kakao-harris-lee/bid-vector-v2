@@ -2,7 +2,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ESLint } from 'eslint';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 /**
  * **게이트 술어 자신의 측정**(M9/screen-display D-4). lint 규칙은 「돌았다」만으로는 아무것도
@@ -26,24 +26,28 @@ function messagesMatching(messages, fragment) {
 }
 
 /**
- * **콜드 기동을 어느 칸의 예산에도 싣지 않는다**(M11/11E 서명 A).
+ * **콜드 기동을 어느 예산에도 싣지 않는다**(M11/11E 서명 A).
  *
- * `new ESLint(…)` 는 아무것도 읽지 않는다 — flat config 해석과 파서·플러그인 적재는 **첫
- * `lintText`** 에서 일어난다. 그 비용이 1.3s(한가한 호스트) ~ 2s+(부하)이고, 앞 판에서는 그것이
- * **이 파일 첫 `it` 하나의 5초 예산 안**에 들어 있었다 — 부하가 그 예산을 먹는 날 이 게이트가
- * 자기 주장과 무관한 이유로 붉어졌다(베이스라인 52회 중 5회, 전부 같은 칸).
+ * `new ESLint(…)` 는 아무것도 읽지 않는다 — flat config 해석과 파서·플러그인 적재(`typescript`
+ * 모듈까지)는 **첫 `lintText`** 에서 일어난다. 앞 판에서는 그 비용이 **첫 `it` 하나의 5000ms
+ * 예산 안**에 있었고, 부하가 그 예산을 먹는 날 이 게이트가 자기 주장과 무관한 이유로 붉어졌다
+ * (베이스라인 52회 중 5회, 전부 같은 칸).
  *
- * 고치는 길은 **예산을 늘리는 것이 아니다**(늘려도 「첫 칸이 파일 전체의 기동 비용을 진다」는
- * 꼴은 그대로다). 비용을 칸 밖으로 옮긴다.
+ * **예산을 늘리는 것은 고치는 것이 아니다 — 실측으로 확인했다.** 중간 판에서 이 예열을
+ * `beforeAll` 로 옮겼더니(hook 예산 10000ms) 서명 A 는 0/52 가 됐지만 **같은 결함이 hook
+ * 예산에서 1/52 로 다시 났다**(`Hook timed out in 10000ms`, 그 파일의 35 칸이 건너뛰어짐).
+ * 예산을 두는 모든 자리가 부하 앞에서 추첨이다.
+ *
+ * 그래서 비용을 **모듈 적재 단계**로 옮긴다. 거기에는 칸·hook 예산이 없고(상한은 CI job 의
+ * `timeout-minutes` 라는 올바른 층이다), 무엇보다 **예열은 측정이 아니다** — 측정에 예산을 더
+ * 주는 것과 측정 아닌 준비를 예산 밖으로 내보내는 것은 다른 일이다.
  */
-let warmedUp = false;
-
-beforeAll(async () => {
+const warmedUp = await (async () => {
   // 첫 칸과 **같은 꼴의 경로**로 예열한다 — flat config 는 경로로 블록을 고르므로, 다른 자리로
   // 예열하면 첫 칸이 쓰는 블록의 파서·플러그인이 그대로 식은 채 남는다.
   await lintAs('src/screens/__warmup__.tsx', 'export const warm = 1;\n');
-  warmedUp = true;
-});
+  return true;
+})();
 
 const CLOCK_FRAGMENT = 'readClock()';
 const RAW_INSTANT_FRAGMENT = 'instantDisplayOf()';
@@ -55,7 +59,7 @@ describe('이 파일의 전제 (M11/11E 서명 A)', () => {
    * 조용히 되돌아온다. 그래서 「칸이 돌기 전에 린터가 이미 더워져 있다」를 결과로 고정한다.
    */
   it('ESLint 콜드 기동은 첫 칸이 돌기 전에 끝나 있다', () => {
-    expect(warmedUp, '예열 hook 이 돌지 않았다 — 콜드 기동이 어느 칸의 예산 안에 있다').toBe(true);
+    expect(warmedUp, '예열이 돌지 않았다 — 콜드 기동이 어느 예산 안에 있다').toBe(true);
   });
 });
 
