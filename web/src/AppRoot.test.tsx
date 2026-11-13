@@ -42,12 +42,17 @@ function withThrowingLeaf(routes: readonly RouteObject[]): RouteObject[] {
 const mounted: { readonly root: Root; readonly container: HTMLElement }[] = [];
 
 /**
- * **알림 배치를 타이머에 싣지 않는다.** 기본 스케줄러는 `setTimeout(callback, 0)` 이라, 마지막
- * 칸이 끝난 뒤에 예약된 배치가 남으면 그것이 **환경이 걷힌 다음**에 깨어난다 — 서명 B 의 스택이
- * 정확히 그 자리다(`Timeout._onTimeout` → 배치 → react-dom 이 `window` 를 찾는다). 예약을 그
- * 자리에서 돌리면 그 창 자체가 없어진다.
+ * 알림 배치를 타이머에 싣지 않는다 — 기본 스케줄러는 `setTimeout(callback, 0)` 이라 마지막 칸
+ * 뒤에 남은 예약이 **환경이 걷힌 다음** 깨어날 수 있다.
  *
- * vitest 는 파일마다 모듈 그래프를 따로 세우므로 이 설정은 **이 파일 안에서만** 산다.
+ * **이 줄이 서명 B 를 고친 것은 아니다**(r1 cr F-8 실측). 둘로 갈라 각각 26회를 쟀다 — 이 줄만
+ * 두고 아래 `afterEach` 정리를 되돌리면 **5/26** 로 서명이 그대로 나고(base 는 4/26), 반대로 이
+ * 줄만 되돌리고 정리를 두면 **0/26** 이다. 즉 **하중은 정리 쪽이 진다**. 기전도 그 결과와 맞는다:
+ * 터지는 경로가 react-dom 의 setState 이므로 root 가 이미 걷혀 있으면 깨어난 배치가 할 일이
+ * 없다.
+ *
+ * 그래도 남겨 둔다 — 정리를 지나지 않는 칸이 생기는 날을 받는 **값싼 구조 보강**이고, 그 사실을
+ * 아래 칸이 단언한다. 전역을 바꾸므로 `afterAll` 이 되돌린다.
  */
 notifyManager.setScheduler((callback) => {
   callback();

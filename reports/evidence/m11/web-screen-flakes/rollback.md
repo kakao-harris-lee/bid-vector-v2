@@ -30,7 +30,10 @@ git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktre
 | M | `web/scripts/screen-card-coverage.test.mjs` |
 | M | `web/src/AppRoot.test.tsx` |
 
-여덟 전부 scope.md 의 `in_scope` 안이다 — `comm -23 <복원목록> <in_scope>` **빈 출력**. out_of_scope
+열 전부 scope.md 의 `in_scope` 안이다 — `comm -23 <복원목록> <in_scope>` **빈 출력**. 완전성도 본다(r1 cr F-7) — r0 의 목록은 실측 HEAD
+기준 여덟이라 그 뒤 커밋에서 생긴 evidence 둘을 담지 않았고, 적힌 pathspec 을 그대로 돌리면 그
+둘이 남았다. 지금 목록은 **판정 SHA 기준 열**이고, 신설 다섯은 복원 원천에 없으므로 복원이 그
+다섯을 지운다(`git cat-file -e <원천>:<경로>` 로 확인하는 자리이며 verifier 가 센다). out_of_scope
 로 적은 경로는 하나도 들어오지 않았다. 특히 공유 파일 둘(`web/config/gate-tests.txt` ·
 `web/vite.config.ts`)과 `web/src/screens/screenVocabulary.test.tsx`(마운트 목록)는 **편집 0**
 이다. 반대 방향(in_scope 인데 안 건드린 것)이 셋 있는 것은 정상이다 — 계약이 「움직일 수 있는
@@ -38,7 +41,7 @@ git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktre
 
 **빈 등식은 그 자체로 건전성의 증거가 아니다.** 이 목록은 `git add` 한 경로에서 나온 것이 아니라
 `git diff --name-status` 의 기계 산출이므로, 「내가 커밋하지 않아도 들어오는 경로」가 있으면 그것도
-여기 선다. 지금 여덟 가운데 그런 것은 없다(전부 이 레인의 커밋이 만든 변경이고, 하네스 레인 변경
+여기 선다. 지금 열 가운데 그런 것은 없다(전부 이 레인의 커밋이 만든 변경이고, 하네스 레인 변경
 0 줄).
 
 ## 복원 원천의 전제
@@ -49,7 +52,7 @@ git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktre
 - **원천을 바꾸면 다시 센다**: 이 브랜치는 main 을 병합하지 않았으므로 원천은 착수 base 그대로다.
   머지 전에 main 을 병합하면 그 **병합 커밋 SHA**(고정 — 움직이는 `origin/main` 이 아니다)가
   원천이 되고, 그때 **셋째 단언**을 잰다(복원 대상 blob 이 두 원천에서 같은가). 지금 측정으로는
-  `origin/main`(`32dead40`)이 복원 대상 여덟 가운데 **어느 것도 건드리지 않았다** —
+  `origin/main`(`32dead40`)이 복원 대상 열 가운데 **어느 것도 건드리지 않았다** —
   `git diff --name-only 94ee445b..origin/main` 이 `README.md`·`milestone-10.md`·`milestone-11.md`
   셋뿐이다.
 

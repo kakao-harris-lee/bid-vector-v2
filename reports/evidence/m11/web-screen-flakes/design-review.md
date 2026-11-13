@@ -93,8 +93,9 @@
 | 표면 | 새것인가 | 지나지 않고 같은 값을 얻는 길 | 처분 |
 | --- | --- | --- | --- |
 | `vocabularyComponentsOf(program, source)` | **의미 변경**(시그니처 동일) | 소비자가 자기 훑기를 쓰는 길 — 소비자는 게이트 test 하나이고 그 파일이 in_scope 다 | 그대로 |
+| `INTERNAL_ASSEMBLER`·`OTHER_AXIS` | **신설**(제외 종류) | 종류를 새로 만들어 구조 의무를 피하는 길 | 열거이고 diff 에 남는다 — 게이트 test 가 종류를 두 값으로 **소진 단언**한다 |
 | `VOCABULARY_MODULE_EXCLUSIONS` | **신설** | 제외를 늘려 새 함수를 조용히 통과시키는 길 | **열거이고 diff 에 남는다** — 경계 밖(「게이트 파일 자체를 고치는 저자」). 다만 종류 `INTERNAL_ASSEMBLER` 는 구조 의무가 붙어 사유가 거짓이면 붉다 |
-| `vocabularyRegistryGaps(program, webRoot)` → `{unclassified, stale, leaked}` | **신설** | ⓐ 어휘 모듈 **밖**(`src/display/` 의 나머지 열하나 · 새 표시 모듈)에 어휘를 감싼 함수를 두는 길 ⓑ 제외 함수를 화면이 **간접으로** 부르는 길(표시층 다른 모듈을 지나) | **r1 F1 정정 — 앞 판의 두 칸이 거짓이었다.** ⓐ 앞 판은 「어휘 호출이 `screens`·`display` 밖에 0」을 근거로 들었는데, 그 grep 은 우회가 **사는** 자리인 `display/**` 를 처음부터 뺐으므로 아무것도 보이지 않았다. ⓑ 앞 판은 「조립 결과를 내는 함수(`amountDisplayOf`)는 이미 등재돼 있다」고 적었는데, `budgetView` 는 `amountDisplayOf` 를 **지나지 않고** 자기 글자를 만들어 `STRATEGY_FIELD_VALUE` 로 올린다. 둘 다 **경계 등재**로 답한다(§(2) 6 번 · 신설 OPEN). `leaked` 가 보는 것은 화면의 **직접** 참조뿐이고, 그 범위를 게이트 소스 주석에 적었다 |
+| `vocabularyRegistryGaps(program, webRoot)` → `{unclassified, stale, leaked}` | **신설**(r1 cr F-1 로 판정이 **꼴 열거 → 타입의 호출 시그니처**가 됐다) | ⓐ 어휘 모듈 **밖**(`src/display/` 의 나머지 열하나 · 새 표시 모듈)에 어휘를 감싼 함수를 두는 길 ⓑ 제외 함수를 화면이 **간접으로** 부르는 길(표시층 다른 모듈을 지나) | **r1 F1 정정 — 앞 판의 두 칸이 거짓이었다.** ⓐ 앞 판은 「어휘 호출이 `screens`·`display` 밖에 0」을 근거로 들었는데, 그 grep 은 우회가 **사는** 자리인 `display/**` 를 처음부터 뺐으므로 아무것도 보이지 않았다. ⓑ 앞 판은 「조립 결과를 내는 함수(`amountDisplayOf`)는 이미 등재돼 있다」고 적었는데, `budgetView` 는 `amountDisplayOf` 를 **지나지 않고** 자기 글자를 만들어 `STRATEGY_FIELD_VALUE` 로 올린다. 둘 다 **경계 등재**로 답한다(§(2) 6 번 · 신설 OPEN). `leaked` 가 보는 것은 화면의 **직접** 참조뿐이고, 그 범위를 게이트 소스 주석에 적었다 |
 
 ## (3) 과잉·미달
 
