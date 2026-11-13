@@ -331,6 +331,9 @@ const PROBES = {
 const probeOverlay = new Map(Object.entries(PROBES).map(([name, text]) => [probePath(name), text]));
 const probeProgram = screenProgram(webRoot, probeOverlay);
 
+/** 기본 내보내기의 의무 이름은 **파일로 한정**된다 — 그 자리를 test 쪽에서도 한 곳에서 만든다. */
+const PROBE_PREFIX = 'screens/__probe__/';
+
 function componentsIn(name) {
   const source = probeProgram.getSourceFile(probePath(name));
   expect(source, `${name} 이 프로그램에 없다 — 대조가 공허하다`).toBeDefined();
@@ -432,19 +435,31 @@ describe('간접 렌더와 그 잔여 (M11/11E)', () => {
  */
 describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
   it('`export default memo(지역 컴포넌트)` 가 의무를 낸다', () => {
-    expect(componentsIn('defaultMemo.tsx')).toStrictEqual(['default']);
+    expect(componentsIn('defaultMemo.tsx')).toStrictEqual([`${PROBE_PREFIX}defaultMemo.tsx#default`]);
   });
 
   it('이름 없는 함수를 감싼 기본 내보내기도 낸다', () => {
-    expect(componentsIn('defaultAnonymous.tsx')).toStrictEqual(['default']);
+    expect(componentsIn('defaultAnonymous.tsx')).toStrictEqual([`${PROBE_PREFIX}defaultAnonymous.tsx#default`]);
   });
 
   it('화살표 기본 내보내기도 낸다', () => {
-    expect(componentsIn('defaultArrow.tsx')).toStrictEqual(['default']);
+    expect(componentsIn('defaultArrow.tsx')).toStrictEqual([`${PROBE_PREFIX}defaultArrow.tsx#default`]);
   });
 
   it('무명 기본 **함수 선언**도 낸다 — 이름이 없어도 자리는 있다', () => {
-    expect(componentsIn('defaultAnonymousDeclaration.tsx')).toStrictEqual(['default']);
+    expect(componentsIn('defaultAnonymousDeclaration.tsx')).toStrictEqual([`${PROBE_PREFIX}defaultAnonymousDeclaration.tsx#default`]);
+  });
+
+  /**
+   * **파일마다 다른 이름이어야 한다**(r1 v R2 · cr N-2). 의무·화면 바구니는 **이름으로** 중복을
+   * 없애므로, 기본 내보내기가 전부 `'default'` 면 둘째 카드부터 집합에서 접혀 조용해진다.
+   */
+  it('기본 내보내기의 의무 이름은 파일마다 다르다', () => {
+    const first = componentsIn('defaultMemo.tsx');
+    const second = componentsIn('defaultArrow.tsx');
+
+    expect(first).not.toStrictEqual(second);
+    expect(new Set([...first, ...second]).size).toBe(2);
   });
 
   it('어휘를 안 쓰는 기본 내보내기는 의무가 아니다', () => {

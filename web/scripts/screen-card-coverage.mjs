@@ -358,6 +358,24 @@ function reachingVocabulary(checker, source, byKey, wanted) {
 }
 
 /**
+ * 의무로 나는 **이름**. 보통은 내보낸 이름 그대로인데, **기본 내보내기만 파일로 한정한다**
+ * (r1 v R2 · cr N-2).
+ *
+ * 사유: 의무 집합과 화면 바구니는 **이름으로** 중복을 없앤다. 기본 내보내기의 이름은 파일마다
+ * `default` 로 같으므로, 그대로 두면 첫 카드는 게이트를 붉혀 결정을 강제하지만 **둘째부터는
+ * 집합에서 접혀 조용해진다**(실측 — 두 파일에 심어도 의무가 하나였다). 자리는 이미 유일하므로
+ * (`declarationKeyOf` 가 파일당 하나의 `#default` 를 낸다) 그것을 이름으로 쓴다.
+ *
+ * 그 밖의 이름은 바꾸지 않는다 — `GATE_MOUNTED_CARDS` 와의 등식이 오늘 쓰는 이름 공간이고,
+ * 오늘 `src/` 의 기본 내보내기는 **0 건**이라 이 한정은 그 등식을 움직이지 않는다.
+ */
+function obligationNameOf(exported, declaration) {
+  return exported.getName() === 'default'
+    ? (relativeKeyOf(declaration, 'default') ?? 'default')
+    : exported.getName();
+}
+
+/**
  * 한 파일에서 **내보낸 이름** 가운데 표시 어휘를 그리는 것.
  *
  * 내보내기를 **심볼로** 받는다(`getExportsOfModule`) — 앞 판은 `export` 수식자가 붙은 함수 선언·
@@ -381,7 +399,7 @@ export function vocabularyComponentsOf(program, source) {
     for (const declaration of aliasResolved(checker, exported).declarations ?? []) {
       const key = declaration.getSourceFile() === source ? declarationKeyOf(declaration) : undefined;
       if (key !== undefined && reaching.has(key)) {
-        names.add(exported.getName());
+        names.add(obligationNameOf(exported, declaration));
       }
     }
   }

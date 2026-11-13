@@ -15,8 +15,16 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const eslint = new ESLint({ cwd: webRoot });
 
+/**
+ * 실제로 린트가 **몇 번** 돌았는가. 아래 전제 칸의 입력이고, **상수로 바꿔치울 수 없다는 것**이
+ * 이 값의 요점이다(r1 v R3) — 앞 판의 전제는 불리언이라 `const warmedUp = true` 한 줄로 참이
+ * 되었고, 그러면 예열을 hook 으로 옮겨도 초록이었다.
+ */
+let lintCalls = 0;
+
 /** 그 파일 경로로 린트한 뒤 **이 slice 의 규칙** 메시지만 센다. */
 async function lintAs(filePath, code) {
+  lintCalls += 1;
   const [result] = await eslint.lintText(code, { filePath: resolve(webRoot, filePath) });
   return result.messages.filter((one) => one.ruleId === 'no-restricted-syntax');
 }
@@ -42,25 +50,26 @@ function messagesMatching(messages, fragment) {
  * `timeout-minutes` 라는 올바른 층이다), 무엇보다 **예열은 측정이 아니다** — 측정에 예산을 더
  * 주는 것과 측정 아닌 준비를 예산 밖으로 내보내는 것은 다른 일이다.
  */
-const warmedUp = await (async () => {
+await (async () => {
   // 경로를 첫 칸과 같은 꼴로 둔 것은 **값싼 조심**이지 이 수정이 기대는 축이 아니다(r1 cr F-6).
   // 실측: 같은 프로세스에서 예열 경로를 바꿔 첫 린트를 재면 `src/screens/*.tsx` 10ms ·
   // `src/api/*.ts` 9ms · `e2e/*.ts` 21ms 다 — 5000ms 예산에 무해하다. 비싼 것은 **프로세스 단위의
   // 모듈 적재**이고(파서·플러그인·`typescript`) 그것은 어느 경로로 예열하든 한 번만 치른다.
   await lintAs('src/screens/__warmup__.tsx', 'export const warm = 1;\n');
-  return true;
 })();
 
 /**
- * **적재 단계에서 이미 더워져 있었는가.** 이 한 줄이 기각된 1안과 채택한 길을 가르는 단언의
- * 입력이다(r1 F4). 앞 판의 단언은 `warmedUp` 을 **칸이 돌 때** 읽었고, 그래서 예열을 `beforeAll`
- * 로 되돌려도(`let` + hook 안에서 참 대입) 초록이었다 — 즉 기각된 1안을 가르지 못했다. 이 값은
- * **모듈 평가가 끝나는 자리**에서 고정되므로, 예열이 hook 으로 옮겨가면 거짓이 된다.
+ * **이 줄을 `lintCalls` 로 인라인하지 말 것** — 그러면 예열을 hook 으로 옮기는 변이가 다시
+ * 초록이 된다(r1 cr N-3). 값의 뜻은 「**모듈 평가가 끝나는 자리**에서 린트가 몇 번 돌았는가」
+ * 이고, 그 시점이 이 줄의 자리다.
+ *
+ * 이 값이 수인 것이 앞 판과의 차이다(r1 v R3) — 불리언은 `true` 한 줄로 바꿔치울 수 있었지만
+ * 이 수는 **실제 린트만** 올린다.
  *
  * suite 가 잴 수 없는 나머지 절반(「예산이 **없다**」)은 예열에 지연을 심는 대조로만 선다. 그
  * 대조는 15s 를 쓰므로 suite 에 두지 않고 evidence 에 둔다.
  */
-const warmedUpAtModuleEvaluation = warmedUp;
+const lintCallsDuringModuleEvaluation = lintCalls;
 
 const CLOCK_FRAGMENT = 'readClock()';
 const RAW_INSTANT_FRAGMENT = 'instantDisplayOf()';
@@ -73,9 +82,9 @@ describe('이 파일의 전제 (M11/11E 서명 A)', () => {
    */
   it('ESLint 콜드 기동은 **적재 단계에서** 끝나 있다', () => {
     expect(
-      warmedUpAtModuleEvaluation,
-      '적재가 끝날 때 린터가 식어 있었다 — 콜드 기동이 칸이나 hook 예산 안에 있다',
-    ).toBe(true);
+      lintCallsDuringModuleEvaluation,
+      '적재가 끝날 때 린트가 0 회였다 — 콜드 기동이 칸이나 hook 예산 안에 있다',
+    ).toBeGreaterThan(0);
   });
 });
 
