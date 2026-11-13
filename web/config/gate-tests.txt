@@ -122,3 +122,8 @@ scripts/kotlin-source-ownership.test.mjs
 # 해석된 실경로를 보고 소유 모듈 밖의 호출자를 던진다 — 그 양성·음성 대조와 확장자 술어가 이 파일에
 # 있고, `vite.config.ts` 의 setupFiles 등재를 지우면 양성 묶음이 RED 다.
 scripts/kotlin-read-guard.test.mjs
+# M11/gates-web-read — **표 선언의 타입 단언 금지**(항목 7)의 양성·음성 대조. `satisfies` 표를
+# `as Record<…>` 로 바꾸면 전수 등식이 선언 타입만 보게 되는 자리를 lint 규칙으로 막고, 그 규칙이
+# 오늘의 `as const satisfies` 표를 붉히지 않는 것과 **새 블록이 앞 블록의 금지를 덮어쓰지 않는
+# 것**(flat config 함정)을 같은 자리에서 잰다.
+scripts/type-assertion-gate.test.mjs
