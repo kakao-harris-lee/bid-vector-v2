@@ -228,15 +228,24 @@ import 그래프 술어로 측정). 그래서 커널화가 새 공개 표면을 
 CI `web` job 의 명령 그대로 + `./gradlew check`. **판정 대상은 main 을 마지막으로 병합한 커밋**
 이므로 아래는 **그 병합 전** 실행이고, 정본은 머지 차례의 재실행과 PR head CI 다.
 
+**r1 재실행**(수정 라운드 뒤). 아래가 이 라운드의 값이다.
+
 | 단계 | 결과 |
 | --- | --- |
-| W-1 `npm ci` · W-2 lint · W-3 typecheck · W-4 gate:src-tree | exit **0** |
-| W-5 api:types:check | exit **0** |
-| W-6 test · W-7 gate:tests | **r1 정정** — 아래 「서명 A」 절 |
+| W-1 `npm ci` · W-2 lint · W-3 typecheck · W-4 gate:src-tree · W-5 api:types:check | exit **0** |
+| W-6 test · W-7 gate:tests | exit **0** · vitest **44 파일 · 954 passed** |
 | W-8 build · W-9 gate:boundary-canary | exit **0** |
 | W-10 playwright install · W-11 스모크 | exit **0** · 2 passed |
-| W-12 `:app:bootJar` · W-13 여정 e2e | exit **0** · 12 passed |
+| W-12 `:app:bootJar` · W-13 여정 e2e | exit **0** · **12 passed** |
 | `./gradlew check` | **아직 돌지 않았다** — 머지 차례에 병합 커밋에서 돈다. 이 slice 는 Kotlin 무편집이고, 이 명령이 acceptance 에 드는 이유는 evidence 가 누출 게이트의 스캔 뿌리에 들기 때문이다. 그 참조형 스캔은 이 트리에서 **매치 0** 이다 |
+
+**W-13 을 다시 돌린 이유**: r1 이 커널에 **호출자 프레임** 판정을 넣었고, 여정 하네스가 그 커널을
+**vitest 밖 프로세스**에서 입구를 통해 부른다. 층이 그 프로세스에서도 소유자를 옳게 집는지는
+가정이 아니라 측정으로 답해야 한다 — 통과했다.
+
+**측정 자리와 최종 HEAD 의 차이**: 위 수치는 `e305d130` **직전** 커밋에서 쟀고, 그 뒤 커밋은
+`rollback.md` 의 괄호 한 줄을 지운 **evidence 전용**이다(코드 트리 동일). acceptance 의 정본은
+PR head CI 다.
 
 ### W-6·W-7 — 서명 A 를 이 slice 가 하나 더 만들었다가 닫았다 (r1 — cr H-1)
 
