@@ -14,7 +14,7 @@ git restore --source=<원천> --staged --worktree -- <아래 목록>
 
 ```
 docs/discovery/capability-map.md
-reports/evidence/m11/gates-web-read/            (commands.md · design-review.md · rollback.md · scope.md)
+reports/evidence/m11/gates-web-read/
 web/config/gate-tests.txt
 web/e2e/harness/opening-axis-extract.mjs
 web/e2e/harness/opening-axis.mjs
@@ -32,6 +32,10 @@ web/vite.config.ts
 
 **등식**: 그 목록에서 in_scope 를 뺀 차집합이 **빈 출력**이다(`comm -23`, 재산출 때마다 확인).
 in_scope 밖 경로는 하나도 없다 — 이 slice 는 공유 working tree 에서 경로 한정 커밋만 했다.
+
+**evidence 는 디렉터리 하나로 적는다**(r1 — cr LOW). 앞 판은 그 자리에 파일 이름을 괄호로 적었는데,
+복원이 **디렉터리 한정**이라 그 괄호는 복원에 쓰이지 않으면서 **수정 라운드가 evidence 를 더할
+때마다 낡는다**. 손으로 세는 계수를 복원 문서에 두지 않는다.
 
 ## 원천 — 고정 SHA 여야 한다
 
