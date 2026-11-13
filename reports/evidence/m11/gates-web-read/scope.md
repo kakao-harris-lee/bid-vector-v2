@@ -8,7 +8,12 @@ head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA
 in_scope:
   - web/scripts/kotlin-read-guard.mjs            # 신설 — 「여는 행위」를 런타임에 재는 층 (⑤)
   - web/scripts/kotlin-read-guard.test.mjs       # 신설 — 그 층의 양성·음성 대조
-  - web/scripts/kotlin-source-ownership.test.mjs # 데이터 파일 술어를 측정된 처방으로 (⑩)
+  - web/scripts/kotlin-source-ownership.test.mjs # 데이터 파일 술어(⑩) · 동일성(⑥) · 커널 import 그래프
+  - web/scripts/kotlin-source.mjs                # 단언을 동일성으로 (⑥ — 팀장 판정 (c))
+  - web/e2e/harness/opening-axis-extract.mjs     # 신설 — 추출 커널(단언을 거치지 않는 입구)
+  - web/e2e/harness/opening-axis.mjs             # 추출 넷을 얇은 입구로 (팀장 판정 (ㄱ))
+  - web/e2e/harness/opening-axis.test.mjs        # 술어 대조를 커널로 · 입구 거부 대조 신설
+  - web/scripts/money-vocab-cross-lang.test.mjs  # 같은 갈래(이 파일 안 커널 둘)
   - web/scripts/type-assertion-gate.test.mjs     # 신설 — (7) 양성·음성 대조 + 덮어쓰기 측정
   - web/eslint.config.js                         # (7) consistent-type-assertions
   - web/vite.config.ts                           # `test:` 블록에 setupFiles 등재 — §공유 파일
@@ -19,7 +24,6 @@ out_of_scope:
   - web/src/**                             # 출하 코드를 바꾸지 않는다 — (7) 오늘 위반 0 실측
   - web/scripts/kotlin-comment-strip.mjs   # 걷기 본체. 걷기 알고리즘은 이 slice 의 축이 아니다
   - web/scripts/display-gate-selectors.test.mjs  # 11E 의 서명 A 대상 — §공유 파일
-  - web/e2e/**                             # 소비자. ⑥ 처분이 (a) 일 때만 계약 갱신으로 들어온다
   - adapters/**, workflow/**, app/**       # Kotlin 무편집
   - openapi/bidvector-operator-api.yaml    # 11B 의 편집 대상
 acceptance_commands:   # ci.yml `web` job 전건 W-1~W-13 그대로 (`web/` 에서 돈다)
@@ -44,7 +48,18 @@ rollback: rollback.md
 
 수치의 정본은 `commands.md` 「착수 실측」이다.
 
-## ⑥ — 1안이 닫지 않는 축 (팀장 답 대기)
+## ⑥ — 팀장 판정 (c)·(ㄱ) 으로 닫는다
+
+**판정(2026-11-13)**: (a) 고정점도 (b) 등재도 아니다. **출처 쪽 단언**으로 간다 — ⑤ 층 뒤에는
+Kotlin 원문을 얻는 길이 소유 모듈 하나뿐이므로, 소유 모듈이 **내준 텍스트 자체**를 단언의 기준
+(동일성)으로 삼으면 소비자 쪽 흐름을 쫓을 필요가 없다. 고정점 추적은 10D 가 상한을 넘긴 꼴
+열거라 택하지 않는다.
+
+그 구조가 추출 술어의 **양성 대조**(합성 Kotlin 조각을 공개 입구로 먹이는 꼴)를 깨뜨렸고,
+**(ㄱ) 래퍼/코어 분리**가 승인됐다(2026-11-13). 그래서 `web/e2e/harness/**` 와
+`scripts/money-vocab-cross-lang.test.mjs` 가 in_scope 로 들어왔다.
+
+### 아래는 착수 때 올린 후보 둘 — 기록으로 남긴다
 
 계약 행과 capability map §12.3 (j) 는 ⑤ 층이 「⑥⑧⑨ 를 함께 닫는다」고 적는다. **⑧⑨ 는 닫는다.
 ⑥ 은 다른 축이다** — ⑤ 는 *여는 행위*를 재고, ⑥ 은 *이미 읽힌 텍스트*가 단언 없이 추출 함수로
@@ -62,13 +77,13 @@ rollback: rollback.md
 - **(b) 경계 밖으로 등재** — 고정한 위협 모델 경계가 「`.kt` 를 **여는** 표류」이므로 ⑥ 은 그 문장
   밖이라고 읽고 `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` 의 잔여로 남긴다.
 
-## 범위 밖 후보 — 미달 ② 의 절반 (팀장 답 대기)
+## 미달 ② 의 절반 — 받는다 (팀장 판정 ④)
 
 받는 항목에 없지만 ⑤ 층을 세우면서 **싼값에** 닫히는 자리가 하나 있다. `assertStrippedKotlin` 이
 지금 「다시 걸어 같은가」만 보므로 **줄을 끊지 않는 사본**(`replaceAll('//','')`)이 단언 **앞**에
 와도 조용하다(`design-review.md` §4 (3) 미달 ② 의 표). 읽기가 내준 텍스트를 소유 모듈이 쥐고
-단언을 **동일성**으로 올리면 그 칸이 닫힌다. **범위 확장이라 구현하지 않고 보고만 한다** — 받으면
-`web/scripts/kotlin-source.mjs` 가 in_scope 로 들어온다.
+단언을 **동일성**으로 올리면 그 칸이 닫힌다. **팀장이 받았고**(판정 ④) 이것이 (c) 의 핵심
+조각이라 `web/scripts/kotlin-source.mjs` 가 in_scope 다. 실측은 `commands.md`.
 
 ## acceptance 근거 — Kotlin 무편집인데 `./gradlew check` 를 돈다
 
@@ -103,6 +118,9 @@ lint 게이트 test(`display-gate-selectors.test.mjs`)를 늘리는 쪽이 싸�
 | `web/config/gate-tests.txt` | 새 test **둘**을 끝에 더한다 | 병합 뒤 **줄 수**와 `npm run gate:tests` 의 판정으로 센다(등록부 전수를 실행 결과로 단언하는 게이트다) |
 | `docs/discovery/capability-map.md` §12.3 | 새 하위 절 하나 | §절 글자 |
 
+`display-gate-selectors.test.mjs` 의 간헐 실패 한 자리는 **이 slice 의 축이 아니다** — 등재된
+**서명 A**(첫 칸 부하 민감 timeout)이고 **11E 소관**이라 건드리지 않는다(팀장 확인 2026-11-13).
+
 ## §12.3 절 글자 — slice 에 고정하지 않는다 (팀장 지시 (1))
 
 브리프의 `(n)` 배정은 **폐기**다. 이 PR 이 main 을 **마지막으로 병합할 때** 그 시점 §12.3 의
@@ -117,6 +135,11 @@ lint 게이트 test(`display-gate-selectors.test.mjs`)를 늘리는 쪽이 싸�
 ## 갱신 이력
 
 - 2026-11-13 초판(착수 보고와 함께).
+- 2026-11-13 r2 — 팀장 착수·설계 판정 반영. ① **⑥ 은 (c) 출처 쪽 단언**(소비자 흐름 추적 대신
+  출처 쪽 단언, 팀장 2026-11-13) ② **(ㄱ) 래퍼/코어 분리 승인** — `web/e2e/harness/opening-axis.mjs`·
+  `.test.mjs`·신설 커널·`money-vocab-cross-lang.test.mjs` 가 in_scope ③ **(7) 범위 확장 승인**
+  (`e2e/**/*.ts` + 뿌리 `*.ts`) ④ **미달 ② 의 절반을 받는다**(`kotlin-source.mjs` in_scope)
+  ⑤ 경계 밖 등재 다섯 승인 ⑥ `./gradlew check` 유지.
 - 2026-11-13 r1 — 팀장 계약 변경(`7817bd4f`) 반영. ① §12.3 절 글자를 머지 순서에 맡긴다
   ② `vite.config.ts` 의 `test:` 블록과 `gate-tests.txt` 를 11E 와의 공유 자리로 등재하고 병합
   확인을 **계수**로 적는다 ③ ⑩ 은 ⑤ 의 덮는 범위를 실측해 **남는 꼴이 있음**을 확인하고 처방을
