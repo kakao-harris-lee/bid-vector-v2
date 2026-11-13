@@ -19,7 +19,7 @@ import java.io.File
  * 판정을 다시 조립하지 않고 공고 표의 **표시 칸**만 읽는다(그래서 공고 사실 값 타입도 이 패키지
  * 자신의 것이다).
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.workflow.notification",
         "bidvector.workflow.event",

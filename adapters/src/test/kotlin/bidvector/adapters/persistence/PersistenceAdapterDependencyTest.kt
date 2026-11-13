@@ -16,7 +16,7 @@ import java.io.File
  * 전부 허용했다 — 새 domain 모듈이 생기면 그 목록이 조용히 낡는다. 허용 목록은
  * 열거되지 않은 좌표를 전부 거부하므로 그 낡음이 열거가 아니라 구성으로 닫힌다.
  */
-private val ALLOWED_ROOTS =
+internal val ALLOWED_ROOTS =
     setOf(
         "bidvector.procurement",
         "bidvector.sharedkernel",
