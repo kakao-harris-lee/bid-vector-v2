@@ -242,6 +242,11 @@ export function resolvedImports(source, fileName) {
  * `#` 줄을 빼는 것이 이 처방의 핵심이다 — 이 저장소의 데이터 파일은 등록부처럼 **주석에 산문을
  * 담고**, 그 산문이 확장자를 언급한다(빼지 않으면 오탐 1). allowlist 는 **토큰을 걸러내는 것이
  * 아니라 값을 차감한다** — 단어 토큰은 파일 이름을 남기지 않으므로 뒤에서 걸러낼 수 없다.
+ *
+ * **두 글자 단어 토큰의 성질**(r1 — cr LOW): 오늘 트리에서 오탐은 0 이지만, 경계뿐인 두 글자라
+ * 임의 토큰 묶음(base64·hex 조각)이나 같은 글자의 상호(`kt.co.kr` 꼴)를 담은 **미래의 fixture** 가
+ * 걸린다. 그때의 탈출구는 allowlist **차감**뿐이다 — 그 차감을 「구멍」으로 읽지 말 것. 술어를
+ * 좁히면(앞에 파일 이름을 요구하면) 확장자 단독 값과 glob 이 다시 열린다.
  */
 export function kotlinPathsInText(text, allowedValues = new Set()) {
   const withoutComments = text
