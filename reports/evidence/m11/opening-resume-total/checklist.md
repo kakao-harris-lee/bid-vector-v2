@@ -37,9 +37,13 @@
 
 - `git diff --name-only <base>..HEAD` ↔ in_scope: **일치**, in_scope 밖 **0**.
 - 하네스(`CLAUDE.md`·`.claude/**`) 커밋 **0**(scope.md 「하네스 레인 변경」 절과 같은 값).
-- out_scope 단언: 공유 누산기 `SourceAccountingTally.kt` · 형제 두 갈래(`CollectNoticesUseCase.kt`·
-  `CollectAwardListUseCase.kt`) · `SlotTally.kt` · `procurement/**` · `adapters/**` · `app/**` diff
-  **빈 출력**(D-1).
+- out_scope 단언은 **두 층이다**(r1 — D-1 의 기준 교체):
+  - **코드 diff 0**: 공유 누산기 `SourceAccountingTally.kt` 와 `CollectNoticesUseCase.kt` 는 **KDoc diff 가
+    있다**(D-7 로 in_scope 에 들어왔다). 거동이 안 바뀐 근거는 「파일을 안 만졌다」가 아니라 **`javap -c`
+    동일**이고, 통제군은 `javap -l` 이다. r0 판이 이 둘을 「diff 빈 출력」으로 적은 것은 그때의 사실이었고
+    r1 에 더는 참이 아니다.
+  - **경로 diff 빈 출력**: `CollectAwardListUseCase.kt` · `SlotTally.kt` · `procurement/**` ·
+    `adapters/**` · `app/**` — 이 경로들은 손대지 않았다.
 - production 변경은 **슬롯 걷기 한 자리**(+ 그 자리가 쓰는 누적 타입)이고, 공유 자리는 **KDoc 만** 바뀌었다
   (거동 0 을 바이트코드로 실측 · 그 비교의 양성 대조도 실측).
 - 수정 라운드가 만든 새 파일: 산출물 쪽 **하나**(`OpeningListResumeTotalTest.kt` — 계약 in_scope 의 그
