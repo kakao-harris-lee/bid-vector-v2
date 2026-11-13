@@ -6,18 +6,25 @@
 git restore --source=94ee445b50cafa669af435e651d811cc551c67e8 --staged --worktree -- <아래 목록>
 ```
 
-실측 HEAD: `1457e9fe089041a3e248588ac055c816bc4ab13a`
+실측 HEAD: **머지 차례에 다시 잰다**(팀장 지시). r0 의 실측은 `1457e9fe` 에서 했고 ①~⑥ 과
+보완 경로가 아래 표에 있다 — 그 측정은 r1 편집 **앞**이고 원천도 착수 base 였다. 최종 실측은
+병합 뒤 **마지막 산출물 커밋**에서 하고, 원천은 병합한 `origin/main` 의 **고정 SHA** 이며
+**셋째 단언**(복원 대상 blob 이 착수 base 와 새 원천에서 같은가)을 함께 잰다. `capability-map.md`
+는 앞 레인들이 §12.3 에 절을 더하므로 **두 원천에서 다를 전망**이고, 그때 그 파일 기준 계수를
+새 원천에서 다시 센다 — 복원이 「내 절만 지우고 남의 절은 남기는가」를 둘 다 세는 것이 그
+자리다(원천 = base 였던 r0 에서는 전수 트리 동일성이 갈음이었지만, 공유 파일에 남의 내용이
+들어오면 그 갈음을 더는 쓸 수 없다).
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-status 94ee445b..1457e9fe` 가 낸 **여덟**이고, 라운드마다 재산출한다.
+`git diff --name-status <base>..HEAD` 의 기계 산출이고 **라운드마다 재산출한다**. r1 에서 **열**
+이 됐다 — r0 의 여덟에 그때는 아직 없던 evidence 둘(`checklist.md`·`rollback.md`)이 들어왔다
+(verifier r1 장부층 지적).
 
 | 상태 | 경로 |
 | --- | --- |
 | M | `docs/discovery/capability-map.md` |
-| A | `reports/evidence/m11/web-screen-flakes/commands.md` |
-| A | `reports/evidence/m11/web-screen-flakes/design-review.md` |
-| A | `reports/evidence/m11/web-screen-flakes/scope.md` |
+| A | `reports/evidence/m11/web-screen-flakes/` 다섯 — `scope`·`design-review`·`commands`·`checklist`·`rollback` |
 | M | `web/scripts/display-gate-selectors.test.mjs` |
 | M | `web/scripts/screen-card-coverage.mjs` |
 | M | `web/scripts/screen-card-coverage.test.mjs` |
@@ -73,21 +80,17 @@ evidence 커밋은 언제나 실측 뒤에 오므로 **실측 HEAD == 판정 SHA
 
 ### ⑥ 의 한 번 붉음 — 이 slice 가 고치는 바로 그 결함이다
 
-복원된 트리는 **base** 이고, base 의 `npm run test` 는 측정된 재현율 **9.6% + 9.6%** 로 불안정하다
-(§commands.md). `gate:tests` 는 **같은 명령에 JSON reporter 를 붙여 한 번 더 돌리는** step 이라 그
-불안정을 그대로 물려받는다. 그래서 복원 뒤 그 게이트가 때때로 붉은 것은 복원의 결함이 아니라
-**복원이 되돌린 결함이 돌아온 것**이다. 같은 트리에서 이어 돌린 `gate:tests` 8회가 전부 초록이고,
-전건을 **26회** 돌려 서명이 실제로 다시 나는지 따로 쟀다 —
-`TOTAL=26 A=0 B=4 OTHER=0 GREEN=22`. **서명 B 가 15.4% 로 돌아왔다**(수정 뒤 52회에서는 0 이었다).
-A 는 26회에 0 인데 그것은 닫혔다는 뜻이 아니다 — base 의 A 는 52회에 5회였고 26회에 0 이 나올
-확률이 작지 않다.
+복원된 트리는 **base** 이고 base 의 전건은 재현율 **9.6%+9.6%** 로 불안정하다. `gate:tests` 는
+**같은 명령을 한 번 더 돌리는** step 이라 그 불안정을 물려받는다. 즉 복원의 결함이 아니라
+**복원이 되돌린 결함이 돌아온 것**이다. 같은 트리에서 이어 돌린 `gate:tests` 8회는 전부 초록이고,
+전건 **26회**로 따로 쟀다 — `TOTAL=26 A=0 B=4 GREEN=22`, **서명 B 15.4% 재현**(수정 뒤 52회 0).
+A 의 26회 0 은 닫혔다는 뜻이 아니다(base 의 A 는 52회 5회였다).
 
-첫 붉음의 로그는 같은 경로를 덮어쓰는 반복문 때문에 남지 않았다 — 그래서 **그 한 건의 서명은
-분류하지 못했다**. 위 26회가 그 자리를 갈음한다. 지어내지 않는다.
+첫 붉음의 로그는 반복문이 같은 경로를 덮어써 남지 않았고, **그 한 건의 서명은 분류하지 못했다**.
+위 26회가 그 자리를 갈음한다. 지어내지 않는다.
 
-**보완 경로 — 실측했다.** 되돌림이 의도라면 ②의 두 수정도 함께 되돌아간다. 불안정을 되돌리고
-싶지 않다면 복원 목록에서 `web/scripts/display-gate-selectors.test.mjs` 와
-`web/src/AppRoot.test.tsx` 둘을 **빼고** 복원한다. 둘째 clone 에서 여섯만 복원해 실행했다 —
-남은 변경이 정확히 그 둘이고(`git diff --name-only <base>` = 두 파일),
-`typecheck`·`lint`·`test`·`gate:tests` 가 전부 **exit 0** 이다. 그 둘은 ①(모집단 게이트)과 파일도
-술어도 겹치지 않으므로 코드 의존이 0 이다.
+**보완 경로 — 실측했다.** 불안정을 되돌리고 싶지 않다면 복원 목록에서 ② 의 두 파일
+(`display-gate-selectors.test.mjs`·`AppRoot.test.tsx`)을 **빼고** 복원한다. 둘째 clone 에서
+여섯만 복원해 실행했고, 남은 변경이 정확히 그 둘이며
+`typecheck`·`lint`·`test`·`gate:tests` 가 전부 **exit 0** 이다. 그 둘은 ① 과 파일도 술어도 겹치지
+않는다.

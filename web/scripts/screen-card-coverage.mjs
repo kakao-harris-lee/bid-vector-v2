@@ -56,8 +56,15 @@ export const VOCABULARY_DECLARATIONS = [
  * 그래서 **집합을 넓히지 않고 목록이 뒤처지는 축만** 등식으로 막는다 — 어휘 모듈의 내보낸 함수
  * 전수 == 등재 ∪ 이 표. 새 함수는 분류될 때까지 붉다.
  *
+ * **이 등식의 모집단은 [VOCABULARY_MODULES] 셋뿐이다**(r1 F1). `src/display/` 에는 표시 모듈이
+ * 열넷 있고, 나머지 열하나에 어휘를 감싼 함수를 더해 화면이 그것을 그리면 이 등식도 의무 집합도
+ * 그것을 보지 못한다 — 그 축은 `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB` 로 **경계 등재**했다
+ * (닫는 길은 파일 사이 폐포이고, 실측하면 오늘의 마운트 목록 밖에 의무 둘을 낳아 승인 경계에
+ * 걸린다).
+ *
  * 이 표 자신이 다시 열거이므로 종류 하나에는 **구조 의무**가 붙는다([INTERNAL_ASSEMBLER]):
- * 화면이 그것을 직접 참조하면 사유가 거짓이 되고 게이트가 붉어진다.
+ * 화면이 그것을 **직접** 참조하면 사유가 거짓이 되고 게이트가 붉어진다. 「직접」이 그 의무의
+ * 범위다 — 표시층 다른 모듈을 지나는 경로는 위 OPEN 의 축이고 이 게이트 밖이다.
  */
 export const INTERNAL_ASSEMBLER = 'INTERNAL_ASSEMBLER';
 export const OTHER_AXIS = 'OTHER_AXIS';
@@ -66,12 +73,16 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
   {
     key: 'display/moneyDisplay.ts#currencyUnitOf',
     kind: INTERNAL_ASSEMBLER,
-    why: '통화 코드 → 단위 글자. 표시층이 금액 글자를 조립할 때 쓰는 속이고, 화면이 받는 얼굴은 amountDisplayOf 다',
+    why: '통화 코드 → 단위 글자. 표시층이 금액 글자를 조립할 때 쓰는 속이고 화면이 직접 부르지 않는다(그 사실만 구조로 잰다)',
   },
   {
     key: 'display/moneyDisplay.ts#amountTextOf',
     kind: INTERNAL_ASSEMBLER,
-    why: '숫자와 단위를 한 글자로. 위와 같은 속이다',
+    // **화면이 직접 부르지 않는다는 것이 「화면에 닿지 않는다」는 뜻은 아니다**(r1 F1 실측):
+    // `editSessionDisplay` 의 비공개 `budgetView` 가 이 함수로 금액 글자를 만들고, 그 글자가
+    // `STRATEGY_FIELD_VALUE` 를 지나 `screens/strategyEdit.tsx` 에 그려진다. 그 화면 파일은
+    // 오늘 의무도 화면 바구니도 아니다 — 그 축이 위 머리 주석의 OPEN 이다.
+    why: '숫자와 단위를 한 글자로. 위와 같은 속이고 화면이 직접 부르지 않는다. 표시층 다른 모듈을 지나 화면에 닿는 경로는 이 게이트 밖이다',
   },
   {
     key: 'display/noticeDisplay.ts#noticeStatusDisplayOf',

@@ -11,21 +11,18 @@
 | 내보낸 심볼 + 지역 그래프 **전이 폐포** + 참조 | 5 (오늘과 같음) | 2 — WorksheetScreen · **InboxScreen** |
 
 한 겹이 닫지 못하는 이유는 사슬 하나다 — `InboxScreen` → `NotificationGroupBlock` →
-`NotificationRow` → 어휘. **두 겹**이다. 오늘 `InboxScreen` 은 의무도 화면 바구니도 아닌 곳에
-있다(게이트의 모집단 문장이 이 파일에 대해 아무 말도 하지 않는다).
+`NotificationRow` → 어휘로 **두 겹**이다. 오늘 `InboxScreen` 은 의무도 화면 바구니도 아니다
+(게이트가 이 파일에 대해 아무 말도 하지 않는다).
 
-어휘를 부르는 **비공개** 지역 선언: `InboxScreen.tsx` 의 `NotificationRow` ·
-`ResultCard.tsx` 의 `OpeningSection`·`AwardGap`·`MyBidSection`(이 파일의 내보낸 `ResultCard` 는
-직접도 부르므로 오늘 이미 의무다).
+어휘를 부르는 **비공개** 선언: `InboxScreen.tsx#NotificationRow` ·
+`ResultCard.tsx` 의 `OpeningSection`·`AwardGap`·`MyBidSection`(그 파일의 `ResultCard` 는 직접도
+부르므로 이미 의무다).
 
-잔여 다섯의 **오늘 실재 수**: 감싸 내보내기 0 · 개명 재수출 0 · 클래스 컴포넌트 0 · 함수 참조
-전달 0(전수 grep) · 간접 렌더 **1**. 어휘 호출은 `src/screens/**`·`src/display/**` **밖에 0**
-(전수 grep, exit 1) — 모집단 경계 문장이 오늘은 완전하다.
-
-어휘 모듈의 내보낸 함수 전수 ↔ 등재(7):
-`moneyDisplay` 등재 5 · 미등재 2(`currencyUnitOf`·`amountTextOf` — 표시층 내부 조립자, 화면이
-참조하지 않는다) · `noticeDisplay` 등재 1 · 미등재 1(`noticeStatusDisplayOf` — 상태 축) ·
-`timeDisplay` 등재 1 · 미등재 4(`daysUntil`·`dayCountText`·`localInputToIso`·`readClock`).
+잔여의 **오늘 실재 수**: 간접 렌더 **1** · 나머지 넷 **0**(전수 grep). 어휘 호출은
+`src/screens/**`·`src/display/**` **밖에 0**. 어휘 모듈의 내보낸 함수 ↔ 등재 7: `moneyDisplay`
+5/미등재 2 · `noticeDisplay` 1/1 · `timeDisplay` 1/4 — 미등재 일곱이 제외 표다.
+**그 등식의 모집단은 어휘 모듈 셋이고 `src/display/` 는 열넷이다**(r1 F1 — 나머지 열하나는
+경계 등재).
 
 ### ② 두 서명의 재현율 — 수정 전 52회
 
@@ -123,27 +120,43 @@ Tests  7 failed | 17 passed (24)
 놓인 사슬에서는 한 바퀴가 이미 폐포다(Map 순회 중에 `reaching` 이 자란다). 그래서 씨앗을 「직접
 닿는 것을 떠 두고 거기서 한 홉」으로 다시 심었고, 그때 비로소 깊이 축이 붉어졌다.
 
+## r1 수정 라운드 (verifier F1~F5)
+
+**구판 RED** — F2·F3 의 대조 다섯을 r0 구현 위에 얹으면 **5 failed / 29 passed**. 전부
+`expected [] to strictly equal […]` 이고, 음성 대조(어휘를 안 쓰는 기본 내보내기)는 r0 에서도
+초록이라 넓힌 범위를 재지 않는다.
+
+**바꿔치우기 변이 다섯**(전부 치환 · 적용 단언 선행 · 되돌림 뒤 `porcelain` 0)
+
+| 변이 | 붉은 칸 |
+| --- | --- |
+| 기본 내보내기 자리를 되돌린다 | **3** — memo(지역) · 이름 없는 함수 · 화살표 |
+| 구조분해 바인딩을 그래프에서 뺀다 | **1** |
+| 리터럴 원소 접근을 참조에서 뺀다 | **1** |
+| 예열을 기각된 `beforeAll` 1안으로 되돌린다 | **1** — r0 단언은 이 변이에 **초록**이었다(F4) |
+| `setScheduler` 만 지운다 | **1** — r0 단언은 **초록**이었다(F5) |
+
+**F1 은 코드가 아니라 문면과 등재로 답했다**(팀장 판정 — 닫는 길이 의무 +2 를 낳아 승인 경계).
+거짓이던 세 문장(게이트 소스의 `amountTextOf` 제외 사유 · design-review (2b) ⓐⓑ)을 실측대로
+고치고, 축을 `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB` 로 세웠다. 실례와 비용은 그 OPEN 에
+있다(표시 키 +2 · 의무 +2).
+
 ## acceptance
 
-ci.yml `web` job 전건을 그 job 의 명령 그대로 `web/` 에서 돌린다(W-1 은 착수 때 이미 돌았다).
+ci.yml `web` job 전건을 그 job 의 명령 그대로 `web/` 에서 돌린다. 아래는 **r1 HEAD** 실측이다.
 
 | step | 명령 | exit |
 | --- | --- | --- |
-| W-2 | `npm run lint` | 0 |
-| W-3 | `npm run typecheck` | 0 |
-| W-4 | `npm run gate:src-tree` | 0 |
-| W-5 | `npm run api:types:check` | 0 |
-| W-6 | `npm run test` | 0 — 42 파일 · 928 칸(base 913 → ② 3 · ① 12) |
-| W-7 | `npm run gate:tests` | 0 |
-| W-8 | `npm run build` | 0 |
-| W-9 | `npm run gate:boundary-canary` | 0 |
-| W-10 | `npx playwright install chromium` | 0 |
-| W-11 | `npm run test:e2e` | 0 |
-| W-12 | `./gradlew --no-daemon :app:bootJar` | (채운다) |
-| W-13 | `npm run test:e2e:journey` | (채운다) |
-| — | `./gradlew --no-daemon check` | (채운다) |
+| W-1~W-5 | `npm ci` · `lint` · `typecheck` · `gate:src-tree` · `api:types:check` | 0 · 0 · 0 · 0 · 0 |
+| W-6~W-9 | `test` · `gate:tests` · `build` · `gate:boundary-canary` | 0 · 0 · 0 · 0 — 42 파일 **935 칸**(base 913 → ② 4 · ① 18) |
+| W-10~W-11 | `playwright install chromium` · `test:e2e` | 0 · 0 — 스모크 2 passed |
+| W-12~W-13 | `./gradlew --no-daemon :app:bootJar` · `test:e2e:journey` | 0 · 0 — 여정 **12 passed · flaky 0 · 건너뜀 0 · spec 4/4** |
 
-W-12·W-13·Kotlin `check` 는 빌드 자리 하나를 잡고(`bv-build.sh`) 돌린다.
+빌드 자리가 필요한 W-12·W-13 은 `bv-build.sh` 로 자리를 잡고 돌린다.
+
+**Kotlin `check` 는 머지 차례의 병합 커밋에서 한 번 돈다**(팀장 지시). r0 판정 SHA `74e756c8`
+에서 **exit 0**(35m53s · 258 실행 · `:leakPatternGate` 가 UP-TO-DATE 가 아니라 실행)이었고, 그
+측정은 r1 편집 앞이라 최종값이 아니다 — 최종값의 정본은 동결 보고와 PR 조치 코멘트다.
 
 ## 측정의 부하 조건
 
