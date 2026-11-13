@@ -225,4 +225,19 @@ import 그래프 술어로 측정). 그래서 커널화가 새 공개 표면을 
 
 ## acceptance (전건)
 
-라운드마다 결과만 적는다.
+CI `web` job 의 명령 그대로 + `./gradlew check`. **판정 대상은 main 을 마지막으로 병합한 커밋**
+이므로 아래는 **그 병합 전** 실행이고, 정본은 머지 차례의 재실행과 PR head CI 다.
+
+| 단계 | 결과 |
+| --- | --- |
+| W-1 `npm ci` · W-2 lint · W-3 typecheck · W-4 gate:src-tree | exit **0** |
+| W-5 api:types:check · W-6 test · W-7 gate:tests | exit **0** · vitest **44 파일 · 942 passed** |
+| W-8 build · W-9 gate:boundary-canary | exit **0** |
+| W-10 playwright install · W-11 스모크 | exit **0** · 2 passed |
+| W-12 `:app:bootJar` · W-13 여정 e2e | exit **0** · 12 passed |
+| `./gradlew check` | **아직 돌지 않았다** — 머지 차례에 병합 커밋에서 돈다. 이 slice 는 Kotlin 무편집이고, 이 명령이 acceptance 에 드는 이유는 evidence 가 누출 게이트의 스캔 뿌리에 들기 때문이다. 그 참조형 스캔은 이 트리에서 **매치 0** 이다 |
+
+**하네스 레인 변경**: `git log 94ee445b..HEAD --no-merges -- CLAUDE.md .claude/` — **0 줄**(재산출).
+
+**복원 목록 등식**: `git diff --name-status 94ee445b..HEAD` 의 경로에서 in_scope 를 뺀 차집합이
+**빈 출력**이다(`comm -23`).
