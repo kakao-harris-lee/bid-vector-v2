@@ -42,7 +42,8 @@
 - out_scope 단언: `SourceAccountingTally.kt`·`procurement/**`·`adapters/**`·`app/**` diff **빈 출력**(D-1).
 - production 변경은 **use case 한 자리**이고 나머지는 이동·test·장부다.
 - 병합(`ff867b5c`)이 들여온 것은 남의 slice 산출물이고 이 slice 의 in_scope 와 겹치는 파일은
-  `capability-map.md` 하나다 — 그 해소는 **삽입 전용**(추가 11 줄 · 삭제 0 줄).
+  `capability-map.md` 하나다 — 그 해소는 **삽입 전용**(실측 HEAD `fee57b5c` 기준 추가 **19** 줄 · 삭제 0 줄.
+  병합 커밋 시점의 수는 11 줄이었고, cr 라운드가 (g) 에 새 OPEN 행과 착수 계수 문단을 더한 뒤가 19 다).
 - `bid-vector` symlink·다른 worktree·운영 host·DB·외부 API **무접촉**. 실행한 것은 Gradle task 뿐이다.
 - 수정 라운드가 만든 새 파일: 산출물 쪽 **하나**(`ClaimedSourceTotal.kt` — 계약 in_scope 의 「새 파일 하나」),
   그 밖의 신규는 이 slice 의 장부뿐이다.
