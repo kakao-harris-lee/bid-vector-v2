@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // `readAliased` 는 **별칭 import** 다 — ⑥ 의 꼴 하나이고, 아래 동일성 대조가 「흐름의 꼴이
 // 답을 바꾸지 않는다」를 재는 자리라 그 꼴을 축어로 들여온다.
@@ -483,15 +484,21 @@ describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
    * 이 단언 자체가 그 증거다: 이 파일은 커널을 평범한 정적 import 로 얻었고, 그래도 거부된다.
    */
   it('허용 밖 파일이 커널을 부르면 거부된다 — 획득 꼴과 무관하다', async () => {
-    const viaStatic = await import('../e2e/harness/opening-axis-extract.mjs');
-    const viaTemplate = await import(`../e2e/harness/opening-axis-extract.${'mjs'}`);
-    const viaNoExtension = await import('../e2e/harness/opening-axis-extract');
+    const specifier = '../e2e/harness/opening-axis-extract.mjs';
+    // **상설 양성 대조**: 보조 층을 지나간 꼴 넷(K1~K4)을 여기 둔다 — 그 넷이 r1 의 HIGH 였고,
+    // 구조 층이 그것을 꼴과 무관하게 받는다는 것이 이 묶음의 주장이다.
+    const namespaces = [
+      ['K1 확장자 없는 정적 import', await import('../e2e/harness/opening-axis-extract')],
+      ['K2 createRequire', createRequire(import.meta.url)(specifier)],
+      ['K3 템플릿 import()', await import(`../e2e/harness/opening-axis-extract.${'mjs'}`)],
+      ['K4 vi.importActual', await vi.importActual(specifier)],
+      // **리터럴 지정자**로도 한 번 얻는다 — 이 파일이 보조 층의 허용 목록에 드는 이유가 이 줄이다.
+      // 계산된 지정자로만 얻으면 보조 층은 이 파일을 **보지 못하고**(그 층의 주장이 「지정자로 적힌
+      // 획득」까지다), 그러면 이 파일이 자기 게이트를 비켜 가는 꼴이 된다.
+      ['정적 import(리터럴)', await import('../e2e/harness/opening-axis-extract.mjs')],
+    ];
 
-    for (const [name, namespace] of [
-      ['정적 import', viaStatic],
-      ['템플릿 import()', viaTemplate],
-      ['확장자 없는 import', viaNoExtension],
-    ]) {
+    for (const [name, namespace] of namespaces) {
       expect(() => namespace.openingOperationPathsOf('val x = 1'), `${name} 이 거부되지 않는다`).toThrow(
         /직접 불렀다/u,
       );
