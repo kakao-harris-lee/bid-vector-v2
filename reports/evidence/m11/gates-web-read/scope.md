@@ -7,6 +7,7 @@ base_sha: 94ee445b50cafa669af435e651d811cc551c67e8   # M10 종결 머지
 head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다(관례).
 in_scope:
   - web/scripts/kotlin-read-guard.mjs            # 신설 — 「여는 행위」를 런타임에 재는 층 (⑤)
+  - web/scripts/kotlin-read-guard-setup.mjs      # 신설 — 그 층을 세우는 유일한 자리(배선 측정용)
   - web/scripts/kotlin-read-guard.test.mjs       # 신설 — 그 층의 양성·음성 대조
   - web/scripts/kotlin-source-ownership.test.mjs # 데이터 파일 술어(⑩) · 동일성(⑥) · 커널 import 그래프
   - web/scripts/kotlin-source.mjs                # 단언을 동일성으로 (⑥ — 팀장 판정 (c))
@@ -135,6 +136,9 @@ lint 게이트 test(`display-gate-selectors.test.mjs`)를 늘리는 쪽이 싸�
 ## 갱신 이력
 
 - 2026-11-13 초판(착수 보고와 함께).
+- 2026-11-13 r3 — 구현 중 신설 파일 하나를 in_scope 와 대조해 등재한다(`kotlin-read-guard-setup.mjs`).
+  층을 **import 만으로 세우지 않는** 이유가 그 파일의 존재 이유다 — 세우는 자리가 하나여야
+  `vite.config.ts` 의 등재를 지우는 변이가 양성 묶음을 RED 로 만든다(실측 3 failed).
 - 2026-11-13 r2 — 팀장 착수·설계 판정 반영. ① **⑥ 은 (c) 출처 쪽 단언**(소비자 흐름 추적 대신
   출처 쪽 단언, 팀장 2026-11-13) ② **(ㄱ) 래퍼/코어 분리 승인** — `web/e2e/harness/opening-axis.mjs`·
   `.test.mjs`·신설 커널·`money-vocab-cross-lang.test.mjs` 가 in_scope ③ **(7) 범위 확장 승인**
