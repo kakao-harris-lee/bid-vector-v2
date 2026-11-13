@@ -31,6 +31,21 @@ export const BID_CASE_STATE_DISPLAY = {
 } as const satisfies Record<BidCaseState, StateDisplay>;
 
 /**
+ * 상태 표를 읽는 **한 자리**. 인자를 `string` 으로 받는다 — 계약이 어휘를 닫은 뒤에도 **번들이
+ * 아직 모르는 값**이 닿을 수 있고(계약이 늘었는데 배포가 비틀린 경우), 그때 서버가 준 코드를
+ * 문면인 척 내면 화면이 계약에 없는 상태를 **아는 것처럼** 보인다. 표 밖 값은 `displayOrUnknown`
+ * 이 보이게 낸다(`commandDisplayOf`·`noticeStatusDisplayOf` 와 같은 관례).
+ *
+ * **M11/11B 전에는 타임라인만 자기 조회를 적었다** — 표를 `Record<string, …>` 으로 단언해 **맨
+ * 색인**으로 읽고 폴백으로 서버가 준 코드를 그대로 냈다(`OPEN-M10-TIMELINE-STATE-OPENAPI-ENUM`
+ * 이 그 우회를 함께 적었다). 맨 색인은 프로토타입 키에서 표 밖 값을 **답으로** 내는 자리이기도
+ * 하고, 그 성질은 `displayOf` 가 닫는다.
+ */
+export function stateDisplayOf(state: string): StateDisplay {
+  return displayOrUnknown<string>(BID_CASE_STATE_DISPLAY, state);
+}
+
+/**
  * 다음 확인 시점 — **「없음」은 빈 값이 아니라 답이다**(§6.1). 시각 하나로 접으면 화면이
  * 「아직 안 정했다」와 「없는 것이 맞다」를 구별할 수 없다.
  */

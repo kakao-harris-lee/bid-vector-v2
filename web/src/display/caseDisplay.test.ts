@@ -10,6 +10,7 @@ import {
   TIMELINE_ACTOR_DISPLAY,
   commandDisplayOf,
   nextActionOf,
+  stateDisplayOf,
   type BidCommandToken,
 } from './caseDisplay';
 import { displayOrUnknown } from './stateDisplay';
@@ -188,6 +189,104 @@ describe('타임라인 명령 어휘 — 전수 열다섯', () => {
 
   it('표 안 토큰은 표의 행을 낸다', () => {
     expect(commandDisplayOf('ADD_TO_BID_BOX')).toBe(BID_COMMAND_DISPLAY.ADD_TO_BID_BOX);
+  });
+});
+
+/**
+ * 타임라인 **상태 두 칸**(출발·도착)의 전수(M11/11B, `OPEN-M10-TIMELINE-STATE-OPENAPI-ENUM`).
+ * 앞 판은 그 두 칸이 계약에서 `type: string` 이었다 — 같은 응답 계열의 건 상태 칸에는 이미
+ * `enum` 이 있어 **한 응답 안에서 선언이 갈려 있었고**, 화면은 표 밖 값에 서버가 준 코드를
+ * 그대로 세웠다.
+ *
+ * 계약이 세 칸을 닫은 뒤로 전수성의 출처는 **생성 타입**이다 — 명령 축(M10/10B)과 같은 자리가
+ * 됐고, Kotlin 어휘와의 등식은 계약 test 층이 든다.
+ */
+describe('타임라인 상태 어휘 — 계약이 닫은 한 집합', () => {
+  /**
+   * **어휘를 다시 열면 이 자리가 컴파일되지 않는다.** 표의 전수는 `satisfies Record<BidCaseState, …>`
+   * 가 지는데, 계약이 그 칸들을 `type: string` 으로 내리면 유도 유니온이 `string` 으로 넓어지고
+   * 전수 검사가 **아무것도 막지 않으면서 초록**이 된다. 그 길을 타입으로 닫는다.
+   *
+   * `@ts-expect-error` 로는 쓸 수 없다 — eslint 가 `src/**` 에서 세 형태를 전부 막는다(W-2).
+   */
+  it('상태 어휘가 `string` 보다 좁다 — 출발·도착 두 칸 모두', () => {
+    type NarrowerThanString<T extends string> = string extends T ? never : T;
+    type ContractToState = components['schemas']['BidTimelineEntry']['toState'];
+    type ContractFromState = NonNullable<components['schemas']['BidTimelineEntry']['fromState']>;
+
+    const closedToState: NarrowerThanString<ContractToState> = 'WATCHING';
+    const closedFromState: NarrowerThanString<ContractFromState> = 'WATCHING';
+
+    expect([closedToState, closedFromState]).toStrictEqual(['WATCHING', 'WATCHING']);
+  });
+
+  /**
+   * **전수성을 별칭이 아니라 계약에 묶는다**(M10/10B v M-1 의 교훈 — 별칭을 손 유니온으로
+   * 되돌리는 변이가 모든 게이트를 지나갔다). 그래서 별칭을 거치지 않고 생성 타입 경로에서 바로
+   * 뽑아 표의 키 집합과 맞댄다. 등식은 **양방향**이다 — 한쪽 포함만 재면 반대쪽이 줄어든 것을
+   * 보지 못한다. 튜플로 감싸는 것은 맨 `extends` 가 유니온을 갈래별로 분배하는 것을 막는다.
+   *
+   * 세 칸을 한 자리에서 맞대는 이유: 「한 응답 안에서 선언이 갈려 있다」가 이 OPEN 의 문면이고,
+   * 갈림을 닫는 것은 **셋이 같은 집합임을 재는 것**이다.
+   */
+  it('표의 키 집합이 상태 세 칸과 **같다** — 별칭을 거치지 않는다', () => {
+    type TableKey = keyof typeof BID_CASE_STATE_DISPLAY;
+    type MutuallySame<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+    const sameAsToState: MutuallySame<TableKey, components['schemas']['BidTimelineEntry']['toState']> = true;
+    const sameAsFromState: MutuallySame<
+      TableKey,
+      NonNullable<components['schemas']['BidTimelineEntry']['fromState']>
+    > = true;
+    const sameAsCaseState: MutuallySame<TableKey, components['schemas']['BidCase']['state']> = true;
+
+    expect([sameAsToState, sameAsFromState, sameAsCaseState]).toStrictEqual([true, true, true]);
+  });
+
+  /**
+   * **출발 칸의 `null` 은 어휘를 닫아도 남는다** — 건을 여는 전이에는 출발 상태가 없고, 그
+   * 사실이 응답에 `null` 로 실린다. 어휘에서 그 값을 빠뜨리면 엄격한 검증기가 실제로 나가는
+   * 값을 거부한다(계약 쪽 짝은 계약 test 가 든다).
+   */
+  it('출발 칸은 생성 전이의 null 을 계속 받는다', () => {
+    const openingTransition: components['schemas']['BidTimelineEntry']['fromState'] = null;
+
+    expect(openingTransition).toBeNull();
+  });
+
+  /**
+   * 계약이 어휘를 닫은 뒤에도 조회는 **런타임의 자유 문자열**을 받는다(배포 비틀림). 표 밖 값은
+   * **보이게** 낸다 — 서버가 준 코드를 문면 자리에 그대로 세우면 화면이 계약에 없는 상태를 아는
+   * 것처럼 보인다(M11/11B D-11B-3 — 그 자리가 이 모듈 밖에 하나 있었다).
+   *
+   * 표본은 **도메인이 명시적으로 거부한 어휘**다(「보류」는 어휘에 없다 — 「나중에」와 「건너뜀」
+   * 으로 갈렸다). 상류가 그 이름을 채택하면 음성 대조가 조용히 공허해지는 자리를 피한다.
+   */
+  it('표 밖 상태는 보이는 미지 상태로 낸다 — 코드 원문이 아니다', () => {
+    const unknown = stateDisplayOf('ON_HOLD');
+
+    expect(unknown.label).toContain('ON_HOLD');
+    expect(unknown.label, '코드 원문이 문면 자리에 그대로 섰다').not.toBe('ON_HOLD');
+    expect(unknown.tone).toBe('unjudged');
+  });
+
+  /**
+   * **`Object.prototype` 의 키도 표 밖이다.** 맨 색인 읽기(`table[value]`)는 `toString`·
+   * `constructor`·`__proto__` 에서 프로토타입의 값을 내고, 그것이 폴백을 삼켜 `label`·`tone` 이
+   * `undefined` 인 「상태」가 화면까지 간다. 조회가 런타임의 자유 문자열을 받는 자리라 계약이
+   * 어휘를 닫은 뒤에도 이 입력은 그대로 닿는다.
+   */
+  it('프로토타입 키도 보이는 미지 상태로 낸다', () => {
+    for (const key of ['toString', 'constructor', 'valueOf', 'hasOwnProperty', '__proto__']) {
+      const unknown = stateDisplayOf(key);
+
+      expect(unknown.label, `${key} 가 프로토타입의 값을 냈다`).toContain(key);
+      expect(unknown.tone, `${key} 의 어조가 미지가 아니다`).toBe('unjudged');
+    }
+  });
+
+  it('표 안 상태는 표의 행을 낸다', () => {
+    expect(stateDisplayOf('WATCHING')).toBe(BID_CASE_STATE_DISPLAY.WATCHING);
   });
 });
 
