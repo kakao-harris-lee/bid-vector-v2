@@ -1,12 +1,20 @@
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { KOTLIN_SOURCE_KEYS, readKotlinSource } from './kotlin-source.mjs';
+// `readAliased` 는 **별칭 import** 다 — ⑥ 의 꼴 하나이고, 아래 동일성 대조가 「흐름의 꼴이
+// 답을 바꾸지 않는다」를 재는 자리라 그 꼴을 축어로 들여온다.
+import {
+  KOTLIN_SOURCE_KEYS,
+  assertStrippedKotlin,
+  readKotlinSource,
+  readKotlinSource as readAliased,
+} from './kotlin-source.mjs';
 
 /**
  * **Kotlin 원문 읽기의 소유권을 구조로 잠근다**(M10/gates-web — verifier r1 M-2 · r2 H-1~H-3·M-1).
@@ -49,6 +57,27 @@ const STRIP_INTERNAL = `scripts/${STRIP_BASENAME}.mjs`;
 
 /** 그 내부 모듈을 참조해도 되는 자리 — 소유 모듈과 그 **단위 test** 둘이다. */
 const STRIP_REF_ALLOWED = [OWNER, 'scripts/kotlin-source.test.mjs'];
+
+/**
+ * **추출 커널 — 동일성 단언을 거치지 않는 입구다**(M11 — 팀장 조건 1).
+ *
+ * 공개 입구(`shipped…` 넷)는 받은 텍스트가 읽기가 내준 그것인지를 단언하고 커널로 넘긴다. 커널을
+ * 직접 부르면 그 단언이 없으므로, 소비자가 커널을 쥐는 순간 ⑥ 이 다시 열린다. 그래서 참조자를
+ * **소유 파일과 그 단위 test 둘**로 고정한다 — 걷기 본체를 같은 꼴로 묶어 둔 선례를 잇는다.
+ */
+const EXTRACT_KERNEL = 'e2e/harness/opening-axis-extract.mjs';
+
+/**
+ * **쥐는 자리와 부르는 자리의 허용이 다르다**(r1). 아래 import 그래프 술어는 「누가 **쥐는가**」를
+ * 보고, 커널 쪽 호출자 프레임 판정은 「누가 **부르는가**」를 본다 — 부르는 자리는 소유자와 그 단위
+ * test **둘**이고, 쥐는 자리에는 이 파일이 하나 더 든다. 이 파일이 커널을 쥐는 이유가 바로
+ * **쥐어도 부를 수 없음을 재는 것**이라, 그 비대칭 자체가 구조 층의 증거다.
+ */
+const EXTRACT_REF_ALLOWED = [
+  'e2e/harness/opening-axis.mjs',
+  'e2e/harness/opening-axis.test.mjs',
+  'scripts/kotlin-source-ownership.test.mjs',
+];
 
 /**
  * 데이터 파일 가운데 Kotlin 경로를 **출처 주석으로** 담는 자리. 여는 데 쓰이지 않고 「이 fixture 가
@@ -105,7 +134,12 @@ const parse = (source, fileName) =>
  * 술어의 정규식은 **조립해서** 만든다 — 통째로 적으면 이 파일이 자기 술어에 걸린다(미달 ①).
  */
 const KT_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'u');
-const KT_FILE_TOKEN = new RegExp(`\\b[\\w-]+\\.${'k'}${'t'}s?\\b`, 'gu');
+/**
+ * 데이터 파일용 — **확장자 토큰 자체**를 든다(M11, ⑩). 파일 이름을 요구하던 앞 판은 확장자 단독
+ * 값과 별표/중괄호 glob 을 지나보냈다. 앞의 이름을 요구하지 않는 대신 **`#` 줄 제외 + allowlist
+ * 차감**이 오탐을 0 으로 유지한다(그 둘이 한 묶음의 처방이다).
+ */
+const KT_FILE_OR_EXTENSION_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'gu');
 
 /** 노드에서 **리터럴 텍스트**를 낸다 — 문자열·템플릿 조각·정규식 리터럴·식별자. */
 function literalTexts(node) {
@@ -158,14 +192,72 @@ export function mentionsStripModule(source, fileName = 'probe.mjs') {
 }
 
 /**
- * 데이터 파일(JSON·txt 등)용 술어 — **`이름.kt` 꼴만** 든다(확장자 단독 값과 별표/중괄호 glob 은
- * 지나간다 — 미달 ⑩. 다음 slice 처방은 `#` 줄 제외 + allowlist 차감 뒤 단어 토큰이다). 디렉터리 구분자를 요구하는 이유는 산문의
- * 확장자 언급(「`.kt` 경로 리터럴」 같은 설명)이 경로가 아니기 때문이다. 데이터 파일에는 조립할
- * 코드가 없으므로 경로는 **통째로** 적히고, 그래서 이 술어로 구조가 성립한다.
+ * **해석된 import 대상 전수**(M11 — 팀장 조건 1: 문자열 grep 이 아니라 **import 그래프**).
+ *
+ * 정적 import · 재수출(`export … from`) · `export *` · 리터럴 동적 import 를 모두 들고, 지정자를
+ * **그 파일 기준으로 해석**한다. 그래서 별칭(`import { x as y }`)·재수출·쿼리(`?v=1`)·다른
+ * 디렉터리에서 오는 긴 상대 경로가 **같은 대상 하나로 접힌다** — 표기를 세지 않는다.
+ *
+ * 비리터럴 지정자(런타임 조립)는 해석되지 않는다 — 의도적 은닉이고 경계 밖이다.
  */
-export function kotlinPathsInText(text) {
-  // 데이터 파일 — **파일 이름 토큰**을 든다(B4 의 `{"basis":"Basis.kt"}` 가 이 자리다).
-  return [...text.matchAll(KT_FILE_TOKEN)].map((m) => m[0]);
+export function resolvedImports(source, fileName) {
+  const fromDir = dirname(resolve(webRoot, fileName));
+  const targets = new Set();
+  const take = (specifier) => {
+    if (specifier === undefined || !specifier.startsWith('.')) {
+      return;
+    }
+    const withoutQuery = specifier.split('?')[0];
+    targets.add(relative(webRoot, resolve(fromDir, withoutQuery)));
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      const specifier = node.moduleSpecifier;
+      if (specifier !== undefined && ts.isStringLiteral(specifier)) {
+        take(specifier.text);
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments[0] !== undefined &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
+      take(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parse(source, fileName));
+  return [...targets];
+}
+
+/**
+ * 데이터 파일(JSON·txt 등)용 술어 — **확장자 토큰**을 든다(M11 — ⑩ 을 닫는다).
+ *
+ * 앞 판은 `이름.kt` 꼴만 보았다. 그래서 확장자 단독 값(`{"ext": ".kt"}`)·별표 glob(`*.kt`)·중괄호
+ * glob(`X.{kt,kts}`)·확장자 목록 값이 전부 지나갔다 — 앞에 단어 문자가 없어 파일 이름 꼴이 아니기
+ * 때문이다. 처방은 **측정된 것**이다(verifier r6): 본문에서 **`#` 로 시작하는 줄을 빼고 allowlist
+ * 값을 차감한 뒤** 단어 토큰을 적용하면 **오탐 0 이면서** 그 네 꼴이 RED 다.
+ *
+ * `#` 줄을 빼는 것이 이 처방의 핵심이다 — 이 저장소의 데이터 파일은 등록부처럼 **주석에 산문을
+ * 담고**, 그 산문이 확장자를 언급한다(빼지 않으면 오탐 1). allowlist 는 **토큰을 걸러내는 것이
+ * 아니라 값을 차감한다** — 단어 토큰은 파일 이름을 남기지 않으므로 뒤에서 걸러낼 수 없다.
+ *
+ * **두 글자 단어 토큰의 성질**(r1 — cr LOW): 오늘 트리에서 오탐은 0 이지만, 경계뿐인 두 글자라
+ * 임의 토큰 묶음(base64·hex 조각)이나 같은 글자의 상호(`kt.co.kr` 꼴)를 담은 **미래의 fixture** 가
+ * 걸린다. 그때의 탈출구는 allowlist **차감**뿐이다 — 그 차감을 「구멍」으로 읽지 말 것. 술어를
+ * 좁히면(앞에 파일 이름을 요구하면) 확장자 단독 값과 glob 이 다시 열린다.
+ */
+export function kotlinPathsInText(text, allowedValues = new Set()) {
+  const withoutComments = text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('#'))
+    .join('\n');
+  let body = withoutComments;
+  for (const value of allowedValues) {
+    body = body.split(value).join('');
+  }
+  return [...body.matchAll(KT_FILE_OR_EXTENSION_TOKEN)].map((match) => match[0]);
 }
 
 
@@ -202,8 +294,11 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       .map((relative) => {
         const text = read(relative);
         const allowed = PROVENANCE_DATA_ALLOWED.get(relative) ?? new Set();
-        const literals = (isAstFile(relative) ? kotlinPathTokens(text, relative) : kotlinPathsInText(text))
-          .filter((token) => !allowed.has(token.split('/').pop()));
+        const literals = isAstFile(relative)
+          ? kotlinPathTokens(text, relative).filter((token) => !allowed.has(token.split('/').pop()))
+          : // 데이터 파일은 allowlist 를 **차감으로** 받는다 — 단어 토큰이 파일 이름을 남기지
+            // 않으므로 뒤에서 걸러낼 수 없다(처방의 둘째 조각).
+            kotlinPathsInText(text, allowed);
         return { relative, literals };
       })
       .filter(({ literals }) => literals.length > 0);
@@ -260,6 +355,39 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
   it('주석 안의 확장자는 걸리지 않는다 — 글자 검색이 아니다', () => {
     expect(kotlinPathTokens(`// 정본은 Basis${KT} 다\n/* Other${KT} */\n`)).toStrictEqual([]);
   });
+
+  /**
+   * **데이터 파일 술어 — 확장자 단독 값과 glob 까지 든다**(M11 — ⑩). 앞 판은 `이름.kt` 꼴만 보아
+   * 네 꼴이 지나갔다(P6·P7·P7b·P7c). 처방은 측정된 것이다: 본문에서 **`#` 로 시작하는 줄을 빼고
+   * allowlist 값을 차감한 뒤** 단어 토큰을 적용한다 — 그래야 산문의 확장자 언급이 오탐이 되지
+   * 않는다(그 한 줄이 `#` 제외가 하는 일이고, 빼면 오탐 1 이다).
+   */
+  it('데이터 파일 술어가 확장자 단독 값과 glob 을 든다', () => {
+    const extension = `${'k'}${'t'}`;
+    const planted = {
+      '이름 꼴(기존)': `{"basis": "Basis.${extension}"}`,
+      'P6 확장자 단독 값': `{"ext": ".${extension}"}`,
+      'P7 별표 glob': `{"glob": "../**/*.${extension}"}`,
+      'P7b 중괄호 glob': `{"glob": "a/X.{${extension},${extension}s}"}`,
+      'P7c 확장자 목록 값': `{"ext": ["${extension}", "${extension}s"]}`,
+    };
+
+    for (const [name, text] of Object.entries(planted)) {
+      expect(kotlinPathsInText(text).length, `${name} 이 술어를 지나간다`).toBeGreaterThan(0);
+    }
+  });
+
+  /** **음성 대조** — `#` 로 시작하는 줄의 산문과 allowlist 값은 들지 않는다(일률 거절이 아니다). */
+  it('주석 줄의 산문과 allowlist 값은 데이터 파일 술어를 지나간다', () => {
+    const extension = `${'k'}${'t'}`;
+    const prose = `# 「.${extension} 경로 리터럴이 공유 모듈 밖에 없다」\nscripts/x.mjs\n`;
+    const allowed = new Set([`KonepsOpeningAxisFieldContracts.${extension}`]);
+
+    expect(kotlinPathsInText(prose)).toStrictEqual([]);
+    expect(kotlinPathsInText(`{"from": "KonepsOpeningAxisFieldContracts.${extension}"}`, allowed)).toStrictEqual(
+      [],
+    );
+  });
 });
 
 describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
@@ -309,6 +437,92 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
     expect(mentionsStripModule(clean, 'scripts/probe.mjs')).toBe(false);
   });
 
+});
+
+/**
+ * **추출 커널을 쥐는 자리가 둘이다.** 술어는 **해석된 import 그래프**이므로 별칭·재수출·쿼리·
+ * 리터럴 동적 import·다른 디렉터리의 긴 상대 경로가 전부 같은 대상으로 접힌다.
+ *
+ * **이 층은 보조다**(r1 — verifier H-1). 주장은 「**지정자로 적힌** 획득」까지이고, 확장자 없는
+ * 정적 import·`createRequire`·템플릿 `import()`·`vi.importActual` 은 이 술어 밖이다. 그 축을 닫는
+ * 것은 커널 쪽 **호출자 프레임** 판정이고(아래 묶음), 이 층은 그보다 이른 시점에 **이름으로**
+ * 알려 주는 값 때문에 남긴다.
+ */
+describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
+  it('커널을 쥐는 파일은 허용 목록뿐이다', () => {
+    const referrers = files
+      .filter(isAstFile)
+      .filter((relativePath) => resolvedImports(read(relativePath), relativePath).includes(EXTRACT_KERNEL))
+      .sort();
+
+    expect(referrers, '이 파일들이 단언을 거치지 않는 입구를 쥔다').toStrictEqual(
+      [...EXTRACT_REF_ALLOWED].sort(),
+    );
+  });
+
+  /** 양성 대조 — 제3 파일이 어떤 표기로 가리든 든다. 표기를 세지 않는 것이 이 술어의 성질이다. */
+  it('술어가 제3 파일의 획득 꼴 전부를 잡는다', () => {
+    const forms = {
+      named: "import { openingOperationPathsOf } from '../e2e/harness/opening-axis-extract.mjs';",
+      별칭: "import { openingOperationPathsOf as f } from '../e2e/harness/opening-axis-extract.mjs';",
+      namespace: "import * as kernel from '../e2e/harness/opening-axis-extract.mjs';",
+      재수출: "export { openingOperationPathsOf } from '../e2e/harness/opening-axis-extract.mjs';",
+      'export *': "export * from '../e2e/harness/opening-axis-extract.mjs';",
+      동적: "const kernel = await import('../e2e/harness/opening-axis-extract.mjs');",
+      쿼리: "import * as kernel from '../e2e/harness/opening-axis-extract.mjs?v=1';",
+      '정규화가 필요한 경로': "import * as k from '../e2e/./harness/../harness/opening-axis-extract.mjs';",
+    };
+
+    for (const [name, source] of Object.entries(forms)) {
+      expect(resolvedImports(source, 'scripts/probe.mjs'), `${name} 이 술어를 지나간다`).toContain(
+        EXTRACT_KERNEL,
+      );
+    }
+  });
+
+  /**
+   * **구조 층 — 부르는 순간 호출자 프레임이 선다**(r1 — verifier H-1). 위 import 그래프 술어는
+   * **지정자 문자열**을 보는 보조 층이라 평범한 획득 꼴 넷(확장자 없는 정적 import · `createRequire` ·
+   * 템플릿 `import()` · `vi.importActual`)이 지나갔다. 획득 꼴을 더 열거하지 않고 **호출자**를 묻는다 —
+   * 이 test 파일은 허용 둘이 아니므로, **어떤 꼴로 얻었든** 부르면 거부된다.
+   *
+   * 이 단언 자체가 그 증거다: 이 파일은 커널을 평범한 정적 import 로 얻었고, 그래도 거부된다.
+   */
+  it('허용 밖 파일이 커널을 부르면 거부된다 — 획득 꼴과 무관하다', async () => {
+    const specifier = '../e2e/harness/opening-axis-extract.mjs';
+    // **상설 양성 대조**: 보조 층을 지나간 꼴 넷(K1~K4)을 여기 둔다 — 그 넷이 r1 의 HIGH 였고,
+    // 구조 층이 그것을 꼴과 무관하게 받는다는 것이 이 묶음의 주장이다.
+    const namespaces = [
+      ['K1 확장자 없는 정적 import', await import('../e2e/harness/opening-axis-extract')],
+      ['K2 createRequire', createRequire(import.meta.url)(specifier)],
+      ['K3 템플릿 import()', await import(`../e2e/harness/opening-axis-extract.${'mjs'}`)],
+      ['K4 vi.importActual', await vi.importActual(specifier)],
+      // **리터럴 지정자**로도 한 번 얻는다 — 이 파일이 보조 층의 허용 목록에 드는 이유가 이 줄이다.
+      // 계산된 지정자로만 얻으면 보조 층은 이 파일을 **보지 못하고**(그 층의 주장이 「지정자로 적힌
+      // 획득」까지다), 그러면 이 파일이 자기 게이트를 비켜 가는 꼴이 된다.
+      ['정적 import(리터럴)', await import('../e2e/harness/opening-axis-extract.mjs')],
+    ];
+
+    for (const [name, namespace] of namespaces) {
+      expect(() => namespace.openingOperationPathsOf('val x = 1'), `${name} 이 거부되지 않는다`).toThrow(
+        /직접 불렀다/u,
+      );
+      expect(() => namespace.detailAxisCountsOf('val x = 1')).toThrow(/직접 불렀다/u);
+      expect(() => namespace.noticeListOperationsOf('val x = 1')).toThrow(/직접 불렀다/u);
+      expect(() => namespace.progressLabelsOf('val x = 1')).toThrow(/직접 불렀다/u);
+    }
+  });
+
+  /** 음성 대조 — 공개 입구만 쓰는 소비자는 걸리지 않는다(여정 하네스가 그 자리다). */
+  it('공개 입구만 쓰는 소비자는 걸리지 않는다', () => {
+    const clean = [
+      "import { shippedDetailAxisCounts } from './opening-axis.mjs';",
+      "import { readKotlinSource } from '../../scripts/kotlin-source.mjs';",
+      "import ts from 'typescript';",
+    ].join('\n');
+
+    expect(resolvedImports(clean, 'e2e/harness/probe.mjs')).not.toContain(EXTRACT_KERNEL);
+  });
 });
 
 describe('소유권 — 읽기 표면이 셋으로 고정된다', () => {
@@ -419,6 +633,9 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
     // **크기 하한이 아니라 정확한 집합**(cr r4 HIGH②): 하한이면 동작이 같은 리팩터로 모집단이
     // 줄어도 조용하다. 줄거나 늘면 이 줄이 먼저 붉어지고, 사람이 그 변화를 보고 판단한다.
     expect([...KOTLIN_SINKS].sort(), '모집단이 바뀌었다 — 줄었는지 늘었는지 보고 판단하라').toStrictEqual([
+      // M11 — 동일성 단언 대조가 내준 텍스트를 이 표면에 직접 넘기므로 모집단에 든다. 소유
+      // 모듈의 선언은 아래 루프가 건너뛴다(단언 함수에게 자기를 부르라고 요구하는 꼴이 된다).
+      'assertStrippedKotlin',
       'expect',
       'kotlinEnumEntries',
       'kotlinFunctionStringLiterals',
@@ -431,7 +648,11 @@ describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
     for (const name of [...KOTLIN_SINKS].sort()) {
       // **파일 단위 키**(cr r4 MEDIUM): 전역 이름 Map 은 같은 이름이 두 파일에 있으면 뒤가
       // 앞을 덮어 한쪽이 조용히 빠진다. 같은 이름의 선언을 **전부** 본다.
-      const matches = [...declared.values()].filter((entry) => entry.name === name);
+      const matches = [...declared.values()].filter(
+        // **소유 모듈은 소비자가 아니다**(M11). 보증이 사는 자리라 「단언을 부르는가」를 묻는
+        // 대상이 아니고, 묻으면 단언 함수 자신이 자기를 부르라는 요구가 된다.
+        (entry) => entry.name === name && entry.relative !== OWNER,
+      );
       for (const found of matches) {
         if (found.calls.has('withoutKotlinComments')) {
           missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
@@ -516,6 +737,88 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
 
     expect(callsStripInsideReader, 'readKotlinSource 가 공유 걷기를 호출하지 않는다').toBe(true);
     expect(readKotlinSource('provenance')).not.toContain('/**');
+  });
+});
+
+/**
+ * **출처 쪽 단언 — 소비자 흐름을 쫓지 않는다**(팀장 판정 2026-11-13 (c)).
+ *
+ * 앞 판의 단언은 「다시 걸어 같은가」였고, 그 성질은 **걷힌 상태를 유지하는 사본**을 지나보냈다
+ * (M10 미달 ② 표의 「단언 앞 · 줄을 끊지 않는 꼴」 칸). 그래서 방어가 「추출 함수 전수가 단언을
+ * 부르는가」라는 **모집단 추적**에 걸렸고, 그 추적이 보지 못하는 꼴을 세는 일이 ⑥ 이었다.
+ *
+ * ⑤ 층 뒤에는 Kotlin 원문을 얻는 길이 **소유 모듈 하나**다. 그러니 단언의 기준을 성질이 아니라
+ * **내준 텍스트와의 동일성**으로 올린다 — 손댄 텍스트는 **어떤 흐름의 꼴로 와도** 같은 자리에서
+ * 던지므로, 꼴을 세는 축이 사라진다. 아래가 그 「꼴이 답을 바꾸지 않는다」의 실측이다.
+ */
+describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
+  it('내준 텍스트는 그대로 지나가고 같은 값을 돌려준다', () => {
+    const basisText = readKotlinSource('basis');
+    const provenanceText = readAliased('provenance');
+
+    expect(assertStrippedKotlin(basisText)).toBe(basisText);
+    expect(assertStrippedKotlin(provenanceText)).toBe(provenanceText);
+  });
+
+  /**
+   * **줄을 끊지 않는 사본** — 걷힌 상태가 유지되므로 앞 판의 성질 단언은 **조용히 지나갔다**.
+   * 동일성은 값이 달라진 것을 본다.
+   */
+  it('줄을 끊지 않는 사본도 던진다', () => {
+    const marker = `/${'/'}`;
+    // 읽기 집합에서 **그 표지를 실제로 담은** 키를 쓴다 — 담지 않은 키로 치환하면 값이
+    // 그대로라 대조가 공허해진다(이 자리에서 한 번 그렇게 됐다).
+    const copied = readKotlinSource('openingEndpoints').replaceAll(marker, '');
+
+    expect(copied, '이 입력이 원문과 같다 — 대조가 공허하다').not.toBe(readKotlinSource('openingEndpoints'));
+    expect(() => assertStrippedKotlin(copied)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+  });
+
+  /** **죽은 단언**(⑥ 의 꼴) — 호출 계수만 맞추는 자리가 더는 서지 않는다. */
+  it('내주지 않은 텍스트는 빈 문자열이어도 던진다', () => {
+    expect(() => assertStrippedKotlin('')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(() => assertStrippedKotlin('val x = 1\n')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+  });
+
+  /**
+   * **⑥ 이 열거하던 꼴 전부가 같은 답을 낸다.** 두 홉 이상·별칭 import·다듬기·spread·콜백으로
+   * **손댄** 텍스트를 넘겨도 전부 같은 자리에서 던진다 — 모집단 추적이 그 꼴을 보든 말든 답이
+   * 같으므로 이 축에서 꼴을 세는 일이 끝난다.
+   */
+  it('손댄 텍스트는 흐름의 꼴과 무관하게 던진다', () => {
+    const marker = `/${'/'}`;
+    const endpointsText = readKotlinSource('openingEndpoints');
+    const shapes = {
+      '두 홉 이상': () => {
+        const first = endpointsText;
+        const second = first.replaceAll(marker, '');
+        return second;
+      },
+      '별칭 import': () => readAliased('openingEndpoints').replaceAll(marker, ''),
+      '다듬기': () => `${endpointsText} `,
+      'spread': () => [endpointsText.replaceAll(marker, '')].at(0),
+      '콜백': () => [endpointsText].map((text) => text.replaceAll(marker, '')).at(0),
+    };
+
+    for (const [name, make] of Object.entries(shapes)) {
+      expect(() => assertStrippedKotlin(make()), `${name} 이 단언을 지나간다`).toThrow(
+        /걷힌 Kotlin 텍스트가 아니다/u,
+      );
+    }
+  });
+
+  /** **음성 대조** — 손대지 않은 텍스트는 어떤 꼴로 와도 지나간다(일률 거절이 아니다). */
+  it('손대지 않은 텍스트는 어떤 꼴로 와도 지나간다', () => {
+    const provenanceText = readKotlinSource('provenance');
+    const twoHops = (() => {
+      const first = provenanceText;
+      const second = first;
+      return second;
+    })();
+
+    expect(assertStrippedKotlin(twoHops)).toBe(provenanceText);
+    expect(assertStrippedKotlin([provenanceText].map((text) => text).at(0))).toBe(provenanceText);
+    expect(assertStrippedKotlin(readAliased('provenance'))).toBe(provenanceText);
   });
 });
 

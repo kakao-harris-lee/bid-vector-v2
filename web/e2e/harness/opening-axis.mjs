@@ -8,6 +8,17 @@
  * 하나에 있고, 출하 정본과의 등식은 `opening-axis.test.mjs` 가 잰다.
  */
 import { assertStrippedKotlin } from '../../scripts/kotlin-source.mjs';
+// 추출 술어는 **내부 커널**에 있다(M11 — 팀장 판정 (ㄱ)). 이 파일의 `shipped…` 넷은 동일성
+// 단언을 거친 뒤 그 커널로 넘기는 **얇은 입구**다 — 술어 자신의 양성·음성 대조는 커널을 직접
+// 재고(합성 조각이 공개 입구에서 거부되므로), 커널을 참조할 수 있는 파일은 import 그래프 술어가
+// 이 파일과 그 단위 test 둘로 고정한다.
+import {
+  DIVISION_TOKENS,
+  detailAxisCountsOf,
+  noticeListOperationsOf,
+  openingOperationPathsOf,
+  progressLabelsOf,
+} from './opening-axis-extract.mjs';
 
 /**
  * 개찰 축 오퍼레이션 경로 — **출하 기본값의 사본**이다
@@ -59,166 +70,37 @@ export const OPENING_PROGRESS_LABELS = {
   재입찰: 'REBID',
 };
 
-const DIVISION_TOKENS = { construction: 'CONSTRUCTION', service: 'SERVICE' };
 const PROGRESS_DIVISION_KEY = 'progrsDivCdNm';
 /** canonical 이 없을 때 조회가 내는 잠정 축 상태 — 그 자리를 한 이름으로 둔다. */
 const NOT_OBSERVED = 'NOT_OBSERVED';
 const NOTICE_ROUND = '000';
 
 /**
- * **주석을 먼저 걷는 이유**(v M-1): 아래 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
- * 가릴 수 있었다** — 재현: 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을 집어
- * 등식이 **초록으로 지나갔다**. 그 축은 조용한 404 로만 나타난다.
- *
- * 걷기 자체는 **공유 한 자리**에 있다(M10/gates-web). 이 파일이 가졌던 줄 단위 구현은 교차언어
- * 게이트의 것과 두 벌이었고 둘 다 부분 구현이었다 — 문자열 안의 주석 표지를 다루는 자리가
- * 하나여야 한다.
- */
-
-/**
- * 일치가 **정확히 하나**인 리터럴(v M-1). 첫 일치를 쓰면 가리는 줄이 조용히 이기고, 둘 이상은
- * 「어느 것이 정본인가」가 서지 않는다 — 둘 다 거부로 닫는다. 패턴은 전역이어야 한다.
- */
-function soleLiteral(text, pattern, what) {
-  const matches = [...text.matchAll(pattern)];
-  if (matches.length !== 1) {
-    throw new Error(
-      `출하 기본값에서 ${what} 의 일치가 ${matches.length} 개다(정확히 하나여야 한다) — ` +
-        '정본의 모양이 바뀌었거나 같은 선언이 두 자리에 있다',
-    );
-  }
-  return matches[0][1];
-}
-
-/**
  * 출하 속성 파일 본문 → 개찰 축 경로 표. [OPENING_AXIS_OPERATIONS] 와 **같은 모양**을 내므로
  * 등식이 업무 배정의 뒤바뀜까지 잡는다(공사 경로가 용역 자리에 앉은 꼴).
  *
- * 업무 키를 믿지 않고 블록 안의 `division =` 토큰까지 본다 — 키만 보면 두 블록의 내용이 통째로
- * 뒤바뀐 경우를 지나보낸다.
+ * **왜 입구에서 단언하는가**(M9 v M-1): 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
+ * 가릴 수 있었다** — 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을 집어 등식이
+ * **초록으로 지나갔다**(그 축은 조용한 404 로만 나타난다). 걷기는 **공유 한 자리**가 하고
+ * (M10/gates-web), 이 입구는 받은 텍스트가 **그 읽기가 내준 바로 그것인지**를 단언한다(M11).
  */
 export function shippedOpeningOperationPaths(source) {
-  const text = assertStrippedKotlin(source);
-  const categories = Object.keys(DIVISION_TOKENS);
-  const divisions = {};
-  for (const [index, category] of categories.entries()) {
-    const start = text.indexOf(`"${category}" to`);
-    if (start < 0) {
-      throw new Error(`출하 기본값에서 업무 ${category} 의 개찰 축 블록을 찾지 못했다`);
-    }
-    // 블록은 **다음 업무 표지까지**다(없으면 끝까지) — 고정 길이나 첫 `),` 로 끊으면 표의 서식이
-    // 바뀔 때 조용히 옆 블록을 함께 읽는다.
-    const next = categories[index + 1];
-    const end = next === undefined ? text.length : text.indexOf(`"${next}" to`, start);
-    const block = text.slice(start, end < 0 ? text.length : end);
-    const declared = soleLiteral(
-      block,
-      /division = BusinessDivision\.(\w+)/gu,
-      `업무 ${category} 의 대분류`,
-    );
-    if (declared !== DIVISION_TOKENS[category]) {
-      throw new Error(`업무 ${category} 의 대분류가 ${declared} 다 — 표의 업무 배정이 뒤바뀌었다`);
-    }
-    divisions[category] = {
-      openingResultListPath: soleLiteral(
-        block,
-        /openingResultListPath = "([^"]+)"/gu,
-        `${category} 개찰결과 목록 경로`,
-      ),
-      reservePriceDetailPath: soleLiteral(
-        block,
-        /reservePriceDetailPath = "([^"]+)"/gu,
-        `${category} 예비가격 상세 경로`,
-      ),
-      baseAmountPath: soleLiteral(block, /baseAmountPath = "([^"]+)"/gu, `${category} 기초금액 경로`),
-    };
-  }
-  return {
-    ...divisions,
-    shared: {
-      openingCompletePath: soleLiteral(
-        text,
-        /val openingCompletePath: String = "([^"]+)"/gu,
-        '개찰완료 경로',
-      ),
-      bidPriceFormulaAPath: soleLiteral(
-        text,
-        /val bidPriceFormulaAPath: String = "([^"]+)"/gu,
-        'A값 경로',
-      ),
-    },
-  };
+  return openingOperationPathsOf(assertStrippedKotlin(source));
 }
 
-/**
- * 출하 본문 → **공고 하나가 받는 상세 축의 수**(cr MEDIUM-1 처방의 입력).
- *
- * 손으로 적지 않는 이유: 공사는 넷이고 **용역은 셋이다**(A값이 공사 전용) — 그 비대칭을 리터럴로
- * 두면 이 slice 가 업종 목록에서 닫은 바로 그 드리프트를 다시 만든다. 축 수가 바뀌면 아래 수집
- * 걸음의 `detailCalls` 기대가 **이름 붙은 실패**로 그 사실을 말한다.
- */
+/** 출하 본문 → **공고 하나가 받는 상세 축의 수**(cr MEDIUM-1 처방의 입력). */
 export function shippedDetailAxisCounts(source) {
-  const text = assertStrippedKotlin(source);
-  const open = text.indexOf('fun detailAxesFor');
-  if (open < 0) {
-    throw new Error('출하 본문에서 상세 축 열거 함수를 찾지 못했다 — 정본의 모양이 바뀌었다');
-  }
-  // 함수 본문만 본다 — 뒤의 열거 선언(`enum class DetailAxis`)에도 같은 토큰이 있다.
-  const body = text.slice(open, text.indexOf('internal enum class DetailAxis', open));
-  const counts = {};
-  for (const [category, token] of Object.entries(DIVISION_TOKENS)) {
-    const start = body.indexOf(`BusinessDivision.${token}`);
-    if (start < 0) {
-      throw new Error(`상세 축 열거에서 업무 ${token} 의 갈래를 찾지 못했다`);
-    }
-    // 그 갈래의 본문은 `->` 뒤부터 다음 갈래(또는 끝)까지다.
-    const from = body.indexOf('->', start);
-    const rest = body.slice(from);
-    const nextBranch = rest.slice(2).search(/BusinessDivision\./u);
-    const branch = nextBranch < 0 ? rest : rest.slice(0, nextBranch + 2);
-    const axes = [...branch.matchAll(/DetailAxis\.(\w+)/gu)].map((match) => match[1]);
-    if (axes.length === 0) {
-      throw new Error(`업무 ${token} 의 상세 축이 0 이다 — 갈래 판독이 빗나갔다`);
-    }
-    counts[category] = new Set(axes).size;
-  }
-  return counts;
+  return detailAxisCountsOf(assertStrippedKotlin(source));
 }
 
 /** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
 export function shippedNoticeListOperations(source) {
-  const text = assertStrippedKotlin(source);
-  const found = {};
-  for (const match of text.matchAll(
-    /"(\w+)" to KonepsOperationProperties\(\s*"([^"]+)",\s*BusinessDivision\.(\w+),?\s*\)/gu,
-  )) {
-    const [, category, path, token] = match;
-    if (DIVISION_TOKENS[category] !== token) {
-      throw new Error(`공고 목록 표의 업무 ${category} 대분류가 ${token} 다 — 배정이 뒤바뀌었다`);
-    }
-    found[category] = path;
-  }
-  if (Object.keys(found).length === 0) {
-    throw new Error('출하 기본값에서 공고 목록 오퍼레이션 표를 찾지 못했다 — 정본의 모양이 바뀌었다');
-  }
-  return found;
+  return noticeListOperationsOf(assertStrippedKotlin(source));
 }
 
 /** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
 export function shippedProgressLabels(source) {
-  const text = assertStrippedKotlin(source);
-  const labels = {};
-  for (const match of text.matchAll(/"([^"]+)" to OpeningProgress\.(\w+)/gu)) {
-    // 같은 라벨이 두 번 등재되면 **뒤가 조용히 이긴다** — 어느 것이 정본인지 서지 않으므로 거부한다.
-    if (labels[match[1]] !== undefined && labels[match[1]] !== match[2]) {
-      throw new Error(`출하 정책에 라벨 ${match[1]} 이 두 값으로 등재돼 있다`);
-    }
-    labels[match[1]] = match[2];
-  }
-  if (Object.keys(labels).length === 0) {
-    throw new Error('출하 정책에서 진행구분 라벨 표를 찾지 못했다 — 정본의 모양이 바뀌었다');
-  }
-  return labels;
+  return progressLabelsOf(assertStrippedKotlin(source));
 }
 
 /**

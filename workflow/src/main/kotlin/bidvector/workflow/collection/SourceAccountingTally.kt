@@ -6,12 +6,16 @@ import bidvector.procurement.TruncationCause
 
 /**
  * 슬롯 하나가 **소스에서 받은** 회계의 누적 — 페이지 걷기 결과를 더하기만 하고 canonical 축
- * (저장 결과)은 모른다. 두 수집 갈래가 공유한다(v2-지침서 §5 중복 금지):
+ * (저장 결과)은 모른다. **세** 수집 갈래가 공유한다(v2-지침서 §5 중복 금지):
  *
  * - 공고 목록 갈래([SlotTally])는 여기에 canonical 저장 결과를 얹어 `normalized` 를 다시 정의한다.
- * - 개찰결과 갈래는 canonical 승격을 하지 않으므로 [toSourceAccounting] 으로 소스 회계를 그대로 낸다.
+ * - 낙찰 목록·개찰결과 갈래는 canonical 승격을 하지 않으므로 [toSourceAccounting] 으로 소스 회계를
+ *   그대로 낸다.
  *
- * 절단 원인은 **마지막** 배치의 것이 슬롯의 최종 상태다.
+ * 절단 원인은 **마지막** 배치의 것이 슬롯의 최종 상태다. **총수는 그렇지 않다** — 세 갈래가 모두
+ * 배치별 총수의 최댓값([widerTotalOf])을 **이 타입 밖에서** 쥐고 결과에 덧싣는다. 그래서 여기
+ * `sourceTotal` 이 마지막 배치의 값인 것은 호출부의 회계 행에 드러나지 않고, 이 타입을 최댓값으로
+ * 올리는 날 세 갈래의 거동이 함께 바뀐다(그 변경이 수집 갈래 slice 들의 승인 경계 밖이었던 사유다).
  */
 internal class SourceAccountingTally {
     var received = 0

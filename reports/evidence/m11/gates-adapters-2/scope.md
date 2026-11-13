@@ -104,7 +104,7 @@
   `source.scoped-allowed-roots.*` 여섯 · 주석)
 - `config/quality/gate-tests.properties`(**주석만** — 「`EventAdapterDependencyTest` 는 여전히 소스 텍스트」가
   거짓이 된다. 여섯 class 는 이미 등재돼 있어 등재 줄 변경 0)
-- `docs/discovery/capability-map.md` §12.3 에 **이 slice 의 하위 절**을 덧붙인다(글자는 D-11C-8 대로 마지막 main 병합 시점에 정한다 — 현재 판은 **(k)**, 브리프의 (m) 배정은 계약 변경으로 폐기됐다)(기존 행 수정 0,
+- `docs/discovery/capability-map.md` §12.3 에 **이 slice 의 하위 절**을 덧붙인다(글자는 D-11C-8 대로 마지막 main 병합 시점에 정했다 — **(o)**. 브리프의 (m) 배정은 계약 변경으로 폐기됐다)(기존 행 수정 0,
   §12 머리 집계 무변경)
 - `reports/evidence/m11/gates-adapters-2/**`
 
@@ -151,8 +151,9 @@ in_scope 경로 한정 `git restore --source=<원천> --staged --worktree -- <�
    깨졌다: 모집단 확장이 `SourceReferencePolicyTest` 의 「범위 축 밖 패키지」 표본
    (`bidvector.adapters.persistence`)을 거짓으로 만들었다. 표본을 `bidvector.adapters.snapshot` 으로
    바꿨고 **단언의 주장은 그대로**다. 모집단 확장이 낳은 필연이다. rollback 복원 목록에 든다.
-7. **§12.3 글자는 마지막 main 병합 시점에 정한다**(D-11C-8). 현재 판은 **(k)** 이고, 앞선 PR 이 먼저
-   머지되면 그 시점에 다시 센다 — 그때 main 재병합 · acceptance · rollback 을 한 라운드로 다시 잰다.
+7. **§12.3 글자는 마지막 main 병합 시점에 정한다**(D-11C-8). 앞선 넷(11A·11E·11B·11D)이 먼저
+   머지돼 (k)~(n) 을 가져갔으므로 이 slice 는 **(o)** 다. 그 병합(원천 `8562b610`)에서 main 재병합 ·
+   acceptance · rollback 을 한 라운드로 다시 쟀다.
 
 ## 하네스 레인 변경
 

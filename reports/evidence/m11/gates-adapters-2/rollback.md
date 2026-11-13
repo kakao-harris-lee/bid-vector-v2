@@ -98,7 +98,7 @@ range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다. 신
 | 내 — `source.scoped-packages` 의 축 수 | 14 | **8** | 원천과 같다(집합 등식까지 대조) |
 | 내 — `internal val ALLOWED_ROOTS` 를 가진 파일 수 | 14 | **8** | 여섯이 `private`·옛 심볼명으로 돌아감 |
 | 내 — `BytecodeConstantPool.kt` 존재 | 1 | **0** | 사라짐 |
-| 내 — capability map `(k) M11/11C` 절 | 1 | **0** | 사라짐 |
+| 내 — capability map `(o) M11/11C` 절 | 1 | **0** | 사라짐 |
 | 내 — capability map 의 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 언급 | 2 | **0** | 사라짐 |
 | 내 — `policy.version` | 15 | **14** | 원천 값 |
 | 내 — build-logic 표본 `adapters.snapshot` | 1 | **0**(옛 표본 `adapters.persistence` 가 **1** 로 돌아옴) | 되돌아감 |
@@ -110,7 +110,7 @@ range revert 가 아니다. 경로 한정이고, 경로는 개별 인자다. 신
 ## 되돌림 뒤 남는 것
 
 장부(`reports/evidence/m11/gates-adapters-2/*.md`)는 복원 대상이 아니라 그대로 남는다. 거동을 담지 않고,
-지우면 「무엇을 왜 되돌렸는가」가 사라진다. capability map §12.3 **(k) 는 복원된다** — 그 절이 적는 종결
+지우면 「무엇을 왜 되돌렸는가」가 사라진다. capability map §12.3 **(o) 는 복원된다** — 그 절이 적는 종결
 넷과 신설 OPEN 하나가 함께 사라지므로 `OPEN-M10-SCOPED-PACKAGES-COVERAGE` 와 10C 등재 ⓐⓑⓒ 가 **열린
 상태로 되돌아온다**. 그것이 되돌림의 뜻이다.
 

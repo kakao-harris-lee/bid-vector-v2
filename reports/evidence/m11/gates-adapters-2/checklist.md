@@ -113,4 +113,4 @@ test 의 보유자 단언).
 | 새 축이 오늘 production 을 붉히는가 | **아니다** — 이름 층 122 파일 위반 0, 바이트코드 층 여섯 축 위반 0 |
 | 외부 effect | **0** — DB·API·LLM·발송·push·merge 0 |
 | acceptance | 「동결 보고」절 |
-| 신설 OPEN 등재 | capability map §12.3 의 이 slice 하위 절(글자는 D-11C-8 대로 마지막 main 병합 시점에 정한다) |
+| 신설 OPEN 등재 | capability map §12.3 **(o)** — 앞선 넷이 (k)~(n) 을 가져갔다(D-11C-8 대로 마지막 main 병합 시점에 정했다) |
