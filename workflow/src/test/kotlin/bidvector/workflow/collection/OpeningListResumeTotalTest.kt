@@ -36,21 +36,25 @@ import org.junit.jupiter.api.Test
 class OpeningListResumeTotalTest {
     @Test
     fun `쪽 상한 재개는 배치마다 말한 총수의 최댓값을 남긴다 — 「없음」이 앞 총수를 지우지 않고 더 큰 총수는 이긴다`() {
-        val (erased, erasedCursors) = resumedWith(secondTotal = 0)
+        val erased = resumedWith(secondTotal = 0)
 
-        // 재개가 **실제로 돌았다** — 한 배치로 끝났다면 아래 단언들은 보호 없이도 통과한다.
-        erasedCursors shouldContainExactly listOf(null, PageCursor("51"))
         erased.sourceTotal shouldBe 7
         // 그 행이 「덜 받았다」로 읽혀야 한다 — 총수가 0 으로 덮이면 이 비교가 뒤집힌다.
         erased.received shouldBe 3
         // 총수 칸을 아예 비운 재개 배치(null) — 0 과 다른 꼴이고 같은 보호를 받아야 한다.
-        resumedWith(secondTotal = null).first.sourceTotal shouldBe 7
+        resumedWith(secondTotal = null).sourceTotal shouldBe 7
         // 최댓값이지 「첫 값 고정」이 아니다 — 뒤 배치가 더 큰 총수를 말하면 그 값이 남는다.
-        resumedWith(secondTotal = 9).first.sourceTotal shouldBe 9
+        resumedWith(secondTotal = 9).sourceTotal shouldBe 9
     }
 
-    /** 쪽 상한으로 끊긴 첫 배치(총수 7·둘 받음)에 이어 재개 배치 하나 — 그 슬롯의 회계 행과 커서 자취. */
-    private fun resumedWith(secondTotal: Int?): Pair<CollectionAccounting, List<PageCursor?>> {
+    /**
+     * 쪽 상한으로 끊긴 첫 배치(총수 7·둘 받음)에 이어 재개 배치 하나 — 그 슬롯의 회계 행을 낸다.
+     *
+     * **재개가 실제로 돌았다는 것을 판마다 여기서 단언한다**(v r1 LOW). 한 배치로 끝나면 회계 행에
+     * 첫 배치의 총수가 그대로 남아 「없음」 판들이 **보호 없이도 통과**한다 — 자취 단언을 호출부 한
+     * 자리에만 두면 나머지 판이 그 구멍으로 조용히 초록이 된다.
+     */
+    private fun resumedWith(secondTotal: Int?): CollectionAccounting {
         val runs = RecordingRunStore()
         val framer =
             OpeningSampleFramer(
@@ -84,7 +88,8 @@ class OpeningListResumeTotalTest {
 
         framer.frame(rangeOf("2026-09-01", "2026-09-01"), listOf(source))
 
-        return runs.recorded.single().first to port.cursors.toList()
+        port.cursors shouldContainExactly listOf(null, PageCursor("51"))
+        return runs.recorded.single().first
     }
 }
 

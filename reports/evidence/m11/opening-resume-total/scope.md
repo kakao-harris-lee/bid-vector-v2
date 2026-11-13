@@ -36,8 +36,9 @@
 
 | ID | 결정 |
 | --- | --- |
-| D-1 | 고치는 자리는 **`OpeningSampleFramer` 의 슬롯 걷기 한 자리**다 — 배치마다 본 총수의 최댓값을 쥐고 `CollectionRunStore` 로 가는 회계에 싣는다. **공유 누산기(`SourceAccountingTally`)는 고치지 않는다**(10A D-1 과 같다 — 최댓값으로 올리면 세 갈래 거동이 함께 바뀐다 · 승인 경계). 그 파일의 diff 가 비는 것이 이 결정의 단언이다. |
+| D-1 | 고치는 자리는 **`OpeningSampleFramer` 의 슬롯 걷기 한 자리**다 — 배치마다 본 총수의 최댓값을 쥐고 `CollectionRunStore` 로 가는 회계에 싣는다. **공유 누산기(`SourceAccountingTally`)의 거동은 고치지 않는다**(10A D-1 과 같다 — 최댓값으로 올리면 세 갈래 거동이 함께 바뀐다 · 승인 경계). **수용 기준은 「그 파일 diff 빈 출력」이 아니라 「코드 diff 0」이다**(r1 갱신 — D-7 이 그 파일의 KDoc 을 고치므로): `javap -c` 동일, 통제군 `javap -l`. |
 | D-2 | 최댓값 함수는 **그대로 부른다** — 새 함수도, 복제도, 이동도 없다(10A D-2 가 세운 공유 자리). 바뀌는 것은 그 파일의 **KDoc 한 문단**뿐이다: 「셋째 갈래는 아직 부르지 않아 같은 결함이 남아 있다」가 이 slice 로 거짓이 되므로 사실을 갱신한다. 그 커밋의 **거동 0 을 바이트코드로 실측**한다(`javap -c` 동일 · 통제군 `javap -l`). |
+| D-7 | **r1 신설(v·cr 지적 · 팀장 결정 2026-11-13).** D-2 의 기준을 같은 결함의 **나머지 자리**에 적용한다 — 이 slice 가 거짓으로 만든 갈래 계수 문장이 둘 더 있다(`SourceAccountingTally` KDoc 머리의 「두 갈래가 공유한다」, `CollectNoticesUseCase.collectSlot` KDoc 의 「낙찰 갈래와 같은 한 자리」·「두 갈래가 공유」). 둘 다 **KDoc 만** 고치고 거동 0 을 같은 방법으로 잰다. 앞 판이 이 둘을 out_scope 로 둔 것은 **그 파일을 안 만지는 것이 곧 거동 불변이라는 등식**에 기댄 것인데, 주석은 그 등식의 반례다. |
 | D-3 | 잠그는 자리는 **새 test 클래스 하나**(`OpeningListResumeTotalTest`)다. 기존 개찰 대역(`ScriptedOpeningPort`)은 커서를 보지 않고 `next = null` 만 내므로 재개 배치를 지을 수 없다. 새 클래스는 `CollectionTestSupport` 의 `claimedTotalAccounting`·`RecordingRawStore`·`RecordingRunStore`·`rangeOf` 를 **재사용**하고, 커서별 배치를 내는 목록 전용 fake 하나만 자기 자리에 둔다. 만드는 커밋에서 `config/quality/gate-tests.properties` 에 등재한다. |
 | D-4 | **보고 경로는 하나다** — 이 갈래가 총수를 나르는 자리는 `runs.record` 로 가는 슬롯 회계 행뿐이고, 틀 짓기 결과(`Framing`)는 총수를 싣지 않는다. 10A V-2(보고가 누산기 값을 따로 나르는 갈림)의 모양이 여기엔 **존재할 수 없고**, 대신 그 한 자리를 「누산기 값을 그대로 적기」 변이로 잰다. |
 | D-5 | **거동 축**: 이 갈래의 멈춤·절단 판정은 `truncationCause` 축이라(`SlotOutcome`·`openingDirective`) 이 변경으로 움직이지 않는다. 짧은 걷기를 총수로 재는 술어(`attemptOutcomeOf`)는 **상세 축과 낙찰 갈래**가 쓰고 이 목록 갈래는 쓰지 않는다. 바뀌는 것은 `collection_run.source_total` 값과 수집 줄의 같은 칸 둘이다 — **장부 품질** 변경이고, 계약(`milestone-11.md` 「거동 변경」 절)이 범위 안으로 적은 그것이다. |
@@ -47,6 +48,8 @@
 
 - `workflow/src/main/kotlin/bidvector/workflow/collection/OpeningSampleFramer.kt` — 최댓값 보호(D-1)
 - `workflow/src/main/kotlin/bidvector/workflow/collection/ClaimedSourceTotal.kt` — **KDoc 만**(D-2, 거동 0)
+- `workflow/src/main/kotlin/bidvector/workflow/collection/SourceAccountingTally.kt` ·
+  `.../CollectNoticesUseCase.kt` — **KDoc 만**(D-7, 거동 0 · r1 에 in_scope 로 들어왔다)
 - `workflow/src/test/kotlin/bidvector/workflow/collection/OpeningListResumeTotalTest.kt` — **새 파일**, RED(D-3)
 - `config/quality/gate-tests.properties` — 그 test 클래스 등재(D-3)
 - `docs/discovery/capability-map.md` — §12.3 **끝에 이 slice 의 하위 절 하나를 덧붙임**(절 글자는
@@ -55,8 +58,9 @@
 
 ## out_scope
 
-`workflow/src/main/kotlin/bidvector/workflow/collection/SourceAccountingTally.kt`(공유 누산기 — D-1) ·
-`CollectNoticesUseCase.kt`·`CollectAwardListUseCase.kt`·`SlotTally.kt`(닫힌 두 갈래) · `procurement/**` ·
+공유 누산기와 형제 두 갈래의 **코드**(`SourceAccountingTally.kt` 의 선언·본문 — D-1 · `CollectNoticesUseCase.kt`·
+`CollectAwardListUseCase.kt`·`SlotTally.kt` 의 거동). **그 파일들의 KDoc 은 r1 에 in_scope 로 옮겼다**(D-7) —
+out_scope 로 남는 것은 거동이다. 그 밖: `procurement/**` ·
 `adapters/**`(어댑터 누산기의 한 배치 안 축 — D-6) · `app/**` · 마이그레이션 · runbook · 과거 행 소급 ·
 실 호출·실 DB.
 
@@ -66,7 +70,8 @@
 - RED 선행: 쪽 상한 재개의 둘째 배치가 총수를 **0** 으로 말해도 슬롯 회계 행에 앞 배치의 총수가 남고,
   총수 칸을 **비운**(`null`) 재개 배치도 같은 보호를 받으며, 둘째 배치가 **더 큰** 총수를 말하면 그 값이
   남는다(최댓값이지 「첫 값 고정」이 아니다).
-- `git diff --stat <base>..HEAD -- <out_scope 경로들>` 빈 출력(D-1·out_scope).
+- out_scope 단언은 **경로 diff 가 아니라 코드 diff 0** 이다(r1): KDoc 을 고친 세 파일은 `javap -c` 동일
+  (통제군 `javap -l`), 그 밖의 out_scope 경로는 `git diff --stat` 빈 출력.
 - 변이: 공유 최댓값 함수를 「마지막 값 쥐기」로 **바꿔치우면 세 갈래 test 가 함께 RED**(D-2 의 실측) ·
   `batch == null` 갈래를 「null 반환」으로 · 슬롯 회계를 누산기 값 그대로 적기(D-4) · KDoc 커밋 거동 0.
 

@@ -64,7 +64,8 @@ private class SlotWalkTally {
         claimedTotal = widerTotalOf(claimedTotal, accounting.sourceTotal)
     }
 
-    fun toAccounting(): CollectionAccounting = source.toSourceAccounting().copy(sourceTotal = claimedTotal)
+    fun toAccountingWithClaimedTotal(): CollectionAccounting =
+        source.toSourceAccounting().copy(sourceTotal = claimedTotal)
 }
 
 /** 슬롯 하나의 끝 — 멈춤 사유와 「끝까지 읽었는가」. 둘은 다른 축이다(절단은 멈춤이 아니다). */
@@ -130,7 +131,7 @@ internal class OpeningSampleFramer(
         while (walk is PageWalk.Next) {
             walk = framePage(referenceDate, source, into, tally, walk.cursor)
         }
-        val accounting = tally.toAccounting()
+        val accounting = tally.toAccountingWithClaimedTotal()
         runs.record(
             accounting,
             CollectionRunMeta(referenceDate, SourceEndpoint.OPENING_RESULT_LIST, startedAt, clock.now()),
