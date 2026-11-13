@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { notifyManager } from '@tanstack/react-query';
+import { defaultScheduler, notifyManager } from '@tanstack/react-query';
 import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { appRoutes } from './AppRoot';
 import { queryClient } from './queryClient';
@@ -51,6 +51,16 @@ const mounted: { readonly root: Root; readonly container: HTMLElement }[] = [];
  */
 notifyManager.setScheduler((callback) => {
   callback();
+});
+
+/**
+ * **전역을 되돌린다**(r1 cr F-10). 위 한 줄은 `notifyManager` 의 **모듈 전역**을 바꾼다. 오늘은
+ * vitest 가 파일마다 모듈 그래프를 따로 세우므로 이 파일 밖으로 새지 않지만, 그 전제는
+ * `vite.config.ts` 의 `test:` 블록이 쥐고 있고 그 파일은 다른 레인과 공유하는 자리다 —
+ * `isolate: false` 가 켜지는 날 이 파일이 남의 tanstack 거동을 바꾼다. 전제에 기대지 않는다.
+ */
+afterAll(() => {
+  notifyManager.setScheduler(defaultScheduler);
 });
 
 function renderAt(routes: RouteObject[], path: string): HTMLElement {
@@ -113,6 +123,8 @@ describe('오류 경계의 자리', () => {
  * 두 칸이 쌍이다: 앞 칸이 **그리면 실제로 공유 캐시가 찬다**는 것을(안 차면 뒤 칸이 공허하다),
  * 뒤 칸이 **그 사이의 `afterEach` 가 그것을 0 으로 되돌렸다**는 것을 잰다.
  */
+let rendered = false;
+
 describe('공유 상태는 칸을 넘어 살지 않는다 (서명 B)', () => {
   /**
    * **스케줄러 절반을 잠근다**(r1 F5). 아래 두 칸은 `afterEach` 를 비우거나 중단·비우기를 빼면
@@ -134,9 +146,14 @@ describe('공유 상태는 칸을 넘어 살지 않는다 (서명 B)', () => {
 
     expect(queryClient.getQueryCache().getAll().length).toBeGreaterThan(0);
     expect(document.body.childElementCount).toBeGreaterThan(0);
+    rendered = true;
   });
 
   it('앞 칸이 세운 질의와 DOM 이 남아 있지 않다', () => {
+    // **뒤 칸만 남으면 공허하게 초록이다**(r1 cr F-9). 앞 칸이 실제로 돌았음을 여기서 단언한다 —
+    // 오늘 수집 순서가 선언 순서인 것은 `vite.config.ts` 가 `sequence.shuffle` 을 안 켜기
+    // 때문이고, 그 설정은 이 파일 밖에 있다.
+    expect(rendered, '앞 칸이 돌지 않았다 — 이 칸은 아무것도 재지 못한다').toBe(true);
     expect(
       queryClient.getQueryCache().getAll().map((one) => one.queryHash),
       '공유 클라이언트에 앞 칸의 질의가 남았다 — jsdom teardown 뒤 알림 배치가 깨어난다',

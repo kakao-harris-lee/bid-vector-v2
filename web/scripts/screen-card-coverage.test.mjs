@@ -289,6 +289,13 @@ const PROBES = {
     import { vatTreatmentDisplayOf } from '../../display/moneyDisplay';
     export default ({ vat }: { readonly vat: string }) => <span>{vatTreatmentDisplayOf(vat).label}</span>;
   `,
+  // 무명 **기본 함수 선언** — `memo` 로 감싸지 않은 꼴. 이름이 없어 자리가 나오지 않았다.
+  'defaultAnonymousDeclaration.tsx': `
+    import { amountBasisDisplayOf } from '../../display/moneyDisplay';
+    export default function ({ basis }: { readonly basis: string }) {
+      return <span>{amountBasisDisplayOf(basis).label}</span>;
+    }
+  `,
   // **음성 대조** — 기본 내보내기가 어휘를 쓰지 않으면 의무가 아니다.
   'defaultPlain.tsx': `
     import { memo } from 'react';
@@ -436,6 +443,10 @@ describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
     expect(componentsIn('defaultArrow.tsx')).toStrictEqual(['default']);
   });
 
+  it('무명 기본 **함수 선언**도 낸다 — 이름이 없어도 자리는 있다', () => {
+    expect(componentsIn('defaultAnonymousDeclaration.tsx')).toStrictEqual(['default']);
+  });
+
   it('어휘를 안 쓰는 기본 내보내기는 의무가 아니다', () => {
     expect(componentsIn('defaultPlain.tsx')).toStrictEqual([]);
   });
@@ -461,7 +472,7 @@ const registryOverlay = new Map([
     `${readFileSync(vocabularyModulePath, 'utf8').replace(
       'export function readClock',
       'function readClock',
-    )}\nexport function brandNewVocabularyOf(at: string): string {\n  return at;\n}\n`,
+    )}\nconst buildVocabulary = (prefix: string) => (at: string) => prefix + at;\nexport const curriedVocabularyOf = buildVocabulary('x');\nexport function brandNewVocabularyOf(at: string): string {\n  return at;\n}\n`,
   ],
   [
     resolve(screensDir, '__probe__', 'leak.tsx'),
@@ -473,6 +484,13 @@ const registryOverlay = new Map([
     `,
   ],
 ]);
+
+/**
+ * **TS 프로그램을 칸 예산 안에서 세우지 않는다**(r1 cr F-3). 실측 1.2~2.1s 이고 칸 예산은
+ * 5000ms 다 — 이 PR 이 서명 A 에서 지운 꼴과 같은 크기의 비용이다. 이 파일은 이미 적재 단계에서
+ * 프로그램을 둘 세우므로 셋째를 그 옆에 둔다(「측정 아닌 준비를 예산 밖으로」).
+ */
+const registryProgram = screenProgram(webRoot, registryOverlay);
 
 describe('어휘 등재의 전수 등식 (M11/11E)', () => {
   it('오늘의 트리에 구멍이 없다', () => {
@@ -494,9 +512,14 @@ describe('어휘 등재의 전수 등식 (M11/11E)', () => {
 
   /** **양성 대조 셋** — 구멍마다 하나씩, 같은 합성 프로그램에서. */
   it('새 어휘 함수 · 썩은 제외 · 화면으로 샌 조립자를 각각 낸다', () => {
-    const gaps = vocabularyRegistryGaps(screenProgram(webRoot, registryOverlay), webRoot);
+    const gaps = vocabularyRegistryGaps(registryProgram, webRoot);
 
-    expect(gaps.unclassified).toStrictEqual(['display/timeDisplay.ts#brandNewVocabularyOf']);
+    // **커링도 들어온다**(r1 cr F-1) — 선언 꼴이 아니라 **타입의 호출 시그니처**로 판정하므로
+    // `build('x')` 처럼 초기값이 호출인 꼴이 열거 밖으로 새지 않는다.
+    expect(gaps.unclassified).toStrictEqual([
+      'display/timeDisplay.ts#brandNewVocabularyOf',
+      'display/timeDisplay.ts#curriedVocabularyOf',
+    ]);
     expect(gaps.stale).toStrictEqual(['display/timeDisplay.ts#readClock']);
     expect(gaps.leaked).toStrictEqual([join('__probe__', 'leak.tsx')]);
   });

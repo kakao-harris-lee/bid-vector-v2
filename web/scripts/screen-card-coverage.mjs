@@ -173,6 +173,14 @@ function declarationKeyOf(declaration) {
   if (ts.isExportAssignment(declaration)) {
     return declaration.isExportEquals === true ? undefined : relativeKeyOf(declaration, 'default');
   }
+  // `export default function (…) {}` · `export default class {}` — 이름이 없어도 **기본
+  // 내보내기는 파일당 하나**라 같은 자리를 쓴다(r1 cr F-2).
+  if (
+    declaration.name === undefined &&
+    (ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Default) !== 0
+  ) {
+    return relativeKeyOf(declaration, 'default');
+  }
   const named =
     (ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) &&
     declaration.parent !== undefined &&
@@ -280,7 +288,8 @@ function topLevelDeclarationsOf(source) {
     }
   };
   ts.forEachChild(source, (node) => {
-    if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name !== undefined) {
+    if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+      // 이름이 없어도 **기본 내보내기**면 자리가 나온다 — [declarationKeyOf] 가 판정한다.
       register(node);
       return;
     }
@@ -379,18 +388,15 @@ export function vocabularyComponentsOf(program, source) {
   return [...names];
 }
 
-function isFunctionDeclarationLike(declaration) {
-  if (ts.isFunctionDeclaration(declaration)) {
-    return true;
-  }
-  return (
-    ts.isVariableDeclaration(declaration) &&
-    declaration.initializer !== undefined &&
-    (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
-  );
-}
-
-/** 그 어휘 모듈이 내보내는 **함수**의 자리 전수. */
+/**
+ * 그 어휘 모듈이 내보내는 **부를 수 있는 것**의 자리 전수.
+ *
+ * **꼴이 아니라 타입을 묻는다**(r1 cr F-1). 앞 판은 「함수 선언 또는 화살표·함수 표현식 초기값」
+ * 이라는 **열거**였고, 그래서 `export const f = build('x')` 같은 커링·감싸기가 등식 밖으로 샜다
+ * (통제군이 서는 실측 — 화살표 꼴은 잡히고 커링은 안 잡혔다). 그것은 이 slice 가 화면 쪽에서
+ * 바로 지운 조건이라 같은 자리에 남겨 둘 수 없다. 호출 시그니처가 하나라도 있으면 「부를 수
+ * 있는 것」이고, `memo(…)`·커링·`as` 단언 꼴이 함께 들어온다.
+ */
 function exportedFunctionKeysOf(checker, program, webRoot, relative) {
   const source = program.getSourceFile(resolve(webRoot, 'src', relative));
   if (source === undefined) {
@@ -400,8 +406,8 @@ function exportedFunctionKeysOf(checker, program, webRoot, relative) {
   const moduleSymbol = checker.getSymbolAtLocation(source);
   const keys = [];
   for (const exported of moduleSymbol === undefined ? [] : checker.getExportsOfModule(moduleSymbol)) {
-    const declaration = (aliasResolved(checker, exported).declarations ?? [])[0];
-    if (declaration !== undefined && isFunctionDeclarationLike(declaration)) {
+    const type = checker.getTypeOfSymbolAtLocation(aliasResolved(checker, exported), source);
+    if (type.getCallSignatures().length > 0) {
       keys.push(`${relative}#${exported.getName()}`);
     }
   }

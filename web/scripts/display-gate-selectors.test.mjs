@@ -43,8 +43,10 @@ function messagesMatching(messages, fragment) {
  * 주는 것과 측정 아닌 준비를 예산 밖으로 내보내는 것은 다른 일이다.
  */
 const warmedUp = await (async () => {
-  // 첫 칸과 **같은 꼴의 경로**로 예열한다 — flat config 는 경로로 블록을 고르므로, 다른 자리로
-  // 예열하면 첫 칸이 쓰는 블록의 파서·플러그인이 그대로 식은 채 남는다.
+  // 경로를 첫 칸과 같은 꼴로 둔 것은 **값싼 조심**이지 이 수정이 기대는 축이 아니다(r1 cr F-6).
+  // 실측: 같은 프로세스에서 예열 경로를 바꿔 첫 린트를 재면 `src/screens/*.tsx` 10ms ·
+  // `src/api/*.ts` 9ms · `e2e/*.ts` 21ms 다 — 5000ms 예산에 무해하다. 비싼 것은 **프로세스 단위의
+  // 모듈 적재**이고(파서·플러그인·`typescript`) 그것은 어느 경로로 예열하든 한 번만 치른다.
   await lintAs('src/screens/__warmup__.tsx', 'export const warm = 1;\n');
   return true;
 })();
