@@ -329,8 +329,9 @@ class ScopedAllowedRootsParityTest {
          * 적지 않는 것은 [ownClassFiles] 와 같은 이유다(실행 위치가 바뀌어도 깨지지 않는다).
          */
         fun testClassesRoot(): File {
+            val ownPackage = ScopedAllowedRootsParityTest::class.java.packageName
             var directory = ownClassDirectory()
-            repeat(ScopedAllowedRootsParityTest::class.java.packageName.split('.').size) {
+            repeat(ownPackage.split('.').size) {
                 directory = directory.parentFile ?: error("test class 출력의 뿌리까지 올라가지 못했다")
             }
             return directory

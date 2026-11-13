@@ -71,9 +71,16 @@ class SourceReferencePolicyTest {
         assertTrue(policy.scopeOf("bidvector.adapters.qualification") != null)
     }
 
+    /**
+     * 표본은 **축이 아닌** 패키지여야 한다 — 축이 되면 이 단언이 거짓이 된다. 앞 판은
+     * `bidvector.adapters.persistence` 를 들었고 M11/11C 가 그 패키지를 축으로 만들어
+     * (`OPEN-M10-SCOPED-PACKAGES-COVERAGE` 종결, 모집단 여덟 → 열넷) 이 자리가 붉었다.
+     * 지금 드는 `bidvector.adapters.snapshot` 은 dependency test 가 없어 축 열넷에 들지 않는
+     * 형제 패키지다 — 같은 모듈 이웃이라 `scopeOf` 의 접두 판정을 그대로 시험한다.
+     */
     @Test
     fun `범위 축 밖 패키지는 판정 대상이 아니다`() {
-        assertTrue(policy.scopeOf("bidvector.adapters.persistence") == null)
+        assertTrue(policy.scopeOf("bidvector.adapters.snapshot") == null)
         assertTrue(policy.scopeOf("bidvector.workflow.evaluation") == null)
     }
 
