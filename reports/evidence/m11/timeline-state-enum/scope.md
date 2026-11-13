@@ -55,28 +55,35 @@ Kotlin 등식 밖이다(어휘 사본 가운데 등식을 가진 것은 대사 �
   배포 비틀림 때만 닿는 **표시** 변경이고 API 응답 값 변경이 아니라 승인 경계 안이다. 조건:
   그 변경을 test 로 잠그고 evidence·PR 본문에 **「거동 변경: 표 밖 상태의 표시 문면」** 으로
   명시한다.
-- **목록 질의 상태 탭 param — 범위 밖 유지**(아래 out_scope).
+- **목록 질의 상태 탭 param — 범위 밖 유지**(둘째 갱신에서 **거둬졌다**, 아래).
+
+## 계약 갱신 2026-11-13 (둘째) — 팀장 계약 변경 둘
+
+- **§12.3 절 글자를 slice 에 고정하지 않는다**(PR #153 리뷰 반영). 각 slice 는 자기 PR 이 `main`
+  을 마지막으로 병합할 때 그 시점의 **다음 글자**를 써서 절을 끝에 덧붙인다. 그때까지 절 머리를
+  `#### (?)` 로 두고 병합 때 고친다 — 브리프의 (k)=11A… 배정은 폐기됐다. 아래 in_scope 의 절
+  항목은 **「§12.3 끝에 덧붙이는 새 하위 절」** 로 읽는다.
+- **목록 질의의 상태 탭 param 은 범위 밖이 아니다.** 그 칸은 **이미 `enum`** 이고 잔여는 선언이
+  아니라 **Kotlin 어휘 ↔ 그 enum 등식의 부재**다. 범위 밖 판정을 거두고 **같은 등식의 넷째
+  자리**로 넣는다. 신설 OPEN `OPEN-M11-LIST-STATE-PARAM-ENUM` 은 만들지 않는다.
+  **요구된 재측정**(enum 인가 · 어휘 집합이 같은가)은 명령으로 냈고 **값 열넷의 집합·차례가 도메인
+  열거와 같다** — 멈출 사유 없다.
 
 ## in_scope
 
 - `openapi/bidvector-operator-api.yaml` — 타임라인 상태 두 칸
 - `app/src/test/kotlin/bidvector/app/http/OpenApiBidCaseContractTest.kt` — 상태 축 등식과 음성 대조
-- `app/src/test/kotlin/bidvector/app/http/OpenApiSpecSupport.kt` — `null` 을 함께 싣는 어휘 읽기
-  하나(새 사본을 만들지 않는다) · 항목 8 의 KDoc 한 줄
+- `app/src/test/kotlin/bidvector/app/http/OpenApiSpecSupport.kt` — `null` 을 함께 싣는 어휘 읽기와
+  질의 인자 어휘 읽기(둘 다 **새 사본을 만들지 않는다**) · 항목 8 의 KDoc 한 줄
 - `web/src/api/generated/operator-api.ts` — 저장소 절차(`npm run api:types`)의 산출물
 - `web/src/display/caseDisplay.ts` · `web/src/display/caseDisplay.test.ts`
 - `web/src/screens/WorksheetTimeline.tsx` — 표 밖 조회 자리(D-11B-3) ·
   `web/src/screens/WorksheetScreen.test.tsx` — 그 거동 변경의 렌더 층 잠금(기존 파일 · 게이트
   등록부에 이미 있다)
-- `docs/discovery/capability-map.md` §12.3 의 새 하위 절 (l)(행을 고치지 않고 덧붙인다)
+- `docs/discovery/capability-map.md` — §12.3 끝에 덧붙이는 새 하위 절(행을 고치지 않는다)
 - `reports/evidence/m11/timeline-state-enum/**`
 
 ## out_scope — 범위 밖과 사유
-
-- **목록 질의의 상태 탭 param** — 같은 어휘의 넷째 사본이고 Kotlin 등식 밖이지만 **요청** 쪽
-  어휘다(응답 계열이 아니다). 팀장 판정으로 **범위 밖 유지**이고 §12.3 (l) 에 신설 OPEN
-  `OPEN-M11-LIST-STATE-PARAM-ENUM` 으로 등재한다 — 받는 자리는 「다음에 그 param 을 만지는
-  계약 slice」다.
 - **어휘 사본을 계약 안에서 하나로 모으는 것**(`$ref` 공용 스키마) — 금액 어휘 「하나의 출처」와
   같은 부류이고 `milestone-11.md` 가 그것을 범위 밖으로 유지했다. 같은 판단을 상태 축에 적용한다.
 - **어휘 읽기 헬퍼의 기존 사본들 통합** — 10B 알려진 제한 ③ 그대로. 또 하나를 만들지 않는 것이
