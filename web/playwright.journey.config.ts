@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-
 /**
  * 여정 e2e 설정(M7/7E-1, D-7E-1) — 7A 의 셸 스모크와 **다른 설정 파일**이다. 이유는 둘이다:
  * ⓐ 이 레인만 하네스(출하 app.jar · 버릴 Postgres · fake KONEPS)를 띄우므로 셸 스모크가 그

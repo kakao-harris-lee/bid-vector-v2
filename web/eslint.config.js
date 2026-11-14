@@ -3,7 +3,6 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-
 // ADR 0011 D-2·D-3 — 서버 호출은 생성 타입으로 타입이 매겨진 클라이언트(`src/api/client.ts`)로
 // 한다. **이 블록의 대상은 `src` 의 `.ts`·`.tsx` 뿐이다** — `index.html` 의 인라인 스크립트와
 // `src` 밖 파일은 아예 린트 대상이 아니다(7A 검토 r5 M-10: 인라인 평문 `fetch` 는 우회 형태가

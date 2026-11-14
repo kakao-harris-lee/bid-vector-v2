@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 
-
 // 7A 의 e2e 는 셸이 뜨는지 하나다(ADR 0011 D-5). 여정 스모크는 7E 가 화면과 함께 들인다.
 //
 // `webServer` 를 둔다 — legacy 는 이 블록이 없어 사람이 서버를 먼저 띄워야 했고(조사 §1.4),
