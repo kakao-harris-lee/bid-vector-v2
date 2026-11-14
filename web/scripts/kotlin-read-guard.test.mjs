@@ -108,6 +108,16 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
   });
 
   /**
+   * **동기 표면은 그 분기에 들지 않는다**(r3 — cr LOW-3). 마지막 인자가 함수여도 `…Sync` 는
+   * **던진다** — 앞 판은 조용히 `undefined` 를 돌려줘 fail-closed 가 fail-silent 로 바뀌었다.
+   */
+  it('마지막 인자가 함수여도 동기 표면은 던진다', () => {
+    const target = shippedKotlinFile();
+
+    expect(() => readFileSync(target, () => undefined)).toThrow(/kotlin-read-guard/u);
+  });
+
+  /**
    * **ⓑ③ — 저장소 밖으로 복사한 뒤 읽는다**(M12). 앞 판은 열리는 경로가 저장소 안인지 **묻고**
    * 밖이면 건너뛰었다. 그래서 디렉터리째 밖으로 복사하면(복사 자체는 디렉터리 인자라 지나간다)
    * 그 사본을 그대로 읽을 수 있었다 — 실측으로 읽혔다.

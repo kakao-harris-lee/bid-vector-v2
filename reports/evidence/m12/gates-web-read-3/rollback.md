@@ -114,7 +114,7 @@ in_scope 밖 경로는 하나도 없다 — 이 slice 는 공유 working tree �
 | ⑤ | **빈 트리 `npm ci`** 뒤 `vitest run` | **44 파일 · 1011 passed**(원천의 수 — 12B 의 칸을 포함한다) |
 | ⑥ | `lint`·`gate:tests`·`gate:src-tree`·`api:types:check`·`gate:boundary-canary` | exit **0** 다섯 |
 
-⑤ 의 1011 은 **원천의 수**다 — 이 판의 1025 에서 내가 더한 칸들이 사라진 값이고, 그 감소 자체가
+⑤ 의 1011 은 **원천의 수**다 — 이 판의 수(라운드마다 움직인다: r2 1025 · r3 1026)에서 내가 더한 칸들이 사라진 값이고, 그 감소 자체가
 「내 표지가 사라졌다」의 또 다른 계수다. **파일 수는 44 로 같다** — 이 slice 는 새 vitest test
 파일을 만들지 않았고(신설은 playwright spec 과 탐침 모듈이다) 그 사실이 이 줄로 선다.
 

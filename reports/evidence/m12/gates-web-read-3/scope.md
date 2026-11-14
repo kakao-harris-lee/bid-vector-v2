@@ -118,7 +118,7 @@ M11 은 이 축을 「진입점마다 미리 적재하는 것은 **진입점 열
 | --- | --- | --- |
 | `web/vite.config.ts` | 층을 세우는 import **한 줄**(`test:` 블록은 건드리지 않는다) | `test:` 블록의 키 수 · `setupFiles` 원소 수 · import 줄 수 |
 | `web/config/gate-tests.txt` | 등록부 **산문 한 줄**(ⓕ-2). 새 게이트 test 파일은 만들지 않는다 — 의무 게이트를 기존 층 test 에 둔다 | 줄 수 · 등재 수 · `npm run gate:tests` 판정 |
-| `web/package.json` | `scripts` 의 `node` 진입점에 층 적재 | `scripts` 키 수 · 각 값의 층 적재 유무 |
+| `web/package.json` | r3: `scripts` 의 플래그 일곱을 거두고 **탐침 둘**을 등재 | **`scripts` 키 수 = 16**(원천 14 + 탐침 둘) · 탐침 둘의 존재 · `--import` 플래그 **0** |
 | `docs/discovery/capability-map.md` §12.3 | 새 하위 절 하나 | §절 글자 |
 
 ### 12D 와 공유하는 셋 (팀장 계약 보완 2026-11-14)

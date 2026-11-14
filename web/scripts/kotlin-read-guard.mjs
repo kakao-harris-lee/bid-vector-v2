@@ -229,7 +229,7 @@ function refusalFor(args) {
  * `apply`·`construct` 두 자리에서 같은 판정을 건다 — **생성자 분류를 열거하지 않고** 전수 감싸기를
  * 유지하는 길이다. 앞 판의 `defineProperty` 와 복사 루프는 함께 사라진다.
  */
-function guarded(surface, original, rejectsInstead) {
+function guarded(surface, original, rejectsInstead, callbackStyle) {
   return new Proxy(original, {
     apply(target, _thisArg, args) {
       const error = refusalFor(args);
@@ -239,9 +239,15 @@ function guarded(surface, original, rejectsInstead) {
         }
         // **콜백 표면은 콜백으로 실패한다**(r2 — cr LOW-4). `fs.readFile(path, cb)` 가 동기로
         // 던지면 이 층이 「원래 계약을 바꾸지 않는다」는 자기 문면을 어긴다 — 호출자는 `cb(err)`
-        // 를 기다리고 있다. 마지막 인자가 함수면 그 자리로 낸다.
+        // 를 기다리고 있다.
+        //
+        // **동기 표면은 이 분기에 들지 않는다**(r3 — cr LOW-3). 앞 판은 마지막 인자가 함수이기만
+        // 하면 콜백으로 냈는데, `fs` 표면 전수를 감싸므로 `…Sync` 호출의 마지막 인자가 함수인
+        // 경우에 **던지지 않고 조용히 `undefined`** 가 됐다 — fail-closed 가 fail-silent 로 바뀌는
+        // 유일한 자리였다. 비동기 여부는 `patch` 가 **이름 규약**으로 가려 넘긴다(Node 자신의
+        // 규약이고, 잘못 가리면 **던지는 쪽**으로 틀린다).
         const callback = args.at(-1);
-        if (typeof callback === 'function') {
+        if (callbackStyle && typeof callback === 'function') {
           queueMicrotask(() => callback(error));
           return undefined;
         }
@@ -262,6 +268,15 @@ function guarded(surface, original, rejectsInstead) {
 /** 층이 자기 해석기를 다시 감싸지 않도록 두 이름만 비운다 — 그 밖은 전수다. */
 const NOT_WRAPPED = new Set(['realpathSync', 'realpath']);
 
+/**
+ * **콜백으로 실패해야 하는 표면인가**(r3 — cr LOW-3). Node 의 이름 규약으로 가린다: `…Sync` 는
+ * 동기라 **던지고**, 그 밖의 `fs` 함수는 콜백을 받는다. `fs.promises` 는 호출부에서 이미 갈린다.
+ *
+ * **`exists` 는 예외다** — 그 콜백의 첫 인자가 `err` 가 아니라 `exists` 라, 오류를 그 자리로 내면
+ * 「있다」로 읽힌다. deprecated API 이고 거부 경로라 **던지는 쪽**으로 둔다(등재).
+ */
+const callbackStyleKey = (key) => !key.endsWith('Sync') && key !== 'exists';
+
 function patch(surface, rejectsInstead = false) {
   for (const key of Object.keys(surface)) {
     if (NOT_WRAPPED.has(key)) {
@@ -272,7 +287,7 @@ function patch(surface, rejectsInstead = false) {
       continue;
     }
     try {
-      surface[key] = guarded(surface, value, rejectsInstead);
+      surface[key] = guarded(surface, value, rejectsInstead, !rejectsInstead && callbackStyleKey(key));
     } catch {
       // 쓸 수 없는 속성은 감쌀 수 없다 — 그 자리는 정적 술어가 받는다.
     }
