@@ -67,4 +67,3 @@ class StrategyAdapterDependencyTest {
         isDisallowed("bidvector.adapters.event") shouldBe false
     }
 }
-

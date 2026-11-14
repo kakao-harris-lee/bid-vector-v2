@@ -206,4 +206,3 @@ private fun qualificationPackageClassFiles(): List<File> {
     classFiles.shouldNotBeEmpty() // 빈 디렉터리를 "위반 없음"으로 오판하지 않는다.
     return classFiles
 }
-

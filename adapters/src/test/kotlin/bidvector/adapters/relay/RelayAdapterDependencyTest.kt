@@ -126,4 +126,3 @@ class RelayAdapterDependencyTest {
         sqlReferences shouldBe emptyList()
     }
 }
-

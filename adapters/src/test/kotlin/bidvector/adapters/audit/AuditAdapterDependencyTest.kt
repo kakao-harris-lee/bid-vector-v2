@@ -31,4 +31,3 @@ class AuditAdapterDependencyTest {
         isDisallowed("bidvector.adapters.audit") shouldBe false
     }
 }
-

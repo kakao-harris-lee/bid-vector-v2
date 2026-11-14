@@ -62,7 +62,10 @@ internal object ScopedAllowedRoots {
      * 구성 표본의 앵커로 쓰이므로 리터럴로 적으면 그 앵커가 또 하나의 열거가 된다.
      */
     val OWN_MODULE_ROOT: String =
-        ScopedAllowedRoots::class.java.packageName.split('.').take(2).joinToString(".")
+        ScopedAllowedRoots::class.java.packageName
+            .split('.')
+            .take(2)
+            .joinToString(".")
 
     /**
      * 축 → 그 패키지의 컴파일 산출물 디렉터리. **경로 리터럴이 이 한 자리**다(앞 판은 축마다 하나로

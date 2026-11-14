@@ -1,6 +1,5 @@
 package bidvector.adapters.ml
 
-import bidvector.adapters.architecture.SELF_COORDINATE
 import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

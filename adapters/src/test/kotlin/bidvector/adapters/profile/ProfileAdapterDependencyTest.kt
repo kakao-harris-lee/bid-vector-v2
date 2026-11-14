@@ -60,4 +60,3 @@ class ProfileAdapterDependencyTest {
         isDisallowed("bidvector.adapters.profile") shouldBe false
     }
 }
-

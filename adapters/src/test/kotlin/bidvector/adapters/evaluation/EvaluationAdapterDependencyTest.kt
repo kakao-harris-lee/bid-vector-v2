@@ -439,4 +439,3 @@ internal class ConcatenationMachineryFixture {
         b: String?,
     ): String = java.lang.String.join(" ", listOfNotNull(a, b))
 }
-

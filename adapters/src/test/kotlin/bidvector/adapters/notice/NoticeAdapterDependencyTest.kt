@@ -85,4 +85,3 @@ class NoticeAdapterDependencyTest {
         BytecodeConstantPool.bodyOf(classFile).contains("beginReadOnlySearchTransaction") shouldBe true
     }
 }
-

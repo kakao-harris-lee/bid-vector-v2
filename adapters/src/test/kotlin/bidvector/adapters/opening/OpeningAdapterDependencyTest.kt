@@ -74,4 +74,3 @@ class OpeningAdapterDependencyTest {
         return BytecodeConstantPool.bodyOf(classFile)
     }
 }
-

@@ -76,11 +76,12 @@ class BytecodeConstantPoolTest {
         roots.shouldNotBeEmpty()
 
         val missed =
-            roots.filterNot { root ->
-                val internal = root.replace('.', '/')
-                extract("(L$internal/Sample;)V") == listOf("$internal/Sample") &&
-                    extract("$root.Sample") == listOf("$root.Sample")
-            }.sorted()
+            roots
+                .filterNot { root ->
+                    val internal = root.replace('.', '/')
+                    extract("(L$internal/Sample;)V") == listOf("$internal/Sample") &&
+                        extract("$root.Sample") == listOf("$root.Sample")
+                }.sorted()
 
         missed shouldBe emptyList()
     }

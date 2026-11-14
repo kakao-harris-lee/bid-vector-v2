@@ -54,4 +54,3 @@ class PersistenceAdapterDependencyTest {
         isDisallowed("bidvector.adapters.snapshot") shouldBe false
     }
 }
-
