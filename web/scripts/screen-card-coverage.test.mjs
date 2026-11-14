@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  cardAnchorsOf,
   collectScreenVocabulary,
+  displayVocabularyReach,
   INTERNAL_ASSEMBLER,
   missingVocabularyDeclarations,
   mountedCardsOf,
@@ -31,7 +33,10 @@ import {
  * 앞 판에서 **전부 초록**이었다(호출 식별자의 이름만 보았기 때문이다).
  */
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const screensDir = resolve(webRoot, 'src', 'screens');
+const srcDir = resolve(webRoot, 'src');
+const screensDir = resolve(srcDir, 'screens');
+const displayDir = resolve(srcDir, 'display');
+const componentsDir = resolve(srcDir, 'components');
 const gatePath = resolve(screensDir, 'screenVocabulary.test.tsx');
 
 const { program, obligations, screens, files } = collectScreenVocabulary(webRoot);
@@ -61,7 +66,8 @@ describe('어휘 게이트의 모집단 (r1 v M-1)', () => {
    * r1 에서 일어난 일의 거울상이다.
    */
   it('표시 어휘를 쓰는 카드 전수 == 게이트가 마운트하는 카드 전수', () => {
-    const required = [...new Set(obligations.map((one) => one.name))].sort();
+    // **자리까지 맞댄다**(r1 v M-3) — 이름만 맞대면 다른 파일의 같은 이름이 접힌다.
+    const required = [...new Set(obligations.map((one) => one.key))].sort();
 
     expect([...mounted].sort(), `의무: ${required.join(', ')}`).toStrictEqual(required);
   });
@@ -77,13 +83,48 @@ describe('어휘 게이트의 모집단 (r1 v M-1)', () => {
   });
 
   /**
+   * **이 라운드의 거동 변화 ①**(M12/12B — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB` ⓐ).
+   * 어휘 도달이 표시층 **파일 사이**로 넓어지면, 비공개 조립 함수와 함수 값 표를 지나 금액
+   * 글자를 그리는 두 카드가 비로소 의무가 된다. 앞 판에서 그 파일은 의무도 화면도 아니었다 —
+   * 즉 게이트가 그 파일에 대해 **아무 말도 하지 않았다**.
+   */
+  it('표시층 파일 사이로 어휘를 그리는 카드가 의무에 든다', () => {
+    const names = obligations.map((one) => one.name);
+
+    expect(names).toContain('StrategyFieldRow');
+    expect(names).toContain('StrategyEditPanel');
+  });
+
+  /**
+   * **이 라운드의 거동 변화 ②**(`OPEN-M11-SCREEN-COVERAGE-POPULATION-DIR`). 모집단이 화면
+   * 디렉터리에 갇혀 있으면 공용 컴포넌트에 둔 카드가 의무를 내지 않는다. 훑기가 `src/**` 를
+   * 담는 것을 **실제 파일로** 잰다(그 축의 술어가 파일시스템이다).
+   */
+  it('훑기가 화면 디렉터리 밖도 담는다', () => {
+    expect(files).toContain(join('components', 'StateBadge.tsx'));
+    expect(files).toContain(join('display', 'moneyDisplay.ts'));
+    expect(files).toContain('LoginScreen.tsx');
+  });
+
+  /**
+   * **훅·패널이 의무로 끌려오지 않는다**(Q1 — 「마운트할 수 있는 카드」를 타입으로 고정). 실측된
+   * 지뢰다: 이름 기준 판정에서는 씨앗이 하나 늘자 마운트할 수 없는 훅이 의무가 됐다.
+   */
+  it('의무는 전부 카드다 — 훅·표는 들어오지 않는다', () => {
+    const names = [...obligations, ...screens].map((one) => one.name);
+
+    expect(names.filter((one) => one.startsWith('use'))).toStrictEqual([]);
+    expect(names.filter((one) => one === one.toUpperCase())).toStrictEqual([]);
+  });
+
+  /**
    * 화면(`*Screen`)은 질의 목이 필요해 이 게이트가 마운트하지 못한다. 그 제외를 **이름 규약
    * 하나에 기대지 않는다** — 뺀 이름마다 짝이 되는 test 파일이 실제로 있는지 센다.
    */
   it('의무에서 뺀 화면마다 자기 test 파일이 있다', () => {
     for (const { name, file } of screens) {
       // **그 파일의 디렉터리에서** 찾는다 — 훑기가 재귀가 된 뒤로 화면이 뿌리에만 있지 않다.
-      const beside = resolve(screensDir, dirname(file));
+      const beside = resolve(srcDir, dirname(file));
       const found = ['tsx', 'ts'].some((ext) => existsSync(resolve(beside, `${name}.test.${ext}`)));
 
       expect(found, `${name} 을 의무에서 뺐는데 짝이 되는 test 파일이 없다`).toBe(true);
@@ -121,10 +162,27 @@ describe('화면 파일 훑기의 범위 (v M-3)', () => {
     }
   });
 
-  /** 실제 화면 디렉터리에서도 비지 않는다 — 빈 훑기는 모든 등식을 공허하게 만든다. */
-  it('실제 화면 디렉터리를 담는다', () => {
-    expect(screenFilesIn(screensDir).length).toBe(files.length);
-    expect(files).toContain('WorksheetTimeline.tsx');
+  /** 실제 트리에서도 비지 않는다 — 빈 훑기는 모든 등식을 공허하게 만든다. */
+  it('실제 소스 트리를 담는다', () => {
+    expect(screenFilesIn(srcDir).length).toBe(files.length);
+    expect(files).toContain(join('screens', 'WorksheetTimeline.tsx'));
+  });
+});
+
+/**
+ * **카드 술어의 앵커**(Q1). 「마운트할 수 있는 카드」를 타입 **이름**이 아니라 JSX 식 자신에서
+ * 얻은 **심볼 동일성**으로 판정한다. 그래서 앵커가 비면 카드 집합이 비고 **모든 등식이 공허**
+ * 해진다 — 조용히 초록이 되는 길을 두지 않는다.
+ */
+describe('카드 앵커의 비-공허 (M12/12B Q1)', () => {
+  it('앵커가 선다', () => {
+    expect(cardAnchorsOf(program, webRoot).size).toBeGreaterThan(0);
+  });
+
+  it('앵커가 비면 던진다 — 빈 카드 집합으로 초록이 되지 않는다', () => {
+    const emptied = new Map([[resolve(srcDir, '__card_anchor__.tsx'), 'export const nothing = 1;\n']]);
+
+    expect(() => collectScreenVocabulary(webRoot, emptied)).toThrow(/앵커/u);
   });
 });
 
@@ -326,44 +384,234 @@ const PROBES = {
     }
     export type UnusedProps = Parameters<typeof Unused>[0];
   `,
+  // ── M12/12B — 표시층 **파일 사이** 도달(ⓐⓑ) ────────────────────────────────
+  // 어휘를 직접 부르지 않는다. 표시층 **다른 파일**의 래퍼를 부른다.
+  'viaWrapper.tsx': `
+    import { wrappedInstantOf } from '../../display/__probe__/wrapper';
+    export function WrapperCard({ at }: { readonly at: string }) {
+      return <span>{wrappedInstantOf(at)}</span>;
+    }
+  `,
+  // 래퍼의 래퍼 — 표시층 안에서도 **두 홉**이다(깊이 상수를 두지 않는 자리).
+  'viaTwoHop.tsx': `
+    import { doubleWrappedOf } from '../../display/__probe__/twoHop';
+    export function TwoHopCard({ at }: { readonly at: string }) {
+      return <span>{doubleWrappedOf(at)}</span>;
+    }
+  `,
+  // **음성 대조** — 표시층 함수를 부르지만 그것이 어휘에 닿지 않는다(폐포가 표시층을 다 삼키면
+  // 이 칸이 붉어진다).
+  'viaPlain.tsx': `
+    import { plainTextOf } from '../../display/__probe__/plain';
+    export function PlainViaCard({ title }: { readonly title: string }) {
+      return <span>{plainTextOf(title)}</span>;
+    }
+  `,
+  // **음성 대조** — 다른 **파일의 카드**를 그리는 조상 카드. 지역 그래프가 파일에 갇히지
+  // 않으면 조상 카드가 뿌리까지 전부 의무가 된다(그 폐포는 「마운트할 수 있는 카드」의 뜻을
+  // 무너뜨린다).
+  'ancestor.tsx': `
+    import { WrapperCard } from './viaWrapper';
+    export function AncestorCard({ at }: { readonly at: string }) {
+      return <section><WrapperCard at={at} /></section>;
+    }
+  `,
+  // ── M12/12B — 카드 술어(Q1). 어휘를 **부르지만** 마운트할 수 있는 카드가 아니다 ──────────
+  'hookOnly.ts': `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function useProbeInstant(at: string): string | null {
+      return instantDisplayOf(at).text;
+    }
+  `,
+  'tableOnly.ts': `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export const PROBE_INSTANT_TEXT = { at: (one: string) => instantDisplayOf(one).text };
+  `,
+  // 반환 꼴만 JSX 원소를 흉낸다 — 구조 비교 변종의 오탐을 심볼 동일성이 막는 자리다.
+  'lookAlike.ts': `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function lookAlikeOf(at: string) {
+      return { type: 1, props: instantDisplayOf(at).text };
+    }
+  `,
+  // ── r1 v H-1 — `.ts` 카드. JSX 를 못 쓰므로 `createElement` 뿐이고 그 반환은 앵커의
+  // **하위 인터페이스**다. 동일성만 보던 판은 이 둘을 의무에서 **잃었다**(base 가 잡던 것을
+  // 잃는 회귀). 그 축을 모집단에 넣은 것이 PR #132 v M-3 이다.
+  'tsCard.ts': `
+    import { createElement } from 'react';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function TsCard({ at }: { readonly at: string }) {
+      return createElement('span', null, instantDisplayOf(at).text);
+    }
+  `,
+  'tsComponentCard.ts': `
+    import { createElement } from 'react';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    function TsLeaf({ at }: { readonly at: string }) {
+      return createElement('span', null, instantDisplayOf(at).text);
+    }
+    export function TsCompCard({ at }: { readonly at: string }) {
+      return createElement(TsLeaf, { at });
+    }
+  `,
+  // ── r1 v M-3 — **같은 이름, 다른 파일**. 이름으로 중복을 없애면 둘째가 접혀 조용해진다.
+  'dupCard.tsx': `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function DupCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
+  // 포털도 카드다 — 반환이 \`Element\` 가 아니라 \`ReactPortal\` 이다.
+  'portal.tsx': `
+    import { createPortal } from 'react-dom';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function PortalCard({ at, host }: { readonly at: string; readonly host: Element }) {
+      return createPortal(<span>{instantDisplayOf(at).text}</span>, host);
+    }
+  `,
 };
 
-const probeOverlay = new Map(Object.entries(PROBES).map(([name, text]) => [probePath(name), text]));
+/**
+ * **표시층의 합성 모듈** — 폐포의 노드 집합을 `src/display/**` **디렉터리**에서 유도하므로,
+ * 여기 둔 파일은 모듈 목록에 손대지 않아도 그래프에 든다(ⓑ 의 「새 표시 모듈」이 그 축이다).
+ */
+const DISPLAY_PROBE_DIR = resolve(displayDir, '__probe__');
+const displayProbePath = (name) => resolve(DISPLAY_PROBE_DIR, name);
+
+const DISPLAY_PROBES = {
+  'wrapper.ts': `
+    import { instantDisplayOf } from '../timeDisplay';
+    export function wrappedInstantOf(at: string): string | null {
+      return instantDisplayOf(at).text;
+    }
+  `,
+  'twoHop.ts': `
+    import { wrappedInstantOf } from './wrapper';
+    export function doubleWrappedOf(at: string): string | null {
+      return wrappedInstantOf(at);
+    }
+  `,
+  'plain.ts': `
+    export function plainTextOf(title: string): string {
+      return title;
+    }
+  `,
+  // ⓑ 뒤 꼴 — 씨앗을 **지나지 않고** 바닥부터 금액 문면을 만든다. 폐포가 닿지 않으므로 등식이
+  // 받아야 하는 자리다.
+  'scratch.ts': `
+    export function rawWonTextOf(won: number): string {
+      return String(won) + '\\uc6d0';
+    }
+  `,
+  // ⓒ 함수 값 표 — 표 **안**의 화살표에 자리가 없어 앞 판의 술어가 보지 못했다.
+  'table.ts': `
+    type ProbeSlot = 'a' | 'b';
+    export const PROBE_SLOT_TEXT: Record<ProbeSlot, (one: string) => string> = {
+      a: (one) => one,
+      b: (one) => one,
+    };
+  `,
+  // ⓒ 클래스 static — 클래스 타입에는 construct 시그니처만 있다.
+  'statics.ts': `
+    export class ProbeTextHolder {
+      static textOf(won: number): string {
+        return String(won);
+      }
+    }
+  `,
+  // ⓒ \`fn | undefined\` — 합집합에는 호출 시그니처가 없다.
+  'maybe.ts': `
+    export const maybeTextOf: ((one: string) => string) | undefined = (one) => one;
+  `,
+  // **음성 대조** — 컬렉션은 함수 값 표가 아니다. prototype 메서드로 「부를 수 있는 것」이
+  // 되면 데이터 표 전부가 장부에 들어온다(실측).
+  'collection.ts': `
+    export const PROBE_TOKENS: ReadonlySet<string> = new Set(['a']);
+  `,
+  // ⓓ — 어휘 모듈이 **남의 선언**을 재수출한다. 키가 내보내기 자리면 등재가 영원히 공허해진다.
+  'reexport.ts': `
+    export { instantDisplayOf as formatProbeInstant } from '../timeDisplay';
+  `,
+  // 자리가 **나오지 않는** 내보내기 — 선언이 `src/` 밖이다. 조용히 빠지지 않는 것을 잰다.
+  'foreign.ts': `
+    export { memo as heldMemo } from 'react';
+  `,
+};
+
+/** 모집단이 화면 디렉터리를 벗어난 것을 **판정 쪽에서도** 잰다(POPULATION-DIR). */
+const OUTSIDE_PROBES = {
+  [resolve(componentsDir, '__probe__', 'sharedCard.tsx')]: `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function SharedProbeCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
+  // r1 cr F-2 — `leaked` 의 모집단이 `src/**` 로 넓어진 것을 **화면 디렉터리 밖**에서 잰다.
+  // 앞 판의 유일한 양성이 화면 디렉터리 **안**이라, 스캔 뿌리를 되돌리는 변이가 초록이었다.
+  [resolve(componentsDir, '__probe__', 'leakOutside.tsx')]: `
+    import { amountTextOf } from '../../display/moneyDisplay';
+    export function LeakOutsideCard({ won }: { readonly won: number }) {
+      return <span>{amountTextOf(won, 'KRW')}</span>;
+    }
+  `,
+  [resolve(componentsDir, '__probe__', 'dupCard.tsx')]: `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function DupCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
+  [resolve(srcDir, '__probe_root__.tsx')]: `
+    import { instantDisplayOf } from './display/timeDisplay';
+    export function RootProbeCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
+};
+
+const probeOverlay = new Map([
+  ...Object.entries(PROBES).map(([name, text]) => [probePath(name), text]),
+  ...Object.entries(DISPLAY_PROBES).map(([name, text]) => [displayProbePath(name), text]),
+  ...Object.entries(OUTSIDE_PROBES),
+]);
 const probeProgram = screenProgram(webRoot, probeOverlay);
 
 /** 기본 내보내기의 의무 이름은 **파일로 한정**된다 — 그 자리를 test 쪽에서도 한 곳에서 만든다. */
 const PROBE_PREFIX = 'screens/__probe__/';
 
+function componentsAt(path) {
+  const source = probeProgram.getSourceFile(path);
+  expect(source, `${path} 이 프로그램에 없다 — 대조가 공허하다`).toBeDefined();
+  return vocabularyComponentsOf(probeProgram, source, webRoot);
+}
+
 function componentsIn(name) {
-  const source = probeProgram.getSourceFile(probePath(name));
-  expect(source, `${name} 이 프로그램에 없다 — 대조가 공허하다`).toBeDefined();
-  return vocabularyComponentsOf(probeProgram, source);
+  return componentsAt(probePath(name));
 }
 
 describe('의무 판정의 양성·음성 대조', () => {
   it('어휘를 쓰는 내보낸 컴포넌트를 집는다', () => {
-    expect(componentsIn('direct.tsx')).toStrictEqual(['DirectCard']);
+    expect(componentsIn('direct.tsx')).toStrictEqual([`${PROBE_PREFIX}direct.tsx#DirectCard`]);
   });
 
   it('화살표 함수로 내보낸 꼴도 집는다 — 선언 꼴 규약에 기대지 않는다', () => {
-    expect(componentsIn('arrow.tsx')).toStrictEqual(['ArrowCard']);
+    expect(componentsIn('arrow.tsx')).toStrictEqual([`${PROBE_PREFIX}arrow.tsx#ArrowCard`]);
   });
 
   /** **앞 판에서 초록이던 넷** — 호출 지점의 글자가 선언과 다른 꼴이다. */
   it('별칭으로 부르는 꼴을 집는다', () => {
-    expect(componentsIn('alias.tsx')).toStrictEqual(['AliasCard']);
+    expect(componentsIn('alias.tsx')).toStrictEqual([`${PROBE_PREFIX}alias.tsx#AliasCard`]);
   });
 
   it('네임스페이스로 접근하는 꼴을 집는다 — 앞 판은 멤버 호출을 아예 보지 않았다', () => {
-    expect(componentsIn('namespace.tsx')).toStrictEqual(['NamespaceCard']);
+    expect(componentsIn('namespace.tsx')).toStrictEqual([`${PROBE_PREFIX}namespace.tsx#NamespaceCard`]);
   });
 
   it('지역 변수로 집어 가 부르는 꼴을 집는다', () => {
-    expect(componentsIn('local.tsx')).toStrictEqual(['LocalCard']);
+    expect(componentsIn('local.tsx')).toStrictEqual([`${PROBE_PREFIX}local.tsx#LocalCard`]);
   });
 
   it('이름을 바꿔 재수출한 것을 부르는 꼴을 집는다', () => {
-    expect(componentsIn('viaReexport.tsx')).toStrictEqual(['ReexportCard']);
+    expect(componentsIn('viaReexport.tsx')).toStrictEqual([`${PROBE_PREFIX}viaReexport.tsx#ReexportCard`]);
   });
 
   it('어휘를 안 쓰면 의무가 아니다', () => {
@@ -383,7 +631,7 @@ describe('의무 판정의 양성·음성 대조', () => {
    * 않는다. 바뀐 것은 「그것을 그리는 내보낸 겉이 의무가 되는가」이고, 그 답이 이제 예다.
    */
   it('비공개 컴포넌트를 지나 그리면 **내보낸 겉**이 의무다 — 속은 이름에 없다', () => {
-    expect(componentsIn('inner.tsx')).toStrictEqual(['Outer']);
+    expect(componentsIn('inner.tsx')).toStrictEqual([`${PROBE_PREFIX}inner.tsx#Outer`]);
   });
 });
 
@@ -394,27 +642,27 @@ describe('의무 판정의 양성·음성 대조', () => {
  */
 describe('간접 렌더와 그 잔여 (M11/11E)', () => {
   it('두 겹을 지나 그려도 내보낸 겉이 의무다 — 한 겹으로는 닫히지 않는 꼴이다', () => {
-    expect(componentsIn('twoLayer.tsx')).toStrictEqual(['TwoLayerCard']);
+    expect(componentsIn('twoLayer.tsx')).toStrictEqual([`${PROBE_PREFIX}twoLayer.tsx#TwoLayerCard`]);
   });
 
   it('감싸 내보낸 꼴을 집는다 — 초기값이 호출이어도', () => {
-    expect(componentsIn('wrapped.tsx')).toStrictEqual(['WrappedCard']);
+    expect(componentsIn('wrapped.tsx')).toStrictEqual([`${PROBE_PREFIX}wrapped.tsx#WrappedCard`]);
   });
 
   it('개명 재수출을 집고, 의무로 나는 이름은 **내보낸 이름**이다', () => {
-    expect(componentsIn('renamed.tsx')).toStrictEqual(['RenamedCard']);
+    expect(componentsIn('renamed.tsx')).toStrictEqual([`${PROBE_PREFIX}renamed.tsx#RenamedCard`]);
   });
 
   it('클래스 컴포넌트를 집는다', () => {
-    expect(componentsIn('classCard.tsx')).toStrictEqual(['ClassCard']);
+    expect(componentsIn('classCard.tsx')).toStrictEqual([`${PROBE_PREFIX}classCard.tsx#ClassCard`]);
   });
 
   it('어휘 함수를 **넘기는** 꼴을 집는다 — 해소할 호출이 없어도', () => {
-    expect(componentsIn('passed.tsx')).toStrictEqual(['PassingCard']);
+    expect(componentsIn('passed.tsx')).toStrictEqual([`${PROBE_PREFIX}passed.tsx#PassingCard`]);
   });
 
   it('상호 재귀가 있어도 폐포가 끝난다', () => {
-    expect(componentsIn('cycle.tsx')).toStrictEqual(['CycleCard']);
+    expect(componentsIn('cycle.tsx')).toStrictEqual([`${PROBE_PREFIX}cycle.tsx#CycleCard`]);
   });
 
   /** **음성 대조 둘** — 폐포가 「지나 그리기」를 다 삼키지 않는다. */
@@ -467,11 +715,106 @@ describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
   });
 
   it('최상위에서 구조분해한 어휘를 **넘기는** 꼴을 집는다', () => {
-    expect(componentsIn('destructuredPass.tsx')).toStrictEqual(['DestructuredPassCard']);
+    expect(componentsIn('destructuredPass.tsx')).toStrictEqual([`${PROBE_PREFIX}destructuredPass.tsx#DestructuredPassCard`]);
   });
 
   it('리터럴 원소 접근으로 **넘기는** 꼴을 집는다', () => {
-    expect(componentsIn('elementAccessPass.tsx')).toStrictEqual(['ElementAccessPassCard']);
+    expect(componentsIn('elementAccessPass.tsx')).toStrictEqual([`${PROBE_PREFIX}elementAccessPass.tsx#ElementAccessPassCard`]);
+  });
+});
+
+/**
+ * **M12/12B — 표시층 파일 사이 도달**(`OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB` ⓐⓑ). 아래
+ * 둘은 앞 판에서 **초록**이었다: 어휘 도달이 파일 **안**에서만 섰으므로, 표시층 다른 파일의
+ * 래퍼를 지나는 카드는 의무를 하나도 내지 않았다. 폐포의 노드 집합을 **디렉터리**에서 유도하는
+ * 것이 ⓑ(새 표시 모듈)까지 함께 닫는 자리다.
+ */
+describe('표시층 파일 사이 도달 (M12/12B ⓐⓑ)', () => {
+  it('표시층 다른 파일의 래퍼를 지나 그려도 의무다', () => {
+    expect(componentsIn('viaWrapper.tsx')).toStrictEqual([`${PROBE_PREFIX}viaWrapper.tsx#WrapperCard`]);
+  });
+
+  it('표시층 안에서 두 홉을 지나도 의무다 — 깊이 상수가 없다', () => {
+    expect(componentsIn('viaTwoHop.tsx')).toStrictEqual([`${PROBE_PREFIX}viaTwoHop.tsx#TwoHopCard`]);
+  });
+
+  /** **음성 대조** — 폐포가 표시층을 다 삼키지 않는다. */
+  it('어휘에 닿지 않는 표시 함수를 부르면 의무가 아니다', () => {
+    expect(componentsIn('viaPlain.tsx')).toStrictEqual([]);
+  });
+
+  /**
+   * **음성 대조 — 지역 그래프는 파일에 갇힌다.** 다른 파일의 카드를 그리는 것만으로는 의무가
+   * 아니다. 이 선이 없으면 조상 카드가 뿌리까지 전부 의무가 되어 「마운트할 수 있는 카드」라는
+   * 의무의 뜻이 무너진다. 그 가둠은 노드 집합(`byKey`)의 범위가 내고, 앞 판의 「같은 파일만」
+   * 매개변수는 변이로 재니 거동이 0 이어서 지웠다 — 이 칸이 그 주장을 든다.
+   */
+  it('다른 파일의 카드를 그리는 조상 카드는 그것만으로 의무가 아니다', () => {
+    expect(componentsIn('ancestor.tsx')).toStrictEqual([]);
+  });
+
+  /** 폐포가 **씨앗 밖으로** 자라는 것과, 자라서 표시층 전부가 되지는 않는 것을 함께 잰다. */
+  it('폐포는 씨앗보다 넓고 표시층보다 좁다', () => {
+    const reach = displayVocabularyReach(probeProgram, webRoot);
+
+    expect(reach.size).toBeGreaterThan(VOCABULARY_DECLARATIONS.length);
+    expect(reach).toContain('display/__probe__/wrapper.ts#wrappedInstantOf');
+    expect(reach).toContain('display/__probe__/twoHop.ts#doubleWrappedOf');
+    expect(reach).not.toContain('display/__probe__/plain.ts#plainTextOf');
+    expect(reach).not.toContain('display/__probe__/scratch.ts#rawWonTextOf');
+  });
+});
+
+/**
+ * **M12/12B — 「마운트할 수 있는 카드」를 타입으로 고정한다**(팀장 판정 Q1 ·
+ * `OPEN-M11-SCREEN-COVERAGE-POPULATION-DIR`). 아래 셋은 앞 판에서 **의무였다**(이름만 보았으므로),
+ * 그리고 그 가운데 훅은 **마운트할 수 없다** — 씨앗이 늘면 그 지뢰가 터지는 것을 실측했다.
+ */
+describe('카드 술어 (M12/12B Q1)', () => {
+  it('어휘를 부르는 훅은 의무가 아니다 — 마운트할 수 있는 것이 아니다', () => {
+    expect(componentsIn('hookOnly.ts')).toStrictEqual([]);
+  });
+
+  it('어휘를 부르는 함수 값 표도 의무가 아니다', () => {
+    expect(componentsIn('tableOnly.ts')).toStrictEqual([]);
+  });
+
+  it('반환 꼴만 JSX 원소를 흉낸 것은 카드가 아니다', () => {
+    expect(componentsIn('lookAlike.ts')).toStrictEqual([]);
+  });
+
+  it('포털을 반환하는 카드는 의무다', () => {
+    expect(componentsIn('portal.tsx')).toStrictEqual([`${PROBE_PREFIX}portal.tsx#PortalCard`]);
+  });
+
+  /**
+   * **r1 v H-1 — 앵커의 하위 타입도 카드다.** `.ts` 카드는 JSX 를 못 쓰므로 `createElement` 뿐이고
+   * 그 반환은 `ReactElement` 의 **하위 인터페이스**다. 앵커 **동일성**만 보면 그 카드가 의무에서
+   * 사라진다(base 가 잡던 것을 잃는 회귀였다). 그래서 **명목 상속 사슬**까지 따라간다.
+   */
+  it('`createElement` 로 그리는 `.ts` 카드가 의무다 — 앵커의 하위 인터페이스를 반환한다', () => {
+    expect(componentsIn('tsCard.ts')).toStrictEqual([`${PROBE_PREFIX}tsCard.ts#TsCard`]);
+    expect(componentsIn('tsComponentCard.ts')).toStrictEqual([`${PROBE_PREFIX}tsComponentCard.ts#TsCompCard`]);
+  });
+
+  /**
+   * **r1 v M-3 — 같은 이름 카드가 접히지 않는다.** 이름으로 중복을 없애면 공용 디렉터리에 같은
+   * 이름 카드를 더해도 등식이 초록이었다(실측). 의무 키를 **자리**로 한정하므로 둘이 따로 선다.
+   */
+  it('다른 파일의 같은 이름 카드가 따로 선다', () => {
+    const inScreens = componentsIn('dupCard.tsx');
+    const inComponents = componentsAt(resolve(componentsDir, '__probe__', 'dupCard.tsx'));
+
+    expect(inScreens).toStrictEqual([`${PROBE_PREFIX}dupCard.tsx#DupCard`]);
+    expect(inComponents).toStrictEqual(['components/__probe__/dupCard.tsx#DupCard']);
+    expect(new Set([...inScreens, ...inComponents]).size).toBe(2);
+  });
+
+  it('화면 디렉터리 밖의 카드도 의무다', () => {
+    expect(componentsAt(resolve(componentsDir, '__probe__', 'sharedCard.tsx'))).toStrictEqual([
+      'components/__probe__/sharedCard.tsx#SharedProbeCard',
+    ]);
+    expect(componentsAt(resolve(srcDir, '__probe_root__.tsx'))).toStrictEqual(['__probe_root__.tsx#RootProbeCard']);
   });
 });
 
@@ -507,12 +850,45 @@ const registryOverlay = new Map([
  */
 const registryProgram = screenProgram(webRoot, registryOverlay);
 
-describe('어휘 등재의 전수 등식 (M11/11E)', () => {
+/**
+ * **제외 사유가 구조적으로 거짓이 되는 자리**(M12/12B 신설 `contradicted`). 「어휘가 아니다」로
+ * 분류한 키가 **폐포에 닿으면** 그 사유는 거짓이다 — 그때 게이트가 붉어진다. 종류 하나에만
+ * 있던 구조 의무가 이로써 **모든 종류**에 붙는다.
+ *
+ * 양성은 실제 어휘 모듈을 **얹어** 세운다: 제외된 조립자가 씨앗을 부르게 만든다.
+ */
+const moneyModulePath = resolve(displayDir, 'moneyDisplay.ts');
+const timeModulePath = resolve(displayDir, 'timeDisplay.ts');
+const contradictedOverlay = new Map([
+  // ⓐ `INTERNAL_ASSEMBLER` 행 — 제외한 조립자가 씨앗을 부른다.
+  [
+    moneyModulePath,
+    readFileSync(moneyModulePath, 'utf8').replace(
+      '  const known = displayOf<string>(AMOUNT_CURRENCY_DISPLAY, token);',
+      '  amountQualifierTextOf({ currency: token });\n  const known = displayOf<string>(AMOUNT_CURRENCY_DISPLAY, token);',
+    ),
+  ],
+  // ⓑ `OTHER_AXIS` 행 — **종류를 가리지 않는다**는 주장이 이 칸으로 측정된다(r1 cr F-1).
+  // 앞 판은 양성 둘이 **모두** 조립자였고, 그래서 버킷을 조립자로 좁히는 변이가 초록으로
+  // 지나갔다(분류 표의 종류 분포는 조립자 둘 · 그 밖 서른이다).
+  [
+    timeModulePath,
+    readFileSync(timeModulePath, 'utf8').replace(
+      '  return days >= 0 ? `D-${days}` : `D+${-days}`;',
+      '  instantDisplayOf(String(days));\n  return days >= 0 ? `D-${days}` : `D+${-days}`;',
+    ),
+  ],
+]);
+const contradictedProgram = screenProgram(webRoot, contradictedOverlay);
+
+describe('어휘 등재의 전수 등식 (M11/11E · M12/12B)', () => {
   it('오늘의 트리에 구멍이 없다', () => {
     expect(vocabularyRegistryGaps(program, webRoot)).toStrictEqual({
       unclassified: [],
       stale: [],
       leaked: [],
+      contradicted: [],
+      unkeyed: [],
     });
   });
 
@@ -536,6 +912,81 @@ describe('어휘 등재의 전수 등식 (M11/11E)', () => {
       'display/timeDisplay.ts#curriedVocabularyOf',
     ]);
     expect(gaps.stale).toStrictEqual(['display/timeDisplay.ts#readClock']);
-    expect(gaps.leaked).toStrictEqual([join('__probe__', 'leak.tsx')]);
+    expect(gaps.leaked).toStrictEqual([join('screens', '__probe__', 'leak.tsx')]);
+  });
+
+  /**
+   * **r1 cr F-2 — `leaked` 의 모집단은 `src/**` 다.** 조립자를 직접 부르는 카드를 **화면
+   * 디렉터리 밖**에 두어도 잡힌다. 앞 판은 양성이 화면 디렉터리 안에만 있어, 스캔 뿌리를
+   * 되돌리는 변이가 초록으로 지나갔다.
+   */
+  it('화면 디렉터리 밖에서 조립자를 직접 부르는 자리도 샌 것으로 센다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.leaked).toStrictEqual([join('components', '__probe__', 'leakOutside.tsx')]);
+  });
+
+  /**
+   * **ⓑⓒ 의 양성 — 모집단이 디렉터리이고 술어가 함수 값 표·클래스 static·`fn | undefined` 를
+   * 본다.** 새 표시 모듈을 만드는 것으로는 등식 밖에 서지 못한다(모듈 목록이 없다). 폐포가
+   * 설명하는 래퍼 둘은 **행이 필요 없으므로** 이 목록에 없다.
+   */
+  it('새 표시 모듈의 어휘·함수 값 표·클래스 static·`fn | undefined` 를 분류하라고 요구한다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.unclassified).toStrictEqual([
+      'display/__probe__/maybe.ts#maybeTextOf',
+      'display/__probe__/plain.ts#plainTextOf',
+      'display/__probe__/scratch.ts#rawWonTextOf',
+      'display/__probe__/statics.ts#ProbeTextHolder',
+      'display/__probe__/table.ts#PROBE_SLOT_TEXT',
+    ]);
+  });
+
+  /** **음성 대조** — 컬렉션은 함수 값 표가 아니다(prototype 메서드로 들어오면 데이터 표 전부가 장부가 된다). */
+  it('컬렉션 내보내기는 분류를 요구하지 않는다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.unclassified).not.toContain('display/__probe__/collection.ts#PROBE_TOKENS');
+  });
+
+  /**
+   * **ⓓ — 키는 해소된 선언의 자리다.** 재수출을 내보내기 자리로 키를 만들면 등재가 영원히
+   * 공허해진다(`touchesAnyOf` 가 그 자리에 닿지 못한다). 선언 자리로 만들면 그 재수출은 **이미
+   * 등재된 씨앗**이라 분류를 요구하지 않는다.
+   */
+  it('재수출의 키는 선언 자리다 — 등재가 공허해지지 않는다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.unclassified).not.toContain('display/__probe__/reexport.ts#formatProbeInstant');
+    expect(gaps.unclassified).not.toContain('display/timeDisplay.ts#instantDisplayOf');
+  });
+
+  /** **신설 `unkeyed`** — 자리가 나오지 않는 내보내기가 조용히 빠지지 않는다. */
+  it('자리가 나오지 않는 내보내기를 따로 센다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.unkeyed).toStrictEqual(['display/__probe__/foreign.ts#heldMemo']);
+  });
+
+  /**
+   * **신설 `contradicted`** — 분류 사유가 구조적으로 거짓이 된 자리. 이 의무는 **종류를
+   * 가리지 않는다**: 목록에 조립자 둘과 **그 밖의 축** 하나가 함께 선다(r1 cr F-1 — 앞 판은
+   * 양성이 모두 조립자여서 버킷을 조립자로 좁히는 변이가 초록으로 지나갔다).
+   */
+  it('분류한 것이 어휘에 닿으면 종류를 가리지 않고 그 사유가 거짓이라고 말한다', () => {
+    const gaps = vocabularyRegistryGaps(contradictedProgram, webRoot);
+
+    expect(gaps.contradicted).toStrictEqual([
+      'display/moneyDisplay.ts#amountTextOf',
+      'display/moneyDisplay.ts#currencyUnitOf',
+      'display/timeDisplay.ts#dayCountText',
+    ]);
+    const kinds = new Set(
+      gaps.contradicted.map((one) => VOCABULARY_MODULE_EXCLUSIONS.find((row) => row.key === one)?.kind),
+    );
+    expect(kinds, '양성 대조가 한 종류뿐이면 「종류를 가리지 않는다」가 미측정이다').toStrictEqual(
+      new Set([INTERNAL_ASSEMBLER, OTHER_AXIS]),
+    );
   });
 });
