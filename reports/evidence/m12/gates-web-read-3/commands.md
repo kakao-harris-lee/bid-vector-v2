@@ -576,3 +576,19 @@ cr CRITICAL-1 의 조건 3 대로 **W-1 을 표의 첫 행**으로 둔다(앞 �
 | ③′ | 내 표지 0 / 남의 표지 보존 | 절 `(q)`·신설 ID·`.npmrc`·신설 파일 **전부 0** · `setupFiles` 복원 / §12.3 **16 절** · 12B ID **넷** |
 | ④ | **빈 트리 `npm ci`** · typecheck · build | exit **0** 셋 |
 | ⑤ ⑥ | `vitest run` · 게이트 다섯 | **1011 passed** · exit **0** |
+
+## r5 — 문서 전사 라운드 (2026-11-15 · 코드 무변경)
+
+v `ready-for-review` · cr `approve` 뒤의 문서 전사다. `git diff <앞 판정 SHA>..HEAD` 가 낸 경로는
+**장부·evidence 넷뿐**이고 `web/` 아래 변경은 **0** 이다.
+
+| 측정 | 값 |
+| --- | --- |
+| web 게이트(코드 무변경이라 둘만) | `gate:src-tree` · `gate:tests` exit **0** |
+| rollback(실측 HEAD `edd86fb0` · 원천 `e07adaa8`) | 목록 기계 산출 **20 줄** · ① exit 0 · ② **D 9 · M 15** · ③ **0 줄** · ③″ **트리 전체 0 줄** |
+| ③′ 내 표지 0 / 남의 표지 보존 | 절 `(q)`·신설 ID 둘·`.npmrc`·신설 파일 **전부 0** / §12.3 **16 절** · 12B ID **넷** · `test:` **5 키**(원천의 수) |
+| ④ 빈 트리 `npm ci` · typecheck · build | exit **0** 셋 |
+| ⑤ · ⑥ | **1011 passed** · 게이트 다섯 exit **0** |
+
+**왜 또 쟀나**: `docs/discovery/capability-map.md` 는 **원천에 있는 파일**이라, 그것을 만진 커밋이
+앞 실측 뒤에 오면 전칭식이 서지 않는다(rollback.md 의 그 조건이 이번에 실제로 발동했다).
