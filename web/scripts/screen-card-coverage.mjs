@@ -492,18 +492,16 @@ export function displayVocabularyReach(program, webRoot) {
 }
 
 /**
- * 의무로 나는 **이름**. 보통은 내보낸 이름 그대로인데, **기본 내보내기만 파일로 한정한다**
- * (r1 v R2 · cr N-2).
+ * 의무의 **키** — 언제나 `<src 기준 상대경로>#<내보낸 이름>` 이다.
  *
- * 사유: 의무 집합과 화면 바구니는 **이름으로** 중복을 없앤다. 기본 내보내기의 이름은 파일마다
- * `default` 로 같으므로, 그대로 두면 첫 카드는 게이트를 붉혀 결정을 강제하지만 **둘째부터는
- * 집합에서 접혀 조용해진다**(실측 — 두 파일에 심어도 의무가 하나였다). 자리는 이미 유일하므로
- * 그것을 이름으로 쓴다.
+ * 사유: 의무 집합과 화면 바구니는 키로 중복을 없앤다. **이름만** 쓰면 다른 파일의 같은 이름이
+ * 하나로 접혀 둘째 카드가 조용해진다 — 기본 내보내기(`default`)에서 먼저 드러나 11E R2 가 그
+ * 자리만 파일로 한정했는데, 이 slice 가 모집단을 `src/**` 로 넓히면서 **이름 있는 내보내기**에도
+ * 같은 일이 생겼다(r1 v M-3 실측: 공용 디렉터리에 같은 이름 카드를 더해도 등식이 초록이었다).
+ * 그래서 특별 분기를 없애고 **모든 의무를 자리로 한정한다** — 규칙이 하나가 되고 접힘이 사라진다.
  */
-function obligationNameOf(exported, declaration) {
-  return exported.getName() === 'default'
-    ? (relativeKeyOf(declaration, 'default') ?? 'default')
-    : exported.getName();
+function obligationKeyOf(exported, declaration) {
+  return relativeKeyOf(declaration, exported.getName()) ?? exported.getName();
 }
 
 /**
@@ -539,7 +537,7 @@ export function vocabularyComponentsOf(program, source, webRoot) {
     for (const declaration of aliasResolved(checker, exported).declarations ?? []) {
       const key = declaration.getSourceFile() === source ? declarationKeyOf(declaration) : undefined;
       if (key !== undefined && reaching.has(key)) {
-        names.add(obligationNameOf(exported, declaration));
+        names.add(obligationKeyOf(exported, declaration));
       }
     }
   }
@@ -696,8 +694,11 @@ export function collectScreenVocabulary(webRoot, overlay = new Map()) {
       // 길을 두지 않는다(tsconfig 의 `include` 가 바뀌는 날이 그 자리다).
       throw new Error(`TS 프로그램에 소스 파일이 없다: ${file}`);
     }
-    for (const name of vocabularyComponentsOf(program, source, webRoot)) {
-      (name.endsWith('Screen') ? screens : obligations).push({ name, file });
+    for (const key of vocabularyComponentsOf(program, source, webRoot)) {
+      // 바구니 가르기와 짝 test 찾기는 **내보낸 이름**으로 한다 — 키는 자리를 담으므로 거기서
+      // 이름을 떼어 쓴다(이름 규약을 키에 섞지 않는다).
+      const name = key.slice(key.indexOf('#') + 1);
+      (name.endsWith('Screen') ? screens : obligations).push({ key, name, file });
     }
   }
   return { program, obligations, screens, files };

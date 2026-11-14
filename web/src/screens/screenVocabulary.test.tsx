@@ -341,14 +341,16 @@ function renderCards() {
  * 먼저 붉어진다.
  */
 export const GATE_MOUNTED_CARDS: readonly string[] = [
-  'NoticeCard',
-  'SuggestionCard',
-  'BidBoxCard',
-  'WorksheetTimeline',
-  'ResultCard',
+  // **자리까지 적는다**(r1 v M-3) — 이름만 적으면 다른 파일의 같은 이름 카드가 집합에서 접혀
+  // 둘째부터 조용해진다. 자리는 파일당 유일하므로 접힘이 없다.
+  'screens/NoticeCard.tsx#NoticeCard',
+  'screens/NoticeCard.tsx#SuggestionCard',
+  'screens/BidBoxCard.tsx#BidBoxCard',
+  'screens/WorksheetTimeline.tsx#WorksheetTimeline',
+  'screens/ResultCard.tsx#ResultCard',
   // M12/12B — 어휘 도달이 표시층 **파일 사이**로 넓어져 의무가 된 둘(계약이 승인한 +2).
-  'StrategyFieldRow',
-  'StrategyEditPanel',
+  'screens/strategyEdit.tsx#StrategyFieldRow',
+  'screens/strategyEdit.tsx#StrategyEditPanel',
 ];
 
 /** 화면 E 카드는 질의 결과를 받으므로 적재가 끝나기를 기다린 뒤 글자를 읽는다. */

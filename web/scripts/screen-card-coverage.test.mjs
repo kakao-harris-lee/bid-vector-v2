@@ -66,7 +66,8 @@ describe('어휘 게이트의 모집단 (r1 v M-1)', () => {
    * r1 에서 일어난 일의 거울상이다.
    */
   it('표시 어휘를 쓰는 카드 전수 == 게이트가 마운트하는 카드 전수', () => {
-    const required = [...new Set(obligations.map((one) => one.name))].sort();
+    // **자리까지 맞댄다**(r1 v M-3) — 이름만 맞대면 다른 파일의 같은 이름이 접힌다.
+    const required = [...new Set(obligations.map((one) => one.key))].sort();
 
     expect([...mounted].sort(), `의무: ${required.join(', ')}`).toStrictEqual(required);
   });
@@ -453,6 +454,13 @@ const PROBES = {
       return createElement(TsLeaf, { at });
     }
   `,
+  // ── r1 v M-3 — **같은 이름, 다른 파일**. 이름으로 중복을 없애면 둘째가 접혀 조용해진다.
+  'dupCard.tsx': `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function DupCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
   // 포털도 카드다 — 반환이 \`Element\` 가 아니라 \`ReactPortal\` 이다.
   'portal.tsx': `
     import { createPortal } from 'react-dom';
@@ -538,6 +546,12 @@ const OUTSIDE_PROBES = {
       return <span>{instantDisplayOf(at).text}</span>;
     }
   `,
+  [resolve(componentsDir, '__probe__', 'dupCard.tsx')]: `
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function DupCard({ at }: { readonly at: string }) {
+      return <span>{instantDisplayOf(at).text}</span>;
+    }
+  `,
   [resolve(srcDir, '__probe_root__.tsx')]: `
     import { instantDisplayOf } from './display/timeDisplay';
     export function RootProbeCard({ at }: { readonly at: string }) {
@@ -568,28 +582,28 @@ function componentsIn(name) {
 
 describe('의무 판정의 양성·음성 대조', () => {
   it('어휘를 쓰는 내보낸 컴포넌트를 집는다', () => {
-    expect(componentsIn('direct.tsx')).toStrictEqual(['DirectCard']);
+    expect(componentsIn('direct.tsx')).toStrictEqual([`${PROBE_PREFIX}direct.tsx#DirectCard`]);
   });
 
   it('화살표 함수로 내보낸 꼴도 집는다 — 선언 꼴 규약에 기대지 않는다', () => {
-    expect(componentsIn('arrow.tsx')).toStrictEqual(['ArrowCard']);
+    expect(componentsIn('arrow.tsx')).toStrictEqual([`${PROBE_PREFIX}arrow.tsx#ArrowCard`]);
   });
 
   /** **앞 판에서 초록이던 넷** — 호출 지점의 글자가 선언과 다른 꼴이다. */
   it('별칭으로 부르는 꼴을 집는다', () => {
-    expect(componentsIn('alias.tsx')).toStrictEqual(['AliasCard']);
+    expect(componentsIn('alias.tsx')).toStrictEqual([`${PROBE_PREFIX}alias.tsx#AliasCard`]);
   });
 
   it('네임스페이스로 접근하는 꼴을 집는다 — 앞 판은 멤버 호출을 아예 보지 않았다', () => {
-    expect(componentsIn('namespace.tsx')).toStrictEqual(['NamespaceCard']);
+    expect(componentsIn('namespace.tsx')).toStrictEqual([`${PROBE_PREFIX}namespace.tsx#NamespaceCard`]);
   });
 
   it('지역 변수로 집어 가 부르는 꼴을 집는다', () => {
-    expect(componentsIn('local.tsx')).toStrictEqual(['LocalCard']);
+    expect(componentsIn('local.tsx')).toStrictEqual([`${PROBE_PREFIX}local.tsx#LocalCard`]);
   });
 
   it('이름을 바꿔 재수출한 것을 부르는 꼴을 집는다', () => {
-    expect(componentsIn('viaReexport.tsx')).toStrictEqual(['ReexportCard']);
+    expect(componentsIn('viaReexport.tsx')).toStrictEqual([`${PROBE_PREFIX}viaReexport.tsx#ReexportCard`]);
   });
 
   it('어휘를 안 쓰면 의무가 아니다', () => {
@@ -609,7 +623,7 @@ describe('의무 판정의 양성·음성 대조', () => {
    * 않는다. 바뀐 것은 「그것을 그리는 내보낸 겉이 의무가 되는가」이고, 그 답이 이제 예다.
    */
   it('비공개 컴포넌트를 지나 그리면 **내보낸 겉**이 의무다 — 속은 이름에 없다', () => {
-    expect(componentsIn('inner.tsx')).toStrictEqual(['Outer']);
+    expect(componentsIn('inner.tsx')).toStrictEqual([`${PROBE_PREFIX}inner.tsx#Outer`]);
   });
 });
 
@@ -620,27 +634,27 @@ describe('의무 판정의 양성·음성 대조', () => {
  */
 describe('간접 렌더와 그 잔여 (M11/11E)', () => {
   it('두 겹을 지나 그려도 내보낸 겉이 의무다 — 한 겹으로는 닫히지 않는 꼴이다', () => {
-    expect(componentsIn('twoLayer.tsx')).toStrictEqual(['TwoLayerCard']);
+    expect(componentsIn('twoLayer.tsx')).toStrictEqual([`${PROBE_PREFIX}twoLayer.tsx#TwoLayerCard`]);
   });
 
   it('감싸 내보낸 꼴을 집는다 — 초기값이 호출이어도', () => {
-    expect(componentsIn('wrapped.tsx')).toStrictEqual(['WrappedCard']);
+    expect(componentsIn('wrapped.tsx')).toStrictEqual([`${PROBE_PREFIX}wrapped.tsx#WrappedCard`]);
   });
 
   it('개명 재수출을 집고, 의무로 나는 이름은 **내보낸 이름**이다', () => {
-    expect(componentsIn('renamed.tsx')).toStrictEqual(['RenamedCard']);
+    expect(componentsIn('renamed.tsx')).toStrictEqual([`${PROBE_PREFIX}renamed.tsx#RenamedCard`]);
   });
 
   it('클래스 컴포넌트를 집는다', () => {
-    expect(componentsIn('classCard.tsx')).toStrictEqual(['ClassCard']);
+    expect(componentsIn('classCard.tsx')).toStrictEqual([`${PROBE_PREFIX}classCard.tsx#ClassCard`]);
   });
 
   it('어휘 함수를 **넘기는** 꼴을 집는다 — 해소할 호출이 없어도', () => {
-    expect(componentsIn('passed.tsx')).toStrictEqual(['PassingCard']);
+    expect(componentsIn('passed.tsx')).toStrictEqual([`${PROBE_PREFIX}passed.tsx#PassingCard`]);
   });
 
   it('상호 재귀가 있어도 폐포가 끝난다', () => {
-    expect(componentsIn('cycle.tsx')).toStrictEqual(['CycleCard']);
+    expect(componentsIn('cycle.tsx')).toStrictEqual([`${PROBE_PREFIX}cycle.tsx#CycleCard`]);
   });
 
   /** **음성 대조 둘** — 폐포가 「지나 그리기」를 다 삼키지 않는다. */
@@ -693,11 +707,11 @@ describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
   });
 
   it('최상위에서 구조분해한 어휘를 **넘기는** 꼴을 집는다', () => {
-    expect(componentsIn('destructuredPass.tsx')).toStrictEqual(['DestructuredPassCard']);
+    expect(componentsIn('destructuredPass.tsx')).toStrictEqual([`${PROBE_PREFIX}destructuredPass.tsx#DestructuredPassCard`]);
   });
 
   it('리터럴 원소 접근으로 **넘기는** 꼴을 집는다', () => {
-    expect(componentsIn('elementAccessPass.tsx')).toStrictEqual(['ElementAccessPassCard']);
+    expect(componentsIn('elementAccessPass.tsx')).toStrictEqual([`${PROBE_PREFIX}elementAccessPass.tsx#ElementAccessPassCard`]);
   });
 });
 
@@ -709,11 +723,11 @@ describe('기본 내보내기와 참조 축의 구멍 (r1 F2·F3)', () => {
  */
 describe('표시층 파일 사이 도달 (M12/12B ⓐⓑ)', () => {
   it('표시층 다른 파일의 래퍼를 지나 그려도 의무다', () => {
-    expect(componentsIn('viaWrapper.tsx')).toStrictEqual(['WrapperCard']);
+    expect(componentsIn('viaWrapper.tsx')).toStrictEqual([`${PROBE_PREFIX}viaWrapper.tsx#WrapperCard`]);
   });
 
   it('표시층 안에서 두 홉을 지나도 의무다 — 깊이 상수가 없다', () => {
-    expect(componentsIn('viaTwoHop.tsx')).toStrictEqual(['TwoHopCard']);
+    expect(componentsIn('viaTwoHop.tsx')).toStrictEqual([`${PROBE_PREFIX}viaTwoHop.tsx#TwoHopCard`]);
   });
 
   /** **음성 대조** — 폐포가 표시층을 다 삼키지 않는다. */
@@ -762,7 +776,7 @@ describe('카드 술어 (M12/12B Q1)', () => {
   });
 
   it('포털을 반환하는 카드는 의무다', () => {
-    expect(componentsIn('portal.tsx')).toStrictEqual(['PortalCard']);
+    expect(componentsIn('portal.tsx')).toStrictEqual([`${PROBE_PREFIX}portal.tsx#PortalCard`]);
   });
 
   /**
@@ -771,13 +785,28 @@ describe('카드 술어 (M12/12B Q1)', () => {
    * 사라진다(base 가 잡던 것을 잃는 회귀였다). 그래서 **명목 상속 사슬**까지 따라간다.
    */
   it('`createElement` 로 그리는 `.ts` 카드가 의무다 — 앵커의 하위 인터페이스를 반환한다', () => {
-    expect(componentsIn('tsCard.ts')).toStrictEqual(['TsCard']);
-    expect(componentsIn('tsComponentCard.ts')).toStrictEqual(['TsCompCard']);
+    expect(componentsIn('tsCard.ts')).toStrictEqual([`${PROBE_PREFIX}tsCard.ts#TsCard`]);
+    expect(componentsIn('tsComponentCard.ts')).toStrictEqual([`${PROBE_PREFIX}tsComponentCard.ts#TsCompCard`]);
+  });
+
+  /**
+   * **r1 v M-3 — 같은 이름 카드가 접히지 않는다.** 이름으로 중복을 없애면 공용 디렉터리에 같은
+   * 이름 카드를 더해도 등식이 초록이었다(실측). 의무 키를 **자리**로 한정하므로 둘이 따로 선다.
+   */
+  it('다른 파일의 같은 이름 카드가 따로 선다', () => {
+    const inScreens = componentsIn('dupCard.tsx');
+    const inComponents = componentsAt(resolve(componentsDir, '__probe__', 'dupCard.tsx'));
+
+    expect(inScreens).toStrictEqual([`${PROBE_PREFIX}dupCard.tsx#DupCard`]);
+    expect(inComponents).toStrictEqual(['components/__probe__/dupCard.tsx#DupCard']);
+    expect(new Set([...inScreens, ...inComponents]).size).toBe(2);
   });
 
   it('화면 디렉터리 밖의 카드도 의무다', () => {
-    expect(componentsAt(resolve(componentsDir, '__probe__', 'sharedCard.tsx'))).toStrictEqual(['SharedProbeCard']);
-    expect(componentsAt(resolve(srcDir, '__probe_root__.tsx'))).toStrictEqual(['RootProbeCard']);
+    expect(componentsAt(resolve(componentsDir, '__probe__', 'sharedCard.tsx'))).toStrictEqual([
+      'components/__probe__/sharedCard.tsx#SharedProbeCard',
+    ]);
+    expect(componentsAt(resolve(srcDir, '__probe_root__.tsx'))).toStrictEqual(['__probe_root__.tsx#RootProbeCard']);
   });
 });
 
