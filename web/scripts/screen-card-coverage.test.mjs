@@ -546,6 +546,14 @@ const OUTSIDE_PROBES = {
       return <span>{instantDisplayOf(at).text}</span>;
     }
   `,
+  // r1 cr F-2 — `leaked` 의 모집단이 `src/**` 로 넓어진 것을 **화면 디렉터리 밖**에서 잰다.
+  // 앞 판의 유일한 양성이 화면 디렉터리 **안**이라, 스캔 뿌리를 되돌리는 변이가 초록이었다.
+  [resolve(componentsDir, '__probe__', 'leakOutside.tsx')]: `
+    import { amountTextOf } from '../../display/moneyDisplay';
+    export function LeakOutsideCard({ won }: { readonly won: number }) {
+      return <span>{amountTextOf(won, 'KRW')}</span>;
+    }
+  `,
   [resolve(componentsDir, '__probe__', 'dupCard.tsx')]: `
     import { instantDisplayOf } from '../../display/timeDisplay';
     export function DupCard({ at }: { readonly at: string }) {
@@ -905,6 +913,17 @@ describe('어휘 등재의 전수 등식 (M11/11E · M12/12B)', () => {
     ]);
     expect(gaps.stale).toStrictEqual(['display/timeDisplay.ts#readClock']);
     expect(gaps.leaked).toStrictEqual([join('screens', '__probe__', 'leak.tsx')]);
+  });
+
+  /**
+   * **r1 cr F-2 — `leaked` 의 모집단은 `src/**` 다.** 조립자를 직접 부르는 카드를 **화면
+   * 디렉터리 밖**에 두어도 잡힌다. 앞 판은 양성이 화면 디렉터리 안에만 있어, 스캔 뿌리를
+   * 되돌리는 변이가 초록으로 지나갔다.
+   */
+  it('화면 디렉터리 밖에서 조립자를 직접 부르는 자리도 샌 것으로 센다', () => {
+    const gaps = vocabularyRegistryGaps(probeProgram, webRoot);
+
+    expect(gaps.leaked).toStrictEqual([join('components', '__probe__', 'leakOutside.tsx')]);
   });
 
   /**
