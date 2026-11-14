@@ -7,7 +7,13 @@
 
 세 조건이 **같은 명령**을 돌리고 조건만 다르다 — `npx vitest run --reporter=json --outputFile=…`
 (987 test / 234 파일, `npm run test` 와 같은 수집). 측정 하네스는 레인 scratch 에 둔다.
-**이 측정은 예비다** — 12C 가 그 모듈 그래프를 바꾸므로 최종은 12C 머지 뒤 main 에서 다시 잰다.
+예비 측정이었고 **최종은 아래 12C 머지 뒤 재측정**이다.
+
+### 2026-11-15 재측정 — 12C 머지 뒤(main `3fd8f62a` 병합본), 같은 조건 C 20회
+- cmd: `measure-pair.sh post12c 20` (전건 vitest 둘 동시, loadavg 약 31, 1026 test)
+- exit: 1 **18/20** — 실패는 전부 **12C 의 `scripts/kotlin-read-guard.test.mjs` 한 칸**(`config 의 자리가 달라도 거부된다 — 하위 디렉터리 config`)의 `Test timed out in 5000ms` 이고, 내 표적 두 파일의 칸은 전부 돌았다
+- 핵심 결과: 여유가 **얇아졌다** — `kotlin-source-ownership` 최악 칸 2342ms → **3915ms(1.3배)** · `money-vocab-cross-lang` 421 → 351ms(14.2배) · 대조 `display-gate-selectors` 1042 → 1463ms(3.4배)
+- 단독 대조: 같은 HEAD 에서 `npm run test` 단독 **3/3 exit 0** — 그 타임아웃은 **부하 전용**이고 CI(단일 vitest)의 조건이 아니다
 
 ### 2026-11-14 조건 A — 16코어, 다른 레인(12C) vitest 와 일부 겹침
 - cmd: `measure-cells.sh idle 10`
@@ -36,18 +42,31 @@
 - exit: 0
 - 핵심 결과: 통과 12 · flaky 0 · 건너뜀 0 · spec 4/4, 1.6m — 뒤의 RED 가 주입 때문임을 이 통제군이 든다
 
-### 2026-11-14 경합 재현 — 구판 단언에 주입을 걸었다 (주입은 커밋하지 않는다)
-- cmd: `npx playwright test --config=playwright.journey.config.ts -g '여정 ③'` + 주입(기록 쓰기가 보이기 **전에 출발한** 타임라인 읽기만 6s 늦춘다)
-- exit: 1
-- 핵심 결과: `expect(locator).toHaveCount(expected) failed` — **Expected 2 · Received 3**, PR #157 첫 CI 와 같은 서명이고 간헐이 아니라 결정적이다
+### 주입의 정의 (재현용 · 커밋하지 않는다)
 
-주입의 전제(실측): 질의 함수가 `signal` 을 쓰지 않으므로 react-query 의 취소는 **전선의 응답을
-막지 않는다** — 늦은 응답은 언제나 도착하고, 그래서 거를 수 있는 축은 **요청 출발 순서**뿐이다.
+`page.route` 둘을 **여정 ③ 시작에** 건다. ① `/record$` 를 가로채 플래그를 세우고 `continue`
+② `/timeline$` 를 가로채 **그 플래그가 서기 전이면** 6000ms 쉰 뒤 `continue`. 즉 **기록 쓰기가
+관측되기 전에 출발한 타임라인 읽기만** 늦추고, 기록이 낳는 재조회는 늦추지 않는다. 판정 시점은
+spec 의 기존 단언 자리 그대로다(바꾸지 않는다).
+
+전제(실측): 질의 함수가 `signal` 을 쓰지 않으므로 react-query 의 취소는 **전선의 응답을 막지
+않는다** — 늦은 응답은 언제나 도착한다.
+
+### 2026-11-14 경합 재현 — 구판 단언 + 위 주입
+- cmd: `npx playwright test --config=playwright.journey.config.ts -g '여정 ③'` + 위 주입
+- exit: 1
+- 핵심 결과: `toHaveCount` **Expected 2 · Received 3** — 낡은 응답을 집었고 화면은 이미 3 이었다(로그: 15s 창 내내 3)
+
+**이 RED 는 결정적이지 않다**(v L-2 정정). verifier 가 같은 주입을 독립 구성했을 때 구판은
+**2/2 초록**이었다 — 낡은 응답(`caseVersion 1 ≠ 2`)을 집고서다. 줄 수 단언은 **화면이 이미
+따라잡았는가**에 달려 있어 같은 결함에서도 통과한다. **하중을 지는 것은 `caseVersion` 등식**이고
+그것은 낡은 응답을 집는 **순간** 붉는다(아래 M1 이 그 자리다). 두 측정의 차이는 판정 시점에
+화면이 2 였는가 3 이었는가이고, 그래서 이 줄은 「결정적」이라고 적지 않는다.
 
 ### 2026-11-14 신판 + 같은 주입 — 두 쪽을 다 잰다
 - cmd: 같은 명령 · 같은 주입, 산출물 쪽
 - exit: 0
-- 핵심 결과: 1 passed — 구판을 결정적으로 붉히는 그 주입 아래 **신판이 초록**이다(음성 대조)
+- 핵심 결과: 1 passed — 구판이 붉었던 그 주입 아래 **신판이 초록**이다(음성 대조)
 
 ## 변이 — 전부 바꿔치우기, 커밋 뒤에 돌렸다
 
