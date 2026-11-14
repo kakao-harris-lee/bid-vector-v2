@@ -441,13 +441,15 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
    * 먹는다」)를 실제로 닫는 자리다.
    */
   it('허용 값과 같은 이름이라도 다른 경로면 걸린다', () => {
-    const allowed = new Set([`procurement/.../KonepsOpeningAxisFieldContracts${KT}`]);
+    // **허용 값이 bare basename 인 자리를 쓴다** — 그 자리가 왼쪽 경계가 일하는 곳이다. 경로를
+    // 통째로 적은 값으로 재면 값이 애초에 일치하지 않아 **경계를 재지 못한다**(변이가 그 사실을
+    // 알려 줬다: 경계를 지워도 그 대조는 초록이었다).
+    const bare = `KonepsOpeningCompleteFieldContracts${KT}`;
+    const allowed = new Set([bare]);
 
-    expect(kotlinPathsInText(`{"from": "procurement/.../KonepsOpeningAxisFieldContracts${KT}"}`, allowed)).toStrictEqual(
-      [],
-    );
+    expect(kotlinPathsInText(`{"from": "… · ${bare}"}`, allowed), '허용 값 자체가 걸린다').toStrictEqual([]);
     expect(
-      kotlinPathsInText(`{"from": "다른/디렉터리/KonepsOpeningAxisFieldContracts${KT}"}`, allowed).length,
+      kotlinPathsInText(`{"from": "다른/디렉터리/${bare}"}`, allowed).length,
       '같은 이름을 다른 경로로 적었는데 지나간다',
     ).toBeGreaterThan(0);
   });
