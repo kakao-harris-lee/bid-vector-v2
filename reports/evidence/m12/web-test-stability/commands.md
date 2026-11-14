@@ -24,6 +24,20 @@ test` 와 같은 수집).
 - exit: 0 (10/10, primary·noise 모두 실패한 run 0)
 - 핵심 결과: 첫 칸은 여전히 **6~22ms**, 최대 칸 `kotlin-source-ownership` 2342ms(2.1배 여유) · `money-vocab-cross-lang` 421ms(11.9배) · 대조로 둔 `display-gate-selectors`(11E 가 고친 파일) 1042ms(4.8배)
 
+## ① 여정 e2e — 착수 기준선 (대조의 통제군)
+
+### 2026-11-14 출하 jar
+- cmd: `bv-build.sh ./gradlew --no-daemon :app:bootJar` (W-12)
+- exit: 0
+- 핵심 결과: `app/build/libs/app.jar` — 이 slice 는 Kotlin 을 편집하지 않으므로 이 jar 가 대조 전후에 같다
+
+### 2026-11-14 착수 HEAD 의 여정 레인 전건
+- cmd: `npm run test:e2e:journey` (W-13)
+- exit: 0
+- 핵심 결과: 통과 12 · flaky 0 · 건너뜀 0 · spec 4/4, 1.6m — 뒤의 RED 가 주입 때문임을 이 통제군이 든다
+
+## ② 판정 근거
+
 판정 근거는 `checklist.md` ② 가 정본이다. 요지: **구속 조건은 CPU 희소가 아니라 fork 과다구독**
 이고(조건 B 가 그것을 가른다), 후보 둘의 **첫 칸은 어느 조건에서도 기동 비용을 지지 않는다** —
 둘 다 `typescript` 를 모듈 꼭대기에서 들여 그 적재가 이미 칸 예산 밖이다.
