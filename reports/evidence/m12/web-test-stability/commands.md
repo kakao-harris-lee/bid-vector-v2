@@ -12,23 +12,23 @@
 ### 2026-11-15 재측정 — 12C 머지 뒤(main `3fd8f62a` 병합본), 같은 조건 C 20회
 - cmd: `measure-pair.sh post12c 20` (전건 vitest 둘 동시, loadavg 약 31, 1026 test)
 - exit: 1 **18/20** — 실패는 전부 **12C 의 `scripts/kotlin-read-guard.test.mjs` 한 칸**(`config 의 자리가 달라도 거부된다 — 하위 디렉터리 config`)의 `Test timed out in 5000ms` 이고, 내 표적 두 파일의 칸은 전부 돌았다
-- 핵심 결과: 여유가 **얇아졌다** — `kotlin-source-ownership` 최악 칸 2342ms → **3915ms(1.3배)** · `money-vocab-cross-lang` 421 → 351ms(14.2배) · 대조 `display-gate-selectors` 1042 → 1463ms(3.4배)
+- 핵심 결과: 후보 둘의 **첫 칸 3~53ms**. 여유가 **얇아졌다** — `kotlin-source-ownership` 최악 칸 2342ms → **3915ms(1.3배)** · `money-vocab-cross-lang` 421 → 351ms(14.2배) · 대조 `display-gate-selectors` 1042 → 1463ms(3.4배)
 - 단독 대조: 같은 HEAD 에서 `npm run test` 단독 **3/3 exit 0** — 그 타임아웃은 **부하 전용**이고 CI(단일 vitest)의 조건이 아니다
 
 ### 2026-11-14 조건 A — 16코어, 다른 레인(12C) vitest 와 일부 겹침
 - cmd: `measure-cells.sh idle 10`
 - exit: 0 (10/10, 실패한 run 0)
-- 핵심 결과: 후보 둘의 **첫 칸 4~16ms**, 최대 칸 `kotlin-source-ownership` 1308ms(예산 5000ms 의 3.8배 여유) · `money-vocab-cross-lang` 319ms(15.7배)
+- 핵심 결과: 후보 둘의 **첫 칸 3~16ms**, 최대 칸 `kotlin-source-ownership` 1308ms(예산 5000ms 의 3.8배 여유) · `money-vocab-cross-lang` 319ms(15.7배)
 
 ### 2026-11-14 조건 B — `taskset -c 0,1`(2코어 고정)
 - cmd: `measure-cells.sh cpu2 10 0,1`
 - exit: 0 (10/10, 실패한 run 0)
-- 핵심 결과: 칸 시간이 **내려간다**(최대 칸 353ms · 48ms) — vitest 가 affinity 를 보고 fork 를 둘만 띄워 칸 안의 경합이 줄기 때문이고, 벽시계는 반대로 10s → 39s 다
+- 핵심 결과: 후보 둘의 **첫 칸 1~4ms**. 칸 시간이 **내려간다**(최대 칸 353ms · 48ms) — vitest 가 affinity 를 보고 fork 를 둘만 띄워 칸 안의 경합이 줄기 때문이고, 벽시계는 반대로 10s → 39s 다
 
 ### 2026-11-14 조건 C — 전건 vitest **둘 동시**(레인 둘이 겹치는 꼴, fork 배수, loadavg 14~44), 10+10회
 - cmd: `measure-pair.sh pairA 10` · `measure-pair.sh pairB 10`
 - exit: 0 (20/20, primary·noise 모두 실패한 run 0)
-- 핵심 결과: 첫 칸은 여전히 **2~25ms**, 20회 합산 최악 칸 `kotlin-source-ownership` 2342ms(**2.1배 여유** — 3배 문턱 밑이라 신설 OPEN) · `money-vocab-cross-lang` 421ms(11.9배) · 대조로 둔 `display-gate-selectors`(11E 가 고친 파일) 1042ms(4.8배)
+- 핵심 결과: 후보 둘의 **첫 칸 2~25ms**, 20회 합산 최악 칸 `kotlin-source-ownership` 2342ms(**2.1배 여유** — 3배 문턱 밑이라 신설 OPEN) · `money-vocab-cross-lang` 421ms(11.9배) · 대조로 둔 `display-gate-selectors`(11E 가 고친 파일) 1042ms(4.8배)
 
 ## ① 여정 e2e — 착수 기준선 (대조의 통제군)
 
@@ -63,10 +63,15 @@ spec 의 기존 단언 자리 그대로다(바꾸지 않는다).
 그것은 낡은 응답을 집는 **순간** 붉는다(아래 M1 이 그 자리다). 두 측정의 차이는 판정 시점에
 화면이 2 였는가 3 이었는가이고, 그래서 이 줄은 「결정적」이라고 적지 않는다.
 
-### 2026-11-14 신판 + 같은 주입 — 두 쪽을 다 잰다
-- cmd: 같은 명령 · 같은 주입, 산출물 쪽
-- exit: 0
-- 핵심 결과: 1 passed — 구판이 붉었던 그 주입 아래 **신판이 초록**이다(음성 대조)
+### 2026-11-15 신판 + 같은 주입 — 두 쪽을 다 잰다 (수정 라운드에서 재실측)
+- cmd: 같은 명령 · 같은 주입, 산출물 쪽, **2회**
+- exit: 0 · 0
+- 핵심 결과: 2/2 passed — 구판이 붉었던 그 주입 아래 **신판이 초록**이다(음성 대조)
+
+### 2026-11-15 초안 거둠 판은 같은 주입 아래 **붉었다** (v H-1 · 그래서 걷었다)
+- cmd: 같은 명령 · 같은 주입 · 초안 쓰기에도 거둠을 둔 판(2ed8263b)
+- exit: 1 (verifier 독립 구성 2/2)
+- 핵심 결과: `투찰 예정 초안 다시 읽기가 닫히지 않았다` → `Test timeout of 120000ms` — 초안 시점에 타임라인 질의가 **data 없이 진행 중**이면 react-query 가 무효화를 그 fetch 에 접어(`cancelRefetch` 는 `data !== undefined` 일 때만 끊는다) **쓰기 뒤에 출발한 재조회가 하나도 없고**, 그 진행 중 읽기는 장부에서 `stale` 이라 거둠이 닫히지 않는다
 
 ## 변이 — 전부 바꿔치우기, 커밋 뒤에 돌렸다
 
@@ -85,20 +90,49 @@ spec 의 기존 단언 자리 그대로다(바꾸지 않는다).
 - exit: 1 → (거둠 추가) 0
 - 핵심 결과: 담기 쓰기가 낳은 재조회가 **클릭보다 1.6ms 앞서** 출발해 걸린다 — 착수 보고에 없던 자리이고 전수 확인에서 나왔다
 
+### 2026-11-15 M5 — 초안에도 거둠을 두었던 판에서 봉인·출발 거르기를 둘 다 제거 (주입 유지)
+- cmd: 같은 명령 · 같은 주입 · 읽기 술어를 구판 「경로+200」으로, 초안 거둠 유지
+- exit: 0
+- 핵심 결과: 초록. 그때는 「거둠이 하중을 진다」로 읽었으나 **그 거둠 자체가 같은 주입 아래 신판을 붉힌다**는 것이 v H-1 로 드러나 걷었다 — 아래 D1·D2 가 걷은 판의 매트릭스다
+
+### 2026-11-15 D1 — 봉인·출발 거르기 **둘 다** 제거 (거둠 없는 판 · 주입 유지)
+- cmd: 같은 명령 · 같은 주입 · 읽기 술어를 구판 「경로+200」으로
+- exit: 1
+- 핵심 결과: `포착한 타임라인이 그 기록 뒤가 아니다` — **Expected 2 · Received 1**
+
+### 2026-11-15 D2 — **출발 거르기만** 제거(봉인 유지 · 거둠 없는 판 · 주입 유지)
+- cmd: 같은 명령 · 같은 주입 · `!stale.has(…)` 만 뺀다
+- exit: 0
+- 핵심 결과: 초록 — 여정 ③ 에서 **하중을 지는 것은 봉인**이고 출발 거르기는 방어 심층이다(onboarding 에서는 그 쪽이 필수다)
+
 ## 전건 acceptance — CI `web` job 그대로
 
-코드 마지막 커밋에서 열을 차례로 돌렸다. `npm ci`(W-1)·`:app:bootJar`(W-12)는 착수 HEAD 의
-것을 쓴다(잠금 파일·Kotlin 편집 0 — `checklist.md` 알려진 제한).
+**라운드마다 다시 돌리고 그 라운드의 조건을 행에 적는다**(cr LOW: 한 행만 두면 문면이 낡는다).
+`:app:bootJar`(W-12)는 착수 HEAD 의 것을 쓴다(Kotlin 편집 0). `npm ci`(W-1)는 12C 가 `.npmrc` 를
+들여온 뒤로 **빈 `node_modules` 에서** 잰다.
 
-### 2026-11-14 W-2 ~ W-13
+### 2026-11-14 W-2 ~ W-13 — 착수 base 위의 코드 마지막 커밋에서
 - cmd: `npm run lint` · `typecheck` · `gate:src-tree` · `api:types:check` · `test` · `gate:tests` · `build` · `gate:boundary-canary` · `test:e2e` · `test:e2e:journey`
 - exit: 0 (열 모두)
 - 핵심 결과: 여정 레인 통과 12 · flaky 0 · 건너뜀 0 · spec 4/4
+
+### 2026-11-15 W-1 ~ W-13 — **머지 차례**(main `3fd8f62a` 병합본) · 빈 `node_modules` 부터
+- cmd: `npm ci` → 위 열 그대로
+- exit: 0 (열하나 모두)
+- 핵심 결과: vitest 1026 passed · 스모크 4 passed · 여정 레인 통과 12 · 건너뜀 0 · spec 4/4. PR CI 의 `web` job 도 같은 head 에서 PASS 다
+
+### 2026-11-15 W-1 ~ W-13 — **수정 라운드**(v H-1 반영 뒤) · 빈 `node_modules` 부터 + 주입 아래 여정 ③ 2회
+- cmd: 위와 같음
+- exit: 동결 보고가 든다
+- 핵심 결과: 같은 자리
 
 ### 2026-11-14 Kotlin `check` — evidence 가 leak-pattern 게이트의 스캔 뿌리에 든다
 - cmd: `bv-build.sh ./gradlew --no-daemon check`
 - exit: 동결 보고가 든다
 - 핵심 결과: 마지막 HEAD 의 정본은 **verifier 와 PR 조치 코멘트**다(CLAUDE.md — evidence 에 최종 수를 넣으려는 시도가 커밋을 또 낳는다)
+
+**네 조건의 첫 칸 합집합 = 1~53ms** — 항목 4 를 「이미 닫힘」으로 처분한 근거 수치이고, 다른
+문서는 이 네 줄에서 유도한다(cr MEDIUM-b: 세 문서가 세 값이던 자리).
 
 ## ② 판정 근거
 
