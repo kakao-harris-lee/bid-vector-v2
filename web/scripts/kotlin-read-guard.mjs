@@ -15,9 +15,16 @@
  * 순간 그 분류가 목록이 되고, 목록 밖이 다음 라운드의 우회가 된다. 전수를 감싸는 비용은 쟀다
  * (전건 소요가 등 맞댄 통제군과 측정 잡음 안이다 — `commands.md`).
  *
- * **이 층이 서는 자리는 vitest 프로세스**다(`vite.config.ts` 의 `test.setupFiles`). playwright
- * spec·여정 하네스·`node` 게이트 스크립트는 층 밖이고, 그 자리는 정적 술어(추적 파일 전수)가
- * 받는다 — 덮는 집합이 다른 **두 층**이고 그 사실은 `design-review.md` 미달 Ⅰ 이 등재한다.
+ * **이 층이 서는 자리는 선언에서 뽑는다**(M12 — ⓑ⑤·ⓑ⑥). M11 판은 vitest 프로세스 하나였고
+ * playwright spec·여정 하네스·`node` 게이트 스크립트·번들러 적재가 층 밖이었다. 지금은 세우는
+ * 자리가 셋이다 — vitest `setupFiles`(소비자 프로세스) · 추적된 뿌리 `*.config.*` 전수의 적재
+ * (vite 메인·playwright·eslint 프로세스) · `package.json` 의 `node --import` 전수(게이트
+ * 스크립트). 그 의무를 `kotlin-read-guard.test.mjs` 가 **선언에서 센다**.
+ *
+ * **그래도 층 밖인 자리가 있다** — `worker_threads`(`--import` 가 서지 않는다 · 실측)와 자식
+ * 프로세스 텍스트 검색(`grep`·`git grep`)이고, 그 자리는 정적 술어(추적 파일 전수)가 **부분만**
+ * 받는다. 덮는 집합이 다른 두 층이라는 사실과 그 잔여는 capability map §12.3 의
+ * `OPEN-M12-KOTLIN-READ-GATE-RESIDUALS-3` 이 등재한다.
  *
  * **막지 않는 것**: 이 모듈이나 setup 등재 자체를 고치는 것, 그리고 가로채기를 피해 자기 바인딩을
  * 미리 붙들어 두는 것. 계약의 위협 모델 경계가 「의도적 은닉은 리뷰 소관」으로 둔 자리다.

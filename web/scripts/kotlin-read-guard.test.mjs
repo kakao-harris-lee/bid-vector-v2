@@ -38,8 +38,11 @@ import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
  * 모듈과 그 밖의 파일은 그대로 돈다**(음성). 이 층이 **설치되지 않으면 양성 묶음 전부가 RED** 이고,
  * 그것이 `vite.config.ts` 의 `setupFiles` 한 줄을 지우는 변이의 자리다.
  *
- * **범위**: 이 층은 **vitest 프로세스**에 선다. playwright spec·여정 하네스·`node` 게이트
- * 스크립트는 층 밖이고 그 자리는 정적 술어가 받는다 — `design-review.md` 미달 Ⅰ 이 그 등재다.
+ * **범위**(M12 — ⓑ⑤·ⓑ⑥): 세우는 자리가 셋이다 — vitest `setupFiles` · 추적된 뿌리 `*.config.*`
+ * 전수의 적재 · `package.json` 의 `node --import` 전수. 아래 묶음 셋이 그것을 각각 잰다(배선을
+ * 세는 의무 게이트 둘 · 전파가 자식에 닿는지 재는 칸 하나)이고, spec 프로세스가 실제로 층
+ * 아래인지는 `e2e/kotlin-read-guard.spec.ts` 가 잰다. 남는 자리(`worker_threads` · 자식 프로세스
+ * 텍스트 검색)는 capability map §12.3 의 신설 OPEN 이 등재한다.
  */
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
