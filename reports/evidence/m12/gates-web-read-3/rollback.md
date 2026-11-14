@@ -41,9 +41,14 @@ web/scripts/kotlin-read-probe.mjs
 web/scripts/kotlin-source-ownership.test.mjs
 web/scripts/kotlin-source.mjs
 web/scripts/money-vocab-cross-lang.test.mjs
+web/vite.config.ts
 ```
 
-**등식**: 그 목록에서 in_scope 를 뺀 차집합이 **빈 출력**이다(`comm -23`, 재산출 때마다 확인).
+**등식 둘**(r2 — v M-2 가 이 자리의 결함을 짚었다: 목록이 **손으로 유지되다** `web/vite.config.ts`
+를 빠뜨렸고, 그러면 복원 뒤 `setupFiles` 없는 설정이 남아 vitest 가 **4 failed** 다).
+- 목록은 `git diff --name-only <원천>..HEAD` 를 **기계로** 접은 것이다(evidence 와 탐침 config 는
+  디렉터리 한 줄). 라운드마다 재산출한다.
+- 그 목록에서 in_scope 를 뺀 차집합이 **빈 출력**이다(`comm -23`, 재산출 때마다 확인).
 in_scope 밖 경로는 하나도 없다 — 이 slice 는 공유 working tree 에서 경로 한정 커밋만 했다.
 구현 중 생긴 신설 파일 둘(`web/scripts/kotlin-raw-glob-probe.mjs` ·
 `web/e2e/kotlin-read-guard.spec.ts`)은 그 대조에서 드러나 **in_scope 에 등재**했다(scope.md r2).
@@ -101,6 +106,7 @@ in_scope 밖 경로는 하나도 없다 — 이 slice 는 공유 working tree �
 | ① | 복원 명령 | exit **0** |
 | ② | D/M 계수 | **D 9 · M 15**(신설 아홉이 지워지고 수정 열다섯이 원천으로 돌아간다) |
 | ③ | 복원 경로 한정 `diff <원천>` | **0 줄** |
+| ③″ | **원천 대비 트리 전체 `diff`**(r2 신설 — 경로 한정 술어는 **목록의 누락을 가린다**) | **0 줄** |
 | ③′ | 내 표지 0 | 절 `(p)` **0** · 신설 ID 잔존 **0** · `.npmrc` 선언 **0** · 신설 파일 **넷 전부 부재** · 내 evidence 디렉터리 **부재** · `vite.config.ts` 의 `setupFiles` **복원됨**(내가 지운 줄이 돌아온다) |
 | ③′ | 남의 표지 글자 계수 | §12.3 하위 절 **16 개**(a~p — 내 `(q)` 만 빠졌다). **12B 의 신설 OPEN 넷**과 그 evidence 디렉터리 보존 |
 | ③′ | 남의 표지 보존 | §12.3 글자 **a~o**, `(n)`·`(o)` 각 **1** · `reports/evidence/` 디렉터리 **14 개 보존** · `gate-tests` **41 등재** · `vite.config` `test:` **5 키** |
