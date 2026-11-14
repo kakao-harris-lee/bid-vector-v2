@@ -139,7 +139,7 @@ const KT_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'u');
  * 값과 별표/중괄호 glob 을 지나보냈다. 앞의 이름을 요구하지 않는 대신 **`#` 줄 제외 + allowlist
  * 차감**이 오탐을 0 으로 유지한다(그 둘이 한 묶음의 처방이다).
  */
-const KT_FILE_OR_EXTENSION_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'gu');
+const KT_FILE_OR_EXTENSION_TOKEN = new RegExp(`\\b${'k'}${'t'}s?\\b`, 'giu');
 
 /** 노드에서 **리터럴 텍스트**를 낸다 — 문자열·템플릿 조각·정규식 리터럴·식별자. */
 function literalTexts(node) {
@@ -236,24 +236,29 @@ export function resolvedImports(source, fileName) {
  *
  * 앞 판은 `이름.kt` 꼴만 보았다. 그래서 확장자 단독 값(`{"ext": ".kt"}`)·별표 glob(`*.kt`)·중괄호
  * glob(`X.{kt,kts}`)·확장자 목록 값이 전부 지나갔다 — 앞에 단어 문자가 없어 파일 이름 꼴이 아니기
- * 때문이다. 처방은 **측정된 것**이다(verifier r6): 본문에서 **`#` 로 시작하는 줄을 빼고 allowlist
- * 값을 차감한 뒤** 단어 토큰을 적용하면 **오탐 0 이면서** 그 네 꼴이 RED 다.
+ * 때문이다. 단어 토큰이 그 넷을 함께 닫는다.
  *
- * `#` 줄을 빼는 것이 이 처방의 핵심이다 — 이 저장소의 데이터 파일은 등록부처럼 **주석에 산문을
- * 담고**, 그 산문이 확장자를 언급한다(빼지 않으면 오탐 1). allowlist 는 **토큰을 걸러내는 것이
- * 아니라 값을 차감한다** — 단어 토큰은 파일 이름을 남기지 않으므로 뒤에서 걸러낼 수 없다.
+ * **주석 개념이 없다**(M12 — ⓕ-2). M11 판은 `#` 로 시작하는 줄을 **주석으로** 빼서 등록부 산문의
+ * 확장자 언급을 넘겼고, 그 규약이 곧 미탐이었다 — `#` 로 시작하는 **데이터** 줄을 보지 못했다.
+ * 형식마다 주석 구문 표(`#` · `//` · `<!-- -->`)를 두는 길은 **목록**이고, 「문자열 안의 `//` 를
+ * 주석으로 읽는」 함정이 딸려 온다(이 저장소가 Kotlin 에서 밟아 걷기 모듈을 만든 그 함정이다).
+ *
+ * 그래서 예외는 **파일별 값 차감 하나뿐**이다. allowlist 는 토큰을 걸러내는 것이 아니라 **값을
+ * 차감한다** — 단어 토큰은 파일 이름을 남기지 않으므로 뒤에서 걸러낼 수 없다. 새 형식이 생기면
+ * 가장 엄격한 쪽으로 떨어진다: 조용한 미탐이 아니라 **시끄러운 오탐**이고, 그쪽이 안전한 실패다.
+ *
+ * **대소문자를 가리지 않는다**(M12 — ⓕ-1). 런타임 층과 같은 성질이다. 「Linux 에서 대문자 표기가
+ * 아무것도 열지 못한다」는 파일시스템의 성질에 기대지 않는다 — WSL 의 Windows 마운트와 macOS 는
+ * 가리지 않는다. 같은 플래그를 **AST 술어에는 붙이지 않았다**: 그 술어는 식별자도 보므로 게이트
+ * 자신의 상수 이름이 걸렸다(실측 — 등재).
  *
  * **두 글자 단어 토큰의 성질**(r1 — cr LOW): 오늘 트리에서 오탐은 0 이지만, 경계뿐인 두 글자라
- * 임의 토큰 묶음(base64·hex 조각)이나 같은 글자의 상호(`kt.co.kr` 꼴)를 담은 **미래의 fixture** 가
- * 걸린다. 그때의 탈출구는 allowlist **차감**뿐이다 — 그 차감을 「구멍」으로 읽지 말 것. 술어를
- * 좁히면(앞에 파일 이름을 요구하면) 확장자 단독 값과 glob 이 다시 열린다.
+ * 임의 토큰 묶음(base64·hex 조각)이나 같은 글자의 상호를 담은 **미래의 fixture** 가 걸린다. 그때의
+ * 탈출구는 allowlist **차감**뿐이다 — 그 차감을 「구멍」으로 읽지 말 것. 술어를 좁히면(앞에 파일
+ * 이름을 요구하면) 확장자 단독 값과 glob 이 다시 열린다.
  */
 export function kotlinPathsInText(text, allowedValues = new Set()) {
-  const withoutComments = text
-    .split('\n')
-    .filter((line) => !line.trimStart().startsWith('#'))
-    .join('\n');
-  let body = withoutComments;
+  let body = text;
   for (const value of allowedValues) {
     body = body.split(value).join('');
   }
@@ -357,10 +362,10 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
   });
 
   /**
-   * **데이터 파일 술어 — 확장자 단독 값과 glob 까지 든다**(M11 — ⑩). 앞 판은 `이름.kt` 꼴만 보아
-   * 네 꼴이 지나갔다(P6·P7·P7b·P7c). 처방은 측정된 것이다: 본문에서 **`#` 로 시작하는 줄을 빼고
-   * allowlist 값을 차감한 뒤** 단어 토큰을 적용한다 — 그래야 산문의 확장자 언급이 오탐이 되지
-   * 않는다(그 한 줄이 `#` 제외가 하는 일이고, 빼면 오탐 1 이다).
+   * **데이터 파일 술어 — 확장자 단독 값·glob·대소문자·`#` 데이터 줄까지 든다**(M11 ⑩ · M12 ⓕ-1·ⓕ-2).
+   *
+   * M11 판은 둘을 지나보냈다. **대문자**(술어에 `i` 가 없었다)와 **`#` 로 시작하는 데이터 줄**
+   * (그 규약이 그 줄을 주석으로 읽었다). 둘 다 이 slice 가 닫는다 — 수치는 `commands.md`.
    */
   it('데이터 파일 술어가 확장자 단독 값과 glob 을 든다', () => {
     const extension = `${'k'}${'t'}`;
@@ -370,6 +375,14 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
       'P7 별표 glob': `{"glob": "../**/*.${extension}"}`,
       'P7b 중괄호 glob': `{"glob": "a/X.{${extension},${extension}s}"}`,
       'P7c 확장자 목록 값': `{"ext": ["${extension}", "${extension}s"]}`,
+      // **ⓕ-1 대소문자** — 런타임 층과 같은 성질을 쓴다. 「Linux 에서 그 표기가 아무것도 열지
+      // 못한다」는 **파일시스템의 성질에 기대지 않는다**(WSL 의 Windows 마운트·macOS 는 가리지
+      // 않는다). 글자를 조립해 드는 것은 이 파일이 자기 술어에 걸리지 않게 하려는 것이다.
+      'ⓕ-1 대문자 glob': `{"glob": "../**/*.${extension.toUpperCase()}"}`,
+      'ⓕ-1 섞인 대소문자': `{"basis": "Basis.${'K'}${'t'}"}`,
+      // **ⓕ-2 `#` 로 시작하는 데이터 줄** — 술어에 주석 개념이 없다(아래 음성 대조의 사유).
+      'ⓕ-2 # 로 시작하는 데이터 줄': `#a/Basis.${extension}\n`,
+      'ⓕ-2 들여쓴 # 데이터 줄': `  #a/Basis.${extension}\n`,
     };
 
     for (const [name, text] of Object.entries(planted)) {
@@ -377,16 +390,27 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
     }
   });
 
-  /** **음성 대조** — `#` 로 시작하는 줄의 산문과 allowlist 값은 들지 않는다(일률 거절이 아니다). */
-  it('주석 줄의 산문과 allowlist 값은 데이터 파일 술어를 지나간다', () => {
+  /**
+   * **음성 대조 — 탈출구는 값 차감 하나다**(M12 ⓕ-2).
+   *
+   * 앞 판은 `#` 로 시작하는 줄을 **주석으로** 빼서 등록부 산문의 확장자 언급을 넘겼고, 그
+   * 규약이 곧 미탐이었다. 형식마다 주석 구문 표(`#` · `//` · `<!-- -->`)를 두는 길은 **목록**
+   * 이고, 「문자열 안의 `//` 를 주석으로 읽는」 함정이 딸려 온다 — 이 저장소가 Kotlin 에서
+   * 밟아 걷기 모듈을 만든 바로 그 함정이다.
+   *
+   * 그래서 **주석 개념을 술어에서 없앤다.** 예외는 파일별 **값 차감** 하나뿐이고, 새 형식은
+   * 가장 엄격한 쪽(전수 적용)으로 떨어진다 — 조용한 미탐이 아니라 시끄러운 오탐이다. 그
+   * 대가로 등록부 산문 한 줄의 표기를 고쳤다(`config/gate-tests.txt` — 오늘 차감 0).
+   */
+  it('allowlist 값만 데이터 파일 술어를 지나간다 — 주석 규약은 없다', () => {
     const extension = `${'k'}${'t'}`;
-    const prose = `# 「.${extension} 경로 리터럴이 공유 모듈 밖에 없다」\nscripts/x.mjs\n`;
     const allowed = new Set([`KonepsOpeningAxisFieldContracts.${extension}`]);
 
-    expect(kotlinPathsInText(prose)).toStrictEqual([]);
     expect(kotlinPathsInText(`{"from": "KonepsOpeningAxisFieldContracts.${extension}"}`, allowed)).toStrictEqual(
       [],
     );
+    // 확장자 토큰이 없는 데이터는 그대로 지나간다 — 일률 거절이 아니다.
+    expect(kotlinPathsInText('scripts/x.mjs\nconfig/y.json\n')).toStrictEqual([]);
   });
 });
 
