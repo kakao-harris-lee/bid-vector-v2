@@ -3,13 +3,6 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// **「여는 행위」 층을 이 프로세스에 세운다**(M12/gates-web-read-3 — ⓑ⑥). 이 설정이 적재되는
-// 프로세스는 저장소가 쓴 코드를 돌리므로 Kotlin 원문을 열 수 있는 자리다. 층 모듈이 자기를
-// `NODE_OPTIONS` 에 실어 **이 도구가 띄우는 node 프로세스**까지 덮는다(실측: playwright spec
-// 워커가 그렇게 거부됐다). 이 의무의 모집단은 손 목록이 아니라 **추적된 뿌리 `*.config.*`
-// 전수**이고 `scripts/kotlin-read-guard.test.mjs` 가 센다.
-import './scripts/kotlin-read-guard-setup.mjs';
-
 
 // ADR 0011 D-2·D-3 — 서버 호출은 생성 타입으로 타입이 매겨진 클라이언트(`src/api/client.ts`)로
 // 한다. **이 블록의 대상은 `src` 의 `.ts`·`.tsx` 뿐이다** — `index.html` 의 인라인 스크립트와

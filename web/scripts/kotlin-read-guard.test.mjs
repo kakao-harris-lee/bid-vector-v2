@@ -17,10 +17,9 @@ import {
 import { readFileSync as aliasedRead } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, relative as relativePath, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { isKotlinSourcePath } from './kotlin-read-guard.mjs';
@@ -279,132 +278,102 @@ describe('여는 행위 — 공개 표면이 셋으로 고정된다', () => {
 });
 
 /**
- * **층이 서야 하는 자리를 선언에서 뽑는다**(M12 — ⓑ⑥).
+ * **층이 선 자리를 글자가 아니라 거동으로 센다**(M12 — ⓑ⑥, r1 에 바꿨다).
  *
- * M11 은 이 축을 「진입점마다 미리 적재하는 것은 **진입점 열거**라 고르지 않았다」로 등재했다.
- * 그 전제를 둘로 가른 것이 이 slice 의 실측이다. ① **기구가 하나**다 — `node --import <층>` 이
- * 평범한 node 프로세스를 막고, config 가 `NODE_OPTIONS` 에 같은 것을 실으면 그 도구가 띄우는
- * 프로세스(playwright spec 워커·`webServer`)까지 막는다(실측: 같은 spec 이 거부됐다). ② **의무의
- * 모집단을 선언에서 뽑을 수 있다** — 손 목록이 아니다.
+ * **앞 판은 열거였다.** `package.json` 의 `node` 명령마다 플래그를, 뿌리 `*.config.*` 마다 import 를
+ * 요구하고 그 의무를 **텍스트 꼴**로 셌다 — `scripts` 값을 `&&` 로 나눠 `^node\s` 로 시작하는 조각만
+ * 보고, config 는 뿌리에 있는 것만 봤다. 그래서 평범한 표기 넷이 게이트를 초록으로 지나가며 원문을
+ * 읽었다(실측, r1 — 환경변수 접두 · `;` 로 이은 둘째 명령 · `env` 명령 · 하위 디렉터리 config).
  *
- * 모집단이 둘이고 **기구가 다른 이유는 저장소 코드가 프로세스에 들어가는 길이 다르기 때문**이다.
- * - **뿌리 config 모듈**: 도구가 그 파일을 적재한다 → 그 파일이 층을 **import** 한다.
- * - **`node` 진입 스크립트**: 셸이 그 파일을 띄운다 → 그 명령이 층을 **`--import`** 한다.
+ * 지금은 **선언 한 줄**(`web/.npmrc` 의 `node-options`)이 npm 이 띄우는 모든 프로세스를 덮는다.
+ * 그래서 이 묶음이 세는 것은 둘뿐이다 — **그 선언이 있는가**(구조)와 **그 넷이 실제로 거부되는가**
+ * (거동). 명령의 모양도 config 의 자리도 술어에 없다.
  *
- * 새 config 파일이나 새 `node` 명령이 층 없이 생기면 아래 둘이 붉어진다. `tsc`·
- * `openapi-typescript` 는 저장소가 쓴 코드를 적재하지 않아 모집단 밖이다(등재).
+ * **경계**: npm 밖에서 직접 띄운 node 는 이 기구가 닿지 않는다(`scope.md` §위협 모델 경계).
  */
-describe('여는 행위 — 층이 선 자리를 선언에서 센다 (ⓑ⑥)', () => {
-  /** 층을 세우는 **유일한 모듈** — 두 모집단의 의무가 같은 파일을 가리킨다. */
+describe('여는 행위 — 층이 선 자리를 거동으로 센다 (ⓑ⑥)', () => {
+  /** 층을 세우는 **유일한 모듈** — 선언이 가리키는 자리다. */
   const SETUP = 'scripts/kotlin-read-guard-setup.mjs';
 
-  const tracked = () =>
-    execFileSync('git', ['ls-files', '-z', '--', '.'], { cwd: webRoot, encoding: 'utf8' })
-      .split('\0')
-      .filter((relative) => relative.length > 0);
+  const npmRun = (script, env = process.env) =>
+    execFileSync('npm', ['run', '-s', script], { cwd: webRoot, encoding: 'utf8', env }).trim();
 
-  /** 뿌리 config 전수 — 이름 목록이 아니라 **추적 파일의 꼴**이다. */
-  const rootConfigs = () => tracked().filter((relative) => /^[^/]+\.config\.[cm]?[jt]s$/u.test(relative));
+  it('`.npmrc` 가 층을 선언한다 — 그 선언이 npm 의 모든 스크립트에 싣는다', () => {
+    const npmrc = readFileSync(resolve(webRoot, '.npmrc'), 'utf8');
+    const declared = npmrc
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('#'))
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('node-options='));
+
+    expect(declared, '`.npmrc` 에 층 선언이 없거나 둘이다 — npm 은 마지막 값만 쓴다').toHaveLength(1);
+    expect(declared[0], '선언이 층 모듈을 가리키지 않는다').toContain(SETUP);
+    expect(declared[0], '선언이 `--import` 가 아니다 — 그러면 층이 서지 않는다').toContain('--import');
+  });
 
   /**
-   * 그 파일이 층을 import 하는가. **지정자를 해석해서** 본다 — 표기(`./scripts/…` · `../web/…`)를
-   * 세지 않는다. 정적 import·동적 import·재수출을 모두 든다.
+   * **r1 이 지나보낸 명령 꼴 셋을 상설 양성 대조로 둔다.** 탐침 스크립트 하나를 세 꼴로 띄우고
+   * 세 줄이 모두 거부인지 본다 — 글자를 세지 않고 **그 프로세스가 무엇을 할 수 있는지**를 센다.
    */
-  const importsSetup = (relative) => {
-    const source = readFileSync(resolve(webRoot, relative), 'utf8');
-    const tree = ts.createSourceFile(relative, source, ts.ScriptTarget.Latest, false);
-    const fromDir = dirname(resolve(webRoot, relative));
-    let found = false;
-    const take = (specifier) => {
-      if (specifier.startsWith('.')) {
-        found ||= relativePath(webRoot, resolve(fromDir, specifier.split('?')[0])) === SETUP;
-      }
-    };
-    const visit = (node) => {
-      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier !== undefined) {
-        if (ts.isStringLiteral(node.moduleSpecifier)) {
-          take(node.moduleSpecifier.text);
-        }
-      }
-      if (
-        ts.isCallExpression(node) &&
-        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-        node.arguments[0] !== undefined &&
-        ts.isStringLiteral(node.arguments[0])
-      ) {
-        take(node.arguments[0].text);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(tree);
-    return found;
-  };
+  it('명령의 꼴이 달라도 거부된다 — 환경변수 접두 · `;` · `env` 명령', () => {
+    const lines = npmRun('probe:kotlin-read').split('\n').map((line) => line.trim());
 
-  /** `package.json` 의 `scripts` 에서 **`node` 로 시작하는 명령 전수**를 뽑는다. */
-  const nodeCommands = () => {
-    const { scripts } = JSON.parse(readFileSync(resolve(webRoot, 'package.json'), 'utf8'));
-    return Object.entries(scripts).flatMap(([name, value]) =>
-      value
-        .split('&&')
-        .map((part) => part.trim())
-        .filter((part) => /^node\s/u.test(part))
-        .map((command) => ({ name, command })),
-    );
-  };
-
-  it('뿌리 config 전수가 층을 import 한다', () => {
-    const configs = rootConfigs();
-
-    expect(configs.length, '뿌리 config 를 하나도 찾지 못했다 — 이 등식이 공허하다').toBeGreaterThan(2);
-    expect(
-      configs.filter((relative) => !importsSetup(relative)),
-      '이 config 가 적재되는 프로세스는 층 밖이다',
-    ).toStrictEqual([]);
-  });
-
-  it('`node` 진입 명령 전수가 층을 먼저 적재한다', () => {
-    const commands = nodeCommands();
-
-    expect(commands.length, '`node` 명령을 하나도 찾지 못했다 — 이 등식이 공허하다').toBeGreaterThan(3);
-    // **자리까지 본다**: node 는 스크립트 앞의 플래그만 읽으므로 뒤에 붙은 `--import` 는 인자다.
-    const flag = new RegExp(`^node\\s+--import[= ]\\./${SETUP}\\s`, 'u');
-    expect(
-      commands.filter(({ command }) => !flag.test(command)).map(({ name }) => name),
-      '이 명령이 띄우는 프로세스는 층 밖이다',
-    ).toStrictEqual([]);
+    expect(lines, '탐침이 세 꼴로 돌지 않았다 — 대조가 공허하다').toHaveLength(3);
+    expect(lines).toStrictEqual(['REFUSED', 'REFUSED', 'REFUSED']);
   });
 
   /**
-   * **전파가 혼자 덮는 자리를 잰다** — 설정을 적재하지 않는 **node 자식**이다. 위 둘은 *배선*을
-   * 세고, 이 칸은 그 배선이 실제로 **자식 프로세스에 닿는가**를 잰다(전파 블록을 층 모듈에서 빼는
-   * 변이가 위 둘을 초록으로 지나가고 이 칸에서 붉어진다).
+   * **음성 대조** — 층을 싣지 않은 같은 탐침은 **읽는다**. 이것이 초록이어야 위 묶음이 「탐침이
+   * 늘 거부한다」가 아니라 「층이 거부한다」가 된다.
+   */
+  it('층 없이 같은 탐침을 돌리면 읽는다 — 대조가 공허하지 않다', () => {
+    const output = execFileSync(process.execPath, ['scripts/kotlin-read-probe.mjs'], {
+      cwd: webRoot,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_OPTIONS: '' },
+    }).trim();
+
+    expect(output.startsWith('READ'), `층 없이도 읽지 못했다: ${output}`).toBe(true);
+  });
+
+  /**
+   * **전파가 node 자식까지 닿고, cwd 가 달라도 자식이 뜬다.**
    *
-   * 자식에게 경로를 **인자로** 넘긴다 — `-e` 본문에 경로를 적으면 이 파일이 소유권 게이트의
-   * 경로 술어에 걸린다.
+   * `.npmrc` 가 싣는 지정자는 **상대 경로**라 그대로 물려주면 cwd 가 다른 자식이
+   * `ERR_MODULE_NOT_FOUND` 로 **뜨지도 못한다**(r1 실측 — `/tmp` 를 cwd 로 띄운 자식이 죽었다).
+   * 층 모듈이 자기 **절대 URL 로 바로잡아** 싣기 때문에 이 칸이 초록이다. 바로잡기를 지우면
+   * 층이 조용히 사라지는 것이 아니라 **자식이 죽어서** 붉어진다.
+   *
+   * 자식에게 경로를 **인자로** 넘긴다 — `-e` 본문에 적으면 이 파일이 소유권 게이트의 경로
+   * 술어에 걸린다.
    */
-  it('전파가 node 자식 프로세스까지 닿는다', () => {
+  it('전파가 cwd 가 다른 node 자식까지 닿는다', () => {
     const target = shippedKotlinFile();
     const code =
       'const { readFileSync } = require("node:fs");' +
       'try { readFileSync(process.argv[1], "utf8"); console.log("READ"); }' +
       'catch (error) { console.log(String(error.message).includes("kotlin-read-guard") ? "REFUSED" : "OTHER"); }';
-    const run = (env) =>
-      execFileSync(process.execPath, ['-e', code, target], { encoding: 'utf8', env }).trim();
+    const run = (options) =>
+      execFileSync(process.execPath, ['-e', code, target], { encoding: 'utf8', ...options }).trim();
 
-    // 양성 — 이 프로세스의 `NODE_OPTIONS` 를 그대로 물려받은 자식은 거부한다.
-    expect(run(process.env)).toBe('REFUSED');
-    // 음성 — 그 변수를 비우면 같은 자식이 읽는다(대조가 공허하지 않다는 증거이고, 전파가
-    // **그 변수로** 일한다는 사실의 측정이다).
-    expect(run({ ...process.env, NODE_OPTIONS: '' })).toBe('READ');
+    expect(run({ cwd: webRoot }), '같은 cwd 자식이 읽는다').toBe('REFUSED');
+    expect(run({ cwd: tmpdir() }), 'cwd 가 다른 자식이 죽거나 읽는다').toBe('REFUSED');
+    // 음성 — 그 변수를 비우면 같은 자식이 읽는다(전파가 **그 변수로** 일한다는 측정).
+    expect(run({ cwd: webRoot, env: { ...process.env, NODE_OPTIONS: '' } })).toBe('READ');
   });
 
-  /** 술어의 양성 대조 — 층을 import 하지 않는 합성 config 는 걸린다(일률 통과가 아니다). */
-  it('술어가 층 없는 config 와 명령을 잡는다', () => {
-    expect(importsSetup('package.json')).toBe(false);
-    const flag = new RegExp(`^node\\s+--import[= ]\\./${SETUP}\\s`, 'u');
-    expect(flag.test('node scripts/x.mjs')).toBe(false);
-    expect(flag.test(`node scripts/x.mjs --import ./${SETUP} `)).toBe(false);
-    expect(flag.test(`node --import ./${SETUP} scripts/x.mjs`)).toBe(true);
+  /**
+   * **하위 디렉터리 config 로 띄운 spec 프로세스**(r1 이 지나보낸 넷째 꼴). 그 config 는 층을
+   * import 하지 않는다 — 덮는 것은 `.npmrc` 다. 돌리는 spec 은 스모크 레인의 그 파일이고, 그
+   * 안의 단언이 **거부**를 요구한다. 그래서 이 칸은 그 실행이 통과하는지만 보면 된다.
+   */
+  it('config 의 자리가 달라도 거부된다 — 하위 디렉터리 config', () => {
+    const output = npmRun('probe:kotlin-read-config');
+
+    expect(output, '탐침 config 가 그 spec 을 돌리지 않았다 — 대조가 공허하다').toContain(
+      'kotlin-read-guard.spec.ts',
+    );
+    expect(output).toContain('passed');
   });
 });
 

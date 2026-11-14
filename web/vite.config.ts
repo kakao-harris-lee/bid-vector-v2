@@ -9,14 +9,6 @@ import { defineConfig } from 'vitest/config';
 // 조용히 떼어내면 그 게이트가 멈춘다.
 import { moduleGraphBoundary } from './scripts/module-graph-boundary.mjs';
 
-// **「여는 행위」 층을 이 프로세스에도 세운다**(M12/gates-web-read-3 — ⓑ⑤). 아래 `test.setupFiles`
-// 의 같은 모듈은 **소비자 프로세스**에 층을 세우는데, 번들러 적재(`import.meta.glob` + `?raw`)는
-// 파일을 **vite 메인 프로세스**가 연다 — 그래서 그 자리는 층 밖이었고, glob 패턴에 확장자 토큰이
-// 없으면 정적 술어도 보지 못했다(실측: 층 없이 Kotlin 원문 201,252 자가 적재됐다). 이 한 줄이 그
-// 프로세스를 층 아래로 넣는다. 상설 양성 대조는 `scripts/kotlin-raw-glob-probe.mjs` 이고 그
-// 거절을 층 test 가 잰다 — 거절 문면은 vite 의 `ENOENT` 다(알려진 제한).
-import './scripts/kotlin-read-guard-setup.mjs';
-
 // vitest 설정을 같은 파일에 둔다 — 단위 test 가 앱과 같은 해석 규칙(플러그인·별칭)을 쓰게
 // 하려는 것이고, 설정 파일이 둘이면 그 둘이 어긋날 자리가 생긴다.
 export default defineConfig({

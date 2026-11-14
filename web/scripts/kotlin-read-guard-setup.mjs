@@ -2,40 +2,55 @@
  * **「여는 행위」 층을 세우는 유일한 자리**(M11/gates-web-read ⑤ · M12/gates-web-read-3 ⓑ⑤·ⓑ⑥).
  *
  * 층 자체는 `kotlin-read-guard.mjs` 에 있고 import 만으로는 서지 않는다. 세우는 자리를 이 한 파일로
- * 두는 이유는 **그 배선을 측정할 수 있게** 하는 것이고, 이제 그 배선이 셋이다.
- * - `vite.config.ts` 의 `test.setupFiles` — vitest **소비자 프로세스**(워커).
- * - `vite.config.ts` 의 적재 — **vite 메인 프로세스**(번들러 적재가 파일을 여는 자리, ⓑ⑤).
- * - 그 밖의 뿌리 config 적재와 `package.json` 의 `node --import` — playwright·eslint·게이트
- *   스크립트 프로세스(ⓑ⑥). 그 **의무의 모집단은 선언에서 뽑고**(추적된 뿌리 `*.config.*` 전수 ·
- *   `scripts` 의 `node` 명령 전수) `kotlin-read-guard.test.mjs` 가 센다.
+ * 두는 이유는 **그 배선을 측정할 수 있게** 하는 것이고, 배선은 **둘**이다.
+ * - **`web/.npmrc` 의 `node-options`** — npm 이 띄우는 **모든** 스크립트 프로세스와 그 자식. 명령을
+ *   어떤 꼴로 적었든(환경변수 접두 · `;` 로 이은 두 번째 명령 · `env` 명령 · 하위 디렉터리 config)
+ *   npm 이 `NODE_OPTIONS` 에 이것을 실으므로 **꼴이 술어 밖으로 나간다**.
+ * - `vite.config.ts` 의 `test.setupFiles` — vitest 워커 풀이 **스레드**일 때. `--import` 는 worker
+ *   thread 에 서지 않으므로(기본 상속도 명시 `execArgv` 도 실측) 위 기구가 그 자리를 덮지 못한다.
  *
- * **자기를 자식 프로세스로 전파한다**(ⓑ⑥). `NODE_OPTIONS` 에 자기 `--import` 를 실어 **이 프로세스가
- * 만드는 node 프로세스**를 층 아래로 넣는다. 그 값을 **실측으로 좁혀 적는다**.
- * - playwright **spec 워커**는 전파가 아니라 **config 적재**가 덮는다 — 워커가 설정 파일을 다시
- *   적재하기 때문이다(전파 블록을 뺀 변이에서도 spec 대조가 초록이었다. 처음 문면은 이것을
- *   전파의 공으로 적었고 그 변이가 정정했다).
- * - 전파가 혼자 덮는 자리는 **설정을 적재하지 않는 node 자식**이다 — playwright 의 `webServer`
- *   (`vite preview`)와 게이트 스크립트가 띄우는 node 자식이 그 꼴이고, 그 자리는 층 test 의
- *   자식 프로세스 대조가 잰다(양성·음성 둘).
- * - **`worker_threads` 는 닿지 않는다** — `--import` 가 worker 에 서지 않는다(기본 상속도 명시
- *   `execArgv` 도 실측). 경계 안의 미달로 등재했다.
+ * **앞 판은 명령과 config 를 열거했다**(r1 에 버렸다 — v H-1). `package.json` 의 `node` 명령마다
+ * 플래그를 붙이고 뿌리 `*.config.*` 마다 import 를 두었는데, 그 의무를 세는 술어가 **텍스트 꼴**이라
+ * `NODE_ENV=test node …` 한 줄로 게이트는 초록인 채 원문이 읽혔다(실측). 지금은 선언 한 줄이 그
+ * 전부를 대신하고, 술어는 **그 키가 있는가**와 **실제로 거부하는가**를 본다.
  *
- * `setupFiles` 를 **함께 둔다**: vitest 의 워커 풀이 프로세스일 때는 전파가 닿고 **스레드일 때는
- * 닿지 않는다**(같은 실측의 다른 쪽). 어느 하나만 두면 풀 선택이 층의 유무를 정하게 된다.
+ * **막지 못하는 것**: npm 밖에서 **직접** 띄운 node(사람이 셸에서 띄우는 프로세스·IDE). 의도적
+ * 은닉이 아니라 **npm 이 선언을 실을 수 없는 자리**이므로 경계 문장으로 등재한다.
  */
 import { installKotlinReadGuard } from './kotlin-read-guard.mjs';
 
 installKotlinReadGuard();
 
 /**
- * **경로에 공백이 있으면 전파하지 않는다.** `NODE_OPTIONS` 는 공백으로 토큰을 가르고 인용을
- * 지원하지 않으므로, 공백이 든 경로를 실으면 그 변수 전체가 깨져 **모든 node 자식이 뜨지 못한다**.
- * 건너뛰는 쪽을 고르고 그 사실을 여기 적는다 — 저장소를 공백 있는 경로에 두면 ⓑ⑥ 의 전파 축이
- * 조용히 사라진다(알려진 제한). 이미 실려 있으면 다시 싣지 않는다(중첩 호출의 누적을 막는다).
+ * **자기를 자식 프로세스로 전파하되 지정자를 절대 URL 로 바로잡는다**(r1 — v L-1 의 정정).
+ *
+ * `.npmrc` 가 싣는 지정자는 **상대 경로**이고 node 는 그것을 **자기 cwd 기준**으로 푼다. 그래서 cwd
+ * 가 다른 node 손자는 `ERR_MODULE_NOT_FOUND` 로 **뜨지도 못한다**(실측: `/tmp` 를 cwd 로 띄운 자식이
+ * 죽었다). 자기 절대 URL 로 바꿔 실어 그 자리를 없앤다 — 변수를 덮어쓰지 않고 **자기 지정자만**
+ * 골라 바꾼다(남이 실은 `--import` 는 그대로 둔다).
+ *
+ * 앞 판은 여기서 「경로에 공백이 있으면 전파하지 않는다」고 적었는데 **사실이 아니었다**(v L-1):
+ * `import.meta.url` 은 파일 URL 이라 공백이 `%20` 으로 인코딩되어 그 조건은 언제나 거짓이고 분기가
+ * **죽어 있었다**. 공백 있는 경로에서도 전파가 서는 것을 실측으로 확인하고 분기를 지웠다.
+ *
+ * 이름으로 자기 토큰을 고르는 것이 이 처방의 약한 고리다. 못 고르면 상대 지정자가 남아 **cwd 가
+ * 다른 자식이 죽는** 쪽으로 실패한다 — 조용히 층이 사라지는 쪽이 아니다.
  */
 const own = import.meta.url;
-const current = process.env.NODE_OPTIONS ?? '';
+const selfName = 'kotlin-read-guard-setup.mjs';
+const tokens = (process.env.NODE_OPTIONS ?? '').split(/\s+/u).filter((token) => token.length > 0);
+const kept = [];
 
-if (!own.includes(' ') && !current.includes(own)) {
-  process.env.NODE_OPTIONS = `${current} --import ${own}`.trim();
+for (let index = 0; index < tokens.length; index += 1) {
+  const token = tokens[index];
+  if (token === '--import' && tokens[index + 1]?.endsWith(selfName)) {
+    index += 1;
+    continue;
+  }
+  if (!(token.startsWith('--import=') && token.endsWith(selfName))) {
+    kept.push(token);
+  }
 }
+
+kept.push('--import', own);
+process.env.NODE_OPTIONS = kept.join(' ');

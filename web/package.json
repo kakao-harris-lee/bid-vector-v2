@@ -13,15 +13,17 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "gate:src-tree": "node --import ./scripts/kotlin-read-guard-setup.mjs scripts/check-src-tree.mjs",
-    "gate:boundary-canary": "node --import ./scripts/kotlin-read-guard-setup.mjs scripts/boundary-canary.mjs",
+    "gate:src-tree": "node scripts/check-src-tree.mjs",
+    "gate:boundary-canary": "node scripts/boundary-canary.mjs",
     "api:types": "openapi-typescript ../openapi/bidvector-operator-api.yaml -o src/api/generated/operator-api.ts",
-    "api:types:check": "node --import ./scripts/kotlin-read-guard-setup.mjs scripts/check-api-types.mjs",
+    "api:types:check": "node scripts/check-api-types.mjs",
     "test": "vitest run",
-    "gate:tests": "node --import ./scripts/kotlin-read-guard-setup.mjs scripts/check-gate-tests.mjs",
+    "gate:tests": "node scripts/check-gate-tests.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:journey": "node --import ./scripts/kotlin-read-guard-setup.mjs scripts/journey-run-begin.mjs && playwright test --config=playwright.journey.config.ts && node --import ./scripts/kotlin-read-guard-setup.mjs scripts/check-journey-results.mjs",
-    "capture:usecase": "node --import ./scripts/kotlin-read-guard-setup.mjs e2e/capture/usecase-captures.mjs"
+    "test:e2e:journey": "node scripts/journey-run-begin.mjs && playwright test --config=playwright.journey.config.ts && node scripts/check-journey-results.mjs",
+    "capture:usecase": "node e2e/capture/usecase-captures.mjs",
+    "probe:kotlin-read": "NODE_ENV=test node scripts/kotlin-read-probe.mjs; true; node scripts/kotlin-read-probe.mjs; env FOO=1 node scripts/kotlin-read-probe.mjs",
+    "probe:kotlin-read-config": "playwright test --config=e2e/probe-config/playwright.probe.config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.2",
