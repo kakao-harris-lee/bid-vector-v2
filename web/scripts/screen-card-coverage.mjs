@@ -275,6 +275,12 @@ function declarationKeyOf(declaration) {
 
 function relativeKeyOf(node, name) {
   const fileName = node.getSourceFile().fileName;
+  // 설치본의 선언은 **자리를 내지 않는다**(r1 cr F-9). `node_modules/<pkg>/src/…` 도 `/src/` 를
+  // 담으므로, 뿌리만 보고 키를 만들면 저장소 밖 선언이 장부의 자리를 차지한다 — 그런 내보내기는
+  // `unkeyed` 로 서는 것이 맞다.
+  if (fileName.includes('/node_modules/')) {
+    return undefined;
+  }
   const marker = fileName.lastIndexOf(SRC_MARKER);
   return marker < 0 ? undefined : `${fileName.slice(marker + SRC_MARKER.length)}#${name}`;
 }
@@ -422,6 +428,15 @@ function edgesOf(checker, declaration, byKey, selfKey) {
   return edges;
 }
 
+/** 노드 집합 전체의 변 — 그래프를 세우는 자리는 **한 곳**이다(r1 cr F-10). */
+function graphOf(checker, byKey) {
+  const edges = new Map();
+  for (const [key, declaration] of byKey) {
+    edges.set(key, edgesOf(checker, declaration, byKey, key));
+  }
+  return edges;
+}
+
 /**
  * 변을 따라 **고정점**까지. 깊이 상수를 두지 않으므로 「왜 1 인가」라는 매직 넘버가 생기지
  * 않고, 상호 재귀가 있어도 끝난다(이미 든 것은 다시 세지 않는다).
@@ -482,11 +497,7 @@ export function displayVocabularyReach(program, webRoot) {
   if (missing.length > 0) {
     throw new Error(`어휘 씨앗이 표시층 그래프에 없다: ${missing.join(', ')}`);
   }
-  const edges = new Map();
-  for (const [key, declaration] of byKey) {
-    edges.set(key, edgesOf(checker, declaration, byKey, key));
-  }
-  const reach = fixpointOf(edges, VOCABULARY_DECLARATIONS);
+  const reach = fixpointOf(graphOf(checker, byKey), VOCABULARY_DECLARATIONS);
   reachCache.set(program, reach);
   return reach;
 }
@@ -520,15 +531,10 @@ export function vocabularyComponentsOf(program, source, webRoot) {
   const anchors = cardAnchorsOf(program, webRoot);
   const reach = displayVocabularyReach(program, webRoot);
   const byKey = topLevelDeclarationsOf(source);
-  const edges = new Map();
-  const seeded = [];
-  for (const [key, declaration] of byKey) {
-    edges.set(key, edgesOf(checker, declaration, byKey, key));
-    if (touchesAnyOf(checker, declaration, reach)) {
-      seeded.push(key);
-    }
-  }
-  const reaching = fixpointOf(edges, seeded);
+  const seeded = [...byKey]
+    .filter(([, declaration]) => touchesAnyOf(checker, declaration, reach))
+    .map(([key]) => key);
+  const reaching = fixpointOf(graphOf(checker, byKey), seeded);
   const names = new Set();
   for (const exported of exportsOf(checker, source)) {
     if (!isCardType(checker, anchors, source, typeOfExport(checker, source, exported))) {
@@ -563,7 +569,8 @@ export function vocabularyRegistryGaps(program, webRoot) {
   const reach = displayVocabularyReach(program, webRoot);
   const srcDir = resolve(webRoot, 'src');
   const displayDir = resolve(srcDir, 'display');
-  const seeds = new Set(VOCABULARY_DECLARATIONS);
+  // 씨앗은 따로 빼지 않는다 — 고정점이 씨앗에서 시작하고 씨앗 부재는 던지므로 **씨앗 ⊆ 폐포**가
+  // 항상 참이고, `!reach.has(one)` 가 그 조건을 이미 담는다(r1 cr F-6: 죽은 조건이었다).
   const classified = new Set(VOCABULARY_MODULE_EXCLUSIONS.map((one) => one.key));
   const population = new Set();
   const unkeyed = [];
@@ -596,7 +603,7 @@ export function vocabularyRegistryGaps(program, webRoot) {
     }
   }
   return {
-    unclassified: [...population].filter((one) => !seeds.has(one) && !classified.has(one) && !reach.has(one)).sort(),
+    unclassified: [...population].filter((one) => !classified.has(one) && !reach.has(one)).sort(),
     stale: [...classified].filter((one) => !population.has(one)).sort(),
     leaked: [...new Set(leaked)].sort(),
     contradicted: [...classified].filter((one) => reach.has(one)).sort(),
