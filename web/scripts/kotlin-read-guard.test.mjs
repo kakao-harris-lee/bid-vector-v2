@@ -134,6 +134,36 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
   });
 });
 
+/**
+ * **층이 서는 자리가 둘이다**(M12 — ⓑ⑤). 하나는 vitest **소비자 프로세스**(`setupFiles`), 다른
+ * 하나는 **vite 메인 프로세스**(`vite.config.ts` 의 적재). 번들러 적재(`import.meta.glob` + `?raw`)는
+ * 파일을 **메인 프로세스**가 열므로 앞의 층이 보지 못했고, 패턴에 확장자 토큰이 없으면 정적 술어도
+ * 보지 못했다(착수 실측: 42 모듈 적재).
+ */
+describe('여는 행위 — 번들러 적재도 층 아래다 (ⓑ⑤)', () => {
+  /**
+   * 쥐는 자리를 **동적**으로 둔다 — 정적으로 import 하면 이 test 파일 자체가 적재되지 못한다.
+   * 거절의 **문면은 층의 것이 아니다**(vite 가 층의 거부를 잡고 상대 경로로 다시 열어 `ENOENT` 를
+   * 낸다 — 알려진 제한). 그래서 「거절한다」까지만 재고, 그 거절이 **Kotlin 축에서만** 일어남은
+   * 아래 통제군이 든다.
+   */
+  it('확장자 토큰 없는 `?raw` glob 은 적재되지 않는다', async () => {
+    await expect(import('./kotlin-raw-glob-probe.mjs')).rejects.toThrow();
+  });
+
+  /**
+   * **통제군** — 저장소 밖의 **비 Kotlin** 파일을 같은 꼴로 끌어오면 그대로 적재된다. 이것이
+   * 통과해야 위 거절이 「glob 이 통째로 막혔다」가 아니라 **Kotlin 축**임이 선다.
+   */
+  it('저장소 밖 비 Kotlin 파일의 같은 glob 은 적재된다', () => {
+    const loaded = import.meta.glob('../../openapi/*', { query: '?raw', import: 'default', eager: true });
+
+    expect(Object.keys(loaded).length, '통제군이 아무것도 적재하지 않았다 — 대조가 공허하다').toBeGreaterThan(
+      0,
+    );
+  });
+});
+
 describe('여는 행위 — 음성 대조', () => {
   /**
    * 소유 모듈은 읽기 집합 전수를 그대로 읽는다 — 일률 거절이 아니다.
