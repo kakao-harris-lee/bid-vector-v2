@@ -126,7 +126,9 @@ function isTimelineRead(one: Request): boolean {
 test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 → 초안 → 제출함 → 타임라인', async ({ page }) => {
   const watched = watchRequests(page);
   // 타임라인 읽기의 출발 장부 — **여정 시작에** 건다(기록 전에 출발한 읽기를 하나도 놓치지
-  // 않아야 그 응답을 낡은 것으로 가를 수 있다).
+  // 않아야 그 응답을 낡은 것으로 가를 수 있다). **걷지 않는 이유**(cr LOW 가 비대칭으로 짚은
+  // 자리): 장부가 이 test 끝까지 필요하고 그 뒤 곧 페이지가 닫힌다 — 헬퍼 셋은 한 여정이 여러
+  // 번 부르므로 걷지만 여기는 한 번이다(`onboarding.spec.ts` 의 같은 판단).
   const timelineReads = readsAfterWrite(page, isTimelineRead);
   await signIn(page);
 
