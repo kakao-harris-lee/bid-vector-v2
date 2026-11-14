@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
 import {
   ABSENT,
@@ -14,6 +14,7 @@ import {
   journeyContext,
   localDateTimeInput,
   NOTICE_STATUS_LABEL,
+  readsAfterWrite,
   search,
   signIn,
   UNJUDGED_LABEL,
@@ -21,6 +22,7 @@ import {
   type BidCaseRow,
   type NoticeRow,
   type PriceBody,
+  type TimelineRow,
 } from './shared';
 
 /**
@@ -116,8 +118,16 @@ test('여정 ② — 로그인 → 검색 → 카드 → 담기', async ({ page 
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
+/** 타임라인 조회인가 — 요청 장부와 응답 포착이 **같은 것**을 세도록 술어가 한 자리다. */
+function isTimelineRead(one: Request): boolean {
+  return one.url().endsWith('/timeline') && one.method() === 'GET';
+}
+
 test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 → 초안 → 제출함 → 타임라인', async ({ page }) => {
   const watched = watchRequests(page);
+  // 타임라인 읽기의 출발 장부 — **여정 시작에** 건다(기록 전에 출발한 읽기를 하나도 놓치지
+  // 않아야 그 응답을 낡은 것으로 가를 수 있다).
+  const timelineReads = readsAfterWrite(page, isTimelineRead);
   await signIn(page);
 
   const rows = await search(page, 'SYN-7E1-FLOOR-USABLE');
@@ -227,14 +237,17 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   await page.getByTestId('record-amount').fill('1050000000');
   await page.getByTestId('record-vat').selectOption('INCLUSIVE');
   await page.getByTestId('record-draw-numbers').fill('3, 7');
-  const recorded = page.waitForResponse((one) => one.url().includes('/record') && one.request().method() === 'POST');
-  const timelineAfterRecord = page.waitForResponse(
-    (one) => one.url().includes('/timeline') && one.status() === 200,
+  // 타임라인은 **그 기록 응답 뒤에 출발한** 읽기로 받는다. 「경로 + 200」만 보는 포착으로는
+  // 초안이 낳은 다시 읽기가 걸린다 — 쓰기 성공 경로가 건 목록을 먼저 다시 읽고 그 **다음에**
+  // 타임라인을 읽으므로, 초안의 상태 칸 단언이 서는 시점에 초안의 타임라인 응답이 아직 날아오는
+  // 중이다(실측 서명: 화면 3 ↔ 응답 2). 쓰기 상태 단언은 이 헬퍼가 든다(`제출함 쓰기 응답`).
+  const recorded = timelineReads.afterWrite(
+    (one) => one.method() === 'POST' && one.url().endsWith('/record'),
+    '제출함',
   );
   await expect(page.getByTestId('worksheet-primary')).toHaveText('제출함');
   await page.getByTestId('worksheet-primary').click();
-  const recordResponse = await recorded;
-  expect(recordResponse.status()).toBe(200);
+  const recordResponse = await recorded.write;
   const recordedCase = (await recordResponse.json()) as BidCaseRow;
   await expect(page.getByTestId('worksheet-case-state')).toHaveText(
     CASE_STATE_LABEL[recordedCase.state] ?? recordedCase.state,
@@ -246,9 +259,13 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   await expect(page.getByTestId('write-failure')).toHaveCount(0);
 
   // 타임라인 — 그 사건이 남는다. **API 가 준 개수·마지막 상태와 같다.**
-  const entries = (await (await timelineAfterRecord).json()) as { readonly toState: string }[];
-  await expect(page.getByTestId('timeline').getByRole('listitem')).toHaveCount(entries.length);
+  const entries = (await (await recorded.read).json()) as TimelineRow[];
+  expect(entries.length, '타임라인이 비면 아래 단언이 공허해진다').toBeGreaterThan(0);
   const last = entries[entries.length - 1]!;
+  // **그 응답이 그 기록을 담았다** — 출발 순서로 거른 것을 내용으로도 센다. 늦은 응답이
+  // 걸리면 이 등식이 **결정적으로** 깨진다(화면 줄 수 대조만으로는 간헐이다).
+  expect(last.caseVersion, '포착한 타임라인이 그 기록 뒤가 아니다').toBe(recordedCase.caseVersion);
+  await expect(page.getByTestId('timeline').getByRole('listitem')).toHaveCount(entries.length);
   await expect(page.getByTestId('timeline')).toContainText(CASE_STATE_LABEL[last.toState] ?? last.toState);
 
   expect(watched.outside).toStrictEqual([]);
@@ -323,6 +340,11 @@ test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰
   const recorded = await driveToRecorded(page, 'SYN-7E2-BIDBOX');
 
   // 셸의 전역 탐색으로 간다 — 주소를 손으로 적지 않는다(셸이 자리 표에서 링크를 만든다).
+  //
+  // 이 포착이 **이 클릭이 낳은 응답**을 집는 근거는 `driveToRecorded` 가 자기 기록이 낳은 건 목록
+  // 다시 읽기를 **거두고 돌아온다**는 것이다(그 함수의 「거둔다」 자리). 거두지 않으면 그
+  // 워크시트의 다시 읽기가 여기 걸리고, 그러면 아래 `kind` 단언이 **내 입찰함의 질의가 아니라
+  // 워크시트의 질의**를 서술한다 — 내용이 같아 붉어지지 않으면서 주장이 한 단 약해지는 자리다.
   const listed = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );

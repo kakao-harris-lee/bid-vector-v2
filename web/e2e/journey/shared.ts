@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { expect, type Locator, type Page, type Request } from '@playwright/test';
+import { expect, type Locator, type Page, type Request, type Response } from '@playwright/test';
 
 import { APPROVED_OPERATIONS } from '../../src/api/approvedOperations';
 
@@ -157,6 +157,18 @@ export interface BidCaseRow {
   readonly nextCheckpointKind: string;
   readonly nextCheckpointAt: string | null;
   readonly overdue: boolean;
+}
+
+/**
+ * 타임라인 한 줄 — spec 이 쓰는 두 칸.
+ *
+ * `caseVersion` 은 그 전이가 낳은 **건의 다음 버전**이고 목록은 그 값으로 오름차순이다(어댑터가
+ * 전이 행에 `expectedVersion + 1` 을 적고 조회가 `ORDER BY case_version` 이다). 그래서 **마지막
+ * 줄의 그 값이 그 쓰기 응답의 `caseVersion` 과 같다** — 늦은 응답을 집으면 그 등식이 깨진다.
+ */
+export interface TimelineRow {
+  readonly toState: string;
+  readonly caseVersion: number;
 }
 
 export interface PriceBody {
@@ -322,6 +334,95 @@ export function watchRequests(page: Page): {
     }
   });
   return { outside, apiPaths, unexpectedSameOrigin };
+}
+
+/** 쓰기 하나와 **그 쓰기 뒤에 출발한** 다시 읽기. 쓰기 상태는 [readsAfterWrite] 가 단언했다. */
+export interface WriteThenRead {
+  readonly write: Promise<Response>;
+  readonly read: Promise<Response>;
+}
+
+export interface ReadsAfterWrite {
+  /**
+   * 그 쓰기의 응답 **뒤에 출발한** 첫 200 읽기. 다시 읽기가 **없으면** 이 기다림은 닫히지 않고
+   * 타임아웃이다 — 낡은 값으로 초록이 되는 것보다 낫다(PR #118 CR r1 L-2). 그때 볼 자리는
+   * 그 쓰기의 `invalidateQueries` 다.
+   */
+  readonly afterWrite: (isWrite: (one: Request) => boolean, label: string) => WriteThenRead;
+  /** 요청 장부를 걷는다 — 한 여정이 이 자리를 여러 번 세울 때 청취자를 쌓지 않으려는 것이다. */
+  readonly stop: () => void;
+}
+
+/**
+ * **읽기의 출발 장부** — 「쓰기 뒤 다시 읽기」를 기다리는 자리가 이것으로 **그 쓰기 응답 뒤에
+ * 출발한** 읽기만 받는다.
+ *
+ * 「경로 + 메서드 + 200」 포착으로는 닫히지 않는다(PR #118 v r1 H-1 · PR #157 첫 CI). 화면은 쓰기가
+ * 성공한 뒤에만 다시 읽지만(`invalidateQueries`), **쓰기 전에 출발한** 읽기의 응답이 그 뒤에 닿을
+ * 수 있다 — 한 화면이 질의 둘을 순차로 다시 읽으면 앞 질의의 단언이 서는 시점에 뒤 질의의 앞
+ * 라운드 응답이 아직 날아오는 중이다. 그 늦은 응답이 포착되면 단언은 쓰기 **전** 상태를 기준으로
+ * 화면을 보고, 화면은 이미 쓰기 뒤를 그려 어긋난다(실측 서명: 화면 3 ↔ 응답 2).
+ *
+ * 취소로는 막을 수 없다 — 질의 함수가 `signal` 을 쓰지 않으므로 react-query 의 취소가 **전선의
+ * 응답을 막지 않는다**(M12/12D 실측). 그래서 거를 수 있는 축은 **요청 출발 순서**다.
+ *
+ * 화면 단언을 먼저 두는 것으로도 「늦은 응답이 아직 날아오는 중이 아니다」는 서지 않는다.
+ */
+export function readsAfterWrite(page: Page, isRead: (one: Request) => boolean): ReadsAfterWrite {
+  const started = new Set<Request>();
+  const ledger = (one: Request) => {
+    if (isRead(one)) {
+      started.add(one);
+    }
+  };
+  page.on('request', ledger);
+  return {
+    afterWrite(isWrite: (one: Request) => boolean, label: string): WriteThenRead {
+      // 봉인은 **응답 핸들러 안에서** 한다 — 그러면 봉인과 다시 읽기의 출발 순서가 **이벤트
+      // 디스패치로** 보장된다. `await` 뒤로 미룬 판은 순서가 런타임의 처리 순서에 달린다
+      // (PR #118 v r1 L-1 변이 M3 GREEN).
+      let stale: ReadonlySet<Request> | null = null;
+      const read = page.waitForResponse(
+        (one) =>
+          stale !== null &&
+          isRead(one.request()) &&
+          one.status() === 200 &&
+          !stale.has(one.request()),
+      );
+      const written = page.waitForResponse((one) => {
+        if (!isWrite(one.request())) {
+          return false;
+        }
+        stale = new Set(started);
+        return true;
+      });
+      // 쓰기 단언이 터지면 `read` 는 관측되지 않은 채 남아 뒤늦게 reject 된다 — 이미 실패한
+      // test 에 노이즈만 붙으므로 삼킨다(PR #118 CR r1 L-3).
+      void read.catch(() => {});
+      const write = (async () => {
+        const response = await written;
+        expect(response.status(), `${label} 쓰기 응답`).toBe(200);
+        return response;
+      })();
+      // 읽기는 **쓰기 단언을 지난 뒤** 돌려준다 — 쓰기가 터진 자리에서 읽기 타임아웃이 겹치면
+      // 어느 쪽이 원인인지 문면이 가리지 못한다.
+      return {
+        write,
+        read: (async () => {
+          await write;
+          return read;
+        })(),
+      };
+    },
+    stop(): void {
+      page.off('request', ledger);
+    },
+  };
+}
+
+/** 건 목록 조회인가 — 포착 술어가 한 자리다(요청 장부와 응답 포착이 같은 것을 센다). */
+export function isBidCaseListRead(one: Request): boolean {
+  return one.url().includes('/api/bid-cases?') && one.method() === 'GET';
 }
 
 /**
@@ -495,6 +596,10 @@ export async function ensureInBidBox(page: Page, card: Locator): Promise<boolean
  * 있다 — 한 하네스를 공유하므로 건의 상태가 전역이고, 같은 건을 쓰면 여정이 서로의 전이를 본다.
  */
 export async function driveToRecorded(page: Page, noticeNumber: string): Promise<BidCaseRow | null> {
+  // 이 함수가 내는 쓰기들이 건 목록 다시 읽기를 낳는다 — **떠날 때 진행 중인 읽기가 없도록**
+  // 마지막 쓰기의 다시 읽기를 여기서 거둔다(아래 「거둔다」 주석). 그러지 않으면 부르는 쪽의
+  // 「내가 연 화면의 응답」 포착이 **이 함수가 낳은 늦은 응답**을 집는다.
+  const caseListReads = readsAfterWrite(page, isBidCaseListRead);
   const rows = await search(page, noticeNumber);
   // 없으면 **사유를 말하고** 멈춘다 — `!` 로 두면 `TypeError` 가 되어 「fixture 가 안 들어왔다」와
   // 「화면이 안 그렸다」를 구별할 수 없다(CR r1 L-11).
@@ -515,6 +620,7 @@ export async function driveToRecorded(page: Page, noticeNumber: string): Promise
   // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
   // `WATCHING` 이고 아래 세 단계를 탄다.
   if (opened.state !== 'WATCHING') {
+    caseListReads.stop();
     return null;
   }
 
@@ -533,9 +639,15 @@ export async function driveToRecorded(page: Page, noticeNumber: string): Promise
 
   await page.getByTestId('record-amount').fill('1350000000');
   await page.getByTestId('record-vat').selectOption('INCLUSIVE');
-  const recorded = page.waitForResponse((one) => one.url().includes('/record') && one.request().method() === 'POST');
+  const recorded = caseListReads.afterWrite(
+    (one) => one.method() === 'POST' && one.url().endsWith('/record'),
+    '제출함',
+  );
   await page.getByTestId('worksheet-primary').click();
-  const response = await recorded;
-  expect(response.status()).toBe(200);
+  const response = await recorded.write;
+  // **거둔다** — 그 기록이 낳은 건 목록 다시 읽기를 여기서 기다려, 이 함수를 떠날 때 진행 중인
+  // 건 목록 읽기가 없게 한다. 그래서 부르는 쪽(여정 ④·⑤)의 포착이 **그 화면의** 응답을 집는다.
+  await recorded.read;
+  caseListReads.stop();
   return (await response.json()) as BidCaseRow;
 }
