@@ -592,3 +592,15 @@ v `ready-for-review` · cr `approve` 뒤의 문서 전사다. `git diff <앞 판
 
 **왜 또 쟀나**: `docs/discovery/capability-map.md` 는 **원천에 있는 파일**이라, 그것을 만진 커밋이
 앞 실측 뒤에 오면 전칭식이 서지 않는다(rollback.md 의 그 조건이 이번에 실제로 발동했다).
+
+## r6 — 마지막 문서 패스 (2026-11-15 · 코드 무변경)
+
+장부 문면 둘을 고쳤다(신설 OPEN 근거 열의 범위 · rollback.md 의 실측 HEAD 와 재측정 사유). 앞
+것이 capability map 이라 **rollback 을 여덟 번째로** 다시 쟀다.
+
+| 측정 | 값 |
+| --- | --- |
+| web 게이트(코드 무변경) | `gate:src-tree` · `gate:tests` exit **0** |
+| rollback(실측 HEAD `168c4e16` · 원천 `e07adaa8`) | 목록 **20 줄** · ① exit 0 · ② **D 9 · M 15** · ③ **0 줄** · ③″ **트리 전체 0 줄** |
+| ③′ | 내 표지 **전부 0**(`setupFiles` 복원 포함) / 남의 표지 §12.3 **16 절** · 12B ID **넷** · `gate-tests` **41** |
+| ④ ⑤ ⑥ | 빈 트리 `npm ci`·typecheck·build exit **0** · **1011 passed** · 게이트 다섯 exit **0** |
