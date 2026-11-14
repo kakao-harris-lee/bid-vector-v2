@@ -48,7 +48,7 @@ dependency가 되어서는 안 된다.
 | M0 | 기존 구현 조사, 요구사항·회귀 장부, 아키텍처 결정 — **종결 2026-09-02**(0E Codex approve + 사용자 「승인」) | 없음 |
 | M1 | Kotlin 빌드 골격과 순수 도메인 커널 — **종결 2026-09-06**(1E 종결·M1 승인 `040ab9d`) | 신규 V2 코드만 |
 | M2 | Kotlin↔Python 및 외부 API 계약 — **종결 2026-09-07**(M2 완료 `a9f1ff9` · 후속 2E·2F 는 additive) | 신규 V2 코드만 |
-| M3 | KONEPS 수집·정규화·저장 adapter — **종결 2026-09-08**(운영자 결정 · 3B-2 잔여 등재) | mock/fixture 우선 |
+| M3 | KONEPS 수집·정규화·저장 adapter — **종결 2026-09-08**(운영자 결정 · 잔여 3B-2 는 2026-09-09 해소 · 3G 까지 2026-09-10 종결) | mock/fixture 우선 |
 | M4 | workflow, event, 상태 제어, prediction gateway — **종결 2026-09-18**(충족 3 · 좁혀짐 4 · 미충족 0) | side effect는 fake |
 | M5 | 기존 ML 코드를 이식·튜닝한 독립 Python training/serving engine — **종결 2026-09-16**(무조건 종결 · OPEN 종결 33 · 이월 14) | DB 없는 serving |
 | M6 | persistence·API·E2E·배포 후보 완성 — **종결 2026-11-03**(사용자 승인 · 충족 6 · 좁혀짐 3 · 미충족 0, PR #118) | 승인된 테스트 환경만 |
