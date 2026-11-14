@@ -850,12 +850,24 @@ const registryProgram = screenProgram(webRoot, registryOverlay);
  * 양성은 실제 어휘 모듈을 **얹어** 세운다: 제외된 조립자가 씨앗을 부르게 만든다.
  */
 const moneyModulePath = resolve(displayDir, 'moneyDisplay.ts');
+const timeModulePath = resolve(displayDir, 'timeDisplay.ts');
 const contradictedOverlay = new Map([
+  // ⓐ `INTERNAL_ASSEMBLER` 행 — 제외한 조립자가 씨앗을 부른다.
   [
     moneyModulePath,
     readFileSync(moneyModulePath, 'utf8').replace(
       '  const known = displayOf<string>(AMOUNT_CURRENCY_DISPLAY, token);',
       '  amountQualifierTextOf({ currency: token });\n  const known = displayOf<string>(AMOUNT_CURRENCY_DISPLAY, token);',
+    ),
+  ],
+  // ⓑ `OTHER_AXIS` 행 — **종류를 가리지 않는다**는 주장이 이 칸으로 측정된다(r1 cr F-1).
+  // 앞 판은 양성 둘이 **모두** 조립자였고, 그래서 버킷을 조립자로 좁히는 변이가 초록으로
+  // 지나갔다(분류 표의 종류 분포는 조립자 둘 · 그 밖 서른이다).
+  [
+    timeModulePath,
+    readFileSync(timeModulePath, 'utf8').replace(
+      '  return days >= 0 ? `D-${days}` : `D+${-days}`;',
+      '  instantDisplayOf(String(days));\n  return days >= 0 ? `D-${days}` : `D+${-days}`;',
     ),
   ],
 ]);
@@ -938,13 +950,24 @@ describe('어휘 등재의 전수 등식 (M11/11E · M12/12B)', () => {
     expect(gaps.unkeyed).toStrictEqual(['display/__probe__/foreign.ts#heldMemo']);
   });
 
-  /** **신설 `contradicted`** — 제외 사유가 구조적으로 거짓이 된 자리. */
-  it('제외한 조립자가 어휘에 닿으면 그 사유가 거짓이라고 말한다', () => {
+  /**
+   * **신설 `contradicted`** — 분류 사유가 구조적으로 거짓이 된 자리. 이 의무는 **종류를
+   * 가리지 않는다**: 목록에 조립자 둘과 **그 밖의 축** 하나가 함께 선다(r1 cr F-1 — 앞 판은
+   * 양성이 모두 조립자여서 버킷을 조립자로 좁히는 변이가 초록으로 지나갔다).
+   */
+  it('분류한 것이 어휘에 닿으면 종류를 가리지 않고 그 사유가 거짓이라고 말한다', () => {
     const gaps = vocabularyRegistryGaps(contradictedProgram, webRoot);
 
     expect(gaps.contradicted).toStrictEqual([
       'display/moneyDisplay.ts#amountTextOf',
       'display/moneyDisplay.ts#currencyUnitOf',
+      'display/timeDisplay.ts#dayCountText',
     ]);
+    const kinds = new Set(
+      gaps.contradicted.map((one) => VOCABULARY_MODULE_EXCLUSIONS.find((row) => row.key === one)?.kind),
+    );
+    expect(kinds, '양성 대조가 한 종류뿐이면 「종류를 가리지 않는다」가 미측정이다').toStrictEqual(
+      new Set([INTERNAL_ASSEMBLER, OTHER_AXIS]),
+    );
   });
 });
