@@ -15,9 +15,16 @@
  * 순간 그 분류가 목록이 되고, 목록 밖이 다음 라운드의 우회가 된다. 전수를 감싸는 비용은 쟀다
  * (전건 소요가 등 맞댄 통제군과 측정 잡음 안이다 — `commands.md`).
  *
- * **이 층이 서는 자리는 vitest 프로세스**다(`vite.config.ts` 의 `test.setupFiles`). playwright
- * spec·여정 하네스·`node` 게이트 스크립트는 층 밖이고, 그 자리는 정적 술어(추적 파일 전수)가
- * 받는다 — 덮는 집합이 다른 **두 층**이고 그 사실은 `design-review.md` 미달 Ⅰ 이 등재한다.
+ * **이 층이 서는 자리는 선언에서 뽑는다**(M12 — ⓑ⑤·ⓑ⑥). M11 판은 vitest 프로세스 하나였고
+ * playwright spec·여정 하네스·`node` 게이트 스크립트·번들러 적재가 층 밖이었다. 지금은 세우는
+ * 자리가 **하나**다 — `web/.npmrc` 의 `node-options`. npm 이 띄우는 모든 프로세스와 그 자식(파일
+ * worker 를 포함한다)이 그 선언을 물려받는다. 그 의무를 `kotlin-read-guard.test.mjs` 가 **선언과
+ * 거동 둘로** 센다.
+ *
+ * **그래도 층 밖인 자리가 있다** — `worker_threads`(`--import` 가 서지 않는다 · 실측)와 자식
+ * 프로세스 텍스트 검색(`grep`·`git grep`)이고, 그 자리는 정적 술어(추적 파일 전수)가 **부분만**
+ * 받는다. 덮는 집합이 다른 두 층이라는 사실과 그 잔여는 capability map §12.3 의
+ * `OPEN-M12-KOTLIN-READ-GATE-RESIDUALS-3` 이 등재한다.
  *
  * **막지 않는 것**: 이 모듈이나 setup 등재 자체를 고치는 것, 그리고 가로채기를 피해 자기 바인딩을
  * 미리 붙들어 두는 것. 계약의 위협 모델 경계가 「의도적 은닉은 리뷰 소관」으로 둔 자리다.
@@ -113,8 +120,15 @@ export function callerOutside(ownFile) {
 /**
  * 인자 가운데 **Kotlin 원문을 가리키는 실경로**가 있으면 그것을 낸다.
  *
- * 저장소 밖과 `node_modules` 아래는 실경로 해석을 **건너뛴다** — Kotlin 정본이 살 수 없는 자리이고,
- * 건너뛰지 않으면 모든 모듈 적재가 실경로 호출을 탄다(그 범위는 단위 대조가 든다).
+ * **위치를 묻지 않는다**(M12 — ⓑ③). 앞 판은 열리는 경로가 저장소 안인지 물어 밖이면 건너뛰었고,
+ * 그래서 디렉터리째 저장소 밖으로 복사한 뒤 그 사본을 읽는 꼴이 지나갔다(실측). 「Kotlin 정본이
+ * 살 수 없는 자리」라는 전제가 **복사 앞에서 무너진다** — 사본은 어디서든 살 수 있다. 그래서
+ * 남는 것은 실경로의 확장자 하나이고, 위치 술어가 사라진다.
+ *
+ * 남는 예외는 **`node_modules` 하나**다. 건너뛰지 않으면 모든 모듈 적재가 실경로 호출을 타고
+ * 전건이 느려진다 — 문면이 아니라 측정으로 든다(같은 조건 3회 중위값: 분기 둘 8.16s · 이 판
+ * 9.19s · 예외까지 지운 판 10.44s). 그 아래로 복사한 뒤 읽는 꼴은 평범한 관용구가 아니라
+ * 의도적 은닉이라 **경계 밖으로 등재**한다.
  */
 function kotlinTargetOf(args) {
   for (const arg of args) {
@@ -123,13 +137,7 @@ function kotlinTargetOf(args) {
       continue;
     }
     const absolute = path.resolve(given);
-    // 접두에 **구분자를 붙인다**(r1 — cr LOW): 붙이지 않으면 형제 디렉터리(`<repo>-m11-…` 같은
-    // 다른 worktree)가 저장소 안으로 읽힌다. 넓어지는 쪽이라 놓치는 축은 없지만, 층의 범위를
-    // 문면과 같게 둔다.
-    if (
-      !absolute.startsWith(`${repoRoot}${path.sep}`) ||
-      absolute.includes(`${path.sep}node_modules${path.sep}`)
-    ) {
+    if (absolute.includes(`${path.sep}node_modules${path.sep}`)) {
       continue;
     }
     // **해석되지 않는 경로는 대상이 아니다.** 없는 파일은 아무것도 열지 않고, 적힌 글자를 그대로
@@ -155,6 +163,47 @@ function refusal(caller, target) {
   );
 }
 
+/**
+ * **읽기가 추출 함수를 부르는 동안 그 텍스트를 걸어 두는 비공개 슬롯**(M12 r2 — cr HIGH).
+ *
+ * 왜 여기 있나: 읽기 모듈과 추출 커널이 **둘 다 이 층을 이미 쓴다**(호출자 판정). 슬롯을 커널에
+ * 두면 읽기가 한 소비자의 커널을 import 해야 하고, 그러면 공유 읽기가 특정 하네스를 알게 된다.
+ *
+ * 무엇을 막나: `bind` 처럼 **프레임을 남기지 않는 래퍼**로 손댄 텍스트를 미리 채워 읽기에 넘기면,
+ * 커널이 보는 호출자가 **읽기 모듈**이 되어 호출자 판정을 지나간다(실측). 커널은 읽기 경유
+ * 호출일 때 **받은 텍스트가 걸린 텍스트인지**를 함께 묻는다 — 값 동일성을 전역으로 되돌리는 것이
+ * 아니라 **그 한 호출에만** 거는 것이라, 단위 test 가 합성 조각을 먹이는 길은 그대로다.
+ */
+let inFlightText;
+
+/**
+ * 텍스트를 걸고 `run` 을 부른 뒤 **반드시 비운다**. 거는 자리는 **읽기 모듈 하나**이고 그것을
+ * 호출자 프레임으로 단언한다.
+ *
+ * **중첩을 금지한다**: 걸려 있는데 또 걸면 던진다. 허용하면 안쪽 호출이 바깥 슬롯을 덮어, 바깥
+ * 호출의 단언이 **다른 값**을 기준으로 서게 된다.
+ */
+export function runWithInFlightText(text, run) {
+  const caller = callerOutside(undefined);
+  if (caller !== OWNER) {
+    throw new Error(`[kotlin-read-guard] ${caller} 가 in-flight 텍스트를 걸려 했다 — 읽기 모듈만 건다`);
+  }
+  if (inFlightText !== undefined) {
+    throw new Error('[kotlin-read-guard] in-flight 텍스트가 이미 걸려 있다 — 읽기를 중첩해 부를 수 없다');
+  }
+  inFlightText = text;
+  try {
+    return run();
+  } finally {
+    inFlightText = undefined;
+  }
+}
+
+/** 걸린 텍스트와 같은가. **값을 내주지 않는다** — 묻는 쪽이 이미 쥔 값으로만 답한다. */
+export function isInFlightText(text) {
+  return inFlightText !== undefined && text === inFlightText;
+}
+
 /** 거부해야 하면 그 오류를, 아니면 `undefined` 를 낸다. 호출·생성 트랩이 같은 판정을 쓴다. */
 function refusalFor(args) {
   const target = kotlinTargetOf(args);
@@ -166,8 +215,9 @@ function refusalFor(args) {
 }
 
 /**
- * 감싼 표면. **원래 함수의 계약을 바꾸지 않는다** — 실패 계약(동기는 던지고 `fs.promises` 는
- * **거절된 promise**)도, **생성·동일성 계약**도 그대로다.
+ * 감싼 표면. **원래 함수의 계약을 바꾸지 않는다** — 실패 계약도 표면을 따른다: 동기는 던지고,
+ * `fs.promises` 는 **거절된 promise**, **콜백 표면은 `cb(error)`**(r2 — cr LOW-4: 앞 판은 콜백
+ * 자리에서도 동기로 던져 호출자의 계약을 어겼다). **생성·동일성 계약**도 그대로다.
  *
  * **`Proxy` 로 두는 이유**(r1 — cr H-2). 앞 판은 래퍼를 평범한 함수로 짓고 속성을
  * `Object.keys` 로 옮겼다. 그래서 `fs` 의 **함수 값에 섞인 생성자**가 깨졌다(실측, node v24):
@@ -179,13 +229,27 @@ function refusalFor(args) {
  * `apply`·`construct` 두 자리에서 같은 판정을 건다 — **생성자 분류를 열거하지 않고** 전수 감싸기를
  * 유지하는 길이다. 앞 판의 `defineProperty` 와 복사 루프는 함께 사라진다.
  */
-function guarded(surface, original, rejectsInstead) {
+function guarded(surface, original, rejectsInstead, callbackStyle) {
   return new Proxy(original, {
     apply(target, _thisArg, args) {
       const error = refusalFor(args);
       if (error !== undefined) {
         if (rejectsInstead) {
           return Promise.reject(error);
+        }
+        // **콜백 표면은 콜백으로 실패한다**(r2 — cr LOW-4). `fs.readFile(path, cb)` 가 동기로
+        // 던지면 이 층이 「원래 계약을 바꾸지 않는다」는 자기 문면을 어긴다 — 호출자는 `cb(err)`
+        // 를 기다리고 있다.
+        //
+        // **동기 표면은 이 분기에 들지 않는다**(r3 — cr LOW-3). 앞 판은 마지막 인자가 함수이기만
+        // 하면 콜백으로 냈는데, `fs` 표면 전수를 감싸므로 `…Sync` 호출의 마지막 인자가 함수인
+        // 경우에 **던지지 않고 조용히 `undefined`** 가 됐다 — fail-closed 가 fail-silent 로 바뀌는
+        // 유일한 자리였다. 비동기 여부는 `patch` 가 **이름 규약**으로 가려 넘긴다(Node 자신의
+        // 규약이고, 잘못 가리면 **던지는 쪽**으로 틀린다).
+        const callback = args.at(-1);
+        if (callbackStyle && typeof callback === 'function') {
+          queueMicrotask(() => callback(error));
+          return undefined;
         }
         throw error;
       }
@@ -204,6 +268,15 @@ function guarded(surface, original, rejectsInstead) {
 /** 층이 자기 해석기를 다시 감싸지 않도록 두 이름만 비운다 — 그 밖은 전수다. */
 const NOT_WRAPPED = new Set(['realpathSync', 'realpath']);
 
+/**
+ * **콜백으로 실패해야 하는 표면인가**(r3 — cr LOW-3). Node 의 이름 규약으로 가린다: `…Sync` 는
+ * 동기라 **던지고**, 그 밖의 `fs` 함수는 콜백을 받는다. `fs.promises` 는 호출부에서 이미 갈린다.
+ *
+ * **`exists` 는 예외다** — 그 콜백의 첫 인자가 `err` 가 아니라 `exists` 라, 오류를 그 자리로 내면
+ * 「있다」로 읽힌다. deprecated API 이고 거부 경로라 **던지는 쪽**으로 둔다(등재).
+ */
+const callbackStyleKey = (key) => !key.endsWith('Sync') && key !== 'exists';
+
 function patch(surface, rejectsInstead = false) {
   for (const key of Object.keys(surface)) {
     if (NOT_WRAPPED.has(key)) {
@@ -214,7 +287,7 @@ function patch(surface, rejectsInstead = false) {
       continue;
     }
     try {
-      surface[key] = guarded(surface, value, rejectsInstead);
+      surface[key] = guarded(surface, value, rejectsInstead, !rejectsInstead && callbackStyleKey(key));
     } catch {
       // 쓸 수 없는 속성은 감쌀 수 없다 — 그 자리는 정적 술어가 받는다.
     }
@@ -224,9 +297,10 @@ function patch(surface, rejectsInstead = false) {
 let installed = false;
 
 /**
- * 층을 세운다. **import 만으로는 서지 않는다** — 세우는 자리가 `vite.config.ts` 의
- * `test.setupFiles` 하나여야, 그 등재를 지우는 변이가 양성 대조를 RED 로 만든다(이 모듈을
- * 술어 때문에 import 하는 파일이 층을 함께 세우면 그 배선을 잴 수 없다).
+ * 층을 세운다. **import 만으로는 서지 않는다** — 세우는 자리를 `kotlin-read-guard-setup.mjs` 한
+ * 파일로 두고, 그 파일을 `web/.npmrc` 의 `node-options` 가 npm 의 모든 프로세스에 싣는다. 그
+ * 배선이 측정되는 자리는 그 선언 단언과 **거동 대조 넷**이다(r2 — 앞 판은 여기서 `setupFiles`
+ * 한 줄을 측정 자리로 적었는데, 층이 `.npmrc` 로 옮겨간 뒤 그 줄은 **아무 하중도 지지 않았다**).
  *
  * 두 번 불러도 한 번만 감싼다 — 두 번 감싸면 호출마다 실경로 해석이 두 번 돈다.
  */

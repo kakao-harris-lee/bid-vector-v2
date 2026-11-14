@@ -7,11 +7,11 @@
  * **이 파일이 개찰 축 라우팅 술어의 한 자리다.** 오퍼레이션 이름·진행구분 어휘·행 모양이 여기
  * 하나에 있고, 출하 정본과의 등식은 `opening-axis.test.mjs` 가 잰다.
  */
-import { assertStrippedKotlin } from '../../scripts/kotlin-source.mjs';
-// 추출 술어는 **내부 커널**에 있다(M11 — 팀장 판정 (ㄱ)). 이 파일의 `shipped…` 넷은 동일성
-// 단언을 거친 뒤 그 커널로 넘기는 **얇은 입구**다 — 술어 자신의 양성·음성 대조는 커널을 직접
-// 재고(합성 조각이 공개 입구에서 거부되므로), 커널을 참조할 수 있는 파일은 import 그래프 술어가
-// 이 파일과 그 단위 test 둘로 고정한다.
+import { withKotlinSource } from '../../scripts/kotlin-source.mjs';
+// 추출 술어는 **내부 커널**에 있다(M11 — 팀장 판정 (ㄱ)). 이 파일의 `shipped…` 넷은 **키와 커널을
+// 읽기에 건네는** 얇은 입구다(M12 — ⓐ: 텍스트를 받지 않는다) — 술어 자신의 양성·음성 대조는
+// 커널을 직접 재고, 커널을 참조할 수 있는 파일은 import 그래프 술어가 이 파일과 그 단위 test
+// 둘로 고정한다.
 import {
   DIVISION_TOKENS,
   detailAxisCountsOf,
@@ -76,31 +76,33 @@ const NOT_OBSERVED = 'NOT_OBSERVED';
 const NOTICE_ROUND = '000';
 
 /**
- * 출하 속성 파일 본문 → 개찰 축 경로 표. [OPENING_AXIS_OPERATIONS] 와 **같은 모양**을 내므로
- * 등식이 업무 배정의 뒤바뀜까지 잡는다(공사 경로가 용역 자리에 앉은 꼴).
+ * 출하 속성 파일 → 개찰 축 경로 표. [OPENING_AXIS_OPERATIONS] 와 **같은 모양**을 내므로 등식이
+ * 업무 배정의 뒤바뀜까지 잡는다(공사 경로가 용역 자리에 앉은 꼴).
  *
- * **왜 입구에서 단언하는가**(M9 v M-1): 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
+ * **왜 텍스트를 받지 않는가**(M12 — ⓐ): 추출이 정규식 일치를 쓰므로 **주석 한 줄이 실제 값을
  * 가릴 수 있었다** — 출하 경로를 바꾸고 옛 값을 바로 위 주석에 두면 추출이 그 주석을 집어 등식이
  * **초록으로 지나갔다**(그 축은 조용한 404 로만 나타난다). 걷기는 **공유 한 자리**가 하고
- * (M10/gates-web), 이 입구는 받은 텍스트가 **그 읽기가 내준 바로 그것인지**를 단언한다(M11).
+ * (M10/gates-web), M11 은 이 입구에서 받은 텍스트의 **출처를 단언**했다. 그 단언은 **잊을 수 있는
+ * 호출**이었고 방어가 모집단 추적에 매달렸다 — 그래서 입구가 텍스트를 받지 않는다. **키와 커널을
+ * 읽기에 건네고**, 원문은 읽기 모듈 밖으로 나오지 않는다.
  */
-export function shippedOpeningOperationPaths(source) {
-  return openingOperationPathsOf(assertStrippedKotlin(source));
+export function shippedOpeningOperationPaths() {
+  return withKotlinSource('openingEndpoints', openingOperationPathsOf);
 }
 
 /** 출하 본문 → **공고 하나가 받는 상세 축의 수**(cr MEDIUM-1 처방의 입력). */
-export function shippedDetailAxisCounts(source) {
-  return detailAxisCountsOf(assertStrippedKotlin(source));
+export function shippedDetailAxisCounts() {
+  return withKotlinSource('detailAxes', detailAxisCountsOf);
 }
 
-/** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
-export function shippedNoticeListOperations(source) {
-  return noticeListOperationsOf(assertStrippedKotlin(source));
+/** 출하 속성 파일 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
+export function shippedNoticeListOperations() {
+  return withKotlinSource('noticeEndpoints', noticeListOperationsOf);
 }
 
-/** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
-export function shippedProgressLabels(source) {
-  return progressLabelsOf(assertStrippedKotlin(source));
+/** 출하 정책 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
+export function shippedProgressLabels() {
+  return withKotlinSource('progressPolicy', progressLabelsOf);
 }
 
 /**
