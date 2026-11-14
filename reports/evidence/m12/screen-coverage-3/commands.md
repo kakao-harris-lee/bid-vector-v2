@@ -121,7 +121,7 @@ DOM 어휘 게이트), 표적 **72 칸**, 같은 명령. 변이는 전부 **바�
 
 ## acceptance — CI `web` job 전건
 
-`web/` 에서 CI 와 같은 명령으로 돌렸다.
+`web/` 에서 CI 와 같은 명령으로 돌렸다. **r1 수정 라운드 뒤 그 head 에서 전건을 다시 돌린 결과**다 (게이트 술어를 바꾸는 커밋이 둘 있었으므로 부분 재실행으로 갈음하지 않았다).
 
 | 단계 | 명령 | 결과 |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ DOM 어휘 게이트), 표적 **72 칸**, 같은 명령. 변이는 전부 **바�
 | W-3 | `npm run typecheck` | exit 0 |
 | W-4 | `npm run gate:src-tree` | exit 0 |
 | W-5 | `npm run api:types:check` | exit 0 |
-| W-6 | `npm run test` | exit 0 · 1007 passed |
+| W-6 | `npm run test` | exit 0 · **1010 passed** — 이 수는 **r1 head** 의 것이다(r1 v L-1). 착수 판에서 1007 로 적었고, 그 뒤 세 칸이 늘었다: 조상 카드 음성 대조 하나 · r1 의 H-1·M-3 대조 둘 |
 | W-7 | `npm run gate:tests` | exit 0 — 등록부의 게이트 test 가 W-6 수집에 있고 skipped/todo/failed 0 |
 | W-8 | `npm run build` | exit 0 |
 | W-9 | `npm run gate:boundary-canary` | exit 0 — 메인·워커 두 그래프에서 경계가 활성 |
