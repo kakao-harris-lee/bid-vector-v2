@@ -348,7 +348,12 @@ export interface ReadsAfterWrite {
    * 타임아웃이다 — 낡은 값으로 초록이 되는 것보다 낫다(PR #118 CR r1 L-2). 그때 볼 자리는
    * 그 쓰기의 `invalidateQueries` 다.
    */
-  readonly afterWrite: (isWrite: (one: Request) => boolean, label: string) => WriteThenRead;
+  readonly afterWrite: (
+    isWrite: (one: Request) => boolean,
+    label: string,
+    /** 그 쓰기가 성공으로 받는 상태 — 담기는 생성이라 201 도 성공이다(계약). */
+    okStatuses?: readonly number[],
+  ) => WriteThenRead;
   /** 요청 장부를 걷는다 — 한 여정이 이 자리를 여러 번 세울 때 청취자를 쌓지 않으려는 것이다. */
   readonly stop: () => void;
 }
@@ -377,7 +382,11 @@ export function readsAfterWrite(page: Page, isRead: (one: Request) => boolean): 
   };
   page.on('request', ledger);
   return {
-    afterWrite(isWrite: (one: Request) => boolean, label: string): WriteThenRead {
+    afterWrite(
+      isWrite: (one: Request) => boolean,
+      label: string,
+      okStatuses: readonly number[] = [200],
+    ): WriteThenRead {
       // 봉인은 **응답 핸들러 안에서** 한다 — 그러면 봉인과 다시 읽기의 출발 순서가 **이벤트
       // 디스패치로** 보장된다. `await` 뒤로 미룬 판은 순서가 런타임의 처리 순서에 달린다
       // (PR #118 v r1 L-1 변이 M3 GREEN).
@@ -401,7 +410,7 @@ export function readsAfterWrite(page: Page, isRead: (one: Request) => boolean): 
       void read.catch(() => {});
       const write = (async () => {
         const response = await written;
-        expect(response.status(), `${label} 쓰기 응답`).toBe(200);
+        expect(okStatuses, `${label} 쓰기 응답`).toContain(response.status());
         return response;
       })();
       // 읽기는 **쓰기 단언을 지난 뒤** 돌려준다 — 쓰기가 터진 자리에서 읽기 타임아웃이 겹치면
@@ -576,11 +585,20 @@ export async function ensureInBidBox(page: Page, card: Locator): Promise<boolean
   if ((await addButton.count()) === 0) {
     return false;
   }
-  const added = page.waitForResponse(
-    (one) => one.url().endsWith('/api/bid-cases') && one.request().method() === 'POST',
+  // 담기도 쓰기이고, 오늘의 공고 화면이 그 뒤에 건 목록을 다시 읽는다(`invalidateQueries`).
+  // 그 다시 읽기를 **떠나기 전에 거둔다** — 거두지 않으면 부르는 쪽이 워크시트로 가며 거는
+  // 「내가 연 화면의 건 목록」 포착이 **이 담기가 낳은 늦은 응답**을 집는다(실측: 클릭보다
+  // 1.6ms 앞서 출발한 읽기가 걸렸다).
+  const caseListReads = readsAfterWrite(page, isBidCaseListRead);
+  const added = caseListReads.afterWrite(
+    (one) => one.method() === 'POST' && one.url().endsWith('/api/bid-cases'),
+    '담기',
+    [200, 201],
   );
   await addButton.click();
-  expect([200, 201]).toContain((await added).status());
+  await added.write;
+  await added.read;
+  caseListReads.stop();
   return true;
 }
 
