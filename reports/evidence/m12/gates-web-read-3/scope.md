@@ -21,6 +21,8 @@ in_scope:                          # 팀장 착수 판정(2026-11-14)으로 확�
   - web/playwright.journey.config.ts              # ⓑ⑥ — 같음(여정 하네스)
   - web/eslint.config.js                          # ⓑ⑥ — 뿌리 config 전수가 모집단이다
   - web/package.json                              # ⓑ⑥ — `node` 진입점 전수 — §공유 파일
+  - web/scripts/kotlin-raw-glob-probe.mjs         # 신설 — ⓑ⑤ 의 상설 양성 대조(구현 중 등재)
+  - web/e2e/kotlin-read-guard.spec.ts             # 신설 — ⓑ⑥ 의 spec 프로세스 대조(구현 중 등재)
   - web/config/gate-tests.txt                     # ⓕ-2 — 등록부 산문 한 줄 — §공유 파일
   - docs/discovery/capability-map.md              # §12.3 의 새 하위 절 하나 — §절 글자
   - reports/evidence/m12/gates-web-read-3/
@@ -133,6 +135,11 @@ M11 은 이 축을 「진입점마다 미리 적재하는 것은 **진입점 열
 
 ## 갱신 이력
 
+- 2026-11-14 r2 — 구현이 만든 **신설 파일 둘**을 in_scope 와 대조해 등재했다(복원 목록 산출에서
+  드러난 자리다): `web/scripts/kotlin-raw-glob-probe.mjs`(ⓑ⑤ 의 상설 양성 대조 — 적재만으로
+  Kotlin 을 끌어오려는 모듈이고, 그 거절을 층 test 가 잰다) · `web/e2e/kotlin-read-guard.spec.ts`
+  (ⓑ⑥ — 의무 게이트가 **배선만** 보므로 spec 프로세스가 실제로 층 아래인지 재는 자리). 설계 검토의
+  미달 「ⓑ⑤ 의 문면」과 신설 OPEN 다섯은 §12.3 (p) 에 등재했다.
 - 2026-11-14 r1 — 팀장 착수 판정 반영. ① 처분 확정(ⓐ·ⓑ③·ⓑ⑤·ⓕ-1 닫음 · ⓕ-2 정적 층 보강 ·
   ⓑ①②④·ⓒ·ⓓ·ⓔ·ⓕ-3 등재 유지) ② **ⓑ⑥ 승인** — 마지막·별 커밋, 진입점 집합은 구성으로,
   깨지면 그 커밋만 되돌리고 등재 ③ **ⓐ 처방 승인** — 함께 움직이는 파일이 in_scope ④ 12D 와
