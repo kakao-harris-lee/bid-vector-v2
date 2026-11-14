@@ -98,8 +98,8 @@ M11 이 닫은 일곱(별칭·재수출·네임스페이스·지역 변수 · �
 
 | 표면 | 새것인가 | 지나지 않고 같은 값을 얻는 길 | 처분 |
 | --- | --- | --- | --- |
-| `VOCABULARY_DECLARATIONS` | **의미 변경**(씨앗 여덟) | 씨앗을 빼서 의무를 줄이는 길 | 열거이고 diff 에 남는다 — 등식·`stale`·`contradicted` 가 받는다 |
-| `VOCABULARY_MODULE_EXCLUSIONS` | **의미 변경**(행 26 증가) | 제외를 늘려 새 함수를 조용히 통과시키는 길 | 경계 밖(「분류를 거짓으로 적는 저자」). 다만 `contradicted` 가 **모든 종류**에 붙어 폐포가 닿는 순간 붉다 |
+| `VOCABULARY_DECLARATIONS` | **의미 변경**(씨앗 **아홉** — 설계 검토 때 여덟이었고 r1 전에 명령 축 하나가 더 들어왔다) | 씨앗을 빼서 의무를 줄이는 길 | 열거이고 diff 에 남는다 — 등식·`stale`·`contradicted` 가 받는다 |
+| `VOCABULARY_MODULE_EXCLUSIONS` | **의미 변경**(행 **+25** — base 7 → **32**. 설계 검토의 26 은 명령 축이 씨앗으로 가기 전의 수다) | 제외를 늘려 새 함수를 조용히 통과시키는 길 | 경계 밖(「분류를 거짓으로 적는 저자」). 다만 `contradicted` 가 **모든 종류**에 붙어 폐포가 닿는 순간 붉다 |
 | `vocabularyComponentsOf(program, source, webRoot)` | **의미 변경**(카드 술어 추가 · 셋째 인자 신설) | 소비자가 자기 훑기를 쓰는 길 — 소비자는 게이트 test 하나이고 in_scope 다 | 그대로 |
 | `vocabularyRegistryGaps` → `{unclassified, stale, leaked, contradicted, unkeyed}` | **의미 변경 + 버킷 둘 신설** | 버킷을 읽지 않아 조용해지는 길 | 게이트 test 가 **객체 전체**를 `toStrictEqual` 로 맞댄다 — 키를 더해도 읽지 않으면 그 단언이 깨진다 |
 | `collectScreenVocabulary(webRoot, overlay)` | **의미 변경**(모집단 `src/**`) | 프로그램에 파일이 없어 빈 집합이 되는 길 | 기존 throw 유지 + 파일 수 하한 단언 |

@@ -512,7 +512,11 @@ export function displayVocabularyReach(program, webRoot) {
  * 그래서 특별 분기를 없애고 **모든 의무를 자리로 한정한다** — 규칙이 하나가 되고 접힘이 사라진다.
  */
 function obligationKeyOf(exported, declaration) {
-  return relativeKeyOf(declaration, exported.getName()) ?? exported.getName();
+  // 폴백을 두지 않는다(r1 cr N-1). 부르는 자리가 `declarationKeyOf(declaration)` 의 **성공**을
+  // 이미 요구하고, `relativeKeyOf` 의 성패는 **파일 이름만**으로 갈린다(설치본 가드 · `/src/`
+  // 마커) — 그래서 이 자리에 오면 반드시 자리가 나온다. 「자리가 안 나오면 `unkeyed` 로 붉다」는
+  // 규율과 한 말이 되고, 혹시 그 불변이 깨지면 집합 등식이 `undefined` 로 **크게** 붉는다.
+  return relativeKeyOf(declaration, exported.getName());
 }
 
 /**
