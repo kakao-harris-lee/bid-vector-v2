@@ -44,7 +44,6 @@ import {
   runnerLine,
   shippedDetailAxisCounts,
 } from './opening-axis.mjs';
-import { readKotlinSource } from '../../scripts/kotlin-source.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..', '..');
@@ -134,8 +133,8 @@ const OPENING_DESIGN = openingAxisDesign(
  * 리터럴로 두면 이 slice 가 업종 목록에서 닫은 드리프트를 다시 만든다.
  */
 const OPENING_EXPECTATION = promotionExpectation(OPENING_DESIGN, {
-  // 경로를 여기서 알지 않는다(r2 — verifier r1 M-2): 키를 넘기고 걷힌 텍스트를 받는다.
-  detailAxesPerNotice: shippedDetailAxisCounts(readKotlinSource('detailAxes')),
+  // 경로도 키도 여기서 알지 않는다(M12 — ⓐ): 입구가 자기 키를 쥐고 읽기가 원문을 커널에 먹인다.
+  detailAxesPerNotice: shippedDetailAxisCounts(),
 });
 
 /**

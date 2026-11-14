@@ -22,7 +22,7 @@ import {
 // 읽기가 내준 그것인지를 단언하므로, 합성 Kotlin 조각은 술어가 돌기 전에 거부된다. 그래서 술어를
 // 재는 대조는 커널로, 출처를 재는 대조는 입구로 간다 — 아래 두 묶음이 그것이다.
 import { detailAxisCountsOf, openingOperationPathsOf } from './opening-axis-extract.mjs';
-import { readKotlinSource } from '../../scripts/kotlin-source.mjs';
+import { withKotlinSource } from '../../scripts/kotlin-source.mjs';
 
 /**
  * 개찰 축 하네스의 **게이트 술어**(M9/opening-harness) — 등식 넷을 잠근다.
@@ -44,16 +44,14 @@ const repoRoot = resolve(webRoot, '..');
 
 const read = (relative) => readFileSync(resolve(repoRoot, relative), 'utf8');
 
-// Kotlin 정본의 **경로를 여기서 알지 않는다**(r2 — verifier r1 M-2). 아래 넷은 읽기 집합의
-// **키**이고, 경로 표와 읽기는 공유 모듈이 소유한다 — 원문을 쥘 수 없으면 걷기 사본도 살 수 없다.
-/** 출하 기본값의 정본 — 개찰 축 엔드포인트 표. */
+// Kotlin 정본의 **경로를 여기서 알지 않는다**(r2 — verifier r1 M-2). 경로 표와 읽기는 공유 모듈이
+// 소유한다 — 원문을 쥘 수 없으면 걷기 사본도 살 수 없다.
+//
+// **키도 여기서 넷을 알지 않는다**(M12 — ⓐ). 입구 넷이 각자 자기 키를 쥐고 읽기에 건네므로
+// 호출부가 키를 고를 자리가 없다(앞 판은 네 키를 여기 두고 호출마다 골랐다 — 잘못 고를 수 있는
+// 자리였다). 남는 하나는 **커널 대조를 읽기 안에서 돌리는** 세 칸이 쓰는 키다.
+/** 출하 기본값의 정본 — 개찰 축 엔드포인트 표. 커널 대조 세 칸이 이 키로 원문을 연다. */
 const SHIPPED_ENDPOINTS = 'openingEndpoints';
-/** 공고 목록 오퍼레이션 표의 정본. */
-const SHIPPED_NOTICE_ENDPOINTS = 'noticeEndpoints';
-/** 상세 축 열거의 정본 — 공고 하나가 받는 축 수(공사 넷 · 용역 셋)가 여기서 나온다. */
-const SHIPPED_DETAIL_AXES = 'detailAxes';
-/** 진행구분 라벨 → 상태 정책의 정본. */
-const SHIPPED_POLICY = 'progressPolicy';
 /**
  * 계약 열거의 **런타임 운반체**. 이 표는 `satisfies Record<OpeningResultState, StateDisplay>` 라
  * 전수를 `tsc` 가 강제한다 — 계약이 열을 더하면 typecheck 가 먼저 붉어지고 이 등식이 이어 붉어진다.
@@ -110,7 +108,7 @@ describe('ⓐ 설계 집합 == 계약 열거 아홉', () => {
 
 describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
   it('fake 가 섬기는 개찰 축 경로가 출하 기본 표와 같다(업무 배정까지)', () => {
-    expect(shippedOpeningOperationPaths(readKotlinSource(SHIPPED_ENDPOINTS))).toStrictEqual(OPENING_AXIS_OPERATIONS);
+    expect(shippedOpeningOperationPaths()).toStrictEqual(OPENING_AXIS_OPERATIONS);
   });
 
   it('출하 기본값을 찾지 못하면 통과가 아니라 거부다', () => {
@@ -129,67 +127,82 @@ describe('ⓑ 오퍼레이션 이름 == 출하 기본값', () => {
    * (`scripts/kotlin-source.test.mjs` — 가리는 선언을 걷으면 실제 값만 남는다).
    */
   it('가리는 줄이 걷힌 뒤에도 실제 값을 집는다', () => {
-    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
-    const shadowed = shipped.replace(
-      'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
-      '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
-    );
+    // **대조를 읽기 안에서 돌린다**(M12 — ⓐ). 원문을 밖으로 빼내지 않고 넘긴 함수 안에서
+    // 심은 변이를 만들어 커널에 먹인다 — 이 파일은 커널을 부를 수 있는 둘 가운데 하나다.
+    withKotlinSource(SHIPPED_ENDPOINTS, (shipped) => {
+      const shadowed = shipped.replace(
+        'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
+        '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
+      );
 
-    expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
-    // 주석이 아니라 **실제 값**을 집는다 → 하네스 사본과 갈려 등식이 붉어질 값이다.
-    expect(openingOperationPathsOf(shadowed).shared.openingCompletePath).toBe(
-      'getOpengResultListInfoOpengCompt02',
-    );
-    expect(openingOperationPathsOf(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
-  });
-
-  /** 걷히지 않은 원문은 추출 자리에서 **거부된다** — 주석이 값을 가릴 기회가 오지 않는다. */
-  it('걷히지 않은 원문은 거부된다', () => {
-    const unstripped = `// 가리는 줄\n${readKotlinSource(SHIPPED_ENDPOINTS)}`;
-
-    expect(() => shippedOpeningOperationPaths(unstripped)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
-  });
-
-  it('같은 선언이 **두 자리에** 있으면 어느 것이 정본인지 서지 않으므로 거부한다', () => {
-    const twice = readKotlinSource(SHIPPED_ENDPOINTS).replace(
-      'val bidPriceFormulaAPath: String =',
-      'val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo"\n' +
-        '    val bidPriceFormulaAPath: String =',
-    );
-
-    expect(() => openingOperationPathsOf(twice)).toThrow(/정확히 하나/u);
+      expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
+      // 주석이 아니라 **실제 값**을 집는다 → 하네스 사본과 갈려 등식이 붉어질 값이다.
+      expect(openingOperationPathsOf(shadowed).shared.openingCompletePath).toBe(
+        'getOpengResultListInfoOpengCompt02',
+      );
+      expect(openingOperationPathsOf(shadowed)).not.toStrictEqual(OPENING_AXIS_OPERATIONS);
+      return shadowed.length;
+    });
   });
 
   /**
-   * **입구는 여전히 거부한다**(M11 — 팀장 조건 3). 위 셋을 커널로 옮기면서 단언이 약해지지
-   * 않았음을 같은 자리에서 잰다 — 손댄 텍스트도, 합성 조각도 **공개 입구**에서 멈춘다.
+   * **주장이 바뀌었다**(M12 — ⓐ). M11 판은 입구가 **텍스트**를 받아 출처를 단언했고, 그래서
+   * 「걷히지 않은 원문을 넘기면 거부된다」가 그 단언의 증거였다. 지금 입구는 텍스트를 받지
+   * 않으므로 그 꼴이 **표현되지 않는다** — 거부보다 강한 자리다: 무엇을 넘겨도 **답이 바뀌지
+   * 않는다**(읽기가 자기 키로 열어 커널에 먹인다).
+   *
+   * 커널에 손댄 텍스트를 먹이는 길은 여전히 있지만(이 파일이 허용 호출자다) 그 길은 **입구를
+   * 지나지 않는다** — 허용 밖 파일이 커널을 부르면 호출자 프레임이 거부한다(그 대조의 자리는
+   * `scripts/kotlin-source-ownership.test.mjs` 다).
    */
-  it('공개 입구는 손댄 텍스트와 합성 조각을 거부한다', () => {
-    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
-    const shadowed = shipped.replace(
-      'val openingCompletePath: String = "getOpengResultListInfoOpengCompt"',
-      '    val openingCompletePath: String = "getOpengResultListInfoOpengCompt02"',
-    );
+  it('입구는 텍스트를 받지 않는다 — 무엇을 넘겨도 답이 바뀌지 않는다', () => {
+    const tampered = '// 가리는 줄\nval 아무것도 없다';
 
-    expect(shadowed, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
-    expect(() => shippedOpeningOperationPaths(shadowed)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
-    expect(() => shippedOpeningOperationPaths('val 아무것도 없다')).toThrow(
-      /걷힌 Kotlin 텍스트가 아니다/u,
-    );
-    expect(() => shippedDetailAxisCounts('아무것도 없다')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(shippedOpeningOperationPaths(tampered)).toStrictEqual(OPENING_AXIS_OPERATIONS);
+    expect(shippedDetailAxisCounts(tampered)).toStrictEqual(shippedDetailAxisCounts());
+  });
+
+  it('같은 선언이 **두 자리에** 있으면 어느 것이 정본인지 서지 않으므로 거부한다', () => {
+    withKotlinSource(SHIPPED_ENDPOINTS, (shipped) => {
+      const twice = shipped.replace(
+        'val bidPriceFormulaAPath: String =',
+        'val bidPriceFormulaAPath: String = "getBidPblancListBidPrceCalclAInfo"\n' +
+          '    val bidPriceFormulaAPath: String =',
+      );
+
+      expect(twice, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
+      expect(() => openingOperationPathsOf(twice)).toThrow(/정확히 하나/u);
+      return twice.length;
+    });
+  });
+
+  /**
+   * **원문이 읽기 밖으로 나가는 길을 좁힌다**(M12 — ⓐ). 입구가 텍스트를 받지 않으므로 남는
+   * 길은 **항등 함수를 넘기는 것**이고, 읽기가 그 결과를 보고 거부한다. 문자열 동일성이라
+   * **값이 같은 사본**까지 들지만 값이 다른 사본은 지나간다 — 그 잔여는 등재된 것이다.
+   */
+  it('읽기는 원문을 그대로 돌려주는 추출을 거부한다', () => {
+    expect(() => withKotlinSource(SHIPPED_ENDPOINTS, (text) => text)).toThrow(/원문을 그대로/u);
+    expect(() => withKotlinSource(SHIPPED_ENDPOINTS, (text) => text.slice(0))).toThrow(/원문을 그대로/u);
+    expect(() => withKotlinSource(SHIPPED_ENDPOINTS, (text) => `${text}`)).toThrow(/원문을 그대로/u);
+    // 값이 다른 사본은 지나간다 — 일률 거절이 아니고, 그 잔여가 등재된 자리다.
+    expect(withKotlinSource(SHIPPED_ENDPOINTS, (text) => `${text} `).length).toBeGreaterThan(0);
   });
 
   it('문자열 안의 `//` 는 주석이 아니다 — base URL 에서 줄이 잘리면 추출이 엉뚱한 값을 본다', () => {
-    const shipped = readKotlinSource(SHIPPED_ENDPOINTS);
+    // 전제(출하 파일에 base URL 리터럴이 있다)를 읽기 **안에서** 재고, 등식은 입구로 잰다.
+    withKotlinSource(SHIPPED_ENDPOINTS, (shipped) => {
+      expect(shipped, '출하 파일에 base URL 리터럴이 없다 — 이 대조가 공허하다').toContain('https://');
+      return shipped.length;
+    });
 
-    expect(shipped, '출하 파일에 base URL 리터럴이 없다 — 이 대조가 공허하다').toContain('https://');
-    expect(shippedOpeningOperationPaths(shipped)).toStrictEqual(OPENING_AXIS_OPERATIONS);
+    expect(shippedOpeningOperationPaths()).toStrictEqual(OPENING_AXIS_OPERATIONS);
   });
 });
 
 describe('ⓕ 상세 축 수 == 출하 열거', () => {
   it('공사가 용역보다 많다 — A값이 공사 전용인 비대칭을 출하 본문에서 센다', () => {
-    const counts = shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES));
+    const counts = shippedDetailAxisCounts();
 
     // 손으로 적으면 그 비대칭이 리터럴로 굳는다(업종 목록에서 닫은 드리프트와 같은 꼴).
     expect(counts.construction).toBeGreaterThan(counts.service);
@@ -201,7 +214,7 @@ describe('ⓕ 상세 축 수 == 출하 열거', () => {
   });
 
   it('수집 걸음의 기대가 그 수에서 나온다 — 상세 축을 **실제로 불렀는가**가 등식 안이다', () => {
-    const counts = shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES));
+    const counts = shippedDetailAxisCounts();
     const expectation = promotionExpectation(design, { detailAxesPerNotice: counts });
 
     for (const [division, one] of Object.entries(expectation.divisions)) {
@@ -219,7 +232,7 @@ describe('ⓕ 상세 축 수 == 출하 열거', () => {
 
 describe('ⓒ 진행구분 어휘 == 출하 정책', () => {
   it('하네스가 쓰는 라벨 → 상태 표가 출하 정책과 같다', () => {
-    expect(shippedProgressLabels(readKotlinSource(SHIPPED_POLICY))).toStrictEqual(OPENING_PROGRESS_LABELS);
+    expect(shippedProgressLabels()).toStrictEqual(OPENING_PROGRESS_LABELS);
   });
 
   it('설계가 선언한 기대 상태는 그 라벨 표에서 유도된 값과 같다', () => {
@@ -278,7 +291,7 @@ describe('ⓓ fixture 둘의 교차 등식', () => {
   });
 
   it('공고 목록 fixture 의 오퍼레이션이 **출하 기본 표 안**이다', () => {
-    const shipped = shippedNoticeListOperations(readKotlinSource(SHIPPED_NOTICE_ENDPOINTS));
+    const shipped = shippedNoticeListOperations();
 
     // 개찰 축과 같은 사유의 등식이다 — `02` 개편이 이 이름을 바꿨을 때 fixture 는 옛 이름을
     // 들고 있었고 fake 가 404 를 내 수집이 **조용히 0건**이었다(PR #130).
@@ -429,7 +442,7 @@ describe('라우팅 표와 행 생성', () => {
 
 describe('러너 계수 등식', () => {
   const expectation = promotionExpectation(design, {
-    detailAxesPerNotice: shippedDetailAxisCounts(readKotlinSource(SHIPPED_DETAIL_AXES)),
+    detailAxesPerNotice: shippedDetailAxisCounts(),
   });
 
   it('업무마다 표본틀·표본 크기가 설계의 공고 수와 같다', () => {
