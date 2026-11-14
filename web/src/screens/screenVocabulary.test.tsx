@@ -342,8 +342,8 @@ function renderCards() {
 
 /**
  * **게이트가 마운트하는 카드 전수**(r1 v M-1 · cr H-1 ③). 손목록이지만 **비어 가는 것을 막는
- * 장치가 있다** — `scripts/screen-card-coverage.test.mjs` 가 `src/screens/**` 에서 표시 어휘를
- * 쓰는 내보낸 카드를 AST 로 모아 이 목록과 **집합 등식**을 건다. 새 카드가 생기면 그 게이트가
+ * 장치가 있다** — `scripts/screen-card-coverage.test.mjs` 가 **`src/**` 전수**에서 표시 어휘를
+ * 쓰는 내보낸 카드를 모아 이 목록과 **집합 등식**을 건다. 새 카드가 생기면 그 게이트가
  * 먼저 붉어진다.
  */
 export const GATE_MOUNTED_CARDS: readonly string[] = [
