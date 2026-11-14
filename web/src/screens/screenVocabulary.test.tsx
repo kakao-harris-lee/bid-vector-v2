@@ -10,6 +10,7 @@ import type {
   MyBidCase,
   NoticeSummary,
   OpeningResultView,
+  StrategyReadResponse,
   SuggestedNotice,
 } from '../api/queries';
 import {
@@ -28,9 +29,12 @@ import {
   type VatTreatment,
 } from '../display/moneyDisplay';
 
+import { sentValueView } from '../display/editSessionDisplay';
+
 import { BidBoxCard } from './BidBoxCard';
 import { NoticeCard, SuggestionCard } from './NoticeCard';
 import { ResultCard } from './ResultCard';
+import { StrategyEditPanel, StrategyFieldRow, type StrategyEditSession } from './strategyEdit';
 import { WorksheetTimeline } from './WorksheetTimeline';
 
 /**
@@ -204,6 +208,75 @@ function myBidCaseRow(): MyBidCase {
 }
 
 /**
+ * 전략 fixture — **예산 네 칸을 비-null 로** 채운다(r1 v M-1 의 같은 교훈). 하나라도 비면 표시
+ * 모듈의 금액 조립이 「없음」 분기만 그려 금액 문면이 **미측정**으로 남는다. 두 예산 칸의 과세·
+ * 출처를 다르게 두어 부속 문면 둘이 다 그려지게 한다.
+ */
+function strategyRow(): StrategyReadResponse {
+  return {
+    revision: 7,
+    focusCategories: ['토목'],
+    focusRegionTerms: ['서울특별시'],
+    excludeRegionTerms: [],
+    requiredKeywordTerms: [],
+    excludeKeywordTerms: [],
+    minBudgetWon: 1_200_000_000,
+    minBudgetCurrency: 'KRW',
+    minBudgetVatTreatment: 'INCLUSIVE',
+    minBudgetProvenance: 'OPERATOR_DECLARED',
+    maxBudgetWon: 3_400_000_000,
+    maxBudgetCurrency: 'KRW',
+    maxBudgetVatTreatment: 'EXCLUSIVE',
+    maxBudgetProvenance: 'PUBLISHED',
+  };
+}
+
+const noop = () => undefined;
+
+/**
+ * 열린 편집 세션 — **확인 단계**를 고른다(그 단계가 지금 값과 보낸 값 **둘**을 그리는 유일한
+ * 자리다). 세션은 평범한 `readonly` 인터페이스라 리터럴로 선다(캐스팅이 없다).
+ *
+ * `expiresAt` 에 **금지 목록의 ISO 원문**을 싣는다 — 패널이 그 값을 그리기 시작하면 이 게이트의
+ * 시각 단언이 그 자리에서 멈춘다(지금은 그리지 않는 것이 맞다, D-7E-4).
+ */
+function editSession(strategy: StrategyReadResponse): StrategyEditSession {
+  return {
+    open: {
+      session: {
+        sessionId: 'SYN-M12-SESSION',
+        state: 'WAITING_FOR_CONFIRMATION',
+        field: 'MIN_BUDGET',
+        sessionVersion: 2,
+        expiresAt: ISO_CHECKPOINT,
+        strategyRevision: strategy.revision,
+      },
+      field: 'MIN_BUDGET',
+      sent: sentValueView('MIN_BUDGET', {
+        commandId: 'SYN-M12-COMMAND',
+        field: 'MIN_BUDGET',
+        amountWon: 2_500_000_000,
+      }),
+    },
+    inProgress: true,
+    busy: false,
+    isError: false,
+    error: null,
+    conflictCode: null,
+    raw: '',
+    missing: false,
+    begin: noop,
+    retry: noop,
+    onRaw: noop,
+    onSendValue: noop,
+    onConfirm: noop,
+    onEdit: noop,
+    onCancel: noop,
+    dismiss: noop,
+  };
+}
+
+/**
  * `ResultCard` 는 `UseQueryResult` 를 받는다. **손으로 지어내지 않는다**(캐스팅은 이 저장소가
  * 거부하는 꼴이다) — 실제 `useQuery` 를 fixture 로 풀어 그 값을 그대로 넘긴다.
  */
@@ -242,6 +315,14 @@ function renderCards() {
       </ul>
       <ResultCardHarness />
       <WorksheetTimeline entries={timelineRows()} />
+      {/*
+        **표시층 파일 사이로 금액 문면에 닿는 둘**(M12/12B — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`
+        ⓐ). 비공개 조립 함수와 함수 값 표를 지나 그리므로 앞 판의 모집단 판정이 이 둘을 보지
+        못했다. `<ul>` 밖에 둔다 — 행이 아니라 묶음이다.
+      */}
+      <StrategyFieldRow field="MIN_BUDGET" strategy={strategyRow()} disabled={false} onBegin={noop} />
+      <StrategyFieldRow field="MAX_BUDGET" strategy={strategyRow()} disabled={false} onBegin={noop} />
+      <StrategyEditPanel session={editSession(strategyRow())} strategy={strategyRow()} />
     </>
   );
   const router = createMemoryRouter([{ path: '/', element: tree }], { initialEntries: ['/'] });
@@ -265,6 +346,9 @@ export const GATE_MOUNTED_CARDS: readonly string[] = [
   'BidBoxCard',
   'WorksheetTimeline',
   'ResultCard',
+  // M12/12B — 어휘 도달이 표시층 **파일 사이**로 넓어져 의무가 된 둘(계약이 승인한 +2).
+  'StrategyFieldRow',
+  'StrategyEditPanel',
 ];
 
 /** 화면 E 카드는 질의 결과를 받으므로 적재가 끝나기를 기다린 뒤 글자를 읽는다. */
@@ -413,6 +497,20 @@ describe('화면이 그린 글자에 금액 토큰 원문이 없다 (D-4)', () =
     // 칸마다 제 요소로 그려지는 자리는 **잎 글자 등식**으로 — 숫자에 붙은 토큰을 글자 경계가
     // 세지 못한다(r2 표적 재검증 실측).
     expect(leafTokenHits(container, MONEY_TOKENS), '원문 토큰이 제 칸에 그대로 섰다').toStrictEqual([]);
+  });
+
+  /**
+   * **음성 대조 — 새로 마운트한 둘이 실제로 금액을 그린다**(M12/12B). 마운트 목록에 이름을
+   * 더하는 것만으로는 아무것도 재지 않는다: 그 카드가 빈 분기만 그리면 금지 단언이 그 자리에서
+   * 공허하다. 세 수는 각각 **지금 값 둘**(칸 행)과 **보낸 값**(확인 단계)이다.
+   */
+  it('표시층 파일 사이로 닿는 금액 문면이 실제로 그려진다', async () => {
+    const { container } = await renderAll();
+    const text = container.textContent ?? '';
+
+    expect(text, '최소 예산의 지금 값이 없다').toContain('1,200,000,000');
+    expect(text, '최대 예산의 지금 값이 없다').toContain('3,400,000,000');
+    expect(text, '확인 단계의 보낸 값이 없다').toContain('2,500,000,000');
   });
 
   /**

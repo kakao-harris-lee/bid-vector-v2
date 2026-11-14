@@ -7,6 +7,7 @@ base_sha: 10d208d2664c6bb87cd7082a2853c08c2c0d3236   # 착수 커밋에서 기�
 head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다
 in_scope:
   - web/scripts/screen-card-coverage.mjs          # ⓐⓑⓒⓓ 판정과 모집단
+  - web/scripts/screen-vocabulary-registry.mjs    # 신설 — 씨앗과 분류 장부(데이터). §계약 갱신 (1)
   - web/scripts/screen-card-coverage.test.mjs     # 그 판정의 양성·음성 대조
   - web/src/screens/screenVocabulary.test.tsx     # 마운트 목록 +2 와 DOM 게이트(계약이 승인한 의무 증가)
   - web/config/gate-tests.txt                     # 새 게이트 test **파일**이 생기면 같은 커밋에서 등재(오늘 계획상 0)
@@ -58,6 +59,20 @@ rollback: rollback.md
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신
+
+**(1) 새 파일 하나 — 장부를 데이터로 뺀다.** 씨앗과 분류 표가 26 행 늘어 판정 코드와 한 파일에
+두면 파일이 권고 한도를 넘고, 사람이 고치는 자리와 기계가 세는 자리가 섞인다. 그래서
+`web/scripts/screen-vocabulary-registry.mjs` 를 신설해 **데이터만** 담고 판정 코드는 그것을 들여온다
+(크기 회피용 기계적 분할이 아니라 역할 경계다). 게이트 test **파일**이 아니므로 `gate-tests.txt`
+편집은 없다.
+
+**(2) 씨앗 하나 더 — 명령 축**(팀장 판정 대기, 추천안으로 진행). DOM 게이트는 명령 토큰도
+금지하는데 씨앗 여덟은 전부 금액·시각이었다. 그래서 명령 축의 입구를 「어휘가 아니다」로 분류하면
+그 사유가 거짓이 된다. 실측상 그것을 씨앗으로 더해도 **마운트 의무는 7 그대로**다(그것을 부르는
+카드가 모두 이미 의무다). 팀장이 거절하면 그 한 행만 되돌린다.
+
 ## 갱신 이력
 
 - 2026-11-14 초판(착수 보고와 함께).
+- 2026-11-14 설계 검토 승인 뒤 — §계약 갱신 (1)(2) · in_scope 에 장부 파일 하나.
