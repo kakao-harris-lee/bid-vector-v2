@@ -223,15 +223,19 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   // 투찰 예정 초안 — 금액·과세를 적으면 primary 가 초안으로 바뀌어 있다.
   await page.getByTestId('record-amount').fill('1050000000');
   await page.getByTestId('record-vat').selectOption('INCLUSIVE');
-  const drafted = page.waitForResponse((one) => one.url().includes('/draft') && one.request().method() === 'POST');
+  const drafted = timelineReads.afterWrite(
+    (one) => one.method() === 'POST' && one.url().endsWith('/draft'),
+    '투찰 예정 초안',
+  );
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰 예정 초안');
   await page.getByTestId('worksheet-primary').click();
-  const draftResponse = await drafted;
-  expect(draftResponse.status()).toBe(200);
+  const draftResponse = await drafted.write;
   const draftedCase = (await draftResponse.json()) as BidCaseRow;
   await expect(page.getByTestId('worksheet-case-state')).toHaveText(
     CASE_STATE_LABEL[draftedCase.state] ?? draftedCase.state,
   );
+  // [cr MEDIUM-2 선측정] 초안이 낳은 타임라인 다시 읽기를 여기서 거둔다.
+  await drafted.read;
 
   // 「제출함」 — 같은 입력으로 기록하고 **응답이 준 상태**를 화면이 보인다.
   await page.getByTestId('record-amount').fill('1050000000');
