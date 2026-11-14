@@ -220,7 +220,10 @@ function strategyRow(): StrategyReadResponse {
     excludeRegionTerms: [],
     requiredKeywordTerms: [],
     excludeKeywordTerms: [],
-    minBudgetWon: 1_200_000_000,
+    // **이 파일에서 유일한 값**이어야 한다(r1 cr F-3). 앞 판은 공고 fixture 의 기초금액과 같은
+    // 값이어서, 아래 「실제로 그려진다」 단언이 `NoticeCard` 가 그린 글자로 통과했다 — 즉
+    // `StrategyFieldRow` 가 아무것도 그리지 않아도 초록이었다.
+    minBudgetWon: 1_230_000_000,
     minBudgetCurrency: 'KRW',
     minBudgetVatTreatment: 'INCLUSIVE',
     minBudgetProvenance: 'OPERATOR_DECLARED',
@@ -297,6 +300,9 @@ function ResultCardHarness() {
 
 /** 카드들은 `<Link>` 를 쓴다 — 라우터 안에서 그린다(실화면과 같은 해석). */
 function renderCards() {
+  // **하나만 만든다**(r1 cr F-12) — 행과 패널이 같은 객체를 보므로 「패널이 보는 값 == 행이
+  // 보는 값」이 구조로 선다.
+  const strategy = strategyRow();
   const tree = (
     <>
       <ul>
@@ -320,9 +326,9 @@ function renderCards() {
         ⓐ). 비공개 조립 함수와 함수 값 표를 지나 그리므로 앞 판의 모집단 판정이 이 둘을 보지
         못했다. `<ul>` 밖에 둔다 — 행이 아니라 묶음이다.
       */}
-      <StrategyFieldRow field="MIN_BUDGET" strategy={strategyRow()} disabled={false} onBegin={noop} />
-      <StrategyFieldRow field="MAX_BUDGET" strategy={strategyRow()} disabled={false} onBegin={noop} />
-      <StrategyEditPanel session={editSession(strategyRow())} strategy={strategyRow()} />
+      <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
+      <StrategyFieldRow field="MAX_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
+      <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />
     </>
   );
   const router = createMemoryRouter([{ path: '/', element: tree }], { initialEntries: ['/'] });
@@ -504,15 +510,24 @@ describe('화면이 그린 글자에 금액 토큰 원문이 없다 (D-4)', () =
   /**
    * **음성 대조 — 새로 마운트한 둘이 실제로 금액을 그린다**(M12/12B). 마운트 목록에 이름을
    * 더하는 것만으로는 아무것도 재지 않는다: 그 카드가 빈 분기만 그리면 금지 단언이 그 자리에서
-   * 공허하다. 세 수는 각각 **지금 값 둘**(칸 행)과 **보낸 값**(확인 단계)이다.
+   * 공허하다.
+   *
+   * **글자를 카드의 제 칸에서 읽는다**(r1 cr F-3 처방을 한 걸음 더). 화면 전체 글자로 재면 같은
+   * 수를 다른 카드가 그려도 통과한다 — 값을 유일하게 바꿔도 **패널의 「지금 값」이 행과 같은
+   * 칸을 그리므로** 행을 언마운트해도 초록이었다(실측). 칸을 지정하면 그 카드가 사라지는 순간
+   * 조회가 먼저 죽는다.
    */
-  it('표시층 파일 사이로 닿는 금액 문면이 실제로 그려진다', async () => {
-    const { container } = await renderAll();
-    const text = container.textContent ?? '';
+  it('표시층 파일 사이로 닿는 금액 문면이 각 카드의 제 칸에 그려진다', async () => {
+    await renderAll();
 
-    expect(text, '최소 예산의 지금 값이 없다').toContain('1,200,000,000');
-    expect(text, '최대 예산의 지금 값이 없다').toContain('3,400,000,000');
-    expect(text, '확인 단계의 보낸 값이 없다').toContain('2,500,000,000');
+    expect(screen.getByTestId('strategy-value-MIN_BUDGET').textContent, '최소 예산 행의 지금 값').toContain(
+      '1,230,000,000',
+    );
+    expect(screen.getByTestId('strategy-value-MAX_BUDGET').textContent, '최대 예산 행의 지금 값').toContain(
+      '3,400,000,000',
+    );
+    expect(screen.getByTestId('edit-current-value').textContent, '패널의 지금 값').toContain('1,230,000,000');
+    expect(screen.getByTestId('edit-sent-value').textContent, '패널의 보낸 값').toContain('2,500,000,000');
   });
 
   /**
