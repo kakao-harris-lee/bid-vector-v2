@@ -265,15 +265,30 @@ describe('여는 행위 — 감싸기가 생성·동일성 계약을 바꾸지 �
  *
  * 늘리거나 줄이면 이 줄이 먼저 붉어지고, 사람이 그 표면이 무엇을 내주는지 보고 판단한다.
  */
-describe('여는 행위 — 공개 표면이 셋으로 고정된다', () => {
-  it('export 집합이 정확히 셋이다', async () => {
+describe('여는 행위 — 공개 표면이 다섯으로 고정된다', () => {
+  /**
+   * **셋에서 다섯으로 늘었다**(r2 — cr HIGH). 악수 둘(`runWithInFlightText` · `isInFlightText`)이
+   * 들어왔다. 늘린 사유를 여기 적는다: 읽기 모듈과 추출 커널이 **둘 다 이 층을 이미 쓰므로**
+   * 슬롯을 여기 두면 공유 읽기가 특정 하네스의 커널을 알 필요가 없다. 내주는 것은 **불리언**이고
+   * 거는 자리는 호출자 프레임으로 읽기 하나에 고정된다.
+   */
+  it('export 집합이 정확히 다섯이다', async () => {
     const namespace = await import('./kotlin-read-guard.mjs');
 
     expect(Object.keys(namespace).sort(), '층의 공개 표면이 바뀌었다 — 늘었는지 줄었는지 보고 판단하라').toStrictEqual([
       'callerOutside',
       'installKotlinReadGuard',
+      'isInFlightText',
       'isKotlinSourcePath',
+      'runWithInFlightText',
     ]);
+  });
+
+  /** 악수를 거는 자리는 **읽기 하나**다 — 밖에서 걸려 하면 던진다(프레임으로 판정). */
+  it('읽기 밖에서는 in-flight 텍스트를 걸 수 없다', async () => {
+    const { runWithInFlightText } = await import('./kotlin-read-guard.mjs');
+
+    expect(() => runWithInFlightText('아무 텍스트', () => 1)).toThrow(/읽기 모듈만 건다/u);
   });
 });
 

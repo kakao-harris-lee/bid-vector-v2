@@ -163,6 +163,47 @@ function refusal(caller, target) {
   );
 }
 
+/**
+ * **읽기가 추출 함수를 부르는 동안 그 텍스트를 걸어 두는 비공개 슬롯**(M12 r2 — cr HIGH).
+ *
+ * 왜 여기 있나: 읽기 모듈과 추출 커널이 **둘 다 이 층을 이미 쓴다**(호출자 판정). 슬롯을 커널에
+ * 두면 읽기가 한 소비자의 커널을 import 해야 하고, 그러면 공유 읽기가 특정 하네스를 알게 된다.
+ *
+ * 무엇을 막나: `bind` 처럼 **프레임을 남기지 않는 래퍼**로 손댄 텍스트를 미리 채워 읽기에 넘기면,
+ * 커널이 보는 호출자가 **읽기 모듈**이 되어 호출자 판정을 지나간다(실측). 커널은 읽기 경유
+ * 호출일 때 **받은 텍스트가 걸린 텍스트인지**를 함께 묻는다 — 값 동일성을 전역으로 되돌리는 것이
+ * 아니라 **그 한 호출에만** 거는 것이라, 단위 test 가 합성 조각을 먹이는 길은 그대로다.
+ */
+let inFlightText;
+
+/**
+ * 텍스트를 걸고 `run` 을 부른 뒤 **반드시 비운다**. 거는 자리는 **읽기 모듈 하나**이고 그것을
+ * 호출자 프레임으로 단언한다.
+ *
+ * **중첩을 금지한다**: 걸려 있는데 또 걸면 던진다. 허용하면 안쪽 호출이 바깥 슬롯을 덮어, 바깥
+ * 호출의 단언이 **다른 값**을 기준으로 서게 된다.
+ */
+export function runWithInFlightText(text, run) {
+  const caller = callerOutside(undefined);
+  if (caller !== OWNER) {
+    throw new Error(`[kotlin-read-guard] ${caller} 가 in-flight 텍스트를 걸려 했다 — 읽기 모듈만 건다`);
+  }
+  if (inFlightText !== undefined) {
+    throw new Error('[kotlin-read-guard] in-flight 텍스트가 이미 걸려 있다 — 읽기를 중첩해 부를 수 없다');
+  }
+  inFlightText = text;
+  try {
+    return run();
+  } finally {
+    inFlightText = undefined;
+  }
+}
+
+/** 걸린 텍스트와 같은가. **값을 내주지 않는다** — 묻는 쪽이 이미 쥔 값으로만 답한다. */
+export function isInFlightText(text) {
+  return inFlightText !== undefined && text === inFlightText;
+}
+
 /** 거부해야 하면 그 오류를, 아니면 `undefined` 를 낸다. 호출·생성 트랩이 같은 판정을 쓴다. */
 function refusalFor(args) {
   const target = kotlinTargetOf(args);

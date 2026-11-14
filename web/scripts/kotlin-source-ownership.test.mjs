@@ -565,6 +565,45 @@ describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
     }
   });
 
+  /**
+   * **프레임 없는 래퍼로 호출자를 세탁하는 길**(r2 — cr HIGH). `bind` 는 스택에 프레임을 남기지
+   * 않으므로, 손댄 텍스트를 미리 채운 래퍼를 **읽기에 넘기면** 커널이 보는 호출자가 읽기 모듈이
+   * 된다 — 이 slice 가 허용 호출자를 입구에서 읽기로 옮기며 **새로 연** 자리다.
+   *
+   * 읽기가 `extract` 직전에 그 텍스트를 비공개 슬롯에 걸고 커널이 **읽기 경유 호출일 때만**
+   * 동일성을 단언하므로, 손댄 값은 그 자리에서 던진다. **진짜 값은 지나간다**(음성 대조) —
+   * 일률 거절이 아니다.
+   */
+  it('K5 — bind 로 미리 채운 손댄 텍스트는 읽기를 통해서도 커널에 닿지 않는다', async () => {
+    const kernel = await import('../e2e/harness/opening-axis-extract.mjs');
+    const marker = 'getOpengResultListInfoOpengCompt';
+    let shipped;
+    withKotlinSource('openingEndpoints', (text) => {
+      shipped = text;
+      return text.length;
+    });
+    const tampered = shipped.replace(`${marker}"`, `${marker}02"`);
+
+    expect(tampered, '재현 원문이 만들어지지 않았다').not.toBe(shipped);
+    // 세탁 꼴 둘 — 둘 다 커널이 보는 호출자는 **읽기 모듈**이다.
+    expect(() =>
+      withKotlinSource('openingEndpoints', kernel.openingOperationPathsOf.bind(null, tampered)),
+    ).toThrow(/읽기가 내준 텍스트가 아니다/u);
+    expect(() =>
+      withKotlinSource(
+        'openingEndpoints',
+        // `call` 을 묶을 때는 **thisArg 자리**를 하나 더 채워야 인자가 앞에 선다 — 그러지 않으면
+        // 진짜 텍스트가 그대로 첫 인자가 되어 대조가 공허해진다(한 번 그렇게 썼다).
+        kernel.openingOperationPathsOf.call.bind(kernel.openingOperationPathsOf, null, tampered),
+      ),
+    ).toThrow(/읽기가 내준 텍스트가 아니다/u);
+    // 음성 대조 — **진짜 값**을 미리 채운 같은 꼴은 지나간다.
+    expect(
+      withKotlinSource('openingEndpoints', kernel.openingOperationPathsOf.bind(null, shipped)).shared
+        .openingCompletePath,
+    ).toBe(marker);
+  });
+
   /** 음성 대조 — 공개 입구만 쓰는 소비자는 걸리지 않는다(여정 하네스가 그 자리다). */
   it('공개 입구만 쓰는 소비자는 걸리지 않는다', () => {
     const clean = [

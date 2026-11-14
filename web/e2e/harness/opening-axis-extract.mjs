@@ -24,7 +24,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { callerOutside } from '../../scripts/kotlin-read-guard.mjs';
+import { callerOutside, isInFlightText } from '../../scripts/kotlin-read-guard.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const HERE = dirname(SELF);
@@ -37,21 +37,28 @@ const HERE = dirname(SELF);
  * 부르는 프레임이 읽기 모듈이다. 그래서 커널을 **구동하는 길이 읽기 하나**로 좁아진다 — 입구는
  * 키와 커널을 읽기에 건네는 얇은 자리가 되고, **손댄 텍스트를 커널에 먹일 자리가 없어진다.**
  */
-const CALL_ALLOWED = new Set([
-  resolve(HERE, '..', '..', 'scripts', 'kotlin-source.mjs'),
-  resolve(HERE, 'opening-axis.test.mjs'),
-]);
+const READER = resolve(HERE, '..', '..', 'scripts', 'kotlin-source.mjs');
+const CALL_ALLOWED = new Set([READER, resolve(HERE, 'opening-axis.test.mjs')]);
 
 /**
  * 호출자가 그 둘 가운데 하나인지 단언한다. **획득 꼴을 보지 않는다** — 어떤 구문으로 이 모듈을
  * 얻었든 부르는 순간 프레임이 선다.
  */
-function assertOwnedCaller(what) {
+function assertOwnedCaller(what, source) {
   const caller = callerOutside(SELF);
   if (!CALL_ALLOWED.has(caller)) {
     throw new Error(
       `[opening-axis-extract] ${caller} 가 추출 커널(${what})을 직접 불렀다 — ` +
         '출하 본문은 공유 읽기 모듈이 열어 커널에 먹인다(opening-axis.mjs 의 shipped… 입구로 불러라)',
+    );
+  }
+  // **읽기 경유 호출이면 받은 텍스트가 그 읽기가 건 텍스트인지 함께 묻는다**(r2 — cr HIGH).
+  // `bind` 는 프레임을 남기지 않으므로 호출자만으로는 세탁을 가를 수 없다. 단위 test 는 허용
+  // 호출자이지만 읽기가 아니므로 이 단언을 지나간다 — 합성 입력 대조가 그대로 산다.
+  if (caller === READER && !isInFlightText(source)) {
+    throw new Error(
+      `[opening-axis-extract] 읽기가 내준 텍스트가 아니다(${what}) — ` +
+        '프레임 없는 래퍼로 호출자를 세탁해 손댄 텍스트를 먹이는 길을 막는다',
     );
   }
 }
@@ -81,7 +88,7 @@ function soleLiteral(text, pattern, what) {
  * 뒤바뀐 경우를 지나보낸다.
  */
 export function openingOperationPathsOf(text) {
-  assertOwnedCaller('openingOperationPathsOf');
+  assertOwnedCaller('openingOperationPathsOf', text);
   const categories = Object.keys(DIVISION_TOKENS);
   const divisions = {};
   for (const [index, category] of categories.entries()) {
@@ -140,7 +147,7 @@ export function openingOperationPathsOf(text) {
  * 두면 업종 목록에서 닫은 바로 그 드리프트를 다시 만든다.
  */
 export function detailAxisCountsOf(text) {
-  assertOwnedCaller('detailAxisCountsOf');
+  assertOwnedCaller('detailAxisCountsOf', text);
   const open = text.indexOf('fun detailAxesFor');
   if (open < 0) {
     throw new Error('출하 본문에서 상세 축 열거 함수를 찾지 못했다 — 정본의 모양이 바뀌었다');
@@ -169,7 +176,7 @@ export function detailAxisCountsOf(text) {
 
 /** 출하 속성 파일 본문 → 공고 목록 오퍼레이션 표(위와 같은 사유의 등식). */
 export function noticeListOperationsOf(text) {
-  assertOwnedCaller('noticeListOperationsOf');
+  assertOwnedCaller('noticeListOperationsOf', text);
   const found = {};
   for (const match of text.matchAll(
     /"(\w+)" to KonepsOperationProperties\(\s*"([^"]+)",\s*BusinessDivision\.(\w+),?\s*\)/gu,
@@ -188,7 +195,7 @@ export function noticeListOperationsOf(text) {
 
 /** 출하 정책 본문 → 라벨 표(등재 밖·부재는 라벨에 배정되지 않으므로 여기 들지 않는다). */
 export function progressLabelsOf(text) {
-  assertOwnedCaller('progressLabelsOf');
+  assertOwnedCaller('progressLabelsOf', text);
   const labels = {};
   for (const match of text.matchAll(/"([^"]+)" to OpeningProgress\.(\w+)/gu)) {
     // 같은 라벨이 두 번 등재되면 **뒤가 조용히 이긴다** — 어느 것이 정본인지 서지 않으므로 거부한다.

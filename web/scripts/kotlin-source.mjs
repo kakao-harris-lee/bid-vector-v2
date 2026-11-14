@@ -46,6 +46,8 @@ import { fileURLToPath } from 'node:url';
 // 걷기 본체는 **내부 모듈**이다 — 공개 표면에 없으므로 어떤 import 구문으로도 소비자가
 // 얻을 수 없다(r4 — verifier r3 H-1). 이 모듈과 그 단위 test 만 참조한다.
 import { withoutKotlinComments } from './kotlin-comment-strip.mjs';
+// 악수 슬롯은 층 모듈에 있다 — 읽기와 커널이 **둘 다** 그 층을 이미 쓴다(호출자 판정).
+import { runWithInFlightText } from './kotlin-read-guard.mjs';
 
 /**
  * **읽기 집합 — `web/` 안에서 `.kt` 경로를 아는 유일한 자리다.**
@@ -103,7 +105,9 @@ export function withKotlinSource(key, extract, ...rest) {
     throw new Error(`추출 함수를 받지 못했다: ${key} — 원문을 가져가는 길이 아니라 함수를 넘기는 길이다`);
   }
   const text = withoutKotlinComments(readFileSync(resolve(repoRoot, relative), 'utf8'));
-  const extracted = extract(text, ...rest);
+  // **추출을 악수 안에서 부른다**(r2 — cr HIGH): 그 텍스트를 걸어 두면, `bind` 로 프레임을 세탁해
+  // 커널에 손댄 값을 먹이는 길이 커널 쪽 단언에서 막힌다.
+  const extracted = runWithInFlightText(text, () => extract(text, ...rest));
   if (extracted === text) {
     throw new Error(
       `추출이 원문을 그대로 돌려줬다: ${key} — 원문은 이 모듈 밖으로 나가지 않는다(추출한 값을 돌려라)`,
