@@ -225,19 +225,30 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   // 투찰 예정 초안 — 금액·과세를 적으면 primary 가 초안으로 바뀌어 있다.
   await page.getByTestId('record-amount').fill('1050000000');
   await page.getByTestId('record-vat').selectOption('INCLUSIVE');
-  const drafted = timelineReads.afterWrite(
-    (one) => one.method() === 'POST' && one.url().endsWith('/draft'),
-    '투찰 예정 초안',
+  /**
+   * **초안 쓰기는 거두지 않는다**(v H-1 실측 — 거뒀다가 되돌린 자리다).
+   *
+   * 거둠은 **재조회가 실재할 때만** 그것을 기다릴 수 있다. 이 자리에서 타임라인 질의가 아직
+   * **data 없이 진행 중**이면 react-query 가 초안의 무효화를 그 fetch 에 **접고**
+   * (`cancelRefetch` 는 `data !== undefined` 일 때만 끊는다), 그러면 「쓰기 뒤에 출발한 재조회」가
+   * **하나도 없다**. 장부는 여정 시작에 서므로 그 진행 중 읽기는 `stale` 이고, 거둠은 **영원히
+   * 닫히지 않는다**(문서화된 지연 주입 아래 2/2 · 120s 타임아웃).
+   *
+   * 그래서 이 자리의 늦은 재조회는 **거둠이 아니라 기록 쪽의 봉인**이 막는다 — 읽기 기다림이
+   * 기록 쓰기의 응답 **뒤에야** 무장하므로 그 전에 닿는 초안 응답은 애초에 포착되지 않는다.
+   * 거둠을 지워도 같은 주입 아래 붉는 것이 없다는 것을 변이로 쟀다.
+   */
+  const drafted = page.waitForResponse(
+    (one) => one.url().endsWith('/draft') && one.request().method() === 'POST',
   );
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰 예정 초안');
   await page.getByTestId('worksheet-primary').click();
-  const draftResponse = await drafted.write;
+  const draftResponse = await drafted;
+  expect(draftResponse.status(), '투찰 예정 초안 쓰기 응답').toBe(200);
   const draftedCase = (await draftResponse.json()) as BidCaseRow;
   await expect(page.getByTestId('worksheet-case-state')).toHaveText(
     CASE_STATE_LABEL[draftedCase.state] ?? draftedCase.state,
   );
-  // [cr MEDIUM-2 선측정] 초안이 낳은 타임라인 다시 읽기를 여기서 거둔다.
-  await drafted.read;
 
   // 「제출함」 — 같은 입력으로 기록하고 **응답이 준 상태**를 화면이 보인다.
   await page.getByTestId('record-amount').fill('1050000000');

@@ -441,8 +441,12 @@ export function readsAfterWrite(page: Page, isRead: (one: Request) => boolean): 
         } catch (cause) {
           // 맨 타임아웃 문면(`waiting for event "response"`)은 **어느 쓰기의** 다시 읽기인지도,
           // 무엇을 볼지도 말하지 않는다. 길잡이를 주석에서 실패 문면으로 옮긴다(cr LOW).
+          // 원문 message 를 **첫 줄에 함께** 싣는다(cr LOW) — 이 래퍼는 타임아웃만이 아니라
+          // 페이지 닫힘·타깃 크래시도 감싸므로, 진단만 적으면 첫 줄이 틀릴 수 있다.
           throw new Error(
-            `${label} 다시 읽기가 닫히지 않았다 — 그 쓰기가 질의를 다시 읽는지(invalidateQueries) 보라`,
+            `${label} 다시 읽기가 닫히지 않았다 — 그 쓰기가 질의를 다시 읽는지(invalidateQueries) 보라: ${
+              cause instanceof Error ? cause.message : String(cause)
+            }`,
             { cause },
           );
         }
@@ -615,6 +619,8 @@ export async function ensureInBidBox(page: Page, card: Locator): Promise<boolean
     return false;
   }
   // 담기도 쓰기이고, 오늘의 공고 화면이 그 뒤에 건 목록을 다시 읽는다(`invalidateQueries`).
+  // **이 자리는 거둘 수 있다** — 앞의 화면 단언이 첫 적재를 이미 소진시켜 무효화가 접힐 진행 중
+  // fetch 가 없다. 그렇지 않은 자리(여정 ③ 의 초안)는 거두지 않는다(그 spec 의 사유 주석).
   //
   // **이 장부는 카드가 보인 뒤에 선다** — 그래서 진행 중이던 **첫 적재**가 아래 거둠을 풀 수 있다
   // (v M-1 실측: 쓰기 응답보다 219ms 먼저 출발한 읽기). 그것을 막는 엄격판은 같은 자리에서
@@ -685,7 +691,7 @@ export async function driveToRecorded(page: Page, noticeNumber: string): Promise
     // 이미 제출 뒤면(같은 DB 에 두 번 미는 지역 실행) 밀지 않는다 — CI 는 버릴 DB 라 늘 여기서
     // `WATCHING` 이고 아래 세 단계를 탄다.
     if (opened.state !== 'WATCHING') {
-        return null;
+      return null;
     }
 
     await page.getByTestId('active-bids').fill('1');
