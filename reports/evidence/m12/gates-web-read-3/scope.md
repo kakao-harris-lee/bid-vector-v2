@@ -5,22 +5,23 @@ milestone: M12
 slice: gates-web-read-3
 base_sha: 10d208d2664c6bb87cd7082a2853c08c2c0d3236   # M11 종결 머지 (`git rev-parse` 실측)
 head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다(관례)
-in_scope:                          # ★ 표시는 설계 검토 판정을 기다리는 후보다
+in_scope:                          # 팀장 착수 판정(2026-11-14)으로 확정
   - web/scripts/kotlin-source.mjs                 # ⓐ — 원문을 얻는 길을 키+추출 함수 하나로
-  - web/scripts/kotlin-source.test.mjs            # 그 모듈의 단위 대조
   - web/scripts/kotlin-source-ownership.test.mjs  # ⓐ 모집단 기계 제거 · ⓕ 데이터 파일 술어 둘
   - web/e2e/harness/opening-axis.mjs              # 입구 넷이 키를 받는다
-  - web/e2e/harness/opening-axis.test.mjs         # 그 입구·커널 대조
+  - web/e2e/harness/opening-axis.test.mjs         # 그 입구·커널 대조의 주장 교체
   - web/e2e/harness/opening-axis-extract.mjs      # 커널의 허용 호출자 한 자리 변경
   - web/e2e/harness/journey-up.mjs                # 입구 호출 한 줄
   - web/scripts/money-vocab-cross-lang.test.mjs   # 같은 갈래(이 파일 안 커널 둘)
-  - web/scripts/kotlin-read-guard.mjs             # ⓑ③ — 저장소 밖 분기 제거
-  - web/scripts/kotlin-read-guard.test.mjs        # ⓑ③⑤ 양성·음성 대조
-  - web/vite.config.ts                            # ★ ⓑ⑤ — 층을 vite 메인 프로세스에 — §공유 파일
-  - web/playwright.config.ts                      # ★ ⓑ⑥ — 층을 spec 프로세스에
-  - web/playwright.journey.config.ts              # ★ ⓑ⑥ — 같음(여정 하네스)
-  - web/package.json                              # ★ ⓑ⑥ — `node` 게이트 스크립트 진입점
-  - web/config/gate-tests.txt                     # 새 게이트 test 등재 — §공유 파일
+  - web/scripts/kotlin-read-guard.mjs             # ⓑ③ — 위치 분기 제거
+  - web/scripts/kotlin-read-guard-setup.mjs       # ⓑ⑥ — 층이 자기를 자식 프로세스로 전파
+  - web/scripts/kotlin-read-guard.test.mjs        # ⓑ③⑤⑥ 양성·음성 대조 + 의무 게이트
+  - web/vite.config.ts                            # ⓑ⑤ — 층을 vite 메인 프로세스에 — §공유 파일
+  - web/playwright.config.ts                      # ⓑ⑥ — 층을 spec 프로세스에
+  - web/playwright.journey.config.ts              # ⓑ⑥ — 같음(여정 하네스)
+  - web/eslint.config.js                          # ⓑ⑥ — 뿌리 config 전수가 모집단이다
+  - web/package.json                              # ⓑ⑥ — `node` 진입점 전수 — §공유 파일
+  - web/config/gate-tests.txt                     # ⓕ-2 — 등록부 산문 한 줄 — §공유 파일
   - docs/discovery/capability-map.md              # §12.3 의 새 하위 절 하나 — §절 글자
   - reports/evidence/m12/gates-web-read-3/
 out_of_scope:
@@ -53,9 +54,9 @@ rollback: rollback.md
 
 ## 받는 항목 — `OPEN-M11-KOTLIN-READ-GATE-RESIDUALS-2` ⓐ~ⓕ (착수 실측)
 
-수치의 정본은 `commands.md` 「착수 실측」이다. **처분 후보는 후보다** — 판정은 팀장이 낸다.
+수치의 정본은 `commands.md` 「착수 실측」이다. **처분은 팀장 착수 판정(2026-11-14)이 확정했다.**
 
-| 축 | 오늘 실측 | 처분 후보 |
+| 축 | 오늘 실측 | 처분 |
 | --- | --- | --- |
 | **ⓐ** 단언을 아예 부르지 않는 새 추출 함수 | 두 홉으로 받는 꼴에서 모집단 등식이 **30 passed**(조용하다). 같은 함수를 **직접 인자**로 바꾸면 **1 failed** | **닫음** — 모집단을 쫓지 않고 **원문을 얻는 길 자체**를 키 + 추출 함수로 바꾼다 |
 | **ⓑ①** 자식 프로세스 `grep` | vitest 안에서 Kotlin **99 줄**이 읽혔다 | **등재 유지** — node 안에 가로챌 자리가 없고 경로 리터럴도 필요 없다 |
@@ -63,12 +64,12 @@ rollback: rollback.md
 | **ⓑ③** 저장소 밖으로 복사한 뒤 읽기 | 읽혔다(**6553 자**). 층에서 **분기 하나를 지우면 거부된다** — 전건 44 파일·987 test 초록, 소요가 기준과 잡음 안 | **닫음** |
 | **ⓑ④** `worker_threads` | worker 안에서 읽혔다(**6553 자**). `--import` 는 worker 에 서지 않는다 — **기본 상속도 명시 `execArgv` 도** 읽혔고 같은 층이 **부모에서는 거부**했다 | **등재 유지** — 구조로 닫을 수 없음을 실측했다 |
 | **ⓑ⑤** 번들러 적재 — 확장자 토큰 없는 glob + `?raw` | **42 모듈**이 적재됐다(정적 술어 밖). 층을 vite 설정에서 세우면 적재가 **실패**하고 전건은 초록, 통제군(저장소 밖 비 Kotlin `?raw`)은 그대로 적재 | **닫음**(제한: 표면에 뜨는 오류 문면이 vite 의 ENOENT 다) |
-| **ⓑ⑥** vitest 밖 프로세스 | playwright spec 프로세스에서 읽혔다(**6553 자**). config 에서 `NODE_OPTIONS` 로 층을 실으면 **같은 spec 이 거부**한다 | **팀장 판정 필요** — 「닫음(진입점 의무를 구성으로)」 vs 「등재 유지」. §ⓑ⑥ |
+| **ⓑ⑥** vitest 밖 프로세스 | playwright spec 프로세스에서 읽혔다(**6553 자**). config 에서 `NODE_OPTIONS` 로 층을 실으면 **같은 spec 이 거부**한다 | **닫음(승인 — 마지막·별 커밋)**. §ⓑ⑥ |
 | **ⓒ** 단언보다 뒤에 덧씌우는 사본 | 어떤 층도 보지 못한다(M10 미달 ② 이월) | **등재 유지** — ⓐ 의 처방이 자리를 좁히지만 없애지 못한다. §ⓒ |
 | **ⓓ** 층·게이트 설정 자체 수정 · 바인딩 선점 | — | **등재 유지**(경계 밖 — 팀장 승인 2026-11-13) |
 | **ⓔ** `eslint-disable` 한 줄 | 추적 파일의 그 주석은 **0 건** | **등재 유지**(경계 밖 — 같은 승인) |
 | **ⓕ-1** 대문자 `*.KT` | 데이터 파일 술어에 `i` 를 붙이면 오늘 트리의 **새 적중 0**(오탐 0) | **닫음** — 런타임 층과 대소문자 성질을 맞춘다 |
-| **ⓕ-2** `#` 로 시작하는 **데이터** 줄 | `#` 제외가 오늘 거르는 산문은 **한 자리 1 건**이고, 그 자리는 `#` 가 실제로 주석인 형식이다 | **정적 층 보강** — 주석 규약을 **형식의 성질**로 본다 |
+| **ⓕ-2** `#` 로 시작하는 **데이터** 줄 | `#` 제외가 오늘 거르는 산문은 **한 자리 1 건**뿐이다 | **정적 층 보강** — 주석 개념을 술어에서 **없앤다**(형식별 주석 구문 표를 만들지 않는다). 그 한 건은 등록부 산문을 고쳐 차감 0 으로 둔다 |
 | **ⓕ-3** 두 글자 토큰의 미래 오탐 | 오늘 오탐 0 | **등재 유지** — 탈출구는 allowlist 차감(이미 등재) |
 
 ## ⓑ⑥ — 하나뿐인 「닫을 수 있는데 비용이 있는」 축
@@ -82,11 +83,14 @@ M11 은 이 축을 「진입점마다 미리 적재하는 것은 **진입점 열
    선언이므로, 새 진입점이 층 없이 생기면 게이트가 붉어지는 쪽으로 의무를 세울 수 있다 —
    손 목록이 아니다(선례: 12A 가 양성 표본을 `settings.gradle.kts` 에서 구성으로 뽑는다).
 
-**대가**: `vite build`·`vite preview`·여정 e2e(W-13, `:app:bootJar` + 컨테이너)가 층 아래서 돌게
-되므로 그 셋의 비용·부작용을 재야 한다. 그리고 `package.json`·config 둘이 in_scope 로 들어온다.
+**대가**: `vite build`·`vite preview`·`eslint`·여정 e2e(W-13, `:app:bootJar` + 컨테이너)가 층
+아래서 돌게 되므로 그 비용·부작용을 재야 한다. 뿌리 config 전수가 모집단이라 `eslint.config.js`
+까지 든다 — 범위에서 빼면 그 자리가 구멍이다(설계 검토 §(3) 과잉).
 
-**추천**: ⓐ·ⓑ③·ⓑ⑤·ⓕ 를 먼저 닫고, ⓑ⑥ 은 **같은 slice 에서 마지막에** 붙인다(앞 넷이 초록인
-HEAD 를 먼저 세워 두면 ⓑ⑥ 의 측정이 깨져도 그 커밋만 되돌릴 수 있다). 판정은 팀장이 낸다.
+**팀장 판정(2026-11-14): 승인. 추천대로 마지막, 별 커밋으로 한다.** 진입점 집합은 `package.json`
+`scripts` 와 playwright config 에서 **구성으로** 뽑는다(손 열거 금지). W-12·W-13 을 층 아래서
+실제로 재고, 그 커밋이 web job 을 깨고 같은 라운드에 원인을 못 잡으면 **그 커밋만 되돌리고**
+ⓑ⑥ 은 등재로 남긴다.
 
 ## ⓒ — ⓐ 의 처방이 자리를 좁히지만 닫지 못한다
 
@@ -94,20 +98,28 @@ HEAD 를 먼저 세워 두면 ⓑ⑥ 의 측정이 깨져도 그 커밋만 되�
 소비자 쪽에서 사라진다. 그래도 넘긴 추출 함수 안에서는 받은 텍스트를 바꿀 수 있다 — 추출은
 텍스트를 손에 쥐어야 성립하므로 그 이음매는 **추출의 성질**이다. 닫는 길은 둘뿐이고 둘 다
 버린 자리다: 값 동일성(합성 입력 대조를 깬다 — M11 이 그래서 커널을 갈랐다)과 데이터 흐름 추적
-(M10/10D 가 상한을 넘긴 축). **좁혀진 꼴을 실측과 함께 등재**하고, 좁혀진 뒤에도 남는 꼴이
-경계 안인지 밖인지는 설계 검토에서 보고한다.
+(M10/10D 가 상한을 넘긴 축). 좁혀진 뒤에도 남는 꼴이 경계 안인지 밖인지는 `design-review.md`
+§「넘긴 함수 안의 변형」이 가른다 — **둘로 갈린다**(정규화는 경계 안의 부분, 걷기 재구현·항등
+함수는 경계 밖).
 
 ## 공유 파일
 
 | 공유 자리 | 이 slice 의 편집 | 병합 때 확인 |
 | --- | --- | --- |
-| `web/vite.config.ts` | ★ 층을 세우는 import **한 줄**(`test:` 블록은 건드리지 않는다) | `test:` 블록의 키 수 · `setupFiles` 원소 수 · import 줄 수 |
-| `web/config/gate-tests.txt` | 새 게이트 test 등재(수는 설계 검토가 정한다) | 줄 수와 `npm run gate:tests` 판정 |
-| `web/package.json` | ★ `scripts` 의 `node` 진입점에 층 적재 | `scripts` 키 수 · 각 값의 층 적재 유무 |
+| `web/vite.config.ts` | 층을 세우는 import **한 줄**(`test:` 블록은 건드리지 않는다) | `test:` 블록의 키 수 · `setupFiles` 원소 수 · import 줄 수 |
+| `web/config/gate-tests.txt` | 등록부 **산문 한 줄**(ⓕ-2). 새 게이트 test 파일은 만들지 않는다 — 의무 게이트를 기존 층 test 에 둔다 | 줄 수 · 등재 수 · `npm run gate:tests` 판정 |
+| `web/package.json` | `scripts` 의 `node` 진입점에 층 적재 | `scripts` 키 수 · 각 값의 층 적재 유무 |
 | `docs/discovery/capability-map.md` §12.3 | 새 하위 절 하나 | §절 글자 |
 
+### 12D 와 공유하는 셋 (팀장 계약 보완 2026-11-14)
+
+`kotlin-source-ownership.test.mjs` · `kotlin-source.mjs` · `kotlin-read-guard-setup.mjs` 는
+12D 가 **기동 비용을 재는** 파일이다. **편집은 12C 만 한다**(12D 는 빼기로 했다). 머지 차례에
+계수로 합집합을 확인하고, **모듈 적재 비용을 크게 바꾸는 변경이면 동결 보고에 전후 소요를
+적는다** — 기준선은 `design-review.md` §12D 와 공유하는 자리에 있다. 머지 순서는 12C 가 앞이다.
+
 12B 는 `web/src/display/**`·화면 게이트, 12D 는 `journey.spec.ts`·게이트 test 예열이 자리다 —
-위 넷 말고 겹치는 파일은 없다(착수 시점 확인).
+위 표의 넷과 이 절의 셋 말고 겹치는 파일은 없다(착수 시점 확인).
 
 ## §12.3 절 글자 — slice 에 고정하지 않는다
 
@@ -121,4 +133,10 @@ HEAD 를 먼저 세워 두면 ⓑ⑥ 의 측정이 깨져도 그 커밋만 되�
 
 ## 갱신 이력
 
-- 2026-11-14 초판(착수 보고와 함께). ★ 표시 넷은 팀장 판정을 기다리는 in_scope 후보다.
+- 2026-11-14 r1 — 팀장 착수 판정 반영. ① 처분 확정(ⓐ·ⓑ③·ⓑ⑤·ⓕ-1 닫음 · ⓕ-2 정적 층 보강 ·
+  ⓑ①②④·ⓒ·ⓓ·ⓔ·ⓕ-3 등재 유지) ② **ⓑ⑥ 승인** — 마지막·별 커밋, 진입점 집합은 구성으로,
+  깨지면 그 커밋만 되돌리고 등재 ③ **ⓐ 처방 승인** — 함께 움직이는 파일이 in_scope ④ 12D 와
+  공유하는 셋을 등재(편집은 12C 만, 비용 변화는 동결 보고에). `kotlin-source.test.mjs` 는
+  `readKotlinSource` 를 쓰지 않아(실측) in_scope 에서 뺐다. 뿌리 config 전수가 모집단이라
+  `eslint.config.js` 가 들어왔다.
+- 2026-11-14 초판(착수 보고와 함께).
