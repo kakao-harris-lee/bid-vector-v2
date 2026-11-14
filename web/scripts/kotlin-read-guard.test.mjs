@@ -295,8 +295,17 @@ describe('여는 행위 — 층이 선 자리를 거동으로 센다 (ⓑ⑥)', 
   /** 층을 세우는 **유일한 모듈** — 선언이 가리키는 자리다. */
   const SETUP = 'scripts/kotlin-read-guard-setup.mjs';
 
-  const npmRun = (script, env = process.env) =>
-    execFileSync('npm', ['run', '-s', script], { cwd: webRoot, encoding: 'utf8', env }).trim();
+  /**
+   * **부모의 `NODE_OPTIONS` 를 비우고 npm 을 띄운다.** 비우지 않으면 이 test 프로세스가 이미 지고
+   * 있는 값이 자식에게 **상속되어**, `.npmrc` 선언을 지운 변이에서도 대조가 초록이었다(실측 —
+   * 그 변이가 이 사각을 찾아 줬다). 비우면 층이 서는 길이 **npm 의 선언 하나**뿐이다.
+   */
+  const npmRun = (script, overrides = {}) =>
+    execFileSync('npm', ['run', '-s', script], {
+      cwd: webRoot,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_OPTIONS: '', ...overrides },
+    }).trim();
 
   it('`.npmrc` 가 층을 선언한다 — 그 선언이 npm 의 모든 스크립트에 싣는다', () => {
     const npmrc = readFileSync(resolve(webRoot, '.npmrc'), 'utf8');
