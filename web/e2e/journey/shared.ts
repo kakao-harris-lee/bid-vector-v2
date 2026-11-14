@@ -415,13 +415,14 @@ export function readsAfterWrite(page: Page, isRead: (one: Request) => boolean): 
       })();
       // 읽기는 **쓰기 단언을 지난 뒤** 돌려준다 — 쓰기가 터진 자리에서 읽기 타임아웃이 겹치면
       // 어느 쪽이 원인인지 문면이 가리지 못한다.
-      return {
-        write,
-        read: (async () => {
-          await write;
-          return read;
-        })(),
-      };
+      const readAfterWrite = (async () => {
+        await write;
+        return read;
+      })();
+      // 이 **래퍼도** 관측되지 않을 수 있다(cr MEDIUM-1) — 부르는 쪽이 `write` 에서 이미 터지면
+      // `read` 를 기다리지 않는다. 안쪽 `read` 만 삼키면 래퍼의 거절이 unhandled 로 남는다.
+      void readAfterWrite.catch(() => {});
+      return { write, read: readAfterWrite };
     },
     stop(): void {
       page.off('request', ledger);
