@@ -1,5 +1,7 @@
 package bidvector.adapters.qualification
 
+import bidvector.adapters.architecture.BytecodeConstantPool
+import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue
 import io.kotest.matchers.collections.shouldNotBeEmpty
@@ -20,26 +22,19 @@ import java.io.File
  * 별개다). `bidvector.adapters.qualification` 자신은 이 패키지의 클래스끼리 서로 참조할 수
  * 있어야 하므로 포함한다.
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.workflow.evaluation",
-        "bidvector.qualification",
-        "bidvector.procurement",
-        "bidvector.sharedkernel",
-        "bidvector.adapters.persistence",
-        "bidvector.adapters.qualification",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.workflow.evaluation",
+            "bidvector.qualification",
+            "bidvector.procurement",
+            "bidvector.sharedkernel",
+            "bidvector.adapters.persistence",
+            "bidvector.adapters.qualification",
+        ),
     )
 
-private fun isDisallowed(importedPackage: String): Boolean =
-    importedPackage.startsWith("bidvector.") &&
-        ALLOWED_ROOTS.none { importedPackage == it || importedPackage.startsWith("$it.") }
-
-/**
- * 바이트코드 내부 이름(`a/b/C`)과 점 표기 좌표(`a.b.C`) 양쪽에서 `bidvector...` 부분을 뽑는다
- * — 상수 풀 전체를 훑는다(`EvaluationAdapterDependencyTest`·`StrategyAdapterDependencyTest`와
- * 같은 정규식·같은 근거).
- */
-private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
+private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 /**
  * D-6F5-9 — `LICENSE_QUALIFICATION_POLICY`는 `bidvector.qualification`에
@@ -77,6 +72,9 @@ private const val LICENSE_POLICY_LOADER_GETTER_MARKER = "getLICENSE_QUALIFICATIO
 private const val LICENSE_VERDICT_SUBTYPE_MARKER = "LicenseVerdict\$"
 
 /**
+ * **이 축의 판정은 이 class 에 없다** — [bidvector.adapters.architecture.ScopedBytecodeLayerGateTest] 가 표를 순회하며 한다(M12/12A ④).
+ * 여기 남은 것은 이 축에만 있는 주장이고, 아래는 그 판정의 술어가 **상수 풀**인 이유다.
+ *
  * D-6F5-6 — **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v`로 훑는다.**
  * import 문 없이 전체 한정 좌표로 직접 참조하는 우회(scope.md 우회 5)를 소스 텍스트 정규식
  * 형태는 못 본다(6F-1 verifier MUT-E3 실측 — `EvaluationAdapterDependencyTest`가 인계한
@@ -84,25 +82,6 @@ private const val LICENSE_VERDICT_SUBTYPE_MARKER = "LicenseVerdict\$"
  * 구조로」).
  */
 class QualificationAdapterDependencyTest {
-    @Test
-    fun `qualification 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val violations = qualificationPackageClassFiles().flatMap(::disallowedBytecodeReferences).distinct()
-        violations shouldBe emptyList()
-    }
-
-    /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다(문자열 판정 자체는 이 값으로 잰다). */
-    @Test
-    fun `허용 밖 domain 모듈을 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.strategy") shouldBe true
-        isDisallowed("bidvector.settlement") shouldBe true
-        isDisallowed("bidvector.workflow.ml") shouldBe true
-        isDisallowed("bidvector.workflow.strategy") shouldBe true
-        isDisallowed("bidvector.adapters.ml") shouldBe true
-        isDisallowed("bidvector.adapters.extraction") shouldBe true
-        isDisallowed("bidvector.app") shouldBe true
-    }
-
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
         isDisallowed("bidvector.workflow.evaluation") shouldBe false
@@ -123,7 +102,7 @@ class QualificationAdapterDependencyTest {
      */
     @Test
     fun `StoredRequirementLicenseGate 의 컴파일된 클래스는 LicenseEligibility 를 참조한다`() {
-        val output = javapOutput(storedRequirementLicenseGateClassFile())
+        val output = BytecodeConstantPool.bodyOf(storedRequirementLicenseGateClassFile())
         output shouldContain "LicenseEligibility"
         output shouldContain "judge"
     }
@@ -143,7 +122,7 @@ class QualificationAdapterDependencyTest {
     fun `qualification 패키지의 컴파일된 클래스는 정책 로더 좌표를 참조하지 않는다`() {
         qualificationPackageClassFiles().forEach { classFile ->
             withClue("정책 로더 좌표 위반: ${classFile.name}") {
-                val output = javapOutput(classFile)
+                val output = BytecodeConstantPool.bodyOf(classFile)
                 output shouldNotContain LICENSE_POLICY_LOADER_CLASS_MARKER
                 output shouldNotContain LICENSE_POLICY_LOADER_GETTER_MARKER
             }
@@ -169,7 +148,7 @@ class QualificationAdapterDependencyTest {
     fun `qualification 패키지의 컴파일된 클래스는 LicenseVerdict 를 통과만 시킨다 — subtype 좌표를 두지 않는다`() {
         qualificationPackageClassFiles().forEach { classFile ->
             withClue("LicenseVerdict subtype 좌표 위반: ${classFile.name}") {
-                javapOutput(classFile) shouldNotContain LICENSE_VERDICT_SUBTYPE_MARKER
+                BytecodeConstantPool.bodyOf(classFile) shouldNotContain LICENSE_VERDICT_SUBTYPE_MARKER
             }
         }
     }
@@ -228,31 +207,3 @@ private fun qualificationPackageClassFiles(): List<File> {
     return classFiles
 }
 
-/**
- * `javap`를 OS `PATH`의 이름 조회가 아니라 **실행 중인 JVM의 `java.home`**에서 해석한다
- * (`EvaluationAdapterDependencyTest`와 같은 이유 — CI의 JDK 21과 다른 `javap`를 부를 여지를
- * 없앤다).
- */
-private val javapExecutable: String by lazy {
-    val javaHome = System.getProperty("java.home")
-    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
-}
-
-private fun javapOutput(classFile: File): String {
-    val process =
-        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-    val output = process.inputStream.bufferedReader().readText()
-    val exitCode = process.waitFor()
-    check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
-    return output
-}
-
-private fun disallowedBytecodeReferences(classFile: File): List<String> =
-    BIDVECTOR_INTERNAL_NAME
-        .findAll(javapOutput(classFile))
-        .map { it.value.replace('/', '.') }
-        .filter(::isDisallowed)
-        .toList()

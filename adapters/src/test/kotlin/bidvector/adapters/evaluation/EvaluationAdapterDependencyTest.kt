@@ -1,5 +1,7 @@
 package bidvector.adapters.evaluation
 
+import bidvector.adapters.architecture.BytecodeConstantPool
+import bidvector.adapters.architecture.isOutsideRoots
 import bidvector.procurement.Notice
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
@@ -50,64 +52,34 @@ import java.io.File
  * 한다 — `ScopedAllowedRootsParityTest` 가 집합 등식을 잰다. 목록을 세 번째로 적지 않으려고
  * 이 집합이 `internal` 이다(cr L-3).
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.workflow.evaluation",
-        "bidvector.workflow.event",
-        "bidvector.workflow.notificationinbox",
-        "bidvector.workflow.strategy",
-        "bidvector.procurement",
-        "bidvector.sharedkernel",
-        "bidvector.strategy",
-        "bidvector.adapters.persistence",
-        "bidvector.adapters.evaluation",
-        "bidvector.adapters.event",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.workflow.evaluation",
+            "bidvector.workflow.event",
+            "bidvector.workflow.notificationinbox",
+            "bidvector.workflow.strategy",
+            "bidvector.procurement",
+            "bidvector.sharedkernel",
+            "bidvector.strategy",
+            "bidvector.adapters.persistence",
+            "bidvector.adapters.evaluation",
+            "bidvector.adapters.event",
+        ),
     )
 
-private fun isDisallowed(importedPackage: String): Boolean =
-    importedPackage.startsWith("bidvector.") &&
-        ALLOWED_ROOTS.none { importedPackage == it || importedPackage.startsWith("$it.") }
+private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 /**
- * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 클래스 로드가 남기는 점 표기 좌표(`a.b.C`) 양쪽에서
- * `bidvector...` 부분을 뽑는다 — 상수 풀 전체를 훑는다(`StrategyAdapterDependencyTest`와 같은
- * 정규식·같은 근거).
- */
-private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
-
-/**
+ * **이 축의 판정은 이 class 에 없다** — [bidvector.adapters.architecture.ScopedBytecodeLayerGateTest] 가 표를 순회하며 한다(M12/12A ④).
+ * 여기 남은 것은 이 축에만 있는 주장이고, 아래는 그 판정의 술어가 **상수 풀**인 이유다.
+ *
  * D-6F2-1 — **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v`로 훑는다.**
  * import 문 없이 전체 한정 좌표로 직접 참조하는 우회(scope.md 우회 6)를 소스 텍스트 정규식
  * 형태(`EventAdapterDependencyTest`)는 못 본다(6F-1 verifier MUT-E3 실측) — 신설 게이트는
  * 구조로 닫는 쪽만 쓴다(CLAUDE.md 「게이트 술어는 문자열이 아니라 구조로」).
  */
 class EvaluationAdapterDependencyTest {
-    @Test
-    fun `evaluation 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val classesDir = File("build/classes/kotlin/main/bidvector/adapters/evaluation")
-        check(classesDir.isDirectory) {
-            "빌드 산출물을 찾지 못했다: ${classesDir.absolutePath} — :adapters:compileKotlin 선행 필요"
-        }
-        val classFiles = classesDir.walkTopDown().filter { it.isFile && it.extension == "class" }.toList()
-        classFiles.shouldNotBeEmpty() // 빈 디렉터리를 "위반 없음"으로 오판하지 않는다.
-
-        val violations = classFiles.flatMap(::disallowedBytecodeReferences).distinct()
-        violations shouldBe emptyList()
-    }
-
-    /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다(문자열 판정 자체는 이 값으로 잰다). */
-    @Test
-    fun `허용 밖 domain 모듈을 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.workflow.ml") shouldBe true
-        isDisallowed("bidvector.adapters.ml") shouldBe true
-        isDisallowed("bidvector.adapters.relay") shouldBe true
-        // M9/ops-code — 알림 **포트**의 루트는 허용했지만 그 **어댑터**는 아니다. 조립이 구현을
-        // 이름으로 고르는 회귀가 이 한 줄에 걸린다.
-        isDisallowed("bidvector.adapters.notificationinbox") shouldBe true
-    }
-
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
         isDisallowed("bidvector.workflow.evaluation") shouldBe false
@@ -139,7 +111,7 @@ class EvaluationAdapterDependencyTest {
             "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
         }
 
-        javapOutput(classFile) shouldContain "biddableStatuses"
+        BytecodeConstantPool.bodyOf(classFile) shouldContain "biddableStatuses"
     }
 
     /**
@@ -155,7 +127,7 @@ class EvaluationAdapterDependencyTest {
             "빌드 산출물을 찾지 못했다: ${classFile.absolutePath} — :adapters:compileKotlin 선행 필요"
         }
 
-        val output = javapOutput(classFile)
+        val output = BytecodeConstantPool.bodyOf(classFile)
         output shouldContain "assembleKeywordScopeText"
         output shouldContain "assembleFullScopeText"
     }
@@ -409,7 +381,7 @@ private val METHOD_REFERENCE_COMMENT = Regex("""#\d+ = (?:Interface)?Methodref\s
 
 private fun methodReferences(classFile: File): Set<String> =
     METHOD_REFERENCE_COMMENT
-        .findAll(javapOutput(classFile))
+        .findAll(BytecodeConstantPool.bodyOf(classFile))
         .map { it.groupValues[1].trim() }
         .toSet()
 
@@ -422,7 +394,7 @@ private val FIELD_REFERENCE_COMMENT = Regex("""#\d+ = Fieldref\s+#\d+\.#\d+\s*//
 
 private fun fieldReferences(classFile: File): Set<String> =
     FIELD_REFERENCE_COMMENT
-        .findAll(javapOutput(classFile))
+        .findAll(BytecodeConstantPool.bodyOf(classFile))
         .map { it.groupValues[1].trim() }
         .toSet()
 
@@ -468,32 +440,3 @@ internal class ConcatenationMachineryFixture {
     ): String = java.lang.String.join(" ", listOfNotNull(a, b))
 }
 
-/**
- * `javap`를 OS `PATH`의 이름 조회가 아니라 **실행 중인 JVM의 `java.home`**에서 해석한다
- * (`StrategyAdapterDependencyTest`와 같은 이유 — CI의 JDK 21과 다른 `javap`를 부를 여지를
- * 없앤다).
- */
-private val javapExecutable: String by lazy {
-    val javaHome = System.getProperty("java.home")
-    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
-}
-
-/** `javap -p -v`의 원문 출력 — [disallowedBytecodeReferences]와 참조 단언 test가 공유한다. */
-private fun javapOutput(classFile: File): String {
-    val process =
-        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-    val output = process.inputStream.bufferedReader().readText()
-    val exitCode = process.waitFor()
-    check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
-    return output
-}
-
-private fun disallowedBytecodeReferences(classFile: File): List<String> =
-    BIDVECTOR_INTERNAL_NAME
-        .findAll(javapOutput(classFile))
-        .map { it.value.replace('/', '.') }
-        .filter(::isDisallowed)
-        .toList()

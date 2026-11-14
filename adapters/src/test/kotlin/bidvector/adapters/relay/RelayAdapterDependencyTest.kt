@@ -1,5 +1,8 @@
 package bidvector.adapters.relay
 
+import bidvector.adapters.architecture.BytecodeConstantPool
+import bidvector.adapters.architecture.SELF_COORDINATE
+import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -30,48 +33,31 @@ import java.io.File
  * 늘어난 간선은 **조립 → 구현** 한 방향뿐이다: 반대 방향은 `NotificationAdapterDependencyTest`
  * 가 막는다(그 허용 루트에 `adapters.event`·`adapters.relay` 가 없다).
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.workflow.event",
-        "bidvector.workflow.notification",
-        "bidvector.workflow.strategy",
-        "bidvector.sharedkernel",
-        "bidvector.adapters.event",
-        "bidvector.adapters.notification",
-        "bidvector.adapters.persistence",
-        "bidvector.adapters.relay",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.workflow.event",
+            "bidvector.workflow.notification",
+            "bidvector.workflow.strategy",
+            "bidvector.sharedkernel",
+            "bidvector.adapters.event",
+            "bidvector.adapters.notification",
+            "bidvector.adapters.persistence",
+            "bidvector.adapters.relay",
+        ),
     )
 
-private fun isDisallowed(importedPackage: String): Boolean =
-    importedPackage.startsWith("bidvector.") &&
-        ALLOWED_ROOTS.none { importedPackage == it || importedPackage.startsWith("$it.") }
+private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 /**
- * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 클래스 로드가 남기는 점 표기 좌표(`a.b.C`) 양쪽에서
- * `bidvector...` 부분을 뽑는다 — 상수 풀 전체를 훑는다.
- */
-private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
-
-/**
+ * **이 축의 판정은 이 class 에 없다** — [bidvector.adapters.architecture.ScopedBytecodeLayerGateTest] 가 표를 순회하며 한다(M12/12A ④).
+ * 여기 남은 것은 이 축에만 있는 주장이고, 아래는 그 판정의 술어가 **상수 풀**인 이유다.
+ *
  * **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v` 로 훑는다**(D-6F2-1 과 같은
  * 근거). import 문 없이 전체 한정 좌표로 직접 참조하는 우회를 소스 텍스트 정규식 형태는 보지
  * 못한다(6F-1 verifier MUT-E3 실측) — 신설 게이트는 구조로 닫는 쪽만 쓴다.
  */
 class RelayAdapterDependencyTest {
-    @Test
-    fun `relay 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val classesDir = File("build/classes/kotlin/main/bidvector/adapters/relay")
-        check(classesDir.isDirectory) {
-            "빌드 산출물을 찾지 못했다: ${classesDir.absolutePath} — :adapters:compileKotlin 선행 필요"
-        }
-        val classFiles = classesDir.walkTopDown().filter { it.isFile && it.extension == "class" }.toList()
-        classFiles.shouldNotBeEmpty() // 빈 디렉터리를 "위반 없음"으로 오판하지 않는다.
-
-        val violations = classFiles.flatMap(::disallowedBytecodeReferences).distinct()
-
-        violations shouldBe emptyList()
-    }
-
     /**
      * cr L-7 — **추출 층의 양성 대조.** 아래 두 대조는 문자열 술어만 재고 추출
      * (`javap` 출력 → 정규식)은 재지 않는다. 추출이 조용히 아무것도 못 뽑게 되면(javap 출력
@@ -92,24 +78,13 @@ class RelayAdapterDependencyTest {
                 .walkTopDown()
                 .filter { it.isFile && it.extension == "class" }
                 .flatMap { classFile ->
-                    BIDVECTOR_INTERNAL_NAME
-                        .findAll(javapOutput(classFile))
+                    SELF_COORDINATE
+                        .findAll(BytecodeConstantPool.bodyOf(classFile))
                         .map { it.value.replace('/', '.') }
                 }.toSet()
 
         extracted shouldContain "bidvector.workflow.notification.RelayOutboxNotifications"
         extracted shouldContain "bidvector.adapters.event.JdbcOutboxPort"
-    }
-
-    /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다. */
-    @Test
-    fun `허용 밖 좌표를 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.workflow.evaluation") shouldBe true
-        isDisallowed("bidvector.procurement") shouldBe true
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.adapters.ml") shouldBe true
-        isDisallowed("bidvector.app") shouldBe true
     }
 
     @Test
@@ -141,8 +116,8 @@ class RelayAdapterDependencyTest {
 
         val sqlReferences =
             classFiles.flatMap { classFile ->
-                BIDVECTOR_INTERNAL_NAME
-                    .findAll(javapOutput(classFile))
+                SELF_COORDINATE
+                    .findAll(BytecodeConstantPool.bodyOf(classFile))
                     .map { it.value.replace('/', '.') }
                     .filter { it.startsWith("bidvector.adapters.event.EventSql") }
                     .toList()
@@ -152,31 +127,3 @@ class RelayAdapterDependencyTest {
     }
 }
 
-/**
- * `javap` 를 OS `PATH` 의 이름 조회가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다
- * (`StrategyAdapterDependencyTest` 와 같은 이유 — CI 의 JDK 21 과 다른 `javap` 를 부를 여지를
- * 없앤다).
- */
-private val javapExecutable: String by lazy {
-    val javaHome = System.getProperty("java.home")
-    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
-}
-
-private fun javapOutput(classFile: File): String {
-    val process =
-        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-    val output = process.inputStream.bufferedReader().readText()
-    val exitCode = process.waitFor()
-    check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
-    return output
-}
-
-private fun disallowedBytecodeReferences(classFile: File): List<String> =
-    BIDVECTOR_INTERNAL_NAME
-        .findAll(javapOutput(classFile))
-        .map { it.value.replace('/', '.') }
-        .filter(::isDisallowed)
-        .toList()

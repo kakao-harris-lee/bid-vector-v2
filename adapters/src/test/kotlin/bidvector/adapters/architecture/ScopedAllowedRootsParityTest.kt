@@ -1,25 +1,11 @@
 package bidvector.adapters.architecture
 
+import bidvector.adapters.architecture.ScopedAllowedRoots.BYTECODE_LAYER_ROOTS
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.lang.reflect.Modifier
-import java.util.Properties
-import bidvector.adapters.audit.ALLOWED_ROOTS as AUDIT_ROOTS
-import bidvector.adapters.evaluation.ALLOWED_ROOTS as EVALUATION_ROOTS
-import bidvector.adapters.event.ALLOWED_ROOTS as EVENT_ROOTS
-import bidvector.adapters.extraction.ALLOWED_ROOTS as EXTRACTION_ROOTS
-import bidvector.adapters.koneps.ALLOWED_ROOTS as KONEPS_ROOTS
-import bidvector.adapters.ml.ALLOWED_ROOTS as ML_ROOTS
-import bidvector.adapters.notice.ALLOWED_ROOTS as NOTICE_ROOTS
-import bidvector.adapters.notification.ALLOWED_ROOTS as NOTIFICATION_ROOTS
-import bidvector.adapters.opening.ALLOWED_ROOTS as OPENING_ROOTS
-import bidvector.adapters.persistence.ALLOWED_ROOTS as PERSISTENCE_ROOTS
-import bidvector.adapters.profile.ALLOWED_ROOTS as PROFILE_ROOTS
-import bidvector.adapters.qualification.ALLOWED_ROOTS as QUALIFICATION_ROOTS
-import bidvector.adapters.relay.ALLOWED_ROOTS as RELAY_ROOTS
-import bidvector.adapters.strategy.ALLOWED_ROOTS as STRATEGY_ROOTS
 
 /**
  * **같은 허용 뿌리 목록이 두 층에 살아 어긋나는 자리를 축 전부에서 잰다**(`OPEN-SCOPED-ROOTS-PARITY-REST`).
@@ -47,13 +33,14 @@ import bidvector.adapters.strategy.ALLOWED_ROOTS as STRATEGY_ROOTS
  * 네 번째 단언이 닫는다(verifier F-2 가 ①~③ 만으로 ④ 가 열린다는 반례 둘을 냈다).
  *
  * 술어 자체의 동치(`fqn == 뿌리 || fqn.startsWith("뿌리.")`)는 이 test 가 아니라 두 층의 술어 test 가 든다 —
- * 바이트코드 층은 각 축 dependency test 의 양성 대조, 이름 층은 build-logic 의 `SourceReferencePolicyTest`다.
+ * 바이트코드 층은 [ScopedBytecodeLayerGateTest] 의 구성 대조, 이름 층은 build-logic 의
+ * `SourceReferencePolicyTest` 다.
  * **두 목록이 「옳은가」도 이 test 의 대상이 아니다** — 둘이 함께 넓어지면 조용하고, 그 자리는 ADR·리뷰가 든다.
  */
 class ScopedAllowedRootsParityTest {
     @Test
     fun `이름 층이 판정하는 축 집합은 바이트코드 층 목록을 가진 축 집합과 같다`() {
-        val scopes = readPolicy().list(SCOPED_PACKAGES)
+        val scopes = ArchitecturePolicyValues.list(ArchitecturePolicyValues.SCOPED_PACKAGES)
 
         // 모집단이 비면 아래 축별 등식이 아무 범위도 잠그지 않는다.
         scopes.shouldNotBeEmpty()
@@ -63,8 +50,10 @@ class ScopedAllowedRootsParityTest {
 
     @Test
     fun `축마다 두 층의 허용 뿌리가 같은 집합이다`() {
-        val policy = readPolicy()
-        val nameLayer = BYTECODE_LAYER_ROOTS.keys.associateWith { policy.list(SCOPED_ROOTS_PREFIX + it).toSet() }
+        val nameLayer =
+            BYTECODE_LAYER_ROOTS.keys.associateWith {
+                ArchitecturePolicyValues.list(ArchitecturePolicyValues.SCOPED_ROOTS_PREFIX + it).toSet()
+            }
 
         // 빈 집합끼리의 등식은 아무 범위도 잠그지 않는다 — 어느 축의 어느 층도 비어 있지 않다.
         val emptySides =
@@ -189,60 +178,6 @@ class ScopedAllowedRootsParityTest {
     }
 
     private companion object {
-        const val SCOPED_PACKAGES = "source.scoped-packages"
-        const val SCOPED_ROOTS_PREFIX = "source.scoped-allowed-roots."
-        const val LOCATION_PROPERTY = "bidvector.architecture.policy"
-
-        /**
-         * 축 → **바이트코드 층**의 허용 뿌리. 값은 각 축 dependency test 가 실제로 판정에 쓰는 그 집합
-         * 자체이고(별칭 import 한 심볼), 그래서 목록을 세 번째로 적지 않는다. key 집합은 위 첫 test 가
-         * `source.scoped-packages` 와 등식으로 묶으므로 이 표는 **열거가 아니라 구성**이다.
-         */
-        val BYTECODE_LAYER_ROOTS: Map<String, Set<String>> =
-            mapOf(
-                "bidvector.adapters.audit" to AUDIT_ROOTS,
-                "bidvector.adapters.evaluation" to EVALUATION_ROOTS,
-                "bidvector.adapters.event" to EVENT_ROOTS,
-                "bidvector.adapters.extraction" to EXTRACTION_ROOTS,
-                "bidvector.adapters.koneps" to KONEPS_ROOTS,
-                "bidvector.adapters.ml" to ML_ROOTS,
-                "bidvector.adapters.notice" to NOTICE_ROOTS,
-                "bidvector.adapters.notification" to NOTIFICATION_ROOTS,
-                "bidvector.adapters.opening" to OPENING_ROOTS,
-                "bidvector.adapters.persistence" to PERSISTENCE_ROOTS,
-                "bidvector.adapters.profile" to PROFILE_ROOTS,
-                "bidvector.adapters.qualification" to QUALIFICATION_ROOTS,
-                "bidvector.adapters.relay" to RELAY_ROOTS,
-                "bidvector.adapters.strategy" to STRATEGY_ROOTS,
-            )
-
-        /**
-         * 경로는 빌드가 넘긴다(`adapters/build.gradle.kts` 의 선언 입력 + system property, 이 모듈의
-         * `bidvector.contracts.policy` 관례와 같은 형태). 작업 디렉터리 상대 경로에 기대면 실행 위치가
-         * 바뀔 때 조용히 깨지고, 선언 입력이 아니면 정책만 고친 뒤 `:adapters:test` 가 UP-TO-DATE 로
-         * 건너뛰어 이 등식들이 **돌지 않은 채 초록**이 된다(이 slice 가 음성 대조로 실측했다).
-         */
-        fun readPolicy(): Map<String, String> {
-            val path =
-                System.getProperty(LOCATION_PROPERTY)
-                    ?: error("시스템 속성 '$LOCATION_PROPERTY' 가 없다 — adapters/build.gradle.kts 가 넘긴다")
-            val file = File(path)
-            check(file.isFile) { "아키텍처 정책 파일을 찾지 못했다: ${file.absolutePath}" }
-            return file.reader(Charsets.UTF_8).use { reader ->
-                Properties()
-                    .apply { load(reader) }
-                    .entries
-                    .associate { (key, value) -> key.toString() to value.toString() }
-            }
-        }
-
-        /** build-logic `requireList` 와 같은 분해다 — 줄 이음은 `Properties` 가 이미 푼다. */
-        fun Map<String, String>.list(key: String): List<String> =
-            (this[key] ?: error("정책 키 '$key' 가 없다"))
-                .split(',')
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-
         /**
          * 패키지 → [BYTECODE_LAYER_ROOTS] 값 심볼의 **소유 class 내부 이름**. `internal` top-level
          * `val` 은 다른 파일에서 **file facade 의 static getter 호출**로 읽히므로 그 호출의 소유
@@ -331,11 +266,11 @@ class ScopedAllowedRootsParityTest {
             String(classFile.readBytes(), Charsets.ISO_8859_1).contains(ROOTS_SYMBOL)
 
         /**
-         * test class 출력의 뿌리 — 자기 class 파일 자리에서 **자기 패키지 깊이만큼** 올라간다. 경로를
+         * test class 출력의 뿌리 — 앵커 class 파일 자리에서 **그 패키지 깊이만큼** 올라간다. 경로를
          * 적지 않는 것은 [ownClassFiles] 와 같은 이유다(실행 위치가 바뀌어도 깨지지 않는다).
          */
         fun testClassesRoot(): File {
-            val ownPackage = ScopedAllowedRootsParityTest::class.java.packageName
+            val ownPackage = ScopedAllowedRoots::class.java.packageName
             var directory = ownClassDirectory()
             repeat(ownPackage.split('.').size) {
                 directory = directory.parentFile ?: error("test class 출력의 뿌리까지 올라가지 못했다")
@@ -344,18 +279,18 @@ class ScopedAllowedRootsParityTest {
         }
 
         /**
-         * 이 test 자신의 class 파일 — **정확히 자기 class 와 그 `$` 중첩**만 센다. 앞 판은 class 이름
-         * **접두**로 모아서 `…ParityTestFillKt` 같은 **별도 파일**의 facade 까지 읽었고, 그 파일에
-         * 표에 쓰지 않는 참조를 두면 선언 패키지 집합을 메꿀 수 있었다(10C 등재 ⓒ, verifier N-2 —
-         * 이 slice 가 음성 대조로 재현했다: 별칭 바꿔치기만 하면 RED, 거기에 `…Fill` 파일을 더하면
-         * 다시 초록). 표의 초기화가 바깥 class 의 `<clinit>` 에서 일어나든 `Companion` 에서
-         * 일어나든 둘 다 이 필터에 든다(`X.class` 와 `X$Companion.class`).
+         * **표를 담은 class 의 파일** — 정확히 [ScopedAllowedRoots] 와 그 `$` 중첩만 센다. 이 앵커가
+         * 표를 따라간다는 것이 중요하다: 단언이 뽑는 것은 「표의 값 심볼의 소유 class」이고 그 정보는
+         * **표를 초기화하는 class 의 상수 풀**에만 있다. 표가 이 test 의 `Companion` 에서
+         * `ScopedAllowedRoots` 로 옮겨갔으므로 앵커도 함께 옮겼다(M12/12A D-12A-1).
          *
-         * 자기 **file facade**(`…ParityTestKt.class`)는 접두가 같지만 `$` 중첩이 아니라 빠진다 —
-         * 오늘 그 facade 에 `getALLOWED_ROOTS` 참조는 **0** 이고(실측) 표는 `Companion` 에 산다.
+         * 앞 판은 class 이름 **접두**로 모아서 `…FillKt` 같은 **별도 파일**의 facade 까지 읽었고, 그
+         * 파일에 표에 쓰지 않는 참조를 두면 선언 패키지 집합을 메꿀 수 있었다(10C 등재 ⓒ, verifier
+         * N-2 — M11 이 음성 대조로 재현했다). 「정확 일치 + `$` 중첩」으로 좁힌 것이 그 처방이고, 표가
+         * `object` 의 `<clinit>` 에서 초기화되든 중첩에서 되든 둘 다 이 필터에 든다.
          */
         fun ownClassFiles(): List<File> {
-            val simpleName = ScopedAllowedRootsParityTest::class.java.simpleName
+            val simpleName = ScopedAllowedRoots::class.java.simpleName
             val directory = ownClassDirectory()
             val files =
                 directory
@@ -369,7 +304,7 @@ class ScopedAllowedRootsParityTest {
         }
 
         private fun ownClassDirectory(): File {
-            val anchor = ScopedAllowedRootsParityTest::class.java
+            val anchor = ScopedAllowedRoots::class.java
             val own =
                 anchor.getResource("${anchor.simpleName}.class")
                     ?: error("자기 class 파일을 class loader 가 주지 않았다 — 이 술어는 컴파일 산출물을 읽는다")
