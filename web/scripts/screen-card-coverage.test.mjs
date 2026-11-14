@@ -406,6 +406,15 @@ const PROBES = {
       return <span>{plainTextOf(title)}</span>;
     }
   `,
+  // **음성 대조** — 다른 **파일의 카드**를 그리는 조상 카드. 지역 그래프가 파일에 갇히지
+  // 않으면 조상 카드가 뿌리까지 전부 의무가 된다(그 폐포는 「마운트할 수 있는 카드」의 뜻을
+  // 무너뜨린다).
+  'ancestor.tsx': `
+    import { WrapperCard } from './viaWrapper';
+    export function AncestorCard({ at }: { readonly at: string }) {
+      return <section><WrapperCard at={at} /></section>;
+    }
+  `,
   // ── M12/12B — 카드 술어(Q1). 어휘를 **부르지만** 마운트할 수 있는 카드가 아니다 ──────────
   'hookOnly.ts': `
     import { instantDisplayOf } from '../../display/timeDisplay';
@@ -690,6 +699,16 @@ describe('표시층 파일 사이 도달 (M12/12B ⓐⓑ)', () => {
   /** **음성 대조** — 폐포가 표시층을 다 삼키지 않는다. */
   it('어휘에 닿지 않는 표시 함수를 부르면 의무가 아니다', () => {
     expect(componentsIn('viaPlain.tsx')).toStrictEqual([]);
+  });
+
+  /**
+   * **음성 대조 — 지역 그래프는 파일에 갇힌다.** 다른 파일의 카드를 그리는 것만으로는 의무가
+   * 아니다. 이 선이 없으면 조상 카드가 뿌리까지 전부 의무가 되어 「마운트할 수 있는 카드」라는
+   * 의무의 뜻이 무너진다. 그 가둠은 노드 집합(`byKey`)의 범위가 내고, 앞 판의 「같은 파일만」
+   * 매개변수는 변이로 재니 거동이 0 이어서 지웠다 — 이 칸이 그 주장을 든다.
+   */
+  it('다른 파일의 카드를 그리는 조상 카드는 그것만으로 의무가 아니다', () => {
+    expect(componentsIn('ancestor.tsx')).toStrictEqual([]);
   });
 
   /** 폐포가 **씨앗 밖으로** 자라는 것과, 자라서 표시층 전부가 되지는 않는 것을 함께 잰다. */

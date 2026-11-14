@@ -351,15 +351,15 @@ function topLevelDeclarationsOf(source) {
 /**
  * 이 선언이 가리키는 **그래프의 다른 노드** — 변이다(JSX 태그도 식별자다).
  *
- * `sameFile` 을 주면 그 파일 안의 선언만 변으로 센다(카드 파일의 지역 그래프). 주지 않으면
- * **파일 사이**로 센다(표시층 그래프).
+ * **그래프의 범위는 `byKey` 하나가 정한다**: 자리(`<상대경로>#<이름>`)가 파일을 담으므로, 노드
+ * 집합이 한 파일이면 변도 그 파일 안이고(카드 파일의 지역 그래프), 표시층 전체면 변도 파일
+ * 사이다(표시층 그래프). 앞 판은 여기에 「같은 파일만」 조건을 하나 더 두었는데 변이로 재니
+ * **거동이 0 이었다**(그 조건이 `byKey` 의 범위와 겹쳤다) — 죽은 분기라 지우고, 지역 그래프가
+ * 파일에 갇힌다는 주장은 test 의 음성 대조(조상 카드)가 든다.
  */
-function edgesOf(checker, declaration, byKey, selfKey, sameFile) {
+function edgesOf(checker, declaration, byKey, selfKey) {
   const edges = new Set();
   const add = (candidate) => {
-    if (sameFile !== undefined && candidate.getSourceFile() !== sameFile) {
-      return;
-    }
     const key = declarationKeyOf(candidate);
     if (key !== undefined && key !== selfKey && byKey.has(key)) {
       edges.add(key);
@@ -446,7 +446,7 @@ export function displayVocabularyReach(program, webRoot) {
   }
   const edges = new Map();
   for (const [key, declaration] of byKey) {
-    edges.set(key, edgesOf(checker, declaration, byKey, key, undefined));
+    edges.set(key, edgesOf(checker, declaration, byKey, key));
   }
   const reach = fixpointOf(edges, VOCABULARY_DECLARATIONS);
   reachCache.set(program, reach);
@@ -487,7 +487,7 @@ export function vocabularyComponentsOf(program, source, webRoot) {
   const edges = new Map();
   const seeded = [];
   for (const [key, declaration] of byKey) {
-    edges.set(key, edgesOf(checker, declaration, byKey, key, source));
+    edges.set(key, edgesOf(checker, declaration, byKey, key));
     if (touchesAnyOf(checker, declaration, reach)) {
       seeded.push(key);
     }
