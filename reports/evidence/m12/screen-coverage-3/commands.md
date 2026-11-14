@@ -179,15 +179,23 @@ available · RSS 상위)은 각각 따로 돌려 보고 시작했고, 끝은 **�
 | W-6 `npm run test` | exit 0 · **1011 passed** |
 | W-7 gate:tests · W-8 build · W-9 boundary-canary | 전부 exit 0 |
 | W-10 playwright install · W-11 스모크 | exit 0 · 2 passed |
-| W-12 `:app:bootJar` | **처음에 exit 127** — 아래 사유. 저장소 뿌리에서 다시 돌려 **exit 0** |
+| W-12 `:app:bootJar` | **처음에 exit 127** — 아래 사유. 저장소 뿌리에서 다시 돌려 **exit 0**(그 실행은 **UP-TO-DATE**) |
 | W-13 여정 | exit 0 · **12 passed · flaky 0 · spec 4/4** |
 | **Kotlin `check`** | **exit 0** · 433 tasks(258 executed · 136 cached · 39 up-to-date) |
 
 **W-12 의 127 을 그대로 적는다.** 빌드 자리 래퍼를 `web/` 에서 불러 `./gradlew` 가 그 디렉터리에
 없었다(래퍼는 자리를 잡은 뒤 그 cwd 에서 명령을 돈다). **여정이 그 뒤에 초록이었던 것이 가린다** —
-여정은 이미 있던 `app.jar` 로 돌았기 때문이다. 그래서 뿌리에서 다시 돌리고 **산출 jar 의 해시를
-맞댔다**: 여정이 쓴 것과 **같은 바이트**다(Kotlin 원문이 그 사이에 바뀌지 않았으므로 재빌드가
-같은 산출을 낸다). 즉 W-13 의 판정은 유효하고, W-12 는 이제 제 명령으로 초록이다.
+여정은 이미 있던 `app.jar` 로 돌았기 때문이다.
+
+뿌리에서 다시 돌려 **exit 0** 을 받았고, 그 실행에서 `:app:bootJar` 는 **UP-TO-DATE** 였다 —
+즉 **jar 를 다시 쓰지 않았다**(그 파일의 mtime 이 여정 전 빌드 시각 그대로이고, 같은 디렉터리의
+`app-plain.jar` 만 재실행 시각이다). 그러므로 **해시 대조는 근거가 아니다** — 같은 파일을 자기
+자신과 맞댄 것이 된다(r1 v L-d 가 짚었다).
+
+W-13 이 유효한 근거는 **입력 불변**이다: 착수 base 부터 판정 SHA 까지 **Kotlin·빌드 입력 변경이
+0** 이고(`*.kt`·`*.kts`·`gradle/**`·모듈 디렉터리 전수 실측), `web/`·`docs/`·`reports/` 밖 변경은
+`README.md`·`milestone-12.md` 둘뿐이다. Gradle 의 최신성 판정이 그 사실과 같은 말을 한다. 즉
+여정이 쓴 jar 는 판정 SHA 의 jar 와 **입력이 같고**, W-12 는 이제 제 명령으로 초록이다.
 
 ## 게이트 test 적재 비용 (r1 cr F-11 — 12D 의 예열 예산 축에 넘긴다)
 
