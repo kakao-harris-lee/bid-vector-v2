@@ -26,10 +26,11 @@ import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
  * 3. **export 집합 전수**와 **import 그래프**를 단언한다. 전자는 경로 표·원문 reader 가 조용히
  *    늘어나는 길을, 후자는 소비자가 걷기 함수를 다시 쥐는 길을 막는다.
  *
- * **층마다 범위가 다르다**(r7 — verifier r6 H-1): JS/TS 는 경로 표기 전부를, **데이터 파일은
- * `이름.kt` 꼴만** 본다(확장자 단독 값·별표/중괄호 glob 은 지나간다). 걷기 이름 축만 **전 파일**
- * 이다. 닫히지 않는 것은 `design-review.md` §4 (3) 미달 ①②⑤⑥⑧⑨⑩ 과 capability map §12.3 (j)
- * 의 `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` 가 든다.
+ * **층마다 범위가 다르다**: JS/TS 는 AST 리터럴의 경로 표기 전부를, **데이터 파일은 본문의
+ * 확장자 토큰 전부**를 본다 — 앞 판에서 데이터 파일 쪽이 `이름.kt` 꼴만 보던 자리는 M11(확장자
+ * 단독 값·glob)과 M12(대소문자·`#` 데이터 줄)가 닫았다. 걷기 이름 축은 **전 파일**이다.
+ * 닫히지 않는 것은 capability map §12.3 의 `OPEN-M12-KOTLIN-READ-GATE-RESIDUALS-3` 이 든다
+ * (AST 술어의 대소문자가 그 가운데 하나다 — 데이터 파일 쪽과 **짝이 맞지 않는다**).
  */
 
 const here = dirname(fileURLToPath(import.meta.url));

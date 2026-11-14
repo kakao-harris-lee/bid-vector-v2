@@ -99,9 +99,10 @@ export function kotlinEnumEntries(key, name) {
 }
 
 /**
- * 그 술어의 **커널** — 텍스트만 받는다(M11 — 팀장 판정 (ㄱ)). 위 입구가 「읽기가 내준 텍스트인가」를
- * 단언하므로, 술어 자신의 양성·음성 대조(합성 Kotlin 조각)는 여기로 들어온다. 둘 다 이 파일 안
- * 함수이고 **어느 추적 파일도 이 파일을 import 하지 않으므로** 새 공개 표면이 0 이다(실측).
+ * 그 술어의 **커널** — 텍스트만 받는다(M11 — 팀장 판정 (ㄱ)). 위 입구는 **키**를 받아 읽기에
+ * 건네므로(M12 — ⓐ) 원문이 이 파일을 지나가지 않고, 술어 자신의 양성·음성 대조(합성 Kotlin
+ * 조각)는 커널로 직접 들어온다. 둘 다 이 파일 안 함수이고 **어느 추적 파일도 이 파일을 import
+ * 하지 않으므로** 새 공개 표면이 0 이다(실측).
  */
 function enumEntriesOf(stripped, name) {
   const header = new RegExp(String.raw`\benum\s+class\s+${name}\b`, 'gu');
