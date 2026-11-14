@@ -108,6 +108,19 @@ export function withKotlinSource(key, extract, ...rest) {
   // **추출을 악수 안에서 부른다**(r2 — cr HIGH): 그 텍스트를 걸어 두면, `bind` 로 프레임을 세탁해
   // 커널에 손댄 값을 먹이는 길이 커널 쪽 단언에서 막힌다.
   const extracted = runWithInFlightText(text, () => extract(text, ...rest));
+  // **비동기 추출은 받지 않는다**(r2 — 팀장 지시로 실측하고 정했다). 악수와 호출자 프레임은 둘 다
+  // **그 동기 호출 구간**에만 선다. `await` 뒤에 커널을 부르면 둘 다 이미 닫혀 있어 **문면이
+  // 원인을 잘못 말하는 거부**가 났다(실측: 「직접 불렀다」). 거부를 여기로 올려 원인을 말하게 하고,
+  // 덤으로 M-1 의 우회 꼴 하나(`async (t) => t` — 실측으로 원문 251 자가 나왔다)가 닫힌다.
+  //
+  // 병행은 막지 않는다 — 읽기 구간이 동기라 두 읽기가 **겹치지 않는다**(실측: 동시 둘 통과).
+  if (typeof extracted?.then === 'function') {
+    // 떠도는 거절을 잠재운다(우리가 값을 버리므로 처리자가 없다).
+    extracted.then(undefined, () => {});
+    throw new Error(
+      `비동기 추출은 받지 않는다: ${key} — 악수와 호출자 판정이 **동기 구간**에만 서므로 \`await\` 뒤의 커널 호출은 막힌다(동기 추출로 적어라)`,
+    );
+  }
   if (extracted === text) {
     throw new Error(
       `추출이 원문을 그대로 돌려줬다: ${key} — **반환값으로는** 원문이 나가지 않는다(추출한 값을 돌려라)`,

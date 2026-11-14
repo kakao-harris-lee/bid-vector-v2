@@ -726,6 +726,23 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
    * 결과를 보고 거부한다. 문자열 동일성이라 **값이 같은 사본**까지 들지만, 값이 다른 사본은
    * 지나간다 — 그 잔여는 등재된 것이다(추출은 텍스트를 쥐어야 성립한다).
    */
+  /**
+   * **비동기 추출은 받지 않는다**(r2 — 팀장 지시로 실측하고 정했다). 악수와 호출자 프레임은 그
+   * **동기 호출 구간**에만 서므로 `await` 뒤의 커널 호출은 어차피 막히는데, 그 거부는 **원인을
+   * 잘못 말했다**(「직접 불렀다」). 여기서 먼저 막아 문면이 원인을 말하게 하고, 덤으로 ⓒ 의 우회
+   * 꼴 하나(`async (t) => t`)가 닫힌다.
+   *
+   * **병행은 막지 않는다** — 읽기 구간이 동기라 두 읽기가 겹치지 않는다(실측).
+   */
+  it('비동기 추출은 거부된다 — 악수가 동기 구간에만 선다', async () => {
+    expect(() => withKotlinSource('basis', async (text) => text.length)).toThrow(/비동기 추출은 받지 않는다/u);
+    // ⓒ 의 우회 꼴 하나가 여기서 닫힌다(앞 판은 원문을 그대로 냈다).
+    expect(() => withKotlinSource('basis', async (text) => text)).toThrow(/비동기 추출은 받지 않는다/u);
+    // 음성 대조 — 동기 추출 둘을 **잇달아** 부르는 것은 막지 않는다.
+    expect(withKotlinSource('basis', (text) => text.length)).toBeGreaterThan(0);
+    expect(withKotlinSource('provenance', (text) => text.length)).toBeGreaterThan(0);
+  });
+
   it('원문을 그대로 돌려주는 추출은 거부된다', () => {
     expect(() => withKotlinSource('basis', (text) => text)).toThrow(/원문을 그대로/u);
     expect(() => withKotlinSource('basis', (text) => text.slice(0))).toThrow(/원문을 그대로/u);
