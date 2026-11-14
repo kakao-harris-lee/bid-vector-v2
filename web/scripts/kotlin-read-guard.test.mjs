@@ -17,9 +17,10 @@ import {
 import { readFileSync as aliasedRead } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative as relativePath, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { isKotlinSourcePath } from './kotlin-read-guard.mjs';
@@ -271,6 +272,112 @@ describe('여는 행위 — 공개 표면이 셋으로 고정된다', () => {
       'installKotlinReadGuard',
       'isKotlinSourcePath',
     ]);
+  });
+});
+
+/**
+ * **층이 서야 하는 자리를 선언에서 뽑는다**(M12 — ⓑ⑥).
+ *
+ * M11 은 이 축을 「진입점마다 미리 적재하는 것은 **진입점 열거**라 고르지 않았다」로 등재했다.
+ * 그 전제를 둘로 가른 것이 이 slice 의 실측이다. ① **기구가 하나**다 — `node --import <층>` 이
+ * 평범한 node 프로세스를 막고, config 가 `NODE_OPTIONS` 에 같은 것을 실으면 그 도구가 띄우는
+ * 프로세스(playwright spec 워커·`webServer`)까지 막는다(실측: 같은 spec 이 거부됐다). ② **의무의
+ * 모집단을 선언에서 뽑을 수 있다** — 손 목록이 아니다.
+ *
+ * 모집단이 둘이고 **기구가 다른 이유는 저장소 코드가 프로세스에 들어가는 길이 다르기 때문**이다.
+ * - **뿌리 config 모듈**: 도구가 그 파일을 적재한다 → 그 파일이 층을 **import** 한다.
+ * - **`node` 진입 스크립트**: 셸이 그 파일을 띄운다 → 그 명령이 층을 **`--import`** 한다.
+ *
+ * 새 config 파일이나 새 `node` 명령이 층 없이 생기면 아래 둘이 붉어진다. `tsc`·
+ * `openapi-typescript` 는 저장소가 쓴 코드를 적재하지 않아 모집단 밖이다(등재).
+ */
+describe('여는 행위 — 층이 선 자리를 선언에서 센다 (ⓑ⑥)', () => {
+  /** 층을 세우는 **유일한 모듈** — 두 모집단의 의무가 같은 파일을 가리킨다. */
+  const SETUP = 'scripts/kotlin-read-guard-setup.mjs';
+
+  const tracked = () =>
+    execFileSync('git', ['ls-files', '-z', '--', '.'], { cwd: webRoot, encoding: 'utf8' })
+      .split('\0')
+      .filter((relative) => relative.length > 0);
+
+  /** 뿌리 config 전수 — 이름 목록이 아니라 **추적 파일의 꼴**이다. */
+  const rootConfigs = () => tracked().filter((relative) => /^[^/]+\.config\.[cm]?[jt]s$/u.test(relative));
+
+  /**
+   * 그 파일이 층을 import 하는가. **지정자를 해석해서** 본다 — 표기(`./scripts/…` · `../web/…`)를
+   * 세지 않는다. 정적 import·동적 import·재수출을 모두 든다.
+   */
+  const importsSetup = (relative) => {
+    const source = readFileSync(resolve(webRoot, relative), 'utf8');
+    const tree = ts.createSourceFile(relative, source, ts.ScriptTarget.Latest, false);
+    const fromDir = dirname(resolve(webRoot, relative));
+    let found = false;
+    const take = (specifier) => {
+      if (specifier.startsWith('.')) {
+        found ||= relativePath(webRoot, resolve(fromDir, specifier.split('?')[0])) === SETUP;
+      }
+    };
+    const visit = (node) => {
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier !== undefined) {
+        if (ts.isStringLiteral(node.moduleSpecifier)) {
+          take(node.moduleSpecifier.text);
+        }
+      }
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        node.arguments[0] !== undefined &&
+        ts.isStringLiteral(node.arguments[0])
+      ) {
+        take(node.arguments[0].text);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(tree);
+    return found;
+  };
+
+  /** `package.json` 의 `scripts` 에서 **`node` 로 시작하는 명령 전수**를 뽑는다. */
+  const nodeCommands = () => {
+    const { scripts } = JSON.parse(readFileSync(resolve(webRoot, 'package.json'), 'utf8'));
+    return Object.entries(scripts).flatMap(([name, value]) =>
+      value
+        .split('&&')
+        .map((part) => part.trim())
+        .filter((part) => /^node\s/u.test(part))
+        .map((command) => ({ name, command })),
+    );
+  };
+
+  it('뿌리 config 전수가 층을 import 한다', () => {
+    const configs = rootConfigs();
+
+    expect(configs.length, '뿌리 config 를 하나도 찾지 못했다 — 이 등식이 공허하다').toBeGreaterThan(2);
+    expect(
+      configs.filter((relative) => !importsSetup(relative)),
+      '이 config 가 적재되는 프로세스는 층 밖이다',
+    ).toStrictEqual([]);
+  });
+
+  it('`node` 진입 명령 전수가 층을 먼저 적재한다', () => {
+    const commands = nodeCommands();
+
+    expect(commands.length, '`node` 명령을 하나도 찾지 못했다 — 이 등식이 공허하다').toBeGreaterThan(3);
+    // **자리까지 본다**: node 는 스크립트 앞의 플래그만 읽으므로 뒤에 붙은 `--import` 는 인자다.
+    const flag = new RegExp(`^node\\s+--import[= ]\\./${SETUP}\\s`, 'u');
+    expect(
+      commands.filter(({ command }) => !flag.test(command)).map(({ name }) => name),
+      '이 명령이 띄우는 프로세스는 층 밖이다',
+    ).toStrictEqual([]);
+  });
+
+  /** 술어의 양성 대조 — 층을 import 하지 않는 합성 config 는 걸린다(일률 통과가 아니다). */
+  it('술어가 층 없는 config 와 명령을 잡는다', () => {
+    expect(importsSetup('package.json')).toBe(false);
+    const flag = new RegExp(`^node\\s+--import[= ]\\./${SETUP}\\s`, 'u');
+    expect(flag.test('node scripts/x.mjs')).toBe(false);
+    expect(flag.test(`node scripts/x.mjs --import ./${SETUP} `)).toBe(false);
+    expect(flag.test(`node --import ./${SETUP} scripts/x.mjs`)).toBe(true);
   });
 });
 
