@@ -433,6 +433,26 @@ const PROBES = {
       return { type: 1, props: instantDisplayOf(at).text };
     }
   `,
+  // ── r1 v H-1 — `.ts` 카드. JSX 를 못 쓰므로 `createElement` 뿐이고 그 반환은 앵커의
+  // **하위 인터페이스**다. 동일성만 보던 판은 이 둘을 의무에서 **잃었다**(base 가 잡던 것을
+  // 잃는 회귀). 그 축을 모집단에 넣은 것이 PR #132 v M-3 이다.
+  'tsCard.ts': `
+    import { createElement } from 'react';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    export function TsCard({ at }: { readonly at: string }) {
+      return createElement('span', null, instantDisplayOf(at).text);
+    }
+  `,
+  'tsComponentCard.ts': `
+    import { createElement } from 'react';
+    import { instantDisplayOf } from '../../display/timeDisplay';
+    function TsLeaf({ at }: { readonly at: string }) {
+      return createElement('span', null, instantDisplayOf(at).text);
+    }
+    export function TsCompCard({ at }: { readonly at: string }) {
+      return createElement(TsLeaf, { at });
+    }
+  `,
   // 포털도 카드다 — 반환이 \`Element\` 가 아니라 \`ReactPortal\` 이다.
   'portal.tsx': `
     import { createPortal } from 'react-dom';
@@ -743,6 +763,16 @@ describe('카드 술어 (M12/12B Q1)', () => {
 
   it('포털을 반환하는 카드는 의무다', () => {
     expect(componentsIn('portal.tsx')).toStrictEqual(['PortalCard']);
+  });
+
+  /**
+   * **r1 v H-1 — 앵커의 하위 타입도 카드다.** `.ts` 카드는 JSX 를 못 쓰므로 `createElement` 뿐이고
+   * 그 반환은 `ReactElement` 의 **하위 인터페이스**다. 앵커 **동일성**만 보면 그 카드가 의무에서
+   * 사라진다(base 가 잡던 것을 잃는 회귀였다). 그래서 **명목 상속 사슬**까지 따라간다.
+   */
+  it('`createElement` 로 그리는 `.ts` 카드가 의무다 — 앵커의 하위 인터페이스를 반환한다', () => {
+    expect(componentsIn('tsCard.ts')).toStrictEqual(['TsCard']);
+    expect(componentsIn('tsComponentCard.ts')).toStrictEqual(['TsCompCard']);
   });
 
   it('화면 디렉터리 밖의 카드도 의무다', () => {

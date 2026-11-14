@@ -146,7 +146,47 @@ export function cardAnchorsOf(program, webRoot) {
 }
 
 /**
- * 이 타입이 **마운트할 수 있는 카드**인가 — 반환 타입의 어느 갈래가 앵커 심볼과 같은가.
+ * 이 타입이 앵커에 **닿는가** — 같은 심볼이거나, **명목 상속 사슬**로 앵커를 기반으로 둔다.
+ *
+ * 동일성만 보면 안 되는 사유(r1 v H-1): `createElement` 의 반환은 `DetailedReactHTMLElement`·
+ * `FunctionComponentElement` 같은 **하위 인터페이스**다. JSX 를 못 쓰는 `.ts` 카드는 그 꼴밖에
+ * 쓸 수 없고(그 축은 PR #132 v M-3 이 모집단에 넣었다), 동일성 술어는 그 카드를 의무에서
+ * **잃는다** — base 가 잡던 것을 잃는 회귀다.
+ *
+ * **구조적 대입 가능성은 쓰지 않는다.** 명목 상속만 따라가므로 꼴만 흉낸 반환
+ * (`{ type, props, key }`)은 계속 거절된다 — 그 선이 위협 모델 경계다.
+ */
+function reachesAnchor(checker, anchors, type) {
+  const seen = new Set();
+  // **타입이 아니라 심볼의 사슬**을 걷는다(실측): `createElement` 의 반환은 제네릭 **타입 참조**라
+  // `isClassOrInterface()` 가 거짓이고 `getBaseTypes()` 가 서지 않는다. 선언의 상속 절을 보면
+  // 제네릭 인자와 무관하게 사슬이 선다.
+  const walk = (symbol) => {
+    const resolved = aliasResolved(checker, symbol);
+    if (resolved === undefined || seen.has(resolved)) {
+      return false;
+    }
+    seen.add(resolved);
+    if (anchors.has(resolved)) {
+      return true;
+    }
+    for (const declaration of resolved.declarations ?? []) {
+      if (!ts.isInterfaceDeclaration(declaration) && !ts.isClassDeclaration(declaration)) {
+        continue;
+      }
+      for (const clause of declaration.heritageClauses ?? []) {
+        if (clause.types.some((one) => walk(checker.getSymbolAtLocation(one.expression)))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+  return typeParts(type).some((part) => walk(part.getSymbol()));
+}
+
+/**
+ * 이 타입이 **마운트할 수 있는 카드**인가 — 반환 타입의 어느 갈래가 앵커에 닿는가.
  *
  * 클래스 컴포넌트도 **이름 없이** 본다: construct 시그니처의 인스턴스에 앵커를 반환하는 멤버가
  * 있는가로 판정한다. 멤버의 이름을 술어로 쓰면 그 글자가 게이트의 구멍이 된다.
@@ -155,9 +195,7 @@ function isCardType(checker, anchors, source, type) {
   const returnsAnchor = (one) =>
     typeParts(one)
       .flatMap((part) => part.getCallSignatures())
-      .some((signature) =>
-        typeParts(checker.getReturnTypeOfSignature(signature)).some((part) => anchors.has(part.getSymbol())),
-      );
+      .some((signature) => reachesAnchor(checker, anchors, checker.getReturnTypeOfSignature(signature)));
   if (returnsAnchor(type)) {
     return true;
   }
