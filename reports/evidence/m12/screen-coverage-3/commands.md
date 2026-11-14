@@ -197,6 +197,14 @@ W-13 이 유효한 근거는 **입력 불변**이다: 착수 base 부터 판정 
 `README.md`·`milestone-12.md` 둘뿐이다. Gradle 의 최신성 판정이 그 사실과 같은 말을 한다. 즉
 여정이 쓴 jar 는 판정 SHA 의 jar 와 **입력이 같고**, W-12 는 이제 제 명령으로 초록이다.
 
+### 리뷰 처방 라운드의 재측정 (문서 변경뿐)
+
+지적 다섯(날짜·교차 참조 셋·W-12 문면)은 **문서만** 바꾼다 — 판정 코드·test 편집 0. 그래서 전건
+대신 **닿는 게이트만** 돌렸다(팀장 지시): Kotlin `:leakPatternGate --rerun` **exit 0**(`--rerun`
+이라 캐시가 아니라 실제로 돌았다 — 그 task 가 executed 로 섰다) · web `gate:src-tree` **exit 0** ·
+`gate:tests` **exit 0**. Kotlin `check` 전건은 CI 가 받는다. capability map 이 복원 목록 안의
+원천 존재 파일이라 **rollback ①~⑥ 도 다시 쟀다**(`rollback.md`).
+
 ## 게이트 test 적재 비용 (r1 cr F-11 — 12D 의 예열 예산 축에 넘긴다)
 
 모집단 판정의 대조 파일은 적재 단계에서 TS 프로그램 **넷**을 세운다 — 실제 트리(훑기가 내부에서
