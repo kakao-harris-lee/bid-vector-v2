@@ -113,8 +113,15 @@ export function callerOutside(ownFile) {
 /**
  * 인자 가운데 **Kotlin 원문을 가리키는 실경로**가 있으면 그것을 낸다.
  *
- * 저장소 밖과 `node_modules` 아래는 실경로 해석을 **건너뛴다** — Kotlin 정본이 살 수 없는 자리이고,
- * 건너뛰지 않으면 모든 모듈 적재가 실경로 호출을 탄다(그 범위는 단위 대조가 든다).
+ * **위치를 묻지 않는다**(M12 — ⓑ③). 앞 판은 열리는 경로가 저장소 안인지 물어 밖이면 건너뛰었고,
+ * 그래서 디렉터리째 저장소 밖으로 복사한 뒤 그 사본을 읽는 꼴이 지나갔다(실측). 「Kotlin 정본이
+ * 살 수 없는 자리」라는 전제가 **복사 앞에서 무너진다** — 사본은 어디서든 살 수 있다. 그래서
+ * 남는 것은 실경로의 확장자 하나이고, 위치 술어가 사라진다.
+ *
+ * 남는 예외는 **`node_modules` 하나**다. 건너뛰지 않으면 모든 모듈 적재가 실경로 호출을 타고
+ * 전건이 느려진다 — 문면이 아니라 측정으로 든다(같은 조건 3회 중위값: 분기 둘 8.16s · 이 판
+ * 9.19s · 예외까지 지운 판 10.44s). 그 아래로 복사한 뒤 읽는 꼴은 평범한 관용구가 아니라
+ * 의도적 은닉이라 **경계 밖으로 등재**한다.
  */
 function kotlinTargetOf(args) {
   for (const arg of args) {
@@ -123,13 +130,7 @@ function kotlinTargetOf(args) {
       continue;
     }
     const absolute = path.resolve(given);
-    // 접두에 **구분자를 붙인다**(r1 — cr LOW): 붙이지 않으면 형제 디렉터리(`<repo>-m11-…` 같은
-    // 다른 worktree)가 저장소 안으로 읽힌다. 넓어지는 쪽이라 놓치는 축은 없지만, 층의 범위를
-    // 문면과 같게 둔다.
-    if (
-      !absolute.startsWith(`${repoRoot}${path.sep}`) ||
-      absolute.includes(`${path.sep}node_modules${path.sep}`)
-    ) {
+    if (absolute.includes(`${path.sep}node_modules${path.sep}`)) {
       continue;
     }
     // **해석되지 않는 경로는 대상이 아니다.** 없는 파일은 아무것도 열지 않고, 적힌 글자를 그대로

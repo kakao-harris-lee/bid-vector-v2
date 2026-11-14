@@ -12,9 +12,11 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { readFileSync as aliasedRead } from 'fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,6 +90,36 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
   });
 
   /**
+   * **ⓑ③ — 저장소 밖으로 복사한 뒤 읽는다**(M12). 앞 판은 열리는 경로가 저장소 안인지 **묻고**
+   * 밖이면 건너뛰었다. 그래서 디렉터리째 밖으로 복사하면(복사 자체는 디렉터리 인자라 지나간다)
+   * 그 사본을 그대로 읽을 수 있었다 — 실측으로 읽혔다.
+   *
+   * 지금은 **위치를 묻지 않는다**. 남는 예외는 `node_modules` 하나이고, 그 분기의 값은 문면이
+   * 아니라 **측정**이다(아래 음성 대조 · `commands.md`).
+   *
+   * 준비는 `cp` 로 한다 — 층은 Kotlin 원문을 **인자로 받는 복사**도 거부하므로(넓은 쪽으로 고른
+   * 범위) 탐침이 자기 준비에 걸리면 안 된다. 실제 ⓑ③ 은 **디렉터리째** 복사하는 꼴이다.
+   */
+  it('저장소 밖으로 복사한 사본도 걸린다 — 위치를 묻지 않는다', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'guard-outside-'));
+    const copy = resolve(dir, 'copied-source.txt');
+    const kotlinCopy = resolve(dir, `X.${'k'}${'t'}`);
+    execFileSync('cp', [target, kotlinCopy]);
+    execFileSync('cp', [target, copy]);
+
+    try {
+      // 이름이 보존된 사본 — **읽을 때** 실경로의 확장자가 선다.
+      expect(() => readFileSync(kotlinCopy, 'utf8')).toThrow(/kotlin-read-guard/u);
+      // 이름을 바꾼 사본은 Kotlin 원문이 **아니다**(확장자가 성질이다). 그 꼴을 받는 자리는
+      // 복사하는 순간이다 — 원본 인자가 Kotlin 실경로라 층이 거기서 거부한다.
+      expect(() => readFileSync(copy, 'utf8')).not.toThrow();
+      expect(() => readFileSync(target, 'utf8')).toThrow(/kotlin-read-guard/u);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
    * **⑩ — 데이터 파일의 glob.** 경로가 코드에 없고 **별표 glob** 으로만 적혀도, 여는 순간
    * 실경로가 서므로 걸린다. 정적 술어는 이 꼴을 데이터 파일 본문에서 따로 받는다(두 층).
    */
@@ -118,9 +150,41 @@ describe('여는 행위 — 음성 대조', () => {
     expect(readFileSync(resolve(webRoot, 'package.json'), 'utf8').length).toBeGreaterThan(0);
   });
 
-  /** 저장소 밖과 `node_modules` 는 실경로 해석을 건너뛴다 — 그 범위를 문면이 아니라 측정으로 든다. */
-  it('저장소 밖 경로는 층의 대상이 아니다', () => {
-    expect(() => readFileSync(resolve(webRoot, 'package-lock.json'), 'utf8')).not.toThrow();
+  /**
+   * **남는 위치 예외는 `node_modules` 하나다**(M12 — ⓑ③ 의 대가).
+   *
+   * 앞 판은 이 자리에서 「저장소 밖 경로는 층의 대상이 아니다」를 주장했는데, 재는 입력이
+   * **저장소 안의** 비 Kotlin 파일이라 그 주장을 재지 못했다. 그 칸은 위 양성 묶음이 받았고
+   * (위치를 묻지 않는다) 이 칸은 **남은 예외 하나**를 재는 자리로 주장을 바꾼다.
+   *
+   * 지우지 않는 이유는 **값이 있기 때문**이다: 이 분기가 없으면 모든 모듈 적재가 실경로 호출을
+   * 타고 vitest 전건이 느려진다(같은 조건 3회 중위값 — `commands.md` 「위치 분기 셋 갈래」).
+   * 그래서 「`node_modules` 아래로 복사한 뒤 읽기」는 열려 있고, 그 꼴은 평범한 관용구가 아니라
+   * **의도적 은닉**이라 경계 밖으로 등재한다.
+   */
+  it('node_modules 아래의 Kotlin 사본은 층을 지나간다 — 값이 있는 예외 하나', () => {
+    const dir = mkdtempSync(resolve(webRoot, 'node_modules', '.guard-probe-'));
+    const inside = resolve(dir, `X.${'k'}${'t'}`);
+    execFileSync('cp', [shippedKotlinFile(), inside]);
+
+    try {
+      expect(() => readFileSync(inside, 'utf8')).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /** 저장소 밖의 **비 Kotlin** 파일은 그대로 지나간다 — 일률 거절이 아니다. */
+  it('저장소 밖의 비 Kotlin 파일 읽기는 통과한다', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'guard-plain-'));
+    const plain = resolve(dir, 'notes.txt');
+    writeFileSync(plain, 'plain\n');
+
+    try {
+      expect(readFileSync(plain, 'utf8')).toBe('plain\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
