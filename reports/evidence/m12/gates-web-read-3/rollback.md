@@ -12,13 +12,14 @@ git restore --source=<원천> --staged --worktree -- <아래 목록>
 
 `git diff --name-status <base>..HEAD` 의 경로 전수다. **라운드마다 재산출한다.**
 
-`git diff --name-status 10d208d2..HEAD` 가 낸 **23 경로**(신설 9 · 수정 14)이고, 디렉터리 하나로
+`git diff --name-status 10d208d2..HEAD` 가 낸 **24 경로**(신설 9 · 수정 15)이고, 디렉터리 하나로
 적는 evidence **다섯**이 그 안에 든다(목록에는 디렉터리 한 줄로 선다).
 
-**r1 에서 줄었다** — `vite.config.ts` 의 층 import 를 거두어 그 파일이 base 와 같아졌고, 세 config
-(`playwright.config.ts` · `playwright.journey.config.ts` · `eslint.config.js`)에 남아 있던 빈 줄도
-되돌려 base 와 **바이트로 같다**. 그래서 그 넷은 **복원 목록에 없다**(in_scope 에는 남는다 —
-되돌림 대상이 아니라 「만지지 않았다」가 사실이다).
+**r1·r2 에서 바뀌었다.** config 셋(`playwright.config.ts` · `playwright.journey.config.ts` ·
+`eslint.config.js`)은 층 import 를 거두고 빈 줄까지 되돌려 base 와 **바이트로 같다** — 그래서
+복원 목록에 **없다**(in_scope 에는 남는다: 되돌림 대상이 아니라 「만지지 않았다」가 사실이다).
+`vite.config.ts` 는 r2 에 `setupFiles` 한 줄을 지워 **다시 목록에 든다**. `web/.npmrc` 와 탐침
+둘(`kotlin-read-probe.mjs` · `e2e/probe-config/…`)이 r1·r2 에서 새로 들어왔다.
 
 ```
 docs/discovery/capability-map.md
@@ -30,7 +31,7 @@ web/e2e/harness/opening-axis-extract.mjs
 web/e2e/harness/opening-axis.mjs
 web/e2e/harness/opening-axis.test.mjs
 web/e2e/kotlin-read-guard.spec.ts
-web/e2e/probe-config/playwright.probe.config.ts
+web/e2e/probe-config/
 web/package.json
 web/scripts/kotlin-raw-glob-probe.mjs
 web/scripts/kotlin-read-guard-setup.mjs
@@ -79,10 +80,10 @@ slice 가 없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
 
 ## ①~⑥ 실측
 
-**실측 HEAD: `a9d0f6cc0ea50267a39ad880bffebdb340401144`** (원천 `10d208d2`). 버릴 clone 에서 돌았고
+**실측 HEAD: `b79eb86c9d2ce052da9b8ad9d2c713443863369c`** (원천 `10d208d2`). 버릴 clone 에서 돌았고
 레인 저장소를 건드리지 않았다. 갈음은 「HEAD 초록」이 아니라 **트리 동일성**으로만 센다.
 
-**두 번 다시 쟀다.** 첫 실측은 `380eb0bd` 에서 돌았고, 그 뒤 **복원 목록 안의 원천에 존재하는
+**세 번 다시 쟀다.** 첫 실측은 `380eb0bd` 에서 돌았고, 그 뒤 **복원 목록 안의 원천에 존재하는
 파일**(층과 그 test 의 머리 주석 · 커널 · money-vocab · 등록부 산문)을 고치는 커밋 넷이 왔다 —
 낡은 범위 문면을 실제 자리로 정정한 커밋들이다. 그 순간 첫 실측은 **재측정 대상**이 되므로
 목록을 재산출하고 ①~⑥ 을 다시 돌렸다(수치는 아래가 정본이고 첫 실측은 옮기지 않았다).
@@ -90,9 +91,9 @@ slice 가 없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
 | | 측정 | 값 |
 | --- | --- | --- |
 | ① | 복원 명령 | exit **0** |
-| ② | D/M 계수 | **D 9 · M 14**(신설 아홉이 지워지고 수정 열넷이 원천으로 돌아간다) |
+| ② | D/M 계수 | **D 9 · M 15**(신설 아홉이 지워지고 수정 열다섯이 원천으로 돌아간다) |
 | ③ | 복원 경로 한정 `diff <원천>` | **0 줄** |
-| ③′ | 내 표지 0 | 절 `(p)` **0** · 신설 ID 잔존 **0** · `.npmrc` 선언 **0** · 신설 파일 **넷 전부 부재** · 내 evidence 디렉터리 **부재** |
+| ③′ | 내 표지 0 | 절 `(p)` **0** · 신설 ID 잔존 **0** · `.npmrc` 선언 **0** · 신설 파일 **넷 전부 부재** · 내 evidence 디렉터리 **부재** · `vite.config.ts` 의 `setupFiles` **복원됨**(내가 지운 줄이 돌아온다) |
 | ③′ | 남의 표지 글자 계수 | §12.3 하위 절 **15 개**(a~o — 내 절만 빠졌다) |
 | ③′ | 남의 표지 보존 | §12.3 글자 **a~o**, `(n)`·`(o)` 각 **1** · `reports/evidence/` 디렉터리 **14 개 보존** · `gate-tests` **41 등재** · `vite.config` `test:` **5 키** |
 | ④ | `npm ci` · `typecheck` · `build` | exit **0 · 0 · 0** |
@@ -103,9 +104,9 @@ slice 가 없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
 「내 표지가 사라졌다」의 또 다른 계수다. **파일 수는 44 로 같다** — 이 slice 는 새 vitest test
 파일을 만들지 않았고(신설은 playwright spec 과 탐침 모듈이다) 그 사실이 이 줄로 선다.
 
-**r1 의 재측정 사유**: 첫 실측(`380eb0bd`) 뒤 낡은 범위 문면을 고치는 커밋이 왔고, r1 수정이 다시
-복원 목록 안 파일을 바꿨다. 두 번 다 **목록을 재산출하고 ①~⑥ 을 다시** 돌렸다 — 앞 실측 수치는
-옮기지 않았다.
+**재측정 사유 셋**: 첫 실측(`380eb0bd`) 뒤 낡은 범위 문면을 고치는 커밋이 왔고, r1 수정(v H-1 등)이
+다시 복원 목록 안 파일을 바꿨고, r2 수정(cr HIGH 등)이 또 바꿨다. **세 번 다 목록을 재산출하고
+①~⑥ 을 다시** 돌렸다 — 앞 실측 수치는 옮기지 않았다.
 
 **실측 뒤 이 문서와 남은 evidence 만 커밋했다.** 복원 목록 안의 **원천에 존재하는 파일**은 실측
 뒤 건드리지 않았다 — 건드리면 재측정이다. 실측 HEAD 와 판정 SHA 사이에서 움직이는 경로는
