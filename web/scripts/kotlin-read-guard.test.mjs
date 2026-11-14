@@ -371,6 +371,30 @@ describe('여는 행위 — 층이 선 자리를 선언에서 센다 (ⓑ⑥)', 
     ).toStrictEqual([]);
   });
 
+  /**
+   * **전파가 혼자 덮는 자리를 잰다** — 설정을 적재하지 않는 **node 자식**이다. 위 둘은 *배선*을
+   * 세고, 이 칸은 그 배선이 실제로 **자식 프로세스에 닿는가**를 잰다(전파 블록을 층 모듈에서 빼는
+   * 변이가 위 둘을 초록으로 지나가고 이 칸에서 붉어진다).
+   *
+   * 자식에게 경로를 **인자로** 넘긴다 — `-e` 본문에 경로를 적으면 이 파일이 소유권 게이트의
+   * 경로 술어에 걸린다.
+   */
+  it('전파가 node 자식 프로세스까지 닿는다', () => {
+    const target = shippedKotlinFile();
+    const code =
+      'const { readFileSync } = require("node:fs");' +
+      'try { readFileSync(process.argv[1], "utf8"); console.log("READ"); }' +
+      'catch (error) { console.log(String(error.message).includes("kotlin-read-guard") ? "REFUSED" : "OTHER"); }';
+    const run = (env) =>
+      execFileSync(process.execPath, ['-e', code, target], { encoding: 'utf8', env }).trim();
+
+    // 양성 — 이 프로세스의 `NODE_OPTIONS` 를 그대로 물려받은 자식은 거부한다.
+    expect(run(process.env)).toBe('REFUSED');
+    // 음성 — 그 변수를 비우면 같은 자식이 읽는다(대조가 공허하지 않다는 증거이고, 전파가
+    // **그 변수로** 일한다는 사실의 측정이다).
+    expect(run({ ...process.env, NODE_OPTIONS: '' })).toBe('READ');
+  });
+
   /** 술어의 양성 대조 — 층을 import 하지 않는 합성 config 는 걸린다(일률 통과가 아니다). */
   it('술어가 층 없는 config 와 명령을 잡는다', () => {
     expect(importsSetup('package.json')).toBe(false);
