@@ -7,14 +7,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 
-// `readAliased` 는 **별칭 import** 다 — ⑥ 의 꼴 하나이고, 아래 동일성 대조가 「흐름의 꼴이
-// 답을 바꾸지 않는다」를 재는 자리라 그 꼴을 축어로 들여온다.
-import {
-  KOTLIN_SOURCE_KEYS,
-  assertStrippedKotlin,
-  readKotlinSource,
-  readKotlinSource as readAliased,
-} from './kotlin-source.mjs';
+import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
 
 /**
  * **Kotlin 원문 읽기의 소유권을 구조로 잠근다**(M10/gates-web — verifier r1 M-2 · r2 H-1~H-3·M-1).
@@ -348,8 +341,8 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
   /** **음성 대조** — 키로만 읽는 소비자는 걸리지 않는다(일률 거절이 아니다). */
   it('키로만 읽는 소비자는 걸리지 않는다', () => {
     const clean = [
-      "import { readKotlinSource } from './kotlin-source.mjs';",
-      "const basis = readKotlinSource('basis');",
+      "import { withKotlinSource } from './kotlin-source.mjs';",
+      "const basis = withKotlinSource('basis', countEntries);",
       "const moneyTs = readFileSync('src/display/moneyDisplay.ts', 'utf8');",
     ].join('\n');
 
@@ -456,7 +449,7 @@ describe('소유권 — 걷기 본체를 쥐는 자리가 둘이다', () => {
 
   /** 음성 대조 — 공개 표면만 쓰는 소비자는 걸리지 않는다(일률 거절이 아니다). */
   it('공개 표면만 쓰는 소비자는 걸리지 않는다', () => {
-    const clean = "import { assertStrippedKotlin, readKotlinSource } from './kotlin-source.mjs';";
+    const clean = "import { withKotlinSource } from './kotlin-source.mjs';";
 
     expect(mentionsStripModule(clean, 'scripts/probe.mjs')).toBe(false);
   });
@@ -541,7 +534,7 @@ describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
   it('공개 입구만 쓰는 소비자는 걸리지 않는다', () => {
     const clean = [
       "import { shippedDetailAxisCounts } from './opening-axis.mjs';",
-      "import { readKotlinSource } from '../../scripts/kotlin-source.mjs';",
+      "import { withKotlinSource } from '../../scripts/kotlin-source.mjs';",
       "import ts from 'typescript';",
     ].join('\n');
 
@@ -549,172 +542,44 @@ describe('소유권 — 추출 커널을 쥐는 자리가 둘이다', () => {
   });
 });
 
-describe('소유권 — 읽기 표면이 셋으로 고정된다', () => {
+describe('소유권 — 읽기 표면이 둘로 고정된다', () => {
   /**
    * **V12·V13 이 선 자리**(verifier r2 H-2). 앞 판의 설계 검토는 「export 집합을 들어 RED」라고
    * 적었는데 **그런 단언이 없었다** — 경로 표나 원문 reader 를 한 줄 더하면 「소비자는 원문을 쥘
    * 수 없다」가 초록인 채 무너졌다. 모듈 네임스페이스로 **정확한 집합**을 든다.
+   *
+   * **셋에서 둘로 줄었다**(M12 — ⓐ). 원문을 **문자열로 내주던** 표면과 소비자가 **부르기로
+   * 약속했던** 출처 단언이 함께 사라지고, 추출 함수를 넘겨받는 읽기 하나가 남았다. 이 등식이
+   * ⓐ 의 **구조적 대체물**이다 — 텍스트를 내주는 표면이 한 줄 늘면 여기가 먼저 붉어진다
+   * (앞 판은 그 자리를 「추출 함수 전수가 단언을 부르는가」라는 모집단 추적으로 지켰다).
    */
-  it('export 집합이 정확히 셋이다 — 걷기는 공개 표면에 없다', async () => {
+  it('export 집합이 정확히 둘이다 — 걷기도 원문 reader 도 공개 표면에 없다', async () => {
     const namespace = await import('./kotlin-source.mjs');
 
-    expect(Object.keys(namespace).sort()).toStrictEqual([
-      'KOTLIN_SOURCE_KEYS',
-      'assertStrippedKotlin',
-      'readKotlinSource',
-    ]);
+    expect(Object.keys(namespace).sort()).toStrictEqual(['KOTLIN_SOURCE_KEYS', 'withKotlinSource']);
   });
 });
 
-describe('소유권 — 단언이 추출 함수 전수에 선다', () => {
-  /**
-   * **모집단을 이름이 아니라 데이터 흐름에서 뽑는다**(r5 보충 — cr r3 HIGH②). 앞 판은 소비자
-   * 파일을 **손 목록**으로 들고 함수를 **이름 접두**(`kotlin`·`shipped`)로 골랐다. 그래서 단언을
-   * 지우고 **접두 밖 이름으로 개명**하면 모집단에서 빠져 조용히 초록이었다.
-   *
-   * 모집단 = **`readKotlinSource(...)` 의 결과가 인자로 흘러드는 호출의 피호출자 전부**. 개명하면
-   * 호출부도 같이 개명되므로 모집단이 **따라온다** — 이름에 의존하지 않는다.
-   */
-  const KOTLIN_SINKS = (() => {
-    const sinks = new Set();
-    for (const relative of files.filter(isAstFile)) {
-      const tree = parse(read(relative), relative);
-      // **한 단계 중간 변수**까지 따라간다(r6 — verifier r5 M-1 C6·C1). 실제 호출 열여덟 가운데
-      // 여덟이 이 꼴이고, r4 에서 RED 였던 `shippedProgressLabels` 가 이 꼴로 바뀌며 회귀했다.
-      // 두 단계 이상·별칭·메서드·`.trim()`·감싼 선언·spread·콜백은 **미달로 등재**한다(고치지 않음).
-      const kotlinVars = new Set();
-      const collectVars = (node) => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
-          const init = node.initializer;
-          if (ts.isCallExpression(init) && ts.isIdentifier(init.expression) && init.expression.text === 'readKotlinSource') {
-            kotlinVars.add(node.name.text);
-          }
-        }
-        ts.forEachChild(node, collectVars);
-      };
-      collectVars(tree);
-
-      const carriesKotlin = (arg) =>
-        (ts.isCallExpression(arg) && ts.isIdentifier(arg.expression) && arg.expression.text === 'readKotlinSource') ||
-        (ts.isIdentifier(arg) && kotlinVars.has(arg.text));
-
-      const visit = (node) => {
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.arguments.some(carriesKotlin)) {
-          sinks.add(node.expression.text);
-        }
-        ts.forEachChild(node, visit);
-      };
-      visit(tree);
-    }
-    return sinks;
-  })();
-
-  /** 이름 → 그 함수 본문이 부르는 이름들. **export 세 꼴**(선언·arrow·`export {}`)을 모두 든다. */
-  const declaredCalls = () => {
-    const out = new Map();
-    for (const relative of files.filter(isAstFile)) {
-      const source = read(relative);
-      const visit = (node) => {
-        let name;
-        let body;
-        if (ts.isFunctionDeclaration(node) && node.name !== undefined) {
-          name = node.name.text;
-          body = node;
-        } else if (ts.isVariableStatement(node)) {
-          const decl = node.declarationList.declarations[0];
-          if (
-            decl !== undefined &&
-            ts.isIdentifier(decl.name) &&
-            decl.initializer !== undefined &&
-            (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer))
-          ) {
-            name = decl.name.text;
-            body = decl.initializer;
-          }
-        }
-        if (name !== undefined && body !== undefined) {
-          const calls = new Set();
-          const inner = (child) => {
-            if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) {
-              calls.add(child.expression.text);
-            }
-            ts.forEachChild(child, inner);
-          };
-          ts.forEachChild(body, inner);
-          out.set(`${relative}:${name}`, { relative, name, calls });
-        }
-        ts.forEachChild(node, visit);
-      };
-      visit(parse(source, relative));
-    }
-    return out;
-  };
-
-  it('Kotlin 원문이 흘러드는 함수 전수가 입력 자리에서 단언을 부른다', () => {
-    const declared = declaredCalls();
-    const missing = [];
-
-    // **크기 하한이 아니라 정확한 집합**(cr r4 HIGH②): 하한이면 동작이 같은 리팩터로 모집단이
-    // 줄어도 조용하다. 줄거나 늘면 이 줄이 먼저 붉어지고, 사람이 그 변화를 보고 판단한다.
-    expect([...KOTLIN_SINKS].sort(), '모집단이 바뀌었다 — 줄었는지 늘었는지 보고 판단하라').toStrictEqual([
-      // M11 — 동일성 단언 대조가 내준 텍스트를 이 표면에 직접 넘기므로 모집단에 든다. 소유
-      // 모듈의 선언은 아래 루프가 건너뛴다(단언 함수에게 자기를 부르라고 요구하는 꼴이 된다).
-      'assertStrippedKotlin',
-      'expect',
-      'kotlinEnumEntries',
-      'kotlinFunctionStringLiterals',
-      'shippedDetailAxisCounts',
-      'shippedNoticeListOperations',
-      'shippedOpeningOperationPaths',
-      'shippedProgressLabels',
-    ]);
-
-    for (const name of [...KOTLIN_SINKS].sort()) {
-      // **파일 단위 키**(cr r4 MEDIUM): 전역 이름 Map 은 같은 이름이 두 파일에 있으면 뒤가
-      // 앞을 덮어 한쪽이 조용히 빠진다. 같은 이름의 선언을 **전부** 본다.
-      const matches = [...declared.values()].filter(
-        // **소유 모듈은 소비자가 아니다**(M11). 보증이 사는 자리라 「단언을 부르는가」를 묻는
-        // 대상이 아니고, 묻으면 단언 함수 자신이 자기를 부르라는 요구가 된다.
-        (entry) => entry.name === name && entry.relative !== OWNER,
-      );
-      for (const found of matches) {
-        if (found.calls.has('withoutKotlinComments')) {
-          missing.push(`${found.relative}:${name} 가 걷기를 직접 부른다`);
-        } else if (!found.calls.has('assertStrippedKotlin')) {
-          missing.push(`${found.relative}:${name} 가 단언을 부르지 않는다`);
-        }
-      }
-    }
-
-    expect(missing, '추출 함수가 걷힌 상태 단언을 거치지 않는다').toStrictEqual([]);
-  });
-
-  /** 양성 대조 — arrow 꼴이고 이름이 접두 밖이어도 모집단에 들고 단언 부재를 잡는다. */
-  it('술어가 arrow·접두 밖 이름의 단언 부재를 잡는다', () => {
-    const planted = [
-      "export const readPolicyTable = (source) => source.trim();",
-      "const t = readPolicyTable(readKotlinSource('progressPolicy'));",
-    ].join('\n');
-    const tree = parse(planted, 'scripts/probe.mjs');
-
-    let sink;
-    const visit = (node) => {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        node.arguments.some(
-          (a) => ts.isCallExpression(a) && ts.isIdentifier(a.expression) && a.expression.text === 'readKotlinSource',
-        )
-      ) {
-        sink = node.expression.text;
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(tree);
-
-    expect(sink, '데이터 흐름에서 모집단을 못 뽑는다').toBe('readPolicyTable');
-  });
-});
+/**
+ * **지운 자리 — 「단언이 추출 함수 전수에 선다」 모집단 등식**(M12 — ⓐ).
+ *
+ * 여기에는 추적 AST 파일 전수를 **두 번 파싱해** ① `readKotlinSource(...)` 의 결과가 인자로
+ * 흘러드는 호출의 피호출자를 모집단으로 모으고 ② 그 이름의 선언 전부가 출처 단언을 부르는지
+ * 세는 기계가 있었다. 지운 사유는 **그 질문의 전제가 사라졌기 때문**이다 — 읽기가 원문을
+ * 문자열로 내주지 않으므로 「추출 함수가 단언을 부르는가」를 물을 대상이 없다.
+ *
+ * 그 기계는 **한 홉까지만** 따라갔고, 두 홉으로 받는 추출 함수를 모집단에서 놓쳤다(직접 인자
+ * 꼴은 1 failed · 두 홉 꼴은 조용한 초록 — 이 slice 의 착수 실측). 홉을 더 쫓는 길은 끝나지
+ * 않는다(M10/10D 가 그 자리에서 재작업 상한을 넘겼다).
+ *
+ * **대체 주장 셋**이 그 보증을 나눠 진다.
+ * 1. 읽기의 **export 집합이 둘**이다(위 묶음) — 텍스트를 내주는 표면이 늘면 거기서 붉어진다.
+ * 2. 읽기가 **원문을 그대로 돌려주는 추출을 거부한다**(아래 묶음 · 하네스 입구 test).
+ * 3. 커널은 **읽기 모듈과 자기 단위 test 만** 부를 수 있다(위 호출자 프레임 묶음).
+ *
+ * 흐름의 꼴(두 홉·별칭·다듬기·spread·콜백)은 **주어를 잃었다**: 원문은 넘긴 함수의 매개변수로만
+ * 존재하므로 소비자 쪽에 그 값을 나르는 흐름이 없다.
+ */
 
 describe('읽기 집합 — 한 자리에 전수로 선다', () => {
   it('읽기 집합은 일곱이고 키 전수가 읽힌다', () => {
@@ -723,8 +588,10 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
     expect(KOTLIN_SOURCE_KEYS).toHaveLength(7);
 
     for (const key of KOTLIN_SOURCE_KEYS) {
-      expect(() => readKotlinSource(key), `${key} 를 읽지 못한다`).not.toThrow();
-      expect(readKotlinSource(key).length, `${key} 가 빈 원문이다`).toBeGreaterThan(0);
+      // 넘기는 것은 **추출 함수**다(M12 — ⓐ). 길이를 재는 함수를 넘기는 것은 원문을 그대로
+      // 돌려주면 읽기가 거부하기 때문이고(항등 함수 후조건), 그래서 이 대조도 추출을 한다.
+      expect(() => withKotlinSource(key, (text) => text.length), `${key} 를 읽지 못한다`).not.toThrow();
+      expect(withKotlinSource(key, (text) => text.length), `${key} 가 빈 원문이다`).toBeGreaterThan(0);
     }
   });
 
@@ -737,7 +604,30 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
 
   /** 모르는 키는 **던진다** — 조용히 빈 문자열을 내면 모든 등식이 공허해진다. */
   it('모르는 키는 던진다', () => {
-    expect(() => readKotlinSource('없는키')).toThrow(/읽기 집합/u);
+    expect(() => withKotlinSource('없는키', (text) => text.length)).toThrow(/읽기 집합/u);
+  });
+
+  /**
+   * **추출 함수를 받지 못하면 던진다**(M12 — ⓐ). 인자를 빠뜨린 호출이 `undefined` 를 내고
+   * 조용히 지나가면 그 자리의 등식이 공허해진다 — 읽기의 계약이 「값을 내준다」가 아니라
+   * 「함수를 받아 부른다」이므로 그 인자는 선택이 아니다.
+   */
+  it('추출 함수를 받지 못하면 던진다', () => {
+    expect(() => withKotlinSource('basis')).toThrow(/추출 함수/u);
+    expect(() => withKotlinSource('basis', '함수가 아니다')).toThrow(/추출 함수/u);
+  });
+
+  /**
+   * **원문은 넘긴 함수 안에서만 산다**(M12 — ⓐ). 남는 유출 길은 **항등 함수**이고 읽기가 그
+   * 결과를 보고 거부한다. 문자열 동일성이라 **값이 같은 사본**까지 들지만, 값이 다른 사본은
+   * 지나간다 — 그 잔여는 등재된 것이다(추출은 텍스트를 쥐어야 성립한다).
+   */
+  it('원문을 그대로 돌려주는 추출은 거부된다', () => {
+    expect(() => withKotlinSource('basis', (text) => text)).toThrow(/원문을 그대로/u);
+    expect(() => withKotlinSource('basis', (text) => text.slice(0))).toThrow(/원문을 그대로/u);
+    expect(() => withKotlinSource('basis', (text) => String(text))).toThrow(/원문을 그대로/u);
+    // 음성 대조 — 값이 다른 사본은 지나간다(일률 거절이 아니다).
+    expect(withKotlinSource('basis', (text) => `${text} `).length).toBeGreaterThan(0);
   });
 
   /** 읽기가 걷기를 떼지 못한다 — 호출을 AST 로 들고 거동으로도 잰다. */
@@ -746,7 +636,7 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
 
     let callsStripInsideReader = false;
     const visit = (node) => {
-      if (ts.isFunctionDeclaration(node) && node.name?.text === 'readKotlinSource') {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === 'withKotlinSource') {
         const inner = (child) => {
           if (ts.isCallExpression(child) && ts.isIdentifier(child.expression)) {
             callsStripInsideReader ||= child.expression.text === 'withoutKotlinComments';
@@ -759,90 +649,64 @@ describe('읽기 집합 — 한 자리에 전수로 선다', () => {
     };
     visit(tree);
 
-    expect(callsStripInsideReader, 'readKotlinSource 가 공유 걷기를 호출하지 않는다').toBe(true);
-    expect(readKotlinSource('provenance')).not.toContain('/**');
+    expect(callsStripInsideReader, '읽기가 공유 걷기를 호출하지 않는다').toBe(true);
+    expect(withKotlinSource('provenance', (text) => text.includes('/**'))).toBe(false);
   });
 });
 
 /**
- * **출처 쪽 단언 — 소비자 흐름을 쫓지 않는다**(팀장 판정 2026-11-13 (c)).
+ * **원문은 읽기 모듈 밖으로 나가지 않는다**(M12 — ⓐ. M11 의 「내준 텍스트와의 동일성」을 잇는다).
  *
- * 앞 판의 단언은 「다시 걸어 같은가」였고, 그 성질은 **걷힌 상태를 유지하는 사본**을 지나보냈다
- * (M10 미달 ② 표의 「단언 앞 · 줄을 끊지 않는 꼴」 칸). 그래서 방어가 「추출 함수 전수가 단언을
- * 부르는가」라는 **모집단 추적**에 걸렸고, 그 추적이 보지 못하는 꼴을 세는 일이 ⑥ 이었다.
+ * M11 판의 기준은 **출처**였다 — 읽기가 내준 텍스트 집합을 쥐고 소비자가 넘긴 값이 그 원소인지
+ * 보았다. 그 단언은 **손댄 텍스트를 어떤 흐름의 꼴로 와도** 같은 자리에서 던졌고(두 홉·별칭·
+ * 다듬기·spread·콜백 전부 실측), 그래서 ⑥ 에서 꼴을 세는 일이 끝났다.
  *
- * ⑤ 층 뒤에는 Kotlin 원문을 얻는 길이 **소유 모듈 하나**다. 그러니 단언의 기준을 성질이 아니라
- * **내준 텍스트와의 동일성**으로 올린다 — 손댄 텍스트는 **어떤 흐름의 꼴로 와도** 같은 자리에서
- * 던지므로, 꼴을 세는 축이 사라진다. 아래가 그 「꼴이 답을 바꾸지 않는다」의 실측이다.
+ * 남은 것은 **그 단언을 아예 부르지 않는** 추출 함수였다(ⓐ). 그 자리를 닫으려고 방향을 뒤집어,
+ * 원문을 **문자열로 내주지 않는다** — 소비자는 추출 함수를 넘기고 읽기가 그것을 부른다. 그래서
+ * 「흐름의 꼴」이라는 축 자체가 사라진다: 소비자 쪽에 원문을 나르는 흐름이 없다.
+ *
+ * 아래가 그 성질의 실측이다. 「던지는가」가 아니라 **텍스트가 어디까지 가는가**를 잰다.
  */
-describe('읽기 — 내준 텍스트와의 동일성 (⑥)', () => {
-  it('내준 텍스트는 그대로 지나가고 같은 값을 돌려준다', () => {
-    const basisText = readKotlinSource('basis');
-    const provenanceText = readAliased('provenance');
+describe('읽기 — 원문은 넘긴 함수 안에서만 산다 (ⓐ)', () => {
+  it('넘긴 함수가 받는 것은 걷힌 텍스트다 — 주석이 닿지 않는다', () => {
+    const seen = withKotlinSource('provenance', (text) => ({
+      hasBlockComment: text.includes('/**'),
+      length: text.length,
+    }));
 
-    expect(assertStrippedKotlin(basisText)).toBe(basisText);
-    expect(assertStrippedKotlin(provenanceText)).toBe(provenanceText);
+    expect(seen.hasBlockComment, '걷히지 않은 텍스트가 추출에 닿는다').toBe(false);
+    expect(seen.length, '빈 원문이 넘어왔다 — 이 대조가 공허하다').toBeGreaterThan(0);
   });
 
   /**
-   * **줄을 끊지 않는 사본** — 걷힌 상태가 유지되므로 앞 판의 성질 단언은 **조용히 지나갔다**.
-   * 동일성은 값이 달라진 것을 본다.
+   * **추출의 결과만 밖으로 나온다.** M11 의 동일성 단언이 받던 「손댄 텍스트」 꼴들은 이제 넘긴
+   * 함수 **안**에서 일어나고, 그 결과는 추출한 값이다 — 밖으로 나온 값이 원문과 같은지는 읽기가
+   * 본다(위 묶음의 항등 함수 후조건).
    */
-  it('줄을 끊지 않는 사본도 던진다', () => {
-    const marker = `/${'/'}`;
-    // 읽기 집합에서 **그 표지를 실제로 담은** 키를 쓴다 — 담지 않은 키로 치환하면 값이
-    // 그대로라 대조가 공허해진다(이 자리에서 한 번 그렇게 됐다).
-    const copied = readKotlinSource('openingEndpoints').replaceAll(marker, '');
+  it('같은 키를 두 번 읽어도 같은 값을 낸다 — 읽기가 상태를 지니지 않는다', () => {
+    const first = withKotlinSource('basis', (text) => text.length);
+    const second = withKotlinSource('basis', (text) => text.length);
 
-    expect(copied, '이 입력이 원문과 같다 — 대조가 공허하다').not.toBe(readKotlinSource('openingEndpoints'));
-    expect(() => assertStrippedKotlin(copied)).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
-  });
-
-  /** **죽은 단언**(⑥ 의 꼴) — 호출 계수만 맞추는 자리가 더는 서지 않는다. */
-  it('내주지 않은 텍스트는 빈 문자열이어도 던진다', () => {
-    expect(() => assertStrippedKotlin('')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
-    expect(() => assertStrippedKotlin('val x = 1\n')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(first).toBe(second);
   });
 
   /**
-   * **⑥ 이 열거하던 꼴 전부가 같은 답을 낸다.** 두 홉 이상·별칭 import·다듬기·spread·콜백으로
-   * **손댄** 텍스트를 넘겨도 전부 같은 자리에서 던진다 — 모집단 추적이 그 꼴을 보든 말든 답이
-   * 같으므로 이 축에서 꼴을 세는 일이 끝난다.
+   * **추출 안에서 던지면 그대로 올라온다** — 읽기가 예외를 삼키지 않는다. 삼키면 「꼴이 바뀌면
+   * 던진다」로 닫아 둔 추출 술어들의 계약이 읽기 자리에서 무너진다.
    */
-  it('손댄 텍스트는 흐름의 꼴과 무관하게 던진다', () => {
-    const marker = `/${'/'}`;
-    const endpointsText = readKotlinSource('openingEndpoints');
-    const shapes = {
-      '두 홉 이상': () => {
-        const first = endpointsText;
-        const second = first.replaceAll(marker, '');
-        return second;
-      },
-      '별칭 import': () => readAliased('openingEndpoints').replaceAll(marker, ''),
-      '다듬기': () => `${endpointsText} `,
-      'spread': () => [endpointsText.replaceAll(marker, '')].at(0),
-      '콜백': () => [endpointsText].map((text) => text.replaceAll(marker, '')).at(0),
-    };
-
-    for (const [name, make] of Object.entries(shapes)) {
-      expect(() => assertStrippedKotlin(make()), `${name} 이 단언을 지나간다`).toThrow(
-        /걷힌 Kotlin 텍스트가 아니다/u,
-      );
-    }
+  it('추출이 던진 예외를 읽기가 삼키지 않는다', () => {
+    expect(() =>
+      withKotlinSource('basis', () => {
+        throw new Error('추출이 꼴을 다룰 수 없다');
+      }),
+    ).toThrow(/추출이 꼴을 다룰 수 없다/u);
   });
 
-  /** **음성 대조** — 손대지 않은 텍스트는 어떤 꼴로 와도 지나간다(일률 거절이 아니다). */
-  it('손대지 않은 텍스트는 어떤 꼴로 와도 지나간다', () => {
-    const provenanceText = readKotlinSource('provenance');
-    const twoHops = (() => {
-      const first = provenanceText;
-      const second = first;
-      return second;
-    })();
+  /** 추가 인자는 추출 함수에 **그대로** 전달된다(어휘 등식이 쓰는 두 번째 인자의 자리다). */
+  it('추가 인자는 추출 함수로 그대로 간다', () => {
+    const tail = withKotlinSource('basis', (text, suffix) => `${text.length}${suffix}`, '-개');
 
-    expect(assertStrippedKotlin(twoHops)).toBe(provenanceText);
-    expect(assertStrippedKotlin([provenanceText].map((text) => text).at(0))).toBe(provenanceText);
-    expect(assertStrippedKotlin(readAliased('provenance'))).toBe(provenanceText);
+    expect(tail.endsWith('-개')).toBe(true);
   });
 });
 

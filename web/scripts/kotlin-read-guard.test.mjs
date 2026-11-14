@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { isKotlinSourcePath } from './kotlin-read-guard.mjs';
-import { KOTLIN_SOURCE_KEYS, readKotlinSource } from './kotlin-source.mjs';
+import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
 
 /**
  * **「여는 행위」를 런타임에 재는 층**(M11/gates-web-read — `OPEN-M10-KOTLIN-READ-GATE-RESIDUALS` ⑤).
@@ -135,10 +135,18 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
 });
 
 describe('여는 행위 — 음성 대조', () => {
-  /** 소유 모듈은 읽기 집합 전수를 그대로 읽는다 — 일률 거절이 아니다. */
+  /**
+   * 소유 모듈은 읽기 집합 전수를 그대로 읽는다 — 일률 거절이 아니다.
+   *
+   * 읽기는 **추출 함수를 넘겨받는다**(M12 — ⓐ). 여기서 넘기는 것은 길이를 재는 함수다: 원문을
+   * 그대로 돌려주면 읽기가 **거부하므로**(항등 함수 후조건) 이 대조도 추출을 해야 한다.
+   */
   it('소유 모듈의 읽기는 통과한다', () => {
     for (const key of KOTLIN_SOURCE_KEYS) {
-      expect(() => readKotlinSource(key), `${key} 를 읽지 못한다`).not.toThrow();
+      expect(
+        () => withKotlinSource(key, (text) => text.length),
+        `${key} 를 읽지 못한다`,
+      ).not.toThrow();
     }
   });
 

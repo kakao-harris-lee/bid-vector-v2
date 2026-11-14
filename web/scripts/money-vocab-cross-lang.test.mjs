@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { assertStrippedKotlin, readKotlinSource } from './kotlin-source.mjs';
+import { withKotlinSource } from './kotlin-source.mjs';
 
 /**
  * **wire 어휘를 손으로 복제한 자리들을 Kotlin 정본에 묶는다**(M9/web-followups —
@@ -94,8 +94,8 @@ const ENUM_ENTRY = /^[A-Za-z_][A-Za-z0-9_]*$/u;
  * 항목 이름을 **대문자로 한정하지 않는다**: Kotlin 이 소문자 항목을 더해도 읽기는 그것을 그대로
  * 내고 **등식**이 갈린 것을 말한다(읽기가 어휘 정책을 겸하면 그 둘이 한 자리에서 섞인다).
  */
-export function kotlinEnumEntries(source, name) {
-  return enumEntriesOf(assertStrippedKotlin(source), name);
+export function kotlinEnumEntries(key, name) {
+  return withKotlinSource(key, enumEntriesOf, name);
 }
 
 /**
@@ -133,8 +133,8 @@ function enumEntriesOf(stripped, name) {
  * Kotlin 함수 본문의 **문자열 리터럴 전수**. `provenanceLabel` 처럼 wire 로 나가는 글자를
  * `when` 으로 내는 자리를 읽는다 — 실제로 wire 에 실리는 것은 그 리터럴이다.
  */
-export function kotlinFunctionStringLiterals(source, name) {
-  return functionStringLiteralsOf(assertStrippedKotlin(source), name);
+export function kotlinFunctionStringLiterals(key, name) {
+  return withKotlinSource(key, functionStringLiteralsOf, name);
 }
 
 /** 그 술어의 **커널** — 텍스트만 받는다(위와 같은 사유). */
@@ -228,14 +228,21 @@ export function tsUnionMembers(text, name, path = 'module.ts') {
   return members;
 }
 
-// Kotlin 정본의 **경로를 여기서 알지 않는다**(verifier r1 M-2). 넘기는 것은 키이고 돌아오는
-// 것은 이미 걷힌 텍스트다. 명령 축은 10B(#149)가 openapi `enum` 으로 올려 **여기서 읽지 않는다**.
-const basisKt = readKotlinSource('basis');
-
-const kotlinBasis = kotlinEnumEntries(basisKt, 'Basis');
-const kotlinCurrency = kotlinEnumEntries(basisKt, 'Currency');
-const kotlinVat = kotlinEnumEntries(basisKt, 'VatTreatment');
-const kotlinProvenance = kotlinEnumEntries(readKotlinSource('provenance'), 'ProvenanceKind');
+// Kotlin 정본의 **경로를 여기서 알지 않는다**(verifier r1 M-2) — 넘기는 것은 키다. 돌아오는 것도
+// 텍스트가 아니라 **추출한 값**이다(M12 — ⓐ: 원문은 읽기 모듈 밖으로 나오지 않는다).
+// 명령 축은 10B(#149)가 openapi `enum` 으로 올려 **여기서 읽지 않는다**.
+//
+// 한 키에서 셋을 뽑을 때는 **한 번 열어 한 함수가 셋을 돌려준다** — 같은 키를 세 번 넘기면 읽기도
+// 세 번이다(값은 같지만 같은 파일을 세 번 연다).
+const { basis: kotlinBasis, currency: kotlinCurrency, vat: kotlinVat } = withKotlinSource(
+  'basis',
+  (text) => ({
+    basis: enumEntriesOf(text, 'Basis'),
+    currency: enumEntriesOf(text, 'Currency'),
+    vat: enumEntriesOf(text, 'VatTreatment'),
+  }),
+);
+const kotlinProvenance = kotlinEnumEntries('provenance', 'ProvenanceKind');
 
 const moneyTs = readWeb('src/display/moneyDisplay.ts');
 const journeyTs = readWeb('e2e/journey/shared.ts');
@@ -267,7 +274,7 @@ describe('금액 어휘의 키 집합 == Kotlin 정본 (OPEN-M9-MONEY-VOCAB-CROS
    */
   it('provenance — wire 리터럴과 `ProvenanceKind` 가 같고, web·e2e 가 그것과 같다', () => {
     const expected = sorted(kotlinProvenance);
-    const wire = sorted(new Set(kotlinFunctionStringLiterals(readKotlinSource('provenanceWire'), 'provenanceLabel')));
+    const wire = sorted(new Set(kotlinFunctionStringLiterals('provenanceWire', 'provenanceLabel')));
 
     expect(wire, 'wire 리터럴과 ProvenanceKind 가 갈렸다').toStrictEqual(expected);
     expect(sorted(tsTableKeys(moneyTs, 'AMOUNT_PROVENANCE_DISPLAY'))).toStrictEqual(expected);
@@ -310,15 +317,19 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
   });
 
   /**
-   * **r3 에서 계약이 바뀌었다**(verifier r2 H-3). 추출 함수는 이제 **걷힌 텍스트만** 받는다 —
-   * 걷기는 읽기(`readKotlinSource`)가 하고, 소비자는 걷기 함수를 import 하지 않는다. 그래서
-   * 주석이 든 원문은 여기서 **거부된다**. 「주석을 섞어도 읽는다」는 성질은 사라진 것이 아니라
-   * **걷기 쪽으로 옮겨 갔고**(`kotlin-source.test.mjs`), 그 결과 주석이 추출에 닿을 길 자체가 없다.
+   * **주장이 바뀌었다**(M12 — ⓐ). r3 에서는 공개 입구가 **텍스트**를 받고 그것이 읽기가 내준
+   * 그것인지 단언했다 — 그래서 주석이 든 합성 원문을 넘기면 거부됐다. 지금 입구는 텍스트를 받지
+   * 않고 **키**를 받으므로, 「걷히지 않은 원문을 넘긴다」는 꼴 자체가 **표현되지 않는다**.
+   *
+   * 그래서 이 칸이 재는 것을 **원문이 입구로 들어갈 자리가 없다**로 바꾼다. 주석이 추출에 닿지
+   * 않는 성질은 그대로이고(걷기는 읽기가 한다 — `kotlin-source.test.mjs`), 커널에 합성 텍스트를
+   * 먹이는 길은 이 파일 안의 `enumEntriesOf` 직접 호출뿐이다(위아래 칸들이 그 자리다).
    */
-  it('걷히지 않은 원문은 거부한다 — 주석은 추출에 닿지 않는다', () => {
+  it('입구는 텍스트가 아니라 키를 받는다 — 원문을 넘길 자리가 없다', () => {
     const commented = 'enum class Probe {\n    // 주석의 B\n    A,\n    /* 블록 */ B,\n}\n';
 
-    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    // 합성 원문은 **키로 읽힌다** — 읽기 집합에 없으므로 거부된다(조용히 빈 값을 내지 않는다).
+    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/읽기 집합에 없는 키다/u);
   });
 
   it('본문에 멤버 선언이 있는 꼴도 열거만 읽는다', () => {
@@ -376,11 +387,16 @@ describe('Kotlin 읽기의 양성·음성 대조', () => {
     expect(() => enumEntriesOf('enum class Probe', 'Probe')).toThrow(/중괄호/u);
   });
 
-  /** 주석 안의 헤더가 계수를 흔드는 길은 **걷기가 먼저 닫는다** — 여기선 거부로 선다. */
-  it('주석 안의 헤더가 든 원문도 거부한다', () => {
+  /**
+   * 주석 안의 헤더가 계수를 흔드는 길은 **걷기가 먼저 닫는다**. 그 원문이 입구로 들어갈 자리가
+   * 없다는 것이 이 칸의 주장이고(M12 — ⓐ), 같은 텍스트를 **커널**에 직접 먹이면 헤더가 둘로
+   * 세어진다 — 걷기가 왜 읽기 쪽에 있어야 하는지가 그 대비다.
+   */
+  it('주석 안의 헤더가 든 원문은 입구로 들어갈 자리가 없다', () => {
     const commented = '// enum class Probe { X }\nenum class Probe { A }\n';
 
-    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/걷힌 Kotlin 텍스트가 아니다/u);
+    expect(() => kotlinEnumEntries(commented, 'Probe')).toThrow(/읽기 집합에 없는 키다/u);
+    expect(() => enumEntriesOf(commented, 'Probe')).toThrow(/2 번/u);
   });
 
   it('함수 리터럴도 못 찾으면 던진다', () => {

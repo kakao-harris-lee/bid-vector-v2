@@ -26,8 +26,18 @@ import { callerOutside } from '../../scripts/kotlin-read-guard.mjs';
 const SELF = fileURLToPath(import.meta.url);
 const HERE = dirname(SELF);
 
-/** 커널을 **부를 수 있는** 자리 — 공개 입구와 그 단위 test 둘이다. */
-const CALL_ALLOWED = new Set([resolve(HERE, 'opening-axis.mjs'), resolve(HERE, 'opening-axis.test.mjs')]);
+/**
+ * 커널을 **부를 수 있는** 자리 — **공유 읽기 모듈**과 이 커널의 단위 test 둘이다.
+ *
+ * **앞 자리가 바뀌었다**(M12 — ⓐ). M11 판에서는 공개 입구(`opening-axis.mjs`)가 텍스트를 받아
+ * 출처를 단언하고 커널을 불렀다. 지금은 읽기가 **추출 함수를 넘겨받아** 자기가 부르므로 커널을
+ * 부르는 프레임이 읽기 모듈이다. 그래서 커널을 **구동하는 길이 읽기 하나**로 좁아진다 — 입구는
+ * 키와 커널을 읽기에 건네는 얇은 자리가 되고, **손댄 텍스트를 커널에 먹일 자리가 없어진다.**
+ */
+const CALL_ALLOWED = new Set([
+  resolve(HERE, '..', '..', 'scripts', 'kotlin-source.mjs'),
+  resolve(HERE, 'opening-axis.test.mjs'),
+]);
 
 /**
  * 호출자가 그 둘 가운데 하나인지 단언한다. **획득 꼴을 보지 않는다** — 어떤 구문으로 이 모듈을
@@ -38,7 +48,7 @@ function assertOwnedCaller(what) {
   if (!CALL_ALLOWED.has(caller)) {
     throw new Error(
       `[opening-axis-extract] ${caller} 가 추출 커널(${what})을 직접 불렀다 — ` +
-        '출하 본문은 opening-axis.mjs 의 shipped… 입구로만 읽는다(그 입구가 동일성을 단언한다)',
+        '출하 본문은 공유 읽기 모듈이 열어 커널에 먹인다(opening-axis.mjs 의 shipped… 입구로 불러라)',
     );
   }
 }
