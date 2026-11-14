@@ -6,8 +6,10 @@
  * - **`web/.npmrc` 의 `node-options`** — npm 이 띄우는 **모든** 스크립트 프로세스와 그 자식. 명령을
  *   어떤 꼴로 적었든(환경변수 접두 · `;` 로 이은 두 번째 명령 · `env` 명령 · 하위 디렉터리 config)
  *   npm 이 `NODE_OPTIONS` 에 이것을 실으므로 **꼴이 술어 밖으로 나간다**.
- * - `vite.config.ts` 의 `test.setupFiles` — vitest 워커 풀이 **스레드**일 때. `--import` 는 worker
- *   thread 에 서지 않으므로(기본 상속도 명시 `execArgv` 도 실측) 위 기구가 그 자리를 덮지 못한다.
+ * 배선은 **그 하나뿐**이다. 앞 판은 `vite.config.ts` 의 `test.setupFiles` 를 「풀이 스레드일 때의
+ * 보험」으로 함께 두었는데, 그 전제가 **틀렸다**(r2 실측) — `--import` 는 **파일 worker 에 선다**
+ * (vitest 의 스레드 풀 워커가 그 꼴이다). 두 풀 모두에서 그 줄을 지워도 층 test 가 초록이라,
+ * **측정되지 않는 배선**으로 남기지 않고 지웠다.
  *
  * **앞 판은 명령과 config 를 열거했다**(r1 에 버렸다 — v H-1). `package.json` 의 `node` 명령마다
  * 플래그를 붙이고 뿌리 `*.config.*` 마다 import 를 두었는데, 그 의무를 세는 술어가 **텍스트 꼴**이라

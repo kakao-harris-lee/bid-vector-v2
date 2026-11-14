@@ -35,13 +35,13 @@ import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
  *
  * 그래서 아래 대조는 두 묶음이다 — **어떤 API·표기로 열어도 걸린다**(양성)와 **읽기 집합의 소유
  * 모듈과 그 밖의 파일은 그대로 돈다**(음성). 이 층이 **설치되지 않으면 양성 묶음 전부가 RED** 이고,
- * 그것이 `vite.config.ts` 의 `setupFiles` 한 줄을 지우는 변이의 자리다.
+ * 그것이 `web/.npmrc` 의 선언 한 줄을 지우는 변이의 자리다(r2 — 앞 판은 `setupFiles` 를 그
+ * 자리로 적었는데, 층이 `.npmrc` 로 옮겨간 뒤 그 줄은 아무 하중도 지지 않았다).
  *
- * **범위**(M12 — ⓑ⑤·ⓑ⑥): 세우는 자리가 셋이다 — vitest `setupFiles` · 추적된 뿌리 `*.config.*`
- * 전수의 적재 · `package.json` 의 `node --import` 전수. 아래 묶음 셋이 그것을 각각 잰다(배선을
- * 세는 의무 게이트 둘 · 전파가 자식에 닿는지 재는 칸 하나)이고, spec 프로세스가 실제로 층
- * 아래인지는 `e2e/kotlin-read-guard.spec.ts` 가 잰다. 남는 자리(`worker_threads` · 자식 프로세스
- * 텍스트 검색)는 capability map §12.3 의 신설 OPEN 이 등재한다.
+ * **범위**(M12 — ⓑ⑤·ⓑ⑥): 세우는 자리는 **`web/.npmrc` 의 선언 하나**다. 아래 묶음이 그것을
+ * 선언(구조)과 거동(명령 꼴 셋 · 하위 config · cwd 가 다른 자식)으로 재고, spec 프로세스가 실제로
+ * 층 아래인지는 `e2e/kotlin-read-guard.spec.ts` 가 잰다. 남는 자리(`eval: true` worker · 자식
+ * 프로세스 텍스트 검색 · npm 밖에서 직접 띄운 node)는 capability map §12.3 의 신설 OPEN 이 등재한다.
  */
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -138,10 +138,10 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
 });
 
 /**
- * **층이 서는 자리가 둘이다**(M12 — ⓑ⑤). 하나는 vitest **소비자 프로세스**(`setupFiles`), 다른
- * 하나는 **vite 메인 프로세스**(`vite.config.ts` 의 적재). 번들러 적재(`import.meta.glob` + `?raw`)는
- * 파일을 **메인 프로세스**가 열므로 앞의 층이 보지 못했고, 패턴에 확장자 토큰이 없으면 정적 술어도
- * 보지 못했다(착수 실측: 42 모듈 적재).
+ * **번들러 적재는 vite 메인 프로세스가 연다**(M12 — ⓑ⑤). 소비자 프로세스의 `fs` 표면을 감싸는
+ * 층은 그 읽기를 보지 못했고, 패턴에 확장자 토큰이 없으면 정적 술어도 보지 못했다(착수 실측:
+ * 42 모듈 적재). 지금은 `.npmrc` 선언이 **그 프로세스도** 층 아래에 둔다 — 그래서 선언을 지우는
+ * 변이에서 이 칸이 함께 RED 다.
  */
 describe('여는 행위 — 번들러 적재도 층 아래다 (ⓑ⑤)', () => {
   /**

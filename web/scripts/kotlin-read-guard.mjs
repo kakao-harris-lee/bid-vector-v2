@@ -17,9 +17,9 @@
  *
  * **이 층이 서는 자리는 선언에서 뽑는다**(M12 — ⓑ⑤·ⓑ⑥). M11 판은 vitest 프로세스 하나였고
  * playwright spec·여정 하네스·`node` 게이트 스크립트·번들러 적재가 층 밖이었다. 지금은 세우는
- * 자리가 셋이다 — vitest `setupFiles`(소비자 프로세스) · 추적된 뿌리 `*.config.*` 전수의 적재
- * (vite 메인·playwright·eslint 프로세스) · `package.json` 의 `node --import` 전수(게이트
- * 스크립트). 그 의무를 `kotlin-read-guard.test.mjs` 가 **선언에서 센다**.
+ * 자리가 **하나**다 — `web/.npmrc` 의 `node-options`. npm 이 띄우는 모든 프로세스와 그 자식(파일
+ * worker 를 포함한다)이 그 선언을 물려받는다. 그 의무를 `kotlin-read-guard.test.mjs` 가 **선언과
+ * 거동 둘로** 센다.
  *
  * **그래도 층 밖인 자리가 있다** — `worker_threads`(`--import` 가 서지 않는다 · 실측)와 자식
  * 프로세스 텍스트 검색(`grep`·`git grep`)이고, 그 자리는 정적 술어(추적 파일 전수)가 **부분만**
@@ -273,9 +273,10 @@ function patch(surface, rejectsInstead = false) {
 let installed = false;
 
 /**
- * 층을 세운다. **import 만으로는 서지 않는다** — 세우는 자리가 `vite.config.ts` 의
- * `test.setupFiles` 하나여야, 그 등재를 지우는 변이가 양성 대조를 RED 로 만든다(이 모듈을
- * 술어 때문에 import 하는 파일이 층을 함께 세우면 그 배선을 잴 수 없다).
+ * 층을 세운다. **import 만으로는 서지 않는다** — 세우는 자리를 `kotlin-read-guard-setup.mjs` 한
+ * 파일로 두고, 그 파일을 `web/.npmrc` 의 `node-options` 가 npm 의 모든 프로세스에 싣는다. 그
+ * 배선이 측정되는 자리는 그 선언 단언과 **거동 대조 넷**이다(r2 — 앞 판은 여기서 `setupFiles`
+ * 한 줄을 측정 자리로 적었는데, 층이 `.npmrc` 로 옮겨간 뒤 그 줄은 **아무 하중도 지지 않았다**).
  *
  * 두 번 불러도 한 번만 감싼다 — 두 번 감싸면 호출마다 실경로 해석이 두 번 돈다.
  */
