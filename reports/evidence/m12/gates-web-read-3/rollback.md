@@ -12,8 +12,8 @@ git restore --source=<원천> --staged --worktree -- <아래 목록>
 
 `git diff --name-status <base>..HEAD` 의 경로 전수다. **라운드마다 재산출한다.**
 
-`git diff --name-status 10d208d2..HEAD` 가 낸 **24 경로**(신설 9 · 수정 15)이고, 디렉터리 하나로
-적는 evidence **다섯**이 그 안에 든다(목록에는 디렉터리 한 줄로 선다).
+**원천 기준으로** `git diff --name-status e07adaa8..HEAD` 가 낸 **24 경로**(신설 9 · 수정 15)이고,
+디렉터리 하나로 적는 evidence **다섯**이 그 안에 든다(목록에는 디렉터리 한 줄로 선다).
 
 **r1·r2 에서 바뀌었다.** config 셋(`playwright.config.ts` · `playwright.journey.config.ts` ·
 `eslint.config.js`)은 층 import 를 거두고 빈 줄까지 되돌려 base 와 **바이트로 같다** — 그래서
@@ -53,14 +53,21 @@ in_scope 밖 경로는 하나도 없다 — 이 slice 는 공유 working tree �
 
 ## 원천 — 고정 SHA 여야 한다
 
-움직이는 `origin/main` 을 쓰지 않는다. 원천은 **이 브랜치에 병합된 마지막 main 커밋**이고, 지금
-그것은 착수 base 와 같은 `10d208d2664c6bb87cd7082a2853c08c2c0d3236` 다. **전제**: 그 SHA 에 이
-slice 가 없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
+움직이는 `origin/main` 을 쓰지 않는다. 원천은 **이 브랜치에 병합된 마지막 main 커밋**이고, 머지
+차례에 **`e07adaa8`**(12B `screen-coverage-3` 머지)로 바뀌었다. **전제**: 그 SHA 에 이 slice 가
+없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
 
-**셋째 단언은 오늘 자동으로 선다** — 원천과 착수 base 가 **같은 SHA** 이므로 복원 대상 blob 이
-둘에서 같은지 물을 것이 없다. **머지 차례에 main 을 병합하면 원천이 바뀌므로 그때 다시 센다**
-(특히 `docs/discovery/capability-map.md` 는 앞 레인이 §12.3 에 절을 더하는 자리라 달라질 것을
-전제한다 — M11 에서 실제로 그랬다).
+**셋째 단언 — 원천이 바뀌었으므로 쟀다.** 복원 대상 blob 이 **착수 base `10d208d2` 와 새 원천
+`e07adaa8` 에서 같은가**:
+
+| 복원 대상 | base ↔ 새 원천 |
+| --- | --- |
+| `docs/discovery/capability-map.md` | **다르다** — 12B 가 §12.3 에 절 `(p)` 를 더했다 |
+| 나머지 **열넷**(수정 대상 전부) | 같다 |
+
+그래서 그 파일은 **새 원천 기준으로 다시 셌다**. 복원이 착수 base 를 가리키고 있었다면 그 한 번이
+12B 의 절을 지웠을 자리다 — 원천을 고정 SHA 로 두고 바뀔 때마다 이 단언을 재는 규율이 막는 것이
+정확히 이것이다.
 
 머지 **뒤** 되돌림은 이 문서가 아니라 **PR revert** 다.
 
@@ -72,8 +79,9 @@ slice 가 없다 — 첫 산출물 커밋이 그 조상에 들어 있지 않다.
   `.npmrc` 의 `node-options` 선언 0 · 신설 파일 넷(`kotlin-raw-glob-probe.mjs` ·
   `kotlin-read-probe.mjs` · `kotlin-read-guard.spec.ts` · `e2e/probe-config/…`) 부재 · 내 evidence
   디렉터리 부재.
-- **남의 표지 보존**: §12.3 의 `(a)`~`(o)` 가 그대로 · `reports/evidence/` 의 남의 디렉터리 보존 ·
-  `gate-tests.txt` 등재 수 보존 · `vite.config.ts` 의 `test:` 블록 키 수 보존.
+- **남의 표지 보존**: §12.3 의 `(a)`~`(p)` **열여섯**이 그대로(12B 의 `(p)` 와 그 신설 OPEN 넷 포함) ·
+  `reports/evidence/` 의 남의 디렉터리 보존(12B 것 포함) · `gate-tests.txt` 등재 수 보존 ·
+  `vite.config.ts` 의 `test:` 블록이 **원천의 5 키**로 돌아온다(내가 지운 `setupFiles` 복원).
 
 **항목 집합으로 세고 어휘 grep 으로 세지 않는다** — 상류가 같은 이름을 쓰면 그 대조가 조용히
 공허해진다.
