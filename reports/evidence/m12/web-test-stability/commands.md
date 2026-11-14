@@ -36,6 +36,14 @@ test` 와 같은 수집).
 - exit: 0
 - 핵심 결과: 통과 12 · flaky 0 · 건너뜀 0 · spec 4/4, 1.6m — 뒤의 RED 가 주입 때문임을 이 통제군이 든다
 
+### 2026-11-14 경합 재현 — 구판 단언에 주입을 걸었다 (주입은 커밋하지 않는다)
+- cmd: `npx playwright test --config=playwright.journey.config.ts -g '여정 ③'` + 주입(기록 쓰기가 보이기 **전에 출발한** 타임라인 읽기만 6s 늦춘다)
+- exit: 1
+- 핵심 결과: `expect(locator).toHaveCount(expected) failed` — **Expected 2 · Received 3**, PR #157 첫 CI 와 같은 서명이고 간헐이 아니라 결정적이다
+
+주입의 전제(실측): 질의 함수가 `signal` 을 쓰지 않으므로 react-query 의 취소는 **전선의 응답을
+막지 않는다** — 늦은 응답은 언제나 도착하고, 그래서 거를 수 있는 축은 **요청 출발 순서**뿐이다.
+
 ## ② 판정 근거
 
 판정 근거는 `checklist.md` ② 가 정본이다. 요지: **구속 조건은 CPU 희소가 아니라 fork 과다구독**
