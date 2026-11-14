@@ -331,3 +331,63 @@ test 프로세스가 지고 있던 `NODE_OPTIONS` 가 자식 npm 에 **상속**�
 
 **복원 목록이 줄었다** — r1 이 `vite.config.ts` 의 import 를 거두어 그 파일이 base 와 같아졌고,
 config 셋에 남아 있던 빈 줄도 되돌렸다(그 셋도 base 와 바이트로 같다).
+
+## r2 실측 — cr 지적 여덟의 처리 (2026-11-15)
+
+### cr HIGH — 프레임 세탁과 한 발 악수
+
+| 꼴 | 처방 전 | 처방 뒤 |
+| --- | --- | --- |
+| 람다 래퍼(`(t) => kernel.fn(손댄값)`) | THROW(프레임) | THROW |
+| `kernel.fn.bind(null, 손댄값)` | **통과** | **THROW**(악수) |
+| `kernel.fn.call.bind(kernel.fn, null, 손댄값)` | **통과** | **THROW**(악수) |
+| 통제군 — `bind(null, 진짜값)` | 통과 | **통과** |
+
+**대조를 한 번 헛디뎠다**: `call` 을 묶을 때 **thisArg 자리**를 비우면 진짜 텍스트가 첫 인자가
+되어 세탁이 일어나지 않는다(그 꼴로 쓴 첫 판은 RED 가 아니라 **공허**였다). 그 사실을 대조
+자리에 주석으로 남겼다.
+
+### cr MEDIUM-1 — setupFiles 의 하중
+
+| 조건 | 층 test |
+| --- | --- |
+| 현재(setupFiles 있음) · 기본 풀 | 22 passed |
+| 현재 · `--pool=threads` | 22 passed |
+| **setupFiles 없음** · 기본 풀 | **22 passed** |
+| **setupFiles 없음** · `--pool=threads` | **22 passed** |
+
+**그 줄은 아무 하중도 지지 않는다.** 남긴 사유(「풀이 스레드일 때의 보험」)가 아래 정정으로
+무너졌으므로 지웠다.
+
+### 내가 등재한 사실의 정정 — `--import` 와 worker
+
+| worker 꼴 | 결과 |
+| --- | --- |
+| **파일** worker(`execArgv` 기본 상속) | **거부됨** — 층이 선다 |
+| `eval: true` worker(코드 문자열) | 읽힘 **1613** |
+
+앞 판의 실측은 `eval` worker 하나였는데 「worker 에 서지 않는다」로 **일반화**했다. vitest 의
+스레드 풀 워커는 파일 worker 라 층이 서고(`isMainThread=false` 에서 층의 문면으로 거부), 그래서
+위 setupFiles 측정이 설명된다.
+
+### cr MEDIUM-2 · LOW-1 — H-1 의 구조 이동으로 사라졌다
+
+텍스트 모집단(`^node\s` · 뿌리 `*.config.*`)과 플래그 자리 정규식이 **술어에서 없어졌다**(남은
+것은 그 사실을 적은 주석 한 줄뿐). 그래서 다섯 표기(`npx tsx`·shebang·`node_modules/.bin`·
+`sh -c`·환경변수 접두)는 **모집단이라는 개념이 없으므로** 빠질 자리가 없고, `.` escape 미탐도
+그 정규식과 함께 사라졌다.
+
+### cr LOW-3 — allowlist 차감
+
+| 입력 | 처방 전 | 처방 뒤 |
+| --- | --- | --- |
+| 허용 값 그대로(경로 포함) | 지나감 | 지나감 |
+| 같은 basename 을 **다른 경로**로 | **지나감**(B7b 반쯤 열림) | **RED** |
+
+### r2 변이
+
+| 변이 | 결과 |
+| --- | --- |
+| 악수(읽기 쪽 `runWithInFlightText`) 제거 | K5 가 **RED** |
+| 커널 쪽 동일성 단언 제거 | K5 가 **RED** |
+| allowlist 차감의 왼쪽 경계 제거 | 「다른 경로」 양성 대조가 **RED** |
