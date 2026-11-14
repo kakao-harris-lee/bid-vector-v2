@@ -84,11 +84,15 @@ const PROVENANCE_DATA_ALLOWED = new Map([
   // 그 파일에 **새 경로**를 더하는 것까지 먹는다(B7b). 여기 적힌 값 밖은 RED 다.
   [
     'e2e/harness/fixtures/opening-axis.json',
-    new Set(
-      ['KonepsOpeningAxisFieldContracts', 'KonepsOpeningCompleteFieldContracts', 'MockOpeningKonepsHttp'].map(
-        (stem) => `${stem}${KT}`,
-      ),
-    ),
+    // **값을 나타나는 그대로 적는다**(r2 — cr LOW-3). basename 만 적고 통째로 차감하면 같은 이름이
+    // **다른 디렉터리 아래**에 적힌 새 경로까지 함께 지워져 위 주석의 B7b 가 반쯤 남는다. 차감은
+    // 왼쪽 경계를 요구하므로(`kotlinPathsInText`) 아래 값들은 그대로 지나가고, 같은 basename 을
+    // 다른 경로로 적으면 **RED** 다(양성 대조가 그 자리를 잰다).
+    new Set([
+      `procurement/.../KonepsOpeningAxisFieldContracts${KT}`,
+      `KonepsOpeningCompleteFieldContracts${KT}`,
+      `app/src/test/kotlin/bidvector/app/collection/MockOpeningKonepsHttp${KT}`,
+    ]),
   ],
 ]);
 
@@ -269,7 +273,11 @@ export function resolvedImports(source, fileName) {
 export function kotlinPathsInText(text, allowedValues = new Set()) {
   let body = text;
   for (const value of allowedValues) {
-    body = body.split(value).join('');
+    // **값 그대로 선 자리만** 차감한다(r2 — cr LOW-3). 통째로 지우면 같은 이름이 **다른 디렉터리
+    // 아래**에 적힌 새 경로까지 함께 지워져, 바로 위 allowlist 주석이 말하는 B7b 가 반쯤 남는다.
+    // 왼쪽 경계를 요구하므로 `어디/다른/<값>` 은 남아 RED 다.
+    const guarded = new RegExp(`(?<![\\w./\\\\-])${value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`, 'gu');
+    body = body.replace(guarded, '');
   }
   return [...body.matchAll(KT_FILE_OR_EXTENSION_TOKEN)].map((match) => match[0]);
 }
@@ -427,6 +435,23 @@ describe('소유권 — 경로를 아는 자리가 하나다', () => {
    * 흔한 상호라, 대소문자를 일률로 무시하면 **미래 fixture 가 시끄럽게 실패한다**. 셋 다 r1 이
    * 실측으로 잡아 준 꼴이고 상설로 둔다.
    */
+  /**
+   * **허용 값과 같은 basename 을 다른 경로로 적으면 걸린다**(r2 — cr LOW-3). 차감이 왼쪽 경계를
+   * 요구하기 때문이고, 이것이 allowlist 주석이 말하는 B7b(「그 파일에 새 경로를 더하는 것까지
+   * 먹는다」)를 실제로 닫는 자리다.
+   */
+  it('허용 값과 같은 이름이라도 다른 경로면 걸린다', () => {
+    const allowed = new Set([`procurement/.../KonepsOpeningAxisFieldContracts${KT}`]);
+
+    expect(kotlinPathsInText(`{"from": "procurement/.../KonepsOpeningAxisFieldContracts${KT}"}`, allowed)).toStrictEqual(
+      [],
+    );
+    expect(
+      kotlinPathsInText(`{"from": "다른/디렉터리/KonepsOpeningAxisFieldContracts${KT}"}`, allowed).length,
+      '같은 이름을 다른 경로로 적었는데 지나간다',
+    ).toBeGreaterThan(0);
+  });
+
   it('대문자 상호와 산문은 데이터 파일 술어를 지나간다', () => {
     const brand = `${'K'}${'T'}`;
     const samples = {

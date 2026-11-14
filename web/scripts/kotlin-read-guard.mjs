@@ -215,8 +215,9 @@ function refusalFor(args) {
 }
 
 /**
- * 감싼 표면. **원래 함수의 계약을 바꾸지 않는다** — 실패 계약(동기는 던지고 `fs.promises` 는
- * **거절된 promise**)도, **생성·동일성 계약**도 그대로다.
+ * 감싼 표면. **원래 함수의 계약을 바꾸지 않는다** — 실패 계약도 표면을 따른다: 동기는 던지고,
+ * `fs.promises` 는 **거절된 promise**, **콜백 표면은 `cb(error)`**(r2 — cr LOW-4: 앞 판은 콜백
+ * 자리에서도 동기로 던져 호출자의 계약을 어겼다). **생성·동일성 계약**도 그대로다.
  *
  * **`Proxy` 로 두는 이유**(r1 — cr H-2). 앞 판은 래퍼를 평범한 함수로 짓고 속성을
  * `Object.keys` 로 옮겼다. 그래서 `fs` 의 **함수 값에 섞인 생성자**가 깨졌다(실측, node v24):
@@ -235,6 +236,14 @@ function guarded(surface, original, rejectsInstead) {
       if (error !== undefined) {
         if (rejectsInstead) {
           return Promise.reject(error);
+        }
+        // **콜백 표면은 콜백으로 실패한다**(r2 — cr LOW-4). `fs.readFile(path, cb)` 가 동기로
+        // 던지면 이 층이 「원래 계약을 바꾸지 않는다」는 자기 문면을 어긴다 — 호출자는 `cb(err)`
+        // 를 기다리고 있다. 마지막 인자가 함수면 그 자리로 낸다.
+        const callback = args.at(-1);
+        if (typeof callback === 'function') {
+          queueMicrotask(() => callback(error));
+          return undefined;
         }
         throw error;
       }

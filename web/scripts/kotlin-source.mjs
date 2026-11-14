@@ -110,7 +110,7 @@ export function withKotlinSource(key, extract, ...rest) {
   const extracted = runWithInFlightText(text, () => extract(text, ...rest));
   if (extracted === text) {
     throw new Error(
-      `추출이 원문을 그대로 돌려줬다: ${key} — 원문은 이 모듈 밖으로 나가지 않는다(추출한 값을 돌려라)`,
+      `추출이 원문을 그대로 돌려줬다: ${key} — **반환값으로는** 원문이 나가지 않는다(추출한 값을 돌려라)`,
     );
   }
   return extracted;

@@ -5,10 +5,10 @@ import {
   closeSync,
   createReadStream,
   globSync,
-  mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
+  readFile as readFileCallback,
   realpathSync,
   rmSync,
   statSync,
@@ -76,9 +76,9 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
    * 실경로를 보므로 그 표기 축이 사라진다.
    */
   it('심볼릭 링크로 가려도 걸린다', () => {
-    const scratch = resolve(webRoot, 'test-results');
-    mkdirSync(scratch, { recursive: true });
-    const dir = mkdtempSync(resolve(scratch, 'guard-'));
+    // scratch 는 **playwright 가 비우는 자리 밖**에 둔다(r2 — cr LOW-5). `web/test-results/` 는
+    // 그 러너가 시작할 때 비우므로, 로컬에서 두 레인을 겹쳐 돌리면 아래 `finally` 와 경합한다.
+    const dir = mkdtempSync(resolve(tmpdir(), 'guard-link-'));
     const link = resolve(dir, 'policy-source.txt');
     // 링크는 **층 밖에서** 만든다. 실제 ⑧ 은 커밋된 링크를 **읽는** 꼴이고, 이 층이 재는 것도
     // 읽기다 — 층은 Kotlin 원문을 가리키는 링크를 **만드는** 호출도 거부하므로(넓은 쪽으로
@@ -90,6 +90,21 @@ describe('여는 행위 — 소유 모듈 밖에서 Kotlin 원문을 열면 던�
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  /**
+   * **콜백 표면은 콜백으로 실패한다**(r2 — cr LOW-4). 동기로 던지면 호출자의 계약이 바뀐다 —
+   * 이 층의 머리 주석이 「원래 함수의 계약을 바꾸지 않는다」로 서 있으므로 그 자리를 잰다.
+   */
+  it('콜백 표면은 던지지 않고 `cb(error)` 로 실패한다', async () => {
+    const target = shippedKotlinFile();
+
+    const error = await new Promise((resolvePromise) => {
+      readFileCallback(target, 'utf8', (failure) => resolvePromise(failure));
+    });
+
+    expect(error, '콜백이 오류를 받지 못했다').toBeInstanceOf(Error);
+    expect(String(error.message)).toMatch(/kotlin-read-guard/u);
   });
 
   /**
@@ -151,7 +166,10 @@ describe('여는 행위 — 번들러 적재도 층 아래다 (ⓑ⑤)', () => {
    * 아래 통제군이 든다.
    */
   it('확장자 토큰 없는 `?raw` glob 은 적재되지 않는다', async () => {
-    await expect(import('./kotlin-raw-glob-probe.mjs')).rejects.toThrow();
+    // **matcher 를 둔다**(r2 — cr LOW-2): 빈 `toThrow()` 는 탐침의 오타·경로 변경 같은 **층과
+    // 무관한 실패**도 초록으로 받는다. 문면이 vite 의 `ENOENT` 라 층 문면으로는 묶지 못하므로
+    // 그 둘 가운데 하나를 요구한다.
+    await expect(import('./kotlin-raw-glob-probe.mjs')).rejects.toThrow(/ENOENT|kotlin-read-guard/u);
   });
 
   /**
