@@ -3,6 +3,7 @@ package bidvector.adapters.architecture
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.Test
 
 /**
@@ -105,21 +106,28 @@ class BytecodeConstantPoolTest {
     }
 
     /**
-     * **토막은 `Classfile` 머리글 줄을 담지 않는다** — 그 줄은 상수 풀이 아니라 **파일 경로**이고,
-     * 경로에는 `…/bidvector/adapters/…` 가 늘 들어 있어 담아 두면 **추출 비공허가 정규식과 무관하게
-     * 늘 만족된다**(앞 판의 형제 열 축이 그 상태였다). 그래서 두 가지를 함께 잰다: 머리글이 빠졌고,
-     * **그래도 실제 좌표가 남는다**. 뒤의 것이 없으면 「머리글만 뺐더니 아무것도 안 남았다」와 구별되지
-     * 않는다.
+     * **토막은 `Constant pool:` 에서 시작한다 — 그 앞의 javap 머리말을 담지 않는다.**
+     *
+     * 머리말에는 `Classfile <경로>` 뿐 아니라 **class 선언 줄**(`public final class bidvector…`)과
+     * `this_class:` 가 있고, 셋 다 자기 좌표를 들고 있다. 담아 두면 **추출 비공허가 상수 풀을 한 글자도
+     * 못 읽어도 선다**(앞 판의 형제 열 축이 그 상태였다).
+     *
+     * **앞 판의 이 test 는 그 계약을 잠그지 못했다**(cr MEDIUM-B): 「`Classfile ` 없음 · 절대 경로 없음 ·
+     * 좌표 비공허」 셋은 끊기를 **되돌려도 전부 초록**이다 — 되살아나는 머리말에는 그 둘이 없고 좌표는
+     * 남기 때문이다. 그래서 **되살아나는 그 두 줄을 직접** 잰다.
      */
     @Test
-    fun `토막은 머리글 경로를 담지 않고 그래도 실제 좌표가 남는다`() {
+    fun `토막은 상수 풀에서 시작하고 javap 머리말을 담지 않는다`() {
         val classesDir = ScopedAllowedRoots.classesDirOf(ScopedAllowedRoots.OWN_MODULE_ROOT)
         val classFile = BytecodeConstantPool.classFilesUnder(classesDir).first()
 
         val body = BytecodeConstantPool.bodyOf(classFile)
 
+        body shouldStartWith "Constant pool:"
+        body shouldNotContain "this_class:"
         body shouldNotContain "Classfile "
         body shouldNotContain classFile.absolutePath
+        // 머리말을 뺀 **뒤에도** 실제 좌표가 남는다 — 없으면 「다 뺐더니 빈 토막」과 구별되지 않는다.
         extract(body).shouldNotBeEmpty()
     }
 }
