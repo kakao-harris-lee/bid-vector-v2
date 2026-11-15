@@ -30,6 +30,10 @@ class ScopedBytecodeLayerGateTest {
      */
     @Test
     fun `축마다 허용 뿌리 밖의 자기 저장소 좌표를 참조하지 않는다`() {
+        // 표가 비면 이 class 의 네 단언이 **전부 공허하게 초록**이다(cr LOW-1). 비공허를 지는 자리가
+        // 두 층 등식 test 에만 있었는데, 그쪽은 다른 class 다 — 판정 입력의 비공허는 판정 자리가 진다.
+        BYTECODE_LAYER_ROOTS.keys.shouldNotBeEmpty()
+
         val violations =
             BYTECODE_LAYER_ROOTS
                 .mapValues { (scope, roots) ->
@@ -50,6 +54,15 @@ class ScopedBytecodeLayerGateTest {
      */
     @Test
     fun `허용 뿌리와 그 하위는 통과하고 이름 접두만 공유하는 이웃은 걸린다 — 구성 대조`() {
+        // 술어의 첫 가드(`bidvector.` 접두)는 구성 표본만으로는 **음성으로 한 번도 실행되지 않는다** —
+        // 모듈 뿌리도 형제 패키지도 전부 그 접두를 갖기 때문이다(cr Open Question 2). 중첩 이름공간
+        // 좌표 하나가 그 가드를 잠근다: 자기 저장소 좌표가 아니므로 허용 뿌리와 무관하게 「밖」이 아니다.
+        val guardLeaks =
+            BYTECODE_LAYER_ROOTS.keys
+                .filter { scope -> isOutsideRoots(FOREIGN_NAMESPACE_SAMPLE, BYTECODE_LAYER_ROOTS.getValue(scope)) }
+                .sorted()
+        guardLeaks shouldBe emptyList()
+
         val wrong =
             BYTECODE_LAYER_ROOTS
                 .mapValues { (_, roots) ->
@@ -121,11 +134,13 @@ class ScopedBytecodeLayerGateTest {
                     val asMutable = BYTECODE_LAYER_ROOTS.getValue(scope) as MutableSet<String>
                     try {
                         asMutable.add(MUTATION_PROBE)
-                        // 받아들여졌다 = 가변. 다음 test 에 오염을 남기지 않고 돌려놓는다.
-                        asMutable.remove(MUTATION_PROBE)
-                        true
+                        true // 받아들여졌다 = 가변.
                     } catch (_: UnsupportedOperationException) {
                         false
+                    } finally {
+                        // 되돌림은 **무조건**이다(cr LOW-4). 표의 값은 축 `ALLOWED_ROOTS` 그 인스턴스라
+                        // (두 층 등식이 `===` 로 잠근다) 탐침이 남으면 suite 전체가 공유하는 집합이 넓어진다.
+                        runCatching { asMutable.remove(MUTATION_PROBE) }
                     }
                 }.sorted()
 
@@ -138,5 +153,8 @@ class ScopedBytecodeLayerGateTest {
          * 두 층 집합 등식이 이름 층 정책에 없는 뿌리를 바로 붉힌다.
          */
         const val MUTATION_PROBE = "bidvector.inplace-mutation-probe"
+
+        /** 자기 저장소 좌표가 **아닌** 꼴 — `ml` 축이 쓰는 생성 proto 의 JVM 패키지와 같은 모양이다. */
+        const val FOREIGN_NAMESPACE_SAMPLE = "contract.bidvector.ml.v1.Embedding"
     }
 }
