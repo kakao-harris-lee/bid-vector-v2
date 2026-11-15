@@ -110,6 +110,9 @@ build-logic `PackageOwnershipPolicy.ownedPackage` 이고, `app` test `Architectu
   소유자 앵커(④)
 - 열네 축의 `*AdapterDependencyTest.kt` — 복제된 정규식·`javapExecutable`·per-file 호출 제거, 판정 호출
   이전(①②③④)
+- **신설 셋**(설계 검토 뒤 계약 갱신으로 더했다 — 사유와 팀장 승인은 `checklist.md` 「계약 갱신 (1)」):
+  `adapters/src/test/kotlin/bidvector/adapters/architecture/ArchitecturePolicyValues.kt` ·
+  `…/architecture/ScopedAllowedRoots.kt` · `…/architecture/ScopedBytecodeLayerGateTest.kt`
 - `config/quality/gate-tests.properties` — 새 test class 가 생기면 **만드는 커밋에서** 등재
 - `docs/discovery/capability-map.md` §12.3 에 이 slice 의 하위 절을 덧붙인다. **글자는 머지 차례에
   다시 정한다** — 지금 쓴 `(p)` 는 자리를 잡아 둔 것이고, 팀장이 알린 머지 순서(12B→12C→12D→12A)대로면
