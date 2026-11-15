@@ -177,6 +177,43 @@ class ScopedAllowedRootsParityTest {
         holders shouldBe owners.mapValues { (_, owner) -> setOf(owner) }
     }
 
+    /**
+     * **축을 정책과 표에서 *함께* 빼면 위 등식들이 전부 그대로 성립한다**(cr Open Question 1) — 그
+     * 축만 조용히 판정에서 사라지고, 모집단 등식도 소유자 등식도 보유자 단일성도 아무것도 모른다.
+     * 선언된 위협 모델 경계 안이지만(게이트 자신을 고치는 저자) **닫는 기계가 이미 이 PR 안에 있다.**
+     *
+     * 모집단을 정책이 아니라 **컴파일 산출물**에서 센다: adapters 의 1급 패키지 가운데 그 test 출력이
+     * `ALLOWED_ROOTS` 를 쥔 것은 전부 표의 축이어야 한다. 축을 빼려면 그 축의 선언까지 지워야 하고,
+     * 그러면 표의 심볼 참조가 깨져 **컴파일**이 먼저 멈춘다.
+     *
+     * **표가 사는 패키지는 모집단 밖**이다 — 거기 있는 것이 표와 그 단언들이고, 그 자리가 **모든 축**의
+     * 심볼을 참조하는 것이 이 설계의 전제다. 리터럴이 아니라 표를 담은 class 의 패키지로 뺀다.
+     */
+    @Test
+    fun `test 출력이 허용 뿌리를 쥔 adapters 패키지는 전부 표의 축이다 — 축을 둘 다에서 빼기`() {
+        val adaptersDir = File(testClassesRoot(), ScopedAllowedRoots.OWN_MODULE_ROOT.replace('.', '/'))
+        check(adaptersDir.isDirectory) { "adapters test 출력을 찾지 못했다: ${adaptersDir.absolutePath}" }
+
+        val tableOwnPackage = ScopedAllowedRoots::class.java.packageName
+        val holding =
+            adaptersDir
+                .listFiles()
+                .orEmpty()
+                .filter(File::isDirectory)
+                .map { "${ScopedAllowedRoots.OWN_MODULE_ROOT}.${it.name}" }
+                .filterNot { it == tableOwnPackage }
+                .filter { scope ->
+                    BytecodeConstantPool
+                        .classFilesUnder(File(testClassesRoot(), scope.replace('.', '/')))
+                        .any(::mentionsAllowedRoots)
+                }.toSet()
+
+        // 선별이 조용히 아무것도 남기지 않으면 이 등식이 공허해진다.
+        holding.shouldNotBeEmpty()
+
+        holding shouldBe BYTECODE_LAYER_ROOTS.keys
+    }
+
     private companion object {
         /**
          * 패키지 → [BYTECODE_LAYER_ROOTS] 값 심볼의 **소유 class 내부 이름**. `internal` top-level
