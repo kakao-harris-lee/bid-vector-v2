@@ -14,8 +14,10 @@ import {
   CHECKPOINT_LABEL,
   driveToRecorded,
   expectedKstText,
+  isBidCaseListRead,
   journeyContext,
   localDateTimeInput,
+  readsAfterWrite,
   signIn,
   watchRequests,
   type BidCaseRow,
@@ -170,29 +172,43 @@ async function transitionInBidBox(
   fill: (card: ReturnType<Page['getByTestId']>) => Promise<void>,
   urlPart: string,
 ): Promise<BidCaseRow> {
-  await page.getByRole('link', { name: 'D 내 입찰함' }).click();
-  await expect(page.getByTestId('screen-bid-box')).toBeVisible();
+  // 이 전이가 낳는 건 목록 다시 읽기를 **떠나기 전에 거둔다** — 거두지 않으면 부르는 쪽의
+  // 「내가 연 화면의 응답」 포착이 **이 함수가 낳은 늦은 응답**을 집는다(아래 「거둔다」 자리).
+  const caseListReads = readsAfterWrite(page, isBidCaseListRead);
+  // **성공 경로에만 두지 않는다**(cr LOW) — 앞의 단언이 던져도 `request` 청취자를 걷는다.
+  try {
+    return await transition();
+  } finally {
+    caseListReads.stop();
+  }
 
-  const tab = CASE_TAB_LABEL[fromState];
-  expect(tab, `상태 ${fromState} 의 탭 문면이 표에 없다`).toBeDefined();
-  await page.getByRole('tab', { name: new RegExp(tab!, 'u') }).click();
+  async function transition(): Promise<BidCaseRow> {
+    await page.getByRole('link', { name: 'D 내 입찰함' }).click();
+    await expect(page.getByTestId('screen-bid-box')).toBeVisible();
 
-  // 카드는 **자기 건으로 좁힌다** — 한 하네스를 공유하므로 같은 탭에 남의 건이 앉아 있다.
-  const card = page.getByTestId(`bid-case-${caseId}`);
-  await expect(card).toBeVisible();
-  await card.scrollIntoViewIfNeeded();
-  await card.getByRole('button', { name: button }).click();
-  await fill(card);
+    const tab = CASE_TAB_LABEL[fromState];
+    expect(tab, `상태 ${fromState} 의 탭 문면이 표에 없다`).toBeDefined();
+    await page.getByRole('tab', { name: new RegExp(tab!, 'u') }).click();
 
-  // **내가 부른 응답을 집는다**(7E-2b r3 교훈): 경로만 보면 앞 화면 전환의 늦은 응답이 걸린다.
-  const sent = page.waitForResponse(
-    (one) =>
-      one.url().includes(`/api/bid-cases/${caseId}/${urlPart}`) && one.request().method() === 'POST',
-  );
-  await card.getByRole('button', { name: '보내기' }).click();
-  const response = await sent;
-  expect(response.status(), `${urlPart} 전이`).toBe(200);
-  return (await response.json()) as BidCaseRow;
+    // 카드는 **자기 건으로 좁힌다** — 한 하네스를 공유하므로 같은 탭에 남의 건이 앉아 있다.
+    const card = page.getByTestId(`bid-case-${caseId}`);
+    await expect(card).toBeVisible();
+    await card.scrollIntoViewIfNeeded();
+    await card.getByRole('button', { name: button }).click();
+    await fill(card);
+
+    // **내가 부른 응답을 집는다**(7E-2b r3 교훈): 경로만 보면 앞 화면 전환의 늦은 응답이 걸린다.
+    const sent = caseListReads.afterWrite(
+      (one) => one.method() === 'POST' && one.url().includes(`/api/bid-cases/${caseId}/${urlPart}`),
+      `${urlPart} 전이`,
+    );
+    await card.getByRole('button', { name: '보내기' }).click();
+    const response = await sent.write;
+    // **거둔다** — 화면 D 가 이 전이 뒤에 건 목록을 다시 읽는다(`invalidateQueries`). 그 응답을
+    // 여기서 기다려야 뒤의 「확정 뒤 화면 E」 포착이 **화면 E 의** 응답을 집는다.
+    await sent.read;
+    return (await response.json()) as BidCaseRow;
+  }
 }
 
 test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확정, 그리고 화면 E 가 그것을 보인다', async ({
@@ -241,7 +257,9 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
 
   // ── 화면 E 가 **잠정 1위 단계**를 보인다 ───────────────────────────────────
   //
-  // 목록 응답을 **내가 연 화면의 것으로** 집는다(7E-2b r3 교훈).
+  // 목록 응답을 **내가 연 화면의 것으로** 집는다(7E-2b r3 교훈). 그 근거는
+  // `transitionInBidBox` 가 자기 전이의 다시 읽기를 **거두고 돌아온다**는 것이다 — 그래서 이
+  // 포착이 걸 수 있는 진행 중인 건 목록 읽기가 없다.
   const listed = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
@@ -398,7 +416,8 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
   );
   expect(decided.state).toBe('WON');
 
-  // 확정 뒤 화면 E — 상태와 「없음」이 그 응답의 값이다.
+  // 확정 뒤 화면 E — 상태와 「없음」이 그 응답의 값이다. 확정 전이가 낳은 건 목록 다시 읽기는
+  // `transitionInBidBox` 가 거뒀으므로 이 포착은 **이 클릭이 낳은** 응답을 집는다.
   const relisted = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
