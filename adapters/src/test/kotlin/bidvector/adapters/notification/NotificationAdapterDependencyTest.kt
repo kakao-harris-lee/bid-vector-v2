@@ -1,5 +1,8 @@
 package bidvector.adapters.notification
 
+import bidvector.adapters.architecture.BytecodeConstantPool
+import bidvector.adapters.architecture.SELF_COORDINATE
+import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -19,21 +22,18 @@ import java.io.File
  * 판정을 다시 조립하지 않고 공고 표의 **표시 칸**만 읽는다(그래서 공고 사실 값 타입도 이 패키지
  * 자신의 것이다).
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.workflow.notification",
-        "bidvector.workflow.event",
-        "bidvector.workflow.strategy",
-        "bidvector.adapters.persistence",
-        "bidvector.adapters.notification",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.workflow.notification",
+            "bidvector.workflow.event",
+            "bidvector.workflow.strategy",
+            "bidvector.adapters.persistence",
+            "bidvector.adapters.notification",
+        ),
     )
 
-private fun isDisallowed(importedPackage: String): Boolean =
-    importedPackage.startsWith("bidvector.") &&
-        ALLOWED_ROOTS.none { importedPackage == it || importedPackage.startsWith("$it.") }
-
-/** 바이트코드 내부 이름(`a/b/C`)과 점 표기 좌표(`a.b.C`) 양쪽에서 `bidvector…` 조각을 뽑는다. */
-private val BIDVECTOR_INTERNAL_NAME = Regex("""bidvector[/.][A-Za-z0-9_/.$]+""")
+private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 /**
  * 로깅 API 좌표 — 이 패키지는 **하나도 쥐지 않는다**. 누출 방어의 로그 축을 문자열 검사가 아니라
@@ -62,20 +62,13 @@ private fun productionClassFiles(): List<File> {
 }
 
 /**
+ * **이 축의 판정은 이 class 에 없다** — [bidvector.adapters.architecture.ScopedBytecodeLayerGateTest] 가 표를 순회하며 한다(M12/12A ④).
+ * 여기 남은 것은 이 축에만 있는 주장이고, 아래는 그 판정의 술어가 **상수 풀**인 이유다.
+ *
  * **소스 텍스트가 아니라 컴파일된 클래스의 상수 풀을 `javap -p -v` 로 훑는다** — import 문 없이
  * 전체 한정 좌표로 직접 참조하는 우회를 소스 정규식은 보지 못한다(6F-1 verifier MUT-E3 실측).
  */
 class NotificationAdapterDependencyTest {
-    @Test
-    fun `notification 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val violations =
-            productionClassFiles()
-                .flatMap { classFile -> coordinatesOf(classFile, BIDVECTOR_INTERNAL_NAME).filter(::isDisallowed) }
-                .distinct()
-
-        violations shouldBe emptyList()
-    }
-
     /**
      * **추출 층의 양성 대조** — 추출이 조용히 아무것도 못 뽑게 되면(javap 출력 형태 변화·경로 오류)
      * 위반 목록이 빈 목록이 되어 게이트가 영구 초록이다.
@@ -83,7 +76,7 @@ class NotificationAdapterDependencyTest {
     @Test
     fun `상수 풀 추출이 허용 루트 안의 알려진 좌표를 실제로 뽑는다 — 추출 층 양성 대조`() {
         val extracted =
-            productionClassFiles().flatMap { coordinatesOf(it, BIDVECTOR_INTERNAL_NAME) }.toSet()
+            productionClassFiles().flatMap { coordinatesOf(it, SELF_COORDINATE) }.toSet()
 
         extracted shouldContain "bidvector.workflow.notification.NotificationSender"
         extracted shouldContain "bidvector.workflow.notification.ContentRenderer"
@@ -100,17 +93,6 @@ class NotificationAdapterDependencyTest {
             productionClassFiles().flatMap { coordinatesOf(it, LOGGING_NAME) }.distinct()
 
         logging shouldBe emptyList()
-    }
-
-    /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다. */
-    @Test
-    fun `허용 밖 좌표를 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.procurement") shouldBe true
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.workflow.evaluation") shouldBe true
-        isDisallowed("bidvector.adapters.koneps") shouldBe true
-        isDisallowed("bidvector.adapters.event") shouldBe true
-        isDisallowed("bidvector.app") shouldBe true
     }
 
     @Test
@@ -130,32 +112,11 @@ class NotificationAdapterDependencyTest {
     }
 }
 
-/**
- * `javap` 를 OS `PATH` 가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다
- * (`RelayAdapterDependencyTest` 와 같은 이유 — CI 의 JDK 21 과 다른 `javap` 를 부를 여지를 없앤다).
- */
-private val javapExecutable: String by lazy {
-    val javaHome = System.getProperty("java.home")
-    val isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
-    File(javaHome, "bin/${if (isWindows) "javap.exe" else "javap"}").absolutePath
-}
-
-private fun javapOutput(classFile: File): String {
-    val process =
-        ProcessBuilder(javapExecutable, "-p", "-v", classFile.absolutePath)
-            .redirectErrorStream(true)
-            .start()
-    val output = process.inputStream.bufferedReader().readText()
-    val exitCode = process.waitFor()
-    check(exitCode == 0) { "javap 실행 실패(exit=$exitCode): ${classFile.name}\n$output" }
-    return output
-}
-
 private fun coordinatesOf(
     classFile: File,
     shape: Regex,
 ): List<String> =
     shape
-        .findAll(javapOutput(classFile))
+        .findAll(BytecodeConstantPool.bodyOf(classFile))
         .map { it.value.replace('/', '.') }
         .toList()

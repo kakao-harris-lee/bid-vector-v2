@@ -1,10 +1,8 @@
 package bidvector.adapters.koneps
 
-import bidvector.adapters.architecture.disallowedCoordinates
 import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.io.File
 
 /**
  * S-3b — 이 패키지가 참조해도 되는 `bidvector.*` 좌표의 루트. koneps 가 보는 domain 은
@@ -30,40 +28,18 @@ import java.io.File
  * **재지 않는 것**: 다른 패키지·모듈 · 상수 풀에 흔적을 남기지 않는 `const val`
  * (`OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` — 이름 층이 덮는다) · 값이 흐르는 경로 일반.
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.procurement",
-        "bidvector.sharedkernel",
-        "bidvector.adapters.koneps",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.procurement",
+            "bidvector.sharedkernel",
+            "bidvector.adapters.koneps",
+        ),
     )
 
 private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 class KonepsAdapterDependencyTest {
-    @Test
-    fun `koneps 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val violations =
-            disallowedCoordinates(File("build/classes/kotlin/main/bidvector/adapters/koneps"), ALLOWED_ROOTS)
-
-        violations shouldBe emptyList()
-    }
-
-    /**
-     * 양성 대조 — **앞 판에는 없었다**(실측). 앞 판이 들던 층 밖 뿌리 여섯을 그대로 들어, 술어
-     * 종류와 의미를 바꾸면서 앞 판이 잡던 것을 잃지 않았음을 같은 자리에서 보인다.
-     */
-    @Test
-    fun `층 밖 domain 루트와 형제 adapter 패키지는 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.strategy") shouldBe true
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.settlement") shouldBe true
-        isDisallowed("bidvector.workflow") shouldBe true
-        isDisallowed("bidvector.app") shouldBe true
-        isDisallowed("bidvector.adapters.extraction") shouldBe true
-        isDisallowed("bidvector.adapters.persistence") shouldBe true
-    }
-
     /** 음성 대조 — 허용 목록이 조용히 좁아지면 이 자리가 붉는다. */
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
@@ -71,15 +47,5 @@ class KonepsAdapterDependencyTest {
         isDisallowed("bidvector.procurement.Notice") shouldBe false
         isDisallowed("bidvector.sharedkernel") shouldBe false
         isDisallowed("bidvector.adapters.koneps") shouldBe false
-    }
-
-    /**
-     * 접두 일치가 **세그먼트 경계**에서만 성립함을 고정한다 — `startsWith(뿌리)` 만 쓰면
-     * `bidvector.procurementX` 같은 이웃 좌표가 허용으로 샌다.
-     */
-    @Test
-    fun `허용 루트의 이름 접두를 공유하는 다른 패키지는 허용되지 않는다`() {
-        isDisallowed("bidvector.procurementlegacy") shouldBe true
-        isDisallowed("bidvector.adapters.konepsx") shouldBe true
     }
 }

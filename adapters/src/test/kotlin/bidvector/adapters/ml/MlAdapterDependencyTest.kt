@@ -1,6 +1,5 @@
 package bidvector.adapters.ml
 
-import bidvector.adapters.architecture.disallowedCoordinates
 import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -31,13 +30,15 @@ import java.io.File
  * `ALLOWED_ROOTS` 가 `internal` 인 것은 **두 층 등식**(`ScopedAllowedRootsParityTest`)이 이 집합을
  * 이름 층 정책 `source.scoped-allowed-roots.bidvector.adapters.ml` 과 집합 등식으로 묶기 때문이다.
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.procurement",
-        "bidvector.decision",
-        "bidvector.sharedkernel",
-        "bidvector.workflow",
-        "bidvector.adapters.ml",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.procurement",
+            "bidvector.decision",
+            "bidvector.sharedkernel",
+            "bidvector.workflow",
+            "bidvector.adapters.ml",
+        ),
     )
 
 private val RESILIENCE4J_RETRY_IMPORT = Regex("""^import io\.github\.resilience4j\.retry""")
@@ -45,14 +46,6 @@ private val RESILIENCE4J_RETRY_IMPORT = Regex("""^import io\.github\.resilience4
 private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 class MlAdapterDependencyTest {
-    @Test
-    fun `ml 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val violations =
-            disallowedCoordinates(File("build/classes/kotlin/main/bidvector/adapters/ml"), ALLOWED_ROOTS)
-
-        violations shouldBe emptyList()
-    }
-
     @Test
     fun `ml 패키지는 resilience4j retry 패키지를 import 하지 않는다(재시도 계층 하나, 우회 8)`() {
         val sourceRoot = File("src/main/kotlin/bidvector/adapters/ml")
@@ -69,15 +62,6 @@ class MlAdapterDependencyTest {
         violations shouldBe emptyList()
     }
 
-    /** 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다. 앞 판이 들던 셋을 그대로 든다. */
-    @Test
-    fun `허용 밖 domain 모듈을 심은 표본은 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.strategy") shouldBe true
-        isDisallowed("bidvector.qualification") shouldBe true
-        isDisallowed("bidvector.settlement") shouldBe true
-        isDisallowed("bidvector.adapters.persistence") shouldBe true
-    }
-
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
         isDisallowed("bidvector.procurement") shouldBe false
@@ -86,16 +70,6 @@ class MlAdapterDependencyTest {
         isDisallowed("bidvector.workflow") shouldBe false
         isDisallowed("bidvector.workflow.prediction") shouldBe false
         isDisallowed("bidvector.adapters.ml") shouldBe false
-    }
-
-    /**
-     * 접두 일치가 **세그먼트 경계**에서만 성립함을 고정한다 — `startsWith(뿌리)` 만 쓰면
-     * `bidvector.workflowX` 같은 이웃 좌표가 허용으로 새고, 그 새는 이름은 지어낼 수 있다.
-     */
-    @Test
-    fun `허용 루트의 이름 접두를 공유하는 다른 패키지는 허용되지 않는다`() {
-        isDisallowed("bidvector.workflowlegacy") shouldBe true
-        isDisallowed("bidvector.adapters.mlx") shouldBe true
     }
 
     @Test

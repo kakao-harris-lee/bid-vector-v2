@@ -3,18 +3,16 @@ package bidvector.adapters.architecture
 import java.io.File
 
 /**
- * **상수 풀을 읽는 한 자리.** 축 dependency test 들이 `javap -p -v` 로 컴파일 산출물의 좌표를 훑는
- * 자리를 공유한다 — 이 slice 가 네 축(`event`·`extraction`·`koneps`·`ml`)을 소스 텍스트 술어에서
- * 이 층으로 옮기면서 세웠고, 두 층 등식 test 의 보유자 단언도 같은 자리를 쓴다.
+ * **상수 풀을 읽는 한 자리.** adapters 의 dependency test 축 **열넷 전부**가 `javap -p -v` 로 컴파일
+ * 산출물을 훑는 자리를 여기서 공유한다 — 축 판정과 두 층 등식 test 의 보유자 단언이 같은 자리를 쓴다.
  *
- * **왜 파일마다가 아니라 일괄인가 — 측정이 꼴을 정했다.** 형제 열 축은 class 파일 하나마다 프로세스
- * 하나를 띄운다. 이 slice 가 받은 네 축의 class 는 260 개이고 그 꼴을 복제하면 `:adapters:test` 에
- * **6분 9초**가 붙는다(실측). 축마다 일괄 호출 한 번이면 같은 260 개가 **12초**다. 형제 열 축의 같은
- * 비용은 이 slice 의 축이 아니라 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 가 받는다(그 OPEN 이 열넷을
- * 공유 헬퍼로 모으는 자리를 받는다).
+ * **왜 파일마다가 아니라 일괄인가 — 측정이 꼴을 정했다.** 앞 판의 형제 열 축은 class 파일 하나마다
+ * 프로세스 하나를 띄웠다. 그 열 축의 class **140** 개를 파일마다 읽으면 `javap` 벽시계가 **47.5초**
+ * 이고 축마다 일괄 한 번이면 **5.8초**다(이 slice 착수 실측 — 같은 호스트·같은 조건에서 잰 쌍).
+ * 그래서 이 꼴은 선택이 아니라 필요다.
  *
- * `javap` 는 OS `PATH` 의 이름 조회가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다(형제
- * 관례와 같은 이유 — CI 의 JDK 21 과 다른 `javap` 를 부를 여지를 없앤다).
+ * `javap` 는 OS `PATH` 의 이름 조회가 아니라 **실행 중인 JVM 의 `java.home`** 에서 해석한다(CI 의
+ * JDK 21 과 다른 `javap` 를 부를 여지를 없앤다).
  */
 internal object BytecodeConstantPool {
     /**
@@ -29,13 +27,54 @@ internal object BytecodeConstantPool {
         check(headers.size == classFiles.size) {
             "javap 가 입력 수와 다른 수의 Classfile 헤더를 냈다: 헤더 ${headers.size} != 입력 ${classFiles.size}"
         }
-        return headers.mapIndexed { index, header ->
-            val end = headers.getOrNull(index + 1)?.range?.first ?: output.length
-            Chunk(File(header.groupValues[1].trim()), output.substring(header.range.first, end))
+        val chunks =
+            headers.mapIndexed { index, header ->
+                val whole =
+                    output.substring(
+                        header.range.last + 1,
+                        headers.getOrNull(index + 1)?.range?.first ?: output.length,
+                    )
+                val poolAt = whole.indexOf(CONSTANT_POOL_MARKER)
+                check(poolAt >= 0) {
+                    "javap 출력에 '$CONSTANT_POOL_MARKER' 이 없다: ${header.groupValues[1].trim()} — " +
+                        "모든 class 파일은 상수 풀을 갖는다. 출력이 끊겼거나 형태가 바뀐 것이고 조용히 넘기면 안 된다"
+                }
+                Chunk(File(header.groupValues[1].trim()), whole.substring(poolAt))
+            }
+
+        // **돌려주는 토막 자체를 잰다**(cr HIGH-A). 앞 판은 「토막 길이 합 == 출력 길이」였는데 그 합이
+        // `headers` 에서 유도된 길이들의 **망원합**이라 어떤 입력으로도 참인 **항등식**이었다 — 붉을 수
+        // 있었던 것은 그 식을 직접 고친 변이 하나뿐이고, 소비자가 받는 `body` 는 한 번도 보지 않았다.
+        // 그래서 단언을 **반환값의 계약**으로 옮긴다: 모든 body 는 상수 풀에서 시작하고 항목을 적어도
+        // 하나 갖는다. 토막을 비우는 변이는 그 자리가 `wholes` 식이든 `Chunk(…)` 생성 자리든 여기서 붉다.
+        val broken =
+            chunks.filterNot { it.body.startsWith(CONSTANT_POOL_MARKER) && POOL_ENTRY.containsMatchIn(it.body) }
+        check(broken.isEmpty()) {
+            "상수 풀 토막이 계약을 어겼다(빈 본문·절단): ${broken.map { it.classFile.name }}"
         }
+        return chunks
     }
 
-    /** 한 class 파일의 `javap -p -v` 출력 토막. [classFile] 은 헤더가 적은 경로다(입력 순서가 아니다). */
+    /** class 파일 **하나**의 상수 풀 본문. 축 고유의 점검들이 쓰는 자리다. */
+    fun bodyOf(classFile: File): String = chunksOf(listOf(classFile)).single().body
+
+    /**
+     * 한 class 파일의 `javap -p -v` 출력 토막. [classFile] 은 헤더가 적은 경로다(입력 순서가 아니다).
+     *
+     * **[body] 는 `Constant pool:` 줄에서 시작한다 — 그 앞의 javap 머리말을 담지 않는다.**
+     * 머리말에는 `Classfile <경로>` 뿐 아니라 **class 선언 줄**(`public final class
+     * bidvector.adapters.<축>.X`)과 `this_class:`·`super_class:` 주석이 있고, 셋 다 자기 좌표를
+     * 들고 있다. 담아 두면 **좌표 추출이 상수 풀을 한 글자도 못 읽어도 비지 않는다** — 즉
+     * `disallowedCoordinates` 의 「하나도 못 뽑았다」 가드가 정규식이 망가져도 선다.
+     *
+     * **머리글 줄만 떼던 앞 판이 실제로 그랬다**(cr MEDIUM-1 실측): 상수 풀 꼴(`a/b/C`)을 버리고
+     * 점 표기만 남기는 축소 변이가 적중을 56500 → 3953 으로 줄였는데도 **추출 0 인 class 가
+     * 534 중 0** 이라 가드가 초록이었다. 경로가 하던 일을 class 선언 줄의 점 표기 FQN 이 그대로
+     * 이어받았기 때문이다. `Constant pool:` 에서 끊으면 세는 수가 **실제 상수 풀 적중**이 된다.
+     *
+     * 축 고유의 `contains` 점검도 같은 자리에서 **자기 파일 이름·class 이름에 우연히 걸리는 길**을
+     * 잃는다. 바늘은 전부 상수 풀과 `Code` 쪽이라 오늘 답은 바뀌지 않는다(전수 실측).
+     */
     data class Chunk(
         val classFile: File,
         val body: String,
@@ -50,6 +89,11 @@ internal object BytecodeConstantPool {
             .toList()
 
     private val CLASSFILE_HEADER = Regex("""(?m)^Classfile (.+)$""")
+
+    private const val CONSTANT_POOL_MARKER = "Constant pool:"
+
+    /** 상수 풀 항목 한 줄(`   #1 = Methodref …`) — 「`Constant pool:` 글자만 남은 토막」과 가른다. */
+    private val POOL_ENTRY = Regex("""(?m)^\s+#\d+ = """)
 
     private val executable: String by lazy {
         val javaHome = System.getProperty("java.home")
@@ -71,7 +115,7 @@ internal object BytecodeConstantPool {
 
 /**
  * 바이트코드 내부 이름(`a/b/C`)과 이름 기반 class 로드가 남기는 점 표기 좌표(`a.b.C`) 양쪽에서
- * `bidvector…` 조각을 뽑는다 — **좌측 경계를 고정한다**(형제 열 축의 같은 정규식은 고정하지 않는다).
+ * `bidvector…` 조각을 뽑는다 — **좌측 경계를 고정한다. 이제 축 열넷 전부가 이 하나를 쓴다.**
  *
  * 고정하지 않으면 **중첩 네임스페이스의 가운데 토막**을 자기 좌표로 읽는다: `ml` 축이 쓰는 생성 proto
  * 타입의 JVM 패키지가 `contract.bidvector.ml.v1` 이고, 고정 없는 정규식은 그 내부 이름
@@ -79,8 +123,10 @@ internal object BytecodeConstantPool {
  * (실측 — 세는 단위가 다르면 수가 다르다: test 가 내는 `class: 좌표` 쌍으로는 **474**다). 틀리는
  * 방향은 막는 쪽이라 미탐이 아니지만, 그 축을 이 층으로 옮기는 순간 게이트가 거짓으로 붉는다.
  *
- * 형제 열 축은 이 경계가 없고 오늘 그 꼴을 만나는 축이 **0** 이다(`contract.bidvector.*` 를 쓰는
- * adapters 패키지는 `ml` 하나, 전수) — 그 잠복은 `OPEN-M11-JAVAP-ROOT-REGEX-UNANCHORED` 가 받는다.
+ * **앞 판의 형제 열 축은 이 경계가 없었다. 상수 풀만 보면 그 둘은 같은 답을 낸다** — 실측:
+ * 열세 축에서 경계 고정 집합과 비경계 집합이 **쌍 단위로 완전히 같고**(`A \ U` = `U \ A` = 0),
+ * 다른 축은 `ml` 하나뿐이며 거기서만 비경계가 **474** 쌍을 더 뽑는다(중첩 이름공간 오탐).
+ * 경계가 버리는 것은 **오탐뿐이고 실제 좌표의 손실은 0** 이다.
  *
  * **경계는 `/` 와 `.` 둘만 배제한다 — 식별자 글자를 배제하면 서술자에만 나타나는 좌표를 잃는다.**
  * JVM 서술자는 `Lbidvector/procurement/Notice;` 꼴이라 좌표 앞 글자가 `L` 이다. 앞 글자를 「식별자
@@ -95,7 +141,10 @@ internal val SELF_COORDINATE = Regex("""(?<![/.])bidvector[/.][A-Za-z0-9_/.$]+""
 /**
  * 허용 뿌리 술어 — `fqn == 뿌리` 또는 `뿌리.` 접두다. 접두 일치가 **세그먼트 경계**에서만 성립해야
  * 한다: 맨 `startsWith(뿌리)` 는 `bidvector.procurementlegacy` 같은 이웃 좌표를 허용으로 새게 하고
- * 그 새는 이름은 지어낼 수 있다(형제 축들의 같은 단언).
+ * 그 새는 이름은 지어낼 수 있다. 그 모양을 잡는 대조는 축마다 손으로 적은 표본이 아니라
+ * [ScopedBytecodeLayerGateTest] 의 **구성 표본**(허용 뿌리마다 `뿌리 + "x"`)이 든다.
+ *
+ * **열넷 축의 열넷 벌이 이 하나로 모였다** — 앞 판의 열 벌은 인자 이름 하나만 다른 같은 식이었다.
  */
 internal fun isOutsideRoots(
     coordinate: String,
@@ -135,6 +184,12 @@ internal fun disallowedCoordinates(
     // **뽑았는가**는 재지 않았다 — 정규식이 조용히 좁아지면 `emptyList()` 가 그대로 통과해 이 게이트가
     // 공허하게 초록이 된다(실측: 좌측 경계를 과하게 조인 변이가 여섯 축 **전부에서 위반 0 그대로**였다).
     // 어느 축이든 자기 패키지 좌표만으로 수백 개를 남기므로(최소 197, 실측) 0 은 술어가 망가진 것이다.
+    // 세는 본문은 `Constant pool:` 에서 시작한다 — javap 머리말(경로 · class 선언 줄 · `this_class`)이
+    // 자기 좌표를 들고 있어 **상수 풀을 한 글자도 못 읽어도** 이 단언이 서던 자리를 `Chunk` 가 구조로
+    // 없앴다(그 KDoc · cr MEDIUM-1). 그래서 이 수는 **상수 풀 적중**의 수다.
+    // **이 가드가 잡는 것은 추출이 통째로 멈추는 꼴이다** — 정규식이 **좁아지는** 것은 잡지 못한다.
+    // 상수 풀에도 점 표기 문자열이 남아, 슬래시 꼴을 버리는 변이에서도 축별 합이 0 이 되지 않는다
+    // (실측: 축마다 8~680). 정규식의 **모양**은 `BytecodeConstantPoolTest` 의 구성 표본이 진다.
     check(extracted > 0) {
         "상수 풀에서 자기 좌표를 하나도 뽑지 못했다: ${classesDir.absolutePath} — " +
             "`SELF_COORDINATE` 가 좁아졌는지 본다(「위반 0」과 「추출 0」은 다른 말이다)"

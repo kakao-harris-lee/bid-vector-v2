@@ -1,10 +1,8 @@
 package bidvector.adapters.extraction
 
-import bidvector.adapters.architecture.disallowedCoordinates
 import bidvector.adapters.architecture.isOutsideRoots
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import java.io.File
 
 /**
  * 이 패키지가 참조해도 되는 `bidvector.*` 좌표의 루트. extraction 이 보는 domain 은
@@ -33,44 +31,20 @@ import java.io.File
  * 남기지 않는 `const val`(형제들과 공유하는 등재된 사각, `OPEN-BYTECODE-GATE-CONST-VAL-BLINDSPOT` —
  * 그 자리를 이름 층이 덮는다) · 값이 흐르는 경로 일반.
  */
-internal val ALLOWED_ROOTS =
-    setOf(
-        "bidvector.procurement",
-        "bidvector.qualification",
-        "bidvector.strategy",
-        "bidvector.sharedkernel",
-        "bidvector.adapters.extraction",
+internal val ALLOWED_ROOTS: Set<String> =
+    java.util.Set.copyOf(
+        setOf(
+            "bidvector.procurement",
+            "bidvector.qualification",
+            "bidvector.strategy",
+            "bidvector.sharedkernel",
+            "bidvector.adapters.extraction",
+        ),
     )
 
 private fun isDisallowed(coordinate: String): Boolean = isOutsideRoots(coordinate, ALLOWED_ROOTS)
 
 class ExtractionAdapterDependencyTest {
-    @Test
-    fun `extraction 패키지의 컴파일된 클래스는 허용 루트 밖의 bidvector 좌표를 참조하지 않는다`() {
-        val violations =
-            disallowedCoordinates(File("build/classes/kotlin/main/bidvector/adapters/extraction"), ALLOWED_ROOTS)
-
-        violations shouldBe emptyList()
-    }
-
-    /**
-     * 양성 대조 — 술어가 늘 통과만 하는 회귀를 막는다. **앞 판에는 이 대조가 없었다**(실측): 금지
-     * 목록만 있고 대조가 없으면 목록을 비우거나 술어를 뒤집는 편집이 조용히 초록이 된다. 앞 판이 들던
-     * 층 밖 뿌리 일곱을 그대로 들어, 술어 종류와 의미를 바꾸면서 **앞 판이 잡던 것을 잃지 않았음**을
-     * 같은 자리에서 보인다.
-     */
-    @Test
-    fun `층 밖 domain 루트와 형제 adapter 패키지는 이 술어에 걸린다 — 양성 대조`() {
-        isDisallowed("bidvector.decision") shouldBe true
-        isDisallowed("bidvector.settlement") shouldBe true
-        isDisallowed("bidvector.workflow") shouldBe true
-        isDisallowed("bidvector.workflow.evaluation") shouldBe true
-        isDisallowed("bidvector.app") shouldBe true
-        isDisallowed("bidvector.adapters.koneps") shouldBe true
-        isDisallowed("bidvector.adapters.persistence") shouldBe true
-        isDisallowed("bidvector.adapters.contract") shouldBe true
-    }
-
     /** 음성 대조 — 허용 목록이 조용히 좁아지면(뿌리를 지우면) 이 자리가 붉는다. */
     @Test
     fun `허용 루트(자기 패키지 포함)는 이 술어에 걸리지 않는다`() {
@@ -80,15 +54,5 @@ class ExtractionAdapterDependencyTest {
         isDisallowed("bidvector.strategy") shouldBe false
         isDisallowed("bidvector.sharedkernel") shouldBe false
         isDisallowed("bidvector.adapters.extraction") shouldBe false
-    }
-
-    /**
-     * 접두 일치가 **세그먼트 경계**에서만 성립함을 고정한다 — `startsWith(뿌리)` 만 쓰면
-     * `bidvector.procurementX` 같은 이웃 좌표가 허용으로 새고, 그 새는 이름은 지어낼 수 있다.
-     */
-    @Test
-    fun `허용 루트의 이름 접두를 공유하는 다른 패키지는 허용되지 않는다`() {
-        isDisallowed("bidvector.procurementlegacy") shouldBe true
-        isDisallowed("bidvector.adapters.extractionx") shouldBe true
     }
 }
