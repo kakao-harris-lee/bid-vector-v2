@@ -27,29 +27,32 @@ internal object BytecodeConstantPool {
         check(headers.size == classFiles.size) {
             "javap 가 입력 수와 다른 수의 Classfile 헤더를 냈다: 헤더 ${headers.size} != 입력 ${classFiles.size}"
         }
-        val wholes =
+        val chunks =
             headers.mapIndexed { index, header ->
-                output.substring(header.range.last + 1, headers.getOrNull(index + 1)?.range?.first ?: output.length)
+                val whole =
+                    output.substring(
+                        header.range.last + 1,
+                        headers.getOrNull(index + 1)?.range?.first ?: output.length,
+                    )
+                val poolAt = whole.indexOf(CONSTANT_POOL_MARKER)
+                check(poolAt >= 0) {
+                    "javap 출력에 '$CONSTANT_POOL_MARKER' 이 없다: ${header.groupValues[1].trim()} — " +
+                        "모든 class 파일은 상수 풀을 갖는다. 출력이 끊겼거나 형태가 바뀐 것이고 조용히 넘기면 안 된다"
+                }
+                Chunk(File(header.groupValues[1].trim()), whole.substring(poolAt))
             }
 
-        // **토막이 출력을 빈틈없이 덮는가**(v L-1). 헤더 계수는 「몇 개를 읽었나」만 재고 **본문이
-        // 잘렸는지는 못 잡는다** — verifier 가 마지막 토막의 본문을 비우고 그 class 에 위반을 심었을 때
-        // 헤더 수는 입력 수와 같았고 판정이 그 위반을 보지 못했다. 덮개 등식은 per-file 비용 없이
-        // 그 꼴을 상시로 잠근다.
-        val covered = headers.first().range.first + headers.sumOf { it.value.length } + wholes.sumOf(String::length)
-        check(covered == output.length) {
-            "토막이 javap 출력을 빈틈없이 덮지 않는다(본문 절단): 덮은 길이 $covered != 출력 ${output.length}"
+        // **돌려주는 토막 자체를 잰다**(cr HIGH-A). 앞 판은 「토막 길이 합 == 출력 길이」였는데 그 합이
+        // `headers` 에서 유도된 길이들의 **망원합**이라 어떤 입력으로도 참인 **항등식**이었다 — 붉을 수
+        // 있었던 것은 그 식을 직접 고친 변이 하나뿐이고, 소비자가 받는 `body` 는 한 번도 보지 않았다.
+        // 그래서 단언을 **반환값의 계약**으로 옮긴다: 모든 body 는 상수 풀에서 시작하고 항목을 적어도
+        // 하나 갖는다. 토막을 비우는 변이는 그 자리가 `wholes` 식이든 `Chunk(…)` 생성 자리든 여기서 붉다.
+        val broken =
+            chunks.filterNot { it.body.startsWith(CONSTANT_POOL_MARKER) && POOL_ENTRY.containsMatchIn(it.body) }
+        check(broken.isEmpty()) {
+            "상수 풀 토막이 계약을 어겼다(빈 본문·절단): ${broken.map { it.classFile.name }}"
         }
-
-        return headers.mapIndexed { index, header ->
-            val whole = wholes[index]
-            val poolAt = whole.indexOf(CONSTANT_POOL_MARKER)
-            check(poolAt >= 0) {
-                "javap 출력에 '$CONSTANT_POOL_MARKER' 이 없다: ${header.groupValues[1].trim()} — " +
-                    "모든 class 파일은 상수 풀을 갖는다. 출력 형태가 바뀐 것이고 조용히 넘기면 안 된다"
-            }
-            Chunk(File(header.groupValues[1].trim()), whole.substring(poolAt))
-        }
+        return chunks
     }
 
     /** class 파일 **하나**의 상수 풀 본문. 축 고유의 점검들이 쓰는 자리다. */
@@ -88,6 +91,9 @@ internal object BytecodeConstantPool {
     private val CLASSFILE_HEADER = Regex("""(?m)^Classfile (.+)$""")
 
     private const val CONSTANT_POOL_MARKER = "Constant pool:"
+
+    /** 상수 풀 항목 한 줄(`   #1 = Methodref …`) — 「`Constant pool:` 글자만 남은 토막」과 가른다. */
+    private val POOL_ENTRY = Regex("""(?m)^\s+#\d+ = """)
 
     private val executable: String by lazy {
         val javaHome = System.getProperty("java.home")
