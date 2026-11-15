@@ -53,12 +53,10 @@ export default defineConfig({
     // 7A 의 단위 test 는 라우트 표처럼 DOM 이 필요 없는 것뿐이다 — jsdom 을 의존에 들이지
     // 않는다. 화면 렌더 test 는 7E 가 환경과 함께 들인다.
     environment: 'node',
-    // M11/gates-web-read — **「여는 행위」 층을 세우는 유일한 자리**(⑤). 이 프로세스에서 Kotlin
-    // 원문을 여는 호출을 가로채, 소유 모듈(`scripts/kotlin-source.mjs`) 밖의 호출자면 던진다.
-    // 표기(링크·대소문자·glob·데이터 파일)를 보지 않고 **해석된 실경로**를 보므로 그 축들이
-    // 술어 밖으로 나간다. 이 줄을 지우면 `scripts/kotlin-read-guard.test.mjs` 의 양성 묶음이
-    // RED 다 — 배선 자체가 측정되는 자리이고, 그래서 층은 import 만으로 서지 않는다.
-    setupFiles: ['./scripts/kotlin-read-guard-setup.mjs'],
+    // M11/gates-web-read 의 **「여는 행위」 층**(⑤)은 M12/12C r2 에 이 자리에서 빠졌다. 층을
+    // 세우는 자리가 `web/.npmrc` 의 `node-options` 한 줄이 되어 npm 이 띄우는 모든 프로세스와
+    // 그 자식(파일 worker 포함)이 그것을 물려받기 때문이다 — 두 풀 모두에서 이 줄을 지워도
+    // 층 test 가 초록이라(실측) **측정되지 않는 배선**으로 남기지 않았다.
     // 게이트 스크립트의 순수 판정 함수도 여기서 잠근다(`scripts/*.test.mjs`) — 그 판정이
     // 번들 경계의 실제 술어다.
     // 하네스의 **파괴적 경로 가드**도 단위 test 로 잠근다(CR r2 H-1) — 그 술어는 부수효과

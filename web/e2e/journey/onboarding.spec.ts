@@ -4,6 +4,7 @@ import {
   assertOnlyAllowedOperations,
   clearStrategyTerms,
   journeyContext,
+  readsAfterWrite,
   signIn,
   watchRequests,
 } from './shared';
@@ -76,50 +77,28 @@ interface ChecklistReads {
  * 체크리스트 읽기의 **출발 장부**(여정 시작에 한 번 건다) — 「쓰기 뒤 다시 읽기」를 기다리는 자리가
  * 이것으로 **그 쓰기 응답 뒤에 출발한** 읽기만 받는다.
  *
- * 「다음에 오는 200 GET」으로는 닫히지 않는다(W-13 간헐 실패 · PR #118 v r1 H-1): 클라이언트는
- * 쓰기가 성공한 뒤에만 체크리스트를 다시 읽지만(`useProfileWrite` → `invalidateQueries`), **쓰기
- * 전에 출발한** 읽기의 응답이 그 뒤에 닿을 수 있다 — 홈을 거쳐 들어오면 배너와 화면이 같은 질의를
- * 각각 걸어 응답이 둘이다. 그 늦은 응답이 포착되면 단언은 쓰기 **전** 상태를 본다(실측: 지우기
- * 자리에서 `pending` 이 `["BUDGET_RANGE"]`). 화면 단언을 먼저 두는 것으로는 「늦은 응답이 아직
- * 날아오는 중이 아니다」가 서지 않는다 — 그래서 **요청 출발 순서**로 거른다.
+ * **장부의 본체는 `shared.ts` 의 [readsAfterWrite] 다**(M12/12D). 이 자리의 사본이던 그 기계를
+ * 여정 e2e 의 한 자리로 올렸다 — 같은 결함 계열이 두 번 물었고(이 파일의 W-13 간헐 실패 ·
+ * 여정 ③ 타임라인), 사본을 둘로 두면 한쪽만 고쳐진다. 여기 남는 것은 **이 여정의 어휘**다:
+ * 무엇이 읽기이고(`isChecklistRead`) 어떤 꼴이 쓰기인지(접미 경로), 그리고 본문의 타입이다.
+ *
+ * 왜 출발 순서로 거르는가는 [readsAfterWrite] 의 주석이 정본이다. 이 여정의 실측은 거기 적힌
+ * 꼴의 한 사례다 — 홈을 거쳐 들어오면 배너와 화면이 같은 질의를 각각 걸어 응답이 둘이고, 그
+ * 늦은 응답이 포착되면 단언은 쓰기 **전** 상태를 본다(지우기 자리에서 `pending` 이
+ * `["BUDGET_RANGE"]`).
+ *
+ * 장부는 **마지막 쓰기까지** 필요하고 그 뒤 곧 페이지가 닫힌다 — 그래서 이 여정은 걷지 않는다
+ * (CR r1 L-5 가 「기록으로만」이라 적은 자리).
  */
 function checklistReads(page: Page): ChecklistReads {
-  // 장부는 **마지막 쓰기까지** 필요하고 그 뒤 곧 페이지가 닫힌다 — 해제 자리를 두어도 버는 것이
-  // 없고, 이 여정의 체크리스트 읽기는 십여 건이다(CR r1 L-5 가 「기록으로만」이라 적은 자리).
-  const started = new Set<Request>();
-  page.on('request', (one) => {
-    if (isChecklistRead(one)) {
-      started.add(one);
-    }
-  });
+  const reads = readsAfterWrite(page, isChecklistRead);
   return {
     afterWrite(write: string): Promise<Checklist> {
-      // 봉인은 **응답 핸들러 안에서** 한다 — 그러면 봉인과 다시 읽기의 출발 순서가 **이벤트
-      // 디스패치로** 보장된다. `await` 뒤로 미룬 판은 지금 실측으로는 구분되지 않지만(v r1 L-1
-      // 변이 M3 GREEN — 마이크로태스크 continuation 이 다음 프로토콜 메시지보다 먼저 돈다),
-      // 그 판의 순서는 런타임의 처리 순서에 달린다. 더 안전한 쪽을 둔다.
-      let stale: ReadonlySet<Request> | null = null;
-      const read = page.waitForResponse(
-        (one) =>
-          stale !== null &&
-          isChecklistRead(one.request()) &&
-          one.status() === 200 &&
-          !stale.has(one.request()),
+      const { read } = reads.afterWrite(
+        (one) => one.method() === 'POST' && one.url().endsWith(write),
+        write,
       );
-      const written = page.waitForResponse((one) => {
-        if (one.request().method() !== 'POST' || !one.url().endsWith(write)) {
-          return false;
-        }
-        stale = new Set(started);
-        return true;
-      });
-      // 쓰기 단언이 터지면 `read` 는 관측되지 않은 채 남아 뒤늦게 reject 된다 — 이미 실패한
-      // test 에 노이즈만 붙으므로 삼킨다(CR r1 L-3).
-      void read.catch(() => {});
-      return (async () => {
-        expect((await written).status(), `${write} 쓰기 응답`).toBe(200);
-        return (await read).json() as Promise<Checklist>;
-      })();
+      return (async () => (await read).json() as Promise<Checklist>)();
     },
   };
 }
