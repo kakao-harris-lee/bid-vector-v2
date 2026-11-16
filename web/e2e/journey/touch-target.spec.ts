@@ -62,6 +62,8 @@ interface MeasuredTarget {
 interface Measurement {
   readonly targets: readonly MeasuredTarget[];
   readonly overflow: number;
+  /** 뷰포트 **밖으로 삐져나간** 타깃 — 손가락이 그 상자의 일부에 닿지 못하는 자리다. */
+  readonly offscreen: readonly string[];
 }
 
 /**
@@ -77,6 +79,7 @@ async function measure(page: Page): Promise<Measurement> {
   return page.evaluate(() => {
     const nodes = [...document.querySelectorAll('button, a, [role="tab"], [role="button"]')];
     const targets = [];
+    const offscreen = [];
     for (const node of nodes) {
       const style = getComputedStyle(node);
       const box = node.getBoundingClientRect();
@@ -91,14 +94,25 @@ async function measure(page: Page): Promise<Measurement> {
       if (!visible) {
         continue;
       }
+      const name = (node.getAttribute('aria-label') ?? node.textContent ?? '').trim().slice(0, 40);
       targets.push({
         tag: node.tagName.toLowerCase(),
-        name: (node.getAttribute('aria-label') ?? node.textContent ?? '').trim().slice(0, 40),
+        name,
         width: Math.round(box.width * 10) / 10,
         height: Math.round(box.height * 10) / 10,
       });
+      // 부분 화소 반올림을 0.5px 로 받는다 — 그보다 큰 삐져나감만 센다.
+      if (box.left < -0.5 || box.right > window.innerWidth + 0.5) {
+        offscreen.push(`${node.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`);
+      }
     }
-    return { targets, overflow: document.documentElement.scrollWidth - window.innerWidth };
+    return {
+      targets,
+      offscreen,
+      // **문서와 본문 둘 다** 본다 — 한쪽만 보면 넘침이 다른 쪽에만 서는 꼴을 놓친다.
+      overflow:
+        Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
+    };
   });
 }
 
@@ -200,7 +214,7 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     }
     await page.waitForLoadState('networkidle');
 
-    const { targets, overflow } = await measure(page);
+    const { targets, overflow, offscreen } = await measure(page);
 
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
     expect(targets.length, `${screen.slotId}: 보이는 타깃이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
@@ -212,7 +226,15 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
       small.map((one) => `${one.tag} ${one.height}px "${one.name}"`),
       `${screen.slotId}: 터치 타깃이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
     ).toStrictEqual([]);
-    // ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.
+    /**
+     * ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.
+     *
+     * **문서 폭만으로는 모자란다**(cr L-8 대조에서 실측): 뷰포트보다 넓은 **고정 배치** 요소는
+     * 흐름 밖이라 `scrollWidth` 를 늘리지 않아, 500px 짜리 하단 탐색을 390px 에 심은 변이가
+     * 그대로 초록이었다. 그래서 **타깃 상자 자체가 뷰포트 밖으로 나가는지**를 함께 센다 — 그것이
+     * 이 게이트가 재려는 것(손가락이 상자 전체에 닿는가)에 더 가깝다.
+     */
+    expect(offscreen, `${screen.slotId}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
     expect(overflow, `${screen.slotId}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
   }
 });
