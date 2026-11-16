@@ -29,15 +29,45 @@ const LOGIN_PATH = '/login';
  *  · `/login` 자신 — 돌아올 자리가 자기면 고리가 된다. **조각과 끝 `/` 를 떼고** 본다.
  * 전부 홈으로 떨어뜨린다.
  */
+/**
+ * 제어 문자 — 브라우저 URL 파서는 탭·개행·복귀를 **떼고** 해석한다. 그래서 `/<TAB>/evil.example`
+ * 은 `//evil.example` 이 되어 바깥 주소다(v M-1). 떼기 전 글자로 판정하면 그 변형을 놓친다.
+ */
+const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/u;
+
+/**
+ * 그 주소가 **로그인 자신으로 돌아오는가**. 비교 전에 세 가지를 접는다(v L-1):
+ *  · 질의와 조각 — 어느 화면을 여는지에 영향이 없다.
+ *  · 점 구간(`.`·`..`)과 겹친 `/` — 브라우저와 history 가 접어서 해석한다.
+ *  · 대소문자 — react-router 의 경로 매칭이 기본적으로 대소문자를 가리지 않는다.
+ */
+function returnsToLogin(raw: string): boolean {
+  const head = raw.split(/[?#]/u)[0] ?? '';
+  const segments: string[] = [];
+  for (const part of head.split('/')) {
+    if (part === '' || part === '.') {
+      continue;
+    }
+    if (part === '..') {
+      segments.pop();
+      continue;
+    }
+    segments.push(part);
+  }
+  return `/${segments.join('/')}`.toLowerCase() === LOGIN_PATH;
+}
+
 export function safeReturnPath(raw: unknown): string {
-  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
+  if (
+    typeof raw !== 'string' ||
+    !raw.startsWith('/') ||
+    raw.startsWith('//') ||
+    raw.includes('\\') ||
+    CONTROL_CHARACTERS.test(raw)
+  ) {
     return HOME_PATH;
   }
-  // **조각(`#`)과 끝 `/` 까지 떼고** 비교한다(cr M-3). 질의만 떼던 앞 판은 `/login#x` 와
-  // `/login/` 을 「로그인 자신이 아니다」로 읽어 고리를 만들었다 — react-router 는 끝 `/` 를 떼고
-  // 매칭하고, 조각은 어느 화면을 여는지에 영향이 없다.
-  const head = raw.split(/[?#]/u)[0]?.replace(/\/+$/u, '') ?? '';
-  return head === '' || head === LOGIN_PATH ? HOME_PATH : raw;
+  return returnsToLogin(raw) ? HOME_PATH : raw;
 }
 
 /**

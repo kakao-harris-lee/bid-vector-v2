@@ -221,10 +221,33 @@ describe('로그인 뒤 돌아갈 자리 (M13/13B)', () => {
     expect(safeReturnPath('/bids\\x')).toBe('/');
   });
 
+  /**
+   * 브라우저 URL 파서는 탭·개행·복귀를 **떼고** 해석한다 — `/<TAB>/evil.example` 은
+   * `//evil.example` 이 되어 바깥 주소다(v M-1).
+   */
+  it('제어 문자가 든 주소는 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/\t/evil.example')).toBe('/');
+    expect(safeReturnPath('/\n/evil.example')).toBe('/');
+    expect(safeReturnPath('/\r/evil.example')).toBe('/');
+  });
+
+  /**
+   * 「로그인 자신」 판정이 **철자 하나**에 걸려 있었다(v L-1). react-router 의 경로 매칭은 기본적으로
+   * 대소문자를 가리지 않고, 점 구간과 겹친 `/` 는 브라우저와 history 가 접어서 해석한다.
+   */
+  it('대소문자·점 구간·겹친 슬래시로 적은 로그인도 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/LOGIN')).toBe('/');
+    expect(safeReturnPath('/Login?x=1')).toBe('/');
+    expect(safeReturnPath('/./login')).toBe('/');
+    expect(safeReturnPath('/x/../login')).toBe('/');
+    expect(safeReturnPath('/login//')).toBe('/');
+  });
+
   /** 조각·끝 `/` 가 **앱 안의 다른 자리**면 그대로 돌려준다 — 과잉 차단이 아니다. */
   it('로그인이 아닌 자리의 조각과 끝 / 는 살린다', () => {
     expect(safeReturnPath('/bids#tab')).toBe('/bids#tab');
     expect(safeReturnPath('/bids/')).toBe('/bids/');
+    expect(safeReturnPath('/notices/LOGIN/000')).toBe('/notices/LOGIN/000');
   });
 
   it('문자열이 아니거나 없으면 홈이다', () => {
