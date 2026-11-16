@@ -202,6 +202,31 @@ describe('로그인 뒤 돌아갈 자리 (M13/13B)', () => {
     expect(safeReturnPath('/login?next=/bids')).toBe('/');
   });
 
+  /**
+   * **조각과 끝 `/` 까지 떼고 본다**(cr M-3). 질의만 떼면 `/login#x`·`/login/` 이 「로그인 자신이
+   * 아니다」로 읽혀 고리가 된다 — react-router 는 끝 `/` 를 떼고 매칭한다.
+   */
+  it('조각이나 끝 / 가 붙은 로그인도 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/login#x')).toBe('/');
+    expect(safeReturnPath('/login/')).toBe('/');
+    expect(safeReturnPath('/login/?next=/bids')).toBe('/');
+  });
+
+  /**
+   * 특수 스킴에서 URL 파서가 `\` 를 `/` 로 읽는다 — 교차 출처가 되어 `pushState` 가
+   * SecurityError 를 던지고, 로그인은 됐는데 아무 데도 못 간다.
+   */
+  it('역슬래시가 든 주소는 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/\\evil.example')).toBe('/');
+    expect(safeReturnPath('/bids\\x')).toBe('/');
+  });
+
+  /** 조각·끝 `/` 가 **앱 안의 다른 자리**면 그대로 돌려준다 — 과잉 차단이 아니다. */
+  it('로그인이 아닌 자리의 조각과 끝 / 는 살린다', () => {
+    expect(safeReturnPath('/bids#tab')).toBe('/bids#tab');
+    expect(safeReturnPath('/bids/')).toBe('/bids/');
+  });
+
   it('문자열이 아니거나 없으면 홈이다', () => {
     expect(safeReturnPath(undefined)).toBe('/');
     expect(safeReturnPath(null)).toBe('/');

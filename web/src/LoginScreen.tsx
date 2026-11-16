@@ -23,15 +23,21 @@ const LOGIN_PATH = '/login';
  *  · `https://…` 처럼 `/` 로 시작하지 않는 것 — 바깥 주소다.
  *  · `//evil.example` — 프로토콜 상대 주소라 브라우저가 바깥으로 읽는다(「/ 로 시작」을
  *    지나가므로 따로 막는다).
- *  · `/login` 자신 — 돌아올 자리가 자기면 고리가 된다.
- * 셋 다 홈으로 떨어뜨린다.
+ *  · `/\evil.example` — 특수 스킴에서 URL 파서가 `\` 를 `/` 로 읽는다. 그러면 교차 출처가 되어
+ *    `history.pushState` 가 SecurityError 를 던진다 — 로그인은 됐는데 아무 데도 못 가고 그
+ *    거부를 잡는 자리도 없다(cr M-3).
+ *  · `/login` 자신 — 돌아올 자리가 자기면 고리가 된다. **조각과 끝 `/` 를 떼고** 본다.
+ * 전부 홈으로 떨어뜨린다.
  */
 export function safeReturnPath(raw: unknown): string {
-  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
     return HOME_PATH;
   }
-  const pathname = raw.split('?')[0];
-  return pathname === LOGIN_PATH ? HOME_PATH : raw;
+  // **조각(`#`)과 끝 `/` 까지 떼고** 비교한다(cr M-3). 질의만 떼던 앞 판은 `/login#x` 와
+  // `/login/` 을 「로그인 자신이 아니다」로 읽어 고리를 만들었다 — react-router 는 끝 `/` 를 떼고
+  // 매칭하고, 조각은 어느 화면을 여는지에 영향이 없다.
+  const head = raw.split(/[?#]/u)[0]?.replace(/\/+$/u, '') ?? '';
+  return head === '' || head === LOGIN_PATH ? HOME_PATH : raw;
 }
 
 /**
