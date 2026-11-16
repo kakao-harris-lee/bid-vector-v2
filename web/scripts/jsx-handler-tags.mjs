@@ -1,91 +1,107 @@
-// M13/13B — **포인터·키 핸들러를 든 비-상호작용 내장 태그가 0** 임을 재는 술어.
+// M13/13B — 내장 태그에 붙은 **누르는 배선**이 상호작용 요소 밖에 서지 않는지 재는 술어.
 //
-// 터치 타깃 게이트(390px 여정)의 모집단은 `button` · `a` · `[role="tab"]` · `[role="button"]`
-// 전수다. 그 모집단을 벗어나는 길이 하나 있다 — 버튼을 `<div onClick>` 으로 적는 것이다. 그러면
-// 손가락이 닿는 자리인데 게이트의 선택자에 걸리지 않고, 키보드로도 닿지 않으며, 보조기기는
-// 그것을 조작 가능한 것으로 읽지 못한다.
+// 터치 타깃 게이트(390px 여정)의 모집단은 선택자 전수다. 그 모집단을 벗어나는 길이 있다 —
+// 버튼을 `<div onClick>` 으로 적는 것이다. 그러면 손가락이 닿는 자리인데 게이트의 선택자에
+// 걸리지 않고, 키보드로도 닿지 않으며, 보조기기는 그것을 조작 가능한 것으로 읽지 못한다.
 //
-// 그래서 **요소 쪽에서** 닫는다: 포인터·키 핸들러는 내장 상호작용 요소(또는 공유 `Button`)만
-// 든다. `role="button"` 을 단 `div` 도 **면제하지 않는다**(팀장 판정 2026-11-16 조건 ①) — 그
-// 면제를 두면 공유 버튼을 쓰지 않는 길이 다시 열린다.
+// **술어는 열거가 아니라 접두와 집합이다**(verifier H-2). 앞 판은 핸들러 **이름 목록**
+// (`onClick|onKeyDown|…`)과 태그 목록의 곱이어서 `onClickCapture` · `onAuxClick` · spread ·
+// `<label onClick>` · 변수 태그 · props 를 펼치는 래퍼가 **전부 샜다**(실측 여섯). 이름을 더
+// 적는 대신 뒤집는다:
 //
-// **경계**: 사용자 정의 컴포넌트(대문자 태그)에 넘긴 `onClick` 은 이 축이 보지 않는다. 그 핸들러가
-// 어느 요소에 닿는지는 그 컴포넌트가 정하고, 그 컴포넌트가 `src/**` 안이면 거기서 다시 이 술어를
-// 지난다. 저장소 밖 컴포넌트에 넘기는 꼴과 `createElement` **호출 인자**로 넘기는 꼴은 경계
-// 밖이다(알려진 제한 — 후자는 변이로 실측했다).
+//   내장(소문자) 태그에 **`on` + 대문자로 시작하는 속성**이 있거나 **spread 속성**이 있으면,
+//   그 태그가 허용 집합에 들지 않는 한 위반이다.
 //
-// **spread 는 경계가 아니라 위반이다**(cr M-4). `<div {...handlers} />` 는 JSX **안**에서 열리는
-// 같은 성질의 구멍인데, 속성 이름이 식 뒤에 숨어 이 술어가 볼 수 없다. 볼 수 없는 것을
-// 통과시키지 않는다 — 비-상호작용 내장 태그의 spread 자체를 위반으로 센다(착수 실측: 출하
-// 트리의 내장 태그 spread 는 **0** 이라 비용이 없다).
+// 허용 쪽은 **HTML 이 정한 것**이라 저장소가 늘리는 목록이 아니고, 좁히는(과차단) 방향이다.
+// 셋으로 나뉜다.
+//  · [INTERACTIVE_TAGS] — 무엇을 달아도 되는 내장 상호작용 요소.
+//  · [CONDITIONAL_EXEMPTION] — 그 속성이 **보일 때만** 상호작용 요소(`href` 없는 `<a>` 는
+//    키보드로 닿지 않는 버튼이다). `label` 은 면제에 **없다** — 누르는 자리는 그 label 이
+//    아니라 연결된 입력이다(팀장 판정).
+//  · [TAG_SCOPED_HANDLERS] — 그 태그에서만 허용되는 **짝 이벤트**. `form` 의 `onSubmit`·
+//    `onReset` 이 그것이고, 그 둘은 폼이 스스로 내는 이벤트라 누르는 자리를 만들지 않는다
+//    (누르는 것은 폼 **안**의 제출 버튼이고 그 버튼은 이미 모집단 안이다). `form` 을 통째로
+//    면제하지 않는 이유는 `<form onClick>` 이 폼 영역 전체를 누르는 자리로 만드는 `<div onClick>`
+//    과 같은 우회이기 때문이다(팀장 판정 2026-11-16).
+//
+// **경계**: 사용자 정의 컴포넌트(대문자 태그)에 넘긴 핸들러와 `createElement` **호출 인자**로
+// 넘긴 핸들러는 이 축 밖이다(알려진 제한). 변수 태그는 **같은 파일의 문자열 상수**까지 따라간다.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import ts from 'typescript';
 
+/** 무엇을 달아도 되는 내장 상호작용 요소. */
+export const INTERACTIVE_TAGS = new Set(['button', 'input', 'select', 'textarea', 'summary']);
+
+/** 그 속성이 **보일 때만** 상호작용 요소인 태그. spread 뒤에 숨으면 면제도 서지 않는다. */
+export const CONDITIONAL_EXEMPTION = { a: 'href' };
+
+/** 그 태그에서만 허용되는 짝 이벤트 — HTML 의 폼 이벤트 둘로 고정이다. */
+export const TAG_SCOPED_HANDLERS = { form: ['onSubmit', 'onReset'] };
+
 /**
- * 핸들러를 들어도 되는 **내장 상호작용 요소**. 열거지만 이것은 HTML 의 집합이고 저장소의
- * 집합이 아니다 — 늘지 않는다. 늘려야 할 일이 생기면 그것은 새 결정이다.
+ * 핸들러 속성의 **꼴**. 이름을 적지 않는다 — `onClickCapture`·`onAuxClick`·`onContextMenu` 가
+ * 전부 이 하나에 든다.
  */
+const HANDLER_ATTRIBUTE = /^on[A-Z]/u;
+
+/** 소문자로 시작하는 태그 == 내장 요소. */
+const isIntrinsicName = (tag) => /^[a-z]/u.test(tag);
+
 /**
- * 면제가 **조건부**인 태그(cr L-9). `href` 없는 `<a onClick>` 과 `htmlFor` 없는 `<label onClick>` 은
- * 키보드로 닿지 않는 버튼을 만드는 같은 계열이다 — 그 속성이 있을 때만 상호작용 요소로 센다.
+ * `const Tag = 'div'` 꼴의 **같은 파일 문자열 상수**. 변수 태그로 내장 요소를 가리키는 우회를
+ * 닫는다(verifier 실측). 다른 파일에서 온 상수와 계산된 값은 경계 밖이다(알려진 제한).
  */
-export const CONDITIONAL_EXEMPTION = { a: 'href', label: 'htmlFor' };
-
-export const INTERACTIVE_TAGS = new Set([
-  'a',
-  'button',
-  'details',
-  'form',
-  'input',
-  'label',
-  'option',
-  'select',
-  'summary',
-  'textarea',
-]);
-
-/**
- * 손가락·키로 누르는 핸들러. `onChange`·`onSubmit`·`onFocus` 는 **대상이 아니다** — 그것들은
- * 누르는 자리를 만들지 않는다(그리고 그 자리는 이미 내장 상호작용 요소다).
- */
-const PRESS_HANDLER =
-  /^on(Click|AuxClick|ContextMenu|DblClick|DoubleClick|MouseDown|MouseUp|PointerDown|PointerUp|TouchStart|TouchEnd|KeyDown|KeyUp|KeyPress)$/u;
-
-/** 소문자로 시작하는 태그 == 내장 요소. 대문자는 사용자 정의 컴포넌트다(위 「경계」). */
-const isIntrinsic = (tag) => /^[a-z]/u.test(tag);
+function intrinsicAliases(source) {
+  const aliases = new Map();
+  const visit = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      ts.isStringLiteralLike(node.initializer) &&
+      isIntrinsicName(node.initializer.text)
+    ) {
+      aliases.set(node.name.text, node.initializer.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return aliases;
+}
 
 /**
- * 그 원문에서 **핸들러를 든 비-상호작용 내장 태그** 전수.
+ * 그 원문에서 **허용되지 않는 누르는 배선** 전수.
  *
- * 술어가 AST 인 이유는 저장소 규율이다 — 문자열 훑기는 주석 한 줄·문자열 리터럴·줄바꿈으로
- * 열린다(`onClick=` 를 속성과 산문이 같은 글자로 쓴다).
+ * 술어가 AST 인 이유는 저장소 규율이다 — 문자열 훑기는 주석 한 줄·문자열 리터럴로 열린다.
  */
 export function handlerBearingTags(text, fileName = 'probe.tsx') {
   const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TSX);
+  const aliases = intrinsicAliases(source);
   const found = [];
   const visit = (node) => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const tag = node.tagName.getText(source);
-      const attributeNames = node.attributes.properties
-        .filter((one) => ts.isJsxAttribute(one))
-        .map((one) => one.name.getText(source));
-      const required = CONDITIONAL_EXEMPTION[tag];
-      // 조건부 면제는 **그 속성이 보일 때만** 선다 — spread 뒤에 숨은 `href` 는 보이지 않으므로
-      // 면제도 서지 않는다(아래 spread 규칙과 같은 방향이다).
-      const exempt = INTERACTIVE_TAGS.has(tag) && (required === undefined || attributeNames.includes(required));
-      if (isIntrinsic(tag) && !exempt) {
-        const at = (property) => source.getLineAndCharacterOfPosition(property.getStart(source)).line + 1;
-        for (const property of node.attributes.properties) {
-          if (ts.isJsxSpreadAttribute(property)) {
-            // **볼 수 없는 것을 통과시키지 않는다**(cr M-4).
-            found.push({ file: fileName, tag, handler: '{...spread}', line: at(property) });
-            continue;
-          }
-          const name = property.name.getText(source);
-          if (PRESS_HANDLER.test(name)) {
-            found.push({ file: fileName, tag, handler: name, line: at(property) });
+      const written = node.tagName.getText(source);
+      const tag = isIntrinsicName(written) ? written : (aliases.get(written) ?? written);
+      if (isIntrinsicName(tag)) {
+        const properties = node.attributes.properties;
+        const names = properties.filter((one) => ts.isJsxAttribute(one)).map((one) => one.name.getText(source));
+        const required = CONDITIONAL_EXEMPTION[tag];
+        const fullyInteractive = INTERACTIVE_TAGS.has(tag) || (required !== undefined && names.includes(required));
+        if (!fullyInteractive) {
+          const allowed = new Set(TAG_SCOPED_HANDLERS[tag] ?? []);
+          const at = (one) => source.getLineAndCharacterOfPosition(one.getStart(source)).line + 1;
+          for (const property of properties) {
+            if (ts.isJsxSpreadAttribute(property)) {
+              // **볼 수 없는 것을 통과시키지 않는다** — 펼친 키가 식 뒤에 숨는다.
+              found.push({ file: fileName, tag, handler: '{...spread}', line: at(property) });
+              continue;
+            }
+            const name = property.name.getText(source);
+            if (HANDLER_ATTRIBUTE.test(name) && !allowed.has(name)) {
+              found.push({ file: fileName, tag, handler: name, line: at(property) });
+            }
           }
         }
       }
