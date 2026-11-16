@@ -207,6 +207,21 @@ function ShellFrame() {
         )}
       </header>
       {/*
+        **로그아웃 실패는 폭과 무관한 자리에 선다**(cr H-1). 앞 판은 이 알림이 `md:hidden` 하단
+        탐색 **안**에 있어서, 로그아웃 버튼이 머리글에 있는 데스크톱에서는 실패가 **아무 데도
+        뜨지 않았다** — 숨는 쪽이 접근성 트리에서도 빠지는 성질(이 셸이 두 탐색을 가르는 근거)이
+        그대로 침묵을 만들었다. jsdom test 는 CSS 가 없어 그 축에 공허했다.
+      */}
+      {signOutFailed ? (
+        <p
+          data-testid="sign-out-failure"
+          role="alert"
+          className="border-b border-line px-4 py-2 text-sm text-bad-ink sm:px-6"
+        >
+          로그아웃하지 못했습니다. 다시 시도하십시오.
+        </p>
+      ) : null}
+      {/*
         본문은 포커스를 받을 수 있는 자리다(`tabIndex={-1}`) — 이동 뒤 포커스가 머리로 간다.
         좁은 화면에서는 아래 고정 탭이 본문을 덮으므로 그만큼 바닥 여백을 둔다.
       */}
@@ -215,11 +230,6 @@ function ShellFrame() {
       </main>
       {atLogin ? null : (
         <nav aria-label="화면" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-card md:hidden">
-          {signOutFailed ? (
-            <p data-testid="sign-out-failure" role="alert" className="px-3 py-2 text-xs text-bad-ink">
-              로그아웃하지 못했습니다. 다시 시도하십시오.
-            </p>
-          ) : null}
           {moreOpen ? (
             <div id="nav-more" data-testid="nav-more" className="border-b border-line p-2">
               <ul className="flex flex-col gap-1">
