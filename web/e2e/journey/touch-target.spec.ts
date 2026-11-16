@@ -77,13 +77,42 @@ interface Measurement {
  */
 async function measure(page: Page): Promise<Measurement> {
   return page.evaluate(() => {
-    const nodes = [...document.querySelectorAll('button, a, [role="tab"], [role="button"]')];
+    /**
+     * 모집단(팀장 판정 2026-11-16 보충) — 계약의 넷에 **누르는 내장 요소 셋**을 더한다:
+     * `input[type=button|submit|reset]` · `summary` · `select`. 손가락이 누르는 자리이고,
+     * AST 축이 그것들을 상호작용 요소로 면제하므로 이쪽에서 받지 않으면 두 게이트 사이에
+     * 틈이 생긴다. `label` 은 넣지 않는다 — 누르는 자리는 연결된 입력이다.
+     */
+    const nodes = [
+      ...document.querySelectorAll(
+        'button, a, [role="tab"], [role="button"], input[type="button"], input[type="submit"], input[type="reset"], summary, select',
+      ),
+    ];
     const targets = [];
     const offscreen = [];
     for (const node of nodes) {
       const style = getComputedStyle(node);
-      const box = node.getBoundingClientRect();
-      const clipped = style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)';
+      let box = node.getBoundingClientRect();
+      /**
+       * **시각 은폐는 위치 지정된 요소에서만 선다**(v M-2). `clip` 은 absolute·fixed 가 아닌
+       * 요소에 **적용되지 않는데** computed 값에는 그대로 남는다 — 그 값만 보던 앞 판은 보이고
+       * 눌리는 44×29 버튼을 모집단에서 뺐다(실측).
+       */
+      const positioned = style.position === 'absolute' || style.position === 'fixed';
+      const clipped =
+        positioned && (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)');
+      /**
+       * **상자가 0 이어도 글자가 보일 수 있다**(v M-2). `display: contents` 요소는 자기 상자가
+       * 없지만 글자는 그려지고 클릭이 발화한다. 그 자리는 **글자 범위**로 다시 잰다.
+       */
+      if (!clipped && box.width === 0 && box.height === 0) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const textBox = range.getBoundingClientRect();
+        if (textBox.width > 0 && textBox.height > 0) {
+          box = textBox;
+        }
+      }
       const visible =
         !clipped &&
         style.visibility !== 'hidden' &&
