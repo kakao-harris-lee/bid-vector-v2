@@ -146,11 +146,9 @@ describe('탐색의 두 모양 (M13/13B)', () => {
     stub();
     await renderAt('/');
 
-    expect(screen.queryByTestId('nav-more')).toBeNull();
-    // 「더 보기」가 품는 자리는 상단 줄에만 있다(접힌 하단 쪽은 그리지 않는다).
-    for (const slot of screenSlots.filter((one) => one.nav === 'more')) {
-      expect(navPaths().filter((one) => one === slot.path).length).toBe(1);
-    }
+    // 패널은 **늘 그려지고** 접힘은 `hidden` 이다(cr L-2) — 그래야 `aria-controls` 의 IDREF 가
+    // 접힌 동안에도 선다. 숨는 동안 접근성 트리·포커스 순서에서는 함께 빠진다.
+    expect(screen.getByTestId('nav-more').hidden).toBe(true);
   });
 
   it('경로 인자가 있는 자리는 탐색에 두지 않는다', async () => {
@@ -173,7 +171,7 @@ describe('「더 보기」 disclosure', () => {
     });
 
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByTestId('nav-more')).not.toBeNull();
+    expect(screen.getByTestId('nav-more').hidden).toBe(false);
   });
 
   it('Escape 로 닫고 포커스가 연 버튼으로 돌아온다', async () => {
@@ -188,8 +186,31 @@ describe('「더 보기」 disclosure', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
 
-    expect(screen.queryByTestId('nav-more')).toBeNull();
+    expect(screen.getByTestId('nav-more').hidden).toBe(true);
     expect(document.activeElement).toBe(toggle);
+  });
+
+  /**
+   * **탭 순서가 설계와 같다**(cr M-2). 토글 다음 포커스 가능 요소가 드러난 패널의 첫 링크여야
+   * 한다 — 앞 판은 패널이 DOM 에서 토글보다 **앞**이라, 편 사람이 Tab 을 누르면 탐색 밖으로
+   * 나갔다. `aria-expanded`·존재·Escape 복귀만 재던 세 test 는 이 축에 공허했다.
+   */
+  it('펼치면 토글 다음 포커스 자리가 패널의 첫 링크다', async () => {
+    stub();
+    await renderAt('/');
+    const toggle = screen.getByTestId('nav-more-toggle');
+    await act(async () => {
+      toggle.click();
+    });
+
+    const focusable = [...document.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')].filter(
+      (one) => one.closest('[hidden]') === null,
+    );
+    const next = focusable[focusable.indexOf(toggle) + 1];
+
+    expect(next, '토글 뒤에 포커스 받을 자리가 없다').toBeDefined();
+    expect(screen.getByTestId('nav-more').contains(next ?? null)).toBe(true);
+    expect(next?.tagName).toBe('A');
   });
 
   /**
@@ -213,7 +234,7 @@ describe('「더 보기」 disclosure', () => {
     });
 
     expect(screen.getByTestId('nav-more-toggle').getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByTestId('nav-more')).toBeNull();
+    expect(screen.getByTestId('nav-more').hidden).toBe(true);
   });
 
   /** 그 안의 자리가 현재일 때 **버튼도 현재**다 — 그러지 않으면 어느 탭도 켜지지 않는다. */
@@ -294,7 +315,7 @@ describe('로그아웃', () => {
     const router = await renderAt('/');
 
     await act(async () => {
-      screen.getAllByTestId('sign-out')[0]!.click();
+      screen.getByTestId('sign-out').click();
     });
 
     await waitFor(() =>
@@ -314,7 +335,7 @@ describe('로그아웃', () => {
     const router = await renderAt('/');
 
     await act(async () => {
-      screen.getAllByTestId('sign-out')[0]!.click();
+      screen.getByTestId('sign-out').click();
     });
 
     await waitFor(() => expect(screen.getByTestId('sign-out-failure')).not.toBeNull());

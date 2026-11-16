@@ -182,11 +182,17 @@ function ShellFrame() {
   }
 
   const moreActive = MORE_SLOTS.some((slot) => slot.path === pathname);
-  const signOutButton = (
-    <Button tone="secondary" onClick={() => void runSignOut()} disabled={signingOut} testId="sign-out">
+  /**
+   * 로그아웃은 **두 자리**에 있다(머리글 · 「더 보기」 패널). 같은 `testId` 를 두 번 그리면
+   * 여정이 `getByTestId('sign-out')` 를 쓰는 순간 strict mode 위반이다(cr L-1) — 자리로 가른다.
+   */
+  const signOutButtonAt = (testId: string) => (
+    <Button tone="secondary" onClick={() => void runSignOut()} disabled={signingOut} testId={testId}>
       로그아웃
     </Button>
   );
+  const signOutButton = signOutButtonAt('sign-out');
+  const signOutButtonInMore = signOutButtonAt('sign-out-more');
 
   return (
     <div data-testid="app-shell" className="min-h-screen bg-page text-ink">
@@ -236,25 +242,21 @@ function ShellFrame() {
       <main id="main" ref={mainRef} tabIndex={-1} className={atLogin ? '' : 'pb-28 md:pb-0'}>
         <Outlet />
       </main>
+      {/*
+        **DOM 순서가 disclosure 의 탭 순서다**(cr M-2). 패널을 토글보다 앞에 두면, 펼친 키보드
+        운영자가 Tab 을 눌렀을 때 드러난 링크가 아니라 탐색 **밖**으로 나간다(닿으려면 Shift+Tab —
+        편 사람이 기대하는 반대 방향이다). 그래서 DOM 은 `목록(마지막이 토글) → 패널` 이고, 시각
+        배치만 `flex-col-reverse` 로 뒤집어 패널이 탭 줄 위에 선다.
+
+        **패널을 늘 그린다**(cr L-2). 조건부로 그리면 접힌 동안 `aria-controls` 가 **없는 id** 를
+        가리킨다. `hidden` 으로 가리면 IDREF 가 늘 서고, 숨는 동안 접근성 트리와 포커스 순서에서
+        함께 빠진다.
+      */}
       {atLogin ? null : (
-        <nav aria-label="화면" className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-card md:hidden">
-          {moreOpen ? (
-            <div id="nav-more" data-testid="nav-more" className="border-b border-line p-2">
-              <ul className="flex flex-col gap-1">
-                {MORE_SLOTS.map((slot) => (
-                  <li key={slot.id}>
-                    <NavLink to={slot.path} className={navLinkClass}>
-                      {slot.label}
-                      {slot.id === INBOX_SLOT_ID ? (
-                        <UnreadBadge count={unreadCount} testId="nav-more-unread" />
-                      ) : null}
-                    </NavLink>
-                  </li>
-                ))}
-                <li>{signOutButton}</li>
-              </ul>
-            </div>
-          ) : null}
+        <nav
+          aria-label="화면"
+          className="fixed inset-x-0 bottom-0 z-20 flex flex-col-reverse border-t border-line bg-card md:hidden"
+        >
           <ul className="flex items-stretch">
             {PRIMARY_SLOTS.map((slot) => (
               <li key={slot.id} className="flex flex-1 items-stretch">
@@ -285,6 +287,19 @@ function ShellFrame() {
               </button>
             </li>
           </ul>
+          <div id="nav-more" data-testid="nav-more" hidden={!moreOpen} className="border-t border-line p-2">
+            <ul className="flex flex-col gap-1">
+              {MORE_SLOTS.map((slot) => (
+                <li key={slot.id}>
+                  <NavLink to={slot.path} className={navLinkClass}>
+                    {slot.label}
+                    {slot.id === INBOX_SLOT_ID ? <UnreadBadge count={unreadCount} testId="nav-more-unread" /> : null}
+                  </NavLink>
+                </li>
+              ))}
+              <li>{signOutButtonInMore}</li>
+            </ul>
+          </div>
         </nav>
       )}
     </div>
