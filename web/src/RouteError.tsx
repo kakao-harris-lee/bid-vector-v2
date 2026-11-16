@@ -12,7 +12,7 @@ export function RouteError() {
   return (
     <section data-testid="route-error" className="p-6">
       <h2 className="text-lg font-semibold">화면을 열지 못했다</h2>
-      <p className="mt-2 text-sm text-gray-600">{detail}</p>
+      <p className="mt-2 text-sm text-ink-soft">{detail}</p>
     </section>
   );
 }

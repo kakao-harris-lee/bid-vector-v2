@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
@@ -27,13 +28,24 @@ function profile(overrides: Partial<Profile> = {}): Profile {
   };
 }
 
+/**
+ * **라우터 안에서 띄운다**(M13/13B). 쓰기 실패 얼굴이 로그인으로 가는 길에 **지금 자리**를
+ * 싣게 되면서(돌아올 자리), 그 얼굴이 라우터 맥락을 요구한다 — 출하 트리에서는 언제나 그
+ * 안이고, 이 harness 만 밖이었다.
+ */
 function renderSection() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <ProfileSection />
-    </QueryClientProvider>,
-  );
+  const router = createMemoryRouter([
+    {
+      path: '/',
+      element: (
+        <QueryClientProvider client={client}>
+          <ProfileSection />
+        </QueryClientProvider>
+      ),
+    },
+  ]);
+  return render(<RouterProvider router={router} />);
 }
 
 const mocked = vi.mocked(queries);

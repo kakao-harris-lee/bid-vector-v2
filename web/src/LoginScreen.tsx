@@ -1,14 +1,38 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 
 import { rememberCsrf } from './api/client';
 import { signIn } from './api/queries';
+import { Button } from './components/Button';
 
 /**
  * 실패 문면은 **하나**다(M7/7D) — 계정 부재·비밀 문구 불일치·연속 실패 잠금을 화면이
  * 구분하면, 서버가 401 하나로 숨긴 사실을 화면이 되돌려 말하는 것이 된다.
  */
 const FAILURE_MESSAGE = '로그인에 실패했습니다. 입력값을 확인하세요.';
+
+const HOME_PATH = '/';
+const LOGIN_PATH = '/login';
+
+/**
+ * 로그인 뒤 **돌아갈 자리**(M13/13B). 세션이 끊겨 떠밀려 온 운영자를 홈이 아니라 하던 자리로
+ * 돌려보낸다 — 그 자리를 아는 것은 보낸 쪽(`WriteFailure` 의 두 길)이고 `state` 로 싣는다.
+ *
+ * **앱 안의 경로만 받는다**(팀장 착수 판정 ⓑ 조건). 이 값은 화면이 지어낸 것이 아니라 라우터
+ * 상태를 거쳐 온 것이고, 그런 값으로 `navigate` 를 부르면 **열린 리다이렉트**가 된다:
+ *  · `https://…` 처럼 `/` 로 시작하지 않는 것 — 바깥 주소다.
+ *  · `//evil.example` — 프로토콜 상대 주소라 브라우저가 바깥으로 읽는다(「/ 로 시작」을
+ *    지나가므로 따로 막는다).
+ *  · `/login` 자신 — 돌아올 자리가 자기면 고리가 된다.
+ * 셋 다 홈으로 떨어뜨린다.
+ */
+export function safeReturnPath(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) {
+    return HOME_PATH;
+  }
+  const pathname = raw.split('?')[0];
+  return pathname === LOGIN_PATH ? HOME_PATH : raw;
+}
 
 /**
  * 로그인 화면(M7/7D 산출물 6) — 폼 하나와 실패 표시 하나다. 화면 다섯(A~E)은 7E 다.
@@ -19,6 +43,7 @@ const FAILURE_MESSAGE = '로그인에 실패했습니다. 입력값을 확인하
  */
 export function LoginScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loginName, setLoginName] = useState('');
   const [passphrase, setPassphrase] = useState('');
   const [failed, setFailed] = useState(false);
@@ -46,7 +71,7 @@ export function LoginScreen() {
     rememberCsrf(csrf);
     // 입력값을 상태에 남기지 않는다 — 다음 렌더에 그 값이 DOM 에 머물 이유가 없다.
     setPassphrase('');
-    await navigate('/');
+    await navigate(safeReturnPath((location.state as { readonly from?: unknown } | null)?.from));
   }
 
   return (
@@ -60,7 +85,7 @@ export function LoginScreen() {
             autoComplete="username"
             value={loginName}
             onChange={(event) => setLoginName(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -71,19 +96,15 @@ export function LoginScreen() {
             autoComplete="current-password"
             value={passphrase}
             onChange={(event) => setPassphrase(event.target.value)}
-            className="rounded border border-gray-300 px-2 py-1"
+            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
         </label>
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-gray-900 px-3 py-1 text-sm text-white disabled:opacity-50"
-        >
+        <Button type="submit" tone="primary" disabled={pending} fullWidth>
           로그인
-        </button>
+        </Button>
       </form>
       {failed ? (
-        <p data-testid="login-failure" role="alert" className="mt-3 text-sm text-red-700">
+        <p data-testid="login-failure" role="alert" className="mt-3 text-sm text-bad-ink">
           {FAILURE_MESSAGE}
         </p>
       ) : null}

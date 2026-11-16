@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { appRoutes } from './AppRoot';
 import { apiClient, hasCsrf, rememberCsrf } from './api/client';
+import { safeReturnPath } from './LoginScreen';
 
 /**
  * React 19 는 `act(...)` 를 쓰는 환경에 이 표지를 요구한다 — 없으면 상태 갱신이 flush 되지 않고
@@ -57,11 +58,14 @@ function stubThrow(): () => void {
 }
 
 /** shipped 라우트 트리를 그대로 `/login` 에서 띄운다 — 화면 자리의 배선까지 함께 잰다. */
-async function renderLogin(container: HTMLElement): Promise<void> {
-  const router = createMemoryRouter(appRoutes, { initialEntries: ['/login'] });
+async function renderLogin(container: HTMLElement, from?: string): Promise<ReturnType<typeof createMemoryRouter>> {
+  const router = createMemoryRouter(appRoutes, {
+    initialEntries: [from === undefined ? '/login' : { pathname: '/login', state: { from } }],
+  });
   await act(async () => {
     createRoot(container).render(<RouterProvider router={router} />);
   });
+  return router;
 }
 
 async function submit(container: HTMLElement, passphrase: string): Promise<void> {
@@ -168,5 +172,75 @@ describe('로그인 화면 (7D)', () => {
 
     const secretInput = container.querySelector<HTMLInputElement>('input[name="passphrase"]');
     expect(secretInput?.type).toBe('password');
+  });
+});
+
+
+/**
+ * M13/13B — **로그인 뒤 돌아갈 자리**. 이 값은 라우터 상태를 거쳐 오므로 화면이 지어낸 것이
+ * 아니고, 그런 값으로 이동을 부르면 **열린 리다이렉트**가 된다. 팀장 착수 판정 ⓑ 조건이
+ * 「앱 내부 경로만」이고 그 셋을 여기서 잠근다.
+ */
+describe('로그인 뒤 돌아갈 자리 (M13/13B)', () => {
+  it('앱 안의 경로는 그대로 돌려준다', () => {
+    expect(safeReturnPath('/bids?tab=closed')).toBe('/bids?tab=closed');
+    expect(safeReturnPath('/notices/SYN-1/000')).toBe('/notices/SYN-1/000');
+  });
+
+  it('바깥 주소는 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('https://evil.example/steal')).toBe('/');
+    expect(safeReturnPath('http://evil.example')).toBe('/');
+  });
+
+  /** 프로토콜 상대 주소는 「/ 로 시작」을 지나지만 브라우저는 **바깥**으로 읽는다. */
+  it('// 로 시작하는 주소는 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('//evil.example/steal')).toBe('/');
+  });
+
+  it('로그인 자신은 홈으로 떨어뜨린다 — 돌아올 자리가 자기면 고리가 된다', () => {
+    expect(safeReturnPath('/login')).toBe('/');
+    expect(safeReturnPath('/login?next=/bids')).toBe('/');
+  });
+
+  it('문자열이 아니거나 없으면 홈이다', () => {
+    expect(safeReturnPath(undefined)).toBe('/');
+    expect(safeReturnPath(null)).toBe('/');
+    expect(safeReturnPath({ pathname: '/bids' })).toBe('/');
+  });
+
+  describe('화면이 그 자리를 실제로 쓴다', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+      rememberCsrf(null);
+      sent.length = 0;
+      container = document.createElement('div');
+      document.body.append(container);
+    });
+
+    afterEach(() => {
+      ejectStub?.();
+      ejectStub = undefined;
+      container.remove();
+    });
+
+    it('성공하면 보낸 쪽이 실은 자리로 돌아간다', async () => {
+      ejectStub = stubResponse(201, { csrf: 'csrf-value' });
+      const router = await renderLogin(container, '/bids?tab=closed');
+
+      await submit(container, 'secret');
+
+      expect(router.state.location.pathname).toBe('/bids');
+      expect(router.state.location.search).toBe('?tab=closed');
+    });
+
+    it('실은 자리가 바깥 주소면 홈으로 간다', async () => {
+      ejectStub = stubResponse(201, { csrf: 'csrf-value' });
+      const router = await renderLogin(container, '//evil.example/steal');
+
+      await submit(container, 'secret');
+
+      expect(router.state.location.pathname).toBe('/');
+    });
   });
 });
