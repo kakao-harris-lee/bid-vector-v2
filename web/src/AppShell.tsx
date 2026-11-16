@@ -85,9 +85,12 @@ function ShellFrame() {
   const navigate = useNavigate();
   const matches = useMatches();
   /**
-   * 「더 보기」의 펼침 — **자리와 함께** 둔다. 자리를 옮기면 펼침이 풀려야 하는데, 그것을
-   * effect 에서 `setState` 로 하면 렌더가 한 번 더 돈다(그리고 그 꼴을 lint 가 막는다).
-   * 펼친 자리를 상태에 담아 **렌더에서 비교**하면 같은 일이 한 번의 렌더로 끝난다.
+   * 「더 보기」의 펼침 — **마지막으로 본 자리**와 함께 둔다.
+   *
+   * 앞 판은 `open && at === pathname` 으로 **접어 읽기만** 했다. 그러면 「닫혔다」가 상태에 남지
+   * 않아서, 펼친 자리를 떠났다가 **돌아오면 저절로 다시 펼쳐졌다**(cr M-1 — 펼침 → 패널 링크로
+   * 이동 → 하단 탭으로 복귀 → `aria-expanded` 가 참). 자리가 바뀌는 **순간** 값을 갱신해 그 기억을
+   * 지운다 — effect 가 아니라 렌더에서 하므로 한 번의 렌더로 끝나고 중간 상태가 그려지지 않는다.
    */
   const [more, setMore] = useState<{ readonly open: boolean; readonly at: string }>({ open: false, at: '' });
   const [signOutFailed, setSignOutFailed] = useState(false);
@@ -98,7 +101,12 @@ function ShellFrame() {
 
   // 로그인 자리에는 탐색을 그리지 않는다 — 세션 전이고, 그 화면에서 갈 수 있는 곳이 없다.
   const atLogin = pathname === LOGIN_PATH;
-  const moreOpen = more.open && more.at === pathname;
+  if (more.at !== pathname) {
+    // 렌더 중 갱신 — React 가 커밋 없이 곧바로 다시 렌더한다(「props 가 바뀔 때 state 를 맞추는」
+    // 표준 꼴). 자리를 옮기면 펼침이 **값으로** 풀린다.
+    setMore({ open: false, at: pathname });
+  }
+  const moreOpen = more.open;
   const setMoreOpen = (open: boolean): void => {
     setMore({ open, at: pathname });
   };

@@ -192,6 +192,30 @@ describe('「더 보기」 disclosure', () => {
     expect(document.activeElement).toBe(toggle);
   });
 
+  /**
+   * **떠났다가 돌아와도 닫힌 채다**(cr M-1). 앞 판은 펼침을 「열린 자리와의 동일성」으로 접어
+   * 읽어서, 「닫혔다」가 상태에 남지 않았다 — 그 자리로 돌아오면 저절로 다시 펼쳐졌다.
+   */
+  it('펼친 자리를 떠났다가 돌아와도 접혀 있다', async () => {
+    stub();
+    const router = await renderAt('/');
+    const toggle = screen.getByTestId('nav-more-toggle');
+    await act(async () => {
+      toggle.click();
+    });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    await act(async () => {
+      await router.navigate('/inbox');
+    });
+    await act(async () => {
+      await router.navigate('/');
+    });
+
+    expect(screen.getByTestId('nav-more-toggle').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('nav-more')).toBeNull();
+  });
+
   /** 그 안의 자리가 현재일 때 **버튼도 현재**다 — 그러지 않으면 어느 탭도 켜지지 않는다. */
   it('품은 자리에 서 있으면 버튼이 현재로 표시된다', async () => {
     stub();
