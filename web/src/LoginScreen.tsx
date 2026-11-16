@@ -48,10 +48,21 @@ function hasControlCharacter(raw: string): boolean {
  *  · 점 구간(`.`·`..`)과 겹친 `/` — 브라우저와 history 가 접어서 해석한다.
  *  · 대소문자 — react-router 의 경로 매칭이 기본적으로 대소문자를 가리지 않는다.
  */
-function returnsToLogin(raw: string): boolean {
-  // `%2e` 는 URL 규칙에서 `.` 과 같다 — 접지 않으면 주소창(`/login`)과 라우터(없는 주소)가
-  // 갈린다(cr O-A). 구분자(`%2f`)는 **접지 않는다**: 그것은 규칙상 칸을 가르지 않는다.
-  const head = (raw.split(/[?#]/u)[0] ?? '').replace(/%2e/giu, '.');
+function returnsToLogin(raw: string): boolean | null {
+  /**
+   * **판정 전에 퍼센트 디코딩한다**(v low). 라우터는 디코딩한 값으로 화면을 고르므로
+   * `/%6Cogin` 이 로그인 화면을 열어 고리가 된다 — 글자 그대로 비교하면 그것을 놓친다.
+   * `%2e` 가 `.` 과 같아지는 자리(cr O-A)도 같은 디코딩이 함께 덮는다.
+   *
+   * 망가진 열(`/%zz`)은 디코딩이 던진다 — 그때는 **무엇인지 증명할 수 없으므로** `null` 을 내고
+   * 부르는 쪽이 홈으로 떨어뜨린다.
+   */
+  let head: string;
+  try {
+    head = decodeURIComponent(raw.split(/[?#]/u)[0] ?? '');
+  } catch {
+    return null;
+  }
   const segments: string[] = [];
   for (const part of head.split('/')) {
     if (part === '' || part === '.') {
@@ -76,7 +87,8 @@ export function safeReturnPath(raw: unknown): string {
   ) {
     return HOME_PATH;
   }
-  return returnsToLogin(raw) ? HOME_PATH : raw;
+  // `null` 은 「디코딩이 실패해 무엇인지 모른다」다 — 모르면 홈이다.
+  return returnsToLogin(raw) !== false ? HOME_PATH : raw;
 }
 
 /**

@@ -246,6 +246,27 @@ describe('로그인 뒤 돌아갈 자리 (M13/13B)', () => {
     expect(safeReturnPath('/%2E/login')).toBe('/');
   });
 
+  /**
+   * 라우터는 **디코딩한 값**으로 화면을 고른다 — `/%6Cogin` 은 `/login` 이라 고리가 된다(v low).
+   * 글자 그대로 비교하던 술어는 그것을 놓쳤다.
+   */
+  it('퍼센트로 가린 로그인도 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/%6Cogin')).toBe('/');
+    expect(safeReturnPath('/%6c%6Fgin')).toBe('/');
+    expect(safeReturnPath('/%4C%4F%47%49%4E')).toBe('/');
+  });
+
+  /** 망가진 열은 **무엇인지 증명할 수 없다** — 모르면 홈이다. */
+  it('디코딩이 실패하는 주소는 홈으로 떨어뜨린다', () => {
+    expect(safeReturnPath('/%zz/bids')).toBe('/');
+    expect(safeReturnPath('/%E0%A4%A')).toBe('/');
+  });
+
+  /** 과잉 차단이 아니다 — 인코딩되었어도 로그인이 아니면 그대로 돌려준다. */
+  it('인코딩된 다른 자리는 살린다', () => {
+    expect(safeReturnPath('/notices/SYN%2D1/000')).toBe('/notices/SYN%2D1/000');
+  });
+
   /** 조각·끝 `/` 가 **앱 안의 다른 자리**면 그대로 돌려준다 — 과잉 차단이 아니다. */
   it('로그인이 아닌 자리의 조각과 끝 / 는 살린다', () => {
     expect(safeReturnPath('/bids#tab')).toBe('/bids#tab');
