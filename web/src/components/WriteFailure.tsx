@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router';
 
 import { ApiError } from '../api/apiError';
 import { Button, controlClass } from './Button';
+import { cardClass } from './Card';
 
 const HTTP_UNAUTHORIZED = 401;
 
@@ -82,7 +83,7 @@ export function WriteFailureFace({
 export function SignedOutFace() {
   const loginState = useLoginLinkState();
   return (
-    <div data-testid="signed-out" role="alert" className="rounded-lg border border-line p-6 text-center">
+    <div data-testid="signed-out" role="alert" className={`${cardClass()} p-6 text-center`}>
       <p className="text-sm font-medium">로그인이 필요합니다.</p>
       <p className="mt-1 text-xs text-ink-soft">세션이 없거나 끝났습니다.</p>
       <Link to={LOGIN_PATH} state={loginState} className={`mt-3 ${controlClass('secondary', 'md')}`}>

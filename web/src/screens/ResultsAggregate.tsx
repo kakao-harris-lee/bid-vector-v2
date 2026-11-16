@@ -1,4 +1,5 @@
 import type { MyBidAggregate } from '../api/queries';
+import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import {
   AWARD_RATE_STATE_DISPLAY,
@@ -32,7 +33,7 @@ function Count({ label, value, testId }: { readonly label: string; readonly valu
  */
 function Axis({ axis }: { readonly axis: RateAxis }) {
   return (
-    <section data-testid={`rate-axis-${axis.id}`} className="rounded-lg border border-line p-3">
+    <section data-testid={`rate-axis-${axis.id}`} className={cardClass('sm')}>
       <h4 className="text-sm font-medium">{axis.label}</h4>
       <p className="mt-0.5 text-xs text-ink-soft">{axis.why}</p>
 
@@ -102,7 +103,7 @@ export function ResultsAggregate({ aggregate }: { readonly aggregate: MyBidAggre
   const axes = rateAxesOf(aggregate);
 
   return (
-    <section data-testid="results-aggregate" className="rounded-lg border border-line bg-card p-4">
+    <section data-testid="results-aggregate" className={cardClass()}>
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="text-sm font-semibold">투찰 대비 낙찰률</h3>
         <span className="text-xs text-ink-soft">

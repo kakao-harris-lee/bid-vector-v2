@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
+import { Card } from '../components/Card';
 import { StateBadge, useHint } from '../components/StateBadge';
 import { amountDisplayOf, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -56,12 +57,14 @@ export function NoticeCard({
   const amount = amountDisplayOf(notice);
   const amountHint = useHint(AMOUNT_HINT);
   return (
-    <li
-      data-testid={`notice-card-${notice.noticeNumber}`}
-      className="rounded-lg border border-line bg-card p-4"
-    >
+    <Card as="li" testId={`notice-card-${notice.noticeNumber}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <Link to={worksheetPathOf(notice)} className="min-w-0 flex-1 hover:underline">
+        {/* 제목은 **블록 타깃**이다(M13/13B) — 모바일에서 손가락이 닿는 것은 글자가 아니라
+            상자다. 이동 대상과 동작은 그대로이고 상자만 커진다. */}
+        <Link
+          to={worksheetPathOf(notice)}
+          className="flex min-h-11 min-w-0 flex-1 items-center rounded-md hover:underline"
+        >
           <span data-testid="notice-title" className="block text-sm font-semibold break-words">
             {notice.title ?? notice.noticeNumber}
           </span>
@@ -103,7 +106,7 @@ export function NoticeCard({
       </dl>
       {/* CR L-7 — 버튼은 `<dl>` **밖**이다(dt/dd 가 아닌 자식은 내용 모형 위반). */}
       <div className="mt-3 flex items-end">{action}</div>
-    </li>
+    </Card>
   );
 }
 
@@ -122,12 +125,12 @@ export function SuggestionCard({
 }) {
   const amount = amountDisplayOf(suggestion);
   return (
-    <li
-      data-testid={`suggestion-card-${suggestion.noticeNumber}`}
-      className="rounded-lg border border-line bg-card p-4"
-    >
+    <Card as="li" testId={`suggestion-card-${suggestion.noticeNumber}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <Link to={worksheetPathOf(suggestion)} className="min-w-0 flex-1 text-sm font-semibold hover:underline">
+        <Link
+          to={worksheetPathOf(suggestion)}
+          className="flex min-h-11 min-w-0 flex-1 items-center rounded-md text-sm font-semibold hover:underline"
+        >
           {suggestion.title ?? suggestion.noticeNumber}
         </Link>
         <StateBadge
@@ -146,6 +149,6 @@ export function SuggestionCard({
         ))}
       </p>
       <div className="mt-3">{action}</div>
-    </li>
+    </Card>
   );
 }

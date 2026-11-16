@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { replaceQualificationFacts, type Profile } from '../api/queries';
+import { Button } from '../components/Button';
 import { Field, StateBadge } from '../components/StateBadge';
 import { termsOf } from '../display/editSessionDisplay';
 import { QUALIFICATION_STATE_DISPLAY, qualificationStateOf } from '../display/profileDisplay';
@@ -84,7 +85,7 @@ export function ProfileFactsCard({
               aria-label="업종"
               value={form.businessTypes}
               onChange={(event) => setFacts({ ...form, businessTypes: event.target.value })}
-              className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -94,7 +95,7 @@ export function ProfileFactsCard({
               disabled={!form.licensesDeclared}
               value={form.licenseNames}
               onChange={(event) => setFacts({ ...form, licenseNames: event.target.value })}
-              className="rounded-md border border-line bg-card px-2 py-1 text-sm disabled:opacity-50"
+              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm disabled:opacity-50"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -103,7 +104,7 @@ export function ProfileFactsCard({
               aria-label="지역어"
               value={form.regionTerms}
               onChange={(event) => setFacts({ ...form, regionTerms: event.target.value })}
-              className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
             />
           </label>
         </div>
@@ -117,8 +118,8 @@ export function ProfileFactsCard({
           면허를 신고함
           <span className="text-xs text-ink-soft">(끄면 면허 목록을 비워 보냅니다)</span>
         </label>
-        <button
-          type="button"
+        <Button
+          tone="primary"
           disabled={save.isPending}
           onClick={() =>
             save.mutate({
@@ -129,10 +130,9 @@ export function ProfileFactsCard({
               regionTerms: termsOf(form.regionTerms),
             })
           }
-          className="mt-2 rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
         >
           자격 사실 저장
-        </button>
+        </Button>
       </div>
     </>
   );

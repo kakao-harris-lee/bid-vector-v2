@@ -1,5 +1,8 @@
 import type { StateDisplay } from '../display/stateDisplay';
 
+import { Button } from './Button';
+import { cardClass } from './Card';
+
 /**
  * 빈·로딩·오류의 **세 얼굴**(§6.5). 세 얼굴을 한 자리에 모아 두는 이유는 화면마다 다른
  * 모양으로 흩어지는 것을 막는 것이다.
@@ -29,7 +32,7 @@ export function EmptyFace({
   readonly action?: React.ReactNode;
 }) {
   return (
-    <div data-testid={testId} className="rounded-lg border border-line p-6 text-center">
+    <div data-testid={testId} className={`${cardClass()} p-6 text-center`}>
       <p className="text-sm font-medium">{display.label}</p>
       {display.why === undefined ? null : <p className="mt-1 text-xs text-ink-soft">{display.why}</p>}
       {action === undefined ? null : <div className="mt-3">{action}</div>}
@@ -43,15 +46,11 @@ export function EmptyFace({
  */
 export function ErrorFace({ testId, onRetry }: { readonly testId: string; readonly onRetry: () => void }) {
   return (
-    <div data-testid={testId} role="alert" className="rounded-lg border border-line p-6 text-center">
+    <div data-testid={testId} role="alert" className={`${cardClass()} p-6 text-center`}>
       <p className="text-sm font-medium">불러오지 못했습니다.</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-3 rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-      >
-        다시 시도
-      </button>
+      <div className="mt-3 flex justify-center">
+        <Button onClick={onRetry}>다시 시도</Button>
+      </div>
     </div>
   );
 }

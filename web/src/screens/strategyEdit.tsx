@@ -13,6 +13,7 @@ import {
   type EditSessionResponse,
   type StrategyReadResponse,
 } from '../api/queries';
+import { Button } from '../components/Button';
 import { Field, StateBadge } from '../components/StateBadge';
 import { WriteFailureFace } from '../components/WriteFailure';
 import {
@@ -361,14 +362,11 @@ export function StrategyFieldRow({
           {view.qualifier}
         </p>
       )}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onBegin}
-        className="mt-2 rounded-md border border-line px-2 py-1 text-xs hover:bg-neutral-skin disabled:opacity-50"
-      >
-        고치기
-      </button>
+      <div className="mt-2">
+        <Button disabled={disabled} onClick={onBegin}>
+          고치기
+        </Button>
+      </div>
     </div>
   );
 }
@@ -420,7 +418,7 @@ export function StrategyEditPanel({
               inputMode={input.kind === 'TERMS' ? 'text' : 'numeric'}
               value={session.raw}
               onChange={(event) => session.onRaw(event.target.value)}
-              className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
             />
           </label>
           {session.missing ? (
@@ -430,22 +428,12 @@ export function StrategyEditPanel({
             </p>
           ) : null}
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={session.busy}
-              onClick={session.onSendValue}
-              className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
-            >
+            <Button tone="primary" disabled={session.busy} onClick={session.onSendValue}>
               값 보내기
-            </button>
-            <button
-              type="button"
-              disabled={session.busy}
-              onClick={session.onCancel}
-              className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-            >
+            </Button>
+            <Button disabled={session.busy} onClick={session.onCancel}>
               그만두기
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
@@ -458,14 +446,9 @@ export function StrategyEditPanel({
       */}
       {phase === 'ENDED' ? (
         <div className="mt-3">
-          <button
-            type="button"
-            data-testid="edit-session-dismiss"
-            onClick={session.dismiss}
-            className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-          >
+          <Button testId="edit-session-dismiss" onClick={session.dismiss}>
             닫기
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -477,30 +460,15 @@ export function StrategyEditPanel({
             <Field label="보낸 값" value={sentView} testId="edit-sent-value" />
           </dl>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={session.busy}
-              onClick={session.onConfirm}
-              className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
-            >
+            <Button tone="primary" disabled={session.busy} onClick={session.onConfirm}>
               적용
-            </button>
-            <button
-              type="button"
-              disabled={session.busy}
-              onClick={session.onEdit}
-              className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-            >
+            </Button>
+            <Button disabled={session.busy} onClick={session.onEdit}>
               값 고치기
-            </button>
-            <button
-              type="button"
-              disabled={session.busy}
-              onClick={session.onCancel}
-              className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-            >
+            </Button>
+            <Button disabled={session.busy} onClick={session.onCancel}>
               그만두기
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

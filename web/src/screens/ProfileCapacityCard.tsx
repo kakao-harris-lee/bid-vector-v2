@@ -7,6 +7,7 @@ import {
   upsertConstructionCapacity,
   type ConstructionCapacity,
 } from '../api/queries';
+import { Button } from '../components/Button';
 import { ErrorFace } from '../components/ScreenFaces';
 import { isUnauthorized } from '../components/WriteFailure';
 import { capacityBodyOf, type CapacityForm } from '../display/profileDisplay';
@@ -55,13 +56,7 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
               <span>{row.licenseName}</span>
               <span className="font-numeric">{row.amountWon.toLocaleString('ko-KR')}원</span>
               <span className="text-xs text-ink-soft">{row.assessmentYear}년 평가</span>
-              <button
-                type="button"
-                onClick={() => drop.mutate({ licenseName: row.licenseName })}
-                className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin"
-              >
-                지우기
-              </button>
+              <Button onClick={() => drop.mutate({ licenseName: row.licenseName })}>지우기</Button>
             </li>
           ))}
         </ul>
@@ -70,21 +65,21 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             aria-label="시평액 면허명"
             value={capacity.licenseName}
             onChange={(event) => setCapacity({ ...capacity, licenseName: event.target.value })}
-            className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
           <input
             aria-label="시평액 금액"
             inputMode="numeric"
             value={capacity.amountWon}
             onChange={(event) => setCapacity({ ...capacity, amountWon: event.target.value })}
-            className="rounded-md border border-line bg-card px-2 py-1 font-numeric text-sm"
+            className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
           />
           <input
             aria-label="평가 연도"
             inputMode="numeric"
             value={capacity.assessmentYear}
             onChange={(event) => setCapacity({ ...capacity, assessmentYear: event.target.value })}
-            className="rounded-md border border-line bg-card px-2 py-1 font-numeric text-sm"
+            className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
           />
         </div>
         {missing ? (
@@ -93,8 +88,8 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             않습니다(잘린 금액이 저장되지 않게).
           </p>
         ) : null}
-        <button
-          type="button"
+        <Button
+          tone="primary"
           disabled={save.isPending}
           onClick={() => {
             // 셋 다 **문자열 전체가 모양에 맞아야** 보낸다 — 0·올해를 지어내지 않고, 앞자리만
@@ -107,10 +102,9 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             setMissing(false);
             save.mutate(body);
           }}
-          className="mt-2 rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
         >
           시평액 저장
-        </button>
+        </Button>
       </div>
     </>
   );

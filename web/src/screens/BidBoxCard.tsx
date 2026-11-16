@@ -1,10 +1,11 @@
 import { useId, useState } from 'react';
-import { Link } from 'react-router';
 
 import type { components } from '../api/generated/operator-api';
 import type { BidCase } from '../api/queries';
 
 type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
+import { Button, LinkButton } from '../components/Button';
+import { Card } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import {
@@ -93,7 +94,7 @@ function ActionForm({
             type="datetime-local"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
         </label>
       ) : null}
@@ -126,21 +127,11 @@ function ActionForm({
           고른 값을 보낼 수 없습니다 — 이 화면이 아는 결과 어휘가 아닙니다.
         </p>
       ) : null}
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={send}
-          className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink"
-        >
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button tone="primary" onClick={send}>
           보내기
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-line px-3 py-1 text-sm hover:bg-neutral-skin"
-        >
-          그만두기
-        </button>
+        </Button>
+        <Button onClick={onCancel}>그만두기</Button>
       </div>
     </div>
   );
@@ -161,17 +152,17 @@ function ActionButton({
   const shape = ACTION_INPUT[action.kind].shape;
   if (shape === 'LINK') {
     return (
-      <Link
+      <LinkButton
+        tone="primary"
         to={`/notices/${encodeURIComponent(bidCase.noticeNumber)}/${encodeURIComponent(bidCase.noticeRound)}`}
-        className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink"
       >
         {action.label}
-      </Link>
+      </LinkButton>
     );
   }
   return (
-    <button
-      type="button"
+    <Button
+      tone="primary"
       onClick={() => {
         // 결과 기록은 표에서 `CHOICE` 라 이 자리에 오지 않는다. 표가 바뀌어 오더라도 **결과 없는
         // 요청을 보내지 않고** 폼을 연다(타입이 그 요청을 만들 수 없게 돼 있다).
@@ -181,10 +172,9 @@ function ActionButton({
         }
         onSend({ kind: action.kind, value: 'instant' });
       }}
-      className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink"
     >
       {action.label}
-    </button>
+    </Button>
   );
 }
 
@@ -203,7 +193,7 @@ export function BidBoxCard({
   const row = bidBoxActionOf(bidCase.state);
 
   return (
-    <li data-testid={`bid-case-${bidCase.caseId}`} className="rounded-lg border border-line bg-card p-4">
+    <Card as="li" testId={`bid-case-${bidCase.caseId}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm font-medium">{bidCase.noticeNumber}</span>
         <span className="text-xs text-ink-soft">차수 {bidCase.noticeRound}</span>
@@ -270,6 +260,6 @@ export function BidBoxCard({
           }}
         />
       )}
-    </li>
+    </Card>
   );
 }

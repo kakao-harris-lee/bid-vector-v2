@@ -206,7 +206,9 @@ export function BidBoxScreen() {
                 setTab(next.id);
               }}
               onClick={() => setTab(one.id)}
-              className={`shrink-0 rounded-md px-2 py-1 ${
+              // 탭은 자기 ARIA 배선(선택·방향키·패널)을 쥐므로 공유 `Button` 이 아니다 —
+              // **터치 타깃 하한만** 같이 쓴다(M13/13B).
+              className={`inline-flex min-h-11 shrink-0 items-center rounded-md px-3 ${
                 selected ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
               }`}
             >

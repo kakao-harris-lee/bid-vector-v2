@@ -11,6 +11,8 @@ import {
   type StrategyReadResponse,
 } from '../api/queries';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
+import { controlClass, LinkButton } from '../components/Button';
+import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import type { StrategyField } from '../display/editSessionDisplay';
@@ -160,12 +162,11 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
         /* **다음 행동 하나**(§6.5 · D-7E2b-4) — 미완이 0 이면 오늘의 공고로 간다. */
         <div data-testid="onboarding-complete" className="rounded-lg border border-accent/40 bg-card p-4">
           <p className="text-sm font-medium">걸리는 항목을 모두 채웠습니다.</p>
-          <Link
-            to="/"
-            className="mt-3 inline-block rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink"
-          >
-            오늘의 공고 보기
-          </Link>
+          <div className="mt-3">
+            <LinkButton to="/" tone="primary">
+              오늘의 공고 보기
+            </LinkButton>
+          </div>
         </div>
       ) : null}
 
@@ -200,7 +201,8 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
                 }
                 setPicked(step.id);
               }}
-              className={`rounded-md px-2 py-1 text-xs aria-disabled:opacity-50 ${
+              // 단계 버튼은 자기 ARIA 배선(현재 단계·잠금 사유)을 쥔다 — 하한만 공유한다.
+              className={`inline-flex min-h-11 items-center rounded-md px-3 text-sm aria-disabled:opacity-50 ${
                 step.id === current
                   ? 'bg-neutral-skin font-medium text-neutral-ink'
                   : 'text-ink-soft hover:bg-neutral-skin'
@@ -371,11 +373,11 @@ export function OnboardingBanner() {
     return null;
   }
   return (
-    <div data-testid="onboarding-banner" className="rounded-lg border border-line bg-card p-3">
+    <div data-testid="onboarding-banner" className={cardClass('sm')}>
       <p className="text-sm">
         시작하기에서 아직 채우지 않은 항목이 <span className="font-numeric">{pending}</span>개 있습니다.
       </p>
-      <Link to="/start" className="mt-2 inline-block rounded-md border border-line px-3 py-1 text-xs underline">
+      <Link to="/start" className={`mt-2 ${controlClass('secondary', 'md')}`}>
         시작하기로
       </Link>
     </div>

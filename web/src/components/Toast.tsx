@@ -1,5 +1,8 @@
 import { useCallback, useState } from 'react';
 
+import { Button } from './Button';
+import { cardClass } from './Card';
+
 /**
  * 즉시 반응의 토스트(§6.5). **실행 취소는 「API 가 되돌림 전이를 줄 때만」** 둔다(D-7E-5) —
  * 되돌릴 수 없는 일에 실행 취소 버튼을 두면 그 버튼이 거짓말이 된다. 그래서 `undo` 는
@@ -44,25 +47,23 @@ export function ToastHost({
       data-testid="toast"
       role="status"
       aria-live="polite"
-      className="fixed inset-x-4 bottom-4 z-10 mx-auto flex max-w-md items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3 shadow-lg"
+      className={`fixed inset-x-4 bottom-24 z-30 mx-auto flex max-w-md items-center justify-between gap-3 shadow-lg md:bottom-4 ${cardClass()}`}
     >
       <span className="text-sm">{toast.text}</span>
       <span className="flex items-center gap-2">
         {toast.undo === undefined ? null : (
-          <button
-            type="button"
+          <Button
             onClick={() => {
               toast.undo?.run();
               onDismiss();
             }}
-            className="rounded-md border border-line px-2 py-1 text-xs"
           >
             {toast.undo.label}
-          </button>
+          </Button>
         )}
-        <button type="button" onClick={onDismiss} aria-label="닫기" className="text-xs text-ink-soft">
+        <Button onClick={onDismiss} ariaLabel="닫기">
           닫기
-        </button>
+        </Button>
       </span>
     </div>
   );
