@@ -103,9 +103,11 @@ function ActionForm({
           <legend className="text-xs text-ink-soft">{input.label}</legend>
           <div className="mt-1 flex flex-wrap gap-3">
             {(input.choices ?? []).map((choice) => (
-              <label key={choice.value} className="flex items-center gap-1 text-sm">
+              <label key={choice.value} className="flex min-h-11 items-center gap-1 text-sm">
+                {/* 손가락이 닿는 상자를 44px 로(M13/13B cr N-1 — 팀장 판정: 13D 착수 전이라 13B 가 고친다). */}
                 <input
                   type="radio"
+                  className="size-11"
                   name={groupId}
                   value={choice.value}
                   checked={value === choice.value}

@@ -38,15 +38,15 @@ const OWN_NOTICES = ['SYN-M9-OPEN-NOT-OPENED', 'SYN-M9-OPEN-REBID'] as const;
  * (`scripts/journey-screen-table.test.mjs`) — 새 화면이 자리 표에 들어오면 이 표가 모를 때 붉는다.
  */
 export const TOUCH_TARGET_SCREENS = [
-  { slotId: 'onboarding', path: '/start', ready: 'screen-onboarding', minCount: 10 },
+  { slotId: 'onboarding', path: '/start', ready: 'screen-onboarding', minCount: 13 },
   { slotId: 'home', path: '/', ready: 'screen-home', minCount: 8 },
   // 경로를 **문자열 리터럴**로 적는다 — 등식 게이트가 AST 로 읽는 자리이고, 식으로 적으면 그
   // 게이트가 값을 읽지 못한다. 씨앗과 어긋나지 않는 것은 아래 첫 단언이 든다.
-  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 6 },
-  { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 10 },
+  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 7 },
+  { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 11 },
   { slotId: 'results', path: '/results', ready: 'screen-results', minCount: 7 },
   { slotId: 'inbox', path: '/inbox', ready: 'screen-inbox', minCount: 12 },
-  { slotId: 'settings', path: '/settings', ready: 'screen-settings', minCount: 18 },
+  { slotId: 'settings', path: '/settings', ready: 'screen-settings', minCount: 27 },
   // 로그인 자리에는 **탐색을 그리지 않는다**(착수 판정) — 그래서 하한이 폼의 버튼 하나다.
   { slotId: 'login', path: '/login', ready: 'screen-login', minCount: 1 },
   { slotId: 'not-found', path: '/no-such-place', ready: 'screen-not-found', minCount: 5 },
@@ -64,6 +64,8 @@ interface Measurement {
   readonly overflow: number;
   /** 뷰포트 **밖으로 삐져나간** 타깃 — 손가락이 그 상자의 일부에 닿지 못하는 자리다. */
   readonly offscreen: readonly string[];
+  /** 부분 잘라내기가 걸린 타깃 — 눌리는 띠를 상자로 잴 수 없다. */
+  readonly partiallyClipped: readonly string[];
 }
 
 /**
@@ -79,17 +81,19 @@ async function measure(page: Page): Promise<Measurement> {
   return page.evaluate(() => {
     /**
      * 모집단(팀장 판정 2026-11-16 보충) — 계약의 넷에 **누르는 내장 요소 셋**을 더한다:
-     * `input[type=button|submit|reset]` · `summary` · `select`. 손가락이 누르는 자리이고,
-     * AST 축이 그것들을 상호작용 요소로 면제하므로 이쪽에서 받지 않으면 두 게이트 사이에
-     * 틈이 생긴다. `label` 은 넣지 않는다 — 누르는 자리는 연결된 입력이다.
+     * `input[type=button|submit|reset]` · `summary` · `select`, 그리고 **체크박스·라디오**
+     * (cr N-1 · 팀장 판정). 손가락이 누르는 자리이고, AST 축이 `input` 을 **무조건** 면제하므로
+     * 이쪽에서 받지 않으면 두 게이트 사이에 틈이 생긴다 — 그 틈에 실물이 있던 쪽이 바로
+     * 체크박스였다(실측 7자리 13px). `label` 은 넣지 않는다 — 누르는 자리는 연결된 입력이다.
      */
     const nodes = [
       ...document.querySelectorAll(
-        'button, a, [role="tab"], [role="button"], input[type="button"], input[type="submit"], input[type="reset"], summary, select',
+        'button, a, [role="tab"], [role="button"], input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], summary, select',
       ),
     ];
     const targets = [];
     const offscreen = [];
+    const partiallyClipped = [];
     for (const node of nodes) {
       const style = getComputedStyle(node);
       let box = node.getBoundingClientRect();
@@ -101,6 +105,16 @@ async function measure(page: Page): Promise<Measurement> {
       const positioned = style.position === 'absolute' || style.position === 'fixed';
       const clipped =
         positioned && (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)');
+      /**
+       * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
+       * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
+       * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
+       */
+      if (!clipped && (style.clipPath !== 'none' || style.clip !== 'auto')) {
+        partiallyClipped.push(
+          `${node.tagName.toLowerCase()} "${(node.getAttribute('aria-label') ?? node.textContent ?? '').trim().slice(0, 24)}"`,
+        );
+      }
       /**
        * **상자가 0 이어도 글자가 보일 수 있다**(v M-2). `display: contents` 요소는 자기 상자가
        * 없지만 글자는 그려지고 클릭이 발화한다. 그 자리는 **글자 범위**로 다시 잰다.
@@ -138,7 +152,21 @@ async function measure(page: Page): Promise<Measurement> {
       let scrollable = false;
       for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
         const overflowX = getComputedStyle(parent).overflowX;
-        if ((overflowX === 'auto' || overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth) {
+        if (!((overflowX === 'auto' || overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth)) {
+          continue;
+        }
+        const container = parent.getBoundingClientRect();
+        /**
+         * **그 스크롤 상자 자신이 뷰포트 안**이어야 한다(v M-5). 뷰포트 밖에 고정된 상자에
+         * `overflow-x-auto` 한 줄을 더하는 것만으로 진짜 넘침이 면제되던 자리다.
+         */
+        if (container.left < -0.5 || container.right > window.innerWidth + 0.5) {
+          continue;
+        }
+        // 그리고 타깃이 그 상자의 **스크롤 범위 안**이어야 한다(cr N-6) — 범위 밖은 밀어도 닿지 않는다.
+        const start = box.left - container.left + parent.scrollLeft;
+        const end = box.right - container.left + parent.scrollLeft;
+        if (start >= -0.5 && end <= parent.scrollWidth + 0.5) {
           scrollable = true;
           break;
         }
@@ -151,10 +179,37 @@ async function measure(page: Page): Promise<Measurement> {
     return {
       targets,
       offscreen,
+      partiallyClipped,
       // **문서와 본문 둘 다** 본다 — 한쪽만 보면 넘침이 다른 쪽에만 서는 꼴을 놓친다.
       overflow:
         Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
     };
+  });
+}
+
+/**
+ * 프로필을 **등록 상태로** 채운다 — 그래야 설정·시작하기의 등록 분야 체크박스가 선다.
+ *
+ * 이 씨앗이 없으면 게이트가 그 체크박스를 **한 번도 보지 못한다**(실측: 설정 27 → 24). cr N-1 이
+ * 가리킨 실물이 바로 그 자리라, 모집단에 넣고도 안 그리면 넣은 뜻이 사라진다. 값은 전부 합성이고
+ * 사업자등록번호는 넣지 않는다(계약에 칸이 없다).
+ */
+async function seedProfile(page: Page, csrf: string): Promise<void> {
+  const write = async (path: string, data: unknown): Promise<void> => {
+    const response = await page.request.post(path, { headers: { 'X-Operator-Csrf': csrf }, data });
+    expect(response.ok(), `${path}: ${response.status()}`).toBe(true);
+  };
+  await write('/api/profile/business-details', {
+    tradeName: '합성건설 주식회사',
+    headquartersRegion: 'SEOUL',
+    naraRegistration: 'REGISTERED',
+    naraRegisteredFields: ['CONSTRUCTION'],
+  });
+  await write('/api/profile/qualification-facts', {
+    businessTypes: ['건축공사업'],
+    licensesDeclared: true,
+    licenseNames: ['건설업 등록증'],
+    regionTerms: ['서울특별시'],
   });
 }
 
@@ -222,6 +277,7 @@ async function prepare(page: Page): Promise<void> {
   const session = await page.request.get('/api/session');
   expect(session.status(), '세션 조회').toBe(200);
   const { csrf } = (await session.json()) as { readonly csrf: string };
+  await seedProfile(page, csrf);
   for (const notice of OWN_NOTICES) {
     await seedCase(page, csrf, notice);
   }
@@ -256,7 +312,7 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     }
     await page.waitForLoadState('networkidle');
 
-    const { targets, overflow, offscreen } = await measure(page);
+    const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
 
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
     expect(targets.length, `${screen.slotId}: 보이는 타깃이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
@@ -277,6 +333,7 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
      * 이 게이트가 재려는 것(손가락이 상자 전체에 닿는가)에 더 가깝다.
      */
     expect(offscreen, `${screen.slotId}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
+    expect(partiallyClipped, `${screen.slotId}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
     expect(overflow, `${screen.slotId}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
   }
 });
