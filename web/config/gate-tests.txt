@@ -141,3 +141,7 @@ src/components/Card.test.tsx
 # `role="button"` 을 단 `div` 도 면제하지 않는다. 착수 실측 위반 0 이라 오늘의 출하 코드는
 # 하나도 붉지 않는다. 양성·음성 대조가 같은 파일에 있다.
 scripts/jsx-handler-tags.test.mjs
+# M13/13B — 터치 타깃 게이트의 **화면 모집단**이 앱의 자리 표와 같은가(등식). 요소 축은 선택자
+# 전수가 들지만 화면 축은 spec 안의 표라, 등식이 없으면 새 화면이 자리 표에 들어와도 게이트가
+# 그 화면에 대해 아무 말도 하지 않는다. 경로 꼴 술어의 양성·음성 대조도 여기 있다.
+scripts/journey-screen-table.test.mjs

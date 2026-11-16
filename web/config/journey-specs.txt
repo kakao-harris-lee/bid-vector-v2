@@ -24,3 +24,4 @@ journey.spec.ts
 onboarding.spec.ts
 results.spec.ts
 settings.spec.ts
+touch-target.spec.ts
