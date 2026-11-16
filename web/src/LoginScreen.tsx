@@ -33,7 +33,14 @@ const LOGIN_PATH = '/login';
  * 제어 문자 — 브라우저 URL 파서는 탭·개행·복귀를 **떼고** 해석한다. 그래서 `/<TAB>/evil.example`
  * 은 `//evil.example` 이 되어 바깥 주소다(v M-1). 떼기 전 글자로 판정하면 그 변형을 놓친다.
  */
-const CONTROL_CHARACTERS = /[\u0000-\u001F\u007F]/u;
+function hasControlCharacter(raw: string): boolean {
+  // 정규식으로 적으면 lint 가 제어 문자 리터럴을 막는다(그 규칙의 사유는 「오타로 들어온 제어
+  // 문자」이고 여기서는 **의도한 집합**이다). 부호 값으로 세면 의도가 더 분명하다.
+  return [...raw].some((one) => {
+    const code = one.codePointAt(0) ?? 0;
+    return code < 0x20 || code === 0x7f;
+  });
+}
 
 /**
  * 그 주소가 **로그인 자신으로 돌아오는가**. 비교 전에 세 가지를 접는다(v L-1):
@@ -63,7 +70,7 @@ export function safeReturnPath(raw: unknown): string {
     !raw.startsWith('/') ||
     raw.startsWith('//') ||
     raw.includes('\\') ||
-    CONTROL_CHARACTERS.test(raw)
+    hasControlCharacter(raw)
   ) {
     return HOME_PATH;
   }
