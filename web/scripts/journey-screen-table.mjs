@@ -93,12 +93,18 @@ function arrayEntries(source, name, keys, where) {
 export function appScreenSlots(routesText) {
   const source = parse(routesText, 'routes.tsx');
   const slots = arrayEntries(source, 'screenSlots', ['id', 'path'], 'routes.tsx');
-  const standalone = ['loginRoute', 'fallbackRoute'].map((name) => {
+  const standalone = ['loginRoute', 'notFoundSlot'].map((name) => {
     const initializer = declarationInitializer(source, name);
     if (initializer === undefined || !ts.isObjectLiteralExpression(initializer)) {
       throw new Error(`routes.tsx: ${name} 의 객체 리터럴을 찾지 못했다`);
     }
-    return { id: stringProperty(initializer, 'id'), path: stringProperty(initializer, 'path') };
+    const entry = { id: stringProperty(initializer, 'id'), path: stringProperty(initializer, 'path') };
+    if (entry.id === undefined || entry.path === undefined) {
+      // 라우트가 자리 값을 **식으로** 참조하면 이 술어가 읽지 못한다 — 조용한 `undefined` 대신
+      // 던진다(그 값으로 등식을 세우면 「없는 값끼리 같다」가 된다).
+      throw new Error(`routes.tsx: ${name} 에 문자열 리터럴 id·path 가 없다`);
+    }
+    return entry;
   });
   return [...slots, ...standalone];
 }

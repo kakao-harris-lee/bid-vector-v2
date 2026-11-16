@@ -135,6 +135,24 @@ export async function readSession(): Promise<SessionResponse | null> {
   return data;
 }
 
+/**
+ * 로그아웃 — **서버 쪽 폐기가 본체**다(계약). 쿠키만 지우면 그 값으로 다시 통하므로 화면이
+ * 쿠키를 만지지 않는다(만질 수도 없다 — `HttpOnly`).
+ *
+ * 응답이 **204 라 본문이 없다**. 그래서 성공을 `data` 로 판정하지 않고 상태로 본다 — 이 모듈의
+ * 다른 읽기들이 쓰는 `data === undefined` 규약을 여기 그대로 쓰면 성공이 실패로 읽힌다.
+ *
+ * 멱등이고 사유를 가르지 않는다(쿠키가 없어도 204). 실패를 **삼키지 않는** 이유는 셸이 그것을
+ * 보여야 하기 때문이다 — 폐기되지 않았는데 로그아웃된 것처럼 보이면 운영자가 세션을 남긴 채
+ * 떠난다.
+ */
+export async function signOut(): Promise<void> {
+  const { error, response } = await apiClient.DELETE('/api/session');
+  if (!response.ok) {
+    raise(response.status, error);
+  }
+}
+
 export async function searchNotices(query: NoticeSearchQuery): Promise<Listed<NoticeSummary, NoticesResultState>> {
   const { data, error, response } = await apiClient.GET('/api/notices', { params: { query } });
   if (data === undefined) {
