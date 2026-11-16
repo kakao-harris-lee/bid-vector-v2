@@ -101,8 +101,21 @@ async function measure(page: Page): Promise<Measurement> {
         width: Math.round(box.width * 10) / 10,
         height: Math.round(box.height * 10) / 10,
       });
+      /**
+       * **가로로 스크롤되는 줄 안의 타깃은 닿을 수 있다** — 운영자가 밀어서 보면 된다. 닿지
+       * 못하는 것은 그런 조상이 없는 채 뷰포트 밖에 **고정된** 자리다(변이 H 가 그 꼴이다).
+       * 그 둘을 조상의 `overflow-x` 와 실제 스크롤 여지로 가른다.
+       */
+      let scrollable = false;
+      for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
+        const overflowX = getComputedStyle(parent).overflowX;
+        if ((overflowX === 'auto' || overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth) {
+          scrollable = true;
+          break;
+        }
+      }
       // 부분 화소 반올림을 0.5px 로 받는다 — 그보다 큰 삐져나감만 센다.
-      if (box.left < -0.5 || box.right > window.innerWidth + 0.5) {
+      if (!scrollable && (box.left < -0.5 || box.right > window.innerWidth + 0.5)) {
         offscreen.push(`${node.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`);
       }
     }
