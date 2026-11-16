@@ -17,14 +17,18 @@ export const CARD_ELEMENTS = ['li', 'div', 'section', 'article'] as const;
 
 export type CardElement = (typeof CARD_ELEMENTS)[number];
 
-/** 안쪽 여백 둘 — 카드가 **줄**이면 좁고(`sm`), 묶음이면 넓다(`md`). */
-export const CARD_PADDINGS = ['sm', 'md'] as const;
+/** 안쪽 여백 — 카드가 **줄**이면 좁고(`sm`), 묶음이면 보통(`md`), 얼굴이면 넓다(`lg`). */
+export const CARD_PADDINGS = ['sm', 'md', 'lg'] as const;
 
 export type CardPadding = (typeof CARD_PADDINGS)[number];
 
 const PADDING_CLASS = {
   sm: 'p-3',
   md: 'p-4',
+  // 얼굴(빈·오류·세션 없음)처럼 **가운데 정렬된 한 덩어리**가 쓰는 넓은 여백. 앞 판은 그 자리가
+  // `cardClass()` 에 `p-6` 을 덧붙여 **`p-4` 와 `p-6` 이 한 요소에** 섰고, 어느 쪽이 이기는지는
+  // Tailwind 의 출력 순서에 달려 있었다(클래스 문자열 순서가 아니다 — cr L-3).
+  lg: 'p-6',
 } as const satisfies Record<CardPadding, string>;
 
 const BASE_CLASS = 'rounded-lg border border-line bg-card';

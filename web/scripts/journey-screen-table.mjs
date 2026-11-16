@@ -118,10 +118,15 @@ export function gateScreens(specText) {
  * 자리 경로가 그 spec 경로를 **받는가**. 경로 인자(`:noticeNumber`)는 한 칸을 받고, catch-all
  * (`*`)은 어느 자리에도 닿지 않는 주소를 받는다. 질의 문자열은 자리를 바꾸지 않으므로 뗀다.
  */
-export function pathMatches(slotPath, specPath) {
+export function pathMatches(slotPath, specPath, otherSlotPaths = []) {
   const pathname = specPath.split('?')[0];
   if (slotPath === '*') {
-    return pathname.startsWith('/');
+    /**
+     * catch-all 은 「**어느 자리도 받지 않는 주소**」다(cr O-1). 앞 판은 `/` 로 시작하기만 하면
+     * 참이라 그 행이 `/bids` 를 가리켜도 초록이었다 — 한 축이 통째로 공허했다. 다른 자리의
+     * 경로와 **하나도 맞지 않는 것**을 본다.
+     */
+    return pathname.startsWith('/') && !otherSlotPaths.some((one) => pathMatches(one, pathname));
   }
   const pattern = slotPath
     .split('/')

@@ -43,10 +43,11 @@ describe('요소 축', () => {
 });
 
 describe('여백 표', () => {
-  it('여백 둘이 서로 다른 클래스를 낸다', () => {
+  /** 수를 박지 않는다 — 표가 늘면 이 단언이 **표를 따라간다**(고정 수는 등식을 흔든다). */
+  it('여백마다 서로 다른 클래스를 낸다', () => {
     const produced = CARD_PADDINGS.map((one) => cardClass(one));
 
-    expect(produced).toHaveLength(2);
+    expect(produced.length).toBeGreaterThan(1);
     expect(new Set(produced).size).toBe(produced.length);
   });
 

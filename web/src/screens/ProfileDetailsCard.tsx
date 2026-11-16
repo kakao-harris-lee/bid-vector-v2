@@ -168,9 +168,11 @@ export function ProfileDetailsCard({
             </div>
           </fieldset>
         ) : null}
-        <Button tone="primary" disabled={save.isPending} onClick={() => save.mutate(businessDetailsBodyOf(form))}>
-          사업 정보 저장
-        </Button>
+        <div className="mt-2">
+          <Button tone="primary" disabled={save.isPending} onClick={() => save.mutate(businessDetailsBodyOf(form))}>
+            사업 정보 저장
+          </Button>
+        </div>
       </div>
     </>
   );

@@ -88,10 +88,11 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             않습니다(잘린 금액이 저장되지 않게).
           </p>
         ) : null}
-        <Button
-          tone="primary"
-          disabled={save.isPending}
-          onClick={() => {
+        <div className="mt-2">
+          <Button
+            tone="primary"
+            disabled={save.isPending}
+            onClick={() => {
             // 셋 다 **문자열 전체가 모양에 맞아야** 보낸다 — 0·올해를 지어내지 않고, 앞자리만
             // 읽어 잘린 금액을 보내지도 않는다(CR M-1 — 여기는 확인 단계가 없어 더 조용하다).
             const body = capacityBodyOf(capacity);
@@ -100,11 +101,12 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
               return;
             }
             setMissing(false);
-            save.mutate(body);
-          }}
-        >
-          시평액 저장
-        </Button>
+              save.mutate(body);
+            }}
+          >
+            시평액 저장
+          </Button>
+        </div>
       </div>
     </>
   );

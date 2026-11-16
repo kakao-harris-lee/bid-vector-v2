@@ -105,6 +105,8 @@ function ShellFrame() {
     // 렌더 중 갱신 — React 가 커밋 없이 곧바로 다시 렌더한다(「props 가 바뀔 때 state 를 맞추는」
     // 표준 꼴). 자리를 옮기면 펼침이 **값으로** 풀린다.
     setMore({ open: false, at: pathname });
+    // 실패 알림도 그 자리의 것이다 — 남겨 두면 다른 화면까지 따라간다(cr L-7).
+    setSignOutFailed(false);
   }
   const moreOpen = more.open;
   const setMoreOpen = (open: boolean): void => {
@@ -176,9 +178,11 @@ function ShellFrame() {
       setSigningOut(false);
     }
     rememberCsrf(null);
-    // 앞 사람의 서버 상태가 다음 화면에 남지 않게 한다 — 캐시는 계정의 것이다.
-    queryClient.clear();
     await navigate(LOGIN_PATH);
+    // **이동 뒤에** 비운다(cr L-10). 앞 판은 비우기가 먼저라, 아직 로그인 자리가 아닌 찰나에
+    // 배지 질의가 한 번 더 나가 세션 없는 401 을 받았다. 앞 사람의 서버 상태가 다음 화면에
+    // 남지 않게 하는 목적은 그대로다 — 캐시는 계정의 것이다.
+    queryClient.clear();
   }
 
   const moreActive = MORE_SLOTS.some((slot) => slot.path === pathname);

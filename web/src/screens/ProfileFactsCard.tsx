@@ -118,21 +118,23 @@ export function ProfileFactsCard({
           면허를 신고함
           <span className="text-xs text-ink-soft">(끄면 면허 목록을 비워 보냅니다)</span>
         </label>
-        <Button
-          tone="primary"
-          disabled={save.isPending}
-          onClick={() =>
+        <div className="mt-2">
+          <Button
+            tone="primary"
+            disabled={save.isPending}
+            onClick={() =>
             save.mutate({
               businessTypes: termsOf(form.businessTypes),
               licensesDeclared: form.licensesDeclared,
               // 신고하지 않으면 **비어 있어야 한다**(계약 — 아니면 400). 받아 두고 버리지 않는다.
               licenseNames: form.licensesDeclared ? termsOf(form.licenseNames) : [],
               regionTerms: termsOf(form.regionTerms),
-            })
-          }
-        >
-          자격 사실 저장
-        </Button>
+              })
+            }
+          >
+            자격 사실 저장
+          </Button>
+        </div>
       </div>
     </>
   );

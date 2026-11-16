@@ -190,15 +190,13 @@ test('이 레인은 모바일 폭으로 돌고, 워크시트 자리가 이 spec 
 
 test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 넘침이 0 이다', async ({ page }) => {
   await prepare(page);
-  // 홈은 **검색 결과가 선 상태**로 잰다 — 빈 목록은 카드 안의 타깃을 하나도 내지 않는다.
-  const searched = new Set<string>();
-
   for (const screen of TOUCH_TARGET_SCREENS) {
     await page.goto(screen.path);
     await expect(page.getByTestId(screen.ready)).toBeVisible();
-    if (screen.slotId === 'home' && !searched.has(screen.slotId)) {
+    // 홈은 **검색 결과가 선 상태**로 잰다 — 빈 목록은 카드 안의 타깃을 하나도 내지 않는다.
+    // 각 화면을 한 번만 돌므로 「이미 검색했는가」를 기억할 자리가 없다(cr L-6).
+    if (screen.slotId === 'home') {
       await search(page, '합성');
-      searched.add(screen.slotId);
     }
     await page.waitForLoadState('networkidle');
 

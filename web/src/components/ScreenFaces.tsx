@@ -32,7 +32,7 @@ export function EmptyFace({
   readonly action?: React.ReactNode;
 }) {
   return (
-    <div data-testid={testId} className={`${cardClass()} p-6 text-center`}>
+    <div data-testid={testId} className={`${cardClass('lg')} text-center`}>
       <p className="text-sm font-medium">{display.label}</p>
       {display.why === undefined ? null : <p className="mt-1 text-xs text-ink-soft">{display.why}</p>}
       {action === undefined ? null : <div className="mt-3">{action}</div>}
@@ -46,7 +46,7 @@ export function EmptyFace({
  */
 export function ErrorFace({ testId, onRetry }: { readonly testId: string; readonly onRetry: () => void }) {
   return (
-    <div data-testid={testId} role="alert" className={`${cardClass()} p-6 text-center`}>
+    <div data-testid={testId} role="alert" className={`${cardClass('lg')} text-center`}>
       <p className="text-sm font-medium">불러오지 못했습니다.</p>
       <div className="mt-3 flex justify-center">
         <Button onClick={onRetry}>다시 시도</Button>

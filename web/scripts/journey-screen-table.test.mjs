@@ -45,7 +45,15 @@ describe('화면 모집단의 등식 (M13/13B)', () => {
   it('게이트가 도는 주소가 그 자리의 경로 꼴이다', () => {
     const wrong = screens
       .map((screen) => ({ screen, slot: slots.find((one) => one.id === screen.slotId) }))
-      .filter(({ screen, slot }) => slot !== undefined && !pathMatches(slot.path, screen.path))
+      .filter(
+        ({ screen, slot }) =>
+          slot !== undefined &&
+          !pathMatches(
+            slot.path,
+            screen.path,
+            slots.filter((one) => one.path !== '*').map((one) => one.path),
+          ),
+      )
       .map(({ screen, slot }) => `${screen.slotId}: ${screen.path} 가 ${slot.path} 의 꼴이 아니다`);
 
     expect(wrong).toStrictEqual([]);
@@ -68,8 +76,17 @@ describe('경로 꼴 술어의 양성·음성 대조', () => {
     expect(pathMatches('/', '/start')).toBe(false);
   });
 
-  it('catch-all 은 어느 주소든 받는다 — 그 자리의 뜻이 그렇다', () => {
-    expect(pathMatches('*', '/no-such-place')).toBe(true);
+  /**
+   * catch-all 의 뜻은 「**어느 자리도 받지 않는 주소**」다(cr O-1). 앞 판은 `/` 로 시작하면 참이라
+   * 그 행이 `/bids` 를 가리켜도 초록이었다 — 등식이 「이름 + 경로 꼴」 두 축이라고 말하는 자리에서
+   * 한 축이 공허했다.
+   */
+  it('catch-all 은 어느 자리도 받지 않는 주소만 받는다', () => {
+    const others = ['/', '/bids', '/notices/:noticeNumber/:noticeRound'];
+
+    expect(pathMatches('*', '/no-such-place', others)).toBe(true);
+    expect(pathMatches('*', '/bids', others)).toBe(false);
+    expect(pathMatches('*', '/notices/SYN-1/000', others)).toBe(false);
   });
 });
 
