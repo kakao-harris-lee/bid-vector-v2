@@ -1,0 +1,67 @@
+# M13 / ux-foundation (13B) — 되돌리기
+
+**range revert 가 아니다.** 이 slice 가 만진 **in_scope 경로만** 착수 base 의 내용으로 돌린다.
+range 로 되돌리면 같은 range 에 섞인 남의 커밋까지 지운다.
+
+## 복원 명령
+
+```
+git restore --source=a338b55b --staged --worktree -- \
+  web/src web/scripts web/config web/e2e/journey reports/evidence/m13/ux-foundation
+```
+
+경로를 **개별 인자**로 준다(`.`·`-A` 를 쓰지 않는다). 원천은 착수 base `a338b55b` 의 고정 SHA 이고
+움직이는 `origin/main` 이 아니다.
+
+**머지 뒤에 되돌릴 때는 원천이 바뀐다** — 그때는 이 slice 를 담은 병합 커밋의 고정 SHA 를 원천으로
+삼고, 복원 대상 blob 이 착수 base 와 그 원천에서 **같은지**를 먼저 센다(다르면 새 원천 기준으로
+목록을 다시 산출한다). 저장소 규율의 셋째 단언이다.
+
+## 되돌림 목록 — 기계 산출
+
+`git diff --name-status a338b55b..HEAD` 로 뽑았고 라운드마다 재산출한다. **47 경로 · 신설 14 ·
+수정 33.** 전부 위 다섯 경로 아래에 있다. 이 slice 는 `web/` 와 자기 evidence 디렉터리 밖을
+한 줄도 만지지 않는다 — Kotlin·OpenAPI·CI 워크플로·다른 마일스톤의 evidence 가 목록에 없다.
+
+`docs/discovery/capability-map.md` 는 in_scope 에 적혀 있으나 **아직 만지지 않았다**(§12.3 의 절
+글자는 머지 차례에 정한다). 그때 이 목록과 아래 실측을 다시 낸다.
+
+## 실측 — 버릴 worktree에서 ①~⑥
+
+**실측 HEAD: `5bcb0662261386f897dc0f3210d7fd6879ed3b7f`**
+
+| # | 잰 것 | 결과 |
+| --- | --- | --- |
+| ① | 복원 명령의 종료 코드 | **0** |
+| ② | 복원 뒤 상태 계수 | **D 14 · M 33** — 기계 산출 목록(신설 14 · 수정 33)과 같다 |
+| ③ | in_scope 경로가 base 와 같은가 | `git diff a338b55b -- <다섯 경로>` **빈 출력** — 트리 동일성 |
+| ④ | 컴파일 | `npm run typecheck` **exit 0** |
+| ⑤ | test | `npm run test` **44 파일 · 1026 test 통과** — 착수 때 잰 base 의 수와 같다 |
+| ⑥ | 게이트 | `npm run lint` · `npm run gate:src-tree` · `npm run gate:tests` **전부 exit 0** |
+
+⑤ 의 수가 착수 실측의 base 수와 **같은 것**이 ③ 의 트리 동일성을 값으로 다시 보인다 — 이 slice 가
+더한 test 64개가 전부 사라졌다는 뜻이다.
+
+갈음은 「HEAD 가 초록이다」가 아니라 **③ 의 트리 동일성**이다. ④⑤⑥ 은 그 트리가 실제로 서는지를
+값으로 확인한 것이고, 동일성이 성립하면 base 의 CI 결과가 그대로 적용된다.
+
+## 실측 뒤에 움직인 것
+
+`git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 다섯 경로>` 가 비어 있지 않다면, **그 줄은
+전부 원천(`a338b55b`)에 없는 신설 파일이다** — 이 slice 의 evidence 파일뿐이고 출하 코드는 실측
+HEAD 이후 한 줄도 움직이지 않는다. 그 전칭이 참인지(열거와 원천 부재 확인)는 verifier 가 센다.
+
+`git rev-list --merges <실측 HEAD>..<판정 SHA>` 도 **빈 출력**이어야 한다(실측 뒤 main 병합이
+없다). 머지 차례에 main 을 병합하면 실측 자리는 그 병합 커밋이 되고, 위 ①~⑥ 과 목록을 거기서
+다시 낸다.
+
+## 비활성화 — 되돌리지 않고 멈추는 길
+
+이 slice 는 **모양과 셸**만 바꾸므로 기능 토글이 없다. 되돌림의 입도는 위 복원 하나다. 부분적으로
+끌 수 있는 자리는 둘뿐이고 둘 다 게이트다:
+
+- **터치 타깃 게이트** — `web/config/journey-specs.txt` 에서 그 spec 한 줄을 빼고 파일을 지우면
+  레인이 다시 돈다(등록부가 **양방향 등식**이라 둘을 함께 해야 한다).
+- **비-상호작용 태그 핸들러 축** — `web/config/gate-tests.txt` 의 한 줄과 test 파일을 함께 지운다.
+
+둘 다 **게이트를 끄는 결정**이라 레인이 임의로 하지 않는다.
