@@ -131,8 +131,9 @@ B 의 「전수가 아니라 계수가 붉는다」가 요점이다: 시각 은�
 `overflow-x-auto` 라 밀면 닿으므로 **위반이 아니다** — 「닿을 수 있는 넘침」과 「고정되어 못 닿는
 넘침」을 조상의 `overflow-x` 와 실제 스크롤 여지로 갈랐고, 그 갈림이 옳은지는 H′ 가 잰다.
 
-**이 라운드의 acceptance**: W-2~W-11 묶음 **exit 0**(vitest 50 파일 · 1108 test), W-13 여정
-**17 통과 · flaky 0 · 건너뜀 0 · spec 6/6**(등록부와 등식 — 셸 세션 spec 하나가 늘었다).
+**이 라운드의 acceptance**(verifier 처분까지 반영한 마지막 실행): W-2~W-11 묶음 **exit 0**
+(vitest **50 파일 · 1119 test**), W-13 여정 **17 통과 · flaky 0 · 건너뜀 0 · spec 6/6**(등록부와
+등식 — 셸 세션 spec 하나가 늘었다).
 
 **이 라운드가 만든 새 파일 둘과 in_scope 대조**: `web/e2e/journey/shell-session.spec.ts` ·
 `web/src/api/queryKeys.test.ts` — 둘 다 `scope.md` in_scope 의 `web/e2e/journey/` · `web/src/`
@@ -157,8 +158,21 @@ B 의 「전수가 아니라 계수가 붉는다」가 요점이다: 시각 은�
 적용되지 않는데 computed 값에는 남는 것을, ⓑ 는 상자가 0 이어도 글자가 보이는 것을 이용한다.
 
 **술어를 뒤집기 전 실측**(v H-2) — 처방대로 「내장 태그에 `on[A-Z]` 속성 또는 spread, 허용 집합
-밖이면 위반」으로 세면 오늘 **2건**이 걸린다: `LoginScreen` 과 `TodayNoticesScreen` 의
-`<form onSubmit>`. 후자는 13E 소유라 **승인 경계**이고, 그 자리에서 멈추고 보고했다.
+밖이면 위반」으로 세면 **2건**이 걸렸다: `LoginScreen` 과 `TodayNoticesScreen` 의 `<form onSubmit>`.
+후자가 13E 소유라 멈추고 보고했고, 팀장 판정(`form` 은 **제출 계열만** 허용)을 받아 다시 재니
+**0 건**이다 — 13E 소유 파일을 건드리지 않는다.
+
+**뒤집은 술어가 닫은 우회 여섯**(verifier 가 앞 판에서 전부 초록으로 실측한 것). 각각을 test 의
+합성 원문으로 RED 로 고정했다: spread · `onClickCapture`(와 `onPointerDownCapture`) · 변수에 담은
+내장 태그 · `<label onClick>` · `onAuxClick`·`onContextMenu` · **props 를 펼치는 래퍼**. 마지막
+것은 앞 판 알려진 제한의 「그 컴포넌트 안쪽에서 다시 지난다」가 **거짓**이던 자리이고, spread 가
+위반이 되면서 그 안쪽에서 닫힌다.
+
+**`form` 의 짝 이벤트**: `onSubmit`·`onReset` 초록 · `<form onClick>`·`<form {...p}>` RED.
+
+**과차단은 의도다**: 누르지 않는 핸들러(`onScroll`·`onFocus`)도 비-상호작용 태그 위에서는 걸린다.
+이름으로 가르면 `onClickCapture` 를 놓친 앞 판으로 되돌아가므로, 좁히는 방향을 골랐다(출하 트리
+위반 0 이라 비용 없음). 상호작용 요소 위에서는 걸리지 않는 것도 같은 자리에서 잰다.
 
 ## 캡처 — 운영자 시각 검토용 (완료 조건 5)
 
