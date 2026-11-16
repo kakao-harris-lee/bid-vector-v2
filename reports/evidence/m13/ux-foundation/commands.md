@@ -138,6 +138,28 @@ B 의 「전수가 아니라 계수가 붉는다」가 요점이다: 시각 은�
 `web/src/api/queryKeys.test.ts` — 둘 다 `scope.md` in_scope 의 `web/e2e/journey/` · `web/src/`
 아래라 계약 갱신이 필요 없다.
 
+## 수정 라운드 1 — verifier 처분의 실측
+
+**모집단 확대**(팀장 보충 판정: `input[type=button|submit|reset]` · `summary` · `select`, `label`
+제외). 바꾸기 전에 쟀다 — **보이는 전수 86 → 92 · 44px 미만 0**. 새로 드는 여섯은 전부 **h=44**
+(A 시작하기 `select` 둘 · B `summary` 하나 · C `select` 하나 · 설정 `select` 둘)이고
+`input[type=button|submit|reset]` 은 **오늘 0건**이다(제출은 전부 `<button type="submit">`). 그래서
+13B 소유 밖 미달이 **없고** 승인 경계에 걸리지 않는다.
+
+**가시성 술어의 구멍 둘**(v M-2) — 변이로 닫은 것을 확인했다.
+
+| # | 변이 | 실측 |
+| --- | --- | --- |
+| I | 위치 지정 **없는** 요소에 `clip` 을 걸고 작게 만든다 | **RED** — 「설정: 44px 에 못 미친다(보이는 전수 23)」 |
+| J | `display: contents` 버튼으로 바꿔치운다 | **RED** — 같은 자리 |
+
+둘 다 앞 판에서는 모집단에서 **빠져** 초록이었다. ⓐ 는 `clip` 이 absolute·fixed 가 아닌 요소에
+적용되지 않는데 computed 값에는 남는 것을, ⓑ 는 상자가 0 이어도 글자가 보이는 것을 이용한다.
+
+**술어를 뒤집기 전 실측**(v H-2) — 처방대로 「내장 태그에 `on[A-Z]` 속성 또는 spread, 허용 집합
+밖이면 위반」으로 세면 오늘 **2건**이 걸린다: `LoginScreen` 과 `TodayNoticesScreen` 의
+`<form onSubmit>`. 후자는 13E 소유라 **승인 경계**이고, 그 자리에서 멈추고 보고했다.
+
 ## 캡처 — 운영자 시각 검토용 (완료 조건 5)
 
 `npm run capture:usecase` 를 **두 트리에서** 돌렸다. 화면 여섯 × 데스크톱·390px 모바일 = 12 장.
@@ -145,7 +167,8 @@ B 의 「전수가 아니라 계수가 붉는다」가 요점이다: 시각 은�
 걸리고, 걸리면 파일을 쓰지 않고 멈춘다 — 두 실행 모두 통과했다.
 
 - **앞** — base `a338b55b` 의 임시 worktree에서. 그 worktree는 캡처 뒤 제거했다.
-- **뒤** — 이 slice 의 트리에서. 저장소의 `docs/usecase/captures/` 는 이 slice 의 in_scope 가
+- **뒤** — 이 slice 의 트리에서. **수정 라운드 1 에서 다시 떴다**(셸의 알림 자리·패널 DOM 순서·
+  저장 버튼 여백이 바뀌었다). 앞 묶음은 base 의 것이라 그대로 둔다. 저장소의 `docs/usecase/captures/` 는 이 slice 의 in_scope 가
   **아니므로** 생성물을 레인 scratch 로 옮기고 트리를 되돌렸다(`git status` 빈 출력 확인).
 
 경로는 동결 보고에 적는다.
