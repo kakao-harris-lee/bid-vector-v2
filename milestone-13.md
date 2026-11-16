@@ -74,7 +74,8 @@
 **편집 0 이 목표**다) · 13E = `TodayNoticesScreen`·`NoticeCard`·`InboxScreen`(「준비 중」 절 제외)·`StateBadge`.
 **그래도 겹치는 자리**: `InboxScreen.tsx`(13A 준비 중 절 ↔ 13E) · `display/worksheetDisplay.ts`·`display/moneyDisplay.ts`(13A 가
 3안 사유 문면을 고치고 13C 가 하한 여유·한글 병기를 더한다) · `api/queryKeys.ts` 와 셸의 안 읽음 배지(13B 가 만들고
-13E 가 알림 질의 꼴을 바꾼다) · `api/approvedOperations.ts`·`api/queries.ts`
+13E 가 알림 질의 꼴을 바꾼다) · 여정 e2e(`web/e2e/**`)와 그 등록부 `web/config/journey-specs.txt`(**양방향 등식** — 등록되지
+않은 spec 이 돌아도 붉다 · 13B·13C·13D·13E 가 여정 spec 을 더한다: spec 을 더하는 **같은 커밋에서** 등록부에도 적는다) · `api/approvedOperations.ts`·`api/queries.ts`
 (13D 가 `/defer`·`/skip` 을 더하고 13C 가 그것을 쓴다 — **13D 가 먼저 머지되면 13C 는 그 위에서, 13C 가 먼저면
 13C 가 질의를 더하고 13D 가 재사용**한다 — 착수 판정에서 하나로 정한다) · `web/config/gate-tests.txt` ·
 `web/vite.config.ts` `test:` 블록 · `web/src/screens/screenVocabulary.test.tsx`. 머지 차례마다 **키·행 계수와 이름으로
@@ -100,7 +101,9 @@ UX 의 상당 부분은 기계로 판정되지 않는다. 그래서 **기계로 
   `\b[DR]-[0-9A-Za-z]+-[0-9A-Za-z]+\b`(**둘째 하이픈이 가른다** — 저장소의 지배적 꼴 `D-6A1-17`·`D-7E-4` 를 잡는다) ·
   `R-\d\b`. 꼴의 위양성은 음성 대조가 막는다 — D-day `D-0`·`D-1`·`D-14`·`D+3` 넷 · `SYN-M9-0` · fixture 공고번호 `SYN-M9-OPEN-REBID`. 공고번호는 담기
   버튼의 `aria-label` 처럼 **문장 안에 끼어** 렌더되므로 「자리」로는 가를 수 없다 — 선택지는 ⓐ 값 술어(렌더된 공고번호
-  값의 집합을 빼고 센다) ⓑ **fixture 어휘 치환**(하네스 공고번호에서 `OPEN` 토큰을 걷는다 — 추천, 게이트가 단순해진다)
+  값의 집합을 빼고 센다) ⓑ **fixture 어휘 치환**(하네스 공고번호에서 `OPEN` 토큰을 걷는다 — 추천, 게이트가 단순해진다. 그 번호를 축어로 쓰는
+  spec·하네스 코드는 0 이고 두 fixture JSON 에만 있으며, `notice-list.json` 의 출처 표기가 「값은 합성이다」라 이름 치환이
+  그 주장과 충돌하지 않는다)
   둘이고, 13A 의 구현 전 설계 검토 보고가 제안하면 **팀장이 「착수 판정」 절에 적어 확정**한다 · 음수 차이 금액이 붙은 요소
   쌍(**합성** 대조)이 걸리지 않는다. 읽는 대상은 텍스트 노드에 더해 **`title`·`aria-label` 속성**이다(눈에 안 보이는
   사유가 거기 산다 — `NoticeCard` 의 마감 힌트 등). 양성 대조: 심은 문면
