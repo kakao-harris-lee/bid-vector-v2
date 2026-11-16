@@ -88,6 +88,17 @@ describe('경로 꼴 술어의 양성·음성 대조', () => {
     expect(pathMatches('*', '/bids', others)).toBe(false);
     expect(pathMatches('*', '/notices/SYN-1/000', others)).toBe(false);
   });
+
+  /**
+   * 목록에 `'*'` 가 섞여도 술어가 **스스로** 거른다(cr N-8). 호출자에게 맡기면 그 불변을 모르는
+   * 다음 호출자가 catch-all 행을 영영 붉게 만든다.
+   */
+  it('목록에 catch-all 이 섞여도 판정이 뒤집히지 않는다', () => {
+    const withStar = ['/', '/bids', '*'];
+
+    expect(pathMatches('*', '/no-such-place', withStar)).toBe(true);
+    expect(pathMatches('*', '/bids', withStar)).toBe(false);
+  });
 });
 
 describe('읽기의 비공허 — 표가 사라지면 던진다', () => {

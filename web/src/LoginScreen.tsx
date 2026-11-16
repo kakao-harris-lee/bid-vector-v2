@@ -49,7 +49,9 @@ function hasControlCharacter(raw: string): boolean {
  *  · 대소문자 — react-router 의 경로 매칭이 기본적으로 대소문자를 가리지 않는다.
  */
 function returnsToLogin(raw: string): boolean {
-  const head = raw.split(/[?#]/u)[0] ?? '';
+  // `%2e` 는 URL 규칙에서 `.` 과 같다 — 접지 않으면 주소창(`/login`)과 라우터(없는 주소)가
+  // 갈린다(cr O-A). 구분자(`%2f`)는 **접지 않는다**: 그것은 규칙상 칸을 가르지 않는다.
+  const head = (raw.split(/[?#]/u)[0] ?? '').replace(/%2e/giu, '.');
   const segments: string[] = [];
   for (const part of head.split('/')) {
     if (part === '' || part === '.') {

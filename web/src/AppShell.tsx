@@ -178,11 +178,15 @@ function ShellFrame() {
       setSigningOut(false);
     }
     rememberCsrf(null);
-    await navigate(LOGIN_PATH);
-    // **이동 뒤에** 비운다(cr L-10). 앞 판은 비우기가 먼저라, 아직 로그인 자리가 아닌 찰나에
-    // 배지 질의가 한 번 더 나가 세션 없는 401 을 받았다. 앞 사람의 서버 상태가 다음 화면에
-    // 남지 않게 하는 목적은 그대로다 — 캐시는 계정의 것이다.
-    queryClient.clear();
+    try {
+      // **이동 뒤에** 비운다(cr L-10). 비우기가 먼저면 아직 로그인 자리가 아닌 찰나에 배지
+      // 질의가 한 번 더 나가 세션 없는 401 을 받는다.
+      await navigate(LOGIN_PATH);
+    } finally {
+      // 그래도 **어떤 경우에도** 비운다(cr N-5) — 이동이 거부돼도 앞 사람의 서버 상태가
+      // 다음 화면에 남지 않는다. 캐시는 계정의 것이다.
+      queryClient.clear();
+    }
   }
 
   const moreActive = MORE_SLOTS.some((slot) => slot.path === pathname);

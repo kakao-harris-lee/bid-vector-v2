@@ -241,6 +241,9 @@ describe('로그인 뒤 돌아갈 자리 (M13/13B)', () => {
     expect(safeReturnPath('/./login')).toBe('/');
     expect(safeReturnPath('/x/../login')).toBe('/');
     expect(safeReturnPath('/login//')).toBe('/');
+    // `%2e` 는 URL 규칙에서 `.` 과 같다 — 접지 않으면 주소창과 라우터가 갈린다(cr O-A).
+    expect(safeReturnPath('/%2e%2e/login')).toBe('/');
+    expect(safeReturnPath('/%2E/login')).toBe('/');
   });
 
   /** 조각·끝 `/` 가 **앱 안의 다른 자리**면 그대로 돌려준다 — 과잉 차단이 아니다. */

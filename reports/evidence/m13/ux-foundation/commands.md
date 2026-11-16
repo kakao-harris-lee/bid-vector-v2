@@ -131,9 +131,10 @@ B 의 「전수가 아니라 계수가 붉는다」가 요점이다: 시각 은�
 `overflow-x-auto` 라 밀면 닿으므로 **위반이 아니다** — 「닿을 수 있는 넘침」과 「고정되어 못 닿는
 넘침」을 조상의 `overflow-x` 와 실제 스크롤 여지로 갈랐고, 그 갈림이 옳은지는 H′ 가 잰다.
 
-**이 라운드의 acceptance**(verifier 처분까지 반영한 마지막 실행): W-2~W-11 묶음 **exit 0**
-(vitest **50 파일 · 1119 test**), W-13 여정 **17 통과 · flaky 0 · 건너뜀 0 · spec 6/6**(등록부와
-등식 — 셸 세션 spec 하나가 늘었다).
+**이 라운드의 acceptance**: W-1~W-13 **전건 exit 0** — 설치(W-1)와 출하 jar(W-12)를 포함한다
+(cr N-9 정정: 앞 판 문면이 「W-2~W-11 + W-13」이라 두 step 이 진술에서 빠져 있었다. 저장소 규율상
+줄일 수 있는 단위는 job 이지 step 이 아니다). vitest **50 파일 · 1119 test** · 여정 **17 통과 ·
+flaky 0 · 건너뜀 0 · spec 6/6**(등록부와 등식 — 셸 세션 spec 하나가 늘었다).
 
 **이 라운드가 만든 새 파일 둘과 in_scope 대조**: `web/e2e/journey/shell-session.spec.ts` ·
 `web/src/api/queryKeys.test.ts` — 둘 다 `scope.md` in_scope 의 `web/e2e/journey/` · `web/src/`

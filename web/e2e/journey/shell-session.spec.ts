@@ -51,6 +51,22 @@ test('데스크톱 폭에서 로그아웃이 실패하면 그 사실이 보인�
   expect(new URL(page.url()).pathname).toBe(before);
 });
 
+/**
+ * **접힌 「더 보기」가 실제로 안 보이는가**(cr N-4). jsdom 의 `.hidden` 속성 단언만으로는
+ * `[hidden]{display:none}` 이 **UA 규칙**이라 작성자 CSS 한 칸(`flex`·`grid`)에 뒤집힌다 —
+ * 그때 속성 test 는 초록이고 390px 게이트도 하한이라 늘어난 타깃을 붉히지 못한다. 상자로 잰다.
+ */
+test('좁은 폭에서 접힌 「더 보기」 패널은 보이지 않는다', async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.getByTestId('screen-home')).toBeVisible();
+
+  await expect(page.getByTestId('nav-more')).toBeHidden();
+  await page.getByTestId('nav-more-toggle').click();
+  await expect(page.getByTestId('nav-more')).toBeVisible();
+});
+
 test('성공하면 로그인 자리로 가고 탐색이 사라진다', async ({ page }) => {
   await signIn(page);
 

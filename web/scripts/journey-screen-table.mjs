@@ -126,7 +126,10 @@ export function pathMatches(slotPath, specPath, otherSlotPaths = []) {
      * 참이라 그 행이 `/bids` 를 가리켜도 초록이었다 — 한 축이 통째로 공허했다. 다른 자리의
      * 경로와 **하나도 맞지 않는 것**을 본다.
      */
-    return pathname.startsWith('/') && !otherSlotPaths.some((one) => pathMatches(one, pathname));
+    // `'*'` 는 **함수 안에서** 거른다(cr N-8). 호출자에게 맡기면 그 불변을 모르는 다음 호출자가
+    // 목록에 `'*'` 를 섞고, 그때 안쪽 호출이 기본값으로 돌아 바깥이 **언제나 거짓**이 된다.
+    const others = otherSlotPaths.filter((one) => one !== '*');
+    return pathname.startsWith('/') && !others.some((one) => pathMatches(one, pathname, others));
   }
   const pattern = slotPath
     .split('/')
