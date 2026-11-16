@@ -11,7 +11,13 @@
 //
 // **경계**: 사용자 정의 컴포넌트(대문자 태그)에 넘긴 `onClick` 은 이 축이 보지 않는다. 그 핸들러가
 // 어느 요소에 닿는지는 그 컴포넌트가 정하고, 그 컴포넌트가 `src/**` 안이면 거기서 다시 이 술어를
-// 지난다. 저장소 밖 컴포넌트에 넘기는 꼴은 경계 밖이다(알려진 제한).
+// 지난다. 저장소 밖 컴포넌트에 넘기는 꼴과 `createElement` **호출 인자**로 넘기는 꼴은 경계
+// 밖이다(알려진 제한 — 후자는 변이로 실측했다).
+//
+// **spread 는 경계가 아니라 위반이다**(cr M-4). `<div {...handlers} />` 는 JSX **안**에서 열리는
+// 같은 성질의 구멍인데, 속성 이름이 식 뒤에 숨어 이 술어가 볼 수 없다. 볼 수 없는 것을
+// 통과시키지 않는다 — 비-상호작용 내장 태그의 spread 자체를 위반으로 센다(착수 실측: 출하
+// 트리의 내장 태그 spread 는 **0** 이라 비용이 없다).
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -21,6 +27,12 @@ import ts from 'typescript';
  * 핸들러를 들어도 되는 **내장 상호작용 요소**. 열거지만 이것은 HTML 의 집합이고 저장소의
  * 집합이 아니다 — 늘지 않는다. 늘려야 할 일이 생기면 그것은 새 결정이다.
  */
+/**
+ * 면제가 **조건부**인 태그(cr L-9). `href` 없는 `<a onClick>` 과 `htmlFor` 없는 `<label onClick>` 은
+ * 키보드로 닿지 않는 버튼을 만드는 같은 계열이다 — 그 속성이 있을 때만 상호작용 요소로 센다.
+ */
+export const CONDITIONAL_EXEMPTION = { a: 'href', label: 'htmlFor' };
+
 export const INTERACTIVE_TAGS = new Set([
   'a',
   'button',
@@ -38,7 +50,8 @@ export const INTERACTIVE_TAGS = new Set([
  * 손가락·키로 누르는 핸들러. `onChange`·`onSubmit`·`onFocus` 는 **대상이 아니다** — 그것들은
  * 누르는 자리를 만들지 않는다(그리고 그 자리는 이미 내장 상호작용 요소다).
  */
-const PRESS_HANDLER = /^on(Click|DblClick|DoubleClick|MouseDown|MouseUp|PointerDown|PointerUp|TouchStart|TouchEnd|KeyDown|KeyUp|KeyPress)$/u;
+const PRESS_HANDLER =
+  /^on(Click|AuxClick|ContextMenu|DblClick|DoubleClick|MouseDown|MouseUp|PointerDown|PointerUp|TouchStart|TouchEnd|KeyDown|KeyUp|KeyPress)$/u;
 
 /** 소문자로 시작하는 태그 == 내장 요소. 대문자는 사용자 정의 컴포넌트다(위 「경계」). */
 const isIntrinsic = (tag) => /^[a-z]/u.test(tag);
@@ -55,19 +68,24 @@ export function handlerBearingTags(text, fileName = 'probe.tsx') {
   const visit = (node) => {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName.getText(source);
-      if (isIntrinsic(tag) && !INTERACTIVE_TAGS.has(tag)) {
+      const attributeNames = node.attributes.properties
+        .filter((one) => ts.isJsxAttribute(one))
+        .map((one) => one.name.getText(source));
+      const required = CONDITIONAL_EXEMPTION[tag];
+      // 조건부 면제는 **그 속성이 보일 때만** 선다 — spread 뒤에 숨은 `href` 는 보이지 않으므로
+      // 면제도 서지 않는다(아래 spread 규칙과 같은 방향이다).
+      const exempt = INTERACTIVE_TAGS.has(tag) && (required === undefined || attributeNames.includes(required));
+      if (isIntrinsic(tag) && !exempt) {
+        const at = (property) => source.getLineAndCharacterOfPosition(property.getStart(source)).line + 1;
         for (const property of node.attributes.properties) {
-          if (!ts.isJsxAttribute(property)) {
+          if (ts.isJsxSpreadAttribute(property)) {
+            // **볼 수 없는 것을 통과시키지 않는다**(cr M-4).
+            found.push({ file: fileName, tag, handler: '{...spread}', line: at(property) });
             continue;
           }
           const name = property.name.getText(source);
           if (PRESS_HANDLER.test(name)) {
-            found.push({
-              file: fileName,
-              tag,
-              handler: name,
-              line: source.getLineAndCharacterOfPosition(property.getStart(source)).line + 1,
-            });
+            found.push({ file: fileName, tag, handler: name, line: at(property) });
           }
         }
       }

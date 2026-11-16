@@ -3,7 +3,13 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { handlerBearingTags, INTERACTIVE_TAGS, scanTree, shippedSourceFiles } from './jsx-handler-tags.mjs';
+import {
+  CONDITIONAL_EXEMPTION,
+  handlerBearingTags,
+  INTERACTIVE_TAGS,
+  scanTree,
+  shippedSourceFiles,
+} from './jsx-handler-tags.mjs';
 
 /**
  * M13/13B — 터치 타깃 게이트의 **모집단을 벗어나는 길**을 요소 쪽에서 닫는 축(설계 검토 우회 2 ·
@@ -67,6 +73,55 @@ describe('양성 대조 — 심은 위반이 붉는다', () => {
     const found = handlerBearingTags('export const X = () => <p onClick={a} onKeyUp={b} />;\n');
 
     expect(found).toHaveLength(2);
+  });
+});
+
+describe('spread 와 조건부 면제 (cr M-4 · L-9)', () => {
+  /**
+   * **볼 수 없는 것을 통과시키지 않는다.** `<div {...handlers} />` 는 JSX 안에서 열리는 같은
+   * 성질의 구멍인데 속성 이름이 식 뒤에 숨는다. 착수 실측에서 출하 트리의 내장 태그 spread 는
+   * 0 이라 이 규칙에 비용이 없다.
+   */
+  it('비-상호작용 태그의 spread 는 그 자체로 위반이다', () => {
+    const found = handlerBearingTags('export const X = () => <div {...handlers} />;\n');
+
+    expect(found).toHaveLength(1);
+    expect(found[0].handler).toBe('{...spread}');
+  });
+
+  it('핸들러를 담은 객체 리터럴 spread 도 같다', () => {
+    expect(handlerBearingTags('export const X = () => <span {...{ onClick: run }} />;\n')).toHaveLength(1);
+  });
+
+  it('상호작용 요소의 spread 는 걸리지 않는다 — 그 요소는 애초에 닿는다', () => {
+    expect(handlerBearingTags('export const X = () => <button {...rest}>x</button>;\n')).toStrictEqual([]);
+  });
+
+  /** `href` 없는 `<a onClick>` 은 키보드로 닿지 않는 버튼이다 — 면제가 조건부인 사유다. */
+  it('href 없는 a 의 onClick 은 걸리고, 있으면 걸리지 않는다', () => {
+    expect(handlerBearingTags('export const X = () => <a onClick={run}>x</a>;\n')).toHaveLength(1);
+    expect(handlerBearingTags('export const X = () => <a href="/x" onClick={run}>x</a>;\n')).toStrictEqual([]);
+  });
+
+  it('htmlFor 없는 label 의 onClick 은 걸리고, 있으면 걸리지 않는다', () => {
+    expect(handlerBearingTags('export const X = () => <label onClick={run}>x</label>;\n')).toHaveLength(1);
+    expect(
+      handlerBearingTags('export const X = () => <label htmlFor="q" onClick={run}>x</label>;\n'),
+    ).toStrictEqual([]);
+  });
+
+  /** 조건부 면제의 속성이 **spread 뒤에 숨으면** 면제도 서지 않는다(같은 방향의 규칙). */
+  it('spread 로 href 를 주는 a 는 면제되지 않는다', () => {
+    expect(handlerBearingTags('export const X = () => <a {...link} onClick={run}>x</a>;\n').length).toBeGreaterThan(0);
+  });
+
+  it('조건부 면제 표가 비어 있지 않다 — 비면 이 축이 공허하다', () => {
+    expect(Object.keys(CONDITIONAL_EXEMPTION).sort()).toStrictEqual(['a', 'label']);
+  });
+
+  it('보조 버튼·맥락 메뉴 핸들러도 누르는 자리다', () => {
+    expect(handlerBearingTags('export const X = () => <div onAuxClick={run} />;\n')).toHaveLength(1);
+    expect(handlerBearingTags('export const X = () => <div onContextMenu={run} />;\n')).toHaveLength(1);
   });
 });
 
