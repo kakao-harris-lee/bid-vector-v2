@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { apiClient, hasCsrf, rememberCsrf } from './api/client';
+import { NOTIFICATIONS_QUERY_KEY } from './api/queryKeys';
 import { appRoutes } from './AppRoot';
 import { queryClient } from './queryClient';
 import { screenSlots } from './routes';
@@ -28,7 +29,17 @@ let sent: Sent[] = [];
 let eject: (() => void) | undefined;
 
 /** 안읽음 전수를 **헤더로** 낸다 — 배지가 읽는 값이 거기 있다(본문 행이 아니다). */
-function stub({ unread = 0, signOutStatus = 204 }: { unread?: number; signOutStatus?: number } = {}): void {
+function stub({
+  unread = 0,
+  signOutStatus = 204,
+  unreadAfterRefetch,
+}: {
+  unread?: number;
+  signOutStatus?: number;
+  /** 두 번째 읽기부터 돌려줄 값 — 「다시 돌았다」를 **보이는 값**으로 재려는 자리다. */
+  unreadAfterRefetch?: number;
+} = {}): void {
+  let notificationReads = 0;
   // 서버를 **상태 있게** 흉내 낸다. 로그아웃이 성공하면 그 뒤의 세션 조회는 404 다(계약) —
   // 늘 200 으로 답하면 화면의 CSRF 재획득이 되살아나 「로그아웃 뒤 값이 비었다」가 거짓이 된다
   // (실측: 그 stub 에서 이 단언이 뒤집혔다).
@@ -53,12 +64,14 @@ function stub({ unread = 0, signOutStatus = 204 }: { unread?: number; signOutSta
             });
       }
       if (path === '/api/notifications') {
+        notificationReads += 1;
+        const count = notificationReads > 1 && unreadAfterRefetch !== undefined ? unreadAfterRefetch : unread;
         return new Response(JSON.stringify([]), {
           status: 200,
           headers: {
             'content-type': 'application/json',
             'X-Total-Count': '0',
-            'X-Unread-Count': String(unread),
+            'X-Unread-Count': String(count),
           },
         });
       }
@@ -223,6 +236,23 @@ describe('탐색의 안 읽음 배지', () => {
       expect(call).toBeDefined();
       expect(new URL(call!.url).searchParams.get('size')).toBe('1');
     });
+  });
+
+  /**
+   * **접두의 뜻을 동작으로 잰다**(cr H-2 ③). 키의 모양은 `api/queryKeys.test.ts` 가 보고, 여기서는
+   * 알림함 키를 무효화했을 때 배지가 **실제로 다시 돌아 값이 바뀌는지**를 본다 — 13E 의 읽음
+   * 쓰기가 거는 것이 바로 그 무효화다.
+   */
+  it('알림함 키를 무효화하면 배지가 다시 돌아 값이 바뀐다', async () => {
+    stub({ unread: 7, unreadAfterRefetch: 2 });
+    await renderAt('/');
+    await waitFor(() => expect(screen.getByTestId('nav-unread').textContent).toBe('7'));
+
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+    });
+
+    await waitFor(() => expect(screen.getByTestId('nav-unread').textContent).toBe('2'));
   });
 
   it('로그인 자리에서는 배지 질의를 걸지 않는다', async () => {
