@@ -6,7 +6,7 @@ slice: ux-foundation
 base_sha: a338b55bd10625b68cfe867d6cab688b2adc3270   # 착수 커밋에서 기계로 확인했다(아래 「base 확인」)
 head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다
 in_scope:
-  - web/src/components/                 # 공유 Button·Card 신설 + 기존 넷의 버튼·링크 이관
+  - web/src/components/                 # 공유 Button·Card 신설 + 기존 넷의 버튼·링크 이관(WriteFailure 의 state.from 포함 — 착수 판정 ⓑ)
   - web/src/AppShell.tsx                # 하단 탭 · 상단 줄 · 안 읽음 배지 · 로그아웃 · 문서 제목 · 포커스
   - web/src/LoginScreen.tsx             # 색 토큰화 · 로그인 뒤 원래 자리 복귀
   - web/src/RouteError.tsx              # 색 토큰화만(문면은 13A)
@@ -18,6 +18,7 @@ in_scope:
   - web/src/api/queryKeys.ts            # 셸 배지의 질의 키(X-Unread-Count)
   - web/src/index.css                   # md 중단점이 토큰을 요구할 때만
   - web/e2e/journey/                    # 터치 타깃 게이트 spec 신설(+ 필요한 공통 helper)
+  - web/scripts/                        # 화면 표 등식 게이트 test(컴파일 경계상 src 밖에 선다)
   - web/config/journey-specs.txt        # 그 spec 을 **같은 커밋에서** 등재
   - web/config/gate-tests.txt           # 새 vitest 게이트 test 파일 등재
   - docs/discovery/capability-map.md    # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
@@ -45,12 +46,30 @@ rollback: rollback.md
 
 | # | 항목 | 이 slice 의 처분 |
 | --- | --- | --- |
-| 5 | 모바일 사용감이 약하다 | 착수 보고의 재측정과 설계 검토 판정으로 고정한다 |
-| 6 | 공유 버튼·카드가 없다 | 같음 |
-| 10 | 셸과 세션 | 같음 — 「로그인 뒤 원래 자리」의 뜻은 팀장 답이 정한다(착수 보고 ⓑ) |
+| 5 | 모바일 사용감이 약하다 | **닫힘** — 하단 탭(`md` 미만)·상단 줄(이상)·터치 타깃 ≥ 44px 전수·가로 넘침 0 을 터치 타깃 게이트가 잠근다 |
+| 6 | 공유 버튼·카드가 없다 | **닫힘** — 공유 `Button`·`Card` 를 세우고 모든 화면의 버튼·카드를 옮긴다(모양만, 동작 0) |
+| 10 | 셸과 세션 | **닫힘** — 로그아웃·복귀·문서 제목·머리 포커스·색 토큰화 다섯 축 전부. 복귀 대상은 **앱 내부 경로만**(착수 판정 ⓑ) |
 
-처분 문면은 팀장 답을 받은 뒤 이 절에 고정한다(범위 밖 판정은 팀장만 낸다). 착수 실측의 수치와
-그것을 낸 조건은 `commands.md` 가 정본이고 여기 옮겨 적지 않는다.
+처분의 **근거와 잔여**는 `checklist.md` 가 정본이다. 착수 실측의 수치와 그것을 낸 조건은
+`commands.md` 가 정본이고 여기 옮겨 적지 않는다.
+
+## 착수 판정 (팀장 2026-11-16 — 이 slice 의 범위 밖 판정과 게이트 술어 확정)
+
+계약 `milestone-13.md` 「착수 판정」 절의 이 slice 몫이다. 팀장이 종결 때 같은 문면을 그 절에 올린다.
+
+| 물음 | 판정 |
+| --- | --- |
+| ⓐ 하단 탭의 칸 수 | **다섯 칸 = A·B·D·E + 「더 보기」**(알림함·설정). 계약의 「다섯」은 탭 칸 수로 읽는다. C 워크시트는 경로 인자가 있어 전역 탐색 밖이다. 「더 보기」의 **현재 자리 표시와 키보드 도달**은 설계 검토가 든다 |
+| ⓑ 「로그인 뒤 원래 자리」의 원천 | `components/WriteFailure.tsx` 의 링크 둘이 `state.from` 을 싣는다 → in_scope. **조건: 복귀 대상은 앱 내부 경로(pathname+search)만** — 외부 URL · `//` 시작 · `/login` 자신은 `/` 로 떨어뜨리고 그 셋을 test 로 잠근다 |
+| ⓒ `Toast.tsx` 의 버튼 둘 | 13B 가 공유 `Button` 으로 옮긴다. 계약 13D 행의 「편집 0」은 13D 기준이다 |
+| ⓓ `routes.tsx` 편집 | **분류 필드 하나만, 문자열 0.** 문서 제목은 `slot.label` 에서 유도한다(13A 의 라벨 변경이 자동으로 흐른다) |
+| ⓔ 셸 배지의 질의 | 키 `['notifications','unread']`(기존 `NOTIFICATIONS_QUERY_KEY` 접두 아래) + 접두 test · `/login` 에선 걸지 않는다. **조건: `size` 가 계약에 있는지 확인** — 확인함(`listNotifications` 의 `size`, 1~100, 기본 20) |
+| ⓕ 터치 타깃 게이트의 자리 | `e2e/journey/touch-target.spec.ts`(390×844) + **같은 커밋**에서 `config/journey-specs.txt` 등재 |
+| ⓖ 로그아웃의 여정 영향 | 쓰기 경로는 vitest(목 + 승인 쌍 등식), 여정은 **버튼 존재와 터치 타깃만** |
+| ⓗ `index.css` | 편집 **0** — Tailwind v4 가 `md` 를 기본으로 낸다 |
+| ⓘ sr-only 를 모집단에서 빼는 술어 | **computed style(`clip`·`clip-path`)로 판정**한다. 클래스 이름 술어 금지. 음성 대조: 보이는 버튼에 은폐를 걸면 **화면별 계수 하한**이 붉는다. 더해 **건너뛰기 링크는 포커스됐을 때 ≥ 44px** 인지 한 단언을 따로 둔다 |
+| ⓙ 카드 안 본문 링크 | `a` **전수 유지**. 블록 타깃화는 13B 몫이다(13B 가 혼자 먼저 머지되므로 13C·13D·13E 소유 침범이 아니다). **조건: 이동 대상·동작 0 변경을 test 로 잠그고, 문장 속 인라인 링크가 나오면 블록화하지 말고 보고한다** |
+| 터치 타깃 하한 N | A 10 · B 8 · C 6 · D 10 · E 7 · 알림함 12 · 설정 18 · 로그인 1 · 없는 주소 5. 단서 둘 승인 — **게이트 spec 은 자기 fixture 로 알림함 N 을 고정**하고, **로그인 화면에는 하단 탭을 그리지 않는다** |
 
 ## 승인 경계 (계약 「승인 경계」 절의 이 slice 몫)
 
@@ -75,8 +94,21 @@ rollback: rollback.md
 
 ## 계약 갱신
 
-(착수 보고에 대한 팀장 답과 설계 검토 판정 뒤에 적는다.)
+**(1) in_scope 에 `web/src/components/WriteFailure.tsx` 가 든다**(착수 판정 ⓑ). `/login` 으로 가는
+길이 그 파일의 링크 둘뿐이라 「원래 자리」를 아는 자리가 거기 말고 없다. 그 파일은 버튼·링크 이관
+대상이기도 하다.
+
+**(2) 새 게이트 test 파일이 셋 선다**(계획) — 공유 컴포넌트의 짝 test 둘과 화면 표 등식 하나.
+세 파일 모두 **만드는 커밋에서** `web/config/gate-tests.txt` 에 등재한다. 화면 표 등식이
+`web/scripts/` 에 서는 이유는 컴파일 경계다: `web/src` 안의 test 가 `e2e/**` 를 import 하면 W-4 의
+「프로그램 전수가 `web/src` ∪ `web/node_modules` 안」 단언이 붉는다(그 게이트의 술어를 바꾸는 것은
+새 결정이다).
+
+**(3) 여정 spec 하나가 는다** — `web/e2e/journey/touch-target.spec.ts`. 같은 커밋에서
+`web/config/journey-specs.txt` 에 적는다(양방향 등식).
 
 ## 갱신 이력
 
 - 2026-11-16 초판(착수 보고와 함께).
+- 2026-11-16 팀장 착수 판정 열 건을 §착수 판정에 옮겨 적고 §받는 항목의 처분을 고정 ·
+  §계약 갱신 (1)~(3).
