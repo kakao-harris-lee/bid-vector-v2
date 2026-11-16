@@ -26,7 +26,7 @@ const MIN_TOUCH_PX = 44;
  * 개찰 축 fixture 를 쓰지만 그 축과 **겹치지 않는다**: 개찰 결과는 수집 경로의 읽기이고 입찰 건의
  * 생애주기는 운영자 기록이다. 둘은 서로의 값을 보지 않는다.
  */
-const OWN_NOTICES = ['SYN-M9-OPEN-NOT-OPENED', 'SYN-M9-OPEN-NOT-COLLECTED'] as const;
+const OWN_NOTICES = ['SYN-M9-OPEN-NOT-OPENED', 'SYN-M9-OPEN-REBID'] as const;
 
 /**
  * 도는 화면과 **화면별 계수 하한**(팀장 착수 판정 2026-11-16).
@@ -120,13 +120,29 @@ async function seedCase(page: Page, csrf: string, noticeNumber: string): Promise
 
   const added = (await write('/api/bid-cases', { noticeNumber, noticeRound, bidKind: 'REAL' })) as {
     readonly caseId: number;
+    readonly state: string;
   };
   const caseId = added.caseId;
   const iso = (days: number): string => new Date(Date.now() + days * 86_400_000).toISOString();
   const money = { amountWon: 1_010_000_000, vatTreatment: 'INCLUSIVE' };
 
-  await write('/api/bid-price-requests', { noticeNumber, noticeRound, currentActiveBids: 1 });
-  await write(`/api/bid-cases/${caseId}/draft`, { ...money, presentedAt: iso(0) });
+  /**
+   * **담은 직후의 상태가 길을 가른다**(계약 전이표). 마감이 지난 공고는 담는 순간
+   * `DEADLINE_PASSED_UNRECORDED` 라 초안을 만들 수 없고(그 상태는 초안 행의 출발 집합에 없다)
+   * **소급 기록**으로 바로 들어간다. 마감 전이면 초안을 거친다.
+   *
+   * 상태를 묻지 않고 한 길만 밀던 앞 판은 그 자리에서 409 `INVALID_TRANSITION` 이었다 — 하네스
+   * 공고 열둘 가운데 마감이 남은 것이 넷뿐이고 그 넷은 다른 여정이 쓴다.
+   */
+  if (added.state === 'WATCHING') {
+    await write('/api/bid-price-requests', { noticeNumber, noticeRound, currentActiveBids: 1 });
+    await write(`/api/bid-cases/${caseId}/draft`, { ...money, presentedAt: iso(0) });
+  } else {
+    expect(
+      added.state,
+      `${noticeNumber}: 담은 직후 상태가 초안·소급 어느 길도 아니다 — fixture 가 달라졌다`,
+    ).toBe('DEADLINE_PASSED_UNRECORDED');
+  }
   await write(`/api/bid-cases/${caseId}/record`, { ...money, submittedAt: iso(0) });
   await write(`/api/bid-cases/${caseId}/await-opening`, { openingAt: iso(2) });
   await write(`/api/bid-cases/${caseId}/opening`, { provisionalFirst: true });
