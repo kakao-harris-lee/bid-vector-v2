@@ -174,6 +174,89 @@ describe('verifier 우회 여섯 (v H-2)', () => {
 });
 
 /**
+ * **verifier H-4 의 네 우회.** 태그 판정이 초기화식의 **글자 꼴**에 걸려 있어 넷이 전부 샜다.
+ * 이제 검사기에게 태그 식의 **타입**을 묻는다 — 문자열 리터럴(유니온)이면 그 글자들이 태그다.
+ */
+describe('변수 태그의 타입 판정 (v H-4)', () => {
+  it('① `as const` 로 좁힌 문자열', () => {
+    const text = "const Tag = 'div' as const;\nexport const X = () => <Tag onClick={run} />;\n";
+
+    expect(handlerBearingTags(text)).toHaveLength(1);
+    expect(handlerBearingTags(text)[0].tag).toBe('div');
+  });
+
+  /** 유니온은 **구성원 하나라도** 허용 집합 밖이면 위반이다. */
+  it('② 리터럴 유니온 삼항 — 구성원마다 센다', () => {
+    const text = "const Tag: 'div' | 'span' = cond ? 'span' : 'div';\nexport const X = () => <Tag onClick={run} />;\n";
+
+    expect(handlerBearingTags(text).map((one) => one.tag).sort()).toStrictEqual(['div', 'span']);
+  });
+
+  /** 검사기는 **스코프**를 본다 — 같은 파일의 이름 가림이 더 이상 Map 의 마지막 값에 걸리지 않는다. */
+  it('③ 안쪽 스코프가 바깥 이름을 가린다', () => {
+    const text = "const Tag = 'button';\nexport function X() {\n  const Tag = 'div';\n  return <Tag onClick={run} />;\n}\n";
+
+    expect(handlerBearingTags(text)).toHaveLength(1);
+    expect(handlerBearingTags(text)[0].tag).toBe('div');
+  });
+
+  /** 이 저장소의 `Card` 가 이미 쓰는 꼴이다 — 13C~13E 가 악의 없이 쓸 수 있는 모양. */
+  it('④ 다형 `as` prop 의 안쪽', () => {
+    const text = "function Poly({ as: Tag, ...rest }: { as: 'div' | 'span' }) {\n  return <Tag {...rest} />;\n}\n";
+
+    expect(handlerBearingTags(text).length).toBeGreaterThan(0);
+    expect(handlerBearingTags(text).every((one) => one.handler === '{...spread}')).toBe(true);
+  });
+
+  it('음성 — 진짜 컴포넌트는 걸리지 않는다', () => {
+    const text = 'function Real() { return null; }\nexport const X = () => <Real onClick={run} />;\n';
+
+    expect(handlerBearingTags(text)).toStrictEqual([]);
+  });
+
+  it('음성 — 리터럴이 허용 태그면 걸리지 않는다', () => {
+    expect(
+      handlerBearingTags("const Tag = 'button' as const;\nexport const X = () => <Tag onClick={run} />;\n"),
+    ).toStrictEqual([]);
+    expect(
+      handlerBearingTags(
+        "const Tag: 'button' | 'select' = cond ? 'button' : 'select';\nexport const X = () => <Tag onClick={run} />;\n",
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /** 넓은 `string` 은 `'div'` 일 수 있다 — 증명할 수 없으면 **보수적으로** 센다. */
+  it('넓은 문자열 타입은 보수적으로 위반이다', () => {
+    const text = 'export function X({ as: Tag }: { as: string }) {\n  return <Tag onClick={run} />;\n}\n';
+
+    expect(handlerBearingTags(text).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **JSX 속성 밖의 배선**(v M-6). 둘 다 요소에 누르는 핸들러를 다는 길이고 출하 트리 사용은 0 이다.
+ */
+describe('JSX 속성 밖의 배선 (v M-6)', () => {
+  it('cloneElement 로 props 를 주면 걸린다', () => {
+    expect(handlerBearingTags('export const X = () => cloneElement(<div />, { onClick: f });\n')).toHaveLength(1);
+  });
+
+  it('요소에 직접 거는 addEventListener 는 걸린다', () => {
+    const text = 'export const X = () => <div ref={(el) => { el?.addEventListener("click", f); }} />;\n';
+
+    expect(handlerBearingTags(text)).toHaveLength(1);
+  });
+
+  /** `document`·`window` 수신자는 **요소가 아니라** 문서다 — 누르는 자리를 만들지 않는다. */
+  it('document·window 수신자는 걸리지 않는다', () => {
+    expect(handlerBearingTags('export function X() { document.addEventListener("keydown", f); }\n')).toStrictEqual(
+      [],
+    );
+    expect(handlerBearingTags('export function X() { window.addEventListener("resize", f); }\n')).toStrictEqual([]);
+  });
+});
+
+/**
  * **`form` 은 통째가 아니라 제출 계열만**(팀장 판정 2026-11-16). 허용 쪽 짝 목록은 HTML 이 정한
  * 폼 이벤트 둘로 고정이고 좁히는 방향이라 「열거를 늘리는」 꼴이 아니다.
  */
@@ -203,9 +286,17 @@ describe('음성 대조 — 걸리면 안 되는 것', () => {
     expect(handlerBearingTags('export const X = () => <summary onClick={b}>x</summary>;\n')).toStrictEqual([]);
   });
 
-  /** 사용자 정의 컴포넌트는 이 축 밖이다(경계) — 그 핸들러가 닿는 요소는 그 파일에서 다시 센다. */
+  /**
+   * 사용자 정의 컴포넌트는 이 축 밖이다 — 그 핸들러가 닿는 요소는 그 컴포넌트 안에서 센다.
+   *
+   * **선언을 함께 둔다**: 태그 판정이 이제 타입이라, 선언 없는 이름은 `any` 가 되어 「증명 불가」로
+   * 센다(보수적). 출하 트리에서는 컴포넌트가 언제나 들여와 있어 함수 타입이고, 그 사실을 이
+   * 대조가 그대로 흉내 낸다.
+   */
   it('대문자 태그(사용자 정의 컴포넌트)는 걸리지 않는다', () => {
-    expect(handlerBearingTags('export const X = () => <Button onClick={run}>x</Button>;\n')).toStrictEqual([]);
+    const text = 'function Button(p: { onClick?: () => void }) { return null; }\nexport const X = () => <Button onClick={run}>x</Button>;\n';
+
+    expect(handlerBearingTags(text)).toStrictEqual([]);
   });
 
   /**
