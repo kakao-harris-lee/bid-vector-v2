@@ -131,3 +131,8 @@ scripts/kotlin-read-guard.test.mjs
 # 오늘의 `as const satisfies` 표를 붉히지 않는 것과 **새 블록이 앞 블록의 금지를 덮어쓰지 않는
 # 것**(flat config 함정)을 같은 자리에서 잰다.
 scripts/type-assertion-gate.test.mjs
+# M13/13B — 공유 버튼·카드의 짝 test. 이 둘이 **크기·어조 표의 전수**와 요소의 신원(목록 안
+# 카드가 `li` 인 것 · 이동이 `a` 인 것)을 든다. 실제 상자 높이는 클래스 글자로 설 수 없어
+# 터치 타깃 게이트(390px 여정)가 재고, 이 파일들은 그 게이트가 재지 못하는 축을 맡는다.
+src/components/Button.test.tsx
+src/components/Card.test.tsx
