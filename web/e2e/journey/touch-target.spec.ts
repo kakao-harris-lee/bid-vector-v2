@@ -1,4 +1,4 @@
-import { expect, request as apiRequest, test, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { journeyContext, search, signIn } from './shared';
 
@@ -246,11 +246,14 @@ function restorableAxes(profile: ProfileSnapshot): Record<string, unknown> {
 }
 
 /**
- * 이 spec 이 **쓰기 전에** 읽어 둔 프로필과, 되돌림이 쓸 세션. 되돌림은 test 밖(`afterAll`)에서
- * 도는데 그 자리에는 `page` 가 없어, 세션 쿠키를 들고 API 전용 맥락을 따로 세운다.
+ * 이 spec 이 **쓰기 전에** 읽어 둔 프로필.
+ *
+ * **세션은 들고 다니지 않는다**: 로그인은 그 계정의 **살아 있는 세션을 폐기한다**(서버의 로그인
+ * 완료가 세션 등록·자격 확인·기존 세션 폐기를 한 트랜잭션으로 묶는다). 그래서 앞 test 에서 떠
+ * 둔 쿠키는 **뒤 test 의 로그인이 죽인다** — 그 쿠키로 되돌리려던 앞 판이 `afterAll` 에서
+ * 401 이었다(실측). 되돌림은 자기 로그인을 새로 한다.
  */
 let savedProfile: ProfileSnapshot | null = null;
-let savedStorage: Awaited<ReturnType<BrowserContext['storageState']>> | null = null;
 
 /**
  * 프로필을 **등록 상태로** 채운다 — 그래야 설정·시작하기의 등록 분야 체크박스가 선다.
@@ -268,7 +271,6 @@ async function seedProfile(page: Page, csrf: string): Promise<void> {
   const before = await page.request.get('/api/profile');
   expect(before.status(), '되돌릴 프로필을 읽지 못했다').toBe(200);
   savedProfile = (await before.json()) as ProfileSnapshot;
-  savedStorage = await page.context().storageState();
 
   const write = async (path: string, data: unknown): Promise<void> => {
     const response = await page.request.post(path, { headers: { 'X-Operator-Csrf': csrf }, data });
@@ -367,14 +369,18 @@ async function prepare(page: Page): Promise<void> {
  * 씨앗이 돌기 전에 죽었으면 **되돌릴 것이 없다** — 그때 여기서 또 실패하면 진단이 teardown 으로
  * 옮겨 간다(원래 실패를 덮지 않는 규율).
  */
-test.afterAll(async () => {
+test.afterAll(async ({ browser }) => {
   const profile = savedProfile;
-  const storage = savedStorage;
-  if (profile === null || storage === null) {
+  if (profile === null) {
     return;
   }
-  const api = await apiRequest.newContext({ baseURL: journeyContext().previewUrl, storageState: storage });
+  // 되돌림의 **자기 자리**를 연다 — 이 hook 에는 test 의 `page` 가 없고, 앞 test 의 쿠키는
+  // 뒤 test 의 로그인이 이미 죽였다. 설정의 기준 주소는 이 hook 에 실리지 않으므로 하네스가
+  // 적어 둔 값을 그대로 준다.
+  const page = await browser.newPage({ baseURL: journeyContext().previewUrl });
   try {
+    await signIn(page);
+    const api = page.request;
     const session = await api.get('/api/session');
     expect(session.status(), '되돌림이 세션을 읽지 못했다').toBe(200);
     const { csrf } = (await session.json()) as { readonly csrf: string };
@@ -416,7 +422,7 @@ test.afterAll(async () => {
       '이 spec 이 계정 전역 프로필을 남겼다',
     ).toStrictEqual(restorableAxes(profile));
   } finally {
-    await api.dispose();
+    await page.close();
   }
 });
 
