@@ -102,12 +102,14 @@ function ActionForm({
         <fieldset className="mt-2">
           <legend className="text-xs text-ink-soft">{input.label}</legend>
           <div className="mt-1 flex flex-wrap gap-3">
+            {/*
+              손가락이 닿는 상자는 **레이블**이다(M13/13B cr P-3 — 팀장 판정: 13D 착수 전이라
+              13B 가 고친다). 암묵 레이블이 `min-h-11` 을 들고 컨트롤은 기본 크기다.
+            */}
             {(input.choices ?? []).map((choice) => (
               <label key={choice.value} className="flex min-h-11 items-center gap-1 text-sm">
-                {/* 손가락이 닿는 상자를 44px 로(M13/13B cr N-1 — 팀장 판정: 13D 착수 전이라 13B 가 고친다). */}
                 <input
                   type="radio"
-                  className="size-11"
                   name={groupId}
                   value={choice.value}
                   checked={value === choice.value}

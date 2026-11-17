@@ -84,19 +84,36 @@ async function measure(page: Page): Promise<Measurement> {
      * `input[type=button|submit|reset]` · `summary` · `select`, 그리고 **체크박스·라디오**
      * (cr N-1 · 팀장 판정). 손가락이 누르는 자리이고, AST 축이 `input` 을 **무조건** 면제하므로
      * 이쪽에서 받지 않으면 두 게이트 사이에 틈이 생긴다 — 그 틈에 실물이 있던 쪽이 바로
-     * 체크박스였다(실측 7자리 13px). `label` 은 넣지 않는다 — 누르는 자리는 연결된 입력이다.
+     * 체크박스였다(실측 7자리 13px). `label` 은 **선택자에** 넣지 않는다 — 레이블이 혼자 서면
+     * 누르는 자리가 아니고, 감싼 레이블은 아래 `touchBoxOf` 가 그 컨트롤을 통해 집는다.
      */
     const nodes = [
       ...document.querySelectorAll(
         'button, a, [role="tab"], [role="button"], input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], summary, select',
       ),
     ];
+    /**
+     * **누르는 자리가 그 요소 자신이 아닐 수 있다**(cr P-3). 체크박스·라디오를 `<label>` 이
+     * **감싸면** 레이블 어디를 눌러도 그 컨트롤이 켜진다 — 손가락이 닿는 상자는 레이블이다.
+     * 그래서 그 자리는 레이블을 잰다.
+     *
+     * **느슨해지지 않는다**: 레이블이 44px 미만이면 그대로 붉고(변이 T), 컨트롤을 키워서 얻던
+     * 초록이 **레이블 상자**로 옮겨갈 뿐이다. 감싸지 않은(명시 `htmlFor`) 레이블은 집지 않는다 —
+     * 그때는 떨어진 두 상자라 컨트롤 자신이 닿는 자리다.
+     */
+    const touchBoxOf = (node: Element): Element => {
+      if (!(node instanceof HTMLInputElement) || (node.type !== 'checkbox' && node.type !== 'radio')) {
+        return node;
+      }
+      return node.closest('label') ?? node;
+    };
     const targets = [];
     const offscreen = [];
     const partiallyClipped = [];
     for (const node of nodes) {
-      const style = getComputedStyle(node);
-      let box = node.getBoundingClientRect();
+      const measured = touchBoxOf(node);
+      const style = getComputedStyle(measured);
+      let box = measured.getBoundingClientRect();
       /**
        * **시각 은폐는 위치 지정된 요소에서만 선다**(v M-2). `clip` 은 absolute·fixed 가 아닌
        * 요소에 **적용되지 않는데** computed 값에는 그대로 남는다 — 그 값만 보던 앞 판은 보이고
@@ -106,22 +123,12 @@ async function measure(page: Page): Promise<Measurement> {
       const clipped =
         positioned && (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)');
       /**
-       * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
-       * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
-       * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
-       */
-      if (!clipped && (style.clipPath !== 'none' || style.clip !== 'auto')) {
-        partiallyClipped.push(
-          `${node.tagName.toLowerCase()} "${(node.getAttribute('aria-label') ?? node.textContent ?? '').trim().slice(0, 24)}"`,
-        );
-      }
-      /**
        * **상자가 0 이어도 글자가 보일 수 있다**(v M-2). `display: contents` 요소는 자기 상자가
        * 없지만 글자는 그려지고 클릭이 발화한다. 그 자리는 **글자 범위**로 다시 잰다.
        */
       if (!clipped && box.width === 0 && box.height === 0) {
         const range = document.createRange();
-        range.selectNodeContents(node);
+        range.selectNodeContents(measured);
         const textBox = range.getBoundingClientRect();
         if (textBox.width > 0 && textBox.height > 0) {
           box = textBox;
@@ -137,9 +144,21 @@ async function measure(page: Page): Promise<Measurement> {
       if (!visible) {
         continue;
       }
-      const name = (node.getAttribute('aria-label') ?? node.textContent ?? '').trim().slice(0, 40);
+      const name = (node.getAttribute('aria-label') ?? measured.textContent ?? '').trim().slice(0, 40);
+      /**
+       * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
+       * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
+       * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
+       *
+       * **보이는 것만 센다**(cr P-5) — `display:none`·0 상자처럼 안 보이는 자리까지 보고하면
+       * 「보이는 타깃」을 재는 게이트가 안 보이는 것 때문에 붉는다. 위 `continue` 뒤라 여기 오는
+       * 것은 전부 보이는 자리이고, 그래서 `clipped` 는 이미 거짓이다.
+       */
+      if (style.clipPath !== 'none' || style.clip !== 'auto') {
+        partiallyClipped.push(`${measured.tagName.toLowerCase()} "${name.slice(0, 24)}"`);
+      }
       targets.push({
-        tag: node.tagName.toLowerCase(),
+        tag: measured.tagName.toLowerCase(),
         name,
         width: Math.round(box.width * 10) / 10,
         height: Math.round(box.height * 10) / 10,
@@ -150,7 +169,7 @@ async function measure(page: Page): Promise<Measurement> {
        * 그 둘을 조상의 `overflow-x` 와 실제 스크롤 여지로 가른다.
        */
       let scrollable = false;
-      for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
+      for (let parent = measured.parentElement; parent !== null; parent = parent.parentElement) {
         const overflowX = getComputedStyle(parent).overflowX;
         if (!((overflowX === 'auto' || overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth)) {
           continue;
@@ -173,7 +192,9 @@ async function measure(page: Page): Promise<Measurement> {
       }
       // 부분 화소 반올림을 0.5px 로 받는다 — 그보다 큰 삐져나감만 센다.
       if (!scrollable && (box.left < -0.5 || box.right > window.innerWidth + 0.5)) {
-        offscreen.push(`${node.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`);
+        offscreen.push(
+          `${measured.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`,
+        );
       }
     }
     return {

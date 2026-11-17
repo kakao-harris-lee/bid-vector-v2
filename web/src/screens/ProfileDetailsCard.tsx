@@ -147,12 +147,11 @@ export function ProfileDetailsCard({
           <fieldset data-testid="nara-fields-choice" className="mt-2">
             <legend className="text-xs text-ink-soft">등록 분야</legend>
             <div className="mt-1 flex flex-wrap gap-3">
+              {/* 손가락이 닿는 상자는 **레이블**이다(M13/13B cr P-3) — 암묵 레이블이 `min-h-11` 을 든다. */}
               {Object.entries(NARA_FIELD_DISPLAY).map(([value, display]) => (
                 <label key={value} className="flex min-h-11 items-center gap-1 text-sm">
-                  {/* 손가락이 닿는 상자를 44px 로(M13/13B cr N-1). */}
                   <input
                     type="checkbox"
-                    className="size-11"
                     aria-label={display.label}
                     checked={form.naraRegisteredFields.includes(value as NaraField)}
                     onChange={(event) =>

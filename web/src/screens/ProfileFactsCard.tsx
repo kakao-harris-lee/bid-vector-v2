@@ -108,14 +108,17 @@ export function ProfileFactsCard({
             />
           </label>
         </div>
+        {/*
+          손가락이 닿는 상자는 **이 레이블**이다(M13/13B cr P-3) — 암묵 레이블이라 어디를 눌러도
+          체크박스가 켜지므로 `min-h-11` 은 레이블이 들고 컨트롤은 기본 크기다. 값·동작·이름은
+          라운드 2 에서도 바뀌지 않았다.
+        */}
         <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
-          {/* 손가락이 닿는 상자를 44px 로(M13/13B cr N-1). 값·동작·이름은 그대로다. */}
           <input
             type="checkbox"
             aria-label="면허를 신고함"
             checked={form.licensesDeclared}
             onChange={(event) => setFacts({ ...form, licensesDeclared: event.target.checked })}
-            className="size-11"
           />
           면허를 신고함
           <span className="text-xs text-ink-soft">(끄면 면허 목록을 비워 보냅니다)</span>
