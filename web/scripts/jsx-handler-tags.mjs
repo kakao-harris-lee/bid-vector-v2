@@ -58,7 +58,40 @@ const HANDLER_ATTRIBUTE = /^on[A-Z]/u;
 /** 소문자로 시작하는 태그 == 내장 요소. */
 const isIntrinsicName = (tag) => /^[a-z]/u.test(tag);
 
-const typeParts = (type) => (type.isUnion() ? type.types : [type]);
+/**
+ * 증명할 수 없는 **문자열 꼴** — 어느 태그인지 열거할 수 없으면 보수적으로 위반이다. 넓은
+ * `string`·`any` · 템플릿 리터럴 · 매핑(`Uppercase<T>`) · **제약 없는 타입 매개변수**가 든다.
+ */
+const UNPROVABLE_TAG_FLAGS =
+  ts.TypeFlags.String |
+  ts.TypeFlags.Any |
+  ts.TypeFlags.TemplateLiteral |
+  ts.TypeFlags.StringMapping |
+  ts.TypeFlags.TypeParameter;
+
+/** 제약을 따라가는 깊이 상한 — 순환 제약에서 멈추는 자리다. */
+const CONSTRAINT_DEPTH = 8;
+
+/**
+ * 유니온을 펼치고 **타입 매개변수는 제약으로 푼다**(v H-5).
+ *
+ * `function X<T extends 'div' | 'span'>({ as: Tag }: { as: T })` 는 오늘 **tsc 가** 막는다(핸들러를
+ * 실으면 TS2322). 그래도 여기서 푸는 이유는 게이트가 **컴파일러의 우연에 기대지 않기** 위해서다 —
+ * 그 진단이 느슨해지는 날 이 축이 조용히 열린다. 제약이 없는 `T` 는 `'div'` 일 수 있으므로 위
+ * 플래그에 걸려 「증명 불가」로 간다.
+ */
+function typeParts(checker, type, depth = 0) {
+  if (type.isUnion()) {
+    return type.types.flatMap((one) => typeParts(checker, one, depth));
+  }
+  if ((type.getFlags() & ts.TypeFlags.TypeParameter) !== 0 && depth < CONSTRAINT_DEPTH) {
+    const constraint = checker.getBaseConstraintOfType(type);
+    if (constraint !== undefined) {
+      return typeParts(checker, constraint, depth + 1);
+    }
+  }
+  return [type];
+}
 
 /**
  * 그 태그 식이 가리키는 **내장 태그 집합**.
@@ -76,21 +109,13 @@ function intrinsicTagsOf(checker, tagName, written) {
     return [written];
   }
   const type = checker.getTypeAtLocation(tagName);
-  const parts = typeParts(type);
   const tags = [];
-  for (const part of parts) {
+  for (const part of typeParts(checker, type)) {
     if (part.isStringLiteral()) {
       tags.push(part.value);
       continue;
     }
-    const flags = part.getFlags();
-    if (
-      (flags & ts.TypeFlags.String) !== 0 ||
-      (flags & ts.TypeFlags.Any) !== 0 ||
-      // 템플릿 리터럴(`` `h${number}` ``)·매핑(`Uppercase<T>`)은 **열거할 수 없는 문자열**이다.
-      (flags & ts.TypeFlags.TemplateLiteral) !== 0 ||
-      (flags & ts.TypeFlags.StringMapping) !== 0
-    ) {
+    if ((part.getFlags() & UNPROVABLE_TAG_FLAGS) !== 0) {
       // 어느 태그인지 **증명할 수 없다** — 넓은 문자열은 `'div'` 일 수 있다.
       return null;
     }
@@ -120,41 +145,111 @@ const scopedHandlers = (tag) =>
   new Set(Object.hasOwn(TAG_SCOPED_HANDLERS, tag) ? TAG_SCOPED_HANDLERS[tag] : []);
 
 /**
- * **JSX 속성 밖의 배선**(verifier M-6). 둘 다 요소에 누르는 핸들러를 다는 길인데 JSX 속성을
- * 보는 술어가 닿지 못한다.
- *  · `cloneElement(<div/>, { onClick })` — 속성이 호출 인자로 간다. 맨 식별자와 속성 접근
- *    (`React.cloneElement`) **둘 다** 센다. 출하 트리 사용 **0**. 들여오면서 이름을 바꾼 꼴
- *    (`import { cloneElement as clone }`)은 이 층이 보지 못한다 — 알려진 제한이다.
- *  · `el.addEventListener('click', …)` — ref 콜백에서 요소에 직접 단다. 출하 트리에서 수신자가
- *    `document` 인 자리 하나뿐이고(셸의 Escape), 그것은 **요소가 아니라 문서**라 누르는 자리를
- *    만들지 않는다. 그래서 **요소 수신자**만 센다.
+ * **JSX 속성 밖의 배선**(verifier M-6 · M-7). 요소에 누르는 핸들러를 다는 길인데 JSX 속성을 보는
+ * 술어가 닿지 못하는 자리들이다.
+ *
+ * **글자가 아니라 구조로 본다**(v M-7). 앞 판은 호출 **텍스트**에 걸려 있어 여섯이 전부 샜다
+ * (실측): `React.cloneElement` · `cloneElement as clone` · `el['addEventListener']` ·
+ * `el.addEventListener.bind(el)` · `const document = el` 로 이름을 가린 수신자 · `el.onclick =`.
+ * 이름을 더 적는 대신 축을 둘로 옮겼다.
+ *  · **부른 대상**은 검사기 심볼로 본다 — 별칭(`as clone`)과 이름공간(`React.`)이 함께 풀린다.
+ *  · **수신자**는 타입이 `Element` 계열인지로 본다 — 이름을 어떻게 가려도 타입은 못 가린다.
+ *    `document`·`window` 는 `Element` 를 상속하지 않으므로 그대로 빠진다(셸의 Escape 하나).
+ *
+ * `createElement` 별칭은 **선언된 경계**라 이 축에 넣지 않는다(JSX 가 아니다).
  */
-function wiringOutsideJsx(source) {
+const CLONE_ELEMENT = 'cloneElement';
+const LISTENER_MEMBER = 'addEventListener';
+/** 요소에 **직접 대입**하는 인라인 핸들러(`el.onclick = …`) — DOM 의 소문자 이름이다. */
+const INLINE_HANDLER_MEMBER = /^on[a-z]+$/u;
+/** 바탕 사슬에 이 이름이 있으면 **DOM 요소**다. `Document`·`Window` 에는 없다. */
+const DOM_ELEMENT_ROOT = 'Element';
+/** 바탕 사슬을 따라가는 깊이 상한. */
+const BASE_CHAIN_DEPTH = 16;
+
+/** 그 타입이 **요소**인가 — 바탕 사슬에 `Element` 가 있는지로 본다. */
+function inheritsElement(type, depth = 0) {
+  if (depth >= BASE_CHAIN_DEPTH) {
+    return false;
+  }
+  const parts = type.isUnion() || type.isIntersection() ? type.types : [type];
+  return parts.some((part) => {
+    if (part.getSymbol()?.getName() === DOM_ELEMENT_ROOT) {
+      return true;
+    }
+    return (part.getBaseTypes?.() ?? []).some((base) => inheritsElement(base, depth + 1));
+  });
+}
+
+/**
+ * 수신자가 무엇인가 — `element`(요소) · `unprovable`(타입이 없어 **증명 불가**) · `other`.
+ * 증명 불가는 **보수적으로** 위반 쪽이다: 타입이 서 있지 않은 자리에서 이 축이 조용히 열리면
+ * 「이름을 가리면 된다」가 다시 참이 된다.
+ */
+function receiverKind(checker, expression) {
+  const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
+  if ((type.getFlags() & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+    return 'unprovable';
+  }
+  return inheritsElement(type) ? 'element' : 'other';
+}
+
+/** 그 접근이 가리키는 **멤버 이름** — 점 접근과 대괄호 접근(`el['addEventListener']`) 둘 다. */
+function memberName(node) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return node.name.text;
+  }
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+    return node.argumentExpression.text;
+  }
+  return null;
+}
+
+/** 별칭이면 **가리키는 심볼**로 푼다. 풀 수 없으면 `undefined` — 부르는 쪽이 글자로 떨어진다. */
+function aliasTarget(checker, symbol) {
+  if ((symbol.getFlags() & ts.SymbolFlags.Alias) === 0) {
+    return symbol;
+  }
+  try {
+    const aliased = checker.getAliasedSymbol(symbol);
+    return (aliased.getDeclarations()?.length ?? 0) > 0 ? aliased : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 부른 대상의 이름 — **심볼을 먼저** 묻고(별칭 해소), 풀리지 않으면 적힌 글자로 떨어진다. */
+function calleeName(checker, callee) {
+  const symbol = checker.getSymbolAtLocation(callee);
+  const resolved = symbol === undefined ? undefined : aliasTarget(checker, symbol);
+  return resolved?.getName() ?? memberName(callee) ?? (ts.isIdentifier(callee) ? callee.text : null);
+}
+
+function wiringOutsideJsx(checker, source) {
   const found = [];
   const at = (node) => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  const hit = (node, tag, handler) => found.push({ file: source.fileName, tag, handler, line: at(node) });
   const visit = (node) => {
-    if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      // 부른 **이름**은 맨 식별자일 수도 속성 접근(`React.cloneElement`)일 수도 있다 — 둘을
-      // 가르면 이름 하나짜리 열거가 되어 속성 접근 꼴이 그대로 샌다(cr P-4).
-      const calleeName = ts.isIdentifier(callee)
-        ? callee.text
-        : ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : null;
-      if (calleeName === 'cloneElement') {
-        found.push({ file: source.fileName, tag: '<cloneElement>', handler: 'props 인자', line: at(node) });
-      } else if (
-        calleeName === 'addEventListener' &&
-        ts.isPropertyAccessExpression(callee) &&
-        !(ts.isIdentifier(callee.expression) && (callee.expression.text === 'document' || callee.expression.text === 'window'))
-      ) {
-        found.push({
-          file: source.fileName,
-          tag: `<${callee.expression.getText(source)}>`,
-          handler: 'addEventListener',
-          line: at(node),
-        });
+    if (ts.isCallExpression(node) && calleeName(checker, node.expression) === CLONE_ELEMENT) {
+      hit(node, `<${CLONE_ELEMENT}>`, 'props 인자');
+    }
+    // **부르든 묶든** 센다 — `el.addEventListener.bind(el)` 은 호출 자리에 없지만 같은 배선이다.
+    if (
+      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+      memberName(node) === LISTENER_MEMBER
+    ) {
+      const kind = receiverKind(checker, node.expression);
+      if (kind !== 'other') {
+        hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, LISTENER_MEMBER);
+      }
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      const name = memberName(node.left);
+      if (name !== null && INLINE_HANDLER_MEMBER.test(name)) {
+        const kind = receiverKind(checker, node.left.expression);
+        if (kind !== 'other') {
+          hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, `${name} 대입`);
+        }
       }
     }
     ts.forEachChild(node, visit);
@@ -199,27 +294,47 @@ export function handlerBearingTagsIn(program, source) {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return [...found, ...wiringOutsideJsx(source)];
+  return [...found, ...wiringOutsideJsx(checker, source)];
 }
+
+const PROBE_FILE = '/probe.tsx';
+const probeModulePath = (specifier) => resolve('/', `${specifier.replace(/[^\w.-]/gu, '_')}.d.ts`);
 
 /**
  * 합성 원문 하나를 재는 입구(대조용). **가벼운 프로그램**을 세운다 — 실제 tsconfig 프로그램은
  * 대조마다 세우기에 비싸고, 리터럴 타입 추론에는 표준 라이브러리가 필요 없다.
+ *
+ * `modules` 로 **곁 모듈**을 줄 수 있다(v M-7). 들여오며 이름을 바꾼 꼴과 다른 파일의 상수 태그는
+ * 한 파일 안에서 흉내 낼 수 없다 — 별칭 해소가 모듈 해소를 거치기 때문이다. 이 자리가 없으면 그
+ * 둘을 **심어서만** 잴 수 있고, 심은 것은 측정이지 잠금이 아니다.
  */
-export function handlerBearingTags(text, fileName = '/probe.tsx') {
-  const options = { jsx: ts.JsxEmit.Preserve, noLib: true, target: ts.ScriptTarget.ESNext, noResolve: true };
+export function handlerBearingTags(text, modules = {}) {
+  const sources = new Map([[resolve(PROBE_FILE), { text, kind: ts.ScriptKind.TSX }]]);
+  for (const [specifier, body] of Object.entries(modules)) {
+    sources.set(probeModulePath(specifier), { text: body, kind: ts.ScriptKind.TS });
+  }
+  const options = { jsx: ts.JsxEmit.Preserve, noLib: true, target: ts.ScriptTarget.ESNext };
   const host = ts.createCompilerHost(options, true);
   const baseGetSourceFile = host.getSourceFile.bind(host);
-  host.getSourceFile = (name, languageVersion, onError, shouldCreate) =>
-    resolve(name) === resolve(fileName)
-      ? ts.createSourceFile(name, text, languageVersion, true, ts.ScriptKind.TSX)
-      : baseGetSourceFile(name, languageVersion, onError, shouldCreate);
-  host.fileExists = (name) => resolve(name) === resolve(fileName) || ts.sys.fileExists(name);
-  host.readFile = (name) => (resolve(name) === resolve(fileName) ? text : ts.sys.readFile(name));
-  const program = ts.createProgram([fileName], options, host);
-  const source = program.getSourceFile(fileName);
+  host.getSourceFile = (name, languageVersion, onError, shouldCreate) => {
+    const own = sources.get(resolve(name));
+    return own === undefined
+      ? baseGetSourceFile(name, languageVersion, onError, shouldCreate)
+      : ts.createSourceFile(name, own.text, languageVersion, true, own.kind);
+  };
+  host.fileExists = (name) => sources.has(resolve(name)) || ts.sys.fileExists(name);
+  host.readFile = (name) => sources.get(resolve(name))?.text ?? ts.sys.readFile(name);
+  // 준 것만 푼다 — 그 밖의 들여오기는 **해소되지 않은 채** 둔다(실제 패키지를 끌어오지 않는다).
+  host.resolveModuleNames = (names) =>
+    names.map((one) =>
+      sources.has(probeModulePath(one))
+        ? { resolvedFileName: probeModulePath(one), extension: ts.Extension.Dts }
+        : undefined,
+    );
+  const program = ts.createProgram([PROBE_FILE], options, host);
+  const source = program.getSourceFile(PROBE_FILE);
   if (source === undefined) {
-    throw new Error(`합성 원문이 프로그램에 없다: ${fileName}`);
+    throw new Error(`합성 원문이 프로그램에 없다: ${PROBE_FILE}`);
   }
   return handlerBearingTagsIn(program, source);
 }

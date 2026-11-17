@@ -32,9 +32,21 @@ describe('비-상호작용 내장 태그의 포인터·키 핸들러 (M13/13B)',
     expect(files.some((one) => one.includes('/'))).toBe(true);
   });
 
+  /**
+   * 한 자리를 **한 줄로** 낸다. 태그 유니온이 넓으면(React 의 `ElementType` 은 내장 태그 전수다)
+   * 한 요소가 150 줄을 내 실패 문면이 읽히지 않는다 — 자리와 핸들러로 묶고 태그 수를 함께 적는다.
+   * 묶는 것은 **문면뿐**이고 단언은 그대로 「빈 목록」이다.
+   */
   it('출하 트리에 위반이 0 이다', () => {
+    const byPlace = new Map();
+    for (const one of findings) {
+      const key = `${one.file}:${one.line} ${one.handler}`;
+      const seen = byPlace.get(key);
+      byPlace.set(key, { tag: seen?.tag ?? one.tag, count: (seen?.count ?? 0) + 1 });
+    }
+
     expect(
-      findings.map((one) => `${one.file}:${one.line} <${one.tag} ${one.handler}>`),
+      [...byPlace].map(([place, { tag, count }]) => `${place} <${tag}${count > 1 ? ` 외 ${count - 1}` : ''}>`),
       '포인터·키 핸들러는 내장 상호작용 요소나 공유 Button 이 든다',
     ).toStrictEqual([]);
   });
@@ -264,42 +276,110 @@ describe('변수 태그의 타입 판정 (v H-4)', () => {
 });
 
 /**
- * **JSX 속성 밖의 배선**(v M-6). 둘 다 요소에 누르는 핸들러를 다는 길이고 출하 트리 사용은 0 이다.
+ * **JSX 속성 밖의 배선**(v M-6 · M-7). 요소에 누르는 핸들러를 다는 길이고 출하 트리 사용은 0 이다.
+ *
+ * 술어가 **호출 텍스트**에 걸려 있던 앞 판에서 verifier 가 여섯을 실측으로 통과시켰다. 이제 부른
+ * 대상은 **심볼**(별칭 해소)로, 수신자는 **타입**(`Element` 계열인가)으로 본다 — 여섯이 각각
+ * 여기서 RED 다.
+ *
+ * DOM 모양을 원문에 **선언해 둔다**: 가벼운 프로그램은 표준 라이브러리를 싣지 않으므로
+ * `HTMLDivElement`·`Document` 가 없고, 그러면 수신자 축이 전부 「증명 불가」로 접혀 **음성 대조가
+ * 공허해진다**(`document` 가 초록인지 재지 못한다).
  */
-describe('JSX 속성 밖의 배선 (v M-6)', () => {
-  it('cloneElement 로 props 를 주면 걸린다', () => {
+const DOM = [
+  'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
+  'interface Node extends EventTarget {}',
+  'interface Element extends Node { onclick: (() => void) | null; }',
+  'interface HTMLElement extends Element {}',
+  'interface HTMLDivElement extends HTMLElement {}',
+  'interface Document extends Node {}',
+  'interface Window extends EventTarget {}',
+  'declare const document: Document;',
+  'declare const window: Window;',
+  'declare const el: HTMLDivElement;',
+  'declare const f: () => void;',
+].join('\n');
+
+const REACT_MODULE = {
+  react: 'export declare function cloneElement(element: unknown, props: unknown): unknown;\nexport declare function createElement(tag: unknown, props: unknown): unknown;\n',
+};
+
+describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
+  it('맨 식별자 cloneElement 는 걸린다', () => {
     expect(handlerBearingTags('export const X = () => cloneElement(<div />, { onClick: f });\n')).toHaveLength(1);
   });
 
-  /**
-   * **이름 하나짜리 열거로 서지 않는다**(cr P-4). `React.cloneElement(…)` 은 속성 접근 꼴이라
-   * 맨 식별자만 보던 앞 판을 그대로 지나갔다 — 같은 파일에서 「이름 목록으로 가르면 샌다」를
-   * 두 번 고친 자리에 그 꼴이 다시 섰다.
-   */
-  it('React.cloneElement 처럼 속성 접근 꼴도 걸린다', () => {
-    expect(handlerBearingTags('export const X = () => React.cloneElement(<div />, { onClick: f });\n')).toHaveLength(
+  /** ① 이름공간을 거친 호출 — 맨 식별자만 보던 앞 판이 그대로 지나갔다. */
+  it('① React.cloneElement 도 걸린다', () => {
+    const text = `import * as React from 'react';\nexport const X = () => React.cloneElement(<div />, { onClick: f });\n`;
+
+    expect(handlerBearingTags(text, REACT_MODULE)).toHaveLength(1);
+  });
+
+  /** ② 들여오며 바꾼 이름 — **글자로는 보이지 않고** 심볼로만 보인다. */
+  it('② import { cloneElement as clone } 도 걸린다', () => {
+    const text = `import { cloneElement as clone } from 'react';\nexport const X = () => clone(<div />, { onClick: f });\n`;
+    const found = handlerBearingTags(text, REACT_MODULE);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].tag).toBe('<cloneElement>');
+  });
+
+  /** **선언된 경계는 그대로 경계다** — `createElement` 별칭은 이 축이 아니다(JSX 가 아니다). */
+  it('음성 — createElement 별칭은 걸리지 않는다', () => {
+    const text = `import { createElement as h } from 'react';\nexport const X = () => h('div', { onClick: f });\n`;
+
+    expect(handlerBearingTags(text, REACT_MODULE)).toStrictEqual([]);
+  });
+
+  it('요소에 직접 거는 addEventListener 는 걸린다', () => {
+    expect(handlerBearingTags(`${DOM}\nexport const X = () => { el.addEventListener('click', f); };\n`)).toHaveLength(
       1,
     );
   });
 
-  it('음성 — 이름이 다른 속성 접근 호출은 걸리지 않는다', () => {
-    expect(handlerBearingTags('export const X = () => React.createElement("div", { onClick: f });\n')).toStrictEqual(
-      [],
-    );
+  /** ③ 대괄호 접근 — 멤버 이름이 글자 리터럴 뒤로 숨는다. */
+  it("③ el['addEventListener'] 도 걸린다", () => {
+    expect(
+      handlerBearingTags(`${DOM}\nexport const X = () => { el['addEventListener']('click', f); };\n`),
+    ).toHaveLength(1);
   });
 
-  it('요소에 직접 거는 addEventListener 는 걸린다', () => {
-    const text = 'export const X = () => <div ref={(el) => { el?.addEventListener("click", f); }} />;\n';
+  /** ④ 묶어 두고 나중에 부르기 — 호출 자리에 없지만 같은 배선이다. */
+  it('④ el.addEventListener.bind(el) 도 걸린다', () => {
+    expect(
+      handlerBearingTags(`${DOM}\nexport const X = () => { const on = el.addEventListener.bind(el); on('click', f); };\n`),
+    ).toHaveLength(1);
+  });
+
+  /** ⑤ 이름 가림 — 수신자를 `document` 라고 **부르기만** 한다. 타입은 가려지지 않는다. */
+  it('⑤ document 라는 이름으로 가린 요소 수신자도 걸린다', () => {
+    const text = `${DOM}\nexport const X = () => { const document = el; document.addEventListener('click', f); };\n`;
 
     expect(handlerBearingTags(text)).toHaveLength(1);
   });
 
-  /** `document`·`window` 수신자는 **요소가 아니라** 문서다 — 누르는 자리를 만들지 않는다. */
-  it('document·window 수신자는 걸리지 않는다', () => {
-    expect(handlerBearingTags('export function X() { document.addEventListener("keydown", f); }\n')).toStrictEqual(
+  /** ⑥ 인라인 핸들러 대입 — `addEventListener` 를 아예 지나간다. */
+  it('⑥ el.onclick = f 도 걸린다', () => {
+    const found = handlerBearingTags(`${DOM}\nexport const X = () => { el.onclick = f; };\n`);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].handler).toBe('onclick 대입');
+  });
+
+  /** `document`·`window` 수신자는 **요소가 아니다** — 누르는 자리를 만들지 않는다. */
+  it('음성 — document·window 수신자는 걸리지 않는다', () => {
+    expect(handlerBearingTags(`${DOM}\nexport const X = () => { document.addEventListener('x', f); };\n`)).toStrictEqual(
       [],
     );
-    expect(handlerBearingTags('export function X() { window.addEventListener("resize", f); }\n')).toStrictEqual([]);
+    expect(handlerBearingTags(`${DOM}\nexport const X = () => { window.addEventListener('x', f); };\n`)).toStrictEqual(
+      [],
+    );
+  });
+
+  /** 타입이 서 있지 않으면 **증명 불가**라 보수적으로 센다 — 그 자리에서 열리면 가림이 다시 통한다. */
+  it('타입 없는 수신자는 보수적으로 걸린다', () => {
+    expect(handlerBearingTags("export const X = (e) => { e.addEventListener('click', f); };\n")).toHaveLength(1);
   });
 });
 
