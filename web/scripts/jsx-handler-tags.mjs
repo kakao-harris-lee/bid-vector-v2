@@ -28,8 +28,9 @@
 // 초기화식의 **리터럴 노드 꼴**로 따라가던 앞 판은 `'div' as const` · 리터럴 유니온 삼항 · 같은
 // 파일의 이름 가림 · 다형 `as` prop 넷에 전부 열려 있었다(실측). 이제 TS 검사기에게 **태그 식의
 // 타입**을 물어, 문자열 리터럴(또는 그 유니온)이면 그 글자들을 태그로 본다 — 유니온은 구성원
-// **하나라도** 허용 집합 밖이면 위반이다. 타입이 넓은 `string`·`any` 면 어느 태그인지 증명할 수
-// 없으므로 **보수적으로** 위반이다.
+// **하나라도** 허용 집합 밖이면 위반이고, 컴포넌트 구성원이 섞여 있어도(React 의 `ElementType`
+// 이 그 꼴이다) 리터럴 쪽을 버리지 않는다(cr P-1). 타입이 **열거할 수 없는 문자열**
+// (넓은 `string`·`any`·템플릿 리터럴)이면 어느 태그인지 증명할 수 없으므로 **보수적으로** 위반이다.
 //
 // **경계**: `createElement` **호출 인자**로 넘긴 핸들러는 이 축 밖이다(JSX 가 아니다).
 import { readdirSync } from 'node:fs';
@@ -63,9 +64,12 @@ const typeParts = (type) => (type.isUnion() ? type.types : [type]);
  * 그 태그 식이 가리키는 **내장 태그 집합**.
  *
  *  · 소문자로 적힌 태그 — 글자 그대로.
- *  · 그 밖 — 검사기에게 타입을 묻는다. 전부 문자열 리터럴이면 그 글자들, 넓은 문자열이면
- *    `null`(증명 불가 → 부르는 쪽이 보수적으로 센다), 그 밖(함수·클래스 = 진짜 컴포넌트)이면
- *    빈 집합.
+ *  · 그 밖 — 검사기에게 타입을 묻는다. 문자열 리터럴 구성원은 그 글자들로 모으고, 열거할 수
+ *    없는 문자열(넓은 `string`·`any`·템플릿 리터럴)이면 `null`(증명 불가 → 부르는 쪽이
+ *    보수적으로 센다), 함수·클래스 = 진짜 컴포넌트인 구성원은 **건너뛴다**(이 축 밖이다).
+ *
+ * 그래서 **섞인 유니온**(리터럴 ∪ 컴포넌트 — React 의 `ElementType` 이 그 꼴이다)에서도 리터럴
+ * 구성원이 그대로 살아, 「유니온은 하나라도 허용 밖이면 위반」이 선다(cr P-1).
  */
 function intrinsicTagsOf(checker, tagName, written) {
   if (isIntrinsicName(written)) {
@@ -80,12 +84,19 @@ function intrinsicTagsOf(checker, tagName, written) {
       continue;
     }
     const flags = part.getFlags();
-    if ((flags & ts.TypeFlags.String) !== 0 || (flags & ts.TypeFlags.Any) !== 0) {
+    if (
+      (flags & ts.TypeFlags.String) !== 0 ||
+      (flags & ts.TypeFlags.Any) !== 0 ||
+      // 템플릿 리터럴(`` `h${number}` ``)·매핑(`Uppercase<T>`)은 **열거할 수 없는 문자열**이다.
+      (flags & ts.TypeFlags.TemplateLiteral) !== 0 ||
+      (flags & ts.TypeFlags.StringMapping) !== 0
+    ) {
       // 어느 태그인지 **증명할 수 없다** — 넓은 문자열은 `'div'` 일 수 있다.
       return null;
     }
-    // 함수·클래스·객체 = 진짜 컴포넌트. 이 축의 대상이 아니다.
-    return [];
+    // 함수·클래스·객체 = 진짜 컴포넌트. 이 축의 대상이 아니니 **건너뛴다** — 여기서 빠지면
+    // 섞인 유니온(React 의 `ElementType` 꼴)에서 **모아 둔 리터럴이 함께 버려져**, 선언한
+    // 「하나라도 밖이면 위반」이 서지 않는다(cr P-1).
   }
   return tags;
 }
@@ -111,7 +122,9 @@ const scopedHandlers = (tag) =>
 /**
  * **JSX 속성 밖의 배선**(verifier M-6). 둘 다 요소에 누르는 핸들러를 다는 길인데 JSX 속성을
  * 보는 술어가 닿지 못한다.
- *  · `cloneElement(<div/>, { onClick })` — 속성이 호출 인자로 간다. 출하 트리 사용 **0**.
+ *  · `cloneElement(<div/>, { onClick })` — 속성이 호출 인자로 간다. 맨 식별자와 속성 접근
+ *    (`React.cloneElement`) **둘 다** 센다. 출하 트리 사용 **0**. 들여오면서 이름을 바꾼 꼴
+ *    (`import { cloneElement as clone }`)은 이 층이 보지 못한다 — 알려진 제한이다.
  *  · `el.addEventListener('click', …)` — ref 콜백에서 요소에 직접 단다. 출하 트리에서 수신자가
  *    `document` 인 자리 하나뿐이고(셸의 Escape), 그것은 **요소가 아니라 문서**라 누르는 자리를
  *    만들지 않는다. 그래서 **요소 수신자**만 센다.
@@ -122,11 +135,18 @@ function wiringOutsideJsx(source) {
   const visit = (node) => {
     if (ts.isCallExpression(node)) {
       const callee = node.expression;
-      if (ts.isIdentifier(callee) && callee.text === 'cloneElement') {
+      // 부른 **이름**은 맨 식별자일 수도 속성 접근(`React.cloneElement`)일 수도 있다 — 둘을
+      // 가르면 이름 하나짜리 열거가 되어 속성 접근 꼴이 그대로 샌다(cr P-4).
+      const calleeName = ts.isIdentifier(callee)
+        ? callee.text
+        : ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : null;
+      if (calleeName === 'cloneElement') {
         found.push({ file: source.fileName, tag: '<cloneElement>', handler: 'props 인자', line: at(node) });
       } else if (
+        calleeName === 'addEventListener' &&
         ts.isPropertyAccessExpression(callee) &&
-        callee.name.text === 'addEventListener' &&
         !(ts.isIdentifier(callee.expression) && (callee.expression.text === 'document' || callee.expression.text === 'window'))
       ) {
         found.push({

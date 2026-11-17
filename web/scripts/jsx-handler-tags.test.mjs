@@ -208,6 +208,36 @@ describe('변수 태그의 타입 판정 (v H-4)', () => {
     expect(handlerBearingTags(text).every((one) => one.handler === '{...spread}')).toBe(true);
   });
 
+  /**
+   * **섞인 유니온**(cr P-1). React 의 다형 표준 타입 `ElementType` 이 정확히 이 꼴이다 — 내장
+   * 태그 문자열 리터럴들 ∪ 컴포넌트. 앞 판은 컴포넌트 구성원을 처음 만나는 순간 **모아 둔
+   * 리터럴을 통째로 버려서**, 선언한 「유니온은 하나라도 밖이면 위반」이 섞인 유니온에서 서지
+   * 않았다(아무것도 위반이 아니었다).
+   */
+  it('⑤ 리터럴과 컴포넌트가 섞인 유니온 — 리터럴 구성원을 버리지 않는다', () => {
+    const text =
+      'type Elementish = "div" | "button" | ((p: { onClick?: () => void }) => null);\nexport function Box({ as: Tag }: { as: Elementish }) {\n  return <Tag onClick={run} />;\n}\n';
+
+    expect(handlerBearingTags(text).map((one) => one.tag)).toStrictEqual(['div']);
+  });
+
+  it('음성 — 섞인 유니온의 리터럴이 전부 허용이면 걸리지 않는다', () => {
+    const text =
+      'type Elementish = "button" | "select" | ((p: unknown) => null);\nexport function Box({ as: Tag }: { as: Elementish }) {\n  return <Tag onClick={run} />;\n}\n';
+
+    expect(handlerBearingTags(text)).toStrictEqual([]);
+  });
+
+  /** 템플릿 리터럴 타입은 **어느 태그인지 열거할 수 없다** — 보수적으로 증명 불가다(cr P-1). */
+  it('⑥ 템플릿 리터럴 타입 태그는 증명 불가로 센다', () => {
+    const found = handlerBearingTags(
+      'export function X({ as: Tag }: { as: `h${number}` }) {\n  return <Tag onClick={run} />;\n}\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].tag).toContain('알 수 없는 태그');
+  });
+
   it('음성 — 진짜 컴포넌트는 걸리지 않는다', () => {
     const text = 'function Real() { return null; }\nexport const X = () => <Real onClick={run} />;\n';
 
@@ -239,6 +269,23 @@ describe('변수 태그의 타입 판정 (v H-4)', () => {
 describe('JSX 속성 밖의 배선 (v M-6)', () => {
   it('cloneElement 로 props 를 주면 걸린다', () => {
     expect(handlerBearingTags('export const X = () => cloneElement(<div />, { onClick: f });\n')).toHaveLength(1);
+  });
+
+  /**
+   * **이름 하나짜리 열거로 서지 않는다**(cr P-4). `React.cloneElement(…)` 은 속성 접근 꼴이라
+   * 맨 식별자만 보던 앞 판을 그대로 지나갔다 — 같은 파일에서 「이름 목록으로 가르면 샌다」를
+   * 두 번 고친 자리에 그 꼴이 다시 섰다.
+   */
+  it('React.cloneElement 처럼 속성 접근 꼴도 걸린다', () => {
+    expect(handlerBearingTags('export const X = () => React.cloneElement(<div />, { onClick: f });\n')).toHaveLength(
+      1,
+    );
+  });
+
+  it('음성 — 이름이 다른 속성 접근 호출은 걸리지 않는다', () => {
+    expect(handlerBearingTags('export const X = () => React.createElement("div", { onClick: f });\n')).toStrictEqual(
+      [],
+    );
   });
 
   it('요소에 직접 거는 addEventListener 는 걸린다', () => {
