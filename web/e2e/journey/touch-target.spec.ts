@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, request as apiRequest, test, type BrowserContext, type Page } from '@playwright/test';
 
-import { search, signIn } from './shared';
+import { journeyContext, search, signIn } from './shared';
 
 /**
  * **터치 타깃 게이트**(M13/13B, 계약 「게이트」 절). 모바일 폭에서 화면마다 **보이는**
@@ -209,13 +209,67 @@ async function measure(page: Page): Promise<Measurement> {
 }
 
 /**
+ * 프로필 한 벌 가운데 **이 spec 이 덮는 축**. 두 쓰기(사업 정보 · 자격 사실)가 통째로 교체하는
+ * 절이고, 되돌림은 읽어 둔 이 값들을 그대로 돌려보낸다.
+ */
+interface ProfileSnapshot {
+  readonly businessTypes: readonly string[];
+  readonly licensesDeclared: boolean;
+  readonly licenseNames: readonly string[];
+  readonly regionTerms: readonly string[];
+  readonly tradeName?: string | null;
+  readonly headquartersRegion?: string | null;
+  readonly naraRegistration: string;
+  readonly naraRegisteredFields: readonly string[];
+  readonly businessCertificateExpiresOn?: string | null;
+}
+
+/**
+ * 되돌림이 **비교하는** 축 — 없는 값을 `null` 로 모은다(응답은 미설정 필드를 빼기도 하고 `null`
+ * 로 주기도 하므로, 두 꼴을 한 값으로 접지 않으면 되돌린 뒤 비교가 꼴 차이로 깨진다).
+ *
+ * `qualificationDeclared` 는 **여기 없다**: 자격 사실 쓰기는 언제나 행을 세우므로 「미설정」으로는
+ * 돌아갈 수 없다(알려진 제한). 값은 전부 돌아가고 잃는 것은 「미설정 ↔ 미신고」의 구분 하나다.
+ */
+function restorableAxes(profile: ProfileSnapshot): Record<string, unknown> {
+  return {
+    businessTypes: profile.businessTypes,
+    licensesDeclared: profile.licensesDeclared,
+    licenseNames: profile.licenseNames,
+    regionTerms: profile.regionTerms,
+    tradeName: profile.tradeName ?? null,
+    headquartersRegion: profile.headquartersRegion ?? null,
+    naraRegistration: profile.naraRegistration,
+    naraRegisteredFields: profile.naraRegisteredFields,
+    businessCertificateExpiresOn: profile.businessCertificateExpiresOn ?? null,
+  };
+}
+
+/**
+ * 이 spec 이 **쓰기 전에** 읽어 둔 프로필과, 되돌림이 쓸 세션. 되돌림은 test 밖(`afterAll`)에서
+ * 도는데 그 자리에는 `page` 가 없어, 세션 쿠키를 들고 API 전용 맥락을 따로 세운다.
+ */
+let savedProfile: ProfileSnapshot | null = null;
+let savedStorage: Awaited<ReturnType<BrowserContext['storageState']>> | null = null;
+
+/**
  * 프로필을 **등록 상태로** 채운다 — 그래야 설정·시작하기의 등록 분야 체크박스가 선다.
  *
  * 이 씨앗이 없으면 게이트가 그 체크박스를 **한 번도 보지 못한다**(실측: 설정 27 → 24). cr N-1 이
  * 가리킨 실물이 바로 그 자리라, 모집단에 넣고도 안 그리면 넣은 뜻이 사라진다. 값은 전부 합성이고
  * 사업자등록번호는 넣지 않는다(계약에 칸이 없다).
+ *
+ * **프로필은 계정에 하나뿐인 전역 상태다**(cr P-2) — `seedCase` 의 공고 둘처럼 자기 fixture 가 될
+ * 수 없다. 여정 하네스는 `workers: 1` 이고 **파일마다 DB 를 되돌리는 자리가 없어서**, 남기면 뒤
+ * 여정이 남의 잔류를 전제로 깨진다(오늘 깨지지 않는 이유는 spec 이름의 알파벳 순서뿐이었다).
+ * 그래서 **쓰기 전에 읽어 두고** 아래 `afterAll` 이 되돌린다.
  */
 async function seedProfile(page: Page, csrf: string): Promise<void> {
+  const before = await page.request.get('/api/profile');
+  expect(before.status(), '되돌릴 프로필을 읽지 못했다').toBe(200);
+  savedProfile = (await before.json()) as ProfileSnapshot;
+  savedStorage = await page.context().storageState();
+
   const write = async (path: string, data: unknown): Promise<void> => {
     const response = await page.request.post(path, { headers: { 'X-Operator-Csrf': csrf }, data });
     expect(response.ok(), `${path}: ${response.status()}`).toBe(true);
@@ -304,6 +358,67 @@ async function prepare(page: Page): Promise<void> {
   }
   seeded = true;
 }
+
+/**
+ * **전역 프로필을 되돌린다**(cr P-2). 화면이 아니라 **출하 API 로** 한다 — 실패 뒤 페이지가 어디에
+ * 있는지 알 수 없고, 되돌림은 화면의 능력이 아니라 운영자 설정 행위다(`shared.ts` 의 어휘·금액대
+ * 되돌림과 같은 규율).
+ *
+ * 씨앗이 돌기 전에 죽었으면 **되돌릴 것이 없다** — 그때 여기서 또 실패하면 진단이 teardown 으로
+ * 옮겨 간다(원래 실패를 덮지 않는 규율).
+ */
+test.afterAll(async () => {
+  const profile = savedProfile;
+  const storage = savedStorage;
+  if (profile === null || storage === null) {
+    return;
+  }
+  const api = await apiRequest.newContext({ baseURL: journeyContext().previewUrl, storageState: storage });
+  try {
+    const session = await api.get('/api/session');
+    expect(session.status(), '되돌림이 세션을 읽지 못했다').toBe(200);
+    const { csrf } = (await session.json()) as { readonly csrf: string };
+    const headers = { 'X-Operator-Csrf': csrf };
+
+    const details = await api.post('/api/profile/business-details', {
+      headers,
+      data: {
+        tradeName: profile.tradeName ?? null,
+        headquartersRegion: profile.headquartersRegion ?? null,
+        naraRegistration: profile.naraRegistration,
+        // 등록 분야·인증서 만료일은 **등록 상태일 때만** 실을 수 있고 그때는 필수다(계약).
+        ...(profile.naraRegistration === 'REGISTERED'
+          ? {
+              naraRegisteredFields: profile.naraRegisteredFields,
+              businessCertificateExpiresOn: profile.businessCertificateExpiresOn ?? null,
+            }
+          : {}),
+      },
+    });
+    expect(details.ok(), `사업 정보를 되돌리지 못했다(${details.status()})`).toBe(true);
+
+    const facts = await api.post('/api/profile/qualification-facts', {
+      headers,
+      data: {
+        businessTypes: profile.businessTypes,
+        licensesDeclared: profile.licensesDeclared,
+        licenseNames: profile.licenseNames,
+        regionTerms: profile.regionTerms,
+      },
+    });
+    expect(facts.ok(), `자격 사실을 되돌리지 못했다(${facts.status()})`).toBe(true);
+
+    // **되돌림까지 단언한다** — 보낸 것이 아니라 **서버에 남은 것**을 본다.
+    const read = await api.get('/api/profile');
+    expect(read.status(), '되돌린 프로필을 읽지 못했다').toBe(200);
+    expect(
+      restorableAxes((await read.json()) as ProfileSnapshot),
+      '이 spec 이 계정 전역 프로필을 남겼다',
+    ).toStrictEqual(restorableAxes(profile));
+  } finally {
+    await api.dispose();
+  }
+});
 
 test.describe.configure({ mode: 'serial' });
 
