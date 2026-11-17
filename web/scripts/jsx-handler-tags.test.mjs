@@ -189,6 +189,18 @@ describe('verifier 우회 여섯 (v H-2)', () => {
  * **verifier H-4 의 네 우회.** 태그 판정이 초기화식의 **글자 꼴**에 걸려 있어 넷이 전부 샜다.
  * 이제 검사기에게 태그 식의 **타입**을 묻는다 — 문자열 리터럴(유니온)이면 그 글자들이 태그다.
  */
+/**
+ * React 의 다형 태그 타입을 **곁 모듈로** 세운다. 가벼운 프로그램에는 `@types/react` 가 없고,
+ * 한 파일 안에서 적으면 그 꼴이 실제 들여오기를 거치는지 알 수 없다.
+ */
+const ELEMENT_TYPE_MODULE = {
+  react: [
+    'export type ComponentType<P> = (props: P) => null;',
+    "export type ElementType = 'div' | 'span' | 'button' | ComponentType<unknown>;",
+    '',
+  ].join('\n'),
+};
+
 describe('변수 태그의 타입 판정 (v H-4)', () => {
   it('① `as const` 로 좁힌 문자열', () => {
     const text = "const Tag = 'div' as const;\nexport const X = () => <Tag onClick={run} />;\n";
@@ -248,6 +260,88 @@ describe('변수 태그의 타입 판정 (v H-4)', () => {
 
     expect(found).toHaveLength(1);
     expect(found[0].tag).toContain('알 수 없는 태그');
+  });
+
+  /**
+   * **verifier 가 실측한 세 꼴**(H-5). 위 ⑤ 와 같은 계열이지만 **그 꼴 자체를** 둔다 — 셋 다
+   * `return []` 로 빠져 게이트 초록 · tsc 0 · lint 0 이었다. React 의 다형 `as` prop 이 쓰는
+   * 관용 타입이고 13C~13E 가 악의 없이 고를 모양이다.
+   */
+  it('⑦ as?: ElementType 다형 prop — 기본값까지 달린 꼴', () => {
+    const text = [
+      `import type { ElementType } from 'react';`,
+      `export function Box({ as: Tag = 'div', run }: { as?: ElementType; run: () => void }) {`,
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text, ELEMENT_TYPE_MODULE).map((one) => one.tag).sort()).toStrictEqual(['div', 'span']);
+  });
+
+  it('⑧ 삼항이 리터럴과 컴포넌트를 섞는다', () => {
+    const text = [
+      'function Real({ onClick }: { onClick: () => void }) {',
+      '  return <button type="button" onClick={onClick} />;',
+      '}',
+      'export function Box({ c, run }: { c: boolean; run: () => void }) {',
+      "  const Tag = c ? 'div' : Real;",
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text).map((one) => one.tag)).toStrictEqual(['div']);
+  });
+
+  it("⑨ 'div' | ComponentType 유니온", () => {
+    const text = [
+      `import type { ComponentType } from 'react';`,
+      `export function Box({ as: Tag, run }: { as: 'div' | ComponentType<{ onClick: () => void }>; run: () => void }) {`,
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text, ELEMENT_TYPE_MODULE).map((one) => one.tag)).toStrictEqual(['div']);
+  });
+
+  /**
+   * **타입 매개변수는 제약으로 푼다**(H-5 후단). 오늘은 tsc 가 이 자리를 막지만(핸들러를 실으면
+   * TS2322), 게이트가 **컴파일러의 우연에 기대지 않게** 스스로 푼다.
+   */
+  it('⑩ 제약 있는 타입 매개변수 태그', () => {
+    const text = [
+      "export function Box<T extends 'div' | 'span'>({ as: Tag, run }: { as: T; run: () => void }) {",
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text).map((one) => one.tag).sort()).toStrictEqual(['div', 'span']);
+  });
+
+  it('음성 — 제약이 전부 허용 태그면 걸리지 않는다', () => {
+    const text = [
+      "export function Box<T extends 'button' | 'select'>({ as: Tag, run }: { as: T; run: () => void }) {",
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text)).toStrictEqual([]);
+  });
+
+  /** 제약이 **없는** 타입 매개변수는 `'div'` 일 수 있다 — 증명 불가다. */
+  it('제약 없는 타입 매개변수는 보수적으로 걸린다', () => {
+    const text = [
+      'export function Box<T>({ as: Tag, run }: { as: T; run: () => void }) {',
+      '  return <Tag onClick={run} />;',
+      '}',
+      '',
+    ].join('\n');
+
+    expect(handlerBearingTags(text)).toHaveLength(1);
   });
 
   it('음성 — 진짜 컴포넌트는 걸리지 않는다', () => {
