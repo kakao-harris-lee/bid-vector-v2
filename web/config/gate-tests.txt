@@ -158,3 +158,7 @@ src/LoginScreen.test.tsx
 # 못하고(반환이 `readonly [string, string]` 이라 아무 두 토막이나 통과한다), 그 접두가 깨지면
 # 읽음 쓰기의 무효화가 배지에 닿지 않아 「실패하면 배지가 줄지 않는다」가 조용히 거짓이 된다.
 src/api/queryKeys.test.ts
+# M13/13B (v L-5) — 체크박스·라디오의 **누르는 자리**. 터치 타깃 게이트는 상자로 재지만 그
+# fixture 가 결과 기록 폼을 열지 않아 입찰함 라디오를 한 번도 보지 못한다. 이 축이 같은 규칙을
+# 원문에서 재 그 자리를 든다.
+scripts/touch-target-labels.test.mjs
