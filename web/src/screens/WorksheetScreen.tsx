@@ -584,7 +584,10 @@ export function WorksheetScreen() {
             </div>
             {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보이고, 하한 대비
                 자리도 같은 자리에 둔다. 확인에 담긴 값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
-            {confirming === null ? null : (
+            {/* **그 상태에서만 선다**(cr L-7). 확인을 열어 둔 사이 건이 움직이면 그 확인은 이미
+                다른 상태의 것이고, 그대로 보내면 서버가 409 로 막는다 — 운영자에게는 「확인했는데
+                실패했다」로 보인다. 다음 행동이 초안이 아니면 패널 자체를 그리지 않는다. */}
+            {confirming === null || action?.kind !== 'DRAFT_BID' ? null : (
               <div
                 data-testid="bid-confirm"
                 role="group"

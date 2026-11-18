@@ -964,17 +964,22 @@ describe('화면 C — 하한 대비 여유', () => {
     fillAmount('820000000');
 
     const margin = await screen.findByTestId('floor-margin');
-    expect(margin.textContent).toContain('하한 초과');
-    expect(margin.textContent).toContain('2.50');
+    // **율 축이다** — 하한 금액이 아니라 임계 사정률과 두 율을 보인다(verifier H-1).
+    expect(margin.textContent).toContain('임계 사정률 1.0250');
+    expect(margin.textContent).toContain('투찰율 0.8200');
+    expect(margin.textContent).toContain('게시 하한율 0.8');
+    expect(margin.textContent, '실격을 단정한다').not.toMatch(/걸러진|실격/u);
   });
 
-  it('하한보다 낮으면 미달이 보인다', async () => {
+  it('임계가 1 아래면 그 사실이 보인다 — 추첨이 기초금액과 같아도 하한 아래다', async () => {
     mocked.requestBidPrice.mockResolvedValue(PRICED_WITH_FLOOR);
     renderScreen();
     await askPrice();
     fillAmount('780000000');
 
-    expect((await screen.findByTestId('floor-margin')).textContent).toContain('하한 미달');
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('예정가격이 기초금액과 같아도 하한 아래');
+    expect(margin.textContent).toContain('임계 사정률 0.9750');
   });
 
   /** 과세 축이 다르면 **재지 않는다** — 0% 나 대시로 접지 않는다(계약). */

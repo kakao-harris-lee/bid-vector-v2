@@ -135,13 +135,21 @@ export function amountTextOf(won: number, token: string | null | undefined): str
   return unit.known ? `${formatted}${unit.text}` : `${formatted} ${unit.text}`;
 }
 
-/** 한글 금액의 자리 단위 — 큰 자리부터다. 자리 이름은 **이 표 한 자리**에만 있다. */
+/**
+ * 한글 금액의 자리 단위 — 큰 자리부터다. 자리 이름은 **이 표 한 자리**에만 있다.
+ *
+ * **조에서 끝난다**(cr L-1). 이 함수는 안전 정수 밖을 먼저 `null` 로 돌려보내므로 조 위의 자리는
+ * **입력이 존재하지 않는다** — 닿지 않는 행을 표에 두면 다음 사람이 그것을 살아 있는 분기로 읽는다.
+ * 짝 test 가 「조가 최대」를 주장으로 든다.
+ */
 const KOREAN_UNITS: readonly { readonly unit: number; readonly name: string }[] = [
-  { unit: 100_000_000_000_000_000, name: '경' },
   { unit: 1_000_000_000_000, name: '조' },
   { unit: 100_000_000, name: '억' },
   { unit: 10_000, name: '만' },
 ];
+
+/** 자리 이름 전수 — 짝 test 가 이 목록으로 「조가 최대」를 잰다(사본을 만들지 않는다). */
+export const KOREAN_UNIT_NAMES: readonly string[] = KOREAN_UNITS.map((one) => one.name);
 
 /**
  * 금액을 **한글 자리로 끊어 읽은 글자**(M13/13C · §6.2 C 4 「원 단위 정수 + 한글 금액 병기」).

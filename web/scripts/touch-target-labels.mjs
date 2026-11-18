@@ -62,6 +62,34 @@ export const MIN_HEIGHT_DISPLAY_TOKENS = new Set([
   'table',
 ]);
 
+/** 그 `style` 이 상자를 덮는가 — 덮는 키가 있거나 **객체를 볼 수 없으면** 참이다. */
+const BOX_STYLE_KEYS = new Set(['display', 'minHeight', 'height', 'maxHeight']);
+
+function styleOverridesBox(element) {
+  for (const property of element.attributes.properties) {
+    if (!ts.isJsxAttribute(property) || property.name.getText() !== 'style') {
+      continue;
+    }
+    const initializer = property.initializer;
+    if (initializer === undefined || !ts.isJsxExpression(initializer) || initializer.expression === undefined) {
+      return true;
+    }
+    const value = initializer.expression;
+    if (!ts.isObjectLiteralExpression(value)) {
+      return true;
+    }
+    return value.properties.some((one) => {
+      if (ts.isSpreadAssignment(one)) {
+        return true;
+      }
+      const name = one.name;
+      const text = name !== undefined && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) ? name.text : null;
+      return text === null || BOX_STYLE_KEYS.has(text);
+    });
+  }
+  return false;
+}
+
 /** 그 여는 태그의 속성 값이 **글자 그대로** 무엇인가 — 식이면 `null`(증명 불가). */
 function literalAttribute(element, name) {
   let spread = false;
@@ -133,8 +161,26 @@ function labelableDescendants(checker, labelElement) {
   return found;
 }
 
+/**
+ * **display 를 덮어쓰는 어휘**(M13/13C 수정 라운드 1 — v M-3). 변형 접두(`max-md:`)와 우선
+ * 표시(`!`)까지 받는다 — 하나라도 붙어 있으면 그 폭에서 어떤 display 가 서는지 증명할 수 없다.
+ * 높이 어휘 쪽과 **같은 규율**이다(앞 판은 높이만 그렇게 보고 display 는 보지 않았다).
+ */
+const DISPLAY_TOKEN = new RegExp(
+  `^(?:[\\w.-]+:)*!?(?:${[...MIN_HEIGHT_DISPLAY_TOKENS, 'contents', 'inline', 'hidden', 'table-cell', 'list-item'].join('|')})$`,
+  'u',
+);
+
 /** 그 레이블이 **44px 를 든다고 증명되는가**. */
 function labelCarriesMinHeight(labelOpening) {
+  /**
+   * **인라인 `style` 로 덮는 길**(설계 검토 B (2) 의 약속 · v M-3). 그 자리의 `display`·높이는
+   * 클래스보다 세므로, 그 키가 있으면(또는 객체를 볼 수 없으면) 증명 불가로 접는다. 덮지 않는
+   * `style` 은 그대로 둔다 — 과차단을 이유 없이 넓히지 않는다.
+   */
+  if (styleOverridesBox(labelOpening)) {
+    return false;
+  }
   const className = literalAttribute(labelOpening, 'className');
   if (className === null || className === undefined) {
     return false;
@@ -144,11 +190,16 @@ function labelCarriesMinHeight(labelOpening) {
     return false;
   }
   // **높이가 서는 display** 가 함께 있어야 한다(v M-11) — 없으면 레이블은 inline 이고 그 값은
-  // 적용되지 않는다. 변형 접두가 붙은 어휘는 이 집합에 들지 않으므로 함께 걸린다.
-  if (!tokens.some((one) => MIN_HEIGHT_DISPLAY_TOKENS.has(one))) {
+  // 적용되지 않는다.
+  const standing = tokens.filter((one) => MIN_HEIGHT_DISPLAY_TOKENS.has(one));
+  if (standing.length === 0) {
     return false;
   }
-  // 덮어쓰는 어휘가 함께 있으면 **실효 높이를 증명할 수 없다**(v M-10).
+  // 그 위에 **다른 display 어휘가 겹치면** 어느 것이 이기는지 증명할 수 없다(v M-3).
+  if (tokens.some((one) => !MIN_HEIGHT_DISPLAY_TOKENS.has(one) && DISPLAY_TOKEN.test(one))) {
+    return false;
+  }
+  // 덮어쓰는 높이 어휘가 함께 있으면 **실효 높이를 증명할 수 없다**(v M-10).
   return !tokens.some((one) => one !== MIN_TOUCH_CLASS && MIN_HEIGHT_TOKEN.test(one));
 }
 

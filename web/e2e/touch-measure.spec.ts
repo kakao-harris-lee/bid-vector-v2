@@ -73,10 +73,11 @@ test('조상의 clip-path 는 잴 수 없는 자리로 센다', async ({ page: b
 });
 
 /**
- * **음성 대조 — 스크롤은 잘라내기가 아니다.** 세로로 스크롤되는 상자 안의 버튼은 밀면 닿는다.
- * 이 구분이 없으면 긴 화면의 모든 타깃이 거짓으로 걸린다.
+ * **스크롤은 잘라내기가 아니다 — 그러나 한 번에 보이는 띠는 그 상자다**(v H-4 로 주장이 바뀐
+ * 자리다). 앞 판은 이 꼴을 「온전히 44」로 셌고, verifier 가 20px 스크롤러 안의 44px 버튼에서
+ * 30px 지점이 버튼에 닿지 않는 것을 실측했다. test 는 남기고 **주장을 바꾼다**.
  */
-test('음성 대조 — 세로로 스크롤되는 조상 안의 버튼은 온전히 잰다', async ({ page: browserPage }) => {
+test('세로 스크롤러 안의 버튼은 그 상자 높이까지만 한 번에 닿는다', async ({ page: browserPage }) => {
   const result = await measured(
     browserPage,
     page({
@@ -85,7 +86,7 @@ test('음성 대조 — 세로로 스크롤되는 조상 안의 버튼은 온전
     }),
   );
 
-  expect(result.targets[0]?.height).toBe(44);
+  expect(result.targets[0]?.height).toBeLessThanOrEqual(20);
   expect(result.partiallyClipped).toStrictEqual([]);
 });
 

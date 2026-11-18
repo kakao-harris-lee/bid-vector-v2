@@ -330,7 +330,14 @@ function renderCards() {
       <KonepsHandoff
         noticeNumber="SYN-M13-HANDOFF-1"
         amountWon={1_050_000_000}
-        margin={{ kind: 'measured', standing: 'ABOVE', percentText: '+2.50' }}
+        margin={{
+          kind: 'measured',
+          standing: 'ABOVE_ONE',
+          bidRateText: '0.8200',
+          floorRateText: '0.8',
+          criticalRateText: '1.0250',
+          marginPercentText: '+2.50',
+        }}
       />
       {/*
         **표시층 파일 사이로 금액 문면에 닿는 둘**(M12/12B — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`

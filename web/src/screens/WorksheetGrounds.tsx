@@ -37,6 +37,26 @@ import {
 export const SECTION_SUMMARY_CLASS = 'flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-sm font-semibold';
 
 /**
+ * **펼침 표지**(cr M-3). 요약 줄의 display 를 `flex` 로 덮으면 브라우저 기본 마커(`list-item`)가
+ * 그려지지 않는다 — 그러면 남는 표지가 커서 하나뿐이고, **이 화면의 축인 모바일 폭에는 커서가
+ * 없다**. 그 상태의 요약은 「눌러서 펼치는 줄」이 아니라 「닫힌 카드」로 보인다.
+ *
+ * 그래서 표지를 직접 그린다. 접힘·펼침은 `<details>` 의 상태라 CSS 로 돌리고(`open` 선택자),
+ * 보조기기는 네이티브 역할·확장 상태를 UA 에서 받으므로 이 표지는 **장식**이다(`aria-hidden`).
+ */
+function DisclosureMarker() {
+  return (
+    <span
+      data-testid="disclosure-marker"
+      aria-hidden="true"
+      className="inline-block text-ink-soft transition-transform group-open:rotate-90"
+    >
+      ▸
+    </span>
+  );
+}
+
+/**
  * 점진적 공개의 한 절(계약 받는 항목 11) — **요약 한 줄 → 펼침**이다.
  *
  * 요약이 그 절의 **핵심 상태**를 든다: 접기가 사실을 숨기면 점진적 공개가 아니라 은폐다. 그래서
@@ -57,8 +77,9 @@ function DisclosureSection({
   readonly children: ReactNode;
 }) {
   return (
-    <details data-testid={testId} className={cardClass()}>
+    <details data-testid={testId} className={`group ${cardClass()}`}>
       <summary data-testid={`${testId}-summary`} className={SECTION_SUMMARY_CLASS}>
+        <DisclosureMarker />
         <span>{title}</span>
         {summary}
       </summary>

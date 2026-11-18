@@ -71,12 +71,28 @@ export function measureInPage(): Measurement {
      * (그 구분이 없으면 긴 화면의 모든 타깃이 거짓으로 걸린다). `clip-path` 는 사각형이 아닐 수
      * 있어 **상자로 잴 수 없으므로** 자기 잘라내기와 같은 처분(위반)으로 돌린다.
      */
-    const clipAncestry = (node: Element, box: DOMRect): { readonly top: number; readonly bottom: number; readonly unmeasurable: boolean } => {
+    /** 그 `touch-action` 이 **그 축으로 밀기**를 허용하는가 — 유효값은 사슬의 교집합이다(v M-2). */
+    const allowsPan = (value: string, axis: 'x' | 'y'): boolean => {
+      if (value === 'auto' || value === 'manipulation') {
+        return true;
+      }
+      const along = axis === 'x' ? /\bpan-(?:x|left|right)\b/u : /\bpan-(?:y|up|down)\b/u;
+      return along.test(value);
+    };
+
+    const clipAncestry = (
+      node: Element,
+      box: DOMRect,
+    ): { readonly top: number; readonly bottom: number; readonly cap: number; readonly unmeasurable: boolean } => {
       let top = box.top;
       let bottom = box.bottom;
+      let cap = Number.POSITIVE_INFINITY;
       let unmeasurable = false;
+      let pannableY = true;
       for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
         const parentStyle = getComputedStyle(parent);
+        // 손가락 축은 **사슬의 교집합**이다 — 중간 한 요소가 막으면 위쪽 스크롤러도 밀리지 않는다.
+        pannableY = pannableY && allowsPan(parentStyle.touchAction, 'y');
         if (parentStyle.clipPath !== 'none') {
           unmeasurable = true;
           continue;
@@ -86,18 +102,24 @@ export function measureInPage(): Measurement {
         if (!containsPaint && !hidesY) {
           continue;
         }
-        // 세로로 **스크롤되는** 조상은 펴고 자르지 않는다 — 운영자가 밀어서 본다.
         const scrollsY =
           (parentStyle.overflowY === 'auto' || parentStyle.overflowY === 'scroll') &&
           parent.scrollHeight > parent.clientHeight;
-        if (scrollsY && !containsPaint) {
+        /**
+         * **세로로 스크롤되는 조상은 자르지 않지만 막는다**(v H-4). 밀면 닿으므로 지금 보이는
+         * 사각형으로 자르지는 않되, **한 번에 보이는 띠는 그 상자 높이를 넘을 수 없다** — 앞 판은
+         * 통째로 면제해서 12px 스크롤러 안의 44px 버튼을 44 로 셌다. 세로로 밀 수 없게 막아 둔
+         * 자리는 스크롤이 아니므로 그냥 자르는 조상이다.
+         */
+        if (scrollsY && !containsPaint && pannableY) {
+          cap = Math.min(cap, parent.clientHeight);
           continue;
         }
         const parentBox = parent.getBoundingClientRect();
         top = Math.max(top, parentBox.top);
         bottom = Math.min(bottom, parentBox.bottom);
       }
-      return { top, bottom, unmeasurable };
+      return { top, bottom, cap, unmeasurable };
     };
     const targets = [];
     const offscreen = [];
@@ -154,8 +176,9 @@ export function measureInPage(): Measurement {
         tag: measured.tagName.toLowerCase(),
         name,
         width: Math.round(box.width * 10) / 10,
-        // **보이는 띠**의 높이다(v M-8) — 조상이 자르면 그만큼만 손가락에 닿는다.
-        height: Math.max(0, Math.round((ancestry.bottom - ancestry.top) * 10) / 10),
+        // **보이는 띠**의 높이다(v M-8 · H-4) — 조상이 자르면 그만큼만, 스크롤러 안이면 그 상자
+        // 높이까지만 한 번에 닿는다.
+        height: Math.max(0, Math.round(Math.min(ancestry.bottom - ancestry.top, ancestry.cap) * 10) / 10),
       });
       /**
        * **가로로 스크롤되는 줄 안의 타깃은 닿을 수 있다** — 운영자가 밀어서 보면 된다. 닿지
@@ -170,12 +193,17 @@ export function measureInPage(): Measurement {
           continue;
         }
         /**
-         * **손가락으로 밀 수 있어야 예외다**(M13/13C — 13B v L-4). `touch-action: pan-y` 면
-         * 가로로는 밀 수 없는데 앞 판은 「스크롤 여지가 있다」만 보고 예외를 세웠다 — 그러면
-         * 운영자가 닿을 수 없는 타깃이 면제된다. 가로 밀기를 허용하는 값만 예외로 받는다.
+         * **손가락으로 밀 수 있어야 예외다**(13B v L-4 · v M-2). `touch-action` 의 유효값은
+         * **사슬의 교집합**이라 스크롤러 하나만 보면 안쪽이 막아 둔 자리를 놓친다 — 타깃부터 그
+         * 스크롤러까지 모두 가로 밀기를 허용할 때만 예외가 선다.
          */
-        const touch = parentStyle.touchAction;
-        const pannableX = touch === 'auto' || touch === 'manipulation' || /\bpan-(?:x|left|right)\b/u.test(touch);
+        let pannableX = true;
+        for (let link: Element | null = measured; link !== null; link = link.parentElement) {
+          pannableX = pannableX && allowsPan(getComputedStyle(link).touchAction, 'x');
+          if (link === parent) {
+            break;
+          }
+        }
         if (!pannableX) {
           continue;
         }

@@ -4,8 +4,8 @@ import { Button, controlClass } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import {
+  CRITICAL_RATE_STANDING_DISPLAY,
   FLOOR_MARGIN_REASON_DISPLAY,
-  FLOOR_STANDING_DISPLAY,
   type FloorMargin,
 } from '../display/floorMargin';
 import { VAT_TREATMENT_DISPLAY, koreanAmountTextOf, type VatTreatment } from '../display/moneyDisplay';
@@ -160,10 +160,17 @@ export function KonepsHandoff({
   const query = new URLSearchParams({ bidNtceNo: noticeNumber }).toString();
   const [attempt, setAttempt] = useState<CopyAttempt | null>(null);
   const shown = attempt !== null && attempt.amountWon === amountWon ? attempt : null;
-  const korean = amountWon === null ? null : koreanAmountTextOf(amountWon);
+  /**
+   * **다룰 수 없는 수는 그리지도 복사하지도 않는다**(cr M-5). 입력 파서의 상한은 M7 자리라 이
+   * slice 가 바꾸지 않지만, 안전 정수 밖 값은 이미 **운영자가 적지 않은 수**다 — 그것을 복사해
+   * 나라장터에 붙이면 서버를 지나지 않는 경로로 틀린 금액이 나간다. 병기가 꺼지는 자리와 같은
+   * 조건으로 묶어, 가장 많이 틀린 수에서 표지가 함께 꺼지지 않게 한다.
+   */
+  const usable = amountWon !== null && Number.isSafeInteger(amountWon);
+  const korean = usable && amountWon !== null ? koreanAmountTextOf(amountWon) : null;
 
   async function copyAmount(): Promise<void> {
-    if (amountWon === null) {
+    if (amountWon === null || !usable) {
       return;
     }
     // 브라우저가 클립보드를 **주지 않을 수 있다**(비보안 출처 · 권한 거부 · 구형). 선언을 넓혀 그
@@ -197,7 +204,13 @@ export function KonepsHandoff({
       <dl className="mt-3 flex flex-col gap-1 text-sm">
         <dt className="text-xs text-ink-soft">투찰 입력값(원 단위 정수)</dt>
         <dd data-testid="handoff-amount" className="font-numeric">
-          {amountWon === null ? <span className="text-absent-ink">값 없음</span> : amountWon.toLocaleString('ko-KR')}
+          {amountWon === null ? (
+            <span className="text-absent-ink">값 없음</span>
+          ) : usable ? (
+            amountWon.toLocaleString('ko-KR')
+          ) : (
+            <span className="text-bad-ink">적은 금액이 다룰 수 없는 크기입니다 — 자리 수를 다시 보십시오</span>
+          )}
         </dd>
         {/* 병기는 **같은 수의 다른 읽기**다 — 자리 수를 세지 않아도 0 하나가 드러난다. */}
         {korean === null ? null : (
@@ -213,7 +226,7 @@ export function KonepsHandoff({
           onClick={() => {
             void copyAmount();
           }}
-          disabled={amountWon === null}
+          disabled={!usable}
         >
           금액 복사
         </Button>
@@ -230,7 +243,7 @@ export function KonepsHandoff({
         )}
       </div>
       {/* 거부에는 **손으로 할 길**이 있다. 포커스가 오면 전체를 골라 둔다. */}
-      {shown === null || shown.copied || amountWon === null ? null : (
+      {shown === null || shown.copied || amountWon === null || !usable ? null : (
         <input
           data-testid="koneps-copy-fallback"
           type="text"
@@ -244,11 +257,21 @@ export function KonepsHandoff({
       {margin === null ? null : (
         <dl className="mt-3 flex flex-col gap-1 text-sm">
           <dt className="text-xs text-ink-soft">하한 대비 여유</dt>
-          <dd data-testid="floor-margin" className="flex flex-wrap items-center gap-2">
+          <dd data-testid="floor-margin" className="flex flex-col gap-1">
             {margin.kind === 'measured' ? (
               <>
-                <StateBadge display={FLOOR_STANDING_DISPLAY[margin.standing]} />
-                <span className="font-numeric text-sm">{margin.percentText}%</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  <StateBadge display={CRITICAL_RATE_STANDING_DISPLAY[margin.standing]} />
+                  <span className="font-numeric text-sm">
+                    임계 사정률 {margin.criticalRateText} ({margin.marginPercentText}%)
+                  </span>
+                </span>
+                {/* **율 축으로 말한다** — 금액을 곱해 하한가를 짓지 않는다(폐기된 basis 혼합이다).
+                    실현 사정률이 임계보다 크면 그때 하한 아래가 된다. */}
+                <span className="text-xs text-ink-soft">
+                  투찰율 <span className="font-numeric">{margin.bidRateText}</span> · 게시 하한율{' '}
+                  <span className="font-numeric">{margin.floorRateText}</span>
+                </span>
               </>
             ) : (
               // **재지 않는 자리는 빈 자리 + 사유**다 — 0% 나 대시로 접지 않는다(계약).

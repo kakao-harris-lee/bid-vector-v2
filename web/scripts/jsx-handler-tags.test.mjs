@@ -381,6 +381,9 @@ describe('변수 태그의 타입 판정 (v H-4)', () => {
  * 공허해진다**(`document` 가 초록인지 재지 못한다).
  */
 const DOM = [
+  // M13/13C 수정 라운드 1 — 면제 앵커가 **기본 라이브러리 선언**에서 오므로 이 묶음도 그 자리에
+  // 둔다(`no-default-lib` 지시가 그 자리를 만든다). 모듈 안에 같은 이름을 세우는 우회와 갈린다.
+  '/// <reference no-default-lib="true"/>',
   'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
   'interface Node extends EventTarget {}',
   'interface Element extends Node { onclick: (() => void) | null; }',
@@ -434,7 +437,7 @@ describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
   });
 
   it('요소에 직접 거는 addEventListener 는 걸린다', () => {
-    expect(handlerBearingTags(`${DOM}\nexport const X = () => { el.addEventListener('click', f); };\n`)).toHaveLength(
+    expect(handlerBearingTags(`export const X = () => { el.addEventListener('click', f); };\n`, {}, DOM)).toHaveLength(
       1,
     );
   });
@@ -442,27 +445,27 @@ describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
   /** ③ 대괄호 접근 — 멤버 이름이 글자 리터럴 뒤로 숨는다. */
   it("③ el['addEventListener'] 도 걸린다", () => {
     expect(
-      handlerBearingTags(`${DOM}\nexport const X = () => { el['addEventListener']('click', f); };\n`),
+      handlerBearingTags(`export const X = () => { el['addEventListener']('click', f); };\n`, {}, DOM),
     ).toHaveLength(1);
   });
 
   /** ④ 묶어 두고 나중에 부르기 — 호출 자리에 없지만 같은 배선이다. */
   it('④ el.addEventListener.bind(el) 도 걸린다', () => {
     expect(
-      handlerBearingTags(`${DOM}\nexport const X = () => { const on = el.addEventListener.bind(el); on('click', f); };\n`),
+      handlerBearingTags(`export const X = () => { const on = el.addEventListener.bind(el); on('click', f); };\n`, {}, DOM),
     ).toHaveLength(1);
   });
 
   /** ⑤ 이름 가림 — 수신자를 `document` 라고 **부르기만** 한다. 타입은 가려지지 않는다. */
   it('⑤ document 라는 이름으로 가린 요소 수신자도 걸린다', () => {
-    const text = `${DOM}\nexport const X = () => { const document = el; document.addEventListener('click', f); };\n`;
+    const text = `export const X = () => { const document = el; document.addEventListener('click', f); };\n`;
 
-    expect(handlerBearingTags(text)).toHaveLength(1);
+    expect(handlerBearingTags(text, {}, DOM)).toHaveLength(1);
   });
 
   /** ⑥ 인라인 핸들러 대입 — `addEventListener` 를 아예 지나간다. */
   it('⑥ el.onclick = f 도 걸린다', () => {
-    const found = handlerBearingTags(`${DOM}\nexport const X = () => { el.onclick = f; };\n`);
+    const found = handlerBearingTags(`export const X = () => { el.onclick = f; };\n`, {}, DOM);
 
     expect(found).toHaveLength(1);
     expect(found[0].handler).toBe('onclick 대입');
@@ -470,17 +473,17 @@ describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
 
   /** `document`·`window` 수신자는 **요소가 아니다** — 누르는 자리를 만들지 않는다. */
   it('음성 — document·window 수신자는 걸리지 않는다', () => {
-    expect(handlerBearingTags(`${DOM}\nexport const X = () => { document.addEventListener('x', f); };\n`)).toStrictEqual(
+    expect(handlerBearingTags(`export const X = () => { document.addEventListener('x', f); };\n`, {}, DOM)).toStrictEqual(
       [],
     );
-    expect(handlerBearingTags(`${DOM}\nexport const X = () => { window.addEventListener('x', f); };\n`)).toStrictEqual(
+    expect(handlerBearingTags(`export const X = () => { window.addEventListener('x', f); };\n`, {}, DOM)).toStrictEqual(
       [],
     );
   });
 
   /** 타입이 서 있지 않으면 **증명 불가**라 보수적으로 센다 — 그 자리에서 열리면 가림이 다시 통한다. */
   it('타입 없는 수신자는 보수적으로 걸린다', () => {
-    expect(handlerBearingTags("export const X = (e) => { e.addEventListener('click', f); };\n")).toHaveLength(1);
+    expect(handlerBearingTags("export const X = (e) => { e.addEventListener('click', f); };\n", {}, DOM)).toHaveLength(1);
   });
 });
 
@@ -556,6 +559,7 @@ describe('음성 대조 — 걸리면 안 되는 것', () => {
  * 타입을 넓히는 것만으로 빠져나갔다 — 아래 꼴 열셋을 착수 라운드에 게이트 자신의 입구로 쟀다.
  */
 const WIRING_DOM = [
+  '/// <reference no-default-lib="true"/>',
   'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
   'interface Node extends EventTarget {}',
   'interface Element extends Node { onclick: (() => void) | null; setAttribute(name: string, value: string): void; }',
@@ -614,14 +618,14 @@ describe('속성 밖 배선 — 수신자는 증명된 문서·창만 면제한�
     ['타입 매개변수', 'export function X<T extends HTMLElement>(node: T) { node.addEventListener(\'c\', f); }'],
     ['GlobalEventHandlers 로 올리기', "export const X = () => { const g: GlobalEventHandlers = el; g.onclick = f; };"],
   ])('%s 도 걸린다', (_label, body) => {
-    expect(handlerBearingTags(`${WIRING_DOM}\n${body}\n`)).not.toStrictEqual([]);
+    expect(handlerBearingTags(`${body}\n`, {}, WIRING_DOM)).not.toStrictEqual([]);
   });
 
   it('음성 — 문서·창 수신자는 그대로 면제다', () => {
-    expect(handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { document.addEventListener('c', f); };\n`)).toStrictEqual(
+    expect(handlerBearingTags(`export const X = () => { document.addEventListener('c', f); };\n`, {}, WIRING_DOM)).toStrictEqual(
       [],
     );
-    expect(handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { window.addEventListener('c', f); };\n`)).toStrictEqual(
+    expect(handlerBearingTags(`export const X = () => { window.addEventListener('c', f); };\n`, {}, WIRING_DOM)).toStrictEqual(
       [],
     );
   });
@@ -634,24 +638,24 @@ describe('속성 밖 배선 — 대입과 멤버 이름의 다른 꼴 (v M-7b)',
     ['속성으로 쓰기', "export const X = () => { el.setAttribute('onclick', 'run()'); };"],
     ['변수 키로 부르기', "const m = 'addEventListener';\nexport const X = () => { el[m]('c', f); };"],
   ])('%s 도 걸린다', (_label, body) => {
-    expect(handlerBearingTags(`${WIRING_DOM}\n${body}\n`)).not.toStrictEqual([]);
+    expect(handlerBearingTags(`${body}\n`, {}, WIRING_DOM)).not.toStrictEqual([]);
   });
 
   it('음성 — 문서 수신자의 같은 꼴은 면제다', () => {
     expect(
-      handlerBearingTags(`${WIRING_DOM}\nconst m = 'addEventListener';\nexport const X = () => { document[m]('c', f); };\n`),
+      handlerBearingTags(`const m = 'addEventListener';\nexport const X = () => { document[m]('c', f); };\n`, {}, WIRING_DOM),
     ).toStrictEqual([]);
   });
 
   it('음성 — on 으로 시작하지 않는 속성 쓰기는 이 축이 아니다', () => {
     expect(
-      handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { el.setAttribute('data-x', '1'); };\n`),
+      handlerBearingTags(`export const X = () => { el.setAttribute('data-x', '1'); };\n`, {}, WIRING_DOM),
     ).toStrictEqual([]);
   });
 
   it('음성 — 요소가 아닌 대상의 객체 합치기는 이 축이 아니다', () => {
     expect(
-      handlerBearingTags(`${WIRING_DOM}\nconst plain = { onclick: null as (() => void) | null };\nexport const X = () => { Object.assign(plain, { onclick: f }); };\n`),
+      handlerBearingTags(`const plain = { onclick: null as (() => void) | null };\nexport const X = () => { Object.assign(plain, { onclick: f }); };\n`, {}, WIRING_DOM),
     ).toStrictEqual([]);
   });
 });
@@ -727,24 +731,27 @@ describe('요소 생성 호출의 태그와 props (팀장 판정 2026-11-18)', (
 describe('prototype 경유 호출 — 선언 둘 모두에서 걸린다', () => {
   it('prototype 이 선언되지 않은 꼴', () => {
     expect(
-      handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n`),
+      handlerBearingTags(`export const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n`, {}, WIRING_DOM),
     ).not.toStrictEqual([]);
   });
 
   it('prototype 이 EventTarget 으로 선언된 꼴', () => {
     const declared = [
+      '/// <reference no-default-lib="true"/>',
       'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
       'interface Node extends EventTarget {}',
       'interface Element extends Node {}',
       'interface HTMLElement extends Element {}',
       'interface HTMLDivElement extends HTMLElement {}',
+      'interface Document extends Node {}',
+      'interface Window extends EventTarget {}',
       'declare const EventTarget: { prototype: EventTarget };',
       'declare const el: HTMLDivElement;',
       'declare const f: () => void;',
     ].join('\n');
 
     expect(
-      handlerBearingTags(`${declared}\nexport const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n`),
+      handlerBearingTags("export const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n", {}, declared),
     ).not.toStrictEqual([]);
   });
 });
@@ -850,5 +857,18 @@ describe('M-1 · M-2 반사·서술자·변수 꼴도 센다', () => {
 
     expect(handlerBearingTags(plain, {}, DOM_LIB)).toStrictEqual([]);
     expect(handlerBearingTags(dataAttribute, {}, DOM_LIB)).toStrictEqual([]);
+  });
+});
+
+/** cr L-4 — 한정된 소문자 이름은 **컴포넌트**다. 글자로 접으면 거짓 양성이 된다. */
+describe('이름공간 컴포넌트는 내장 태그가 아니다 (cr L-4)', () => {
+  it('음성 — styles.Row 는 걸리지 않는다', () => {
+    const text = 'declare const styles: { Row: () => unknown };\ndeclare const f: () => void;\nexport const X = () => <styles.Row onClick={f} />;\n';
+
+    expect(handlerBearingTags(text)).toStrictEqual([]);
+  });
+
+  it('양성 대조 — 같은 꼴의 내장 태그는 그대로 걸린다', () => {
+    expect(handlerBearingTags('declare const f: () => void;\nexport const X = () => <div onClick={f} />;\n')).toHaveLength(1);
   });
 });
