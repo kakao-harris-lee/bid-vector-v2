@@ -16,8 +16,8 @@ import { StrategySection } from './StrategySection';
  * 클라이언트에 머물고, 그것은 「화면이 V2 API 밖에 값을 둔다」 + 개인정보 보관이다(D-7E2-7).
  */
 const NOT_READY = [
-  { id: 'nts', label: '사업자번호·국세청 확인', why: '계약에 그 칸이 없습니다(자기 신고 입력도 두지 않습니다)' },
-  { id: 'channels', label: '알림 채널(텔레그램·메일)', why: '발송 경로 결정 뒤입니다' },
+  { id: 'nts', label: '사업자번호·국세청 확인', why: '저장할 자리가 아직 없어 입력을 받지 않습니다' },
+  { id: 'channels', label: '알림 채널(텔레그램·메일)', why: '보내는 방법을 정한 뒤에 엽니다' },
   { id: 'paper', label: '페이퍼(가상) 투찰', why: '근거가 더 필요합니다' },
 ] as const;
 

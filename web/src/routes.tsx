@@ -43,12 +43,12 @@ export interface ScreenSlot {
 }
 
 export const screenSlots: readonly ScreenSlot[] = [
-  { id: 'onboarding', path: '/start', label: 'A 시작하기', nav: 'primary', element: <OnboardingScreen /> },
-  { id: 'home', path: '/', label: 'B 오늘의 공고', nav: 'primary', element: <TodayNoticesScreen /> },
+  { id: 'onboarding', path: '/start', label: '시작하기', nav: 'primary', element: <OnboardingScreen /> },
+  { id: 'home', path: '/', label: '오늘의 공고', nav: 'primary', element: <TodayNoticesScreen /> },
   // 공고 식별자는 **번호와 차수 두 칸**이다 — 한 문자열로 접으면 화면이 구분자를 지어내야 한다.
-  { id: 'worksheet', path: '/notices/:noticeNumber/:noticeRound', label: 'C 공고 워크시트', nav: 'none', element: <WorksheetScreen /> },
-  { id: 'bid-box', path: '/bids', label: 'D 내 입찰함', nav: 'primary', element: <BidBoxScreen /> },
-  { id: 'results', path: '/results', label: 'E 결과 확인', nav: 'primary', element: <ResultsScreen /> },
+  { id: 'worksheet', path: '/notices/:noticeNumber/:noticeRound', label: '공고 워크시트', nav: 'none', element: <WorksheetScreen /> },
+  { id: 'bid-box', path: '/bids', label: '내 입찰함', nav: 'primary', element: <BidBoxScreen /> },
+  { id: 'results', path: '/results', label: '결과 확인', nav: 'primary', element: <ResultsScreen /> },
   { id: 'inbox', path: '/inbox', label: '알림함', nav: 'more', element: <InboxScreen /> },
   // 「설정」은 요구표의 화면 다섯(A~E)·알림함과 **다른 축**이지만 운영자가 늘 닿는 자리이고
   // 전역 탐색에 있어야 한다(M7/7E-2, D-7E2-9 — 자리 하나 추가는 in_scope).

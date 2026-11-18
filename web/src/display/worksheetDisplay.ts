@@ -34,8 +34,8 @@ export const BID_PRICE_MENU_DISPLAY = {
 
 export const BID_PRICE_MENU_REASON_DISPLAY = {
   MENU_PATH_NOT_WIRED: {
-    label: '산출 경로가 이 배선에 없음',
-    why: '커널을 불러 「출처가 없었다」를 받은 것이 아니라 부르지 않았다',
+    label: '아직 산출하지 않는 자리',
+    why: '계산을 해 보고 실패한 것이 아니라, 아직 계산하지 않습니다',
     tone: 'absent',
   },
 } as const satisfies Record<Response['bidPriceMenuNotComputedReason'], StateDisplay>;
@@ -95,7 +95,7 @@ export const ML_UNAVAILABLE_REASON_DISPLAY = {
   MODEL_NOT_READY: { label: '모델이 준비되지 않음', tone: 'absent' },
   RELEASE_MISMATCH: { label: '릴리스가 맞지 않음', tone: 'absent' },
   CONTRACT_VIOLATION: { label: '분석 계약 위반', tone: 'absent' },
-  UNSUPPORTED_SCHEMA: { label: '지원하지 않는 스키마', tone: 'absent' },
+  UNSUPPORTED_SCHEMA: { label: '지원하지 않는 자료 형식', tone: 'absent' },
   UNSUPPORTED_RELEASE: { label: '지원하지 않는 릴리스', tone: 'absent' },
   INVALID_REQUEST: { label: '요청이 유효하지 않음', tone: 'absent' },
 } as const satisfies Record<Present<Response['mlUnavailableReason']>, StateDisplay>;

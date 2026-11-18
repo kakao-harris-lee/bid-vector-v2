@@ -106,7 +106,7 @@ function checklistReads(page: Page): ChecklistReads {
 /** 시작하기로 — 셸의 전역 탐색을 지난다(주소를 손으로 적지 않는다). */
 async function openOnboarding(page: Page): Promise<Checklist> {
   const read = checklistResponse(page);
-  await page.getByRole('link', { name: 'A 시작하기' }).click();
+  await page.getByRole('link', { name: '시작하기' }).click();
   await expect(page.getByTestId('screen-onboarding')).toBeVisible();
   return (await (await read).json()) as Checklist;
 }
@@ -116,7 +116,7 @@ async function openOnboarding(page: Page): Promise<Checklist> {
  * 다시 읽지 않는다(첫 실행이 그 자리에서 멈췄다). 홈을 거쳐 들어와 **서버에 다시 묻는다**.
  */
 async function reopenOnboarding(page: Page): Promise<Checklist> {
-  await page.getByRole('link', { name: 'B 오늘의 공고' }).click();
+  await page.getByRole('link', { name: '오늘의 공고' }).click();
   await expect(page.getByTestId('screen-home')).toBeVisible();
   return openOnboarding(page);
 }
@@ -572,7 +572,7 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   // ⑨ 미완이 남았으므로 완료 행동은 없고, 홈의 진입은 그대로 서 있다.
   await expect(page.getByTestId('onboarding-complete')).toHaveCount(0);
-  await page.getByRole('link', { name: 'B 오늘의 공고' }).click();
+  await page.getByRole('link', { name: '오늘의 공고' }).click();
   await expect(page.getByTestId('screen-home')).toBeVisible();
   await expect(page.getByTestId('onboarding-banner')).toBeVisible();
 

@@ -50,9 +50,9 @@ const STEP_LOCK_REASON_ID = 'onboarding-step-lock-reason';
  * 미리보기의 「어느 입력이 좁혔는가」는 `OPEN-6A3-EVALUATION-DETAIL` 이다.
  */
 const NOT_READY = [
-  { id: 'nts', label: '사업자번호·국세청 확인', why: '계약에 그 칸이 없습니다(자기 신고 입력도 두지 않습니다)' },
-  { id: 'channels', label: '알림 채널(텔레그램·메일)', why: '발송 경로 결정 뒤입니다' },
-  { id: 'preview', label: '첫 공고 미리보기와 「어느 입력이 좁혔는가」', why: '좁힌 사유를 내는 API 가 아직 없습니다' },
+  { id: 'nts', label: '사업자번호·국세청 확인', why: '저장할 자리가 아직 없어 입력을 받지 않습니다' },
+  { id: 'channels', label: '알림 채널(텔레그램·메일)', why: '보내는 방법을 정한 뒤에 엽니다' },
+  { id: 'preview', label: '첫 공고 미리보기와 「어느 입력이 좁혔는가」', why: '어느 입력이 결과를 좁혔는지 알려 주는 기능이 아직 없습니다' },
 ] as const;
 
 /** 단계가 쓰는 전략 칸 — 체크리스트 항목 하나가 이 칸들 뒤에 선다. */

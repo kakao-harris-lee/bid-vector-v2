@@ -28,25 +28,60 @@ const RENDER_LAYER = 'screens/screenCopy.test.tsx';
 /* ── 금지 꼴 — 두 층이 읽는 한 자리 ───────────────────────────────────────────── */
 
 /**
- * `config/screen-copy-shapes.txt` 를 읽는다. **비면 던진다** — 빈 집합은 모든 판정을 공허하게
- * 만들고, 그 상태에서 게이트는 초록을 보고한다(이 저장소가 「조용히 초록이 되는 길」로 부르는 꼴).
+ * 금지 꼴을 **렌더 층의 선언에서** 읽는다(AST — 문자열 grep 은 주석 한 줄로 열린다). 정본이 그
+ * 파일에 있는 이유는 경계다: `src` 의 TS 프로그램에는 node 타입이 없어 그 층이 데이터 파일을
+ * 읽을 수 없다. 사본을 두는 대신 **한 선언을 두 층이 나눠 쓴다**.
+ *
+ * **비면 던진다** — 빈 집합은 모든 판정을 공허하게 만들고, 그 상태에서 게이트는 초록을 보고한다.
  */
-export function shapesOf(root = webRoot) {
-  const text = readFileSync(resolve(root, 'config/screen-copy-shapes.txt'), 'utf8');
-  const shapes = [];
-  for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (line === '' || line.startsWith('#')) {
-      continue;
+export function shapesOf(text) {
+  const source = sourceOf(RENDER_LAYER, text);
+  let shapes = null;
+  ts.forEachChild(source, (node) => {
+    if (!ts.isVariableStatement(node)) {
+      return;
     }
-    const at = line.indexOf(' :: ');
-    if (at < 0) {
-      throw new Error(`금지 꼴 등록부의 줄을 읽지 못했다(「<이름> :: <정규식>」이 아니다): ${line}`);
+    for (const declaration of node.declarationList.declarations) {
+      if (
+        !ts.isIdentifier(declaration.name) ||
+        declaration.name.text !== 'COPY_FORBIDDEN_SHAPES' ||
+        declaration.initializer === undefined
+      ) {
+        continue;
+      }
+      const array = ts.isAsExpression(declaration.initializer)
+        ? declaration.initializer.expression
+        : declaration.initializer;
+      if (!ts.isArrayLiteralExpression(array)) {
+        continue;
+      }
+      shapes = array.elements.map((element) => {
+        if (!ts.isObjectLiteralExpression(element)) {
+          throw new Error('금지 꼴 선언의 원소가 객체 리터럴이 아니다');
+        }
+        const read = (key) => {
+          const property = element.properties.find(
+            (one) => ts.isPropertyAssignment(one) && one.name.getText(source) === key,
+          );
+          if (property === undefined || !ts.isPropertyAssignment(property)) {
+            throw new Error(`금지 꼴 선언에 ${key} 가 없다`);
+          }
+          const value = property.initializer;
+          if (ts.isStringLiteral(value) || ts.isNoSubstitutionTemplateLiteral(value)) {
+            return value.text;
+          }
+          // `String.raw` 태그 템플릿 — 이스케이프를 그대로 쓰려고 그 꼴로 적는다.
+          if (ts.isTaggedTemplateExpression(value) && ts.isNoSubstitutionTemplateLiteral(value.template)) {
+            return value.template.rawText ?? value.template.text;
+          }
+          throw new Error(`금지 꼴 선언의 ${key} 가 리터럴이 아니다`);
+        };
+        return { name: read('name'), source: read('source') };
+      });
     }
-    shapes.push({ name: line.slice(0, at).trim(), source: line.slice(at + 4).trim() });
-  }
-  if (shapes.length === 0) {
-    throw new Error('금지 꼴 등록부가 비었다');
+  });
+  if (shapes === null || shapes.length === 0) {
+    throw new Error('렌더 층에서 금지 꼴 선언을 읽지 못했다');
   }
   return shapes;
 }
@@ -226,10 +261,10 @@ export function renderedElementsOf(text, path = RENDER_LAYER) {
 
 /* ── 단언 ─────────────────────────────────────────────────────────────────────── */
 
-const shapes = shapesOf();
+const renderLayer = readFileSync(resolve(srcDir, RENDER_LAYER), 'utf8');
+const shapes = shapesOf(renderLayer);
 const derived = derivedIdsOf();
 const corpus = domReachableStringsOf();
-const renderLayer = readFileSync(resolve(srcDir, RENDER_LAYER), 'utf8');
 
 describe('문면 게이트 — 모집단과 금지 집합이 비지 않았다', () => {
   it('금지 꼴 · 접두사 · OPEN ID · 문자열 모집단의 하한', () => {

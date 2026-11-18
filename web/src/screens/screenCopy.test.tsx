@@ -1,9 +1,6 @@
 // @vitest-environment jsdom
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { QueryClient, QueryClientProvider, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -57,40 +54,29 @@ import { WorksheetTimeline } from './WorksheetTimeline';
 afterEach(cleanup);
 
 /**
- * 등록부의 자리를 **vitest 의 작업 디렉터리**(`web/`)에서 푼다. `import.meta.url` 은 쓸 수 없다 —
- * Vite 가 그것을 `file:` 가 아닌 주소로 바꿔 놓는다(실측). 없으면 **던진다**: 조용히 빈 집합으로
- * 내려가면 모든 판정이 공허해진다.
+ * **금지 꼴의 정본이 이 배열이다.** 소스 층은 이 파일을 **AST 로 읽어** 같은 집합을 쓴다(저장소의
+ * `GATE_MOUNTED_CARDS` 관례와 같은 꼴) — 사본을 두지 않으려는 것이고, 데이터 파일로 빼는 길은
+ * 막혀 있다: `src` 의 TS 프로그램에는 node 타입이 없어 이 층이 파일을 읽을 수 없다(실측 — 그
+ * 경계를 넓히는 것은 새 결정이다).
+ *
+ * 줄을 더하거나 고치면 **음성 대조**(두 층 모두에 있다)를 함께 본다. 좁히는 변이는 소스 층의
+ * 포함 단언이 잡고, 넓히는 변이는 음성 대조가 잡는다.
  */
-const SHAPES_PATH = resolve(process.cwd(), 'config/screen-copy-shapes.txt');
-if (!existsSync(SHAPES_PATH)) {
-  throw new Error(`금지 꼴 등록부를 찾지 못했다(작업 디렉터리 ${process.cwd()}): ${SHAPES_PATH}`);
-}
+export const COPY_FORBIDDEN_SHAPES = [
+  // capability ID 와 같은 꼴 **전수**. 접두사 목록에 기대지 않는다 — 두 글자 이상 접두 + 번호.
+  // 음성: D-day `D-0`·`D-14`(한 글자 접두) · 합성 공고번호 `SYN-M9-0`(`M9` 뒤가 숫자가 아니다).
+  { name: '대문자 접두 ID', source: String.raw`\b[A-Z]{2,}-\d+\b` },
+  // OPEN ID. 끝을 열어 둔다(토막이 여럿이다).
+  { name: 'OPEN ID', source: String.raw`OPEN-[A-Z0-9][A-Z0-9-]*` },
+  // 마일스톤/slice 표기. **슬래시가 가른다** — 합성 공고번호가 음성 대조다.
+  { name: '마일스톤 표기', source: String.raw`M\d+/` },
+  // 결정 ID. **둘째 하이픈이 가른다** — D-day 가 음성 대조다.
+  { name: '결정 ID', source: String.raw`\b[DR]-[0-9A-Za-z]+-[0-9A-Za-z]+\b` },
+  // 요구표 행 ID. 음수 금액이 이어 붙으면 가짜로 서는 꼴이라 이 층은 노드 단위로 읽는다.
+  { name: '요구표 행 ID', source: String.raw`R-\d\b` },
+] as const;
 
-interface Shape {
-  readonly name: string;
-  readonly source: string;
-}
-
-function shapesOf(): readonly Shape[] {
-  const shapes: Shape[] = [];
-  for (const raw of readFileSync(SHAPES_PATH, 'utf8').split('\n')) {
-    const line = raw.trim();
-    if (line === '' || line.startsWith('#')) {
-      continue;
-    }
-    const at = line.indexOf(' :: ');
-    if (at < 0) {
-      throw new Error(`금지 꼴 등록부의 줄을 읽지 못했다: ${line}`);
-    }
-    shapes.push({ name: line.slice(0, at).trim(), source: line.slice(at + 4).trim() });
-  }
-  if (shapes.length === 0) {
-    throw new Error('금지 꼴 등록부가 비었다');
-  }
-  return shapes;
-}
-
-const SHAPES = shapesOf();
+const SHAPES: readonly { readonly name: string; readonly source: string }[] = COPY_FORBIDDEN_SHAPES;
 
 /** 한 조각에서 걸린 꼴 전수. 조각 **하나씩** 본다 — 그것이 「텍스트 노드 단위」의 구현이다. */
 function forbiddenIn(piece: string): readonly string[] {
@@ -257,7 +243,7 @@ const timelineRows = (): readonly BidTimelineEntry[] => [
     caseVersion: 1,
     fromState: null,
     toState: 'WATCHING',
-    command: 'WATCH',
+    command: 'ADD_TO_BID_BOX',
     actorKind: 'USER',
     retroactive: false,
     occurredAt: '2026-07-15T15:00:00Z',
@@ -380,6 +366,22 @@ function Thrower(): never {
   throw new Error(SENTINEL);
 }
 
+/**
+ * 던지기를 **바깥에서** 끈다 — 렌더 안에서 한 번만 던지는 꼴은 설 수 없다(실측: React 가 실패한
+ * 렌더를 다시 돌려 경계가 서기 **전에** 회복했다). 플래그를 test 가 쥐면 경계가 먼저 서고,
+ * 그 뒤 「다시 시도」가 정말로 자리를 다시 여는지 잴 수 있다.
+ */
+function makeFlakyRoute() {
+  const state = { shouldThrow: true };
+  const Flaky = () => {
+    if (state.shouldThrow) {
+      throw new Error(SENTINEL);
+    }
+    return <p data-testid="recovered">화면이 섰습니다</p>;
+  };
+  return { state, Flaky };
+}
+
 function renderRouteBoundary() {
   const router = createMemoryRouter([{ path: '/', element: <Thrower />, errorElement: <RouteError /> }], {
     initialEntries: ['/'],
@@ -431,6 +433,64 @@ describe('문면 게이트 — 라우트 경계가 던진 값의 원문을 보�
     const boundary = screen.getByTestId('route-error');
     expect(boundary.textContent ?? '').not.toContain(SENTINEL);
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeDefined();
+  });
+});
+
+describe('라우트 오류 — 「다시 시도」가 자리를 다시 연다', () => {
+  it('던지기를 끈 뒤 누르면 화면이 선다', async () => {
+    const { state, Flaky } = makeFlakyRoute();
+    const router = createMemoryRouter([{ path: '/', element: <Flaky />, errorElement: <RouteError /> }], {
+      initialEntries: ['/'],
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByTestId('route-error')).toBeDefined();
+    state.shouldThrow = false;
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(await screen.findByTestId('recovered')).toBeDefined();
+  });
+
+  /**
+   * 음성 대조 — **다른 test 에** 둔다. 한 test 안에서 두 번 그리면 `render` 가 돌려주는 질의가
+   * `document.body` 에 묶여 앞 렌더가 남긴 자리를 집는다(실측). 그 함정이 이 저장소의 공유
+   * 하네스에서 이미 한 번 섰다.
+   */
+  it('던지기가 그대로면 눌러도 경계가 남는다', () => {
+    const { Flaky } = makeFlakyRoute();
+    const router = createMemoryRouter([{ path: '/', element: <Flaky />, errorElement: <RouteError /> }], {
+      initialEntries: ['/'],
+    });
+    render(<RouterProvider router={router} />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(screen.getByTestId('route-error')).toBeDefined();
+    expect(screen.queryByTestId('recovered')).toBeNull();
+  });
+});
+
+describe('문면 — 걷어 낸 내부 용어가 그 자리에 돌아오지 않는다', () => {
+  /**
+   * 금지 **꼴**은 개발 코드를 잡지만 내부 용어(「배선」·「커널」 같은 말)는 열거할 수 없다 — 그
+   * 판단은 사람의 것이다. 그래서 이 slice 가 고친 자리만 **축어로** 잠근다. 일반 축은 열지 않는다.
+   */
+  it('표시층의 고친 행들', () => {
+    const fixed = [
+      resultDisplay.RESULT_PENDING_SLOTS[0]?.why ?? '',
+      resultDisplay.RESULT_PENDING_SLOTS[1]?.why ?? '',
+      worksheetDisplay.BID_PRICE_MENU_REASON_DISPLAY.MENU_PATH_NOT_WIRED.label,
+      worksheetDisplay.BID_PRICE_MENU_REASON_DISPLAY.MENU_PATH_NOT_WIRED.why ?? '',
+      worksheetDisplay.ML_UNAVAILABLE_REASON_DISPLAY.UNSUPPORTED_SCHEMA.label,
+      myBidResultDisplay.RECONCILIATION_BLOCKER_DISPLAY.OPERATOR_NAME_NORMALIZES_TO_EMPTY.why ?? '',
+      myBidResultDisplay.RECONCILIATION_BLOCKER_DISPLAY.WINNER_NAME_NORMALIZES_TO_EMPTY.why ?? '',
+    ];
+    for (const term of ['배선', '커널', '스키마', '토큰']) {
+      expect(fixed.filter((one) => one.includes(term))).toEqual([]);
+    }
+    // 비공허: 고친 행이 비어 있지 않다(빈 글자는 어느 금지 어휘도 담지 않아 위 단언이 공허하다).
+    expect(fixed.filter((one) => one.trim() === '')).toEqual([]);
   });
 });
 
