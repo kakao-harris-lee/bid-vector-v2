@@ -40,10 +40,18 @@ async function openOwnCase(page: Page): Promise<{ readonly row: BidCaseRow; read
 
   // 셸이 자리 표에서 만든 링크로 간다 — 주소를 손으로 적지 않는다. 이름은 **안정된 쪽**으로만
   // 고른다(머리 글자는 다른 slice 가 걷을 수 있는 문면이다).
+  //
+  // **이 화면 전체 locator 가 하나로 풀리는지 먼저 센다**(13A 레인이 밟은 자리): 이름 일치는
+  // 부분 문자열이고 셸이 탐색을 둘 그리므로, 라벨이 짧아지면 같은 이름이 링크 둘에 걸려
+  // strict mode 로 죽는다. 그 실패는 vitest 가 초록인 채 **여정에서만** 난다. 계수를 먼저 재면
+  // 라벨이 어느 쪽이든 사유가 문면으로 남는다.
+  const toBidBox = page.getByRole('link', { name: /내 입찰함/u });
+  await expect(toBidBox, '탐색 링크가 하나로 풀리지 않는다 — 라벨 문면이 바뀌었는지 보라').toHaveCount(1);
+
   const listed = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: /내 입찰함/u }).click();
+  await toBidBox.click();
   await expect(page.getByTestId('screen-bid-box')).toBeVisible();
 
   const cases = (await (await listed).json()) as BidCaseRow[];
