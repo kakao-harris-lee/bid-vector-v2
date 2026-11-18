@@ -232,6 +232,33 @@ test('음성 대조 — 고정이 아닌 아래쪽 내용은 밀면 닿는다', 
   expect(result.offscreen).toStrictEqual([]);
 });
 
+/**
+ * **sticky 는 고정이 아니다**(cr R2-5 · verifier medium). 붙기 전에는 흐름과 함께 스크롤되므로
+ * 접힘 아래의 sticky 머리는 밀면 닿는다 — 그 자리를 「영원히 닿지 않는다」로 세면 과차단이고,
+ * 13D·13E 의 목록 절 머리가 이유 없이 붉는다.
+ */
+test('음성 대조 — 접힘 아래의 sticky 머리는 밀면 닿는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({
+      open: '<div style="height:2000px"></div><div style="position:sticky; top:0">',
+      close: '</div>',
+    }),
+  );
+
+  // **비공허**: 그 버튼이 실제로 접힘 아래에 있고, 조상이 실제로 sticky 다.
+  const below = await browserPage.evaluate(() => {
+    const button = document.querySelector('button');
+    const parent = button?.parentElement ?? null;
+    return {
+      offscreen: button !== null && button.getBoundingClientRect().top > window.innerHeight,
+      sticky: parent !== null && getComputedStyle(parent).position === 'sticky',
+    };
+  });
+  expect(below).toStrictEqual({ offscreen: true, sticky: true });
+  expect(result.offscreen).toStrictEqual([]);
+});
+
 test('음성 대조 — 뷰포트 안에 든 고정 요소는 그대로다', async ({ page: browserPage }) => {
   const result = await measured(
     browserPage,
