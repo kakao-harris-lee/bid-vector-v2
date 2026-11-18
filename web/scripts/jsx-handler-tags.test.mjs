@@ -585,6 +585,21 @@ describe('속성 밖 배선 — 부른 대상은 참조로 센다 (v M-7b · cr 
     expect(handlerBearingTags(`declare const f: () => void;\n${body}`, WIRING_REACT)).not.toStrictEqual([]);
   });
 
+  /**
+   * **글자가 한 번도 나타나지 않는 꼴** — 이 자리가 「심볼로 본다」와 「글자로 본다」를 가른다.
+   * 다른 모듈이 이름을 바꿔 재수출하면 쓰는 쪽 원문에는 `cl` 밖에 없다. 변이(심볼 해소를 빼고
+   * 글자만 비교)를 걸면 **이 test 만** 붉는다 — 나머지 꼴은 원문 어딘가에 그 글자가 남기 때문이다.
+   */
+  it('이름을 바꿔 재수출한 것을 다른 모듈에서 써도 걸린다', () => {
+    const modules = {
+      ...WIRING_REACT,
+      './relay': "export { cloneElement as cl } from 'react';\n",
+    };
+    const text = "import { cl } from './relay';\ndeclare const f: () => void;\nexport const X = () => cl(<div />, { onClick: f });\n";
+
+    expect(handlerBearingTags(text, modules)).not.toStrictEqual([]);
+  });
+
   it('들여오는 자리 자체가 참조다 — 쓰지 않아도 걸린다', () => {
     expect(handlerBearingTags("import { cloneElement } from 'react';\nexport const X = 1;\n", WIRING_REACT)).not.toStrictEqual(
       [],
