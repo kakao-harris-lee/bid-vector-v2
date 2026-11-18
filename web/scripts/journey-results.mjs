@@ -19,6 +19,13 @@
  */
 const NOT_RUN_STATUSES = ['skipped', 'interrupted'];
 
+/**
+ * **이 술어는 두 Playwright 레인이 함께 쓴다**(M13/13C r2): 여정 레인과 셸 스모크 레인이다.
+ * 사본을 만들지 않는 것이 요점이고, 레인마다 다른 것은 「왜 건너뛰지 않는가」 한 줄뿐이라
+ * 그것만 인자로 받는다.
+ */
+const JOURNEY_SKIP_NOTE = '여정은 건너뛰지 않는다(하네스는 실행마다 버릴 DB 다)';
+
 /** test 가 **통과하기로 선언된** 상태. 그 밖은 `test.fail`·`fixme`·`skip` 이 바꾼 것이다. */
 const EXPECTED_TO_PASS = 'passed';
 
@@ -112,15 +119,14 @@ export function parseSpecRegistry(text) {
  * 조건(`if (env) test(…)`)으로 빼는 것은 집합을 바꾸지 않아 이 축이 잡지 못한다. vitest 레인의
  * 등록부도 같은 입도이고(일관된 선택), 수를 박으면 등록부가 test 마다 흔들린다 — 알려진 제한이다.
  */
-export function verdictOf(report, registry) {
+export function verdictOf(report, registry, skipNote = JOURNEY_SKIP_NOTE) {
   const { counts, titles, notExpectedToPass, retried, specFiles } = countOutcomes(report);
   const problems = [];
 
   for (const status of NOT_RUN_STATUSES) {
     if (counts[status] > 0) {
       problems.push(
-        `${status} ${counts[status]}건 — 여정은 건너뛰지 않는다(하네스는 실행마다 버릴 DB 다): ` +
-          titles[status].join(' / '),
+        `${status} ${counts[status]}건 — ${skipNote}: ` + titles[status].join(' / '),
       );
     }
   }
