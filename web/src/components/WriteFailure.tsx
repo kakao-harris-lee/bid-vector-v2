@@ -1,8 +1,24 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 import { ApiError } from '../api/apiError';
+import { Button, controlClass } from './Button';
+import { cardClass } from './Card';
 
 const HTTP_UNAUTHORIZED = 401;
+
+const LOGIN_PATH = '/login';
+
+/**
+ * 로그인으로 가는 **유일한 두 길**이 여기 있다(M13/13B 착수 실측). 그래서 「로그인 뒤 원래
+ * 자리로 돌아온다」를 참으로 만드는 자리도 여기다 — 떠나는 쪽이 자기 자리를 싣는다.
+ *
+ * 받는 쪽(`LoginScreen.safeReturnPath`)이 **앱 안의 경로만** 받는다. 이 자리가 싣는 값은 라우터가
+ * 준 지금 자리라 언제나 그 조건을 지나지만, 신뢰의 방향은 **받는 쪽**이다.
+ */
+function useLoginLinkState(): { readonly from: string } {
+  const location = useLocation();
+  return { from: `${location.pathname}${location.search}` };
+}
 
 /**
  * 쓰기 전이가 실패했을 때의 얼굴(CR H-2 · M-2). 읽기만 세 얼굴을 갖추고 쓰기가 비어 있으면,
@@ -26,6 +42,7 @@ export function WriteFailureFace({
   readonly onRetry: () => void;
 }) {
   const unauthorized = error instanceof ApiError && error.status === HTTP_UNAUTHORIZED;
+  const loginState = useLoginLinkState();
   return (
     <div
       data-testid="write-failure"
@@ -36,10 +53,9 @@ export function WriteFailureFace({
         <>
           <p className="text-sm font-medium">로그인이 필요합니다.</p>
           <p className="mt-1 text-xs">세션이 끝났습니다 — 다시 로그인한 뒤 같은 자리에서 이어 하십시오.</p>
-          <Link
-            to="/login"
-            className="mt-3 inline-block rounded-md border border-bad-ink/40 px-3 py-1 text-xs underline"
-          >
+          {/* 공유 `Button` 이 `state` 를 받지 않으므로 **같은 표**를 쓰고 요소만 여기서 그린다
+              (`controlClass` 의 KDoc — 사본을 만들지 않는 것이 요점이다). */}
+          <Link to={LOGIN_PATH} state={loginState} className={`mt-3 ${controlClass('danger', 'md')}`}>
             로그인 화면으로
           </Link>
         </>
@@ -49,13 +65,11 @@ export function WriteFailureFace({
           {/* 실패 뒤 서버 상태를 다시 읽었다는 사실을 함께 적는다 — 화면이 보이는 상태가
               「내가 눌렀다고 믿는 것」이 아니라 서버의 사실이라는 뜻이다. */}
           <p className="mt-1 text-xs">서버에 남은 상태를 다시 읽었습니다. 아래 상태를 확인한 뒤 다시 시도하십시오.</p>
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-3 rounded-md border border-bad-ink/40 px-3 py-1 text-xs"
-          >
-            다시 시도
-          </button>
+          <div className="mt-3">
+            <Button tone="danger" onClick={onRetry}>
+              다시 시도
+            </Button>
+          </div>
         </>
       )}
     </div>
@@ -67,11 +81,12 @@ export function WriteFailureFace({
  * 재시도로 풀리지 않는다 — 앞 판은 그것을 일시 장애와 같은 얼굴로 내고 영원히 재시도하게 했다.
  */
 export function SignedOutFace() {
+  const loginState = useLoginLinkState();
   return (
-    <div data-testid="signed-out" role="alert" className="rounded-lg border border-line p-6 text-center">
+    <div data-testid="signed-out" role="alert" className={`${cardClass('lg')} text-center`}>
       <p className="text-sm font-medium">로그인이 필요합니다.</p>
       <p className="mt-1 text-xs text-ink-soft">세션이 없거나 끝났습니다.</p>
-      <Link to="/login" className="mt-3 inline-block rounded-md border border-line px-3 py-1 text-sm underline">
+      <Link to={LOGIN_PATH} state={loginState} className={`mt-3 ${controlClass('secondary', 'md')}`}>
         로그인 화면으로
       </Link>
     </div>

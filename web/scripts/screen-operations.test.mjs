@@ -60,11 +60,21 @@ describe('화면이 부르는 operation 집합', () => {
     expect([...APPROVED].filter((one) => !contract.has(one))).toStrictEqual([]);
   });
 
-  /** 술어가 메서드를 **실제로** 가리는지 — 승인 경로의 미승인 메서드는 목록 밖이다. */
+  /**
+   * 술어가 메서드를 **실제로** 가리는지 — 승인 경로의 미승인 메서드는 목록 밖이다.
+   *
+   * 표본이 `DELETE /api/session` 이었는데 M13/13B 가 **그 쌍을 승인했다**(셸의 로그아웃). 승인된
+   * 쌍을 표본으로 두면 이 단언이 거짓이 되므로, 같은 경로의 **다른 미승인 메서드**로 옮긴다 —
+   * 재는 축(「경로가 승인돼도 메서드가 아니면 밖이다」)은 그대로다. 표본이 승인 목록에 들어 있지
+   * 않은 것도 함께 단언한다(다음에 그 쌍이 승인되면 이 자리가 먼저 붉는다).
+   */
   it('승인 경로의 미승인 메서드는 목록 밖으로 센다', () => {
-    const { outsideApproved } = compareSets(['DELETE /api/session'], [...APPROVED]);
+    const sample = 'PUT /api/session';
 
-    expect(outsideApproved).toStrictEqual(['DELETE /api/session']);
+    expect([...APPROVED], '표본이 이미 승인돼 있으면 이 단언이 공허하다').not.toContain(sample);
+    const { outsideApproved } = compareSets([sample], [...APPROVED]);
+
+    expect(outsideApproved).toStrictEqual([sample]);
   });
 });
 

@@ -11,6 +11,7 @@ import {
   type NoticeSummary,
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
+import { Button } from '../components/Button';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
@@ -144,12 +145,12 @@ export function TodayNoticesScreen() {
             name="q"
             value={form.q}
             onChange={(event) => setForm({ ...form, q: event.target.value })}
-            className="rounded-md border border-line bg-card px-3 py-2 text-sm"
+            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
         </label>
         {/* 점진적 공개(§6.5) — 조건은 접어 둔다. 기본 화면은 검색창 하나다. */}
-        <details className="rounded-md border border-line px-3 py-2">
-          <summary className="cursor-pointer text-xs text-ink-soft">조건 더하기</summary>
+        <details className="rounded-md border border-line px-3">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm text-ink-soft">조건 더하기</summary>
           <div className="mt-2 grid gap-2 sm:grid-cols-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-soft">기관명</span>
@@ -157,7 +158,7 @@ export function TodayNoticesScreen() {
                 name="agency"
                 value={form.agency}
                 onChange={(event) => setForm({ ...form, agency: event.target.value })}
-                className="rounded-md border border-line bg-card px-2 py-1 text-sm"
+                className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -169,7 +170,7 @@ export function TodayNoticesScreen() {
                 inputMode="numeric"
                 value={form.amountMin}
                 onChange={(event) => setForm({ ...form, amountMin: event.target.value })}
-                className="rounded-md border border-line bg-card px-2 py-1 font-numeric text-sm"
+                className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -181,17 +182,16 @@ export function TodayNoticesScreen() {
                 inputMode="numeric"
                 value={form.amountMax}
                 onChange={(event) => setForm({ ...form, amountMax: event.target.value })}
-                className="rounded-md border border-line bg-card px-2 py-1 font-numeric text-sm"
+                className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
               />
             </label>
           </div>
         </details>
-        <button
-          type="submit"
-          className="self-start rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-ink"
-        >
-          검색
-        </button>
+        <div className="self-start">
+          <Button type="submit" tone="primary">
+            검색
+          </Button>
+        </div>
       </form>
 
       {add.isError ? (
@@ -230,16 +230,15 @@ export function TodayNoticesScreen() {
                       inBox.has(`${notice.noticeNumber}\u0000${notice.noticeRound}`) ? (
                         <span className="text-xs text-ink-soft">담긴 건</span>
                       ) : (
-                        <button
-                          type="button"
+                        <Button
+                          tone="primary"
                           disabled={add.isPending}
                           onClick={() => add.mutate(notice)}
                           // CR L-8 — 스크린리더의 버튼 목록에서 어느 공고의 담기인지 구별된다.
-                          aria-label={`${notice.title ?? notice.noticeNumber} 입찰함에 담기`}
-                          className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
+                          ariaLabel={`${notice.title ?? notice.noticeNumber} 입찰함에 담기`}
                         >
                           담기
-                        </button>
+                        </Button>
                       )
                     }
                   />
@@ -247,15 +246,15 @@ export function TodayNoticesScreen() {
               </ul>
             )}
             {notices.hasNextPage ? (
-              <button
-                type="button"
-                data-testid="notices-more"
-                disabled={notices.isFetchingNextPage}
-                onClick={() => void notices.fetchNextPage()}
-                className="self-start rounded-md border border-line px-3 py-2 text-sm disabled:opacity-50"
-              >
-                더 보기
-              </button>
+              <div className="self-start">
+                <Button
+                  testId="notices-more"
+                  disabled={notices.isFetchingNextPage}
+                  onClick={() => void notices.fetchNextPage()}
+                >
+                  더 보기
+                </Button>
+              </div>
             ) : null}
           </>
         )}
@@ -283,15 +282,14 @@ export function TodayNoticesScreen() {
                   inBox.has(`${suggestion.noticeNumber}\u0000${suggestion.noticeRound}`) ? (
                     <span className="text-xs text-ink-soft">담긴 건</span>
                   ) : (
-                    <button
-                      type="button"
+                    <Button
+                      tone="primary"
                       disabled={add.isPending}
                       onClick={() => add.mutate(suggestion)}
-                      aria-label={`${suggestion.title ?? suggestion.noticeNumber} 입찰함에 담기`}
-                      className="rounded-md bg-accent px-3 py-1 text-sm font-medium text-accent-ink disabled:opacity-50"
+                      ariaLabel={`${suggestion.title ?? suggestion.noticeNumber} 입찰함에 담기`}
                     >
                       담기
-                    </button>
+                    </Button>
                   )
                 }
               />

@@ -22,6 +22,15 @@ export const APPROVED_OPERATIONS = [
   { method: 'GET', path: '/api/bid-cases' },
   { method: 'POST', path: '/api/bid-cases' },
   { method: 'POST', path: '/api/bid-price-requests' },
+  // 로그아웃(M13/13B) — 셸이 부른다. **이 쌍이 이 slice 의 유일한 증분**이고 계약
+  // `milestone-13.md` 의 13B 행이 미리 승인했다. 이 줄과 `queries.ts` 의 `signOut` 호출은
+  // **같은 커밋**에 선다(`screen-operations` 등식이 그것을 센다).
+  //
+  // 이 경로는 앞 판에서 **우회의 실례**였다: 읽기만 승인한 경로에 `DELETE` 를 보내는 꼴이 다섯
+  // 층을 모두 지났고, 그래서 좁히는 단위가 경로가 아니라 (메서드, 경로) 쌍이 됐다. 이제 그
+  // 메서드가 **승인되어** 들어온다 — 좁히기의 모양은 그대로다.
+  { method: 'DELETE', path: '/api/session' },
+
   { method: 'GET', path: '/api/bid-cases/{caseId}/timeline' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/draft' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/record' },

@@ -559,10 +559,20 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
   const watched = watchRequests(page);
   await signIn(page);
 
-  // **내가 연 화면의 응답을 집는다** — 그 응답의 헤더가 배지의 출처다.
+  /**
+   * **내가 연 화면의 응답을 집는다** — 그 응답의 헤더가 알림함 배지의 출처다.
+   *
+   * M13/13B 로 **셸의 탐색 배지**가 같은 operation 을 쓴다(`X-Unread-Count` 는 그 헤더에만
+   * 있다). 그 읽기는 본문을 쓰지 않으므로 `size=1` 로 한 행만 받아 오고, 그래서 느슨한 술어는
+   * **그 한 행짜리 응답**을 집었다(실측: 종류 집합이 하나로 줄었다). 화면의 읽기는 쪽 인자를
+   * 주지 않으므로 그 자리로 가른다.
+   */
   const listed = page.waitForResponse(
     (one) =>
-      one.url().includes('/api/notifications') && one.request().method() === 'GET' && one.status() === 200,
+      one.url().includes('/api/notifications') &&
+      one.request().method() === 'GET' &&
+      one.status() === 200 &&
+      new URL(one.url()).searchParams.get('size') === null,
   );
   await page.getByRole('link', { name: '알림함' }).click();
   await expect(page.getByTestId('screen-inbox')).toBeVisible();

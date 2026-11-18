@@ -1,4 +1,5 @@
 import type { BidPriceRequestResponse } from '../api/queries';
+import { cardClass } from '../components/Card';
 import { Field, StateBadge } from '../components/StateBadge';
 import { displayOrUnknown } from '../display/stateDisplay';
 import {
@@ -30,7 +31,7 @@ import {
  */
 function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
-    <section data-testid="bid-price-menu" className="rounded-lg border border-line bg-card p-4">
+    <section data-testid="bid-price-menu" className={cardClass()}>
       {/* 제목에는 도메인 용어의 숫자가 들어간다(「3안」) — 그래서 **값 자리**를 따로 표시해
           두고 「이 자리에 숫자가 없다」를 그 자리에서만 잰다(test 가 제목을 함께 읽으면 그
           단언이 용어 때문에 붉어진다, 실측). */}
@@ -57,7 +58,7 @@ function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
  */
 function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
-    <section data-testid="verdict" className="rounded-lg border border-line bg-card p-4">
+    <section data-testid="verdict" className={cardClass()}>
       <h3 className="text-sm font-semibold">판정</h3>
       <p className="mt-2 flex flex-wrap items-center gap-2">
         <StateBadge display={displayOrUnknown(OUTCOME_DISPLAY, price.outcome)} testId="verdict-outcome" />
@@ -90,7 +91,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
   const floorOrigin = price.publishedFloorRateOrigin;
   const mlReason = price.mlUnavailableReason;
   return (
-    <section className="rounded-lg border border-line bg-card p-4">
+    <section className={cardClass()}>
       <h3 className="text-sm font-semibold">근거</h3>
       <dl className="mt-3 grid gap-4 sm:grid-cols-2">
         <Field
@@ -172,7 +173,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
 function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
   const reason = price.licenseUncertainReason;
   return (
-    <section data-testid="qualification" className="rounded-lg border border-line bg-card p-4">
+    <section data-testid="qualification" className={cardClass()}>
       <h3 className="text-sm font-semibold">자격</h3>
       <p className="mt-2 flex flex-wrap items-center gap-2">
         <StateBadge display={displayOrUnknown(LICENSE_VERDICT_DISPLAY, price.licenseVerdict)} testId="license-verdict" />
@@ -229,7 +230,7 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
 /** 고지 — **계약이 준 코드 전수**를 문장으로 보인다(문장은 표면이 짓는다). */
 function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
-    <section className="rounded-lg border border-line bg-card p-4">
+    <section className={cardClass()}>
       <h3 className="text-sm font-semibold">고지</h3>
       <ul data-testid="disclosures" className="mt-2 flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
         {/* CR r2 M-6 — 직접 색인이 남아 있었다. 표 밖 코드에 `undefined.label` 로 터지면 오류

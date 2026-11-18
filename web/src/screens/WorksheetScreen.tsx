@@ -14,6 +14,8 @@ import {
   type BidPriceRequestResponse,
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
+import { Button } from '../components/Button';
+import { cardClass } from '../components/Card';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
@@ -383,7 +385,7 @@ export function WorksheetScreen() {
 
   return (
     <section data-testid="screen-worksheet" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <header className="rounded-lg border border-line bg-card p-4">
+      <header className={cardClass()}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h2 data-testid="worksheet-title" className="text-base font-semibold break-words">
             {notice.title ?? notice.noticeNumber}
@@ -431,15 +433,18 @@ export function WorksheetScreen() {
             {action.kind === 'REQUEST_PRICE' ? (
               <ActiveBidsDeclaration value={activeBids} onChange={setActiveBids} blocked={activeBidsBlocked} />
             ) : null}
-            <button
-              type="button"
-              data-testid="worksheet-primary"
-              onClick={() => runPrimary(action.kind, bidCase.caseId, bidCase.caseVersion)}
-              disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
-              className="mt-3 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink disabled:opacity-50"
-            >
-              {action.label}
-            </button>
+            {/* 그 상태의 **다음 행동 하나** — 화면에서 가장 큰 타깃이다(§6.5). */}
+            <div className="mt-3">
+              <Button
+                tone="primary"
+                size="lg"
+                testId="worksheet-primary"
+                onClick={() => runPrimary(action.kind, bidCase.caseId, bidCase.caseVersion)}
+                disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
+              >
+                {action.label}
+              </Button>
+            </div>
           </>
         )}
       </header>
@@ -457,7 +462,7 @@ export function WorksheetScreen() {
       {bidCase === undefined ? null : (
         <>
           <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} />
-          <section className="rounded-lg border border-line bg-card p-4">
+          <section className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰 금액과 기록</h3>
             {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
                 「아직 산출 안 함」을 화면이 추론해 말하는 꼴이었다(D-7E-4). */}

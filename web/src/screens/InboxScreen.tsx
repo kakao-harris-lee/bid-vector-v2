@@ -11,6 +11,8 @@ import {
 } from '../api/queries';
 import { NOTIFICATIONS_QUERY_KEY } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
+import { Button } from '../components/Button';
+import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import {
@@ -143,9 +145,10 @@ function NotificationRow({
         {item.read ? '읽음' : '안읽음'}
       </span>
 
+      {/* 본문 링크도 **블록 타깃**이다(M13/13B) — 이동 대상과 동작은 그대로다. */}
       <Link
         to={`/notices/${encodeURIComponent(item.noticeNumber)}/${encodeURIComponent(item.noticeRound)}`}
-        className="text-xs underline"
+        className="inline-flex min-h-11 items-center rounded-md text-sm underline"
       >
         워크시트 열기
       </Link>
@@ -153,14 +156,9 @@ function NotificationRow({
       {/* **버튼을 지우지 않는다**(r1 CR L-1): 서버 응답 뒤 재조회가 그 행을 읽음으로 만들면
           누른 버튼이 DOM 에서 사라져 포커스가 `<body>` 로 떨어졌다. 잠그고 문면만 바꾼다 —
           누른 자리가 그대로 남아 키보드 운영자가 위치를 잃지 않는다. */}
-      <button
-        type="button"
-        disabled={disabled || item.read}
-        onClick={() => onRead(focusTarget)}
-        className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
-      >
+      <Button disabled={disabled || item.read} onClick={() => onRead(focusTarget)}>
         {item.read ? '읽음' : '읽음으로'}
-      </button>
+      </Button>
     </li>
   );
 }
@@ -189,7 +187,7 @@ function NotificationGroupBlock({
       ref={focusTarget}
       tabIndex={-1}
       data-testid={`notice-group-${index}-${group.noticeNumber}-${group.noticeRound}-${group.bidKind}`}
-      className="rounded-lg border border-line bg-card p-4 focus:outline focus:outline-2"
+      className={`${cardClass()} focus:outline focus:outline-2`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm font-medium">{group.noticeNumber}</span>
@@ -214,8 +212,7 @@ function NotificationGroupBlock({
           {group.hasMoreThanShown ? ' · 이 페이지에 다 오지 않았습니다' : ''}
         </span>
 
-        <button
-          type="button"
+        <Button
           disabled={disabled || group.unreadCount === 0}
           onClick={() =>
             onRead({
@@ -226,10 +223,9 @@ function NotificationGroupBlock({
               bidKind: group.bidKind,
             })
           }
-          className="rounded-md border border-line px-2 py-0.5 text-xs hover:bg-neutral-skin disabled:opacity-50"
         >
           묶음 전체 읽음
-        </button>
+        </Button>
       </div>
 
       <ul className="mt-2 flex flex-col">

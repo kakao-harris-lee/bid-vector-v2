@@ -1,4 +1,5 @@
 import type { BidTimelineEntry } from '../api/queries';
+import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import {
   BID_CASE_STATE_DISPLAY,
@@ -23,7 +24,7 @@ import { InstantText } from './InstantText';
  */
 export function WorksheetTimeline({ entries }: { readonly entries: readonly BidTimelineEntry[] }) {
   return (
-    <section className="rounded-lg border border-line bg-card p-4">
+    <section className={cardClass()}>
       <h3 className="text-sm font-semibold">타임라인</h3>
       <ol data-testid="timeline" className="mt-3 flex flex-col gap-3">
         {entries.map((entry) => (

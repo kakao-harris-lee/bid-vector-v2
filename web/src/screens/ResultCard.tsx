@@ -1,9 +1,10 @@
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Link } from 'react-router';
 
 import { isUnauthorized } from '../api/apiError';
 import type { BidCase, MyBidCase, OpeningResultView } from '../api/queries';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
+import { LinkButton } from '../components/Button';
+import { Card } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -379,7 +380,7 @@ export function ResultCard({
   readonly result: CaseResult;
 }) {
   return (
-    <li data-testid={`result-case-${bidCase.caseId}`} className="rounded-lg border border-line bg-card p-4">
+    <Card as="li" testId={`result-case-${bidCase.caseId}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm font-medium">{bidCase.noticeNumber}</span>
         <span className="text-xs text-ink-soft">차수 {bidCase.noticeRound}</span>
@@ -423,19 +424,13 @@ export function ResultCard({
       <div className="mt-3 flex flex-wrap gap-2 text-sm">
         {/* **그 건이 보이는 탭으로** 보낸다(D-7E3a-8 · r1 M-2). 맨 `/bids` 는 첫 탭(관심)을 열고
             결과 단계 건은 거기 없다 — 운영자가 탭을 스스로 찾아야 「다음 행동」에 닿는다. */}
-        <Link
-          to={`/bids?tab=${tabOf(bidCase.state)}`}
-          className="rounded-md border border-line px-3 py-1 hover:bg-neutral-skin"
-        >
-          입찰함에서 기록
-        </Link>
-        <Link
+        <LinkButton to={`/bids?tab=${tabOf(bidCase.state)}`}>입찰함에서 기록</LinkButton>
+        <LinkButton
           to={`/notices/${encodeURIComponent(bidCase.noticeNumber)}/${encodeURIComponent(bidCase.noticeRound)}`}
-          className="rounded-md border border-line px-3 py-1 hover:bg-neutral-skin"
         >
           공고 워크시트
-        </Link>
+        </LinkButton>
       </div>
-    </li>
+    </Card>
   );
 }

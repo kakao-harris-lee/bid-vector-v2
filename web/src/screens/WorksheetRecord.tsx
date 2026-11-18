@@ -1,5 +1,7 @@
 import { useId } from 'react';
 
+import { controlClass } from '../components/Button';
+import { cardClass } from '../components/Card';
 import { VAT_TREATMENT_DISPLAY, type VatTreatment } from '../display/moneyDisplay';
 
 /** 나라장터 입찰공고 상세 — **이동만** 한다(D-UX-2: 자동 제출은 범위 밖이고 상한이 「이동 + 복사」다). */
@@ -106,7 +108,7 @@ export function ActiveBidsDeclaration({
           aria-describedby={noteId}
           aria-invalid={blocked === null ? undefined : true}
           onChange={(event) => onChange(event.target.value)}
-          className="w-32 rounded-md border border-line bg-card px-3 py-2 font-numeric text-sm"
+          className="min-h-11 w-32 rounded-md border border-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <p id={noteId} className="text-xs text-ink-soft">
@@ -134,7 +136,7 @@ export function KonepsHandoff({
 }) {
   const query = new URLSearchParams({ bidNtceNo: noticeNumber }).toString();
   return (
-    <section className="rounded-lg border border-line bg-card p-4">
+    <section className={cardClass()}>
       <h3 className="text-sm font-semibold">나라장터에서 투찰하기</h3>
       <p className="mt-1 text-xs text-ink-soft">이 화면은 대신 제출하지 않습니다. 금액을 복사해 직접 제출하십시오.</p>
       <a
@@ -142,7 +144,7 @@ export function KonepsHandoff({
         href={`${KONEPS_NOTICE_URL}?${query}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-3 inline-block rounded-md border border-line px-3 py-2 text-sm hover:bg-neutral-skin"
+        className={`mt-3 ${controlClass('secondary', 'md')}`}
       >
         나라장터 열기
       </a>
@@ -188,7 +190,7 @@ export function BidAmountFields({
           inputMode="numeric"
           value={form.amount}
           onChange={(event) => onChange({ ...form, amount: event.target.value })}
-          className="rounded-md border border-line bg-card px-3 py-2 font-numeric text-sm"
+          className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -198,7 +200,7 @@ export function BidAmountFields({
           name="vatTreatment"
           value={form.vat}
           onChange={(event) => onChange({ ...form, vat: event.target.value as VatTreatment | '' })}
-          className="rounded-md border border-line bg-card px-3 py-2 text-sm"
+          className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
         >
           <option value="">고르십시오</option>
           {VAT_CHOICES.map((choice) => (
@@ -215,7 +217,7 @@ export function BidAmountFields({
           name="drawNumbers"
           value={form.drawNumbers}
           onChange={(event) => onChange({ ...form, drawNumbers: event.target.value })}
-          className="rounded-md border border-line bg-card px-3 py-2 font-numeric text-sm"
+          className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -225,7 +227,7 @@ export function BidAmountFields({
           name="memo"
           value={form.memo}
           onChange={(event) => onChange({ ...form, memo: event.target.value })}
-          className="rounded-md border border-line bg-card px-3 py-2 text-sm"
+          className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           rows={2}
         />
       </label>
