@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   cssEntryRoots,
+  entryStateOf,
   scanOf,
   shippedSources,
   utilityClassesWithoutCandidates,
@@ -100,5 +101,33 @@ describe('훑기 밖에서 들어오는 유틸리티 (v M-4)', () => {
 
     expect(roots.length).toBeGreaterThan(0);
     expect(roots.filter((one) => one.root !== 'none')).toStrictEqual([]);
+  });
+});
+
+/**
+ * M13/13C 수정 라운드 2 — code-review N-7(오탐). **Tailwind 를 들이지 않는 CSS 는 입구가 아니다.**
+ * 앞 판은 「뿌리가 `none` 이 아니면 위반」이라, 글꼴·컴포넌트 전용 스타일시트를 하나 더하는 순간
+ * 붉었다 — 그 파일의 뿌리가 비어 있는 것은 자동 탐지가 아니라 **입구가 아니라는 뜻**이다.
+ */
+describe('CSS 입구 판별 (cr N-7)', () => {
+  it('평범한 CSS 는 입구가 아니다', async () => {
+    const state = await entryStateOf(WEB_ROOT, '.brand { color: red }\n');
+
+    expect(state.isEntry).toBe(false);
+  });
+
+  it('양성 대조 — 자동 탐지로 들인 둘째 입구는 입구이고 뿌리가 묶이지 않았다', async () => {
+    const state = await entryStateOf(WEB_ROOT, "@import 'tailwindcss';\n");
+
+    expect(state.isEntry).toBe(true);
+    expect(state.root).toBeNull();
+  });
+
+  it('출하 입구는 입구이고 뿌리가 묶여 있다', async () => {
+    const entries = await cssEntryRoots(WEB_ROOT);
+    const real = entries.filter((one) => one.isEntry);
+
+    expect(real.length).toBeGreaterThan(0);
+    expect(real.filter((one) => one.root !== 'none')).toStrictEqual([]);
   });
 });

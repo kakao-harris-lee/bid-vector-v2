@@ -18,7 +18,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
-import { compile } from '@tailwindcss/node';
+import { Features, compile } from '@tailwindcss/node';
 import { Scanner } from '@tailwindcss/oxide';
 
 import { shippedSourceFiles } from './jsx-handler-tags.mjs';
@@ -89,6 +89,20 @@ export async function utilityClassesWithoutCandidates(webRoot, css = null) {
  * 그 파일의 뿌리가 저장소 쪽으로 열리고 번들은 둘을 모두 싣는다 — 입구가 하나라는 사실을
  * **선언이 아니라 컴파일 결과**로 잰다.
  */
+/**
+ * 그 CSS 가 **Tailwind 입구인가**(cr N-7). 뿌리가 비어 있는 것만으로는 「자동 탐지가 켜졌다」를
+ * 말할 수 없다 — 평범한 스타일시트도 그 꼴이다(실측: 평범한 CSS 와 자동 탐지 입구가 뿌리·패턴이
+ * 똑같다). 입구인지는 컴파일러가 낸 **기능 비트**가 말한다: 유틸리티 층을 세운 파일만 입구다.
+ */
+export async function entryStateOf(webRoot, css, base = resolve(webRoot, 'src')) {
+  const compiled = await compile(css, { base, onDependency: () => undefined });
+  return {
+    root: compiled.root,
+    sources: compiled.sources,
+    isEntry: (compiled.features & Features.Utilities) !== 0,
+  };
+}
+
 export async function cssEntryRoots(webRoot) {
   const srcRoot = resolve(webRoot, 'src');
   const entries = [];
@@ -107,11 +121,8 @@ export async function cssEntryRoots(webRoot) {
   walk(srcRoot);
   const roots = [];
   for (const file of entries) {
-    const compiled = await compile(readFileSync(file, 'utf8'), {
-      base: resolve(file, '..'),
-      onDependency: () => undefined,
-    });
-    roots.push({ file: relative(srcRoot, file), root: compiled.root });
+    const state = await entryStateOf(webRoot, readFileSync(file, 'utf8'), resolve(file, '..'));
+    roots.push({ file: relative(srcRoot, file), root: state.root, isEntry: state.isEntry });
   }
   return roots;
 }
