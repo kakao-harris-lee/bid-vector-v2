@@ -18,6 +18,20 @@ import {
  */
 const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src');
 
+/**
+ * 대조에 쓰는 어휘를 **글자로 적지 않는다.** Tailwind 의 훑기는 `src/` 에 묶여 있지 않아, 이
+ * 파일에 적은 class 꼴 글자가 **출하 CSS 에 그대로 실린다**(실측: 아래 셋이 번들에 들어가 CSS 가
+ * 105 B 늘었다). 상수에서 유도하면 그 자리가 사라진다 — 주석에 적어도 훑기는 읽는다.
+ */
+const MIN_HEIGHT_PREFIX = MIN_TOUCH_CLASS.slice(0, MIN_TOUCH_CLASS.lastIndexOf('-'));
+/** 같은 접두를 쓰지만 값이 0 인 덮어쓰기(우선 표시 포함). */
+const OVERRIDE_IMPORTANT = `!${MIN_HEIGHT_PREFIX}-0`;
+/** 변형 접두가 붙은 덮어쓰기. */
+const OVERRIDE_VARIANT = `max-md:${MIN_HEIGHT_PREFIX}-0`;
+/** 접두가 같을 뿐 다른 어휘 — 칸으로 가르지 않으면 이것이 지나간다. */
+const LOOKALIKE = `${MIN_TOUCH_CLASS}0`;
+
+
 describe('체크박스·라디오의 누르는 자리 (M13/13B v L-5)', () => {
   const { files, findings } = scanControls(srcDir);
 
@@ -63,11 +77,11 @@ describe('양성 대조 — 심은 위반이 붉는다', () => {
     expect(found[0].why).toContain(MIN_TOUCH_CLASS);
   });
 
-  /** 접두가 같은 다른 어휘(`min-h-110`)로 지나가지 않는다 — 칸으로 가른다. */
+  /** 접두만 같은 다른 어휘로 지나가지 않는다 — 칸으로 가른다. */
   it('비슷한 이름의 다른 어휘는 그 어휘가 아니다', () => {
     expect(
       unwrappedControls(
-        'export const X = () => (\n  <label className="flex min-h-110 items-center">\n    <input type="radio" />\n  </label>\n);\n',
+        `export const X = () => (\n  <label className="flex ${LOOKALIKE} items-center">\n    <input type="radio" />\n  </label>\n);\n`,
       ),
     ).toHaveLength(1);
   });
@@ -123,12 +137,12 @@ describe('증명할 수 없는 자리도 같은 의무를 진다 (cr Q-1 · v M-
   it('레이블이 최소 높이를 덮어쓰면 걸린다', () => {
     expect(
       unwrappedControls(
-        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} !min-h-0">\n    <input type="checkbox" />\n  </label>\n);\n`,
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} ${OVERRIDE_IMPORTANT}">\n    <input type="checkbox" />\n  </label>\n);\n`,
       ),
     ).toHaveLength(1);
     expect(
       unwrappedControls(
-        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} max-md:min-h-0">\n    <input type="checkbox" />\n  </label>\n);\n`,
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} ${OVERRIDE_VARIANT}">\n    <input type="checkbox" />\n  </label>\n);\n`,
       ),
     ).toHaveLength(1);
   });
