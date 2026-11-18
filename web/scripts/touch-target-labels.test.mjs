@@ -78,6 +78,91 @@ describe('양성 대조 — 심은 위반이 붉는다', () => {
   });
 });
 
+/**
+ * **자기 규칙 「증명 불가 → 같은 의무」를 지키는가**(cr Q-1 = v M-10). 앞 판은 레이블 **밖**의
+ * 증명 불가는 위반으로 세면서 레이블 **안**의 증명 불가에는 최소 높이 의무를 지우지 않았다 —
+ * 같은 파일 주석이 선언한 규칙과 코드가 어긋난 자리다.
+ */
+describe('증명할 수 없는 자리도 같은 의무를 진다 (cr Q-1 · v M-10)', () => {
+  it('레이블 안에서 type 이 식이면 최소 높이 의무를 진다', () => {
+    const found = unwrappedControls(
+      "export const X = () => (\n  <label className=\"flex\">\n    <input type={kind} />\n  </label>\n);\n",
+    );
+
+    expect(found).toHaveLength(1);
+  });
+
+  it('음성 — 같은 꼴이라도 레이블이 최소 높이를 들면 초록이다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}">\n    <input type={kind} />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /** HTML 은 `type` 의 대소문자를 가리지 않는다 — 이 축이 가리면 한 글자로 열린다. */
+  it('type 의 대소문자를 접어 본다', () => {
+    expect(
+      unwrappedControls('export const X = () => <input type="CHECKBOX" />;\n'),
+    ).toHaveLength(1);
+  });
+
+  /** **볼 수 없는 것을 통과시키지 않는다** — 형제 술어가 spread 를 그렇게 다룬다. */
+  it('spread 로 준 type 은 증명 불가다', () => {
+    expect(unwrappedControls("export const X = () => <input {...{ type: 'radio' }} />;\n")).toHaveLength(1);
+  });
+
+  /** 태그를 변수에 담아 `input` 임을 숨기는 길 — 태그 판정은 ① 축과 같은 층이어야 한다. */
+  it('변수에 담은 input 태그도 같은 의무를 진다', () => {
+    const text = "const Input = 'input' as const;\nexport const X = () => <Input type=\"checkbox\" />;\n";
+
+    expect(unwrappedControls(text)).toHaveLength(1);
+  });
+
+  /** 최소 높이를 **덮어쓰는** 어휘가 함께 있으면 그 레이블이 44px 를 든다고 증명할 수 없다. */
+  it('레이블이 최소 높이를 덮어쓰면 걸린다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} !min-h-0">\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS} max-md:min-h-0">\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * **레이블이 켜는 것은 컨트롤 하나뿐이다**(cr Q-4). 둘을 감싸면 뒤의 체크박스는 레이블을 눌러도
+   * 켜지지 않는다 — 그 자리의 누르는 상자는 자기 13px 이다. 증명할 수 없으니 보수적으로 센다.
+   */
+  it('레이블 하나가 컨트롤 둘을 감싸면 걸린다', () => {
+    const found = unwrappedControls(
+      `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}">\n    <input className="x" />\n    <input type="checkbox" />\n  </label>\n);\n`,
+    );
+
+    expect(found.length).toBeGreaterThan(0);
+  });
+
+  /** `htmlFor` 가 다른 곳을 가리키면 그 레이블의 컨트롤은 이 체크박스가 아니다. */
+  it('htmlFor 가 다른 곳을 가리키면 걸린다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label htmlFor="other" className="flex ${MIN_TOUCH_CLASS}">\n    <input type="checkbox" id="mine" />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('음성 — htmlFor 가 자기 컨트롤을 가리키면 초록이다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label htmlFor="mine" className="flex ${MIN_TOUCH_CLASS}">\n    <input type="checkbox" id="mine" />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
+  });
+});
+
 describe('음성 대조 — 걸리면 안 되는 것', () => {
   it(`${MIN_TOUCH_CLASS} 를 든 레이블이 감싸면 걸리지 않는다`, () => {
     expect(

@@ -104,7 +104,7 @@ function typeParts(checker, type, depth = 0) {
  * 그래서 **섞인 유니온**(리터럴 ∪ 컴포넌트 — React 의 `ElementType` 이 그 꼴이다)에서도 리터럴
  * 구성원이 그대로 살아, 「유니온은 하나라도 허용 밖이면 위반」이 선다(cr P-1).
  */
-function intrinsicTagsOf(checker, tagName, written) {
+export function intrinsicTagsOf(checker, tagName, written) {
   if (isIntrinsicName(written)) {
     return [written];
   }
@@ -309,6 +309,15 @@ const probeModulePath = (specifier) => resolve('/', `${specifier.replace(/[^\w.-
  * 둘을 **심어서만** 잴 수 있고, 심은 것은 측정이지 잠금이 아니다.
  */
 export function handlerBearingTags(text, modules = {}) {
+  const { program, source } = probeProgram(text, modules);
+  return handlerBearingTagsIn(program, source);
+}
+
+/**
+ * 합성 원문 하나로 **가벼운 프로그램**을 세운다 — 표준 라이브러리를 싣지 않고, `modules` 로 준
+ * 곁 모듈만 푼다. 레이블 축도 태그 판정에 검사기가 필요해 같은 자리를 쓴다(사본을 만들지 않는다).
+ */
+export function probeProgram(text, modules = {}) {
   const sources = new Map([[resolve(PROBE_FILE), { text, kind: ts.ScriptKind.TSX }]]);
   for (const [specifier, body] of Object.entries(modules)) {
     sources.set(probeModulePath(specifier), { text: body, kind: ts.ScriptKind.TS });
@@ -336,7 +345,7 @@ export function handlerBearingTags(text, modules = {}) {
   if (source === undefined) {
     throw new Error(`합성 원문이 프로그램에 없다: ${PROBE_FILE}`);
   }
-  return handlerBearingTagsIn(program, source);
+  return { program, source };
 }
 
 /** 소스 트리의 출하 파일 — 재귀이고 test 파일은 뺀다(출하되지 않는다). */
