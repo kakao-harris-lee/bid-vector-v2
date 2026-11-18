@@ -254,7 +254,16 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
           testId="license-groups-missing"
           value={price.licenseGroupsMissing.length === 0 ? null : price.licenseGroupsMissing.join(', ')}
         />
-        <Field label="판정 어휘 version" testId="license-policy" value={price.licensePolicySource} />
+        {/* 13A 재측정 넘김(팀장 2026-11-18) — 앞 판의 라벨은 개발 쪽 말이었다. 운영자가 알아야
+            하는 것은 **무엇의 판본인가**다: 규칙이 바뀌면 지난 판정이 어느 판에서 나왔는지
+            되짚을 수 있다는 사실(QUAL-05)이 이 칸의 뜻이다. 값은 서버가 준 그대로 둔다 —
+            화면이 출처를 고쳐 적지 않는다. */}
+        <Field
+          label="자격 판정에 쓴 규칙 판본"
+          hint="면허 판정에 쓴 규칙표가 어느 판인지. 규칙이 바뀌어도 지난 판정을 그 판으로 되짚을 수 있다."
+          testId="license-policy"
+          value={price.licensePolicySource}
+        />
         <Field label="읽지 못한 요건 행" testId="license-unparsable" value={`${price.licenseUnparsableRowCount}`} />
       </dl>
       <p className="mt-2">
