@@ -40,6 +40,28 @@ const LABELABLE_TAGS = new Set(['button', 'input', 'meter', 'output', 'progress'
  */
 const MIN_HEIGHT_TOKEN = /^(?:[\w.-]+:)*!?min-h-/u;
 
+/**
+ * **`min-height` 가 실제로 서는 display 어휘**(M13/13C — 13B v M-11).
+ *
+ * 레이블의 기본 display 는 `inline` 이고 CSS 는 inline 요소에 `min-height` 를 **적용하지 않는다**.
+ * 그래서 `min-h-11` 만 든 레이블은 Chromium 에서 17px 로 섰다(verifier 실측). 높이가 서는 쪽을
+ * **허용 집합**으로 두고 나머지(어휘가 **없는 경우를 포함**)는 증명 불가로 센다 — `contents`·
+ * `inline`·`hidden` 을 금지 목록에 따로 적지 않는다(목록이 둘이면 갈린다).
+ *
+ * 변형 접두가 붙은 display(`md:flex`)는 **그 폭에서만** 서므로 증명이 되지 않는다. 이 축이 지키는
+ * 자리는 모바일 폭이다.
+ */
+export const MIN_HEIGHT_DISPLAY_TOKENS = new Set([
+  'block',
+  'flex',
+  'flow-root',
+  'grid',
+  'inline-block',
+  'inline-flex',
+  'inline-grid',
+  'table',
+]);
+
 /** 그 여는 태그의 속성 값이 **글자 그대로** 무엇인가 — 식이면 `null`(증명 불가). */
 function literalAttribute(element, name) {
   let spread = false;
@@ -85,13 +107,21 @@ function enclosingLabelElement(checker, node) {
   return null;
 }
 
-/** 그 레이블 안의 labelable 자손 전수 — 둘 이상이면 어느 것이 켜지는지 증명할 수 없다. */
+/**
+ * 그 레이블 안의 labelable 자손 전수 — 둘 이상이면 어느 것이 켜지는지 증명할 수 없다.
+ *
+ * **컴포넌트도 센다**(M13/13C — 13B v M-11 셋째 꼴). 레이블이 켜는 것은 첫 labelable 자손
+ * 하나인데, 그 자리에 컴포넌트가 있으면 그것이 무엇을 그리는지 이 축은 모른다. 모르는 것을
+ * 「labelable 이 아니다」로 접으면 컴포넌트가 버튼을 그리는 순간 레이블이 체크박스를 켜지
+ * 않는데도 초록이다 — 보수적으로 센다.
+ */
 function labelableDescendants(checker, labelElement) {
   const found = [];
   const visit = (node) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
       const tags = tagsOf(checker, node);
-      if (tags === null || tags.some((one) => LABELABLE_TAGS.has(one))) {
+      const custom = tags !== null && tags.length === 0;
+      if (tags === null || custom || tags.some((one) => LABELABLE_TAGS.has(one))) {
         found.push(node);
       }
     }
@@ -111,6 +141,11 @@ function labelCarriesMinHeight(labelOpening) {
   }
   const tokens = className.split(/\s+/u).filter((one) => one !== '');
   if (!tokens.includes(MIN_TOUCH_CLASS)) {
+    return false;
+  }
+  // **높이가 서는 display** 가 함께 있어야 한다(v M-11) — 없으면 레이블은 inline 이고 그 값은
+  // 적용되지 않는다. 변형 접두가 붙은 어휘는 이 집합에 들지 않으므로 함께 걸린다.
+  if (!tokens.some((one) => MIN_HEIGHT_DISPLAY_TOKENS.has(one))) {
     return false;
   }
   // 덮어쓰는 어휘가 함께 있으면 **실효 높이를 증명할 수 없다**(v M-10).
