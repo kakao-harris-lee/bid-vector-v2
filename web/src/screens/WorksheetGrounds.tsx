@@ -232,14 +232,20 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
 }
 
 /**
- * 규칙 판본의 **사용자 문면**(팀장 판정 2026-11-18). 시행일이 있으면 그 날짜의 판이고, 없으면
- * 그것이 **최초 판**이라는 사실이다(계약이 그 자리를 「시행일이라는 값 자체가 없다」로 둔다) —
- * 빈 자리로 두면 「서버가 안 보냈다」로 읽힌다.
+ * 규칙 판본의 **사용자 문면**(팀장 판정 2026-11-18 · cr N-2 로 갈래가 셋이 됐다).
+ *
+ * 계약이 이 칸을 **optional 이면서 nullable** 로 둔다. 그 둘은 **다른 사실**이다 —
+ * `null` 은 「시행일이라는 값 자체가 없다」(= 최초 판)이고, **부재**는 「서버가 그 칸을 보내지
+ * 않았다」(= 판본을 모른다)다. 부재를 최초 판으로 접으면 화면이 **도메인 사실을 단정**하게
+ * 되고, 그 자리는 재현 축(QUAL-05)이라 틀린 판본을 믿는 비용이 작지 않다.
  *
  * 서버가 사용자용 판본 이름을 주지 않아 날짜로 말한다(그 표면 부재는 새 OPEN 후보다).
  */
 function policyVersionTextOf(effectiveFrom: string | null | undefined): string {
-  return effectiveFrom === null || effectiveFrom === undefined ? '최초 판(시행일 없음)' : `${effectiveFrom} 시행 판`;
+  if (effectiveFrom === undefined) {
+    return '판본을 받지 못했습니다';
+  }
+  return effectiveFrom === null ? '최초 판(시행일 없음)' : `${effectiveFrom} 시행 판`;
 }
 
 /** 자격 — **면허 축만** 판정한다. 판정하지 않는 축을 함께 싣는 것이 이 카드의 요점이다. */

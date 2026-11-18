@@ -1286,11 +1286,37 @@ describe('화면 C — 규칙 판본은 시행일로 보인다', () => {
     expect(cell.textContent, '개발 식별자가 화면에 섰다').not.toMatch(/OPEN-[A-Z0-9-]+/u);
   });
 
-  it('시행일이 없으면 최초 판이라는 사실을 말한다 — 빈 자리로 두지 않는다', async () => {
+  /**
+   * **서버의 실제 꼴은 이쪽이다**(verifier R1-M4) — 오늘 정책 표의 항목이 최초 판 하나뿐이라
+   * 시행일이 `null` 로 온다. 그래서 **부재 단언을 이 갈래에도** 건다: 원문과 개발 식별자가 0 인
+   * 것을 운영 상태에서 재지 않으면, 「`null` 일 때만 원문을 덧붙이는」 변이가 조용히 초록이다.
+   */
+  it('시행일이 null 이면 최초 판이라는 사실을 말하고, 그 상태에서도 원문을 그리지 않는다', async () => {
     mocked.requestBidPrice.mockResolvedValue({ ...PRICE, licensePolicyEffectiveFrom: null });
     renderScreen();
     await askPrice();
 
-    expect((await screen.findByTestId('license-policy')).textContent).toContain('최초 판');
+    const cell = await screen.findByTestId('license-policy');
+    expect(cell.textContent).toContain('최초 판');
+    expect(cell.textContent, '서버의 재현용 출처 원문이 그대로 그려졌다').not.toContain(PRICE.licensePolicySource);
+    expect(cell.textContent, '개발 식별자가 화면에 섰다').not.toMatch(/OPEN-[A-Z0-9-]+/u);
+  });
+
+  /**
+   * **부재를 사실로 읽지 않는다**(cr N-2). 계약이 그 칸을 optional + nullable 로 두므로 「서버가
+   * 보내지 않았다」와 「최초 판이다」는 **다른 사실**이다 — 앞은 판본을 모르는 것이고, 그것을
+   * 「최초 판」으로 단정하면 재현 축에서 틀린 판본을 믿게 된다.
+   */
+  it('서버가 그 칸을 아예 보내지 않으면 최초 판이라고 단정하지 않는다', async () => {
+    // 그 칸을 **아예 담지 않은** 응답이다(계약이 optional 로 둔 자리 — 배포 비틀림의 꼴).
+    const withoutField: queries.BidPriceRequestResponse = { ...PRICE };
+    delete withoutField.licensePolicyEffectiveFrom;
+    mocked.requestBidPrice.mockResolvedValue(withoutField);
+    renderScreen();
+    await askPrice();
+
+    const cell = await screen.findByTestId('license-policy');
+    expect(cell.textContent, '부재를 최초 판이라는 사실로 읽었다').not.toContain('최초 판');
+    expect(cell.textContent).toContain('받지 못했');
   });
 });
