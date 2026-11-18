@@ -579,3 +579,30 @@ describe('화면 D — 건을 내려놓는다', () => {
     expect(within(empty).getByTestId('bid-box-empty-action').getAttribute('href')).toBe('/');
   });
 });
+
+/**
+ * 서버만 공백으로 보는 제어문자 넷은 **화면이 보내고 서버가 400 으로 거부하는** 잔여다(실측 —
+ * 화면 술어가 서버보다 좁은 쪽). 그 400 이 운영자에게 **사용자 말로** 보이는지 여기서 잰다.
+ */
+describe('화면 D — 화면이 보낸 사유를 서버가 거부할 때', () => {
+  it('400 이 사용자 말의 쓰기 실패 얼굴로 보이고 서버 코드가 새지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.skipCase.mockRejectedValue(new ApiError(400, 'INVALID_REQUEST'));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-SKIP-11'));
+    // 서버만 공백으로 보는 글자 하나 — 화면 술어는 이것을 글자로 본다(그래서 보낸다).
+    fireEvent.change(screen.getByLabelText('건너뜀 사유'), { target: { value: String.fromCodePoint(0x1f) } });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(mocked.skipCase, '화면이 그 값을 보냈다 — 술어가 서버보다 좁은 쪽이다').toHaveBeenCalled();
+    expect(face.textContent ?? '').toContain('보내지 못했습니다');
+    // 서버 메시지·코드를 그대로 내보이지 않는다(D-7E-6).
+    expect(face.textContent ?? '', '서버 코드가 화면에 샜다').not.toContain('INVALID_REQUEST');
+    // **무엇이 잘못됐는지는 말하지 않는다** — 그 잔여를 알려진 제한에 적었다.
+    expect(within(face).getByRole('button', { name: '다시 시도' })).toBeTruthy();
+  });
+});
