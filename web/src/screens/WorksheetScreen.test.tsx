@@ -8,6 +8,9 @@ import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { stateDisplayOf } from '../display/caseDisplay';
 
+import { controlClass } from '../components/Button';
+
+import { SECTION_SUMMARY_CLASS } from './WorksheetGrounds';
 import { WorksheetScreen } from './WorksheetScreen';
 
 vi.mock('../api/queries');
@@ -416,6 +419,8 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
     fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
     fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    // M13/13C — 초안 앞에 **확인**이 선다(§6.2 C 3). 누름이 한 번 늘었을 뿐 보내는 진술은 같다.
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
 
     await waitFor(() => {
       expect(mocked.draftBid).toHaveBeenCalled();
@@ -487,6 +492,7 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     fireEvent.change(await screen.findByTestId('record-amount'), { target: { value: '1100000000' } });
     fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
     fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
 
     expect((await screen.findByTestId('write-failure')).textContent).toContain('만들지 못했습니다');
   });
@@ -615,6 +621,7 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     fireEvent.change(await screen.findByTestId('record-vat'), { target: { value: 'INCLUSIVE' } });
     const before = mocked.listBidCases.mock.calls.length;
     fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
 
     await screen.findByTestId('write-failure');
     await waitFor(() => {
@@ -842,5 +849,368 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
     expect(rows[1]?.textContent, '출발 쪽 조회가 공용 자리를 지나지 않았다').toContain(
       `${stateDisplayOf(outOfVocabularyFrom).label} → ${stateDisplayOf('WATCHING').label}`,
     );
+  });
+});
+
+/**
+ * M13/13C — **나라장터 넘김**(계약 받는 항목 2 · §6.2 C 4). 이 화면이 대신 제출하지 않으므로
+ * 운영자는 금액을 손으로 옮긴다 — 그 옮기는 길에서 나는 실수(「0 을 하나 더/덜」·하한 미달)를
+ * 화면이 줄인다: 복사 · 한글 병기 · 하한 대비 여유 · 보내기 전 확인.
+ */
+
+/** 하한 여유가 **서는** 응답 — 근거가 `USABLE` 이고 기초금액의 과세 축이 선언돼 있다. */
+const PRICED_WITH_FLOOR: queries.BidPriceRequestResponse = {
+  ...PRICE,
+  floorRateGroundsState: 'USABLE',
+  publishedFloorRateFraction: '0.8',
+  publishedFloorRateOrigin: 'NOTICE_VALUE',
+  baseAmountWon: 1_000_000_000,
+  baseAmountVatTreatment: 'INCLUSIVE',
+};
+
+/** 클립보드는 **브라우저가 줄 수도, 거부할 수도** 있다. 두 길을 따로 세운다. */
+function stubClipboard(writeText: ((text: string) => Promise<void>) | null): void {
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: writeText === null ? undefined : { writeText },
+  });
+}
+
+afterEach(() => {
+  Reflect.deleteProperty(navigator, 'clipboard');
+});
+
+/** 금액·과세를 적는 자리 — 복사와 확인이 같은 입력을 쓴다. */
+function fillAmount(amount: string, vat = 'INCLUSIVE'): void {
+  fireEvent.change(screen.getByTestId('record-amount'), { target: { value: amount } });
+  fireEvent.change(screen.getByTestId('record-vat'), { target: { value: vat } });
+}
+
+describe('화면 C — 금액 복사', () => {
+  it('복사를 누르면 원 단위 정수만 클립보드로 가고 그 사실이 보인다', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+    renderScreen();
+    await screen.findByTestId('koneps-copy');
+    fillAmount('1050000000');
+
+    fireEvent.click(screen.getByTestId('koneps-copy'));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('1050000000'));
+    expect((await screen.findByTestId('koneps-copy-status')).textContent).toContain('복사했습니다');
+  });
+
+  /**
+   * **거부는 조용히 지나가지 않는다.** 클립보드 권한은 브라우저·맥락에 따라 거부되고, 그때
+   * 운영자가 할 수 있는 일은 **직접 고르는 것**이다 — 그래서 선택 가능한 원문을 그 자리에 낸다.
+   */
+  it('클립보드가 거부하면 사유와 선택 가능한 원문이 뜬다', async () => {
+    stubClipboard(() => Promise.reject(new Error('denied')));
+    renderScreen();
+    await screen.findByTestId('koneps-copy');
+    fillAmount('1050000000');
+
+    fireEvent.click(screen.getByTestId('koneps-copy'));
+
+    const status = await screen.findByTestId('koneps-copy-status');
+    expect(status.textContent).toContain('복사하지 못했습니다');
+    const fallback = await screen.findByTestId('koneps-copy-fallback');
+    expect((fallback as HTMLInputElement).value).toBe('1050000000');
+    expect(fallback.getAttribute('readonly')).not.toBeNull();
+  });
+
+  /** 클립보드 **자체가 없는** 맥락(비보안 출처 등)도 같은 길이다 — 아무 일도 안 일어나지 않는다. */
+  it('클립보드가 없는 맥락에서도 같은 길로 간다', async () => {
+    stubClipboard(null);
+    renderScreen();
+    await screen.findByTestId('koneps-copy');
+    fillAmount('1050000000');
+
+    fireEvent.click(screen.getByTestId('koneps-copy'));
+
+    expect((await screen.findByTestId('koneps-copy-status')).textContent).toContain('복사하지 못했습니다');
+    expect((await screen.findByTestId('koneps-copy-fallback')) as HTMLInputElement).not.toBeNull();
+  });
+
+  /** **없는 값을 복사하지 않는다** — 금액을 적기 전에는 누를 자리가 막혀 있다. */
+  it('금액을 적기 전에는 복사가 막혀 있다', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+    renderScreen();
+
+    const copy = await screen.findByTestId('koneps-copy');
+    expect((copy as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(copy);
+    expect(writeText).not.toHaveBeenCalled();
+  });
+});
+
+describe('화면 C — 한글 금액 병기', () => {
+  it('넘김 카드가 숫자와 한글 병기를 함께 보인다', async () => {
+    renderScreen();
+    await screen.findByTestId('handoff-amount');
+    fillAmount('1050000000');
+
+    expect((await screen.findByTestId('handoff-amount')).textContent).toContain('1,050,000,000');
+    expect((await screen.findByTestId('handoff-amount-korean')).textContent).toContain('10억 5000만원');
+  });
+});
+
+describe('화면 C — 하한 대비 여유', () => {
+  it('근거가 서고 과세 축이 같으면 여유가 선다', async () => {
+    mocked.requestBidPrice.mockResolvedValue(PRICED_WITH_FLOOR);
+    renderScreen();
+    await askPrice();
+    fillAmount('820000000');
+
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('하한 초과');
+    expect(margin.textContent).toContain('2.50');
+  });
+
+  it('하한보다 낮으면 미달이 보인다', async () => {
+    mocked.requestBidPrice.mockResolvedValue(PRICED_WITH_FLOOR);
+    renderScreen();
+    await askPrice();
+    fillAmount('780000000');
+
+    expect((await screen.findByTestId('floor-margin')).textContent).toContain('하한 미달');
+  });
+
+  /** 과세 축이 다르면 **재지 않는다** — 0% 나 대시로 접지 않는다(계약). */
+  it('과세 축이 다르면 사유가 보이고 숫자가 없다', async () => {
+    mocked.requestBidPrice.mockResolvedValue(PRICED_WITH_FLOOR);
+    renderScreen();
+    await askPrice();
+    fillAmount('820000000', 'EXCLUSIVE');
+
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('과세 구분이 서로 달라');
+    expect(margin.textContent).not.toContain('%');
+  });
+
+  it('근거가 서지 않는 상태에서는 사유만 있고 0% 가 없다', async () => {
+    renderScreen();
+    await askPrice();
+    fillAmount('820000000');
+
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('근거로 쓸 수 없어');
+    expect(margin.textContent).not.toContain('0%');
+  });
+
+  /** 투찰가를 요청하기 **전에는** 하한율 자체가 없다 — 그 자리를 만들지 않는다. */
+  it('요청 전에는 여유 자리가 없다', async () => {
+    renderScreen();
+    await screen.findByTestId('handoff-amount');
+
+    expect(screen.queryByTestId('floor-margin')).toBeNull();
+  });
+});
+
+/**
+ * **확인 단계는 「투찰 예정 초안」에만 선다**(§6.2 C 3 「안을 고르면 확인 → 초안이 만들어진다」).
+ * 「제출함」은 §6.2 C 5 가 「한 번으로 ④ 완료」로 못박은 자리라 확인을 더하지 않는다.
+ */
+describe('화면 C — 보내기 전 확인', () => {
+  it('초안을 누르면 확인이 뜨고 아직 보내지 않는다', async () => {
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    expect(await screen.findByTestId('bid-confirm')).not.toBeNull();
+    expect(mocked.draftBid).not.toHaveBeenCalled();
+  });
+
+  it('확인은 보낼 금액을 숫자와 한글로 함께 보인다', async () => {
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    const confirm = await screen.findByTestId('bid-confirm');
+    expect(confirm.textContent).toContain('이 금액으로 투찰하시겠습니까');
+    expect(confirm.textContent).toContain('1,050,000,000');
+    expect(confirm.textContent).toContain('10억 5000만원');
+  });
+
+  it('확인을 누르면 그 금액으로 초안이 간다', async () => {
+    mocked.draftBid.mockResolvedValue({ ...CASE, state: 'BID_PLANNED', caseVersion: 1 });
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
+
+    await waitFor(() =>
+      expect(mocked.draftBid).toHaveBeenCalledWith(
+        CASE.caseId,
+        expect.objectContaining({ amountWon: 1_050_000_000, vatTreatment: 'INCLUSIVE' }),
+      ),
+    );
+  });
+
+  it('취소하면 보내지 않고 적은 금액이 남는다', async () => {
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    fireEvent.click(await screen.findByTestId('bid-confirm-cancel'));
+
+    expect(screen.queryByTestId('bid-confirm')).toBeNull();
+    expect(mocked.draftBid).not.toHaveBeenCalled();
+    expect((screen.getByTestId('record-amount') as HTMLInputElement).value).toBe('1050000000');
+  });
+
+  /**
+   * **확인한 금액과 보내는 금액이 갈리지 않는다.** 확인을 열어 둔 채 입력을 고치면 그 확인은
+   * 다른 수를 가리킨다 — 그때 확인은 **닫힌다**(다시 누르면 새 금액으로 다시 묻는다).
+   */
+  it('확인을 열어 둔 채 금액을 고치면 확인이 닫힌다', async () => {
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await screen.findByTestId('bid-confirm');
+
+    fireEvent.change(screen.getByTestId('record-amount'), { target: { value: '1050000001' } });
+
+    expect(screen.queryByTestId('bid-confirm')).toBeNull();
+    expect(mocked.draftBid).not.toHaveBeenCalled();
+  });
+
+  it('금액·과세가 없으면 확인이 뜨지 않고 무엇이 없는지 말한다', async () => {
+    renderScreen();
+    await askPrice();
+
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    expect(screen.queryByTestId('bid-confirm')).toBeNull();
+    expect((await screen.findByTestId('record-blocked')).textContent).toContain('투찰 금액');
+  });
+
+  it('「제출함」에는 확인 단계가 없다 — 한 번 누르면 기록된다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED', caseVersion: 1 }]);
+    mocked.recordBid.mockResolvedValue({ ...CASE, state: 'BID_RECORDED', caseVersion: 2 });
+    renderScreen();
+    await screen.findByTestId('record-amount');
+    fillAmount('1050000000');
+
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+
+    await waitFor(() => expect(mocked.recordBid).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('bid-confirm')).toBeNull();
+  });
+});
+
+/**
+ * **점진적 공개**(계약 받는 항목 11). 판정·근거·자격·고지 네 절이 요약 한 줄로 서고 펼치면
+ * 전부 보인다. 요약은 **그 절의 핵심 상태**를 들어, 펼치지 않고도 판정을 읽을 수 있다.
+ */
+describe('화면 C — 네 절의 접기', () => {
+  const sections = [
+    ['판정', 'verdict', '판정 전에 멈춤'],
+    ['3안 자리', 'bid-price-menu', '아직 산출 안 함'],
+    ['자격', 'qualification', '면허 판정 불가'],
+    ['고지', 'disclosures-section', '고지'],
+  ] as const;
+
+  it.each(sections)('%s 절이 접힌 상태로 서고 요약이 핵심 상태를 든다', async (_label, testId, summaryText) => {
+    renderScreen();
+    await askPrice();
+
+    const section = await screen.findByTestId(testId);
+    expect(section.tagName.toLowerCase()).toBe('details');
+    expect((section as HTMLDetailsElement).open).toBe(false);
+    const summary = within(section).getByTestId(`${testId}-summary`);
+    expect(summary.textContent).toContain(summaryText);
+  });
+
+  it('근거 절도 같은 꼴이다', async () => {
+    renderScreen();
+    await askPrice();
+
+    const section = await screen.findByTestId('grounds-section');
+    expect((section as HTMLDetailsElement).open).toBe(false);
+    expect(within(section).getByTestId('grounds-section-summary').textContent).toContain('게시 하한율');
+  });
+
+  it('펼치면 접혀 있던 값이 그 자리에 있다', async () => {
+    renderScreen();
+    await askPrice();
+    const section = await screen.findByTestId('grounds-section');
+
+    (section as HTMLDetailsElement).open = true;
+
+    expect(within(section).getByTestId('base-amount').textContent).toContain('1,200,000,000');
+  });
+
+  /**
+   * **요약 줄은 손가락이 누르는 자리다.** 다섯 절이 같은 한 자리에서 최소 높이를 받고, 그 토큰이
+   * **공유 컨트롤 표와 같은 것**인지 두 글자를 맞대서 잰다 — 44px 를 두 곳에 적어 두면 한 곳만
+   * 바뀐다. 상자로 재는 축은 390px 여정인데 그 fixture 가 이 절을 펼치지 않는다(알려진 제한).
+   */
+  it('다섯 요약이 한 자리에서 최소 높이를 받고 그 토큰이 공유 컨트롤과 같다', async () => {
+    renderScreen();
+    await askPrice();
+
+    const minHeightTokenOf = (classes: string): string | undefined =>
+      classes.split(/\s+/u).find((one) => one.startsWith('min-h-'));
+    expect(minHeightTokenOf(SECTION_SUMMARY_CLASS)).toBe(minHeightTokenOf(controlClass('secondary', 'md')));
+    for (const [, testId] of sections) {
+      const summary = within(await screen.findByTestId(testId)).getByTestId(`${testId}-summary`);
+      expect(summary.className, `${testId} 의 요약이 공용 자리를 지나지 않았다`).toBe(SECTION_SUMMARY_CLASS);
+    }
+    const grounds = within(await screen.findByTestId('grounds-section')).getByTestId('grounds-section-summary');
+    expect(grounds.className).toBe(SECTION_SUMMARY_CLASS);
+  });
+});
+
+/**
+ * **담기와 다음 걸음**(계약 받는 항목 3·7 의 워크시트 자리). 서버는 같은 (공고, 종류)에 건을
+ * 하나만 두므로(이미 담긴 건이면 그 건을 돌려준다) 이 길은 중복을 만들지 않는다.
+ */
+describe('화면 C — 담기와 빈 화면의 다음 걸음', () => {
+  it('입찰함에 없는 공고는 그 자리에서 담을 수 있다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    mocked.addBidCase.mockResolvedValue(CASE);
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-add-case'));
+
+    await waitFor(() =>
+      expect(mocked.addBidCase).toHaveBeenCalledWith({
+        noticeNumber: NOTICE.noticeNumber,
+        noticeRound: NOTICE.noticeRound,
+        bidKind: 'REAL',
+      }),
+    );
+  });
+
+  it('담기가 실패하면 그 사실이 뜨고 다시 시도가 있다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    mocked.addBidCase.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-add-case'));
+
+    const failure = await screen.findByTestId('write-failure');
+    expect(failure.textContent).toContain('입찰함에 담지');
+    fireEvent.click(within(failure).getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(mocked.addBidCase).toHaveBeenCalledTimes(2));
+  });
+
+  /** 빈 얼굴이 **다음 걸음**을 든다(계약 받는 항목 7 — 오늘 그 자리를 넘기는 호출부가 0 이다). */
+  it('공고를 찾지 못한 빈 얼굴에 다음 걸음이 있다', async () => {
+    mocked.searchNotices.mockResolvedValue({ rows: [], total: 0, resultState: 'NO_MATCH' });
+    renderScreen();
+
+    const face = await screen.findByTestId('worksheet-missing');
+    const next = within(face).getByTestId('worksheet-missing-next');
+    expect(next.getAttribute('href')).toBe('/');
   });
 });

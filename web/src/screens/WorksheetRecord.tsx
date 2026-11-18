@@ -1,8 +1,14 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
-import { controlClass } from '../components/Button';
+import { Button, controlClass } from '../components/Button';
 import { cardClass } from '../components/Card';
-import { VAT_TREATMENT_DISPLAY, type VatTreatment } from '../display/moneyDisplay';
+import { StateBadge } from '../components/StateBadge';
+import {
+  FLOOR_MARGIN_REASON_DISPLAY,
+  FLOOR_STANDING_DISPLAY,
+  type FloorMargin,
+} from '../display/floorMargin';
+import { VAT_TREATMENT_DISPLAY, koreanAmountTextOf, type VatTreatment } from '../display/moneyDisplay';
 
 /** 나라장터 입찰공고 상세 — **이동만** 한다(D-UX-2: 자동 제출은 범위 밖이고 상한이 「이동 + 복사」다). */
 const KONEPS_NOTICE_URL = 'https://www.g2b.go.kr/index.jsp';
@@ -124,21 +130,61 @@ export function ActiveBidsDeclaration({
 }
 
 /**
- * 나라장터 이동 카드(§6.2 C 4) — 딥링크 + 투찰 입력값 + 체크리스트. 체크리스트는 **정적
- * 안내**이고 요구표가 「클라이언트」로 판정한 자리다.
+ * **복사의 결과는 그 금액에 매여 있다** — 금액을 고치면 앞의 「복사했습니다」가 다른 수를
+ * 가리킨다. 그래서 상태에 **복사한 금액**을 함께 담고 지금 금액과 같을 때만 보인다(지우는
+ * 시점을 따로 두면 그 시점이 빠지는 자리가 생긴다).
+ */
+interface CopyAttempt {
+  readonly amountWon: number;
+  readonly copied: boolean;
+}
+
+/**
+ * 나라장터 이동 카드(§6.2 C 4) — 딥링크 + 투찰 입력값(**복사 · 한글 병기 · 하한 대비 여유**) +
+ * 체크리스트. 체크리스트는 **정적 안내**이고 요구표가 「클라이언트」로 판정한 자리다.
+ *
+ * 이 화면은 대신 제출하지 않으므로(D-UX-2 — 상한이 「이동 + 복사」다) 운영자가 금액을 손으로
+ * 옮긴다. 그 길에서 나는 실수가 가이드 실측의 첫 두 줄이다 — 「0 을 하나 더/덜」과 「하한 미달
+ * 즉시 실격」. 이 카드의 세 자리가 그 둘을 겨눈다.
  */
 export function KonepsHandoff({
   noticeNumber,
   amountWon,
+  margin,
 }: {
   readonly noticeNumber: string;
   readonly amountWon: number | null;
+  /** 투찰가를 요청하기 **전에는 자리 자체가 없다** — 하한율이 아직 응답에 없다. */
+  readonly margin: FloorMargin | null;
 }) {
   const query = new URLSearchParams({ bidNtceNo: noticeNumber }).toString();
+  const [attempt, setAttempt] = useState<CopyAttempt | null>(null);
+  const shown = attempt !== null && attempt.amountWon === amountWon ? attempt : null;
+  const korean = amountWon === null ? null : koreanAmountTextOf(amountWon);
+
+  async function copyAmount(): Promise<void> {
+    if (amountWon === null) {
+      return;
+    }
+    // 브라우저가 클립보드를 **주지 않을 수 있다**(비보안 출처 · 권한 거부 · 구형). 선언을 넓혀 그
+    // 사실을 타입으로 들고, 없으면 거부와 **같은 길**로 간다 — 조용히 아무 일도 없지 않다.
+    const clipboard: Clipboard | undefined = navigator.clipboard;
+    if (clipboard === undefined) {
+      setAttempt({ amountWon, copied: false });
+      return;
+    }
+    try {
+      await clipboard.writeText(`${amountWon}`);
+      setAttempt({ amountWon, copied: true });
+    } catch {
+      setAttempt({ amountWon, copied: false });
+    }
+  }
+
   return (
     <section className={cardClass()}>
       <h3 className="text-sm font-semibold">나라장터에서 투찰하기</h3>
-      <p className="mt-1 text-xs text-ink-soft">이 화면은 대신 제출하지 않습니다. 금액을 복사해 직접 제출하십시오.</p>
+      <p className="mt-1 text-xs text-ink-soft">이 화면은 대신 제출하지 않습니다. 아래 금액을 복사해 직접 제출하십시오.</p>
       <a
         data-testid="koneps-deeplink"
         href={`${KONEPS_NOTICE_URL}?${query}`}
@@ -153,7 +199,64 @@ export function KonepsHandoff({
         <dd data-testid="handoff-amount" className="font-numeric">
           {amountWon === null ? <span className="text-absent-ink">값 없음</span> : amountWon.toLocaleString('ko-KR')}
         </dd>
+        {/* 병기는 **같은 수의 다른 읽기**다 — 자리 수를 세지 않아도 0 하나가 드러난다. */}
+        {korean === null ? null : (
+          <dd data-testid="handoff-amount-korean" className="text-xs text-ink-soft">
+            {korean}
+          </dd>
+        )}
       </dl>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* **없는 값을 복사하지 않는다** — 금액을 적기 전에는 누를 자리가 막혀 있다. */}
+        <Button
+          testId="koneps-copy"
+          onClick={() => {
+            void copyAmount();
+          }}
+          disabled={amountWon === null}
+        >
+          금액 복사
+        </Button>
+        {shown === null ? null : (
+          <p
+            data-testid="koneps-copy-status"
+            role={shown.copied ? 'status' : 'alert'}
+            className={`text-xs ${shown.copied ? 'text-ink-soft' : 'text-bad-ink'}`}
+          >
+            {shown.copied
+              ? '복사했습니다 — 나라장터 입력칸에 붙여 넣으십시오.'
+              : '복사하지 못했습니다 — 아래 값을 직접 고르십시오.'}
+          </p>
+        )}
+      </div>
+      {/* 거부에는 **손으로 할 길**이 있다. 포커스가 오면 전체를 골라 둔다. */}
+      {shown === null || shown.copied || amountWon === null ? null : (
+        <input
+          data-testid="koneps-copy-fallback"
+          type="text"
+          readOnly
+          value={`${amountWon}`}
+          aria-label="투찰 입력값 원문"
+          onFocus={(event) => event.currentTarget.select()}
+          className="mt-2 min-h-11 w-full rounded-md border border-line bg-card px-3 font-numeric text-sm"
+        />
+      )}
+      {margin === null ? null : (
+        <dl className="mt-3 flex flex-col gap-1 text-sm">
+          <dt className="text-xs text-ink-soft">하한 대비 여유</dt>
+          <dd data-testid="floor-margin" className="flex flex-wrap items-center gap-2">
+            {margin.kind === 'measured' ? (
+              <>
+                <StateBadge display={FLOOR_STANDING_DISPLAY[margin.standing]} />
+                <span className="font-numeric text-sm">{margin.percentText}%</span>
+              </>
+            ) : (
+              // **재지 않는 자리는 빈 자리 + 사유**다 — 0% 나 대시로 접지 않는다(계약).
+              <StateBadge display={FLOOR_MARGIN_REASON_DISPLAY[margin.reason]} />
+            )}
+          </dd>
+        </dl>
+      )}
       <ul className="mt-3 flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
         <li>인증서 두 종(서명용·암호용)을 준비하십시오.</li>
         <li>추첨번호 두 개를 적어 두십시오.</li>

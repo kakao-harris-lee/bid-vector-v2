@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import type { BidPriceRequestResponse } from '../api/queries';
 import { cardClass } from '../components/Card';
 import { Field, StateBadge } from '../components/StateBadge';
@@ -26,28 +28,63 @@ import {
 } from '../display/worksheetDisplay';
 
 /**
+ * 절의 **요약 줄** 클래스 — 한 자리다. 다섯 절이 각자 적으면 그 가운데 하나가 44px 를 잃는다.
+ *
+ * 손가락이 누르는 자리라 최소 높이를 든다. 그 토큰은 **공유 컨트롤 표와 같아야** 하고 짝 test
+ * 가 두 글자를 맞댄다(여기 적은 토큰이 그 표와 갈리면 붉는다). 상자로도 재려면 390px 여정이 이
+ * 절을 **펼친 상태**로 그려야 하는데 그 fixture 가 없다 — 알려진 제한으로 등재한다.
+ */
+export const SECTION_SUMMARY_CLASS = 'flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-sm font-semibold';
+
+/**
+ * 점진적 공개의 한 절(계약 받는 항목 11) — **요약 한 줄 → 펼침**이다.
+ *
+ * 요약이 그 절의 **핵심 상태**를 든다: 접기가 사실을 숨기면 점진적 공개가 아니라 은폐다. 그래서
+ * 펼치지 않고도 판정 · 3안 상태 · 면허 판정 · 하한율 상태를 읽을 수 있다.
+ *
+ * 열린 절을 **기억하지 않는다**. 기억하면 그것이 화면 밖의 숨은 설정이 되어 두 사람이 같은 자리를
+ * 다르게 보고, 「접혀 있다」를 전제로 쓴 문면이 어긋난다.
+ */
+function DisclosureSection({
+  testId,
+  title,
+  summary,
+  children,
+}: {
+  readonly testId: string;
+  readonly title: string;
+  readonly summary: ReactNode;
+  readonly children: ReactNode;
+}) {
+  return (
+    <details data-testid={testId} className={cardClass()}>
+      <summary data-testid={`${testId}-summary`} className={SECTION_SUMMARY_CLASS}>
+        <span>{title}</span>
+        {summary}
+      </summary>
+      <div className="mt-3">{children}</div>
+    </details>
+  );
+}
+
+/**
  * 투찰가 **3안 자리**(DEC-05 · DEC-02). 계약에 금액 칸이 없으므로 이 자리에 숫자가 들어올
  * 경로가 없다 — 상태와 사유만 보인다. 그것이 「근거 없는 숫자를 내지 않는다」의 구조다.
  */
 function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
+  const menu = displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState);
   return (
-    <section data-testid="bid-price-menu" className={cardClass()}>
+    <DisclosureSection testId="bid-price-menu" title="투찰가 3안" summary={<StateBadge display={menu} />}>
       {/* 제목에는 도메인 용어의 숫자가 들어간다(「3안」) — 그래서 **값 자리**를 따로 표시해
           두고 「이 자리에 숫자가 없다」를 그 자리에서만 잰다(test 가 제목을 함께 읽으면 그
           단언이 용어 때문에 붉어진다, 실측). */}
-      <h3 className="text-sm font-semibold">투찰가 3안</h3>
       <div data-testid="bid-price-menu-value">
-        <p className="mt-2">
-          <StateBadge display={displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState)} />
-        </p>
-        <p className="mt-1 text-xs text-ink-soft">
-          {displayOrUnknown(BID_PRICE_MENU_DISPLAY, price.bidPriceMenuState).why}
-        </p>
+        <p className="text-xs text-ink-soft">{menu.why}</p>
         <p className="mt-2 text-xs text-ink-soft">
           {displayOrUnknown(BID_PRICE_MENU_REASON_DISPLAY, price.bidPriceMenuNotComputedReason).label}
         </p>
       </div>
-    </section>
+    </DisclosureSection>
   );
 }
 
@@ -58,17 +95,17 @@ function BidPriceMenu({ price }: { readonly price: BidPriceRequestResponse }) {
  */
 function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
-    <section data-testid="verdict" className={cardClass()}>
-      <h3 className="text-sm font-semibold">판정</h3>
-      <p className="mt-2 flex flex-wrap items-center gap-2">
-        <StateBadge display={displayOrUnknown(OUTCOME_DISPLAY, price.outcome)} testId="verdict-outcome" />
-        {price.verdict === null || price.verdict === undefined ? null : (
-          <span data-testid="verdict-value" className="font-numeric text-xs">
-            {price.verdict}
-          </span>
-        )}
-      </p>
-      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+    <DisclosureSection
+      testId="verdict"
+      title="판정"
+      summary={<StateBadge display={displayOrUnknown(OUTCOME_DISPLAY, price.outcome)} testId="verdict-outcome" />}
+    >
+      {price.verdict === null || price.verdict === undefined ? null : (
+        <p data-testid="verdict-value" className="font-numeric text-xs">
+          {price.verdict}
+        </p>
+      )}
+      <dl className="grid gap-3 sm:grid-cols-2">
         <Field label="멈춘 단계" testId="drop-stage" value={price.dropStage ?? null} />
         <Field label="멈춘 사유" testId="drop-reason" value={price.dropReasonCode ?? null} />
         <Field
@@ -82,7 +119,7 @@ function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
           value={price.failedWatchRuleIds.length === 0 ? null : price.failedWatchRuleIds.join(', ')}
         />
       </dl>
-    </section>
+    </DisclosureSection>
   );
 }
 
@@ -91,9 +128,13 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
   const floorOrigin = price.publishedFloorRateOrigin;
   const mlReason = price.mlUnavailableReason;
   return (
-    <section className={cardClass()}>
-      <h3 className="text-sm font-semibold">근거</h3>
-      <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+    <DisclosureSection
+      testId="grounds-section"
+      title="근거"
+      // 요약에 **하한율 상태**를 둔다 — 투찰 금액을 정하는 자리에서 가장 먼저 보는 축이다.
+      summary={<StateBadge display={displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, price.floorRateGroundsState)} />}
+    >
+      <dl className="grid gap-4 sm:grid-cols-2">
         <Field
           label="기초금액"
           hint="투찰 기준 금액. 추정가격과 다르다."
@@ -165,7 +206,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
           ? ''
           : ` — ${displayOrUnknown(INBOX_RECORD_REASON_DISPLAY, price.inboxRecordNotRecordedReason).label}`}
       </p>
-    </section>
+    </DisclosureSection>
   );
 }
 
@@ -173,10 +214,16 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
 function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
   const reason = price.licenseUncertainReason;
   return (
-    <section data-testid="qualification" className={cardClass()}>
-      <h3 className="text-sm font-semibold">자격</h3>
-      <p className="mt-2 flex flex-wrap items-center gap-2">
+    <DisclosureSection
+      testId="qualification"
+      title="자격"
+      // 요약에 **면허 판정**을 둔다 — 「판정 불가」가 「미달」로 읽히지 않는 것이 이 카드의 축이고,
+      // 접힌 상태에서도 그 사실이 보여야 한다.
+      summary={
         <StateBadge display={displayOrUnknown(LICENSE_VERDICT_DISPLAY, price.licenseVerdict)} testId="license-verdict" />
+      }
+    >
+      <p className="flex flex-wrap items-center gap-2">
         {reason === null || reason === undefined ? null : (
           <StateBadge display={displayOrUnknown(LICENSE_UNCERTAIN_REASON_DISPLAY, reason)} testId="license-reason" />
         )}
@@ -208,11 +255,7 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
           value={price.licenseGroupsMissing.length === 0 ? null : price.licenseGroupsMissing.join(', ')}
         />
         <Field label="판정 어휘 version" testId="license-policy" value={price.licensePolicySource} />
-        <Field
-          label="읽지 못한 요건 행"
-          testId="license-unparsable"
-          value={`${price.licenseUnparsableRowCount}`}
-        />
+        <Field label="읽지 못한 요건 행" testId="license-unparsable" value={`${price.licenseUnparsableRowCount}`} />
       </dl>
       <p className="mt-2">
         <StateBadge display={displayOrUnknown(LICENSE_MISSING_DETAIL_DISPLAY, price.licenseMissingDetailState)} />
@@ -223,27 +266,31 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
           <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
         ))}
       </p>
-    </section>
+    </DisclosureSection>
   );
 }
 
 /** 고지 — **계약이 준 코드 전수**를 문장으로 보인다(문장은 표면이 짓는다). */
 function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
-    <section className={cardClass()}>
-      <h3 className="text-sm font-semibold">고지</h3>
-      <ul data-testid="disclosures" className="mt-2 flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
+    <DisclosureSection
+      testId="disclosures-section"
+      title="고지"
+      // 요약은 **건수**다 — 몇 줄이 접혀 있는지 모르면 접힌 자리가 비어 보인다.
+      summary={<span className="text-xs font-normal text-ink-soft">{price.disclosures.length}건</span>}
+    >
+      <ul data-testid="disclosures" className="flex list-inside list-disc flex-col gap-1 text-xs text-ink-soft">
         {/* CR r2 M-6 — 직접 색인이 남아 있었다. 표 밖 코드에 `undefined.label` 로 터지면 오류
             경계가 **근거 패널 전체**를 먹는다 — 보이는 미지 상태가 조용한 폭발보다 낫다. */}
         {price.disclosures.map((code) => (
           <li key={code}>{displayOrUnknown(DISCLOSURE_SENTENCE, code).label}</li>
         ))}
       </ul>
-    </section>
+    </DisclosureSection>
   );
 }
 
-/** 투찰가 요청의 결과 전부 — 3안 자리 · 근거 · 자격 · 고지. */
+/** 투찰가 요청의 결과 전부 — 판정 · 3안 자리 · 자격 · 근거 · 고지. 다섯 절이 접혀서 선다. */
 export function WorksheetGrounds({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
     <div className="flex flex-col gap-4">

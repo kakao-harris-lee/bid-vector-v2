@@ -1,8 +1,9 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useParams } from 'react-router';
 
 import {
+  addBidCase,
   draftBid,
   listBidCases,
   readTimeline,
@@ -14,13 +15,15 @@ import {
   type BidPriceRequestResponse,
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
-import { Button } from '../components/Button';
+import { Button, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
+import { floorMarginOf, type FloorMargin } from '../display/floorMargin';
+import { koreanAmountTextOf } from '../display/moneyDisplay';
 import { amountDisplayOf, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { dayCountText, daysUntil, instantDisplayOf, readClock } from '../display/timeDisplay';
@@ -37,10 +40,23 @@ import {
   parseDrawNumbers,
   parseWon,
   type BidAmountForm,
+  type VatTreatment,
 } from './WorksheetRecord';
 import { CaseStateBadge, WorksheetTimeline } from './WorksheetTimeline';
 
 const BID_KIND: BidCase['bidKind'] = 'REAL';
+
+/**
+ * **보내기 전 확인**(§6.2 C 3 — 「안을 고르면 확인이 뜨고, 확인하면 초안이 만들어진다」).
+ *
+ * 확인에 **보낼 값을 담는다**. 지금 입력을 다시 읽으면 확인한 수와 보내는 수가 갈릴 수 있고,
+ * 이 화면의 축이 바로 투찰 금액이다. 입력이 바뀌면 이 확인은 **닫힌다**(다른 수를 가리키는
+ * 확인을 들고 있지 않는다).
+ */
+interface BidConfirmation {
+  readonly amountWon: number;
+  readonly vat: VatTreatment;
+}
 
 /**
  * 화면 C — 공고 워크시트(§6.2 C). ②③④를 한 화면에 둔다: 머리 → 자격·근거 → 나라장터 이동 →
@@ -63,6 +79,8 @@ export function WorksheetScreen() {
   const [price, setPrice] = useState<BidPriceRequestResponse | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [activeBidsBlocked, setActiveBidsBlocked] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<BidConfirmation | null>(null);
+  const confirmTitleId = `bid-confirm-title-${useId()}`;
   // **한 번 읽고 내린다**(M9 D-1) — 렌더마다 다시 읽으면 같은 화면의 두 칸이 서로 다른
   // 「지금」으로 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
   const [now] = useState(readClock);
@@ -91,6 +109,15 @@ export function WorksheetScreen() {
   async function refreshCase(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: bidCasesQueryKey(BID_KIND) });
     await queryClient.invalidateQueries({ queryKey: ['timeline'] });
+  }
+
+  /**
+   * 입력이 바뀌면 **열어 둔 확인은 닫는다** — 확인한 금액과 보낼 금액이 갈리지 않게 한다.
+   * 어느 칸이 바뀌어도 닫는다: 과세 구분도 보낼 진술의 일부다.
+   */
+  function changeForm(next: BidAmountForm): void {
+    setForm(next);
+    setConfirming(null);
   }
 
   /**
@@ -242,6 +269,25 @@ export function WorksheetScreen() {
     },
   });
 
+  /**
+   * **담기**(계약 받는 항목 3·7 의 워크시트 자리) — 이 공고가 입찰함에 없으면 그 자리에서 담는다.
+   * 앞 판은 「오늘의 공고에서 담으십시오」라고만 말해, 워크시트까지 온 운영자를 되돌려 보냈다.
+   *
+   * 서버가 같은 (공고, 종류)에 건을 **하나만** 두고 이미 담긴 건이면 그 건을 돌려주므로, 재시도가
+   * 중복 행을 만들지 않는다(그래서 다른 쓰기들과 달리 버전 가드가 필요 없다).
+   */
+  const addCase = useMutation({
+    mutationFn: () => addBidCase({ noticeNumber, noticeRound, bidKind: BID_KIND }),
+    onSuccess: async () => {
+      show({ text: '입찰함에 담았습니다.' });
+      await refreshCase();
+    },
+    onError: async () => {
+      dismiss();
+      await refreshCase();
+    },
+  });
+
   /** 금액·과세가 **둘 다** 있어야 전이를 부른다 — 없으면 멈추고 무엇이 없는지 말한다. */
   function amountOrBlock(): { readonly amountWon: number; readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN' } | null {
     const amountWon = parseWon(form.amount);
@@ -290,7 +336,9 @@ export function WorksheetScreen() {
       return;
     }
     if (kind === 'DRAFT_BID') {
-      makeDraft.mutate({ caseId, ...amount, at: readClock().toISOString(), fromVersion });
+      // **초안 앞에만 확인이 선다**(§6.2 C 3). 「제출함」은 §6.2 C 5 가 「한 번으로 ④ 완료」로
+      // 둔 자리라 같은 단계를 더하지 않는다 — 운영자는 이미 나라장터에서 제출을 끝내고 돌아온다.
+      setConfirming({ amountWon: amount.amountWon, vat: amount.vat });
       return;
     }
     const drawNumbers = parseDrawNumbers(form.drawNumbers);
@@ -303,6 +351,21 @@ export function WorksheetScreen() {
       ...amount,
       drawNumbers,
       memo: form.memo,
+      at: readClock().toISOString(),
+      fromVersion,
+    });
+  }
+
+  /** 확인에 담긴 **그 진술**을 보낸다 — 보내는 순간 확인은 닫힌다. */
+  function acceptConfirmed(caseId: number, fromVersion: number): void {
+    if (confirming === null) {
+      return;
+    }
+    setConfirming(null);
+    makeDraft.mutate({
+      caseId,
+      amountWon: confirming.amountWon,
+      vat: confirming.vat,
       at: readClock().toISOString(),
       fromVersion,
     });
@@ -344,6 +407,12 @@ export function WorksheetScreen() {
         <EmptyFace
           testId="worksheet-missing"
           display={{ label: '그 공고를 찾지 못했습니다', why: '수집된 공고 가운데 이 번호·차수가 없습니다', tone: 'absent' }}
+          // 이유만 말하고 멈추지 않는다 — 여기서 할 수 있는 다음 걸음은 목록으로 돌아가는 것이다.
+          action={
+            <LinkButton to="/" testId="worksheet-missing-next">
+              오늘의 공고로 가기
+            </LinkButton>
+          }
         />
       </section>
     );
@@ -373,7 +442,14 @@ export function WorksheetScreen() {
             error: resume.error,
             retry: writeRetry(resume),
           }
-        : null;
+        : addCase.isError
+          ? {
+              what: '입찰함에 담지',
+              error: addCase.error,
+              // 담기는 **멱등**이라(서버가 이미 담긴 건을 돌려준다) 보낸 진술을 그대로 다시 보낸다.
+              retry: () => addCase.mutate(),
+            }
+          : null;
 
   const amount = amountDisplayOf(notice);
   // 마감은 **절대 시각과 남은 날이 한 칸**이다 — 둘 다 `timeDisplay` 를 지난다(M9 D-1·D-2).
@@ -382,6 +458,21 @@ export function WorksheetScreen() {
   const checkpoint = bidCase === undefined ? null : instantDisplayOf(bidCase.nextCheckpointAt);
   const action = bidCase === undefined ? null : nextActionOf(bidCase.state, price !== null);
   const amountWon = parseWon(form.amount);
+  /**
+   * 하한 대비 여유 — **투찰가 응답이 있어야** 하한율이 있다. 요청 전에는 자리 자체를 만들지
+   * 않는다(없는 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다).
+   */
+  const margin: FloorMargin | null =
+    price === null
+      ? null
+      : floorMarginOf({
+          groundsState: price.floorRateGroundsState,
+          rateFraction: price.publishedFloorRateFraction,
+          baseAmountWon: price.baseAmountWon,
+          baseAmountVatTreatment: price.baseAmountVatTreatment,
+          bidAmountWon: amountWon,
+          bidVatTreatment: form.vat,
+        });
 
   return (
     <section data-testid="screen-worksheet" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -424,7 +515,23 @@ export function WorksheetScreen() {
           )}
         </dl>
         {bidCase === undefined ? (
-          <p className="mt-3 text-xs text-ink-soft">이 공고는 아직 입찰함에 없습니다 — 「오늘의 공고」에서 담으십시오.</p>
+          /* **다음 걸음을 그 자리에 둔다**(계약 받는 항목 7) — 앞 판은 다른 화면으로 돌려보냈다. */
+          <div className="mt-3 flex flex-col gap-2">
+            <p className="text-xs text-ink-soft">
+              이 공고는 아직 입찰함에 없습니다 — 담으면 투찰가를 요청하고 투찰을 기록할 수 있습니다.
+            </p>
+            <div>
+              <Button
+                tone="primary"
+                size="lg"
+                testId="worksheet-add-case"
+                onClick={() => addCase.mutate()}
+                disabled={addCase.isPending}
+              >
+                입찰함에 담기
+              </Button>
+            </div>
+          </div>
         ) : action === null ? (
           <p className="mt-3 text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
         ) : (
@@ -461,7 +568,7 @@ export function WorksheetScreen() {
 
       {bidCase === undefined ? null : (
         <>
-          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} />
+          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
           <section className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰 금액과 기록</h3>
             {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
@@ -473,8 +580,42 @@ export function WorksheetScreen() {
             ) : null}
             <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
             <div className="mt-3">
-              <BidAmountFields form={form} onChange={setForm} blocked={blocked} />
+              <BidAmountFields form={form} onChange={changeForm} blocked={blocked} />
             </div>
+            {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보이고, 하한 대비
+                자리도 같은 자리에 둔다. 확인에 담긴 값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
+            {confirming === null ? null : (
+              <div
+                data-testid="bid-confirm"
+                role="group"
+                aria-labelledby={confirmTitleId}
+                className="mt-3 rounded-md border border-line p-3"
+              >
+                <p id={confirmTitleId} className="text-sm font-medium">
+                  이 금액으로 투찰하시겠습니까?
+                </p>
+                <p className="mt-2 font-numeric text-base">{confirming.amountWon.toLocaleString('ko-KR')}</p>
+                {koreanAmountTextOf(confirming.amountWon) === null ? null : (
+                  <p className="mt-1 text-xs text-ink-soft">{koreanAmountTextOf(confirming.amountWon)}</p>
+                )}
+                <p className="mt-2 text-xs text-ink-soft">
+                  이 수로 투찰 예정 초안을 남깁니다. 나라장터 제출은 운영자가 직접 합니다.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    tone="primary"
+                    testId="bid-confirm-accept"
+                    onClick={() => acceptConfirmed(bidCase.caseId, bidCase.caseVersion)}
+                    disabled={makeDraft.isPending}
+                  >
+                    이 금액으로 초안 만들기
+                  </Button>
+                  <Button testId="bid-confirm-cancel" onClick={() => setConfirming(null)}>
+                    취소
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
         </>
       )}
