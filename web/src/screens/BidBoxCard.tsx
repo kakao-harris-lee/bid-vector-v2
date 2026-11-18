@@ -13,6 +13,8 @@ import {
   OUTCOME_VALUES,
   OVERDUE_DISPLAY,
   bidBoxActionOf,
+  blankToServer,
+  exitsOf,
   type BidBoxAction,
   type BidBoxActionKind,
 } from '../display/bidBoxDisplay';
@@ -61,11 +63,42 @@ function ActionForm({
   const [missing, setMissing] = useState(false);
   /** 고르기는 했는데 **그 값을 보낼 수 없다** — 표와 계약이 갈린 자리다(오늘 닿을 길은 없다). */
   const [unsendable, setUnsendable] = useState(false);
+  /** 되돌릴 수 없는 전이에서 한 번 더 물은 뒤인가 — 표의 `confirm` 이 있는 행만 이 자리를 쓴다. */
+  const [confirming, setConfirming] = useState(false);
   const groupId = useId();
+  /** 세는 칸의 id — 입력과 **묶어** 둔다(그 값이 칸의 이름이 되지 않게 하면서 낭독에 남긴다). */
+  const lengthId = `${groupId}-length`;
+
+  /**
+   * 「값이 없다」의 뜻이 꼴마다 다르다 — 고르는 입력은 **빈 문자열**이고 자유 텍스트는 **서버가
+   * 공백뿐으로 볼 값**이다(공백만 적은 사유는 사유가 아니다. 서버도 그것을 거부한다).
+   */
+  const blank = input.shape === 'TEXT' ? blankToServer(value) : value === '';
+  /** 글자 수 상한을 넘었는가 — 상한이 없는 꼴에서는 늘 거짓이다. */
+  const tooLong = input.maxChars !== undefined && value.length > input.maxChars;
+
+  /**
+   * 값이 바뀌면 **확인을 되돌린다** — 확인한 뒤 글자를 고치면 운영자가 본 문장과 실제로 보내는
+   * 값이 달라진다. 되돌릴 수 없는 전이에서 그 어긋남은 기록으로 남는다.
+   */
+  function change(next: string): void {
+    setValue(next);
+    setConfirming(false);
+  }
 
   function send(): void {
-    if (value === '') {
+    if (blank) {
       setMissing(true);
+      return;
+    }
+    // **자르지 않는다**(팀장 판정): 네이티브 길이 제약으로 붙여넣기를 조용히 자르면 운영자가
+    // 잘린 줄 모른 채 기록을 남긴다. 넘으면 보내지 않고 말한다.
+    if (tooLong) {
+      return;
+    }
+    // 되돌림 전이가 없는 전이는 한 번 더 묻는다(D-7E-5 의 짝 — 실행 취소를 줄 수 없는 자리다).
+    if (input.confirm !== undefined && !confirming) {
+      setConfirming(true);
       return;
     }
     if (action.kind === 'RECORD_OUTCOME') {
@@ -93,7 +126,7 @@ function ActionForm({
           <input
             type="datetime-local"
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => change(event.target.value)}
             className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
           />
         </label>
@@ -113,7 +146,7 @@ function ActionForm({
                   name={groupId}
                   value={choice.value}
                   checked={value === choice.value}
-                  onChange={() => setValue(choice.value)}
+                  onChange={() => change(choice.value)}
                 />
                 {choice.label}
               </label>
@@ -121,9 +154,48 @@ function ActionForm({
           </div>
         </fieldset>
       ) : null}
-      {missing && value === '' ? (
+      {input.shape === 'TEXT' ? (
+        <div className="mt-2 flex flex-col gap-1">
+          {/* 세는 칸은 **레이블 밖**이다 — 안에 두면 칸의 접근 가능 이름이 「사유 0 / 500」이 되어
+              이름이 입력할 때마다 바뀐다. 대신 `aria-describedby` 로 묶어 낭독에서 잃지 않는다. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-soft">{input.label}</span>
+            {/* 네이티브 길이 제약을 **두지 않는다**(팀장 판정): 그것은 붙여넣기를 조용히 자르고,
+                운영자는 기록에 남은 사유가 잘린 줄 모른다. 세어 보이고 넘으면 거부한다. */}
+            <textarea
+              value={value}
+              rows={3}
+              onChange={(event) => change(event.target.value)}
+              aria-describedby={input.maxChars === undefined ? undefined : lengthId}
+              className="rounded-md border border-line bg-card px-3 py-2 text-sm"
+            />
+          </label>
+          {input.maxChars === undefined ? null : (
+            <span
+              id={lengthId}
+              data-testid="action-length"
+              className={`text-xs ${tooLong ? 'text-bad-ink' : 'text-ink-soft'}`}
+            >
+              {value.length} / {input.maxChars}
+            </span>
+          )}
+        </div>
+      ) : null}
+      {missing && blank ? (
         <p data-testid="action-missing" role="alert" className="mt-2 text-xs text-bad-ink">
-          {input.label} 을(를) 먼저 고르십시오 — 고르지 않은 값을 보내지 않습니다.
+          {input.shape === 'TEXT'
+            ? `${input.label} 을(를) 먼저 적으십시오 — 빈 사유를 보내지 않습니다.`
+            : `${input.label} 을(를) 먼저 고르십시오 — 고르지 않은 값을 보내지 않습니다.`}
+        </p>
+      ) : null}
+      {tooLong ? (
+        <p data-testid="action-too-long" role="alert" className="mt-2 text-xs text-bad-ink">
+          {input.label} 이(가) 너무 깁니다 — 줄여서 다시 보내십시오. 잘라서 보내지 않습니다.
+        </p>
+      ) : null}
+      {confirming ? (
+        <p data-testid="action-confirm" role="alert" className="mt-2 text-xs text-bad-ink">
+          {input.confirm}
         </p>
       ) : null}
       {unsendable ? (
@@ -132,8 +204,10 @@ function ActionForm({
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button tone="primary" onClick={send}>
-          보내기
+        {/* 확인 단계에서는 **어조와 글자가 함께** 바뀐다 — 같은 버튼이 같은 모양으로 두 뜻을
+            가지면 운영자가 두 번째 누름이 무엇인지 모른다. */}
+        <Button tone={confirming ? 'danger' : 'primary'} onClick={send} testId="action-send">
+          {confirming ? '확인' : '보내기'}
         </Button>
         <Button onClick={onCancel}>그만두기</Button>
       </div>
@@ -195,6 +269,8 @@ export function BidBoxCard({
 }) {
   const [open, setOpen] = useState<BidBoxAction | null>(null);
   const row = bidBoxActionOf(bidCase.state);
+  /** 이 상태에서 열린 내려놓기 — **표에서 유도된다**(카드가 상태를 보고 고르지 않는다). */
+  const exits = exitsOf(bidCase.state);
 
   return (
     <Card as="li" testId={`bid-case-${bidCase.caseId}`}>
@@ -251,6 +327,26 @@ export function BidBoxCard({
                 onSend={(payload) => onSend(bidCase.caseId, payload)}
               />
             ))}
+        </div>
+      )}
+
+      {/* 내려놓기는 **다른 줄**이다(M13/13D). 위 줄의 「다음 행동 하나」와 섞으면 관심 상태에서
+          행동이 넷이 되고 무엇이 다음 걸음인지 화면이 말하지 못한다(§6.5). 머리 줄의 상태 배지와도
+          떨어진다. 둘 다 입력을 받으므로 바로 폼을 연다 — 즉시 보내는 자리가 아니다.
+
+          testId 를 **종류마다** 단다: 카드 안 버튼을 전부 집는 술어로는 내려놓기 집합을 셀 수
+          없다(배지가 버튼이 되면 그 집합에 함께 든다 — 13E). 상태 전수 루프가 이 testId 를 쓴다. */}
+      {exits.length === 0 ? null : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {exits.map((action) => (
+            <Button
+              key={action.kind}
+              testId={`exit-${action.kind}-${bidCase.caseId}`}
+              onClick={() => setOpen(action)}
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
       )}
 

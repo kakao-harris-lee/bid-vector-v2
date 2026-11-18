@@ -4,13 +4,16 @@ import { useSearchParams } from 'react-router';
 
 import {
   awaitOpening,
+  deferCase,
   enterQualificationReview,
   listBidCases,
   recordOpening,
   recordOutcome,
   resumeCase,
+  skipCase,
   type BidCase,
 } from '../api/queries';
+import { LinkButton } from '../components/Button';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
@@ -67,8 +70,14 @@ function instantOrRefuse(value: string): string {
 
 function send({ caseId, payload }: Sent): Promise<BidCase> {
   switch (payload.kind) {
+    case 'DEFER':
+      return deferCase(caseId, { remindAt: instantOrRefuse(payload.value) });
     case 'RESUME':
       return resumeCase(caseId);
+    case 'SKIP':
+      // 사유는 **적힌 그대로** 싣는다 — 다듬으면 기록에 남는 말이 운영자가 본 말과 달라진다.
+      // 빈 값·상한 초과는 카드가 보내기 전에 거른다(표시 층의 판정).
+      return skipCase(caseId, { reason: payload.value });
     case 'AWAIT_OPENING':
       return awaitOpening(caseId, { openingAt: instantOrRefuse(payload.value) });
     case 'RECORD_OPENING':
@@ -141,10 +150,30 @@ export function BidBoxScreen() {
 
   const transition = useMutation({
     mutationFn: send,
-    onSuccess: async (updated) => {
-      // 실행 취소를 두지 않는다 — 이 전이들의 **역전이가 계약에 없다**(되돌림은 `resume` 하나고
-      // 그것 자체가 역전이다). 「취소할 수 있다」고 보이면 거짓말이 된다(D-7E-5).
-      show({ text: '보냈습니다.' });
+    onSuccess: async (updated, sent) => {
+      /*
+       * 실행 취소는 **되돌림 전이가 있는 곳에만** 둔다(D-7E-5) — 없는 자리에 두면 그 버튼이
+       * 거짓말이 된다. 계약에서 되돌림 전이가 있는 쌍은 **하나**다: 「나중에」의 역전이가
+       * 「다시 보기」이고 그 둘이 서로의 역이다. 그래서 분기도 하나다(표로 펼칠 갈래가 없다).
+       *
+       * 「건너뜀」은 유일한 종단이라 실행 취소가 **없고**, 그 대신 카드가 보내기 전에 한 번 더
+       * 묻는다(입력 꼴 표의 `confirm`).
+       *
+       * 되돌릴 건의 식별자는 **서버가 준 응답**에서 온다 — 화면이 쥔 값이 아니다.
+       */
+      show(
+        sent.payload.kind === 'DEFER'
+          ? {
+              text: '나중에 보기로 했습니다.',
+              undo: {
+                label: '실행 취소',
+                run: () => {
+                  transition.mutate({ caseId: updated.caseId, payload: { kind: 'RESUME', value: 'instant' } });
+                },
+              },
+            }
+          : { text: '보냈습니다.' },
+      );
       await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       // 전이는 타임라인에도 사건을 남긴다 — C 의 쓰기와 **같은 관례**로 그 질의도 무효화한다
       // (CR r1 L-6: 두 화면의 관례가 갈리면 C 로 돌아갔을 때 낡은 목록을 볼 수 있다).
@@ -241,7 +270,17 @@ export function BidBoxScreen() {
           잃었다. 이제 `<div role="tabpanel">` 가 감싸고 그 안에 빈 얼굴 또는 `<ul>` 이 온다. */}
       <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)}>
         {cases.isSuccess && shown.length === 0 ? (
-          <EmptyFace display={EMPTY_TAB_DISPLAY} testId="bid-box-empty" />
+          /* 빈 얼굴이 **다음 걸음을 준다**(항목 7). 사유는 이미 문면에 있고 없던 것은 「그래서
+             무엇을 하면 되는가」다 — 담을 건을 찾는 자리로 보낸다. */
+          <EmptyFace
+            display={EMPTY_TAB_DISPLAY}
+            testId="bid-box-empty"
+            action={
+              <LinkButton to="/" tone="primary" testId="bid-box-empty-action">
+                오늘의 공고에서 담기
+              </LinkButton>
+            }
+          />
         ) : null}
         {shown.length === 0 ? null : (
           <ul className="flex flex-col gap-3">

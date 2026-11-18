@@ -493,3 +493,89 @@ describe('첫 탭을 URL 이 정한다 (r1 M-2)', () => {
     expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
   });
 });
+
+/* ── 내려놓기의 배선(M13/13D) ─────────────────────────────────────────────────
+   카드가 표를 따르는지는 짝 test(`BidBoxCard.test.tsx`)가 상태 전수로 든다. 여기서 재는 것은
+   **화면이 그 요청을 어떻게 보내고 무엇을 되돌릴 수 있게 하는가**다. */
+
+describe('화면 D — 건을 내려놓는다', () => {
+  it('「나중에」는 지역 시각을 ISO 로 바꿔 싣는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.deferCase.mockResolvedValue(bidCase({ state: 'DEFERRED', nextCheckpointKind: 'REMINDER' }));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() =>
+      expect(mocked.deferCase).toHaveBeenCalledWith(11, {
+        remindAt: new Date('2099-02-03T10:30').toISOString(),
+      }),
+    );
+  });
+
+  /**
+   * 실행 취소는 **되돌림 전이가 있는 유일한 쌍**에만 선다(D-7E-5). 되돌릴 건의 식별자는 **서버가
+   * 준 응답**에서 오므로, 응답이 다른 건을 말하면 그 건이 되돌려진다 — 그것을 여기서 잠근다.
+   */
+  it('「나중에」 뒤 실행 취소가 서버가 준 건을 되돌린다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.deferCase.mockResolvedValue(bidCase({ caseId: 42, state: 'DEFERRED' }));
+    mocked.resumeCase.mockResolvedValue(bidCase({ caseId: 42, state: 'WATCHING' }));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const toast = await screen.findByTestId('toast');
+    fireEvent.click(within(toast).getByRole('button', { name: '실행 취소' }));
+
+    await waitFor(() => expect(mocked.resumeCase).toHaveBeenCalledWith(42));
+  });
+
+  /** 종단 전이에 실행 취소를 두면 그 버튼이 거짓말이 된다 — 그 자리는 카드의 확인이 든다. */
+  it('「건너뜀」 뒤에는 실행 취소가 없다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.skipCase.mockResolvedValue(bidCase({ state: 'SKIPPED' }));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-SKIP-11'));
+    fireEvent.change(screen.getByLabelText('건너뜀 사유'), { target: { value: '예산이 맞지 않는다' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() => expect(mocked.skipCase).toHaveBeenCalledWith(11, { reason: '예산이 맞지 않는다' }));
+    const toast = await screen.findByTestId('toast');
+    expect(within(toast).queryByRole('button', { name: '실행 취소' })).toBeNull();
+  });
+
+  /** 쓰기가 실패하면 토스트를 **걷는다** — 되돌릴 것이 없는데 실행 취소가 남으면 거짓말이다. */
+  it('「나중에」가 실패하면 실행 취소가 남지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.deferCase.mockRejectedValue(new ApiError(409, 'INVALID_TRANSITION'));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() => expect(screen.getByTestId('write-failure')).toBeTruthy());
+    expect(screen.queryByTestId('toast')).toBeNull();
+    expect(mocked.resumeCase).not.toHaveBeenCalled();
+  });
+
+  /** 빈 얼굴이 **다음 걸음**을 준다(항목 7) — 사유만 있고 길이 없던 자리다. */
+  it('빈 탭이 담을 자리로 가는 길을 준다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    renderScreen();
+
+    const empty = await screen.findByTestId('bid-box-empty');
+    expect(within(empty).getByTestId('bid-box-empty-action').getAttribute('href')).toBe('/');
+  });
+});
