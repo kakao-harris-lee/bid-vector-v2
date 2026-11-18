@@ -127,11 +127,31 @@ export function derivedIdsOf(root = repoRoot) {
     throw new Error(`접두사 표에서 접두사를 ${prefixes.length} 개만 얻었다 — 표의 모양이 바뀌었다`);
   }
   const open = [...new Set(text.match(/OPEN-[A-Z0-9][A-Z0-9-]*/gu) ?? [])];
-  const capability = [...new Set(text.match(new RegExp(`\\b(?:${prefixes.join('|')})-\\d+\\b`, 'gu')) ?? [])];
+  // **넓게** 유도한다(팀장 판정 2026-11-18): 번호가 붙은 것만 담으면 번호 없는 ID 토막이 유도
+  // 집합 밖이라 포함 단언이 그 잔여를 보지 못했다. 전칭이 성립하려면 유도가 먼저 전수여야 한다.
+  const capability = [
+    ...new Set(text.match(new RegExp(`\\b(?:${prefixes.join('|')})-[A-Z0-9][A-Z0-9-]*\\b`, 'gu')) ?? []),
+  ];
   if (open.length === 0 || capability.length === 0) {
     throw new Error('유도 집합이 비었다 — 훑기가 문서의 꼴을 따라가지 못한다');
   }
   return { prefixes, open, capability };
+}
+
+/**
+ * 렌더 층의 「등록부 접두 ID」 꼴에 **박힌** 접두사 집합. 정규식 안의 교대를 꺼내는 좁은 추출이고,
+ * 꼴의 모양이 바뀌면 **던진다** — 조용히 빈 집합을 돌려주면 아래 등식이 공허해진다.
+ */
+export function shapePrefixesOf(shapes) {
+  const shape = shapes.find((one) => one.name === '등록부 접두 ID');
+  if (shape === undefined) {
+    throw new Error('렌더 층에 「등록부 접두 ID」 꼴이 없다');
+  }
+  const alternation = /\(\?:([A-Z|]+)\)/u.exec(shape.source);
+  if (alternation === null) {
+    throw new Error(`「등록부 접두 ID」 꼴에서 접두사 교대를 꺼내지 못했다: ${shape.source}`);
+  }
+  return alternation[1].split('|').filter((one) => one !== '');
 }
 
 /* ── 모집단 — DOM 에 닿을 수 있는 문자열 전수 ────────────────────────────────── */
@@ -263,6 +283,10 @@ export function renderedElementsOf(text, path = RENDER_LAYER) {
 
 const renderLayer = readFileSync(resolve(srcDir, RENDER_LAYER), 'utf8');
 const shapes = shapesOf(renderLayer);
+// **모듈 꼭대기에서 부른다**(선례 `screen-card-coverage.test.mjs` 와 같은 자리). 이 호출은 TS
+// 프로그램과 타입 검사기를 세우므로, `it` 안에 두면 전체 suite 의 병렬 아래에서 5s 기본 상한을
+// 넘는다(실측: 단독 2.1s · 전건 5.8s 타임아웃).
+const { obligations } = collectScreenVocabulary(webRoot);
 const derived = derivedIdsOf();
 const corpus = domReachableStringsOf();
 
@@ -277,10 +301,30 @@ describe('문면 게이트 — 모집단과 금지 집합이 비지 않았다', 
   });
 });
 
-describe('문면 게이트 — 포함 단언(꼴이 등록부를 덮는다)', () => {
-  it('capability map 이 선언한 ID 전수가 금지 꼴에 걸린다', () => {
+describe('문면 게이트 — 포함 단언(금지 판정이 등록부를 덮는다)', () => {
+  /**
+   * **전칭이다**(팀장 판정 2026-11-18): 「잔여가 오늘 몇 개」가 아니라 「유도 집합 ⊂ 금지 판정」.
+   * 유도를 번호 없는 ID 토막까지 넓혔으므로 이 단언이 그 잔여까지 든다.
+   */
+  it('capability map 이 선언한 ID 전수가 금지 판정에 걸린다', () => {
     const uncovered = [...derived.open, ...derived.capability].filter((id) => forbiddenIn(id, shapes).length === 0);
     expect(uncovered).toEqual([]);
+  });
+
+  /** 접두 꼴의 접두사 집합 == §0.6 의 표. 사본이 아니라 등식이다(양방향). */
+  it('접두 꼴에 박힌 접두사가 등록부의 표와 같다', () => {
+    const inShape = [...shapePrefixesOf(shapes)].sort();
+    const inTable = [...derived.prefixes].sort();
+    expect(inShape).toEqual(inTable);
+    expect(inShape.length).toBeGreaterThanOrEqual(5);
+  });
+
+  /** 그 잔여가 **오늘 화면에 닿는 자리**는 0 이다(위 판정이 그것을 센다 — 여기서는 수를 적는다). */
+  it('번호 없는 ID 토막이 DOM 에 닿는 자리가 0 이다', () => {
+    const bare = derived.capability.filter((id) => !/-\d+$/u.test(id));
+    expect(bare.length).toBeGreaterThan(0);
+    const reached = corpus.filter((one) => bare.some((id) => one.value.includes(id)));
+    expect(reached.map((one) => `${one.file}:${one.line}`)).toEqual([]);
   });
 });
 
@@ -344,7 +388,6 @@ describe('문면 게이트 — 렌더 층의 모집단이 뒤처지지 않는다
   });
 
   it('카드 의무 전수를 렌더 층이 그린다', () => {
-    const { obligations } = collectScreenVocabulary(webRoot);
     const drawn = renderedElementsOf(renderLayer);
     expect(obligations.map((one) => one.name).filter((name) => !drawn.has(name)).sort()).toEqual([]);
   });

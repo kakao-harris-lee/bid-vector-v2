@@ -74,6 +74,21 @@ export const COPY_FORBIDDEN_SHAPES = [
   { name: '결정 ID', source: String.raw`\b[DR]-[0-9A-Za-z]+-[0-9A-Za-z]+\b` },
   // 요구표 행 ID. 음수 금액이 이어 붙으면 가짜로 서는 꼴이라 이 층은 노드 단위로 읽는다.
   { name: '요구표 행 ID', source: String.raw`R-\d\b` },
+  /**
+   * **등록부의 접두사에 묶인 꼴**(팀장 판정 2026-11-18 — 제한 3 을 등재가 아니라 닫는다).
+   *
+   * 위 「대문자 접두 ID」는 **번호가 붙은** ID 만 덮는다. 등록부에는 번호가 없는 ID 토막도 있고
+   * (`OPEN-…` 의 토막들) 그것이 홀로 쓰이면 어느 꼴에도 걸리지 않았다. 번호 요구를 그냥 버리면
+   * 합성 공고번호를 문다(실측) — 그래서 **접두사를 등록부의 것으로 못박는다**. 그 접두사 집합이
+   * capability map §0.6 의 표와 같은지는 소스 층이 등식으로 잰다(이 줄이 정본이고 사본은 없다).
+   *
+   * 넓은 「대문자 접두 ID」 꼴을 **함께** 둔다 — 표에 없는 접두의 번호 ID 도 덮으려는 것이고,
+   * 그래서 표가 줄어도 번호 ID 의 보호는 줄지 않는다.
+   */
+  {
+    name: '등록부 접두 ID',
+    source: String.raw`\b(?:COL|STR|QUAL|ML|DEC|NOTI|SET|OPS|BID)-[A-Z0-9][A-Z0-9-]*\b`,
+  },
 ] as const;
 
 const SHAPES: readonly { readonly name: string; readonly source: string }[] = COPY_FORBIDDEN_SHAPES;
@@ -398,7 +413,7 @@ function renderRouteBoundary() {
 
 describe('문면 게이트 — 모집단이 비지 않았다', () => {
   it('금지 꼴 · 표 행 · 그린 조각의 하한', () => {
-    expect(SHAPES.length).toBeGreaterThanOrEqual(5);
+    expect(SHAPES.length).toBeGreaterThanOrEqual(6);
     expect(ALL_ROWS.length).toBeGreaterThanOrEqual(100);
     expect(ROWS_BY_MODULE.filter((one) => one.rows.length > 0).length).toBeGreaterThanOrEqual(8);
     const { container } = renderAll();
