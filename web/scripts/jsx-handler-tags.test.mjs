@@ -895,6 +895,18 @@ describe('요소 생성·복제를 글자 키로 부르는 길 (R1-H1)', () => {
     expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).not.toStrictEqual([]);
   });
 
+  /**
+   * **이 꼴이 새 갈래의 고유 몫이다**: 복제는 글자 리터럴 참조 축이 이미 받고(그 축이 문자열
+   * 노드를 본다), 호출 자리의 생성은 판정 갈래가 받는다. 호출이 아닌 자리에서 생성 함수를
+   * 글자 키로 꺼내는 이 꼴만 **새 갈래가 아니면 아무도 보지 않는다**.
+   */
+  it('값으로 옮긴 글자 키 생성 함수도 참조로 센다', () => {
+    const text =
+      "import * as React from 'react';\ndeclare const f: () => void;\nconst make = React['createElement'];\nexport const X = () => make('div', { onClick: f });\n";
+
+    expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).not.toStrictEqual([]);
+  });
+
   it('리터럴 키로 꺼낸 복제 함수도 참조로 센다', () => {
     const text =
       "import * as React from 'react';\ndeclare const el: unknown;\ndeclare const f: () => void;\nexport const X = () => React['cloneElement'](el, { onClick: f });\n";
