@@ -21,7 +21,14 @@ const SPEC_DIR = resolve(here, '..', 'e2e');
 
 const registry = parseSpecRegistry(readFileSync(REGISTRY_PATH, 'utf8'));
 
-/** 설정의 수집 경계와 같은 규약 — `testDir: './e2e'` · `testMatch: '**''/*.spec.ts'` · `testIgnore: journey/**`. */
+/**
+ * `e2e/` **바로 아래**의 spec 파일 집합(cr R2-4 — 앞 주석은 설정의 수집 경계와 같다고 적었는데
+ * 설정은 재귀에서 `journey/**` 만 뺀다. 오늘 결과가 같은 것은 하위 디렉터리가 `journey/` 하나
+ * 라는 우연이다).
+ *
+ * 그래서 이 싼 축은 **한 단만** 본다: 누가 `e2e/<하위>/foo.spec.ts` 를 만들면 여기서는 보이지
+ * 않고 레인 게이트가 e2e 를 다 돌린 뒤에 집합 등식으로 받는다. 그 차이는 알려진 제한이다.
+ */
 function specsOnDisk() {
   return new Set(readdirSync(SPEC_DIR, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.spec.ts'))

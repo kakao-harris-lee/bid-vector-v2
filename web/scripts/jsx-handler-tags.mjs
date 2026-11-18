@@ -278,9 +278,13 @@ function exemptReceiverAnchors(program, checker) {
 const holderCacheByProgram = new WeakMap();
 
 /**
- * `Object`·`Reflect` 가 가진 멤버 심볼 묶음. **없으면 빈 묶음**이고, 그때 이 축은 돌지 않는다 —
- * 그 전역이 없는 프로그램에는 `Object.assign` 호출 자체가 없으므로 **좁히는 쪽이지 여는 쪽이
- * 아니다**(면제 수신자 앵커와 달리 던지지 않는 이유다).
+ * `Object`·`Reflect` 가 가진 멤버 심볼 묶음 — **증명하는 쪽**이다.
+ *
+ * 앞 판의 주석은 「없으면 이 축이 돌지 않아도 좁히는 쪽」이라 적었는데 **그 전건이 거짓이다**
+ * (cr R2-3 실측): lib 에 그 전역이 없고 모듈에만 선언된 프로그램에서도 호출은 성립한다. 그래서
+ * 앵커가 비면 이 묶음은 아무것도 증명하지 못하고, 그 자리는 **이름으로 받는 보수적 갈래**
+ * (`shadowedGlobalMember`)가 위반 쪽에서 받는다. 던지지 않는 이유가 그것이다 — 꺼지는 길이
+ * 없다.
  */
 function globalMemberAnchors(program, checker) {
   const cached = holderCacheByProgram.get(program);
@@ -349,6 +353,7 @@ function globalMemberOf(checker, anchors, callee, names, depth = 0) {
     return globalMemberOf(checker, anchors, declaration.initializer, names, depth + 1);
   }
   // 구조 분해 — 꺼낸 **키**가 멤버 이름이고, 꺼낸 **대상**이 그 전역이면 같은 자리다.
+  // (이름으로 받는 보수적 갈래는 아래 `shadowedGlobalMember` 가 진다.)
   if (ts.isBindingElement(declaration)) {
     const key = propertyKeyText(declaration.propertyName ?? declaration.name);
     const root = declaration.parent?.parent;
@@ -359,6 +364,25 @@ function globalMemberOf(checker, anchors, callee, names, depth = 0) {
     }
   }
   return null;
+}
+
+/**
+ * **가려진 전역도 보수적으로 센다**(cr R2-2) — 수신자 축과 **같은 구조**로 맞춘다.
+ *
+ * 모듈에 `declare const Object: {…}` 를 두면 그 식별자는 모듈 심볼로 해소돼 앵커와 맞지 않는다.
+ * 그런데 `declare` 는 **타입 선언일 뿐**이라 런타임에는 진짜 전역이 돌고 합치기는 그대로 일어난다.
+ * 수신자 축은 그 꼴에서 「면제가 서지 않는다 → 위반」으로 더 엄해지는데, 이 축만 「이 축이 아니다」
+ * 로 꺼졌다. 심볼로 증명되지 않으면 **이름으로 받아 위반 쪽에 둔다**(볼 수 없는 것을 통과시키지
+ * 않는 이 파일의 규율과 같은 방향).
+ */
+function shadowedGlobalMember(callee, names) {
+  const access = memberAccess(callee);
+  if (access === null || !access.provable || !names.has(access.name ?? '')) {
+    return null;
+  }
+  const receiver = ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee) ? callee.expression : null;
+  const receiverName = receiver !== null && ts.isIdentifier(receiver) ? receiver.text : null;
+  return receiverName !== null && GLOBAL_HOLDERS.includes(receiverName) ? access.name : null;
 }
 
 function isExemptReceiver(type, anchors, depth = 0) {
@@ -657,7 +681,9 @@ function wiringOutsideJsx(program, checker, source) {
        * 구조 분해·별칭은 축 밖이었고(미탐), 요소를 키로 쓰는 `Map.get` 은 축 안이었다(오탐).
        * 이제 `Object`·`Reflect` 의 **그 멤버 심볼**과 맞댄다.
        */
-      const merging = globalMemberOf(checker, holders, node.expression, MERGE_MEMBERS);
+      const merging =
+        globalMemberOf(checker, holders, node.expression, MERGE_MEMBERS) ??
+        shadowedGlobalMember(node.expression, MERGE_MEMBERS);
       if (merging !== null && onElement) {
         // 합치는 자리의 **원본**은 대상 뒤의 인자들이다(프로토타입 바꿔치기도 같은 자리다).
         const sources = args.slice(1);
@@ -672,7 +698,9 @@ function wiringOutsideJsx(program, checker, source) {
        * 글자로 증명돼야 한다 — 증명되지 않으면 닫는다. **인자가 하나뿐인 호출은 이 축이 아니다**
        * (cr N-6: 키 자리가 없는 호출을 「키를 증명할 수 없다」로 접지 않는다).
        */
-      const keyed = globalMemberOf(checker, holders, node.expression, KEYED_MEMBERS);
+      const keyed =
+        globalMemberOf(checker, holders, node.expression, KEYED_MEMBERS) ??
+        shadowedGlobalMember(node.expression, KEYED_MEMBERS);
       if (keyed !== null && onElement && args.length >= 2) {
         const judged = handlerKeyOf(args[1]);
         if (judged !== undefined) {

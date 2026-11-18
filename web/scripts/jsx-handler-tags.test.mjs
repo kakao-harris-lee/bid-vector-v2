@@ -967,3 +967,34 @@ describe('합치는·반사 축은 해소된 심볼로 센다 (R1-M1 · cr N-1 �
     expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).toStrictEqual([]);
   });
 });
+
+/**
+ * M13/13C 수정 라운드 3 — code-review R2-2. **축 구조의 비대칭**을 없앤다.
+ *
+ * 수신자 축은 앵커와 맞지 않으면 **위반**으로 보는데(면제가 서지 않는다), 합치기·반사 축은 맞지
+ * 않으면 「이 축이 아니다」로 보았다. 그래서 모듈에 `declare const Object` 한 줄을 두면 — 타입
+ * 선언일 뿐이라 **런타임에는 진짜 전역이 돈다** — 축이 통째로 꺼졌다.
+ */
+describe('전역을 가려도 합치기·반사 축이 꺼지지 않는다 (cr R2-2)', () => {
+  const SHADOWED_OBJECT = 'declare const Object: { assign(a: unknown, b: unknown): unknown };\n';
+  const SHADOWED_REFLECT = 'declare const Reflect: { set(a: unknown, k: string, v: unknown): boolean };\n';
+
+  it('가려진 Object 로 합쳐도 걸린다', () => {
+    const text = `${SHADOWED_OBJECT}const bag = { onclick: f };\nexport const X = () => { Object.assign(el, bag); };\n`;
+
+    expect(handlerBearingTags(text, {}, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('가려진 Reflect 로 키를 넣어도 걸린다', () => {
+    const text = `${SHADOWED_REFLECT}export const X = () => { Reflect.set(el, 'onclick', f); };\n`;
+
+    expect(handlerBearingTags(text, {}, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('음성 — 이름이 다른 수신자는 여전히 이 축이 아니다', () => {
+    const text =
+      "declare const store: { assign(a: Element, b: { onclick: () => void }): void };\nexport const X = () => { store.assign(el, { onclick: f }); };\n";
+
+    expect(handlerBearingTags(text, {}, DOM_LIB)).toStrictEqual([]);
+  });
+});
