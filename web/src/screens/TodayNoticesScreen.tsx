@@ -242,28 +242,36 @@ function FilterChip({
           </button>
         )}
       </span>
-      {/* 접힌 칸은 **그리지 않는다** — 자리만 숨기면 접힌 칸이 터치 타깃 모집단에 남는다. */}
-      {expanded ? (
-        <span id={panelId} data-testid={panelId} className="mt-1 flex flex-col gap-2 rounded-md border border-line p-2">
-          {axis.fields.map((one) => (
-            /*
-              레이블이 터치 타깃 하한을 **자기도** 든다(13B 의 레이블 축). 그 게이트는 입력의
-              종류를 **증명하지 못하면** 체크박스·라디오와 같은 의무를 씌우는데, 여기서 종류는
-              위 표에서 오므로 원문에 리터럴이 없다 — 표를 풀어 쓰는 대신 의무를 채운다.
-            */
-            <label key={one.field} className="flex min-h-11 flex-col gap-1">
-              <span className="text-xs text-ink-soft">{one.label}</span>
-              <input
-                {...FIELD_INPUT[one.kind]}
-                name={one.field}
-                value={form[one.field]}
-                onChange={(event) => onEdit(one.field, event.target.value)}
-                className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
-              />
-            </label>
-          ))}
-        </span>
-      ) : null}
+      {/*
+        접힌 칸은 **DOM 에 두고 숨긴다**. 지우면 `aria-controls` 가 없는 자리를 가리켜 보조기기가
+        「무엇을 펼치는 버튼인지」를 잃는다. 숨기는 수단이 `hidden` **속성**인 것이 요점이다 —
+        전역 CSS 가 그 속성에 `display:none` 을 `!important` 로 걸어 두어 이 칸의 `flex` 가 그것을
+        덮지 못하고(실측), 그래서 접힌 칸은 터치 타깃 모집단에서도 빠진다.
+      */}
+      <span
+        id={panelId}
+        data-testid={panelId}
+        hidden={!expanded}
+        className="mt-1 flex flex-col gap-2 rounded-md border border-line p-2"
+      >
+        {axis.fields.map((one) => (
+          /*
+            레이블이 터치 타깃 하한을 **자기도** 든다(13B 의 레이블 축). 그 게이트는 입력의
+            종류를 **증명하지 못하면** 체크박스·라디오와 같은 의무를 씌우는데, 여기서 종류는
+            위 표에서 오므로 원문에 리터럴이 없다 — 표를 풀어 쓰는 대신 의무를 채운다.
+          */
+          <label key={one.field} className="flex min-h-11 flex-col gap-1">
+            <span className="text-xs text-ink-soft">{one.label}</span>
+            <input
+              {...FIELD_INPUT[one.kind]}
+              name={one.field}
+              value={form[one.field]}
+              onChange={(event) => onEdit(one.field, event.target.value)}
+              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            />
+          </label>
+        ))}
+      </span>
     </span>
   );
 }

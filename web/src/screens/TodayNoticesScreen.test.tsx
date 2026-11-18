@@ -189,16 +189,33 @@ describe('화면 B — 기본은 제안, 검색이 그 자리를 대신한다', 
  * 프리셋 구간을 지어내지 않으므로 정책 상수가 화면에 생기지 않는다.
  */
 describe('화면 B — 조건 칩', () => {
-  it('칩 셋이 서고 접혀 있다', async () => {
+  /**
+   * 접힌 칸은 **DOM 에 남고 숨는다** — 지우면 `aria-controls` 가 없는 자리를 가리켜 보조기기가
+   * 「무엇을 펼치는 버튼인지」를 잃는다. 숨기는 수단은 `hidden` 속성이다(전역 CSS 가 그 속성에
+   * `display:none` 을 `!important` 로 걸어 두어 칸의 배치 클래스가 그것을 덮지 못한다).
+   */
+  it('칩 셋이 서고, 접힌 칸은 숨되 가리킬 수 있다', async () => {
     renderScreen();
 
     await screen.findByTestId('suggestions-empty');
     for (const chip of ['agency', 'amount', 'deadline']) {
-      expect(screen.getByTestId(`chip-${chip}`).getAttribute('aria-expanded'), `${chip} 칩이 처음부터 펼쳐져 있다`).toBe(
-        'false',
-      );
-      expect(screen.queryByTestId(`chip-panel-${chip}`), `${chip} 칩의 칸이 접히지 않았다`).toBeNull();
+      const button = screen.getByTestId(`chip-${chip}`);
+      expect(button.getAttribute('aria-expanded'), `${chip} 칩이 처음부터 펼쳐져 있다`).toBe('false');
+      const panel = document.getElementById(button.getAttribute('aria-controls') ?? '');
+      expect(panel, `${chip} 칩의 aria-controls 가 없는 자리를 가리킨다`).not.toBeNull();
+      expect(panel?.hidden, `${chip} 칩의 칸이 접히지 않았다`).toBe(true);
     }
+  });
+
+  it('칩을 누르면 그 칸이 드러나고 다시 누르면 숨는다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fireEvent.click(screen.getByTestId('chip-agency'));
+    expect(screen.getByTestId('chip-panel-agency').hidden).toBe(false);
+
+    fireEvent.click(screen.getByTestId('chip-agency'));
+    expect(screen.getByTestId('chip-panel-agency').hidden, '칩이 한 방향 문이다').toBe(true);
   });
 
   it('기관 칩의 값이 서버 인자로 나간다', async () => {
