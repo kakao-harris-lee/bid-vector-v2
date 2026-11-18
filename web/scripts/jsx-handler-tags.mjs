@@ -32,7 +32,8 @@
 // 이 그 꼴이다) 리터럴 쪽을 버리지 않는다(cr P-1). 타입이 **열거할 수 없는 문자열**
 // (넓은 `string`·`any`·템플릿 리터럴)이면 어느 태그인지 증명할 수 없으므로 **보수적으로** 위반이다.
 //
-// **경계**: `createElement` **호출 인자**로 넘긴 핸들러는 이 축 밖이다(JSX 가 아니다).
+// **경계였던 자리 하나가 닫혔다**(M13/13C): `createElement` 의 props 로 넘긴 핸들러도 센다 — 첫
+// 인자가 태그라 JSX 와 같은 타입 판정이 그대로 선다.
 import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -156,9 +157,19 @@ const scopedHandlers = (tag) =>
  *  · **수신자**는 타입이 `Element` 계열인지로 본다 — 이름을 어떻게 가려도 타입은 못 가린다.
  *    `document`·`window` 는 `Element` 를 상속하지 않으므로 그대로 빠진다(셸의 Escape 하나).
  *
- * `createElement` 별칭은 **선언된 경계**라 이 축에 넣지 않는다(JSX 가 아니다).
+ * `createElement` 는 **더 이상 경계가 아니다**(M13/13C · 팀장 판정) — 첫 인자가 태그라 같은 타입
+ * 판정을 적용할 수 있고, 그래서 복제(참조 축)와 **다른 자리에서** 센다.
  */
 const CLONE_ELEMENT = 'cloneElement';
+/**
+ * 요소 **생성** 호출(M13/13C · 팀장 판정 2026-11-18). 13B 는 이것을 「JSX 가 아니다」로 경계에
+ * 두었지만 기전은 같다 — 비-상호작용 태그에 누르는 배선을 props 로 넘긴다.
+ *
+ * **복제와 판정이 다른 이유는 증명 가능성이다.** 복제는 이미 만들어진 요소에 props 를 덧붙이므로
+ * 태그를 볼 수 없어 **참조 자체**가 위반이고, 생성은 **첫 인자가 태그**라 JSX 와 같은 타입 판정을
+ * 그대로 적용할 수 있다 — 증명할 수 있을 때는 판정하고, 없을 때는 거절한다.
+ */
+const CREATE_ELEMENT = 'createElement';
 const LISTENER_MEMBER = 'addEventListener';
 /** 요소에 **직접 대입**하는 인라인 핸들러(`el.onclick = …`) — DOM 의 소문자 이름이다. */
 const INLINE_HANDLER_MEMBER = /^on[a-z]+$/u;
@@ -261,6 +272,40 @@ function memberAccess(node) {
 /** 대입 토큰 전수 — `=` 하나만 보면 `??=`·`||=` 가 그대로 지나간다(v M-7b). */
 const isAssignmentToken = (kind) => kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
 
+/**
+ * 요소 생성의 **props 자리가 무엇을 거는가**. 빈 배열이면 거는 것이 없다.
+ *
+ * 리터럴이 아니거나 펼치기가 있으면 **볼 수 없으므로** 거는 것으로 센다(cr M-4 가 JSX 쪽에서
+ * 세운 그 규율이다). `null`·`undefined` 는 React 의 「props 없음」이라 거는 것이 없다.
+ */
+function createElementHandlers(propsArgument) {
+  if (propsArgument === undefined) {
+    return [];
+  }
+  if (propsArgument.kind === ts.SyntaxKind.NullKeyword) {
+    return [];
+  }
+  if (ts.isIdentifier(propsArgument) && propsArgument.text === 'undefined') {
+    return [];
+  }
+  if (!ts.isObjectLiteralExpression(propsArgument)) {
+    return ['{증명할 수 없는 props}'];
+  }
+  const names = [];
+  for (const property of propsArgument.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      names.push('{...spread}');
+      continue;
+    }
+    const name = property.name;
+    const text = name !== undefined && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) ? name.text : null;
+    if (text !== null && HANDLER_ATTRIBUTE.test(text)) {
+      names.push(text);
+    }
+  }
+  return names;
+}
+
 /** 객체 리터럴에 **누르는 배선 키**가 있는가 — 객체 합치기로 거는 길이다. */
 function carriesHandlerKey(node) {
   if (!ts.isObjectLiteralExpression(node)) {
@@ -325,6 +370,28 @@ function wiringOutsideJsx(checker, source) {
       if (target !== null && target.provable && target.name !== null && INLINE_HANDLER_MEMBER.test(target.name)) {
         if (!receiverExempt(checker, node.left.expression)) {
           hit(node, '<면제되지 않은 수신자>', `${target.name} 대입`);
+        }
+      }
+    }
+    // 요소 **생성** — 첫 인자가 태그라 JSX 와 **같은 타입 판정**을 그대로 쓴다.
+    if (ts.isCallExpression(node) && resolvedName(checker, node.expression) === CREATE_ELEMENT) {
+      const tagArgument = node.arguments[0];
+      const handlers = createElementHandlers(node.arguments[1]);
+      if (tagArgument !== undefined && handlers.length > 0) {
+        const written = tagArgument.getText(source);
+        const tags = intrinsicTagsOf(checker, tagArgument, ts.isStringLiteralLike(tagArgument) ? tagArgument.text : written);
+        const risky =
+          tags === null
+            ? [{ tag: `<알 수 없는 태그 ${written}>`, allowed: new Set() }]
+            : tags
+                .filter((one) => isIntrinsicName(one) && !isFullyInteractive(one, handlers))
+                .map((one) => ({ tag: one, allowed: scopedHandlers(one) }));
+        for (const { tag, allowed } of risky) {
+          for (const handler of handlers) {
+            if (!allowed.has(handler)) {
+              hit(node, tag, handler);
+            }
+          }
         }
       }
     }

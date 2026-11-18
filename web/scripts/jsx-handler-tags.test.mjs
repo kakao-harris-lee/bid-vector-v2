@@ -421,11 +421,16 @@ describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
     expect(found.every((one) => one.tag === `<${'cloneElement'}>`)).toBe(true);
   });
 
-  /** **선언된 경계는 그대로 경계다** — `createElement` 별칭은 이 축이 아니다(JSX 가 아니다). */
-  it('음성 — createElement 별칭은 걸리지 않는다', () => {
+  /**
+   * **그 경계가 닫혔다**(M13/13C · 팀장 판정 2026-11-18). 13B 는 요소 생성 호출을 「JSX 가
+   * 아니다」로 경계에 두었는데 기전이 같다 — 비-상호작용 태그에 누르는 배선을 props 로 넘긴다.
+   * 그래서 **주장을 뒤집어** 같은 꼴을 그대로 둔다(test 를 지우면 이 자리가 다시 열릴 때
+   * 아무것도 말하지 않는다).
+   */
+  it('createElement 별칭으로 비-상호작용 태그에 거는 것도 걸린다', () => {
     const text = `import { createElement as h } from 'react';\nexport const X = () => h('div', { onClick: f });\n`;
 
-    expect(handlerBearingTags(text, REACT_MODULE)).toStrictEqual([]);
+    expect(handlerBearingTags(text, REACT_MODULE)).toHaveLength(1);
   });
 
   it('요소에 직접 거는 addEventListener 는 걸린다', () => {
@@ -633,5 +638,98 @@ describe('속성 밖 배선 — 대입과 멤버 이름의 다른 꼴 (v M-7b)',
     expect(
       handlerBearingTags(`${WIRING_DOM}\nconst plain = { onclick: null as (() => void) | null };\nexport const X = () => { Object.assign(plain, { onclick: f }); };\n`),
     ).toStrictEqual([]);
+  });
+});
+
+/**
+ * M13/13C — **요소 생성 호출의 경계를 닫는다**(팀장 판정 2026-11-18). 13B 는 `createElement` 를
+ * 「JSX 가 아니다」로 경계에 두었지만 기전이 같다 — 비-상호작용 태그에 누르는 배선을 props 로
+ * 넘긴다. 차이는 **증명 가능성**이고 그래서 판정이 다르다: 요소 복제는 태그를 볼 수 없어 참조
+ * 자체가 위반이고, 요소 생성은 **첫 인자가 태그**라 같은 타입 판정을 그대로 적용할 수 있다.
+ */
+describe('요소 생성 호출의 태그와 props (팀장 판정 2026-11-18)', () => {
+  const createElementOf = (body) =>
+    handlerBearingTags(`import { createElement } from 'react';\ndeclare const f: () => void;\n${body}`, WIRING_REACT);
+
+  it('비-상호작용 태그에 누르는 props 를 넘기면 걸린다', () => {
+    expect(createElementOf("export const X = () => createElement('div', { onClick: f });\n")).toHaveLength(1);
+  });
+
+  it('들여오며 바꾼 이름으로 불러도 걸린다 — 이름이 아니라 심볼이다', () => {
+    expect(
+      handlerBearingTags(
+        `import { createElement as h } from 'react';\ndeclare const f: () => void;\nexport const X = () => h('span', { onClickCapture: f });\n`,
+        WIRING_REACT,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('태그를 증명할 수 없으면 걸린다', () => {
+    expect(
+      createElementOf("declare const tag: string;\nexport const X = () => createElement(tag, { onClick: f });\n"),
+    ).toHaveLength(1);
+  });
+
+  it('props 를 증명할 수 없으면 걸린다 — 볼 수 없는 것을 통과시키지 않는다', () => {
+    expect(
+      createElementOf('declare const props: Record<string, unknown>;\nexport const X = () => createElement(\'div\', props);\n'),
+    ).toHaveLength(1);
+  });
+
+  it('props 에 펼치기가 있으면 걸린다', () => {
+    expect(
+      createElementOf("declare const rest: Record<string, unknown>;\nexport const X = () => createElement('div', { ...rest });\n"),
+    ).toHaveLength(1);
+  });
+
+  it('음성 — 내장 상호작용 요소는 걸리지 않는다', () => {
+    expect(createElementOf("export const X = () => createElement('button', { onClick: f });\n")).toStrictEqual([]);
+  });
+
+  it('음성 — 누르는 props 가 없으면 걸리지 않는다(오늘 출하 트리의 그 한 자리)', () => {
+    expect(
+      createElementOf(
+        "declare const as: 'li' | 'div' | 'section' | 'article';\ndeclare const kids: unknown;\nexport const X = () => createElement(as, { 'data-testid': 'x', className: 'y' }, kids);\n",
+      ),
+    ).toStrictEqual([]);
+  });
+
+  it('음성 — props 자리가 null 이면 거는 것이 없다', () => {
+    expect(createElementOf("export const X = () => createElement('div', null);\n")).toStrictEqual([]);
+  });
+
+  it('음성 — 사용자 컴포넌트는 이 축이 아니다', () => {
+    expect(
+      createElementOf('declare const Thing: () => unknown;\nexport const X = () => createElement(Thing, { onClick: f });\n'),
+    ).toStrictEqual([]);
+  });
+});
+
+/**
+ * M13/13C — `EventTarget.prototype` 경유 호출은 **선언에 따라 결과가 갈렸다**(13B verifier 는
+ * 초록, 내 탐침은 RED). 한쪽 선언에서만 붉으면 우회가 남으므로 **두 선언 모두**에서 센다.
+ */
+describe('prototype 경유 호출 — 선언 둘 모두에서 걸린다', () => {
+  it('prototype 이 선언되지 않은 꼴', () => {
+    expect(
+      handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n`),
+    ).not.toStrictEqual([]);
+  });
+
+  it('prototype 이 EventTarget 으로 선언된 꼴', () => {
+    const declared = [
+      'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
+      'interface Node extends EventTarget {}',
+      'interface Element extends Node {}',
+      'interface HTMLElement extends Element {}',
+      'interface HTMLDivElement extends HTMLElement {}',
+      'declare const EventTarget: { prototype: EventTarget };',
+      'declare const el: HTMLDivElement;',
+      'declare const f: () => void;',
+    ].join('\n');
+
+    expect(
+      handlerBearingTags(`${declared}\nexport const X = () => { EventTarget.prototype.addEventListener.call(el, 'c', f); };\n`),
+    ).not.toStrictEqual([]);
   });
 });
