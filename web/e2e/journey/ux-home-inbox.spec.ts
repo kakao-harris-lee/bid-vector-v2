@@ -1,8 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { notificationItemTestId } from '../../src/display/notificationDisplay';
-
-import { assertOnlyAllowedOperations, ensureInBidBox, search, signIn, watchRequests } from './shared';
+import { assertOnlyAllowedOperations, search, signIn, watchRequests } from './shared';
 
 /**
  * **홈과 알림함의 여정**(M13/13E — 받는 항목 8 · 9 · 11 · 7).
@@ -13,13 +11,13 @@ import { assertOnlyAllowedOperations, ensureInBidBox, search, signIn, watchReque
  * 나가 200 을 받는가 ⓑ 2층 라벨을 **탭했을 때 글자가 자리를 차지하는가**(시각 은폐의 1px 상자와
  * 가른다 — jsdom 은 상자를 모른다) ⓒ 링크를 열면 **셸의 안 읽음 배지가 줄어드는가**를 본다.
  *
- * **이 spec 은 자기 공고를 쓴다.** 한 하네스를 공유하므로 건의 상태가 전역이고(fixture 의
- * `why_third_notice`·`why_fourth_notice` 가 같은 사유를 적어 둔 자리), 다른 여정이 미는 공고를
- * 쓰면 서로의 전이를 본다. 파일 이름이 `touch-target` **뒤로** 정렬되는 것도 그 축이다 — 이
- * spec 이 세우는 건·알림을 앞 여정들이 보지 않는다(13B 알려진 제한 19 가 미리 적어 둔 전제).
+ * **이 spec 은 건의 상태를 하나도 바꾸지 않는다.** 한 하네스를 공유하므로 건의 상태가
+ * 전역이고(fixture 의 `why_third_notice`·`why_fourth_notice` 가 같은 사유를 적어 둔 자리),
+ * 마감이 남은 공고는 전부 다른 여정의 것이다. 그래서 홈 쪽은 **읽기만** 하고(검색), 알림함
+ * 쪽은 앞선 여정이 만든 **안읽음 행 하나**를 읽음으로 바꾼다 — 파일 이름이 `touch-target`
+ * **뒤로** 정렬되는 것이 그 전제다(13B 알려진 제한 19 가 미리 적어 둔 자리).
  */
 const OWN_NOTICE = 'SYN-M9-OPEN-PROGRESS-NONE';
-const OWN_ROUND = '000';
 
 /** 그 셸 배지의 지금 값 — 0 이면 **배지가 없다**(13B: 0 은 그리지 않는다). */
 async function navUnreadCount(page: Page): Promise<number> {
@@ -103,42 +101,32 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
   const watched = watchRequests(page);
   await signIn(page);
 
-  /**
-   * **자기 알림을 만든다.** 투찰가 요청이 알림함에 기록을 남긴다(M7/7C③-b 의 트리거) — 앞선
-   * 여정의 알림에 기대면 이 여정이 그 순서에 매인다.
-   *
-   * 같은 하네스에 두 번 미는 꼴(`--repeat-each`)에서는 둘째 회차에 이미 요청된 건이라 주 행동이
-   * 「투찰가 요청」이 아니다. 그때는 알림이 이미 있으므로 요청을 **다시 보내지 않는다**(여정 ②
-   * 의 「이미 담긴 건」과 같은 판단).
-   */
-  const rows = await search(page, OWN_NOTICE);
-  expect(rows.map((one) => one.noticeNumber), `검색이 ${OWN_NOTICE} 를 내지 않았다`).toContain(OWN_NOTICE);
-  const card = page.getByTestId(`notice-card-${OWN_NOTICE}`);
-  await ensureInBidBox(page, card);
-  await card.getByTestId('notice-title').click();
-  await expect(page.getByTestId('screen-worksheet')).toBeVisible();
-  const primary = page.getByTestId('worksheet-primary');
-  if ((await primary.textContent()) === '투찰가 요청') {
-    const priced = page.waitForResponse(
-      (one) => one.url().includes('/api/bid-price-requests') && one.request().method() === 'POST',
-    );
-    await page.getByTestId('active-bids').fill('1');
-    await primary.click();
-    expect((await priced).status()).toBe(200);
-  }
-
   await page.getByRole('link', { name: '알림함' }).click();
   await expect(page.getByTestId('screen-inbox')).toBeVisible();
 
-  const rowId = notificationItemTestId({
-    kind: 'BID_PRICE_REQUEST_RECORDED',
-    noticeNumber: OWN_NOTICE,
-    noticeRound: OWN_ROUND,
-    bidKind: 'REAL',
-  });
-  const row = page.getByTestId(rowId);
-  await expect(row).toBeVisible();
-  await expect(row.getByTestId('read-state'), '내가 만든 알림이 이미 읽음이다').toHaveText('안읽음');
+  /**
+   * **안읽음 행 하나를 고른다 — 이 spec 은 알림을 새로 만들지 않는다.**
+   *
+   * 앞선 여정들이 트리거를 발화시켜 알림을 남기고(그 사실은 `results.spec.ts` 가 단언한다), 이
+   * 파일은 `touch-target` **뒤로** 정렬되므로 그 알림이 이미 있다. 자기 알림을 만들려면 마감이
+   * 남은 공고에 건을 세워야 하는데, 그런 fixture 는 전부 다른 여정의 것이다 — **남의 건을 밀지
+   * 않는 쪽**을 골랐다(공유 하네스에서 건의 상태는 전역이다). 그래서 전제를 숨기지 않고 **아래
+   * 단언으로 드러낸다**.
+   *
+   * 읽은 행은 쓰기를 내지 않으므로(그 분기는 vitest 가 잠근다) 고르는 것은 **안읽음** 행이다.
+   * 행 문면의 「안읽음」으로 가른다 — 버튼은 「읽음으로」라 이 글자를 담지 않는다.
+   */
+  const unread = page
+    .getByTestId('screen-inbox')
+    .locator('[data-testid^="notification-"]')
+    .filter({ hasText: '안읽음' });
+  await expect(
+    unread.first(),
+    '안읽음 알림이 없다 — 앞선 여정의 트리거가 발화하지 않았다',
+  ).toBeVisible();
+  const row = unread.first();
+  const rowId = await row.getAttribute('data-testid');
+  expect(rowId, '행이 자기 신원을 싣지 않는다').not.toBeNull();
 
   /**
    * **2층 라벨의 아래층이 탭으로 자리를 차지한다**(받는 항목 11). 접힌 동안은 시각 은폐라 상자가
@@ -149,7 +137,7 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
   // 차례를 testId 에 담으므로 이름으로 짓지 않고 **내 행을 품은 묶음**으로 집는다.
   const group = page
     .locator('[data-testid^="notice-group-"]')
-    .filter({ has: page.getByTestId(rowId) });
+    .filter({ has: page.getByTestId(rowId!) });
   const badge = group.locator('[aria-expanded]').first();
   const whyId = await badge.getAttribute('aria-controls');
   expect(whyId, '2층 라벨이 펼침 대상을 가리키지 않는다').not.toBeNull();
@@ -184,7 +172,7 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
 
   // 돌아오면 그 행은 **서버가 준 값**으로 읽음이다(낙관 갱신이 아니라 재조회의 결과다).
   await page.getByRole('link', { name: '알림함' }).click();
-  await expect(page.getByTestId(rowId).getByTestId('read-state')).toHaveText('읽음');
+  await expect(page.getByTestId(rowId!).getByTestId('read-state')).toHaveText('읽음');
 
   expect(watched.outside).toStrictEqual([]);
   expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);

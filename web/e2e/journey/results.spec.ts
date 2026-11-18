@@ -557,6 +557,16 @@ type InboxItem = NotificationTestIdParts & { readonly read: boolean };
 
 test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그대로 보인다', async ({ page }) => {
   const watched = watchRequests(page);
+  /**
+   * 알림 읽기의 장부 — **로그인 앞에** 건다. 셸의 안 읽음 배지는 앱이 뜨는 순간 자기 읽기를
+   * 보내므로(어느 화면에서나 서는 값이다), 로그인 뒤에 장부를 걸면 그 한 건을 놓친다(실측).
+   */
+  const notificationReads: string[] = [];
+  page.on('request', (one) => {
+    if (one.url().includes('/api/notifications') && one.method() === 'GET') {
+      notificationReads.push(one.url());
+    }
+  });
   await signIn(page);
 
   /**
@@ -571,12 +581,6 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
    * 명시한다**. 이제 그 **존재**로 가르고, 배지가 쪽을 보내지 않는 것은 아래 음성 단언이 든다 —
    * 둘이 함께 서야 이 술어가 공허하지 않다(한쪽만으로는 두 읽기가 한 꼴로 접혀도 조용하다).
    */
-  const notificationReads: string[] = [];
-  page.on('request', (one) => {
-    if (one.url().includes('/api/notifications') && one.method() === 'GET') {
-      notificationReads.push(one.url());
-    }
-  });
   const listed = page.waitForResponse(
     (one) =>
       one.url().includes('/api/notifications') &&

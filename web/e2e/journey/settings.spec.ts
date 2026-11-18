@@ -32,12 +32,18 @@ interface SuggestionsRead {
   readonly total: string | null;
 }
 
-/** 설정 화면으로 — 셸의 전역 탐색을 지난다(주소를 손으로 적지 않는다). */
+/**
+ * 설정 화면으로 — 셸의 전역 탐색을 지난다(주소를 손으로 적지 않는다).
+ *
+ * **이름을 정확히 맞춘다**(M13/13E). Playwright 의 `name` 은 기본이 부분 일치라, 화면 안에
+ * 「설정에서 …」으로 가는 걸음이 생기면 이 조회가 둘을 집어 strict 위반으로 멈춘다(실측). 셸의
+ * 자리 라벨은 정확히 「설정」이므로 그 축으로 가른다.
+ */
 async function openSettings(page: Page): Promise<number> {
   const read = page.waitForResponse(
     (one) => one.url().endsWith('/api/strategy') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('link', { name: '설정', exact: true }).click();
   await expect(page.getByTestId('screen-settings')).toBeVisible();
   const body = (await (await read).json()) as { readonly revision: number };
   return body.revision;
