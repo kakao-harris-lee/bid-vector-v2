@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { unknownStateDisplay, type DisplayTone, type StateDisplay } from '../display/stateDisplay';
 
@@ -14,14 +14,23 @@ const TONE_CLASS = {
   bad: 'bg-bad-skin text-bad-ink',
 } as const satisfies Record<DisplayTone, string>;
 
+/** 알약 하나의 모양 — 어조 토큰만 갈린다. */
+const PILL_CLASS = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
+
 /**
  * 상태 하나의 표시. **2층 라벨**(§6.4)이다.
  *
- * **아래층(`why`)이 `title` 하나에만 있지 않다**(CR M-7). `why` 는 이 slice 의 정직 문면을
- * 나른다 — 「미달이 아니라 판정하지 못했다」·「요건이 없는 것과 다른 사실이다」 — 그것을
- * `title` 로만 두면 터치 기기에서 볼 방법이 없고, 포커스를 받지 않는 `<span>` 이라 키보드로
- * 닿지 않으며, 보조기술 노출이 설정에 따라 들쭉날쭉하다. 그래서 `aria-describedby` 로 묶은
- * **sr-only 문면**을 함께 둔다 — 보조기술은 늘 읽고, 보는 사람에게는 `title` 이 남는다.
+ * **아래층(`why`)에 가는 길이 둘이고 문면은 하나다**(M13/13E, 받는 항목 11). `why` 는 이
+ * 저장소의 정직 문면을 나른다 — 「미달이 아니라 판정하지 못했다」·「요건이 없는 것과 다른
+ * 사실이다」. 앞 판에서 **보이는 쪽**은 툴팁 속성뿐이라 터치 기기에서 볼 방법이 없었고(보조기기
+ * 경로는 `aria-describedby` + 시각 은폐 문면으로 이미 닫혀 있었다), 그래서 손가락만 남아 있었다.
+ *
+ * 이제 라벨 자리가 **내장 `button`** 이고 탭하면 아래층이 펼쳐진다. 요점은 **문면의 노드가
+ * 하나**라는 것이다 — 펼침은 그 한 노드의 모양을 바꾸는 것이고 사본을 만들지 않는다. 펼친 자리에
+ * 문면을 **또 그리면** 보조기기가 설명과 본문에서 같은 말을 두 번 읽는다.
+ *
+ * **툴팁 속성은 걷었다**(팀장 착수 판정 2026-11-18 ⓑ): 손가락·마우스가 같은 길을 쓰므로 할 일이
+ * 없고, 같은 문면이 세 곳(속성·시각 은폐 문면·펼친 자리)에 사는 꼴을 없앤다.
  *
  * **표 밖의 값은 조용히 사라지지 않는다**(CR M-3): `display` 가 없으면 부르는 자리가
  * `displayOrUnknown` 으로 **보이는** 미지 상태를 주게 되어 있고, 그래도 없으면 그 사실을
@@ -37,23 +46,51 @@ export function StateBadge({
   // `useId` 를 쓴다 — 모듈 전역 카운터를 렌더 중에 올리는 것은 부수효과이고 리렌더 시점에
   // 따라 값이 달라진다(react-hooks 규칙이 그 자리를 잡았다).
   const generatedId = useId();
+  const [expanded, setExpanded] = useState(false);
   const shown = display ?? unknownStateDisplay('표에 없음');
-  const describedBy = shown.why === undefined ? undefined : `state-why-${generatedId}`;
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span
-        data-testid={testId}
-        title={shown.why}
-        aria-describedby={describedBy}
-        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TONE_CLASS[shown.tone]}`}
-      >
+  const pillClass = `${PILL_CLASS} ${TONE_CLASS[shown.tone]}`;
+
+  // **아래층이 없으면 펼칠 것이 없다** — 빈 펼침 버튼을 두면 운영자가 눌러 보고 아무 일도
+  // 일어나지 않는다(가짜 affordance). 그 배지는 앞 판 그대로 글자다.
+  if (shown.why === undefined) {
+    return (
+      <span data-testid={testId} className={pillClass}>
         {shown.label}
       </span>
-      {describedBy === undefined ? null : (
-        <span id={describedBy} className="sr-only">
-          {shown.why}
-        </span>
-      )}
+    );
+  }
+
+  const whyId = `state-why-${generatedId}`;
+  return (
+    <span className="inline-flex flex-col items-start">
+      {/*
+        손가락이 닿는 것은 알약이 아니라 **상자**다(M13/13B 의 블록 타깃과 같은 축) — 알약의
+        모양은 그대로 두고 누르는 자리만 터치 타깃 하한까지 키운다. 실제 상자는 390px 여정의
+        터치 타깃 게이트가 전수로 잰다.
+      */}
+      <button
+        type="button"
+        data-testid={testId}
+        aria-describedby={whyId}
+        aria-expanded={expanded}
+        aria-controls={whyId}
+        onClick={() => setExpanded((open) => !open)}
+        className="inline-flex min-h-11 items-center rounded-md"
+      >
+        <span className={pillClass}>{shown.label}</span>
+      </button>
+      {/*
+        **한 노드다.** 접히면 시각 은폐(보조기기만 읽는다), 펼치면 보이는 글자가 된다 —
+        `aria-describedby` 는 두 상태에서 같은 자리를 가리킨다. `data-expanded` 는 그 상태를
+        클래스 글자에 기대지 않고 재는 자리다(13B 알려진 제한 27).
+      */}
+      <span
+        id={whyId}
+        data-expanded={expanded}
+        className={expanded ? 'mt-0.5 text-xs text-ink-soft' : 'sr-only'}
+      >
+        {shown.why}
+      </span>
     </span>
   );
 }
