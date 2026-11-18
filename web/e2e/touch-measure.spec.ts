@@ -214,12 +214,21 @@ test('아래로 걸친 고정 요소는 화면 밖으로 센다', async ({ page:
   expect(result.offscreen).toHaveLength(1);
 });
 
+/**
+ * **이 대조가 「고정인가」를 재는 자리다**(변이 F-2 가 드러냈다 — 앞 꼴은 타깃이 뷰포트 안에
+ * 있어 고정 판정을 늘 참으로 바꿔도 초록이었다). 버튼을 **화면 아래로 밀어낸** 뒤에야 두
+ * 갈래가 갈린다: 보통 흐름이면 밀어서 닿고, 고정이면 영원히 닿지 않는다.
+ */
 test('음성 대조 — 고정이 아닌 아래쪽 내용은 밀면 닿는다', async ({ page: browserPage }) => {
-  const result = await measured(
-    browserPage,
-    page({ open: '<div style="height:2000px">', close: '</div>' }),
-  );
+  const result = await measured(browserPage, page({ open: '<div style="height:2000px"></div>' }));
 
+  // **비공허**: 버튼이 실제로 뷰포트 아래에 있다(그러지 않으면 이 대조가 아무것도 가르지 않는다).
+  // 게이트가 내는 기록이 아니라 **브라우저에 직접** 묻는다 — 측정 표면을 늘리지 않기 위해서다.
+  const belowFold = await browserPage.evaluate(() => {
+    const button = document.querySelector('button');
+    return button !== null && button.getBoundingClientRect().top > window.innerHeight;
+  });
+  expect(belowFold).toBe(true);
   expect(result.offscreen).toStrictEqual([]);
 });
 
