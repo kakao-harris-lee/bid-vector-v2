@@ -103,6 +103,19 @@ export async function entryStateOf(webRoot, css, base = resolve(webRoot, 'src'))
   };
 }
 
+/**
+ * **묶이지 않은 입구 전수**(v R2-B1 · cr R2-1) — 트리 수준 판정을 test 파일의 거름이 아니라
+ * **여기 한 자리**에 둔다.
+ *
+ * 앞 판은 그 판정이 test 안의 `root !== 'none'` 한 줄이었고, 기능 비트를 고친 뒤에도 그 줄이
+ * 남아 평범한 컴포넌트 CSS 한 장이 게이트를 붉혔다(실측 재현). 「입구가 아닌 파일」과 「뿌리를
+ * 열어 둔 입구」는 다른 사실이므로, 그 둘을 가르는 자리는 술어여야 한다.
+ */
+export async function unpinnedEntries(webRoot) {
+  const roots = await cssEntryRoots(webRoot);
+  return roots.filter((one) => one.isEntry && one.root !== 'none');
+}
+
 export async function cssEntryRoots(webRoot) {
   const srcRoot = resolve(webRoot, 'src');
   const entries = [];

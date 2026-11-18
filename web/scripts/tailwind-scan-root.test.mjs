@@ -1,3 +1,5 @@
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -5,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cssEntryRoots,
   entryStateOf,
+  unpinnedEntries,
   scanOf,
   shippedSources,
   utilityClassesWithoutCandidates,
@@ -12,6 +15,21 @@ import {
 } from './tailwind-scan-root.mjs';
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
+
+/**
+ * 합성 web 뿌리 — `src/` 한 장짜리 트리를 임시 자리에 세운다.
+ *
+ * 출하 트리에 파일을 심어 재면 그 심은 파일이 다른 게이트(훑기 집합·출하 소스 목록)에도 들어
+ * 다른 축을 함께 흔든다. 여기서 재는 것은 **트리 판정 술어 하나**이므로 그 자리만 만든다.
+ * `@import 'tailwindcss'` 대신 `@tailwind utilities` 를 쓰는 이유는 **모듈 해소가 필요 없기**
+ * 때문이다(둘 다 유틸리티 층을 세운다 — 기능 비트로 실측했다).
+ */
+function syntheticRoot(css) {
+  const root = mkdtempSync(resolve(tmpdir(), 'scan-root-'));
+  mkdirSync(resolve(root, 'src'));
+  writeFileSync(resolve(root, 'src', 'one.css'), css);
+  return root;
+}
 
 /**
  * **음성 표본** — 출하 소스가 절대 쓰지 않을 꼴이고 이 파일(출하 밖)에만 있다. 뿌리가 넓어지면
@@ -99,8 +117,10 @@ describe('훑기 밖에서 들어오는 유틸리티 (v M-4)', () => {
   it('출하 소스의 모든 CSS 입구가 자동 탐지를 끈다', async () => {
     const roots = await cssEntryRoots(WEB_ROOT);
 
+    // **비공허**: 볼 CSS 가 실제로 있다. 판정은 술어가 한다 — 「입구가 아닌 파일」과 「뿌리를
+    // 열어 둔 입구」를 test 안의 거름으로 가르면 그 둘이 같은 값이 된다(cr R2-1 이 그 자리다).
     expect(roots.length).toBeGreaterThan(0);
-    expect(roots.filter((one) => one.root !== 'none')).toStrictEqual([]);
+    expect(await unpinnedEntries(WEB_ROOT)).toStrictEqual([]);
   });
 });
 
@@ -128,6 +148,23 @@ describe('CSS 입구 판별 (cr N-7)', () => {
     const real = entries.filter((one) => one.isEntry);
 
     expect(real.length).toBeGreaterThan(0);
-    expect(real.filter((one) => one.root !== 'none')).toStrictEqual([]);
+    expect(await unpinnedEntries(WEB_ROOT)).toStrictEqual([]);
+  });
+
+  /**
+   * **이 둘이 트리 판정을 재는 자리다**(v R2-B1 · cr R2-1). 합성 뿌리를 써서 출하 트리를 건드리지
+   * 않는다 — 음성은 「평범한 컴포넌트 CSS 를 하나 더해도 조용하다」(앞 판에서 **붉었다**), 양성은
+   * 「뿌리를 열어 둔 둘째 입구는 걸린다」(측정이 살아 있다는 증거).
+   */
+  it('음성 대조 — 평범한 컴포넌트 CSS 는 게이트를 붉히지 않는다', async () => {
+    const root = syntheticRoot('.plain { color: red }\n');
+
+    expect(await unpinnedEntries(root)).toStrictEqual([]);
+  });
+
+  it('양성 대조 — 뿌리를 열어 둔 입구는 걸린다', async () => {
+    const root = syntheticRoot('@tailwind utilities;\n');
+
+    expect(await unpinnedEntries(root)).toHaveLength(1);
   });
 });
