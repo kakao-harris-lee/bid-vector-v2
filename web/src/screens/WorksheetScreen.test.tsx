@@ -70,7 +70,15 @@ const PRICE: queries.BidPriceRequestResponse = {
   licenseMissingDetailState: 'NOT_APPLICABLE',
   licenseUnparsableRowCount: 0,
   licenseValidity: 'NOT_VERIFIED',
-  // 실제 서버가 내는 꼴이다(팀장 판정 2026-11-18 — 재현용 출처 문자열이고 사용자 문면이 아니다).
+  /**
+   * **이 값은 적대적 입력이다**(팀장 판정 2026-11-18). 실제 서버가 내는 꼴 그대로이고, 그 안에
+   * 개발 식별자가 들어 있다 — QUAL-05 의 **재현용 출처**이지 사용자 문면이 아니다.
+   *
+   * 그래서 이 fixture 는 「어휘가 금지 집합 밖이어야 한다」는 13A 문면 게이트의 전제를 **일부러
+   * 어기는 입력**이다: 화면이 그것을 **그리지 않는다**는 것이 여기서 재는 것이고, 금지 어휘가
+   * fixture 에 있다는 사실 자체는 이 test 의 재료다(그 게이트의 모집단이 아니라 이 짝 test 의
+   * 입력 자리다).
+   */
   licensePolicySource: 'OPEN-QUAL-07 — 별칭·포괄 코드 내용 미확정(2026-09-06), 형태만',
   licensePolicyEffectiveFrom: '2026-09-06',
   unjudgedAxes: ['QUAL_08_REGION', 'QUAL_10_PERFORMANCE', 'QUAL_11_CONSTRUCTION_CAPACITY'],
