@@ -70,7 +70,9 @@ const PRICE: queries.BidPriceRequestResponse = {
   licenseMissingDetailState: 'NOT_APPLICABLE',
   licenseUnparsableRowCount: 0,
   licenseValidity: 'NOT_VERIFIED',
-  licensePolicySource: 'policy-values.md §1.2',
+  // 실제 서버가 내는 꼴이다(팀장 판정 2026-11-18 — 재현용 출처 문자열이고 사용자 문면이 아니다).
+  licensePolicySource: 'OPEN-QUAL-07 — 별칭·포괄 코드 내용 미확정(2026-09-06), 형태만',
+  licensePolicyEffectiveFrom: '2026-09-06',
   unjudgedAxes: ['QUAL_08_REGION', 'QUAL_10_PERFORMANCE', 'QUAL_11_CONSTRUCTION_CAPACITY'],
   baseAmountWon: 1_200_000_000,
   baseAmountBasis: 'BASE_AMOUNT',
@@ -1254,5 +1256,33 @@ describe('화면 C — 다룰 수 없는 금액 (cr M-5)', () => {
     expect(writeText).not.toHaveBeenCalled();
     expect(screen.queryByTestId('handoff-amount-korean')).toBeNull();
     expect((await screen.findByTestId('handoff-amount')).textContent).toContain('다룰 수 없는');
+  });
+});
+
+/**
+ * M13/13C — **자격 판정 규칙 판본 칸**(팀장 판정 2026-11-18). 서버가 주는 출처 문자열은 QUAL-05 의
+ * **재현용 값**이지 사용자 문면이 아니다(오늘 그 값에 개발 식별자가 들어 있다). 화면은 그 원문을
+ * 그리지 않고 **시행일로 판본**을 보인다 — 원문은 API 와 서버에 그대로 남아 재현성을 잃지 않는다.
+ */
+describe('화면 C — 규칙 판본은 시행일로 보인다', () => {
+  it('투찰가 응답이 있는 상태에서 그 칸이 서고, 원문·개발 식별자를 그리지 않는다', async () => {
+    renderScreen();
+    await askPrice();
+
+    // 이 단언이 **그 상태**(투찰가 응답이 있는 워크시트)를 실제로 그린다는 것을 먼저 든다.
+    expect(await screen.findByTestId('qualification')).not.toBeNull();
+    const cell = await screen.findByTestId('license-policy');
+
+    expect(cell.textContent).toContain('2026-09-06');
+    expect(cell.textContent, '서버의 재현용 출처 원문이 그대로 그려졌다').not.toContain(PRICE.licensePolicySource);
+    expect(cell.textContent, '개발 식별자가 화면에 섰다').not.toMatch(/OPEN-[A-Z0-9-]+/u);
+  });
+
+  it('시행일이 없으면 최초 판이라는 사실을 말한다 — 빈 자리로 두지 않는다', async () => {
+    mocked.requestBidPrice.mockResolvedValue({ ...PRICE, licensePolicyEffectiveFrom: null });
+    renderScreen();
+    await askPrice();
+
+    expect((await screen.findByTestId('license-policy')).textContent).toContain('최초 판');
   });
 });

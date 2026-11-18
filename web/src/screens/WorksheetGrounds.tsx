@@ -231,6 +231,17 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
   );
 }
 
+/**
+ * 규칙 판본의 **사용자 문면**(팀장 판정 2026-11-18). 시행일이 있으면 그 날짜의 판이고, 없으면
+ * 그것이 **최초 판**이라는 사실이다(계약이 그 자리를 「시행일이라는 값 자체가 없다」로 둔다) —
+ * 빈 자리로 두면 「서버가 안 보냈다」로 읽힌다.
+ *
+ * 서버가 사용자용 판본 이름을 주지 않아 날짜로 말한다(그 표면 부재는 새 OPEN 후보다).
+ */
+function policyVersionTextOf(effectiveFrom: string | null | undefined): string {
+  return effectiveFrom === null || effectiveFrom === undefined ? '최초 판(시행일 없음)' : `${effectiveFrom} 시행 판`;
+}
+
 /** 자격 — **면허 축만** 판정한다. 판정하지 않는 축을 함께 싣는 것이 이 카드의 요점이다. */
 function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
   const reason = price.licenseUncertainReason;
@@ -275,15 +286,15 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
           testId="license-groups-missing"
           value={price.licenseGroupsMissing.length === 0 ? null : price.licenseGroupsMissing.join(', ')}
         />
-        {/* 13A 재측정 넘김(팀장 2026-11-18) — 앞 판의 라벨은 개발 쪽 말이었다. 운영자가 알아야
-            하는 것은 **무엇의 판본인가**다: 규칙이 바뀌면 지난 판정이 어느 판에서 나왔는지
-            되짚을 수 있다는 사실(QUAL-05)이 이 칸의 뜻이다. 값은 서버가 준 그대로 둔다 —
-            화면이 출처를 고쳐 적지 않는다. */}
+        {/* **원문을 그리지 않는다**(팀장 판정 2026-11-18). 서버의 출처 문자열은 QUAL-05 의
+            **재현용 값**이라 개발 식별자를 담는다 — 그것은 사용자 문면이 아니다. 운영자가 알아야
+            하는 것은 **어느 판으로 판정했는가**이고, 그 사실은 시행일이 말한다. 원문은 API 와
+            서버에 그대로 남으므로 재현성은 잃지 않는다. */}
         <Field
           label="자격 판정에 쓴 규칙 판본"
           hint="면허 판정에 쓴 규칙표가 어느 판인지. 규칙이 바뀌어도 지난 판정을 그 판으로 되짚을 수 있다."
           testId="license-policy"
-          value={price.licensePolicySource}
+          value={policyVersionTextOf(price.licensePolicyEffectiveFrom)}
         />
         <Field label="읽지 못한 요건 행" testId="license-unparsable" value={`${price.licenseUnparsableRowCount}`} />
       </dl>
