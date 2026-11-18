@@ -183,7 +183,7 @@ async function transitionInBidBox(
   }
 
   async function transition(): Promise<BidCaseRow> {
-    await page.getByRole('link', { name: '내 입찰함' }).click();
+    await page.getByRole('link', { name: '내 입찰함', exact: true }).click();
     await expect(page.getByTestId('screen-bid-box')).toBeVisible();
 
     const tab = CASE_TAB_LABEL[fromState];
@@ -269,7 +269,7 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
       new URL(one.url()).searchParams.get('noticeNumber') === NOTICE &&
       one.status() === 200,
   );
-  await page.getByRole('link', { name: '결과 확인' }).click();
+  await page.getByRole('link', { name: '결과 확인', exact: true }).click();
   await expect(page.getByTestId('screen-results')).toBeVisible();
 
   const rows = (await (await listed).json()) as BidCaseRow[];
@@ -429,7 +429,7 @@ test('여정 ⑤ — 제출함 → 개찰 대기 → 개찰 → 심사 → 확�
     (one) =>
       one.url().includes('/api/bid-results') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: '결과 확인' }).click();
+  await page.getByRole('link', { name: '결과 확인', exact: true }).click();
   const finalRows = (await (await relisted).json()) as BidCaseRow[];
   const settled = finalRows.find((row) => row.caseId === caseId)!;
   expect(settled.state).toBe('WON');
