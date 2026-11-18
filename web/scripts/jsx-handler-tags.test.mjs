@@ -940,6 +940,24 @@ describe('합치는·반사 축은 해소된 심볼로 센다 (R1-M1 · cr N-1 �
     expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).not.toStrictEqual([]);
   });
 
+  /**
+   * **이 둘이 「수신자가 그 전역인가」를 재는 자리다**(변이 B-4 가 드러냈다). 인자 수 규칙만으로는
+   * 이름 맞추기와 심볼 묶음이 **같은 값을 낸다** — 아래 둘은 멤버 이름이 축의 이름과 같고 인자
+   * 수도 맞고 핸들러 키까지 싣는 평범한 코드이므로, 심볼로 묶지 않으면 걸린다.
+   */
+  it.each([
+    [
+      '요소를 키로 쓰는 핸들러 장부',
+      "declare const handlers: Map<Element, { onclick: () => void }>;\nexport const X = () => { handlers.set(el, { onclick: f }); };",
+    ],
+    [
+      '자기 이름이 같은 평범한 합치기',
+      "declare const store: { assign(target: Element, source: { onclick: () => void }): void };\nexport const X = () => { store.assign(el, { onclick: f }); };",
+    ],
+  ])('음성 — %s 는 걸리지 않는다(수신자가 그 전역이 아니다)', (_label, body) => {
+    expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).toStrictEqual([]);
+  });
+
   /** cr N-6 — 요소를 **키로 쓰는** 조회는 이 축이 아니다. 수신자가 `Object`·`Reflect` 여야 한다. */
   it.each([
     ['요소를 키로 쓰는 조회', "declare const cache: Map<Element, string>;\nexport const X = () => cache.get(el);"],
