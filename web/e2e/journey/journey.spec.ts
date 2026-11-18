@@ -90,13 +90,19 @@ test('여정 ② — 로그인 → 검색 → 카드 → 담기', async ({ page 
   const watched = watchRequests(page);
   await signIn(page);
 
-  const rows = await search(page, 'SYN-7E1');
-  await assertCardsMatch(page, rows);
-
-  // D-7E-9 — 제안 목록은 감시 조건이 없으므로 **API 상태 그대로** 빈 얼굴이다.
+  /**
+   * **기본 화면은 제안이다**(M13/13E, 받는 항목 8) — 검색하기 **전에** 그 자리가 서고, 감시
+   * 조건이 없으므로 그 문면은 API 상태 그대로다(D-7E-9).
+   */
   const suggestions = page.getByTestId('suggestions-empty');
   await expect(suggestions).toBeVisible();
   await expect(suggestions).toContainText('감시 조건이 설정되지 않았습니다');
+
+  const rows = await search(page, 'SYN-7E1');
+  await assertCardsMatch(page, rows);
+
+  // 검색 결과가 **그 자리를 대신한다** — 둘이 함께 서면 어느 쪽이 답인지 알 수 없다(받는 항목 8).
+  await expect(suggestions, '결과가 제안을 대신하지 않고 둘이 함께 섰다').toHaveCount(0);
 
   const first = rows[0]!;
   const card = page.getByTestId(`notice-card-${first.noticeNumber}`);
