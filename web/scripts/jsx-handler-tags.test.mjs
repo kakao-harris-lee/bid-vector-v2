@@ -748,3 +748,107 @@ describe('prototype 경유 호출 — 선언 둘 모두에서 걸린다', () => 
     ).not.toStrictEqual([]);
   });
 });
+
+/**
+ * M13/13C 수정 라운드 1 — verifier H-2 · H-3 · M-1, code-review M-1 · M-2.
+ *
+ * 앵커는 **기본 라이브러리 선언**에서 온다. 그래서 합성 대조도 DOM 을 `lib` 로 받는다(세 번째
+ * 인자) — 모듈 안에 같은 이름의 interface 를 세우는 우회(h06)와 **같은 글자**를 쓰면서도 판정이
+ * 갈리는 것이 이 축의 요점이다.
+ */
+const DOM_LIB = [
+  '/// <reference no-default-lib="true"/>',
+  'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
+  'interface Node extends EventTarget {}',
+  'interface Element extends Node { onclick: (() => void) | null; setAttribute(name: string, value: string): void; setAttributeNS(ns: string | null, name: string, value: string): void; }',
+  'interface HTMLElement extends Element {}',
+  'interface HTMLDivElement extends HTMLElement {}',
+  'interface Document extends Node {}',
+  'interface Window extends EventTarget {}',
+  'interface GlobalEventHandlers { onclick: (() => void) | null; }',
+  'declare const document: Document;',
+  'declare const window: Window;',
+  'declare const el: HTMLDivElement;',
+  'declare const f: () => void;',
+  'declare const Object: { assign(a: unknown, b: unknown): unknown; defineProperty(a: unknown, k: string, d: unknown): unknown };',
+  'declare const Reflect: { apply(fn: unknown, self: unknown, args: unknown[]): unknown; get(a: unknown, k: string): unknown; set(a: unknown, k: string, v: unknown): boolean };',
+].join('\n');
+
+const RUNTIME_MODULES = {
+  ...WIRING_REACT,
+  'react/jsx-runtime': 'export declare function jsx(tag: unknown, props: unknown): unknown;\nexport declare function jsxs(tag: unknown, props: unknown): unknown;\n',
+};
+
+describe('H-2 면제 수신자는 기본 라이브러리 심볼이다', () => {
+  it('모듈 안에 같은 이름의 interface 를 세워도 면제되지 않는다', () => {
+    const text = [
+      'interface Document extends HTMLElement { readonly marker?: never }',
+      "export const X = () => { const d: Document = el; d.addEventListener('c', f); };",
+    ].join('\n');
+
+    expect(handlerBearingTags(text, {}, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('음성 — 라이브러리의 문서·창은 그대로 면제다', () => {
+    expect(handlerBearingTags("export const X = () => { document.addEventListener('c', f); };\n", {}, DOM_LIB)).toStrictEqual([]);
+    expect(handlerBearingTags("export const X = () => { window.addEventListener('c', f); };\n", {}, DOM_LIB)).toStrictEqual([]);
+  });
+
+  /** **앵커가 없으면 게이트가 공허하다** — 그 자리는 조용히 통과시키지 않고 던진다. */
+  it('앵커를 찾지 못하면 던진다 (fail-closed · 비공허 단언)', () => {
+    const libWithoutAnchors = '/// <reference no-default-lib="true"/>\ninterface Element { onclick: (() => void) | null }\ndeclare const el: Element;\ndeclare const f: () => void;\n';
+
+    expect(() => handlerBearingTags("export const X = () => { el.addEventListener('c', f); };\n", {}, libWithoutAnchors)).toThrow(
+      /앵커/u,
+    );
+  });
+});
+
+describe('H-3 요소 생성 함수는 참조로 센다', () => {
+  it.each([
+    ['값으로 옮긴 꼴', "import { createElement } from 'react';\nconst h = createElement;\nexport const X = () => h('div', { onClick: f });"],
+    ['Reflect.apply', "import { createElement } from 'react';\nexport const X = () => Reflect.apply(createElement, null, ['div', { onClick: f }]);"],
+    ['다른 로더 이름', "import { jsx } from 'react/jsx-runtime';\nexport const X = () => jsx('div', { onClick: f });"],
+    ['jsxs', "import { jsxs } from 'react/jsx-runtime';\nexport const X = () => jsxs('div', { onClick: f });"],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`${body}\n`, RUNTIME_MODULES, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  /** cr M-1 — 조건부 면제가 생성 갈래에도 **닿아야** 한다(JSX 와 같은 기전이다). */
+  it('음성 — href 를 함께 넘긴 a 는 걸리지 않는다', () => {
+    const text = "import { createElement } from 'react';\nexport const X = () => createElement('a', { href: '/x', onClick: f });\n";
+
+    expect(handlerBearingTags(text, RUNTIME_MODULES, DOM_LIB)).toStrictEqual([]);
+  });
+
+  it('음성 — 내장 상호작용 요소와 사용자 컴포넌트는 그대로다', () => {
+    const button = "import { createElement } from 'react';\nexport const X = () => createElement('button', { onClick: f });\n";
+    const custom =
+      "import { createElement } from 'react';\ndeclare const Thing: () => unknown;\nexport const X = () => createElement(Thing, { onClick: f });\n";
+
+    expect(handlerBearingTags(button, RUNTIME_MODULES, DOM_LIB)).toStrictEqual([]);
+    expect(handlerBearingTags(custom, RUNTIME_MODULES, DOM_LIB)).toStrictEqual([]);
+  });
+});
+
+describe('M-1 · M-2 반사·서술자·변수 꼴도 센다', () => {
+  it.each([
+    ['변수로 넘긴 객체 합치기', 'const bag = { onclick: f };\nexport const X = () => { Object.assign(el, bag); };'],
+    ['Reflect.get 으로 멤버 꺼내기', "export const X = () => { Reflect.get(el, 'addEventListener'); };"],
+    ['Reflect.set 으로 핸들러 걸기', "export const X = () => { Reflect.set(el, 'onclick', f); };"],
+    ['서술자로 핸들러 걸기', "export const X = () => { Object.defineProperty(el, 'onclick', { value: f }); };"],
+    ['이름공간 속성 쓰기', "export const X = () => { el.setAttributeNS(null, 'onclick', 'run()'); };"],
+    ['조립한 속성 이름', "export const X = () => { el.setAttribute('on' + 'click', 'run()'); };"],
+    ['계산 키 구조 분해', "export const X = () => { const { ['addEventListener']: add } = el; return add; };"],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('음성 — 요소가 아닌 대상과 on 이 아닌 속성은 그대로다', () => {
+    const plain = 'const plain = { onclick: f };\nconst bag = { onclick: f };\nexport const X = () => { Object.assign(plain, bag); };\n';
+    const dataAttribute = "export const X = () => { el.setAttribute('data-x', '1'); };\n";
+
+    expect(handlerBearingTags(plain, {}, DOM_LIB)).toStrictEqual([]);
+    expect(handlerBearingTags(dataAttribute, {}, DOM_LIB)).toStrictEqual([]);
+  });
+});

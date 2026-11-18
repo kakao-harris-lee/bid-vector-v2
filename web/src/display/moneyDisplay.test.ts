@@ -12,6 +12,7 @@ import {
   amountProvenanceDisplayOf,
   amountQualifierTextOf,
   currencyDisplayOf,
+  KOREAN_UNIT_NAMES,
   koreanAmountTextOf,
   vatTreatmentDisplayOf,
   type AmountBasis,
@@ -317,6 +318,16 @@ describe('한글 금액 병기', () => {
     ['수가 아님', Number.NaN],
   ])('%s 이면 글자가 없다', (_label, won) => {
     expect(koreanAmountTextOf(won)).toBeNull();
+  });
+
+  /**
+   * **닿지 않는 자리를 두지 않는다**(cr L-1). 이 함수는 안전 정수 밖을 먼저 `null` 로 돌려보내므로
+   * 조 위의 자리 이름은 **입력이 존재하지 않는다** — 그래서 어휘를 조에서 끝내고, 그 사실을
+   * 여기서 단언한다(죽은 분기를 지울 때 test 는 남기고 주장을 바꾼다).
+   */
+  it('자리 이름이 조에서 끝난다 — 그 위는 입력이 아니다', () => {
+    expect(KOREAN_UNIT_NAMES).toStrictEqual(['조', '억', '만']);
+    expect(koreanAmountTextOf(Number.MAX_SAFE_INTEGER)).toMatch(/^\d+조/u);
   });
 
   /** 병기는 **같은 수의 다른 읽기**다 — 숫자 글자와 한글 글자가 같은 값을 말해야 한다. */

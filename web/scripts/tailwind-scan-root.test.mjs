@@ -2,7 +2,13 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { scanOf, shippedSources, widenedCss } from './tailwind-scan-root.mjs';
+import {
+  cssEntryRoots,
+  scanOf,
+  shippedSources,
+  utilityClassesWithoutCandidates,
+  widenedCss,
+} from './tailwind-scan-root.mjs';
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
 
@@ -62,5 +68,37 @@ describe('class 후보의 훑기 뿌리 (M13/13C — 13B 제한 27 · v L-10)', 
     const widened = await scanOf(WEB_ROOT, widenedCss(WEB_ROOT));
 
     expect(widened.scanned.length).toBeGreaterThan(pinned.scanned.length);
+  });
+});
+
+/**
+ * M13/13C 수정 라운드 1 — verifier M-4. 설계 검토 D 의 주장 둘이 실측과 달랐다: `@source inline`
+ * 과 **둘째 CSS 입구**가 모두 초록이었다. 둘 다 구조적 입구라 닫는다.
+ */
+describe('훑기 밖에서 들어오는 유틸리티 (v M-4)', () => {
+  /**
+   * `@source inline(…)` 은 훑기 **뿌리와 패턴을 바꾸지 않는다** — 후보를 직접 심는다. 그래서
+   * 「훑은 파일 == 출하 소스」 등식이 그것을 보지 못한다. 재는 자리는 **후보 0 으로 지은 CSS** 다:
+   * 훑기에서 오지 않은 유틸리티가 있으면 그 빌드에 클래스 규칙이 남는다.
+   */
+  it('후보가 0 이면 출하 CSS 에 클래스 규칙이 0 이다', async () => {
+    expect(await utilityClassesWithoutCandidates(WEB_ROOT)).toStrictEqual([]);
+  });
+
+  it('양성 대조 — 어휘를 직접 심으면 그 빌드에 규칙이 남는다', async () => {
+    const seeded = `${widenedCss(WEB_ROOT).replace("@import 'tailwindcss';", "@import 'tailwindcss' source(none);")}\n@source inline('${OUT_OF_TREE_SAMPLE}');\n`;
+
+    expect(await utilityClassesWithoutCandidates(WEB_ROOT, seeded)).not.toStrictEqual([]);
+  });
+
+  /**
+   * **입구가 하나여야 한다.** 다른 CSS 가 `@import 'tailwindcss'` 를 자동 탐지로 들이면 그 파일의
+   * 뿌리가 저장소 쪽으로 열린다 — 번들은 두 CSS 를 모두 싣는다.
+   */
+  it('출하 소스의 모든 CSS 입구가 자동 탐지를 끈다', async () => {
+    const roots = await cssEntryRoots(WEB_ROOT);
+
+    expect(roots.length).toBeGreaterThan(0);
+    expect(roots.filter((one) => one.root !== 'none')).toStrictEqual([]);
   });
 });

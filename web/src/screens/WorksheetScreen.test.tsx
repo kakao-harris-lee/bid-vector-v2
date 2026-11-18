@@ -1214,3 +1214,40 @@ describe('화면 C — 담기와 빈 화면의 다음 걸음', () => {
     expect(next.getAttribute('href')).toBe('/');
   });
 });
+
+/**
+ * M13/13C 수정 라운드 1 — code-review M-3 · M-5 · L-7.
+ */
+describe('화면 C — 접힌 절의 펼침 표지 (cr M-3)', () => {
+  it('요약마다 펼침 표지가 있다 — 커서만으로는 손가락에 보이지 않는다', async () => {
+    renderScreen();
+    await askPrice();
+
+    for (const testId of ['verdict', 'bid-price-menu', 'qualification', 'grounds-section', 'disclosures-section']) {
+      const summary = within(await screen.findByTestId(testId)).getByTestId(`${testId}-summary`);
+
+      expect(
+        within(summary).queryByTestId('disclosure-marker'),
+        `${testId} 의 요약에 펼침 표지가 없다`,
+      ).not.toBeNull();
+    }
+  });
+});
+
+describe('화면 C — 다룰 수 없는 금액 (cr M-5)', () => {
+  const UNSAFE = '99999999999999999';
+
+  it('안전 정수 밖 금액은 복사도 병기도 하지 않는다', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined);
+    stubClipboard(writeText);
+    renderScreen();
+    await screen.findByTestId('koneps-copy');
+    fillAmount(UNSAFE);
+
+    expect((screen.getByTestId('koneps-copy') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByTestId('koneps-copy'));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('handoff-amount-korean')).toBeNull();
+    expect((await screen.findByTestId('handoff-amount')).textContent).toContain('다룰 수 없는');
+  });
+});

@@ -290,3 +290,31 @@ describe('실효 높이 — min-height 가 서는 display 를 함께 요구한�
     expect(MIN_HEIGHT_DISPLAY_TOKENS.size).toBeGreaterThan(0);
   });
 });
+
+/**
+ * M13/13C 수정 라운드 1 — verifier M-3. 설계 검토 B (2) 가 「display 를 `style` 로 주면 증명 불가」
+ * 라고 적었는데 구현이 없었다. 덮어쓰는 display 어휘(변형 접두·우선 표시)도 같은 자리다 —
+ * min-height 쪽은 이미 그렇게 센다(비대칭을 없앤다).
+ */
+describe('실효 높이 — 덮어쓰는 display 를 증명 불가로 센다 (v M-3)', () => {
+  it.each([
+    ['인라인 style 로 display 를 준 꼴', `<label className="flex ${MIN_TOUCH_CLASS}" style={{ display: 'inline' }}>`],
+    ['인라인 style 로 최소 높이를 덮은 꼴', `<label className="flex ${MIN_TOUCH_CLASS}" style={{ minHeight: 0 }}>`],
+    ['변형 접두로 덮은 display', `<label className="flex max-md:inline ${MIN_TOUCH_CLASS}">`],
+    ['우선 표시로 덮은 display', `<label className="flex !inline ${MIN_TOUCH_CLASS}">`],
+    ['그리지 않는 display 를 덧붙인 꼴', `<label className="flex hidden ${MIN_TOUCH_CLASS}">`],
+    ['상자를 없애는 display 를 덧붙인 꼴', `<label className="flex contents ${MIN_TOUCH_CLASS}">`],
+  ])('%s 은 증명이 되지 않는다', (_label, opening) => {
+    expect(unwrappedControls(`export const X = () => (\n  ${opening}\n    <input type="checkbox" />\n  </label>\n);\n`)).toHaveLength(
+      1,
+    );
+  });
+
+  it('음성 — 덮어쓰지 않는 style 은 그대로 둔다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}" style={{ gap: 4 }}>\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
+  });
+});

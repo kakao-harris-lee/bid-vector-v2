@@ -134,3 +134,62 @@ test('음성 대조 — 시각 은폐된 자리는 모집단 밖이다', async (
 
   expect(result.targets).toStrictEqual([]);
 });
+
+/**
+ * M13/13C 수정 라운드 1 — verifier H-4 · M-2. 앞 판은 **세로로 스크롤되는 조상**을 「밀면 닿는다」로
+ * 통째로 면제했다. 그런데 스크롤러가 타깃보다 **낮으면** 한 번에 보이는 띠는 스크롤러 높이뿐이고,
+ * 손가락으로 세로로 밀 수 없게 막아 둔 자리도 같은 면제를 받았다.
+ */
+test('세로 스크롤러가 타깃보다 낮으면 그 높이로 막는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({
+      open: '<div style="height:12px; overflow-y:auto"><div style="height:400px">',
+      close: '</div></div>',
+    }),
+  );
+
+  expect(result.targets[0]?.height).toBeLessThanOrEqual(12);
+});
+
+test('세로로 밀 수 없는 스크롤러는 면제가 서지 않는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({
+      open: '<div style="height:12px; overflow-y:auto; touch-action:none"><div style="height:400px">',
+      close: '</div></div>',
+    }),
+  );
+
+  expect(result.targets[0]?.height).toBeLessThanOrEqual(12);
+});
+
+/** 음성 대조 — 타깃보다 **높은** 스크롤러는 앞 판 그대로 온전히 잰다. */
+test('음성 대조 — 타깃보다 높은 세로 스크롤러는 자르지 않는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({
+      open: '<div style="height:200px; overflow-y:auto"><div style="height:400px">',
+      close: '</div></div>',
+    }),
+  );
+
+  expect(result.targets[0]?.height).toBe(44);
+  expect(result.partiallyClipped).toStrictEqual([]);
+});
+
+/**
+ * v M-2 — 유효 `touch-action` 은 **사슬의 교집합**이다. 스크롤러 한 요소만 보면, 안쪽이 전부
+ * `pan-y` 인 가로 줄이 예외를 그대로 받는다.
+ */
+test('안쪽이 가로 밀기를 막으면 가로 스크롤 예외가 서지 않는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({
+      open: '<div style="width:300px; overflow-x:auto"><div style="width:900px; padding-left:500px; touch-action:pan-y">',
+      close: '</div></div>',
+    }),
+  );
+
+  expect(result.offscreen).toHaveLength(1);
+});
