@@ -87,6 +87,8 @@ test('세로 스크롤러 안의 버튼은 그 상자 높이까지만 한 번에
   );
 
   expect(result.targets[0]?.height).toBeLessThanOrEqual(20);
+  // **0 으로 무너진 것과 가른다**(cr N-8) — 한쪽 부등식만으로는 과잉 절삭이 초록이다.
+  expect(result.targets[0]?.height).toBeGreaterThan(0);
   expect(result.partiallyClipped).toStrictEqual([]);
 });
 
@@ -151,6 +153,8 @@ test('세로 스크롤러가 타깃보다 낮으면 그 높이로 막는다', as
   );
 
   expect(result.targets[0]?.height).toBeLessThanOrEqual(12);
+  // **0 으로 무너진 것과 가른다**(cr N-8) — 한쪽 부등식만으로는 과잉 절삭이 초록이다.
+  expect(result.targets[0]?.height).toBeGreaterThan(0);
 });
 
 test('세로로 밀 수 없는 스크롤러는 면제가 서지 않는다', async ({ page: browserPage }) => {
@@ -163,6 +167,8 @@ test('세로로 밀 수 없는 스크롤러는 면제가 서지 않는다', asyn
   );
 
   expect(result.targets[0]?.height).toBeLessThanOrEqual(12);
+  // **0 으로 무너진 것과 가른다**(cr N-8) — 한쪽 부등식만으로는 과잉 절삭이 초록이다.
+  expect(result.targets[0]?.height).toBeGreaterThan(0);
 });
 
 /** 음성 대조 — 타깃보다 **높은** 스크롤러는 앞 판 그대로 온전히 잰다. */
@@ -193,4 +199,36 @@ test('안쪽이 가로 밀기를 막으면 가로 스크롤 예외가 서지 않
   );
 
   expect(result.offscreen).toHaveLength(1);
+});
+
+/**
+ * M13/13C 수정 라운드 2 — verifier R1-M2. 뷰포트 밖 판정이 **가로만** 봐서, 아래로 걸친 고정
+ * 요소를 온전한 높이로 셌다. 고정 배치는 **밀어서 볼 수 없다** — 그 자리가 13B 하단 탭이다.
+ */
+test('아래로 걸친 고정 요소는 화면 밖으로 센다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({ button: 'position:fixed; left:0; bottom:-30px' }),
+  );
+
+  expect(result.offscreen).toHaveLength(1);
+});
+
+test('음성 대조 — 고정이 아닌 아래쪽 내용은 밀면 닿는다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({ open: '<div style="height:2000px">', close: '</div>' }),
+  );
+
+  expect(result.offscreen).toStrictEqual([]);
+});
+
+test('음성 대조 — 뷰포트 안에 든 고정 요소는 그대로다', async ({ page: browserPage }) => {
+  const result = await measured(
+    browserPage,
+    page({ button: 'position:fixed; left:0; bottom:0' }),
+  );
+
+  expect(result.offscreen).toStrictEqual([]);
+  expect(result.targets[0]?.height).toBe(44);
 });

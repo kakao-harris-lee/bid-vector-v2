@@ -88,7 +88,8 @@ export function measureInPage(): Measurement {
       let bottom = box.bottom;
       let cap = Number.POSITIVE_INFINITY;
       let unmeasurable = false;
-      let pannableY = true;
+      // **사슬은 타깃에서 시작한다**(cr N-9) — 가로 축과 같은 자리에서 시작해야 두 축이 갈리지 않는다.
+      let pannableY = allowsPan(getComputedStyle(node).touchAction, 'y');
       for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
         const parentStyle = getComputedStyle(parent);
         // 손가락 축은 **사슬의 교집합**이다 — 중간 한 요소가 막으면 위쪽 스크롤러도 밀리지 않는다.
@@ -120,6 +121,19 @@ export function measureInPage(): Measurement {
         bottom = Math.min(bottom, parentBox.bottom);
       }
       return { top, bottom, cap, unmeasurable };
+    };
+    /**
+     * **밀어서 볼 수 없는 자리인가**(v R1-M2). 고정 배치는 문서와 함께 스크롤되지 않으므로,
+     * 뷰포트 밖으로 걸친 부분은 **영원히 닿지 않는다**. 보통 흐름의 아래쪽 내용과 가르는 축이다.
+     */
+    const inFixedSubtree = (node: Element): boolean => {
+      for (let link: Element | null = node; link !== null; link = link.parentElement) {
+        const position = getComputedStyle(link).position;
+        if (position === 'fixed' || position === 'sticky') {
+          return true;
+        }
+      }
+      return false;
     };
     const targets = [];
     const offscreen = [];
@@ -227,6 +241,15 @@ export function measureInPage(): Measurement {
       if (!scrollable && (box.left < -0.5 || box.right > window.innerWidth + 0.5)) {
         offscreen.push(
           `${measured.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`,
+        );
+      }
+      /**
+       * **세로로도 뷰포트 밖이 있다**(v R1-M2). 보통 흐름의 아래쪽은 밀면 닿으므로 세지 않고,
+       * **고정 배치**로 걸친 자리만 센다 — 13B 의 하단 탭이 그 꼴의 자리다.
+       */
+      if (inFixedSubtree(measured) && (box.top < -0.5 || box.bottom > window.innerHeight + 0.5)) {
+        offscreen.push(
+          `${measured.tagName.toLowerCase()} [세로 ${Math.round(box.top)}, ${Math.round(box.bottom)}] "${name}"`,
         );
       }
     }
