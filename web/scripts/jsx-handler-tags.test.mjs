@@ -415,8 +415,10 @@ describe('JSX 속성 밖의 배선 (v M-6 · M-7)', () => {
     const text = `import { cloneElement as clone } from 'react';\nexport const X = () => clone(<div />, { onClick: f });\n`;
     const found = handlerBearingTags(text, REACT_MODULE);
 
-    expect(found).toHaveLength(1);
-    expect(found[0].tag).toBe('<cloneElement>');
+    // M13/13C — 이제 **참조**를 세므로 한 꼴에 여러 자리가 걸린다(들여오기 · 쓰는 자리).
+    // 세는 것은 「몇 자리인가」가 아니라 「걸리는가」다.
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((one) => one.tag === `<${'cloneElement'}>`)).toBe(true);
   });
 
   /** **선언된 경계는 그대로 경계다** — `createElement` 별칭은 이 축이 아니다(JSX 가 아니다). */
@@ -538,5 +540,98 @@ describe('음성 대조 — 걸리면 안 되는 것', () => {
     expect(INTERACTIVE_TAGS.has('button')).toBe(true);
     expect(INTERACTIVE_TAGS.has('div')).toBe(false);
     expect(INTERACTIVE_TAGS.has('span')).toBe(false);
+  });
+});
+
+/**
+ * M13/13C — **속성 밖 배선을 참조와 수신자로 뒤집는다**(13B v M-7b · cr Q-2 · Q-3①).
+ *
+ * 앞 판의 두 자리가 열거였다: 부른 대상을 **호출 자리의 이름**으로 비교하고, 수신자를
+ * 「`Element` 를 상속하면 위반」이라는 **허용 쪽 기본값**으로 봤다. 그래서 값으로 옮기거나
+ * 타입을 넓히는 것만으로 빠져나갔다 — 아래 꼴 열셋을 착수 라운드에 게이트 자신의 입구로 쟀다.
+ */
+const WIRING_DOM = [
+  'interface EventTarget { addEventListener(type: string, handler: () => void): void; }',
+  'interface Node extends EventTarget {}',
+  'interface Element extends Node { onclick: (() => void) | null; setAttribute(name: string, value: string): void; }',
+  'interface HTMLElement extends Element {}',
+  'interface HTMLDivElement extends HTMLElement {}',
+  'interface Document extends Node {}',
+  'interface Window extends EventTarget {}',
+  'interface GlobalEventHandlers { onclick: (() => void) | null; }',
+  'declare const document: Document;',
+  'declare const window: Window;',
+  'declare const el: HTMLDivElement;',
+  'declare const f: () => void;',
+  'declare const Object: { assign(target: unknown, source: unknown): unknown };',
+].join('\n');
+
+const WIRING_REACT = {
+  react: 'export declare function cloneElement(element: unknown, props: unknown): unknown;\nexport declare function createElement(tag: unknown, props: unknown): unknown;\n',
+};
+
+describe('속성 밖 배선 — 부른 대상은 참조로 센다 (v M-7b · cr Q-3①)', () => {
+  it.each([
+    ['변수 재묶음', "import { cloneElement } from 'react';\nconst cl = cloneElement;\nexport const X = () => cl(<div />, { onClick: f });\n"],
+    ['구조 분해', "import * as React from 'react';\nexport const X = () => { const { cloneElement: cl } = React; return cl(<div />, { onClick: f }); };\n"],
+    ['call 로 부르기', "import { cloneElement } from 'react';\nexport const X = () => cloneElement.call(null, <div />, { onClick: f });\n"],
+    ['bind 로 묶기', "import { cloneElement } from 'react';\nexport const X = () => cloneElement.bind(null);\n"],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`declare const f: () => void;\n${body}`, WIRING_REACT)).not.toStrictEqual([]);
+  });
+
+  it('들여오는 자리 자체가 참조다 — 쓰지 않아도 걸린다', () => {
+    expect(handlerBearingTags("import { cloneElement } from 'react';\nexport const X = 1;\n", WIRING_REACT)).not.toStrictEqual(
+      [],
+    );
+  });
+});
+
+describe('속성 밖 배선 — 수신자는 증명된 문서·창만 면제한다 (v M-7b · cr Q-2)', () => {
+  it.each([
+    ['EventTarget 으로 올리기', "export const X = () => { const t: EventTarget = el; t.addEventListener('c', f); };"],
+    ['Node 로 올리기', "export const X = () => { const t: Node = el; t.addEventListener('c', f); };"],
+    ['타입 매개변수', 'export function X<T extends HTMLElement>(node: T) { node.addEventListener(\'c\', f); }'],
+    ['GlobalEventHandlers 로 올리기', "export const X = () => { const g: GlobalEventHandlers = el; g.onclick = f; };"],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`${WIRING_DOM}\n${body}\n`)).not.toStrictEqual([]);
+  });
+
+  it('음성 — 문서·창 수신자는 그대로 면제다', () => {
+    expect(handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { document.addEventListener('c', f); };\n`)).toStrictEqual(
+      [],
+    );
+    expect(handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { window.addEventListener('c', f); };\n`)).toStrictEqual(
+      [],
+    );
+  });
+});
+
+describe('속성 밖 배선 — 대입과 멤버 이름의 다른 꼴 (v M-7b)', () => {
+  it.each([
+    ['복합 대입', "export const X = () => { el.onclick ??= f; };"],
+    ['객체 합치기', 'export const X = () => { Object.assign(el, { onclick: f }); };'],
+    ['속성으로 쓰기', "export const X = () => { el.setAttribute('onclick', 'run()'); };"],
+    ['변수 키로 부르기', "const m = 'addEventListener';\nexport const X = () => { el[m]('c', f); };"],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`${WIRING_DOM}\n${body}\n`)).not.toStrictEqual([]);
+  });
+
+  it('음성 — 문서 수신자의 같은 꼴은 면제다', () => {
+    expect(
+      handlerBearingTags(`${WIRING_DOM}\nconst m = 'addEventListener';\nexport const X = () => { document[m]('c', f); };\n`),
+    ).toStrictEqual([]);
+  });
+
+  it('음성 — on 으로 시작하지 않는 속성 쓰기는 이 축이 아니다', () => {
+    expect(
+      handlerBearingTags(`${WIRING_DOM}\nexport const X = () => { el.setAttribute('data-x', '1'); };\n`),
+    ).toStrictEqual([]);
+  });
+
+  it('음성 — 요소가 아닌 대상의 객체 합치기는 이 축이 아니다', () => {
+    expect(
+      handlerBearingTags(`${WIRING_DOM}\nconst plain = { onclick: null as (() => void) | null };\nexport const X = () => { Object.assign(plain, { onclick: f }); };\n`),
+    ).toStrictEqual([]);
   });
 });

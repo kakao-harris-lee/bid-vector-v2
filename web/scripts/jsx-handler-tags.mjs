@@ -182,27 +182,48 @@ function inheritsElement(type, depth = 0) {
 }
 
 /**
- * 수신자가 무엇인가 — `element`(요소) · `unprovable`(타입이 없어 **증명 불가**) · `other`.
- * 증명 불가는 **보수적으로** 위반 쪽이다: 타입이 서 있지 않은 자리에서 이 축이 조용히 열리면
- * 「이름을 가리면 된다」가 다시 참이 된다.
+ * **면제되는 수신자는 증명 가능한 문서·창뿐이다**(M13/13C — 13B v M-7b · cr Q-2).
+ *
+ * 앞 판은 「`Element` 를 상속하면 위반」이라는 **허용 쪽 기본값**이었다. 그래서 타입을
+ * `EventTarget`·`Node`·`GlobalEventHandlers` 로 **넓히거나** 타입 매개변수로 두는 것만으로
+ * 빠져나갔다(실측 넷). 뒤집으면 좁히는 쪽이 기본이 된다 — 문서·창임을 증명하지 못하면 위반이다.
+ *
+ * 문서·창은 **누르는 자리를 만들지 않는다**(그 면제가 여는 자리는 위임 핸들러이고, 그것은 이
+ * 축이 아니라 알려진 제한이다).
  */
-function receiverKind(checker, expression) {
-  const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
-  if ((type.getFlags() & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
-    return 'unprovable';
+const EXEMPT_RECEIVER_ROOTS = new Set(['Document', 'Window']);
+
+function isExemptReceiver(type, depth = 0) {
+  if (depth >= BASE_CHAIN_DEPTH) {
+    return false;
   }
-  return inheritsElement(type) ? 'element' : 'other';
+  const parts = type.isUnion() || type.isIntersection() ? type.types : [type];
+  // 유니온은 **전부** 면제여야 면제다 — 하나라도 요소일 수 있으면 그 자리는 요소다.
+  return parts.every((part) => {
+    if (EXEMPT_RECEIVER_ROOTS.has(part.getSymbol()?.getName() ?? '')) {
+      return true;
+    }
+    // 타입 매개변수는 **제약을 풀어** 본다(태그 축이 같은 라운드에 간 길이다).
+    const constraint = part.getConstraint?.();
+    if (constraint !== undefined && constraint !== part) {
+      return isExemptReceiver(constraint, depth + 1);
+    }
+    return (part.getBaseTypes?.() ?? []).some((base) => isExemptReceiver(base, depth + 1));
+  });
 }
 
-/** 그 접근이 가리키는 **멤버 이름** — 점 접근과 대괄호 접근(`el['addEventListener']`) 둘 다. */
-function memberName(node) {
-  if (ts.isPropertyAccessExpression(node)) {
-    return node.name.text;
+/** 그 수신자가 면제인가 — 아니면 전부 위반 쪽이다. */
+function receiverExempt(checker, expression) {
+  return isExemptReceiver(checker.getNonNullableType(checker.getTypeAtLocation(expression)));
+}
+
+/** 그 식이 **요소일 수 있는가** — 객체 합치기 축이 대상을 가리는 자리에서 쓴다. */
+function maybeElement(checker, expression) {
+  const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
+  if ((type.getFlags() & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+    return true;
   }
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
-    return node.argumentExpression.text;
-  }
-  return null;
+  return inheritsElement(type);
 }
 
 /** 별칭이면 **가리키는 심볼**로 푼다. 풀 수 없으면 `undefined` — 부르는 쪽이 글자로 떨어진다. */
@@ -218,44 +239,117 @@ function aliasTarget(checker, symbol) {
   }
 }
 
-/** 부른 대상의 이름 — **심볼을 먼저** 묻고(별칭 해소), 풀리지 않으면 적힌 글자로 떨어진다. */
-function calleeName(checker, callee) {
-  const symbol = checker.getSymbolAtLocation(callee);
+/** 그 이름 자리가 가리키는 **해소된 이름** — 별칭을 풀고, 풀리지 않으면 적힌 글자다. */
+function resolvedName(checker, node) {
+  const symbol = checker.getSymbolAtLocation(node);
   const resolved = symbol === undefined ? undefined : aliasTarget(checker, symbol);
-  return resolved?.getName() ?? memberName(callee) ?? (ts.isIdentifier(callee) ? callee.text : null);
+  return resolved?.getName() ?? (ts.isIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : null);
 }
 
+/** 그 접근이 **증명 가능한 멤버 이름**을 가리키는가 — 변수 키는 증명되지 않는다. */
+function memberAccess(node) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return { name: node.name.text, provable: true };
+  }
+  if (ts.isElementAccessExpression(node)) {
+    const argument = node.argumentExpression;
+    return ts.isStringLiteralLike(argument) ? { name: argument.text, provable: true } : { name: null, provable: false };
+  }
+  return null;
+}
+
+/** 대입 토큰 전수 — `=` 하나만 보면 `??=`·`||=` 가 그대로 지나간다(v M-7b). */
+const isAssignmentToken = (kind) => kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+/** 객체 리터럴에 **누르는 배선 키**가 있는가 — 객체 합치기로 거는 길이다. */
+function carriesHandlerKey(node) {
+  if (!ts.isObjectLiteralExpression(node)) {
+    return false;
+  }
+  return node.properties.some((one) => {
+    const name = one.name === undefined ? null : ts.getNameOfJsxAttribute?.(one.name) ?? (ts.isIdentifier(one.name) || ts.isStringLiteralLike(one.name) ? one.name.text : null);
+    return name !== null && INLINE_HANDLER_MEMBER.test(name);
+  });
+}
+
+/**
+ * JSX 속성 **밖**의 배선. 세 축을 **구성으로** 센다(M13/13C — 13B v M-7b · cr Q-2 · Q-3①).
+ *
+ * ⓐ **부른 대상은 참조로** — 호출 자리가 아니라 그 이름이 **나타나는 자리**를 센다. 값으로
+ *    옮기거나(`const cl = cloneElement`) 구조 분해하거나 `.call`·`.bind` 로 불러도 참조는 남는다.
+ * ⓑ **수신자는 증명된 문서·창만 면제** — 넓히는 것으로 가려지지 않는다.
+ * ⓒ **대입은 꼴 전수** — 복합 대입 · 객체 합치기 · 속성으로 쓰기.
+ */
 function wiringOutsideJsx(checker, source) {
   const found = [];
   const at = (node) => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   const hit = (node, tag, handler) => found.push({ file: source.fileName, tag, handler, line: at(node) });
   const visit = (node) => {
-    if (ts.isCallExpression(node) && calleeName(checker, node.expression) === CLONE_ELEMENT) {
-      hit(node, `<${CLONE_ELEMENT}>`, 'props 인자');
+    // ⓐ 참조 축 — 이름이 서는 모든 자리(들여오기 · 속성 접근 · 구조 분해 · 맨 식별자).
+    if ((ts.isIdentifier(node) || ts.isStringLiteralLike(node)) && resolvedName(checker, node) === CLONE_ELEMENT) {
+      hit(node, `<${CLONE_ELEMENT}>`, '참조');
     }
-    // **부르든 묶든** 센다 — `el.addEventListener.bind(el)` 은 호출 자리에 없지만 같은 배선이다.
-    if (
-      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
-      memberName(node) === LISTENER_MEMBER
-    ) {
-      const kind = receiverKind(checker, node.expression);
-      if (kind !== 'other') {
-        hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, LISTENER_MEMBER);
+    const access = memberAccess(node);
+    if (access !== null && !receiverExempt(checker, node.expression)) {
+      // **부르든 묶든** 센다 — `el.addEventListener.bind(el)` 은 호출 자리에 없지만 같은 배선이다.
+      if (access.provable && access.name === LISTENER_MEMBER) {
+        hit(node, '<면제되지 않은 수신자>', LISTENER_MEMBER);
+      }
+      /**
+       * 변수 키는 **무엇을 부르는지 증명할 수 없다**. 다만 이 갈래의 수신자 조건은 위와 **다르다**:
+       * 멤버 이름을 모르는 자리까지 「문서·창이 아니면 위반」으로 보면 표 조회(`TABLE[key](…)`)
+       * 같은 평범한 코드가 전부 걸린다(출하 트리 실측 둘). 이름을 모를 때는 **수신자가 요소일 수
+       * 있을 때만** 센다 — 그 조합이 이 축이 겨누는 꼴이다.
+       */
+      if (!access.provable && maybeElement(checker, node.expression) && (ts.isCallExpression(node.parent) || isAssignmentTarget(node))) {
+        hit(node, '<요소일 수 있는 수신자>', '증명할 수 없는 멤버 이름');
+      }
+      // ⓒ 속성으로 쓰기 — `setAttribute('onclick', …)`.
+      if (access.provable && access.name === 'setAttribute' && ts.isCallExpression(node.parent)) {
+        const first = node.parent.arguments[0];
+        if (first !== undefined && ts.isStringLiteralLike(first) && /^on/iu.test(first.text)) {
+          hit(node, '<면제되지 않은 수신자>', '속성으로 건 핸들러');
+        }
       }
     }
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      const name = memberName(node.left);
-      if (name !== null && INLINE_HANDLER_MEMBER.test(name)) {
-        const kind = receiverKind(checker, node.left.expression);
-        if (kind !== 'other') {
-          hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, `${name} 대입`);
+    // 구조 분해로 멤버를 꺼내는 길 — 이름이 그 멤버다.
+    if (ts.isBindingElement(node)) {
+      const name = node.propertyName ?? node.name;
+      if ((ts.isIdentifier(name) || ts.isStringLiteralLike(name)) && name.text === LISTENER_MEMBER) {
+        hit(node, '<구조 분해>', LISTENER_MEMBER);
+      }
+    }
+    // ⓒ 대입 — **토큰 전수**다(`=` 만 보면 복합 대입이 지나간다).
+    if (ts.isBinaryExpression(node) && isAssignmentToken(node.operatorToken.kind)) {
+      const target = memberAccess(node.left);
+      if (target !== null && target.provable && target.name !== null && INLINE_HANDLER_MEMBER.test(target.name)) {
+        if (!receiverExempt(checker, node.left.expression)) {
+          hit(node, '<면제되지 않은 수신자>', `${target.name} 대입`);
         }
+      }
+    }
+    // ⓒ 객체 합치기 — 요소일 수 있는 대상과 누르는 키가 **같은 호출**에 실린다.
+    if (ts.isCallExpression(node)) {
+      const args = [...node.arguments];
+      if (args.some((one) => maybeElement(checker, one)) && args.some((one) => carriesHandlerKey(one))) {
+        hit(node, '<면제되지 않은 수신자>', '객체로 합친 핸들러');
       }
     }
     ts.forEachChild(node, visit);
   };
   visit(source);
   return found;
+}
+
+/** 그 접근이 **대입의 왼쪽**인가. */
+function isAssignmentTarget(node) {
+  const parent = node.parent;
+  return (
+    parent !== undefined &&
+    ts.isBinaryExpression(parent) &&
+    parent.left === node &&
+    isAssignmentToken(parent.operatorToken.kind)
+  );
 }
 
 /** 한 소스 파일의 위반 — 검사기를 **받는다**(태그 판정이 타입이라서). */
