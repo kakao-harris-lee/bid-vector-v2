@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
@@ -11,7 +11,7 @@ import {
 } from '../api/queries';
 import { NOTIFICATIONS_QUERY_KEY } from '../api/queryKeys';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
-import { Button } from '../components/Button';
+import { Button, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
@@ -30,6 +30,9 @@ import { useSessionCsrf } from '../session/useSessionCsrf';
 import { InstantText } from './InstantText';
 
 const ABSENT = '값 없음';
+
+/** 한 쪽 크기 — 계약의 상한(100) 안이고 서버 기본값과 같다. 「더 보기」가 다음 쪽을 이어 붙인다. */
+const PAGE_SIZE = 20;
 
 /**
  * 읽음 처리 요청의 두 모양. **단건과 묶음을 갈라 둔 것이 계약의 모양**이다(선택적 `kind` 가
@@ -116,10 +119,13 @@ function NotificationRow({
   item,
   disabled,
   onRead,
+  onOpen,
 }: {
   readonly item: NotificationItem;
   readonly disabled: boolean;
   readonly onRead: (focus: FocusTarget) => void;
+  /** 링크를 열 때 — 쓰기를 **걸고** 떠난다(아래 [readOnOpen]). */
+  readonly onOpen: () => void;
 }) {
   const focusTarget = useRef<HTMLLIElement | null>(null);
 
@@ -145,9 +151,13 @@ function NotificationRow({
         {item.read ? '읽음' : '안읽음'}
       </span>
 
-      {/* 본문 링크도 **블록 타깃**이다(M13/13B) — 이동 대상과 동작은 그대로다. */}
+      {/*
+        본문 링크도 **블록 타깃**이다(M13/13B) — 이동 대상은 그대로다. 달라진 것은 **열면
+        읽음**이라는 것뿐이고(M13/13E, 받는 항목 9), 그 쓰기는 이동을 막지 않는다.
+      */}
       <Link
         to={`/notices/${encodeURIComponent(item.noticeNumber)}/${encodeURIComponent(item.noticeRound)}`}
+        onClick={onOpen}
         className="inline-flex min-h-11 items-center rounded-md text-sm underline"
       >
         워크시트 열기
@@ -168,6 +178,7 @@ function NotificationGroupBlock({
   index,
   disabled,
   onRead,
+  onOpen,
 }: {
   readonly group: NotificationGroup;
   /**
@@ -179,6 +190,7 @@ function NotificationGroupBlock({
   readonly index: number;
   readonly disabled: boolean;
   readonly onRead: (request: ReadRequest) => void;
+  readonly onOpen: (item: NotificationItem) => void;
 }) {
   const focusTarget = useRef<HTMLLIElement | null>(null);
 
@@ -234,6 +246,7 @@ function NotificationGroupBlock({
             key={notificationItemTestId(item)}
             item={item}
             disabled={disabled}
+            onOpen={() => onOpen(item)}
             onRead={(focus) =>
               onRead({
                 scope: 'ITEM',
@@ -267,7 +280,32 @@ export function InboxScreen() {
   const queryClient = useQueryClient();
   const { signedIn } = useSessionCsrf();
 
-  const inbox = useQuery({ queryKey: NOTIFICATIONS_QUERY_KEY, queryFn: () => listNotifications() });
+  /**
+   * **다음 쪽은 홈과 같은 「더 보기」 꼴이다**(M13/13E, 받는 항목 9). 앞 판은 쪽 인자를 하나도
+   * 주지 않아, 묶음이 「이 페이지에 다 오지 않았습니다」라고 말하면서 **다음으로 가는 길이
+   * 없었다**. 다음 쪽의 유무는 헤더의 전체 건수(필터를 지난 수)와 지금까지 받은 수로 정한다.
+   *
+   * 질의 **키는 그대로**다(`['notifications']`). 셸의 안 읽음 배지가 그 접두 아래
+   * (`['notifications','unread']`)에 살아 읽음 쓰기의 무효화가 배지까지 번지는데, 키를 바꾸면
+   * 그 관계가 조용히 끊긴다(13B 알려진 제한 10 이 넘긴 자리).
+   */
+  const inbox = useInfiniteQuery({
+    queryKey: NOTIFICATIONS_QUERY_KEY,
+    queryFn: ({ pageParam }) => listNotifications({ page: pageParam, size: PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((count, one) => count + one.rows.length, 0);
+      // 빈 쪽을 받으면 더 받을 것이 없다 — 계수와 행이 갈려도 「더 보기」가 아무것도 더하지
+      // 않으면서 남지 않는다(화면 B 의 같은 판단).
+      if (lastPage.rows.length === 0) {
+        return undefined;
+      }
+      return loaded < lastPage.total ? allPages.length : undefined;
+    },
+  });
+  const inboxPages = inbox.data?.pages;
+  // **안읽음 전수는 헤더 값**이고 쪽마다 같은 뜻이다(계정 전수) — 가장 나중에 받은 답을 쓴다.
+  const unread = inboxPages?.at(-1)?.unread;
 
   /**
    * 쓰기 뒤 포커스를 **명시적으로** 돌려놓는다(r2 CR M-1 · `BidBoxScreen` 의 같은 관례).
@@ -313,6 +351,36 @@ export function InboxScreen() {
     onSettled: () => setSettleCount((count) => count + 1),
   });
 
+  /**
+   * **링크를 열면 읽음**(받는 항목 9) — 쓰기를 **걸고 바로 이동한다**.
+   *
+   * 그래서 이 경로는 `useMutation` 을 쓰지 않는다: 응답은 화면이 **언마운트된 뒤에** 오고, 그때
+   * 컴포넌트에 매인 콜백이 서는지는 보장되지 않는다. app 수준 `queryClient` 를 쥔 평범한 호출이
+   * 그 수명과 무관하게 선다.
+   *
+   * **실패는 무효화하지 않는다.** 떠난 뒤라 알림함 안의 실패 얼굴은 볼 수 없고, 쓰기가 실패한
+   * 사실은 **셸의 안 읽음 배지가 줄지 않는 것**으로 보인다(계약 13E 행). 실패에서도 다시 읽으면
+   * 같은 수를 받아 와 「변하지 않았다」가 **우연히** 참이 되므로, 그 우연에 기대지 않는다.
+   *
+   * 낙관 갱신은 **여기서도 없다**(D-7E3a-1): 서버가 답하기 전에는 어느 자리도 읽음으로 바뀌지
+   * 않는다 — 성공하면 무효화가 배지와 목록을 서버의 답으로 되돌린다.
+   */
+  function readOnOpen(item: NotificationItem): void {
+    if (item.read) {
+      return;
+    }
+    void markNotificationRead({
+      kind: item.kind,
+      noticeNumber: item.noticeNumber,
+      noticeRound: item.noticeRound,
+      bidKind: item.bidKind,
+    })
+      .then(() => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }))
+      .catch(() => {
+        // 실패의 신호는 **배지가 줄지 않는 것**이다(위 주석) — 떠난 화면에 얼굴을 세울 자리가 없다.
+      });
+  }
+
   if (signedIn === false || isUnauthorized(inbox.error)) {
     return (
       <section data-testid="screen-inbox" className="mx-auto max-w-3xl p-4">
@@ -321,7 +389,11 @@ export function InboxScreen() {
     );
   }
 
-  const groups = groupNotifications(inbox.data?.rows ?? []);
+  /**
+   * 받은 쪽들을 **이어 붙여** 묶는다. 묶음은 **연속 접기**라(계약) 쪽 경계에 걸쳐 있던 묶음이
+   * 다음 쪽을 받으면 한 묶음이 되고, 그때 「이 페이지에 다 오지 않았습니다」가 스스로 사라진다.
+   */
+  const groups = groupNotifications((inboxPages ?? []).flatMap((one) => one.rows));
 
   return (
     <section data-testid="screen-inbox" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -337,7 +409,7 @@ export function InboxScreen() {
           aria-live="polite"
           className="rounded-md bg-neutral-skin px-2 py-0.5 text-xs"
         >
-          안읽음 {inbox.data === undefined ? ABSENT : inbox.data.unread}
+          안읽음 {unread === undefined ? ABSENT : unread}
         </span>
       </div>
 
@@ -363,7 +435,12 @@ export function InboxScreen() {
         <ErrorFace testId="inbox-error" onRetry={() => void inbox.refetch()} />
       ) : null}
       {inbox.isSuccess && groups.length === 0 ? (
-        <EmptyFace display={EMPTY_DISPLAY} testId="inbox-empty" />
+        /* 빈 화면이 **다음 걸음**을 준다(받는 항목 7) — 소식이 없으면 할 일은 공고를 보는 것이다. */
+        <EmptyFace
+          display={EMPTY_DISPLAY}
+          testId="inbox-empty"
+          action={<LinkButton to="/">오늘의 공고 보기</LinkButton>}
+        />
       ) : null}
 
       {groups.length === 0 ? null : (
@@ -384,10 +461,23 @@ export function InboxScreen() {
                 pendingFocus.current = request.focus;
                 read.mutate(request);
               }}
+              onOpen={readOnOpen}
             />
           ))}
         </ul>
       )}
+
+      {inbox.hasNextPage ? (
+        <div className="self-start">
+          <Button
+            testId="inbox-more"
+            disabled={inbox.isFetchingNextPage}
+            onClick={() => void inbox.fetchNextPage()}
+          >
+            더 보기
+          </Button>
+        </div>
+      ) : null}
 
       <section
         data-testid="pending-notification-channel"

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { notificationsUnreadQueryKey } from '../api/queryKeys';
 import {
   NOTIFICATION_BID_KIND_DISPLAY,
   NOTIFICATION_DETAIL_DISPLAY,
@@ -613,5 +614,203 @@ describe('로딩·오류 얼굴과 적재 중 배지 (r1 v M-1 · CR M-2)', () =
     const before = mocked.listNotifications.mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     await waitFor(() => expect(mocked.listNotifications.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+/**
+ * **링크를 열면 읽음이다**(M13/13E, 받는 항목 9). 앞 판은 워크시트 링크를 열어도 읽음이
+ * 되지 않아, 운영자가 소식을 **보고 나서** 따로 「읽음으로」를 눌러야 했다.
+ *
+ * 쓰기를 **걸고 바로 이동한다** — 그래서 알림함 안의 실패 얼굴은 볼 수 없고, 쓰기가 실패한
+ * 사실은 **셸의 안 읽음 배지가 줄지 않는 것**으로 보인다(계약 13E 행). 그 배지는 알림함 질의
+ * 키의 접두 아래에 있으므로, 이 축은 「그 키가 무효화되는가」로 **구조로** 잰다.
+ */
+describe('링크로 읽음 (받는 항목 9)', () => {
+  /** 배지가 쓰는 질의가 **이미 있는** 상태를 만든다 — 셸은 어느 화면에서나 그것을 쥐고 있다. */
+  function seedBadgeQuery(unread: number): void {
+    client.setQueryData(notificationsUnreadQueryKey(), { rows: [], total: 0, unread });
+  }
+
+  function badgeInvalidated(): boolean {
+    return client.getQueryState(notificationsUnreadQueryKey())?.isInvalidated ?? false;
+  }
+
+  it('워크시트 링크를 누르면 읽음 쓰기가 나가고 이동이 막히지 않는다', async () => {
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+
+    await waitFor(() =>
+      expect(mocked.markNotificationRead, '링크를 열었는데 읽음 쓰기가 나가지 않았다').toHaveBeenCalledWith({
+        kind: 'OPENING_COMPLETED',
+        noticeNumber: 'SYN-7E3-RESULT',
+        noticeRound: '000',
+        bidKind: 'REAL',
+      }),
+    );
+    // **이동을 막지 않는다** — 쓰기를 기다리는 동안 운영자를 알림함에 붙들어 두지 않는다.
+    expect(await screen.findByText('워크시트 자리'), '읽음 쓰기가 이동을 삼켰다').toBeTruthy();
+  });
+
+  /** 이미 읽은 행에서는 **다시 쓰지 않는다** — 같은 사실을 두 번 보내지 않는다. */
+  it('이미 읽은 행의 링크는 쓰기를 더 보내지 않는다', async () => {
+    mocked.listNotifications.mockResolvedValue(
+      page([item({ read: true, readAt: '2026-11-02T02:00:00Z', noticeUnreadCount: 0 })], 0),
+    );
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+
+    expect(await screen.findByText('워크시트 자리')).toBeTruthy();
+    expect(mocked.markNotificationRead).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **낙관 갱신 금지는 그대로다**(D-7E3a-1). 떠나기 전의 마지막 그림에서도, 그리고 배지가 쥔
+   * 값에서도 읽은 것으로 보이지 않는다 — 서버가 답하기 전에는 **어디서도** 아니다.
+   */
+  it('응답 전에는 어디서도 읽음으로 보이지 않는다', async () => {
+    let release: (value: queries.MarkReadResult) => void = () => {};
+    mocked.markNotificationRead.mockReturnValue(
+      new Promise<queries.MarkReadResult>((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderScreen();
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    seedBadgeQuery(3);
+
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+    await waitFor(() => expect(mocked.markNotificationRead).toHaveBeenCalled());
+
+    expect(
+      (client.getQueryData(notificationsUnreadQueryKey()) as queries.NotificationPage).unread,
+      '서버가 답하기 전에 배지 값을 깎았다 — 낙관 갱신이다',
+    ).toBe(3);
+    expect(badgeInvalidated(), '응답 전에 배지를 다시 읽혔다').toBe(false);
+
+    release({ markedCount: 1, unreadCount: 2 });
+    await waitFor(() => expect(badgeInvalidated()).toBe(true));
+  });
+
+  /**
+   * **성공 → 배지가 다시 읽힌다**(그래서 줄어든다). 그 무효화는 배선이 아니라 **키의 접두
+   * 관계**로 선다 — 알림 질의를 무효화하면 배지가 그 아래에 있어 함께 닿는다.
+   */
+  it('성공하면 배지가 쓰는 질의 키도 무효화된다', async () => {
+    mocked.markNotificationRead.mockResolvedValue({ markedCount: 1, unreadCount: 0 });
+    renderScreen();
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    seedBadgeQuery(1);
+
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+
+    await waitFor(() => expect(badgeInvalidated(), '성공했는데 배지가 그대로다').toBe(true));
+  });
+
+  /**
+   * **실패 → 배지가 그대로다.** 알림함을 떠난 뒤라 실패 얼굴이 설 자리가 없고, 그래서 배지가
+   * **줄지 않는 것**이 운영자가 보는 신호다(계약 13E 행). 실패에서 무효화를 걸면 같은 수를
+   * 다시 읽어 오느라 「변하지 않았다」가 **우연히** 참이 된다 — 그 우연에 기대지 않는다.
+   */
+  it('실패하면 배지 값도 그 질의도 건드리지 않는다', async () => {
+    mocked.markNotificationRead.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    seedBadgeQuery(5);
+
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+
+    expect(await screen.findByText('워크시트 자리')).toBeTruthy();
+    await waitFor(() => expect(mocked.markNotificationRead).toHaveBeenCalled());
+    expect(
+      (client.getQueryData(notificationsUnreadQueryKey()) as queries.NotificationPage).unread,
+      '쓰기가 실패했는데 배지 값이 바뀌었다',
+    ).toBe(5);
+    expect(badgeInvalidated(), '실패인데 배지를 다시 읽혔다').toBe(false);
+  });
+
+  /** 묶음 머리의 「읽음으로」 길은 **그대로 남는다** — 열지 않고 읽는 길이 있어야 한다. */
+  it('「읽음으로」 버튼이 남아 있다 — 열지 않고 읽는 길', async () => {
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    expect(within(row).getByRole('button', { name: /읽음으로/u })).toBeTruthy();
+  });
+});
+
+/**
+ * **다음 쪽은 홈과 같은 「더 보기」 꼴이다**(받는 항목 9). 앞 판은 「이 페이지에 다 오지
+ * 않았습니다」라고 말하면서 다음으로 가는 길이 없었다(`listNotifications()` 무인자 호출).
+ */
+describe('알림함 — 「더 보기」', () => {
+  it('화면의 읽기는 쪽을 **명시한다**', async () => {
+    renderScreen();
+
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    expect(mocked.listNotifications).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }));
+  });
+
+  it('받은 수가 전체보다 적으면 「더 보기」가 있고, 누르면 다음 쪽을 이어 붙인다', async () => {
+    mocked.listNotifications.mockResolvedValueOnce(page([item({ noticeNumber: 'A' })], 2, 2));
+    mocked.listNotifications.mockResolvedValueOnce(page([item({ noticeNumber: 'B' })], 2, 2));
+    renderScreen();
+
+    const more = await screen.findByTestId('inbox-more');
+    fireEvent.click(more);
+
+    expect(await screen.findByTestId('notice-group-1-B-000-REAL')).toBeTruthy();
+    expect(screen.getByTestId('notice-group-0-A-000-REAL')).toBeTruthy();
+    expect(mocked.listNotifications).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
+    await waitFor(() => expect(screen.queryByTestId('inbox-more')).toBeNull());
+  });
+
+  it('받은 수가 전체와 같으면 「더 보기」가 없다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    expect(screen.queryByTestId('inbox-more')).toBeNull();
+  });
+
+  /**
+   * **페이지 경계에 걸린 묶음이 다음 쪽을 받으면 합쳐진다.** 묶음은 **연속 접기**라 이어 붙인
+   * 배열에서 한 묶음이 되고, 그러면 「이 페이지에 다 오지 않았습니다」가 사라진다 — 그 문면이
+   * 남으면 다 받았는데도 더 있다고 말하는 꼴이다.
+   */
+  it('이어 붙이면 걸쳐 있던 묶음이 합쳐지고 그 문면이 사라진다', async () => {
+    const first = item({ kind: 'OPENING_COMPLETED', noticeItemCount: 2, noticeUnreadCount: 2 });
+    const second = item({ kind: 'AWARD_DECIDED', noticeItemCount: 2, noticeUnreadCount: 2 });
+    mocked.listNotifications.mockResolvedValueOnce(page([first], 2, 2));
+    mocked.listNotifications.mockResolvedValueOnce(page([second], 2, 2));
+    renderScreen();
+
+    const group = await screen.findByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL');
+    expect(group.textContent ?? '').toContain('이 페이지에 다 오지 않았습니다');
+
+    fireEvent.click(screen.getByTestId('inbox-more'));
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL').textContent ?? '',
+        '다 받았는데도 더 있다고 말한다',
+      ).not.toContain('이 페이지에 다 오지 않았습니다'),
+    );
+    const merged = within(screen.getByTestId('notice-group-0-SYN-7E3-RESULT-000-REAL'));
+    expect(merged.getByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL')).toBeTruthy();
+    expect(merged.getByTestId('notification-AWARD_DECIDED-SYN-7E3-RESULT-000-REAL')).toBeTruthy();
+  });
+});
+
+/** **빈 화면이 다음 걸음을 준다**(받는 항목 7 의 알림함 자리). */
+describe('알림함 — 빈 화면의 다음 걸음', () => {
+  it('알림이 없으면 오늘의 공고로 가는 걸음을 준다', async () => {
+    mocked.listNotifications.mockResolvedValue(page([], 0));
+    renderScreen();
+
+    const empty = await screen.findByTestId('inbox-empty');
+    expect(within(empty).getByRole('link', { name: /오늘의 공고/u }).getAttribute('href')).toBe('/');
   });
 });
