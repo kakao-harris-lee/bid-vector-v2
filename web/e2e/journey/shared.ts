@@ -200,6 +200,13 @@ export const NOTICE_STATUS_LABEL: Readonly<Record<string, string>> = {
 };
 export const CASE_STATE_LABEL: Readonly<Record<string, string>> = {
   WATCHING: '관심',
+  // M13/13D — **화면이 이 상태를 만드는 길이 생겨서** 들어온다. 이 셋이 없는 동안 호출부의
+  // `?? state` 폴백이 기대값을 wire 토큰으로 만들었고, 그 단언은 **화면이 틀렸을 때만** 맞았다
+  // (실측: 배지가 「나중에」인데 기대가 `DEFERRED` 라 붉었다). 표의 전수는 아래 게이트가 잰다
+  // (`scripts/bid-exit-transitions.test.mjs` 의 어휘 축).
+  DEFERRED: '나중에',
+  SKIPPED: '건너뜀',
+  DEADLINE_PASSED_UNRECORDED: '마감 지남(미기록)',
   PRICE_RECEIVED: '투찰가 받음',
   BID_PLANNED: '투찰 예정',
   BID_RECORDED: '투찰 기록됨',

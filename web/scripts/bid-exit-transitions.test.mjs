@@ -32,6 +32,7 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const readWeb = (relative) => readFileSync(resolve(webRoot, relative), 'utf8');
 
 const EXIT_MODULE = 'src/display/bidBoxDisplay.ts';
+const JOURNEY_LABEL_MODULE = 'e2e/journey/shared.ts';
 const STATE_MODULE = 'src/display/caseDisplay.ts';
 const GENERATED_MODULE = 'src/api/generated/operator-api.ts';
 
@@ -441,6 +442,29 @@ describe('어휘 축 — 읽은 상태가 계약이 아는 상태인가', () => 
    */
   it('화면 상태 표의 키 집합이 계약 어휘와 같다', () => {
     expect(sorted(screenStateKeys())).toStrictEqual(sorted(contractStateVocabulary()));
+  });
+});
+
+describe('여정 라벨 표의 전수 — 폴백이 숨긴 자리', () => {
+  /**
+   * 여정 spec 들은 상태 문면을 **자기 표**에서 꺼내 화면과 대조한다(화면의 표를 끌어오면 표가
+   * 틀려도 초록이므로 일부러 복제한 자리다). 그 표에 상태가 **빠지면** 호출부의 폴백이 기대값을
+   * wire 토큰으로 만들고, 그 단언은 **화면이 틀렸을 때만** 맞는다 — 실측으로 밟았다(이 slice 가
+   * 「나중에」를 처음 만들었고 그 상태가 표에 없었다).
+   *
+   * 폴백을 쓰는 호출부가 남아 있어도 이 등식이 그 자리를 **구조로** 닫는다.
+   */
+  it('여정 라벨 표의 키 집합이 계약 어휘와 같다', () => {
+    const table = objectLiteralOf(readWeb(JOURNEY_LABEL_MODULE), JOURNEY_LABEL_MODULE, 'CASE_STATE_LABEL');
+    const keys = table.properties.map((one) => {
+      if (!ts.isPropertyAssignment(one)) {
+        throw new Error('여정 라벨 표에 속성 대입이 아닌 조각이 있다');
+      }
+      return nameText(one.name);
+    });
+
+    expect(keys.length, '여정 라벨 표가 비었다').toBeGreaterThan(0);
+    expect(sorted(keys)).toStrictEqual(sorted(contractStateVocabulary()));
   });
 });
 

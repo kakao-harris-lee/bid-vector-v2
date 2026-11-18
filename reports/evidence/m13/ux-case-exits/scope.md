@@ -17,6 +17,7 @@ in_scope:
   - web/src/screens/ResultsScreen.test.tsx
   - web/src/screens/ResultCard.tsx      # 소유 선언(이 slice 의 편집은 0 일 수 있다)
   - web/e2e/journey/case-exits.spec.ts  # 여정 둘 신설
+  - web/e2e/journey/shared.ts           # 계약 갱신 (4) — 상태 문면 표에 빠진 셋(공유 자리, 덧붙이기만)
   - web/config/journey-specs.txt        # 그 spec 을 **같은 커밋에서** 등재(양방향 등식)
   - web/e2e/harness/fixtures/notice-list.json   # 이 여정의 **자기 공고** 한 건(§착수 보고 OPEN-1)
   - web/config/gate-tests.txt           # 새 게이트 test 등재
@@ -138,6 +139,12 @@ base `bd5cd039` 의 worktree 에서 쟀다. **백엔드 변경 0 이 선다** �
 
 **(3) `ResultCard.tsx` 편집 0 으로 확정**(팀장 승인). 그 카드에 화면 얼굴이 없고 칸 단위 빈
 자리·미판정 문면뿐이며 이미 사유를 든다 — 항목 7 의 결과 쪽은 결과 **화면**의 얼굴이 닫는다.
+
+**(4) in_scope 에 여정의 공유 모듈이 든다.** 그 파일의 상태 문면 표에 **상태 셋이 없었다**
+(`DEFERRED`·`SKIPPED`·`마감 지남`). 화면이 그 상태를 만드는 길이 없던 동안 아무도 밟지 않았고,
+호출부의 폴백(`?? state`)이 기대값을 **wire 토큰**으로 만들어 그 단언이 「화면이 틀렸을 때만 맞는」
+꼴이었다 — 이 slice 의 첫 여정 실행이 그것을 붉혔다(실측). 덧붙이기만 했고 기존 행은 건드리지
+않았다. 그 표의 **전수**는 이 slice 의 게이트가 계약 어휘와 등식으로 닫는다.
 
 ## 갱신 이력
 
