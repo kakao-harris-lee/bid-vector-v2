@@ -15,6 +15,11 @@ in_scope:
   - web/config/gate-tests.txt                # 새 vitest 게이트 test 를 만드는 커밋에서 등재
   - web/e2e/                                 # 여정 단언 갱신(접기·확인) · 측정 공용 모듈 · 합성 대조 spec(스모크 레인)
   - web/config/journey-specs.txt             # 여정 spec 을 더하면 같은 커밋에서(이 라운드는 증분 0)
+  - web/config/smoke-specs.txt               # 셸 스모크 등록부 신설 — 아래 「계약 갱신」 (6)
+  - web/scripts/smoke-lane.mjs               # 그 레인의 상수 한 자리(+ run-begin · 게이트 · 짝 test)
+  - web/scripts/journey-results.mjs          # 판정 술어를 두 레인이 함께 쓴다(사유 문면만 인자로) — 공유 파일
+  - web/playwright.config.ts                 # json 리포터를 켠다(그 레인의 판정 산출물)
+  - web/package.json                         # `test:e2e` 체인만 — dependencies 증분 0(승인 경계 유지)
   - web/scripts/screen-vocabulary-registry.mjs  # 어휘 장부 분류 둘 — 아래 「계약 갱신」 (1)
   - web/src/screens/screenVocabulary.test.tsx   # 넘김 카드 마운트 등재 — 공유 파일(팀장 승인)
   - reports/evidence/m13/ux-worksheet/
@@ -132,8 +137,26 @@ rollback: rollback.md
 **(5) `web/src/index.css` 편집이 섰다** — 13B 착수 판정 ⓗ 의 「편집 0」 묶음은 13B 기준이고,
 13C 는 제한 27 의 구조 해법(훑기 뿌리 묶기)을 받았다.
 
+**(6) 셸 스모크 레인에 등록부와 결과 판정이 섰다**(수정 라운드 2 · verifier R1-M5). 신설 파일
+다섯(`web/config/smoke-specs.txt` · `web/scripts/smoke-lane.mjs` · `smoke-run-begin.mjs` ·
+`check-smoke-results.mjs` · `check-smoke-results.test.mjs`)과 편집 셋(`playwright.config.ts` 의
+리포터 · `package.json` 의 `test:e2e` 체인 · `scripts/journey-results.mjs` 의 사유 문면 인자)이
+in_scope 에 든다.
+
+**레인 간 영향** — 이 셋은 다른 slice 가 만지는 자리다.
+- `web/config/smoke-specs.txt`: 셸 스모크 레인에 spec 을 더하거나 이름을 바꾸는 slice 는 **같은
+  커밋에서** 이 파일을 고쳐야 한다. 그러지 않으면 `npm run test:e2e` 가 「등록부에 없는 spec 이
+  돌았다」로 붉는다(여정 등록부와 같은 규약이고 같은 술어다).
+- `web/scripts/journey-results.mjs`: 셋째 인자(건너뛰지 않는 사유 문면)가 늘었다. 기본값이 여정
+  문면이라 **여정 레인의 거동은 그대로**이고(acceptance W-13 재측정으로 확인), 호출 자리도 그대로다.
+- `web/package.json`: `test:e2e` 가 세 명령 체인이 됐다. **CI 의 명령 글자는 그대로**이고
+  (`npm run test:e2e`), 부분 실행(`-- <인자>`)은 이제 그 게이트가 거절한다 — 여정 레인이 이미
+  그 꼴이다.
+
 ## 갱신 이력
 
 - 2026-11-18 초판(착수 보고와 함께).
 - 2026-11-18 팀장 착수 판정(§1~§3)을 받아 구현 착수 · 설계 검토 보고(`design-review.md`).
 - 2026-11-18 계약 갱신 (1)~(5) — 구현 라운드가 만진 파일을 in_scope 와 대조해 등재.
+- 2026-11-18 계약 갱신 (6) — 수정 라운드 2 의 신설 파일 다섯·편집 셋을 in_scope 와 대조해 등재
+  (셸 스모크 등록부). 레인 간 영향 셋을 같은 절에 적었다.
