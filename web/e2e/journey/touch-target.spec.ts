@@ -94,18 +94,21 @@ async function measure(page: Page): Promise<Measurement> {
     ];
     /**
      * **누르는 자리가 그 요소 자신이 아닐 수 있다**(cr P-3). 체크박스·라디오를 `<label>` 이
-     * **감싸면** 레이블 어디를 눌러도 그 컨트롤이 켜진다 — 손가락이 닿는 상자는 레이블이다.
-     * 그래서 그 자리는 레이블을 잰다.
+     * 감싸고 **그 레이블이 켜는 컨트롤이 이 노드이면** 레이블 어디를 눌러도 이것이 켜진다 —
+     * 손가락이 닿는 상자는 레이블이다. 그 자리는 레이블을 잰다.
      *
-     * **느슨해지지 않는다**: 레이블이 44px 미만이면 그대로 붉고(변이 T), 컨트롤을 키워서 얻던
-     * 초록이 **레이블 상자**로 옮겨갈 뿐이다. 감싸지 않은(명시 `htmlFor`) 레이블은 집지 않는다 —
-     * 그때는 떨어진 두 상자라 컨트롤 자신이 닿는 자리다.
+     * **`closest('label')` 만으로는 모자란다**(v M-9 · cr Q-4). 레이블이 켜는 것은 자기
+     * **labeled control 하나뿐**이라, 레이블 하나가 컨트롤 둘을 감싸면 뒤의 것은 레이블을 눌러도
+     * 켜지지 않고, `for` 가 다른 곳을 가리키면 감싸고도 켜지지 않는다. 그 자리들의 누르는 상자는
+     * **자기 13px** 인데 감싼 레이블을 재면 44px 로 세 **앞 판보다 느슨해진다**(실측).
+     * `HTMLLabelElement.control` 이 그 피연결 컨트롤을 그대로 주므로 그것으로 가른다.
      */
     const touchBoxOf = (node: Element): Element => {
       if (!(node instanceof HTMLInputElement) || (node.type !== 'checkbox' && node.type !== 'radio')) {
         return node;
       }
-      return node.closest('label') ?? node;
+      const label = node.closest('label');
+      return label instanceof HTMLLabelElement && label.control === node ? label : node;
     };
     const targets = [];
     const offscreen = [];
