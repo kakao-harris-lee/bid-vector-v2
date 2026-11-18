@@ -20,6 +20,12 @@ in_scope:
   - web/config/journey-specs.txt        # 그 spec 을 **같은 커밋에서** 등재(양방향 등식)
   - web/e2e/harness/fixtures/notice-list.json   # 이 여정의 **자기 공고** 한 건(§착수 보고 OPEN-1)
   - web/config/gate-tests.txt           # 새 게이트 test 등재
+  # 계약 갱신 (1) — 게이트가 요구한 자리들. 아래 「계약 갱신」 절이 사유를 든다.
+  - web/scripts/bid-exit-transitions.test.mjs      # 신설 — 출발 집합·주체·상한 등식(export 0)
+  - web/scripts/kotlin-source.mjs                  # 읽기 집합에 전이표 키 +1(비공개 표 · 공개 표면 불변)
+  - web/scripts/kotlin-source-ownership.test.mjs   # 그 키 계수 단언 7 → 8
+  - web/scripts/screen-vocabulary-registry.mjs     # 새 표시 함수 둘의 분류(전수 등식이 요구한다)
+  - web/src/screens/BidBoxCard.test.tsx            # 신설 — 상태 전수 루프(설계 검토 우회 ⑤)
   - docs/discovery/capability-map.md    # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
   - reports/evidence/m13/ux-case-exits/
 out_of_scope:
@@ -116,6 +122,24 @@ base `bd5cd039` 의 worktree 에서 쟀다. **백엔드 변경 0 이 선다** �
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신
+
+**(1) in_scope 에 `web/scripts/` 넷과 카드 짝 test 가 든다.** 구현이 만든 새 파일 둘(출발 집합
+등식 게이트 · 카드의 상태 전수 루프)과, **오늘의 게이트가 요구해서** 열게 된 자리 셋이다.
+
+- 읽기 집합의 키 +1 과 그 **계수 단언 7 → 8**: Kotlin 원문을 읽는 길이 공유 모듈 하나뿐이고
+  (그 소유권을 게이트가 센다) 키 전수에 계수 단언이 걸려 있다. 팀장 승인 항목이다.
+- **표시 함수 둘의 분류**: 어휘 등재의 전수 등식이 새 `export` 함수를 「분류하라」고 요구한다
+  (착수 때 모르던 의무다 — 실측으로 알았다). 둘 다 보이는 글자를 만들지 않는 축으로 등재했다.
+- **카드 짝 test 를 가른 이유**는 축이 다르기 때문이다(카드가 표를 따르는가 ↔ 화면이 요청을
+  어떻게 보내는가). 크기 회피용 분할이 아니다 — 화면 test 에 몰면 그 파일이 권장 한도를 넘는다.
+
+**(2) 새 파일 둘은 만드는 커밋에서 `gate-tests.txt` 에 등재했다**(양방향 등식).
+
+**(3) `ResultCard.tsx` 편집 0 으로 확정**(팀장 승인). 그 카드에 화면 얼굴이 없고 칸 단위 빈
+자리·미판정 문면뿐이며 이미 사유를 든다 — 항목 7 의 결과 쪽은 결과 **화면**의 얼굴이 닫는다.
+
 ## 갱신 이력
 
 - 2026-11-18 초판(착수 보고와 함께). OPEN 셋은 팀장 판정을 기다린다.
+- 2026-11-18 팀장 착수 판정(OPEN-1·2·3 승인 · 사유 축 처분 셋) 뒤 §계약 갱신 (1)~(3).
