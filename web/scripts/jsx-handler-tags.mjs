@@ -179,6 +179,20 @@ const CREATE_ELEMENT = 'createElement';
  * 기전이 다른 로더 이름으로 그대로 선다 — `react/jsx-runtime` 의 `jsx`·`jsxs`·`jsxDEV` 가 그것이다.
  */
 const ELEMENT_FACTORIES = new Set([CREATE_ELEMENT, 'jsx', 'jsxs', 'jsxDEV']);
+
+/** 생성·복제를 **한 묶음**으로 보는 자리(R1-H1) — 글자 키로 꺼내는 길이 둘 다 같다. */
+const ELEMENT_FUNCTION_NAMES = new Set([...ELEMENT_FACTORIES, CLONE_ELEMENT]);
+
+/**
+ * `Object`·`Reflect` 의 **멤버 심볼**로 합치기·반사 축을 묶는다(R1-M1 · cr N-1 · N-6).
+ *
+ * 앞 판은 **적힌 멤버 이름**으로 섰다. 그래서 두 방향으로 틀렸다 — 구조 분해·별칭으로 부르면
+ * 축이 아예 돌지 않았고(미탐), 요소를 키로 쓰는 `Map.get` 이 그 축에 들었다(오탐). 이름 대신
+ * **기본 라이브러리의 그 전역이 가진 멤버 심볼**과 맞댄다.
+ */
+const MERGE_MEMBERS = new Set(['assign', 'defineProperties', 'setPrototypeOf']);
+const KEYED_MEMBERS = new Set(['get', 'set', 'defineProperty', 'getOwnPropertyDescriptor']);
+const GLOBAL_HOLDERS = ['Object', 'Reflect'];
 const LISTENER_MEMBER = 'addEventListener';
 /** 요소에 **직접 대입**하는 인라인 핸들러(`el.onclick = …`) — DOM 의 소문자 이름이다. */
 const INLINE_HANDLER_MEMBER = /^on[a-z]+$/u;
@@ -261,6 +275,92 @@ function exemptReceiverAnchors(program, checker) {
   return anchors;
 }
 
+const holderCacheByProgram = new WeakMap();
+
+/**
+ * `Object`·`Reflect` 가 가진 멤버 심볼 묶음. **없으면 빈 묶음**이고, 그때 이 축은 돌지 않는다 —
+ * 그 전역이 없는 프로그램에는 `Object.assign` 호출 자체가 없으므로 **좁히는 쪽이지 여는 쪽이
+ * 아니다**(면제 수신자 앵커와 달리 던지지 않는 이유다).
+ */
+function globalMemberAnchors(program, checker) {
+  const cached = holderCacheByProgram.get(program);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const members = new Map();
+  const holders = new Set();
+  for (const file of program.getSourceFiles()) {
+    if (!program.isSourceFileDefaultLibrary(file)) {
+      continue;
+    }
+    for (const statement of file.statements) {
+      if (!ts.isVariableStatement(statement) && !ts.isInterfaceDeclaration(statement)) {
+        continue;
+      }
+      const declarations = ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations
+        : [statement];
+      for (const declaration of declarations) {
+        const name = declaration.name;
+        if (!ts.isIdentifier(name) || !GLOBAL_HOLDERS.includes(name.text)) {
+          continue;
+        }
+        const holderSymbol = checker.getSymbolAtLocation(name);
+        if (holderSymbol !== undefined) {
+          holders.add(holderSymbol);
+        }
+        for (const property of checker.getTypeAtLocation(name).getProperties()) {
+          members.set(property, name.text);
+        }
+      }
+    }
+  }
+  const anchors = { members, holders };
+  holderCacheByProgram.set(program, anchors);
+  return anchors;
+}
+
+/**
+ * 그 호출 대상이 `Object`·`Reflect` 의 **그 멤버**인가 — 이름이 아니라 **심볼**로 본다.
+ *
+ * 값으로 옮긴 꼴(`const merge = Object.assign`)과 구조 분해(`const { assign } = Object`)는 심볼이
+ * 지역 변수라 한 단 더 따라가야 한다 — 복제·생성 축이 쓰는 그 규율(「이름을 더 적는 대신 축을
+ * 옮긴다」)을 이 축에도 그대로 둔다.
+ */
+function globalMemberOf(checker, anchors, callee, names, depth = 0) {
+  if (depth >= BASE_CHAIN_DEPTH) {
+    return null;
+  }
+  const symbol = checker.getSymbolAtLocation(callee);
+  const resolved = symbol === undefined ? undefined : aliasTarget(checker, symbol);
+  if (resolved === undefined) {
+    return null;
+  }
+  if (anchors.members.has(resolved)) {
+    const name = resolved.getName();
+    return names.has(name) ? name : null;
+  }
+  const declaration = resolved.getDeclarations()?.[0];
+  if (declaration === undefined) {
+    return null;
+  }
+  // 값으로 옮긴 꼴 — 초기화식을 따라간다.
+  if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined && ts.isIdentifier(callee)) {
+    return globalMemberOf(checker, anchors, declaration.initializer, names, depth + 1);
+  }
+  // 구조 분해 — 꺼낸 **키**가 멤버 이름이고, 꺼낸 **대상**이 그 전역이면 같은 자리다.
+  if (ts.isBindingElement(declaration)) {
+    const key = propertyKeyText(declaration.propertyName ?? declaration.name);
+    const root = declaration.parent?.parent;
+    const source = root !== undefined && ts.isVariableDeclaration(root) ? root.initializer : undefined;
+    const holder = source === undefined ? undefined : aliasTarget(checker, checker.getSymbolAtLocation(source) ?? undefined);
+    if (key !== null && names.has(key) && holder !== undefined && anchors.holders.has(holder)) {
+      return key;
+    }
+  }
+  return null;
+}
+
 function isExemptReceiver(type, anchors, depth = 0) {
   if (depth >= BASE_CHAIN_DEPTH) {
     return false;
@@ -297,6 +397,9 @@ function maybeElement(checker, expression) {
 
 /** 별칭이면 **가리키는 심볼**로 푼다. 풀 수 없으면 `undefined` — 부르는 쪽이 글자로 떨어진다. */
 function aliasTarget(checker, symbol) {
+  if (symbol === undefined) {
+    return undefined;
+  }
   if ((symbol.getFlags() & ts.SymbolFlags.Alias) === 0) {
     return symbol;
   }
@@ -398,13 +501,6 @@ function carriesHandlerKey(node) {
   });
 }
 
-/**
- * **합치는 호출**의 이름(cr M-2). 키를 변수에 담아 넘기면 리터럴 축이 그것을 보지 못한다 —
- * 그 자리를 닫되 **합치는 호출로 좁힌다**: 요소를 인자로 받는 평범한 호출(마운트·그리기)까지
- * 「볼 수 없으니 위반」으로 보면 출하 코드가 붉는다(실측: 뿌리 마운트 한 줄).
- */
-const MERGE_CALLS = new Set(['assign']);
-
 /** 그 값이 **담은 것을 볼 수 없는가** — 합치는 호출의 원본 자리에서만 묻는다. */
 function isOpaqueBag(node) {
   if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || node.kind === ts.SyntaxKind.NullKeyword) {
@@ -412,9 +508,6 @@ function isOpaqueBag(node) {
   }
   return !ts.isObjectLiteralExpression(node);
 }
-
-/** 반사·서술자로 **키를 숨겨** 거는 길(v M-1) — 키가 증명되지 않으면 닫는다. */
-const KEYED_REFLECTION = new Set(['get', 'set', 'defineProperty', 'getOwnPropertyDescriptor']);
 
 /** 그 키 인자가 **누르는 배선**인가 — 글자로 증명되지 않으면 `null`(증명 불가). */
 function handlerKeyOf(argument) {
@@ -455,6 +548,22 @@ function wiringOutsideJsx(program, checker, source) {
     if (ts.isIdentifier(node) && ELEMENT_FACTORIES.has(resolvedName(checker, node) ?? '') && !isDeclarationName(node)) {
       if (!isJudgeableFactoryCall(node)) {
         hit(node, '<요소 생성 함수>', '판정할 수 없는 참조');
+      }
+    }
+    /**
+     * **글자 키로 꺼내는 길**(R1-H1). `React['createElement']` 는 식별자 노드가 아니라 대괄호
+     * 접근이라 위 갈래를 지나갔다. 증명 가능한 키가 그 이름이면 **참조**이고, 그 이름공간에서
+     * 키를 증명할 수 없으면(`React[k]`) 무엇을 꺼내는지 모르므로 **증명 불가**다.
+     */
+    if (ts.isElementAccessExpression(node)) {
+      const key = memberAccess(node);
+      if (key !== null && key.provable && ELEMENT_FUNCTION_NAMES.has(key.name ?? '')) {
+        if (!isJudgeableFactoryCall(node)) {
+          hit(node, '<요소 생성 함수>', '글자 키로 꺼낸 참조');
+        }
+      }
+      if (key !== null && !key.provable && holdsElementFunction(checker, node.expression)) {
+        hit(node, '<요소 생성 함수>', '증명할 수 없는 키');
       }
     }
     /**
@@ -513,7 +622,10 @@ function wiringOutsideJsx(program, checker, source) {
       }
     }
     // 요소 **생성** — 첫 인자가 태그라 JSX 와 **같은 타입 판정**을 그대로 쓴다.
-    if (ts.isCallExpression(node) && ELEMENT_FACTORIES.has(resolvedName(checker, node.expression) ?? '')) {
+    const calleeName = ts.isCallExpression(node)
+      ? resolvedName(checker, node.expression) ?? memberAccess(node.expression)?.name ?? null
+      : null;
+    if (ts.isCallExpression(node) && ELEMENT_FACTORIES.has(calleeName ?? '')) {
       const tagArgument = node.arguments[0];
       const { names, handlers } = createElementProps(node.arguments[1]);
       if (tagArgument !== undefined && handlers.length > 0) {
@@ -538,14 +650,16 @@ function wiringOutsideJsx(program, checker, source) {
     // ⓒ 객체 합치기 — 요소일 수 있는 대상과 누르는 키가 **같은 호출**에 실린다.
     if (ts.isCallExpression(node)) {
       const args = [...node.arguments];
-      const callee = memberAccess(node.expression);
       const onElement = args.some((one) => maybeElement(checker, one));
+      const holders = globalMemberAnchors(program, checker);
       /**
-       * **합치는 호출만 본다.** 요소를 인자로 받는 평범한 호출(뿌리 마운트·요소 생성)까지 이 축으로
-       * 보면 출하 코드가 붉고(실측 한 줄), 생성 props 는 자기 갈래가 센다. 원본이 리터럴이면 키를
-       * 보고, **볼 수 없는 값이면 닫는다**(cr M-2).
+       * **무엇을 하는 호출인가로 가른다**(R1-M1 · cr N-1 · N-6). 앞 판은 적힌 멤버 이름으로 섰다 —
+       * 구조 분해·별칭은 축 밖이었고(미탐), 요소를 키로 쓰는 `Map.get` 은 축 안이었다(오탐).
+       * 이제 `Object`·`Reflect` 의 **그 멤버 심볼**과 맞댄다.
        */
-      if (callee !== null && callee.provable && MERGE_CALLS.has(callee.name ?? '') && onElement) {
+      const merging = globalMemberOf(checker, holders, node.expression, MERGE_MEMBERS);
+      if (merging !== null && onElement) {
+        // 합치는 자리의 **원본**은 대상 뒤의 인자들이다(프로토타입 바꿔치기도 같은 자리다).
         const sources = args.slice(1);
         if (sources.some((one) => carriesHandlerKey(one))) {
           hit(node, '<면제되지 않은 수신자>', '객체로 합친 핸들러');
@@ -555,9 +669,11 @@ function wiringOutsideJsx(program, checker, source) {
       }
       /**
        * **반사·서술자로 키를 숨기는 길**(v M-1). 요소를 넘기면서 키를 함께 싣는 호출은 키가
-       * 글자로 증명돼야 한다 — 증명되지 않으면 닫는다(볼 수 없는 것을 통과시키지 않는다).
+       * 글자로 증명돼야 한다 — 증명되지 않으면 닫는다. **인자가 하나뿐인 호출은 이 축이 아니다**
+       * (cr N-6: 키 자리가 없는 호출을 「키를 증명할 수 없다」로 접지 않는다).
        */
-      if (callee !== null && callee.provable && KEYED_REFLECTION.has(callee.name ?? '') && onElement) {
+      const keyed = globalMemberOf(checker, holders, node.expression, KEYED_MEMBERS);
+      if (keyed !== null && onElement && args.length >= 2) {
         const judged = handlerKeyOf(args[1]);
         if (judged !== undefined) {
           hit(node, '<반사·서술자>', judged === null ? '증명할 수 없는 키' : judged);
@@ -587,10 +703,32 @@ function isDeclarationName(node) {
   return ts.isBindingElement(parent) && parent.name === node && parent.propertyName !== undefined;
 }
 
-/** 그 참조가 **판정할 수 있는 직접 호출**의 부름 자리인가. */
+/**
+ * 그 참조가 **판정할 수 있는 직접 호출**의 부름 자리인가.
+ *
+ * 이름공간 꼴(`React.createElement(…)`)은 부모가 속성 접근이라 앞 판이 「판정할 수 없는 참조」로
+ * 발화했다 — 같은 호출을 판정 갈래는 제대로 해소해 **한 호출이 동시에 깨끗하고 더러웠다**
+ * (cr N-3). 접근 한 단을 올라가 그 부모가 호출인지 본다.
+ */
 function isJudgeableFactoryCall(node) {
-  const parent = node.parent;
-  return parent !== undefined && ts.isCallExpression(parent) && parent.expression === node;
+  const direct = node.parent;
+  if (direct === undefined) {
+    return false;
+  }
+  if (ts.isCallExpression(direct)) {
+    return direct.expression === node;
+  }
+  const access =
+    (ts.isPropertyAccessExpression(direct) && direct.name === node) || ts.isElementAccessExpression(direct)
+      ? direct
+      : null;
+  return access !== null && access.parent !== undefined && ts.isCallExpression(access.parent) && access.parent.expression === access;
+}
+
+/** 그 값이 **요소 생성·복제 함수를 가진** 이름공간인가 — 키를 증명할 수 없을 때 묻는다. */
+function holdsElementFunction(checker, expression) {
+  const type = checker.getTypeAtLocation(expression);
+  return [...ELEMENT_FUNCTION_NAMES].some((name) => type.getProperty(name) !== undefined);
 }
 
 /** 그 접근이 **대입의 왼쪽**인가. */

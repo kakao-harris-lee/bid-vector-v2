@@ -777,8 +777,10 @@ const DOM_LIB = [
   'declare const window: Window;',
   'declare const el: HTMLDivElement;',
   'declare const f: () => void;',
-  'declare const Object: { assign(a: unknown, b: unknown): unknown; defineProperty(a: unknown, k: string, d: unknown): unknown };',
+  'declare const Object: { assign(a: unknown, b: unknown): unknown; defineProperty(a: unknown, k: string, d: unknown): unknown; defineProperties(a: unknown, d: unknown): unknown; setPrototypeOf(a: unknown, p: unknown): unknown; getOwnPropertyDescriptor(a: unknown, k: string): unknown };',
   'declare const Reflect: { apply(fn: unknown, self: unknown, args: unknown[]): unknown; get(a: unknown, k: string): unknown; set(a: unknown, k: string, v: unknown): boolean };',
+  'interface Map<K, V> { get(key: K): V | undefined; set(key: K, value: V): this; }',
+  'interface WeakMap<K extends object, V> { get(key: K): V | undefined; set(key: K, value: V): this; }',
 ].join('\n');
 
 const RUNTIME_MODULES = {
@@ -870,5 +872,68 @@ describe('이름공간 컴포넌트는 내장 태그가 아니다 (cr L-4)', () 
 
   it('양성 대조 — 같은 꼴의 내장 태그는 그대로 걸린다', () => {
     expect(handlerBearingTags('declare const f: () => void;\nexport const X = () => <div onClick={f} />;\n')).toHaveLength(1);
+  });
+});
+
+/**
+ * M13/13C 수정 라운드 2 — verifier R1-H1 · R1-M1, code-review N-1 · N-3 · N-6.
+ *
+ * **이 축의 경계**(design-review (0) 재작성): 이 게이트가 막는 것은 **실수로 쓴 평범한 코드**이고,
+ * 타입을 속이거나 글자를 조립해 **일부러 숨기는 꼴**은 경계 밖이다. 그래서 이번 라운드는 구조로
+ * 닫을 수 있는 자리(증명 가능한 리터럴 키 · 해소되는 심볼)만 닫고 나머지는 등재한다.
+ */
+describe('요소 생성·복제를 글자 키로 부르는 길 (R1-H1)', () => {
+  const REACT_NS = {
+    ...WIRING_REACT,
+    'react/jsx-runtime': 'export declare function jsx(tag: unknown, props: unknown): unknown;\n',
+  };
+
+  it('리터럴 키로 꺼낸 생성 함수도 참조로 센다', () => {
+    const text =
+      "import * as React from 'react';\ndeclare const f: () => void;\nexport const X = () => React['createElement']('div', { onClick: f });\n";
+
+    expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('리터럴 키로 꺼낸 복제 함수도 참조로 센다', () => {
+    const text =
+      "import * as React from 'react';\ndeclare const el: unknown;\ndeclare const f: () => void;\nexport const X = () => React['cloneElement'](el, { onClick: f });\n";
+
+    expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  it('키를 증명할 수 없는 이름공간 접근은 증명 불가로 센다', () => {
+    const text =
+      "import * as React from 'react';\ndeclare const k: 'createElement';\ndeclare const f: () => void;\nexport const X = () => React[k]('div', { onClick: f });\n";
+
+    expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  /** cr N-3 — 같은 호출이 **판정되면서 동시에 발화**하면 안 된다(오탐). */
+  it('음성 — 이름공간으로 부른 정상 생성 호출은 걸리지 않는다', () => {
+    const text =
+      "import * as React from 'react';\ndeclare const f: () => void;\nexport const X = () => React.createElement('button', { onClick: f });\n";
+
+    expect(handlerBearingTags(text, REACT_NS, DOM_LIB)).toStrictEqual([]);
+  });
+});
+
+describe('합치는·반사 축은 해소된 심볼로 센다 (R1-M1 · cr N-1 · N-6)', () => {
+  it.each([
+    ['구조 분해한 합치기', 'const { assign } = Object;\nconst bag = { onclick: f };\nexport const X = () => { assign(el, bag); };'],
+    ['별칭으로 옮긴 합치기', 'const merge = Object.assign;\nexport const X = () => { merge(el, { onclick: f }); };'],
+    ['서술자 여럿', 'export const X = () => { Object.defineProperties(el, { onclick: { value: f } }); };'],
+    ['프로토타입 바꿔치기', 'export const X = () => { Object.setPrototypeOf(el, { onclick: f }); };'],
+  ])('%s 도 걸린다', (_label, body) => {
+    expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).not.toStrictEqual([]);
+  });
+
+  /** cr N-6 — 요소를 **키로 쓰는** 조회는 이 축이 아니다. 수신자가 `Object`·`Reflect` 여야 한다. */
+  it.each([
+    ['요소를 키로 쓰는 조회', "declare const cache: Map<Element, string>;\nexport const X = () => cache.get(el);"],
+    ['요소를 키로 쓰는 기록', "declare const cache: Map<Element, string>;\nexport const X = () => { cache.set(el, 'x'); };"],
+    ['약한 장부', "declare const refs: WeakMap<Element, number>;\nexport const X = () => refs.get(el);"],
+  ])('음성 — %s 는 걸리지 않는다', (_label, body) => {
+    expect(handlerBearingTags(`${body}\n`, {}, DOM_LIB)).toStrictEqual([]);
   });
 });
