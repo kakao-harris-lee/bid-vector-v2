@@ -476,6 +476,17 @@ describe('문면 — 걷어 낸 내부 용어가 그 자리에 돌아오지 않�
    * 금지 **꼴**은 개발 코드를 잡지만 내부 용어(「배선」·「커널」 같은 말)는 열거할 수 없다 — 그
    * 판단은 사람의 것이다. 그래서 이 slice 가 고친 자리만 **축어로** 잠근다. 일반 축은 열지 않는다.
    */
+  /**
+   * 탐색 라벨의 **머리 글자**는 금지 꼴이 아니다 — 「A 」는 개발 코드가 아니라 요구표의 화면
+   * 구분을 화면에 흘린 것이다. 꼴로는 잡히지 않으므로 자리 표에 **직접** 거는 술어를 둔다.
+   */
+  it('자리 표 라벨이 요구표의 머리 글자로 시작하지 않는다', () => {
+    const slots = [...screenSlots, notFoundSlot];
+    // 비공허: 자리 표가 비면 아래 단언이 공허하다.
+    expect(slots.length).toBeGreaterThanOrEqual(7);
+    expect(slots.filter((slot) => /^[A-Z] /u.test(slot.label)).map((slot) => slot.id)).toEqual([]);
+  });
+
   it('표시층의 고친 행들', () => {
     const fixed = [
       resultDisplay.RESULT_PENDING_SLOTS[0]?.why ?? '',
