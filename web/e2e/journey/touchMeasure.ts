@@ -123,13 +123,16 @@ export function measureInPage(): Measurement {
       return { top, bottom, cap, unmeasurable };
     };
     /**
-     * **밀어서 볼 수 없는 자리인가**(v R1-M2). 고정 배치는 문서와 함께 스크롤되지 않으므로,
-     * 뷰포트 밖으로 걸친 부분은 **영원히 닿지 않는다**. 보통 흐름의 아래쪽 내용과 가르는 축이다.
+     * **밀어서 볼 수 없는 자리인가**(v R1-M2 · r3 에서 `sticky` 를 뺐다). 고정 배치는 문서와
+     * 함께 스크롤되지 않으므로 뷰포트 밖으로 걸친 부분이 **영원히 닿지 않는다**.
+     *
+     * `sticky` 는 **붙기 전에는 흐름과 함께 스크롤된다** — 접힘 아래의 sticky 머리는 밀면 닿으므로
+     * 이 축에 두면 과차단이고, 이 축에는 가로가 가진 「스크롤되면 예외」 같은 탈출구가 없다
+     * (cr R2-5 · verifier medium). 목록의 절 머리는 평범한 꼴이라 13D·13E 가 그 자리를 쓴다.
      */
     const inFixedSubtree = (node: Element): boolean => {
       for (let link: Element | null = node; link !== null; link = link.parentElement) {
-        const position = getComputedStyle(link).position;
-        if (position === 'fixed' || position === 'sticky') {
+        if (getComputedStyle(link).position === 'fixed') {
           return true;
         }
       }
