@@ -162,3 +162,7 @@ src/api/queryKeys.test.ts
 # fixture 가 결과 기록 폼을 열지 않아 입찰함 라디오를 한 번도 보지 못한다. 이 축이 같은 규칙을
 # 원문에서 재 그 자리를 든다.
 scripts/touch-target-labels.test.mjs
+# M13/13C — 하한 대비 여유의 **10진 정확 계산**. 부동소수로 접으면 정확히 하한인 금액이 미달이나
+# 초과로 뒤집히고(두 자리를 대조로 든다), 근거가 서지 않는 상태에서 0% 로 접지 않는 것도 여기서
+# 잰다. 사유 전수와 절삭 방향(불리한 쪽)이 이 slice 의 게이트 술어다.
+src/display/floorMargin.test.ts
