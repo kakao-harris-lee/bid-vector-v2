@@ -42,7 +42,8 @@ export const TOUCH_TARGET_SCREENS = [
   { slotId: 'home', path: '/', ready: 'screen-home', minCount: 8 },
   // 경로를 **문자열 리터럴**로 적는다 — 등식 게이트가 AST 로 읽는 자리이고, 식으로 적으면 그
   // 게이트가 값을 읽지 못한다. 씨앗과 어긋나지 않는 것은 아래 첫 단언이 든다.
-  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 7 },
+  // M13/13C — 금액 복사 버튼이 늘어 **다시 조였다**(실측 8 · 여유 0). 하한은 올리기만 한다.
+  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 8 },
   { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 11 },
   { slotId: 'results', path: '/results', ready: 'screen-results', minCount: 7 },
   { slotId: 'inbox', path: '/inbox', ready: 'screen-inbox', minCount: 12 },
@@ -460,7 +461,7 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
 
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
-    expect(targets.length, `${screen.slotId}: 보이는 타깃이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
+    expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
       screen.minCount,
     );
     // ② 전수 — 이름으로 고르지 않는다.

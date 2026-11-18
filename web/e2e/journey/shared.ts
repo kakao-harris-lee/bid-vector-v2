@@ -708,6 +708,8 @@ export async function driveToRecorded(page: Page, noticeNumber: string): Promise
     await page.getByTestId('record-vat').selectOption('INCLUSIVE');
     const drafted = page.waitForResponse((one) => one.url().includes('/draft') && one.request().method() === 'POST');
     await page.getByTestId('worksheet-primary').click();
+    // M13/13C — 초안 앞의 **확인**을 지난다(§6.2 C 3). 「제출함」에는 이 단계가 없다.
+    await page.getByTestId('bid-confirm-accept').click();
     expect((await drafted).status()).toBe(200);
 
     await page.getByTestId('record-amount').fill('1350000000');

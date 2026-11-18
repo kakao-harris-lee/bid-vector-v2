@@ -184,6 +184,16 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   expect(priceResponse.status()).toBe(200);
   const price = (await priceResponse.json()) as PriceBody;
 
+  /**
+   * M13/13C — 근거 다섯 절이 **접힌 상태**로 선다(점진적 공개). 아래 단언은 앞 판과 **같은 값을
+   * 같은 계수로** 보되, 그 전에 펼친다 — 접힌 자리는 역할 질의와 `innerText` 에서 빠지므로
+   * 펼치지 않으면 단언이 조용히 공허해진다(계수 0 · 빈 글자).
+   */
+  for (const section of ['verdict', 'bid-price-menu', 'qualification', 'grounds-section', 'disclosures-section']) {
+    await page.getByTestId(`${section}-summary`).click();
+    await expect(page.getByTestId(section)).toHaveJSProperty('open', true);
+  }
+
   // 선언한 값이 그대로 실려 되돌아오고 화면이 그것을 보인다(CR H-1).
   expect(price.currentActiveBids).toBe(2);
   const capacity = page.getByTestId('capacity');
@@ -243,6 +253,10 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   );
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰 예정 초안');
   await page.getByTestId('worksheet-primary').click();
+  // M13/13C — 초안 앞에 **확인**이 선다(§6.2 C 3). 보낼 금액이 숫자와 한글로 함께 보인다.
+  await expect(page.getByTestId('bid-confirm')).toContainText('이 금액으로 투찰하시겠습니까');
+  await expect(page.getByTestId('bid-confirm')).toContainText('10억 5000만원');
+  await page.getByTestId('bid-confirm-accept').click();
   const draftResponse = await drafted;
   expect(draftResponse.status(), '투찰 예정 초안 쓰기 응답').toBe(200);
   const draftedCase = (await draftResponse.json()) as BidCaseRow;
