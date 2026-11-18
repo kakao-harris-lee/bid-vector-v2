@@ -13,8 +13,10 @@ in_scope:
   - web/src/display/moneyDisplay.ts          # 한글 금액 병기(억·만) — 금액 어휘의 한 자리
   - web/src/display/                         # 하한 여유의 10진 계산 모듈 신설 + 그 짝 test
   - web/config/gate-tests.txt                # 새 vitest 게이트 test 를 만드는 커밋에서 등재
-  - web/e2e/journey/                         # 여정 단언 갱신(접기·확인 단계) · 화면 C 하한 N
-  - web/config/journey-specs.txt             # 여정 spec 을 더하면 같은 커밋에서
+  - web/e2e/                                 # 여정 단언 갱신(접기·확인) · 측정 공용 모듈 · 합성 대조 spec(스모크 레인)
+  - web/config/journey-specs.txt             # 여정 spec 을 더하면 같은 커밋에서(이 라운드는 증분 0)
+  - web/scripts/screen-vocabulary-registry.mjs  # 어휘 장부 분류 둘 — 아래 「계약 갱신」 (1)
+  - web/src/screens/screenVocabulary.test.tsx   # 넘김 카드 마운트 등재 — 공유 파일(팀장 승인)
   - reports/evidence/m13/ux-worksheet/
   # 아래 넷은 **팀장이 넘김 항목을 13C 범위로 승인할 때만** 든다(아래 「넘김 항목」).
   - web/scripts/jsx-handler-tags.mjs         # v M-7b · cr Q-2 · Q-3① (게이트 술어 — 설계 검토 선행)
@@ -94,6 +96,29 @@ rollback: rollback.md
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신
+
+**(1) `web/scripts/screen-vocabulary-registry.mjs` 가 in_scope 에 든다.** 새 표시 모듈과 새 함수는
+어휘 장부에 **분류**되어야 하고(그러지 않으면 모집단 게이트가 붉는다), 그 장부가 이 파일이다.
+분류는 둘이다 — 한글 병기는 **어휘**(통화 표의 라벨을 싣는다), 하한 여유는 **다른 축**(비율
+글자이고 금지 어휘를 그리지 않는다).
+
+**(2) `web/src/screens/screenVocabulary.test.tsx` 가 in_scope 에 든다.** 병기를 어휘로 분류한
+결과로 넘김 카드가 **마운트 의무**를 지고, 그 목록이 이 파일이다(팀장 착수 판정 §3-5 가 미리
+승인한 공유 파일 셋 가운데 하나다).
+
+**(3) 새 spec 하나가 셸 스모크 레인에 선다**(`web/e2e/touch-measure.spec.ts`). 터치 타깃 측정의
+합성 대조이고 하네스가 필요 없어 **여정 레인이 아니다** — 그래서 여정 등록부 증분이 0 이다
+(그 등록부는 여정 레인의 집합과 등식을 건다).
+
+**(4) 측정 함수를 공용 모듈로 옮겼다**(`web/e2e/journey/touchMeasure.ts`). 합성 대조가 게이트와
+**같은 함수**를 보게 하려는 것이고, 사본을 만들지 않는 것이 요점이다.
+
+**(5) `web/src/index.css` 편집이 섰다** — 13B 착수 판정 ⓗ 의 「편집 0」 묶음은 13B 기준이고,
+13C 는 제한 27 의 구조 해법(훑기 뿌리 묶기)을 받았다.
+
 ## 갱신 이력
 
 - 2026-11-18 초판(착수 보고와 함께).
+- 2026-11-18 팀장 착수 판정(§1~§3)을 받아 구현 착수 · 설계 검토 보고(`design-review.md`).
+- 2026-11-18 계약 갱신 (1)~(5) — 구현 라운드가 만진 파일을 in_scope 와 대조해 등재.
