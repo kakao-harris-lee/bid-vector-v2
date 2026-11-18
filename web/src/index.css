@@ -1,4 +1,14 @@
-@import 'tailwindcss';
+/* M13/13C — class 후보의 **훑기 뿌리를 출하 소스로 묶는다**(13B 알려진 제한 27 · v L-10).
+   자동 탐지를 켜 두면 뿌리가 저장소 쪽으로 넓어져, 게이트 test·여정 spec·설정에 **글자로** 적은
+   class 꼴이 후보가 되어 출하 CSS 에 죽은 규칙으로 실린다(13B 라운드 4 가 자산 해시 변화로
+   발견했고 verifier 가 그 규칙 하나를 base 대조로 분리했다). 그래서 자동 탐지를 끄고 출하
+   소스만 훑는다 — test 파일은 출하되지 않으므로 함께 뺀다.
+
+   이 선언이 정본이고, 그 **거동**(훑은 파일 집합 == 출하 소스 집합 · 바깥 글자가 후보에 들지
+   않음)은 짝 게이트가 실제 컴파일러와 훑기 엔진으로 잰다. */
+@import 'tailwindcss' source(none);
+@source './**/*.{ts,tsx}';
+@source not './**/*.test.{ts,tsx}';
 
 /* M7/7E-1 — 디자인 토큰은 **이 한 자리**다(D-7E-5). Tailwind v4 CSS-first 이므로 설정
    파일(`tailwind.config.*`·`postcss.config.*`)을 두지 않는다. 색을 컴포넌트에 리터럴로

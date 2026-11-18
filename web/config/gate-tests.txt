@@ -166,3 +166,7 @@ scripts/touch-target-labels.test.mjs
 # 초과로 뒤집히고(두 자리를 대조로 든다), 근거가 서지 않는 상태에서 0% 로 접지 않는 것도 여기서
 # 잰다. 사유 전수와 절삭 방향(불리한 쪽)이 이 slice 의 게이트 술어다.
 src/display/floorMargin.test.ts
+# M13/13C — class 후보의 **훑기 뿌리**(13B 제한 27 · v L-10). 선언 글자를 확인하는 presence 가
+# 아니라 실제 컴파일러·훑기 엔진으로 거동을 잰다: 훑은 파일 집합 == 출하 소스 집합 · 출하 밖
+# 글자가 후보에 들지 않음 · 뿌리를 넓히면 같은 표본이 든다(양성 대조).
+scripts/tailwind-scan-root.test.mjs
