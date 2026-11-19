@@ -305,6 +305,13 @@ export function WorksheetScreen() {
    * 되돌릴 수 없거나(건너뜀) 되돌리는 데 전이가 하나 더 드는 자리라(나중에) 중복이 비싸다.
    */
   const exitSending = useRef(false);
+  /**
+   * 지금 떠 있는 토스트가 **실행 취소를 들었는가**(cr L-1 · 13D 가 같은 자리에 둔 예외).
+   * 뒤이은 쓰기가 실패해도 **성공한 내려놓기의 되돌릴 길**은 걷지 않는다 — 되돌릴 수 있는데
+   * 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다. 토스트가 떠나면 함께 비운다(묵은 참이
+   * 다음 실패의 판단을 흐린다).
+   */
+  const exitUndoable = useRef(false);
 
   const resume = useMutation({
     mutationFn: (payload: { readonly caseId: number; readonly fromVersion: number }) =>
@@ -339,6 +346,7 @@ export function WorksheetScreen() {
     onSuccess: async (updated, sent) => {
       // **가드를 여기서 푼다** — 실행 취소가 살아나는 시점과 같아야 한다(13D 의 그 자리와 같은 사유).
       exitSending.current = false;
+      exitUndoable.current = sent.kind === 'DEFER';
       show(
         sent.kind === 'DEFER'
           ? {
@@ -357,12 +365,24 @@ export function WorksheetScreen() {
       exitSending.current = false;
     },
     onError: async () => {
-      dismiss();
+      // **실행 취소가 붙은 토스트는 걷지 않는다**(cr L-1): 실패는 쓰기 실패 얼굴이 따로 말하고,
+      // 실행 취소가 없는 토스트만 걷는다(그것이 실패 얼굴 옆에 남으면 무엇이 성공인지 흐려진다).
+      if (!exitUndoable.current) {
+        dismiss();
+      }
       await refreshCase();
     },
   });
 
-  /** 내려놓기로 가는 **한 입구** — 폼의 보내기와 다시 시도가 같은 가드를 지난다. */
+  /**
+   * 내려놓기로 가는 **한 입구** — 폼의 보내기와 **쓰기 실패 얼굴의 다시 시도**가 이 가드를 지난다
+   * (cr M-1 — 앞 판은 다시 시도가 가드 밖이었고, 같은 틱의 두 누름이 요청 셋을 냈다. 실측:
+   * 1 → 3). 입구가 둘이면 가드가 하나여도 소용이 없다.
+   *
+   * **토스트의 실행 취소는 이 가드 밖이다** — 그 버튼은 한 번 누르면 토스트가 닫히는 **단발
+   * 입구**이고(ToastHost 가 그 자리에서 토스트를 걷는다), 그래서 같은 틱의 둘째 누름이 닿을
+   * 요소가 없다. 되돌림 전이는 서버가 409 로 막는 쪽이기도 하다.
+   */
   function submitExit(caseId: number, fromVersion: number, payload: ActionPayload): void {
     if (exitSending.current) {
       return;
@@ -564,7 +584,14 @@ export function WorksheetScreen() {
                    멱등이 아니다). */
                 what: `${exit.variables?.kind === 'SKIP' ? '건너뛰지' : '나중에 보기로 돌리지'}`,
                 error: exit.error,
-                retry: writeRetry(exit),
+                /* **가드를 지나는 입구로 보낸다**(cr M-1). `writeRetry` 의 버전 가드는 그대로
+                   쓰고(틱을 건넌 재전송을 막는다) 보내는 자리만 `submitExit` 으로 바꾼다 —
+                   `exit.mutate` 를 직접 부르면 같은 틱의 연타가 가드 밖에서 요청을 더 낸다. */
+                retry: writeRetry({
+                  variables: exit.variables,
+                  reset: exit.reset,
+                  mutate: (sent) => submitExit(sent.caseId, sent.fromVersion, { kind: sent.kind, value: sent.value }),
+                }),
               }
             : null;
 
@@ -775,7 +802,14 @@ export function WorksheetScreen() {
 
       {timeline.data === undefined ? null : <WorksheetTimeline entries={timeline.data} />}
 
-      <ToastHost toast={toast} onDismiss={dismiss} />
+      <ToastHost
+        toast={toast}
+        onDismiss={() => {
+          // 토스트가 떠나면 그 기억도 함께 비운다 — 묵은 참이 다음 실패의 판단을 흐린다.
+          exitUndoable.current = false;
+          dismiss();
+        }}
+      />
     </section>
   );
 }

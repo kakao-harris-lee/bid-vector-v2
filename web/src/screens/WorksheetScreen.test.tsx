@@ -1418,3 +1418,67 @@ describe('화면 C — 건을 내려놓는다', () => {
     expect(await screen.findByTestId('write-failure')).toBeTruthy();
   });
 });
+
+/**
+ * **머지 차례 수정 라운드 — 13D 의 defect ④ 가 반복된 자리**(cr M-1 · L-1).
+ *
+ * 가드는 「한 입구」일 때만 가드다. 다시 시도가 가드 밖에 있으면 같은 틱의 두 누름이 요청 둘을
+ * 내고, 둘째의 409 가 **첫째의 성공 위에 실패 얼굴**을 세운다 — 이 저장소가 이미 두 번 고친 꼴이다.
+ */
+describe('화면 C — 내려놓기의 입구는 하나다', () => {
+  async function failedDefer(): Promise<void> {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    await screen.findByTestId('write-failure');
+  }
+
+  it('다시 시도 연타는 요청을 하나만 더 낸다', async () => {
+    await failedDefer();
+    expect(mocked.deferCase).toHaveBeenCalledTimes(1);
+
+    const retry = within(screen.getByTestId('write-failure')).getByRole('button', { name: '다시 시도' });
+    // 같은 틱의 두 누름 — `disabled` 가 올라오는 재렌더보다 손가락이 빠르다(13D 실측).
+    retry.click();
+    retry.click();
+
+    await waitFor(() => expect(mocked.deferCase.mock.calls.length).toBeGreaterThan(1));
+    expect(mocked.deferCase).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * **실패가 성공한 내려놓기의 되돌릴 길을 걷지 않는다**(cr L-1 · 13D 가 같은 자리에 둔 예외).
+   * 되돌릴 수 있는데 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다.
+   */
+  it('뒤이은 내려놓기가 실패해도 실행 취소 토스트는 남는다', async () => {
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'WATCHING' }]);
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED', caseVersion: 1 }]);
+    mocked.deferCase.mockResolvedValue({ ...CASE, state: 'DEFERRED', caseVersion: 1 });
+    mocked.skipCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    expect((await screen.findByTestId('toast')).textContent).toContain('실행 취소');
+
+    // 같은 건에서 건너뜀을 시도해 실패시킨다 — 그 실패가 위 토스트를 걷으면 안 된다.
+    fireEvent.click(await screen.findByTestId('worksheet-exit-SKIP'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.SKIP.label ?? ''), {
+      target: { value: '예산 초과' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+    await screen.findByTestId('write-failure');
+
+    expect(screen.queryByTestId('toast')?.textContent, '실패가 되돌릴 길을 걷었다').toContain('실행 취소');
+  });
+});
