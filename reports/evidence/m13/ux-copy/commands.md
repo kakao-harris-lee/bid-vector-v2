@@ -288,3 +288,9 @@ W-1~W-13 **각각 exit 0** · 스크립트 자기 종료 코드 **`SCRIPT EXIT=0
 
 **내 라벨 변경이 13D·13C 의 여정을 깨지 않았다** — 여정 일곱 spec 이 모두 돌고 건너뜀 0 이다.
 스모크 레인은 13C 가 세운 등록부이고 그 등식도 함께 선다.
+
+### Kotlin `check` — 머지 차례
+
+`BUILD SUCCESSFUL in 33s` · **exit 0**(424 actionable · 37 실행 · 387 up-to-date).
+**`leakPatternGate` 는 실행된 쪽**이다(UP-TO-DATE·FROM-CACHE·SKIPPED 표지 0) — 캐시 적중을
+초록으로 읽지 않았다.
