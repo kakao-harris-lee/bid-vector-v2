@@ -87,6 +87,25 @@ async function setRequiredKeyword(page: Page, raw: string): Promise<{ readonly s
 
 /** 오늘의 공고로 가서 제안 목록 응답을 받는다 — 상태·총수는 **헤더**가 나른다. */
 async function readSuggestions(page: Page): Promise<SuggestionsRead> {
+  /**
+   * **홈에 서 있으면 먼저 떠난다**(CI W-13 실패의 자리, 2026-11-20).
+   *
+   * 같은 자리로 가는 탐색 클릭은 **재마운트를 만들지 않고**, 제안 질의는 이미 캐시에 있어
+   * 아무 요청도 나가지 않는다 — 그러면 아래 포착이 120초를 기다리다 멈춘다. 로그인 직후가 바로
+   * 그 자리다(`signIn` 이 홈에서 끝나고, 홈은 마운트에서 제안을 읽는다).
+   *
+   * **이 구조는 13E 이전부터 있었다**(base 의 홈도 `enabled` 없이 마운트에서 읽었다 — 실측).
+   * 달라진 것은 **도착 차례**다: 앞 판의 홈은 공고 목록까지 함께 읽어 제안 응답이 늦게 왔고,
+   * 그래서 포착이 먼저 서는 쪽으로 **운이 좋았다**. 13E 가 그 읽기를 없애자 응답이 빨라져 순서가
+   * 뒤집혔다.
+   *
+   * 떠났다가 돌아오면 홈이 **다시 마운트**되고 기본 staleTime 이 0 이라 그 마운트가 새 읽기를
+   * 낸다 — 도착 차례에 기대지 않는다. 주소를 손으로 적지 않는 규율은 그대로다(셸 탐색을 지난다).
+   */
+  if (await page.getByTestId('screen-home').isVisible()) {
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    await expect(page.getByTestId('screen-settings')).toBeVisible();
+  }
   const read = page.waitForResponse(
     (one) => one.url().endsWith('/api/suggestions') && one.request().method() === 'GET' && one.status() === 200,
   );
