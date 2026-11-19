@@ -1,8 +1,10 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 
 import {
+  addBidCase,
+  deferCase,
   draftBid,
   listBidCases,
   readTimeline,
@@ -10,22 +12,27 @@ import {
   requestBidPrice,
   resumeCase,
   searchNotices,
+  skipCase,
   type BidCase,
   type BidPriceRequestResponse,
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
-import { Button } from '../components/Button';
+import { Button, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { Field, StateBadge } from '../components/StateBadge';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
+import { exitsOf, type BidBoxAction, type ExitActionKind } from '../display/bidBoxDisplay';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
+import { floorMarginOf, type FloorMargin } from '../display/floorMargin';
+import { koreanAmountTextOf } from '../display/moneyDisplay';
 import { amountDisplayOf, noticeStatusDisplayOf } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
-import { dayCountText, daysUntil, instantDisplayOf, readClock } from '../display/timeDisplay';
+import { dayCountText, daysUntil, instantDisplayOf, localInputToIso, readClock } from '../display/timeDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
+import { ActionForm, type ActionPayload } from './BidBoxCard';
 import { InstantText } from './InstantText';
 import { WorksheetGrounds } from './WorksheetGrounds';
 import {
@@ -37,10 +44,57 @@ import {
   parseDrawNumbers,
   parseWon,
   type BidAmountForm,
+  type VatTreatment,
 } from './WorksheetRecord';
 import { CaseStateBadge, WorksheetTimeline } from './WorksheetTimeline';
 
 const BID_KIND: BidCase['bidKind'] = 'REAL';
+
+/**
+ * 내려놓기 하나를 보낸다 — **열린 종류 전수의 `switch`** 다(`ExitActionKind` 가 13D 의 표에서
+ * 유도된 타입이라, 그 표에 종류가 늘면 `never` 단언이 **여기서 컴파일을 멈춘다**).
+ *
+ * 쿼리도 표도 13D 의 것을 그대로 쓴다 — 이 함수가 더하는 것은 「워크시트의 두 축을 그 쿼리에
+ * 잇는다」뿐이다. `datetime-local` 값의 변환 자리는 저장소에 하나(`timeDisplay`)이고, 읽히지
+ * 않으면 **보내지 않는다**(쓰기 실패 얼굴이 받는다 — 오류 경계로 보내지 않는다).
+ */
+function sendExit(caseId: number, payload: { readonly kind: ExitActionKind; readonly value: string }): Promise<BidCase> {
+  switch (payload.kind) {
+    case 'DEFER': {
+      const iso = localInputToIso(payload.value);
+      if (iso === null) {
+        throw new Error('시각을 읽지 못했다 — 날짜와 시각을 다시 적으십시오.');
+      }
+      return deferCase(caseId, { remindAt: iso });
+    }
+    case 'SKIP':
+      // 사유는 **적힌 그대로** 싣는다 — 다듬으면 기록에 남는 말이 운영자가 본 말과 달라진다.
+      // 빈 값·상한 초과는 폼이 보내기 전에 거른다(13D 의 표시 층 판정).
+      return skipCase(caseId, { reason: payload.value });
+    default: {
+      const unreachable: never = payload.kind;
+      throw new Error(`모르는 내려놓기 종류: ${JSON.stringify(unreachable)}`);
+    }
+  }
+}
+
+/** 내려놓기의 자리 표지 — 화면 D 의 카드와 **다른 이름**이다(한 여정이 두 화면을 지난다). */
+const EXIT_TEST_ID = {
+  DEFER: 'worksheet-exit-DEFER',
+  SKIP: 'worksheet-exit-SKIP',
+} as const satisfies Record<ExitActionKind, string>;
+
+/**
+ * **보내기 전 확인**(§6.2 C 3 — 「안을 고르면 확인이 뜨고, 확인하면 초안이 만들어진다」).
+ *
+ * 확인에 **보낼 값을 담는다**. 지금 입력을 다시 읽으면 확인한 수와 보내는 수가 갈릴 수 있고,
+ * 이 화면의 축이 바로 투찰 금액이다. 입력이 바뀌면 이 확인은 **닫힌다**(다른 수를 가리키는
+ * 확인을 들고 있지 않는다).
+ */
+interface BidConfirmation {
+  readonly amountWon: number;
+  readonly vat: VatTreatment;
+}
 
 /**
  * 화면 C — 공고 워크시트(§6.2 C). ②③④를 한 화면에 둔다: 머리 → 자격·근거 → 나라장터 이동 →
@@ -63,6 +117,10 @@ export function WorksheetScreen() {
   const [price, setPrice] = useState<BidPriceRequestResponse | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
   const [activeBidsBlocked, setActiveBidsBlocked] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<BidConfirmation | null>(null);
+  const confirmTitleId = `bid-confirm-title-${useId()}`;
+  /** 내려놓기 폼의 자리 — 13D 의 폼이 `aria-controls` 로 쓰는 그 id 와 같은 몫이다. */
+  const exitFormId = `worksheet-exit-form-${useId()}`;
   // **한 번 읽고 내린다**(M9 D-1) — 렌더마다 다시 읽으면 같은 화면의 두 칸이 서로 다른
   // 「지금」으로 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
   const [now] = useState(readClock);
@@ -91,6 +149,15 @@ export function WorksheetScreen() {
   async function refreshCase(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: bidCasesQueryKey(BID_KIND) });
     await queryClient.invalidateQueries({ queryKey: ['timeline'] });
+  }
+
+  /**
+   * 입력이 바뀌면 **열어 둔 확인은 닫는다** — 확인한 금액과 보낼 금액이 갈리지 않게 한다.
+   * 어느 칸이 바뀌어도 닫는다: 과세 구분도 보낼 진술의 일부다.
+   */
+  function changeForm(next: BidAmountForm): void {
+    setForm(next);
+    setConfirming(null);
   }
 
   /**
@@ -228,6 +295,24 @@ export function WorksheetScreen() {
     },
   });
 
+  /**
+   * 열어 둔 내려놓기 폼 — **열린 집합은 표가 정한다**(화면이 상태를 보고 고르지 않는다).
+   */
+  const [exiting, setExiting] = useState<BidBoxAction | null>(null);
+  /**
+   * 쓰기가 날아가 있는가 — **동기 가드**다(13D cr MEDIUM 실측의 선례). 버튼의 `disabled` 만으로는
+   * 같은 틱의 연타를 막지 못한다(`isPending` 이 올린 재렌더보다 손가락이 빠르다). 내려놓기 둘은
+   * 되돌릴 수 없거나(건너뜀) 되돌리는 데 전이가 하나 더 드는 자리라(나중에) 중복이 비싸다.
+   */
+  const exitSending = useRef(false);
+  /**
+   * 지금 떠 있는 토스트가 **실행 취소를 들었는가**(cr L-1 · 13D 가 같은 자리에 둔 예외).
+   * 뒤이은 쓰기가 실패해도 **성공한 내려놓기의 되돌릴 길**은 걷지 않는다 — 되돌릴 수 있는데
+   * 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다. 토스트가 떠나면 함께 비운다(묵은 참이
+   * 다음 실패의 판단을 흐린다).
+   */
+  const exitUndoable = useRef(false);
+
   const resume = useMutation({
     mutationFn: (payload: { readonly caseId: number; readonly fromVersion: number }) =>
       resumeCase(payload.caseId),
@@ -241,6 +326,115 @@ export function WorksheetScreen() {
       await refreshCase();
     },
   });
+
+  /**
+   * **내려놓기**(계약 받는 항목 3 의 워크시트 자리 — 13D 머지 뒤 팀장 호출로 섰다).
+   *
+   * 「나중에」는 역전이가 있어 **되돌릴 길을 토스트에 함께** 낸다(그 전이는 이 화면이 이미 가진
+   * `resume` 이다 — 사본이 생기지 않는다). 「건너뜀」은 유일한 종단이라 실행 취소가 없고, 그 대신
+   * 폼이 보내기 전에 한 번 더 묻는다(13D 의 입력 꼴 표에 그 문면이 있다).
+   *
+   * 실패는 **서버 상태를 다시 읽고** 쓰기 실패 얼굴을 낸다 — 다른 쓰기들과 같은 관례다.
+   */
+  const exit = useMutation({
+    mutationFn: (payload: {
+      readonly caseId: number;
+      readonly kind: ExitActionKind;
+      readonly value: string;
+      readonly fromVersion: number;
+    }) => sendExit(payload.caseId, { kind: payload.kind, value: payload.value }),
+    onSuccess: async (updated, sent) => {
+      // **가드를 여기서 푼다** — 실행 취소가 살아나는 시점과 같아야 한다(13D 의 그 자리와 같은 사유).
+      exitSending.current = false;
+      /*
+       * **실행 취소가 붙은 토스트인가.** 오늘 이 값은 도달 가능한 자리에서 늘 참이다 — 성공 뒤
+       * 내려놓기가 또 열리는 상태는 「나중에」가 만든 그 상태 하나뿐이고(「건너뜀」은 종단이라
+       * 그 뒤로 열린 내려놓기가 없다), 그래서 이 줄을 `true` 로 바꾸는 변이가 **초록이다**(실측).
+       * 그래도 종류에서 유도한다: 종류가 늘면(예: 되돌릴 수 없는 셋째 내려놓기) 그 순간부터
+       * 두 값이 갈리고, 그때 이 줄이 이미 맞는 쪽에 서 있다.
+       */
+      exitUndoable.current = sent.kind === 'DEFER';
+      show(
+        sent.kind === 'DEFER'
+          ? {
+              text: '나중에 보기로 했습니다.',
+              undo: {
+                label: '실행 취소',
+                // 되돌릴 건과 버전은 **서버가 준 응답**에서 온다 — 화면이 쥔 값이 아니다.
+                run: () => resume.mutate({ caseId: updated.caseId, fromVersion: updated.caseVersion }),
+              },
+            }
+          : { text: '건너뛰었습니다.' },
+      );
+      await refreshCase();
+    },
+    onSettled: () => {
+      exitSending.current = false;
+    },
+    onError: async () => {
+      // **실행 취소가 붙은 토스트는 걷지 않는다**(cr L-1): 실패는 쓰기 실패 얼굴이 따로 말하고,
+      // 실행 취소가 없는 토스트만 걷는다(그것이 실패 얼굴 옆에 남으면 무엇이 성공인지 흐려진다).
+      if (!exitUndoable.current) {
+        dismiss();
+      }
+      await refreshCase();
+    },
+  });
+
+  /**
+   * 내려놓기로 가는 **한 입구** — 폼의 보내기와 **쓰기 실패 얼굴의 다시 시도**가 이 가드를 지난다
+   * (cr M-1 — 앞 판은 다시 시도가 가드 밖이었고, 같은 틱의 두 누름이 요청 셋을 냈다. 실측:
+   * 1 → 3). 입구가 둘이면 가드가 하나여도 소용이 없다.
+   *
+   * **토스트의 실행 취소는 이 가드 밖이다** — 그 버튼은 한 번 누르면 토스트가 닫히는 **단발
+   * 입구**이고(ToastHost 가 그 자리에서 토스트를 걷는다), 그래서 같은 틱의 둘째 누름이 닿을
+   * 요소가 없다. 되돌림 전이는 서버가 409 로 막는 쪽이기도 하다.
+   */
+  function submitExit(caseId: number, fromVersion: number, payload: ActionPayload): void {
+    if (exitSending.current) {
+      return;
+    }
+    if (payload.kind !== 'DEFER' && payload.kind !== 'SKIP') {
+      return;
+    }
+    exitSending.current = true;
+    setExiting(null);
+    exit.mutate({ caseId, kind: payload.kind, value: payload.value, fromVersion });
+  }
+
+  /**
+   * **담기**(계약 받는 항목 3·7 의 워크시트 자리) — 이 공고가 입찰함에 없으면 그 자리에서 담는다.
+   * 앞 판은 「오늘의 공고에서 담으십시오」라고만 말해, 워크시트까지 온 운영자를 되돌려 보냈다.
+   *
+   * 서버가 같은 (공고, 종류)에 건을 **하나만** 두고 이미 담긴 건이면 그 건을 돌려주므로, 재시도가
+   * 중복 행을 만들지 않는다(그래서 다른 쓰기들과 달리 버전 가드가 필요 없다).
+   */
+  const addCase = useMutation({
+    mutationFn: () => addBidCase({ noticeNumber, noticeRound, bidKind: BID_KIND }),
+    onSuccess: async () => {
+      show({ text: '입찰함에 담았습니다.' });
+      await refreshCase();
+    },
+    onError: async () => {
+      dismiss();
+      await refreshCase();
+    },
+  });
+
+  /**
+   * 내려놓기의 **다시 시도** — 가드를 지나는 입구로 보낸다(cr M-1). 버전 가드는 공용 `writeRetry`
+   * 를 그대로 쓰고(틱을 건넌 재전송을 막는 축) 보내는 자리만 `submitExit` 으로 바꾼다.
+   *
+   * 조립을 **누를 때** 하는 이유: 그 조립이 `submitExit` 을 담고 그것이 가드 ref 를 읽으므로,
+   * render 중에 만들면 「render 중 ref 접근」이 된다(lint 가 그 자리를 든다).
+   */
+  function retryExit(): void {
+    writeRetry({
+      variables: exit.variables,
+      reset: exit.reset,
+      mutate: (sent) => submitExit(sent.caseId, sent.fromVersion, { kind: sent.kind, value: sent.value }),
+    })();
+  }
 
   /** 금액·과세가 **둘 다** 있어야 전이를 부른다 — 없으면 멈추고 무엇이 없는지 말한다. */
   function amountOrBlock(): { readonly amountWon: number; readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN' } | null {
@@ -290,7 +484,9 @@ export function WorksheetScreen() {
       return;
     }
     if (kind === 'DRAFT_BID') {
-      makeDraft.mutate({ caseId, ...amount, at: readClock().toISOString(), fromVersion });
+      // **초안 앞에만 확인이 선다**(§6.2 C 3). 「제출함」은 §6.2 C 5 가 「한 번으로 ④ 완료」로
+      // 둔 자리라 같은 단계를 더하지 않는다 — 운영자는 이미 나라장터에서 제출을 끝내고 돌아온다.
+      setConfirming({ amountWon: amount.amountWon, vat: amount.vat });
       return;
     }
     const drawNumbers = parseDrawNumbers(form.drawNumbers);
@@ -303,6 +499,21 @@ export function WorksheetScreen() {
       ...amount,
       drawNumbers,
       memo: form.memo,
+      at: readClock().toISOString(),
+      fromVersion,
+    });
+  }
+
+  /** 확인에 담긴 **그 진술**을 보낸다 — 보내는 순간 확인은 닫힌다. */
+  function acceptConfirmed(caseId: number, fromVersion: number): void {
+    if (confirming === null) {
+      return;
+    }
+    setConfirming(null);
+    makeDraft.mutate({
+      caseId,
+      amountWon: confirming.amountWon,
+      vat: confirming.vat,
       at: readClock().toISOString(),
       fromVersion,
     });
@@ -344,6 +555,12 @@ export function WorksheetScreen() {
         <EmptyFace
           testId="worksheet-missing"
           display={{ label: '그 공고를 찾지 못했습니다', why: '수집된 공고 가운데 이 번호·차수가 없습니다', tone: 'absent' }}
+          // 이유만 말하고 멈추지 않는다 — 여기서 할 수 있는 다음 걸음은 목록으로 돌아가는 것이다.
+          action={
+            <LinkButton to="/" testId="worksheet-missing-next">
+              오늘의 공고로 가기
+            </LinkButton>
+          }
         />
       </section>
     );
@@ -373,7 +590,28 @@ export function WorksheetScreen() {
             error: resume.error,
             retry: writeRetry(resume),
           }
-        : null;
+        : addCase.isError
+          ? {
+              what: '입찰함에 담지',
+              error: addCase.error,
+              // 담기는 **멱등**이라(서버가 이미 담긴 건을 돌려준다) 보낸 진술을 그대로 다시 보낸다.
+              retry: () => addCase.mutate(),
+            }
+          : exit.isError
+            ? {
+                /* 어느 내려놓기였는지 **그 전이로** 말한다. 이 문면은 실패를 말하는 문장의
+                   조각이라 표의 라벨(「나중에」·「건너뜀」)과 모양이 다르다 — 표를 여기 끼우면
+                   「나중에를 하지 못했습니다」가 되어 한국어가 아니다. 다시 보내기는 다른 쓰기와
+                   같은 버전 가드를 지난다: 그 사이 건이 움직였으면 보내지 않는다(내려놓기는
+                   멱등이 아니다). */
+                what: `${exit.variables?.kind === 'SKIP' ? '건너뛰지' : '나중에 보기로 돌리지'}`,
+                error: exit.error,
+                /* 이 갈래의 다시 시도는 **가드를 지나는 입구**이고 그 입구가 가드 ref 를 읽는다.
+                   그래서 이 객체에 담지 않고 **그리는 자리에서** 건다 — 담으면 이 객체 자체가
+                   「render 중에 읽는 ref 값」이 되어 그 자리를 보는 lint 가 든다. */
+                retry: null,
+              }
+            : null;
 
   const amount = amountDisplayOf(notice);
   // 마감은 **절대 시각과 남은 날이 한 칸**이다 — 둘 다 `timeDisplay` 를 지난다(M9 D-1·D-2).
@@ -381,7 +619,24 @@ export function WorksheetScreen() {
   const deadlineDays = dayCountText(daysUntil(notice.deadlineAt, now));
   const checkpoint = bidCase === undefined ? null : instantDisplayOf(bidCase.nextCheckpointAt);
   const action = bidCase === undefined ? null : nextActionOf(bidCase.state, price !== null);
+  /** 이 상태에서 열린 내려놓기 — **표에서 유도된다**(화면이 상태를 보고 고르지 않는다). */
+  const exits = bidCase === undefined ? [] : exitsOf(bidCase.state);
   const amountWon = parseWon(form.amount);
+  /**
+   * 하한 대비 여유 — **투찰가 응답이 있어야** 하한율이 있다. 요청 전에는 자리 자체를 만들지
+   * 않는다(없는 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다).
+   */
+  const margin: FloorMargin | null =
+    price === null
+      ? null
+      : floorMarginOf({
+          groundsState: price.floorRateGroundsState,
+          rateFraction: price.publishedFloorRateFraction,
+          baseAmountWon: price.baseAmountWon,
+          baseAmountVatTreatment: price.baseAmountVatTreatment,
+          bidAmountWon: amountWon,
+          bidVatTreatment: form.vat,
+        });
 
   return (
     <section data-testid="screen-worksheet" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -424,7 +679,23 @@ export function WorksheetScreen() {
           )}
         </dl>
         {bidCase === undefined ? (
-          <p className="mt-3 text-xs text-ink-soft">이 공고는 아직 입찰함에 없습니다 — 「오늘의 공고」에서 담으십시오.</p>
+          /* **다음 걸음을 그 자리에 둔다**(계약 받는 항목 7) — 앞 판은 다른 화면으로 돌려보냈다. */
+          <div className="mt-3 flex flex-col gap-2">
+            <p className="text-xs text-ink-soft">
+              이 공고는 아직 입찰함에 없습니다 — 담으면 투찰가를 요청하고 투찰을 기록할 수 있습니다.
+            </p>
+            <div>
+              <Button
+                tone="primary"
+                size="lg"
+                testId="worksheet-add-case"
+                onClick={() => addCase.mutate()}
+                disabled={addCase.isPending}
+              >
+                입찰함에 담기
+              </Button>
+            </div>
+          </div>
         ) : action === null ? (
           <p className="mt-3 text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
         ) : (
@@ -447,10 +718,45 @@ export function WorksheetScreen() {
             </div>
           </>
         )}
+
+        {/* **내려놓기는 다른 줄이다**(13D 의 선례). 위 줄의 「다음 행동 하나」와 섞으면 이 상태에서
+            행동이 셋이 되고 무엇이 다음 걸음인지 화면이 말하지 못한다(§6.5). 열린 집합은 표가
+            정하고, 폼은 13D 의 것 하나다 — 입력 꼴·빈 값 가드·확인 한 단이 두 화면에서 같다. */}
+        {bidCase === undefined || exits.length === 0 ? null : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {exits.map((one) => (
+              <Button
+                key={one.kind}
+                testId={EXIT_TEST_ID[one.kind as ExitActionKind]}
+                onClick={() => setExiting(one)}
+                disabled={exit.isPending || resume.isPending}
+              >
+                {one.label}
+              </Button>
+            ))}
+          </div>
+        )}
+        {bidCase === undefined || exiting === null ? null : (
+          /* **폼의 정체를 행동에 묶는다**(13D cr HIGH): `key` 가 없으면 「닫지 않고 다른 것을
+             연다」가 앞 폼의 값과 확인 상태를 그대로 물려받고, 그 입력이 되돌릴 수 없는 전이에
+             실려 나간다. */
+          <ActionForm
+            key={exiting.kind}
+            action={exiting}
+            formId={exitFormId}
+            pending={exit.isPending}
+            onCancel={() => setExiting(null)}
+            onSend={(payload) => submitExit(bidCase.caseId, bidCase.caseVersion, payload)}
+          />
+        )}
       </header>
 
       {writeFailure === null ? null : (
-        <WriteFailureFace what={writeFailure.what} error={writeFailure.error} onRetry={writeFailure.retry} />
+        <WriteFailureFace
+          what={writeFailure.what}
+          error={writeFailure.error}
+          onRetry={writeFailure.retry ?? retryExit}
+        />
       )}
 
       {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
@@ -461,7 +767,7 @@ export function WorksheetScreen() {
 
       {bidCase === undefined ? null : (
         <>
-          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} />
+          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
           <section className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰 금액과 기록</h3>
             {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
@@ -473,15 +779,59 @@ export function WorksheetScreen() {
             ) : null}
             <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
             <div className="mt-3">
-              <BidAmountFields form={form} onChange={setForm} blocked={blocked} />
+              <BidAmountFields form={form} onChange={changeForm} blocked={blocked} />
             </div>
+            {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보이고, 하한 대비
+                자리도 같은 자리에 둔다. 확인에 담긴 값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
+            {/* **그 상태에서만 선다**(cr L-7). 확인을 열어 둔 사이 건이 움직이면 그 확인은 이미
+                다른 상태의 것이고, 그대로 보내면 서버가 409 로 막는다 — 운영자에게는 「확인했는데
+                실패했다」로 보인다. 다음 행동이 초안이 아니면 패널 자체를 그리지 않는다. */}
+            {confirming === null || action?.kind !== 'DRAFT_BID' ? null : (
+              <div
+                data-testid="bid-confirm"
+                role="group"
+                aria-labelledby={confirmTitleId}
+                className="mt-3 rounded-md border border-line p-3"
+              >
+                <p id={confirmTitleId} className="text-sm font-medium">
+                  이 금액으로 투찰하시겠습니까?
+                </p>
+                <p className="mt-2 font-numeric text-base">{confirming.amountWon.toLocaleString('ko-KR')}</p>
+                {koreanAmountTextOf(confirming.amountWon) === null ? null : (
+                  <p className="mt-1 text-xs text-ink-soft">{koreanAmountTextOf(confirming.amountWon)}</p>
+                )}
+                <p className="mt-2 text-xs text-ink-soft">
+                  이 수로 투찰 예정 초안을 남깁니다. 나라장터 제출은 운영자가 직접 합니다.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    tone="primary"
+                    testId="bid-confirm-accept"
+                    onClick={() => acceptConfirmed(bidCase.caseId, bidCase.caseVersion)}
+                    disabled={makeDraft.isPending}
+                  >
+                    이 금액으로 초안 만들기
+                  </Button>
+                  <Button testId="bid-confirm-cancel" onClick={() => setConfirming(null)}>
+                    취소
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
         </>
       )}
 
       {timeline.data === undefined ? null : <WorksheetTimeline entries={timeline.data} />}
 
-      <ToastHost toast={toast} onDismiss={dismiss} />
+      <ToastHost
+        toast={toast}
+        onDismiss={() => {
+          // 토스트가 떠나면 그 기억도 함께 비운다 — 묵은 참이 다음 실패의 판단을 흐린다.
+          exitUndoable.current = false;
+          dismiss();
+        }}
+      />
     </section>
   );
 }

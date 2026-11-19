@@ -4,13 +4,16 @@ import { useSearchParams } from 'react-router';
 
 import {
   awaitOpening,
+  deferCase,
   enterQualificationReview,
   listBidCases,
   recordOpening,
   recordOutcome,
   resumeCase,
+  skipCase,
   type BidCase,
 } from '../api/queries';
+import { LinkButton } from '../components/Button';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
@@ -67,8 +70,14 @@ function instantOrRefuse(value: string): string {
 
 function send({ caseId, payload }: Sent): Promise<BidCase> {
   switch (payload.kind) {
+    case 'DEFER':
+      return deferCase(caseId, { remindAt: instantOrRefuse(payload.value) });
     case 'RESUME':
       return resumeCase(caseId);
+    case 'SKIP':
+      // 사유는 **적힌 그대로** 싣는다 — 다듬으면 기록에 남는 말이 운영자가 본 말과 달라진다.
+      // 빈 값·상한 초과는 카드가 보내기 전에 거른다(표시 층의 판정).
+      return skipCase(caseId, { reason: payload.value });
     case 'AWAIT_OPENING':
       return awaitOpening(caseId, { openingAt: instantOrRefuse(payload.value) });
     case 'RECORD_OPENING':
@@ -126,6 +135,21 @@ export function BidBoxScreen() {
    * 탭으로 끌려갔다. 카드의 `datetime-local` 을 채우는 중 전이 응답이 오면 입력에서 빠진다.
    */
   const pendingFocus = useRef<BidBoxTabId | null>(null);
+  /**
+   * 지금 떠 있는 토스트가 **실행 취소를 들었는가** — 실패가 그것을 지우지 않게 하는 자리다
+   * (`onError`). 토스트가 떠나면 함께 비운다: 남겨 두면 **다음 실패**가 그 묵은 참을 보고
+   * 「보냈습니다」 토스트를 실패 얼굴 옆에 남긴다.
+   */
+  const undoable = useRef(false);
+  /**
+   * 쓰기가 날아가 있는가 — **동기 가드**다(cr MEDIUM).
+   *
+   * 버튼의 `disabled` 만으로는 모자란다: 같은 틱에 들어온 연타는 `isPending` 이 올린 재렌더보다
+   * **빠르다**(실측 — 세 클릭이 요청 셋이 됐다). 손가락·더블클릭이 한 프레임 안에 두 번 닿는
+   * 것은 평범하므로, 막는 자리는 상태가 아니라 **이 ref** 여야 한다. `disabled` 는 그 사실을
+   * 눈과 보조기기에 **보이는** 몫이다.
+   */
+  const sending = useRef(false);
 
   useEffect(() => {
     const target = pendingFocus.current;
@@ -141,10 +165,42 @@ export function BidBoxScreen() {
 
   const transition = useMutation({
     mutationFn: send,
-    onSuccess: async (updated) => {
-      // 실행 취소를 두지 않는다 — 이 전이들의 **역전이가 계약에 없다**(되돌림은 `resume` 하나고
-      // 그것 자체가 역전이다). 「취소할 수 있다」고 보이면 거짓말이 된다(D-7E-5).
-      show({ text: '보냈습니다.' });
+    onSuccess: async (updated, sent) => {
+      /*
+       * **가드를 여기서 푼다 — `onSettled` 가 아니라.**
+       *
+       * 토스트는 바로 아래에서 뜨는데 이 함수는 재조회를 기다리며 **계속 돈다**. 가드를 끝에서
+       * 풀면 그 창 안의 실행 취소 누름이 거절되고, 누르면 토스트는 닫히므로 **아무것도 가지
+       * 않은 채 되돌릴 길만 사라진다**(실측: 되돌림 호출 0). 실행 취소가 살아나는 시점과 가드가
+       * 풀리는 시점은 **같아야 한다**.
+       *
+       * 거절 경로는 `onSettled` 가 계속 든다(그 자리는 토스트를 띄우지 않는다).
+       */
+      sending.current = false;
+      /*
+       * 실행 취소는 **되돌림 전이가 있는 곳에만** 둔다(D-7E-5) — 없는 자리에 두면 그 버튼이
+       * 거짓말이 된다. 계약에서 되돌림 전이가 있는 쌍은 **하나**다: 「나중에」의 역전이가
+       * 「다시 보기」이고 그 둘이 서로의 역이다. 그래서 분기도 하나다(표로 펼칠 갈래가 없다).
+       *
+       * 「건너뜀」은 유일한 종단이라 실행 취소가 **없고**, 그 대신 카드가 보내기 전에 한 번 더
+       * 묻는다(입력 꼴 표의 `confirm`).
+       *
+       * 되돌릴 건의 식별자는 **서버가 준 응답**에서 온다 — 화면이 쥔 값이 아니다.
+       */
+      undoable.current = sent.payload.kind === 'DEFER';
+      show(
+        sent.payload.kind === 'DEFER'
+          ? {
+              text: '나중에 보기로 했습니다.',
+              undo: {
+                label: '실행 취소',
+                run: () => {
+                  submit(updated.caseId, { kind: 'RESUME', value: 'instant' });
+                },
+              },
+            }
+          : { text: '보냈습니다.' },
+      );
       await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       // 전이는 타임라인에도 사건을 남긴다 — C 의 쓰기와 **같은 관례**로 그 질의도 무효화한다
       // (CR r1 L-6: 두 화면의 관례가 갈리면 C 로 돌아갔을 때 낡은 목록을 볼 수 있다).
@@ -154,11 +210,36 @@ export function BidBoxScreen() {
     },
     // 실패는 **서버 상태를 다시 읽고** 얼굴을 낸다 — 카드가 옛 버튼을 계속 보이면 운영자가
     // 다시 누르고, 그 사이 실제로 전이됐는지는 아무도 모른다.
+    // 거절 경로의 풀기 — 성공 경로는 `onSuccess` 맨 앞에서 이미 풀었다(그 자리의 사유 참조).
+    onSettled: () => {
+      sending.current = false;
+    },
     onError: async () => {
-      dismiss();
+      /*
+       * 뒤이은 쓰기가 실패해도 **성공한 쓰기의 되돌릴 길**은 지우지 않는다(cr MEDIUM).
+       * 되돌릴 수 있는데 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다 — 실패는 쓰기 실패
+       * 얼굴이 따로 말한다. 실행 취소가 없는 토스트(「보냈습니다」)만 걷는다: 그것이 실패 얼굴
+       * 옆에 남으면 무엇이 성공이고 무엇이 실패인지 흐려진다.
+       */
+      if (!undoable.current) {
+        dismiss();
+      }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
   });
+
+  /**
+   * 쓰기로 가는 **한 입구** — 카드의 버튼도, 토스트의 실행 취소도, 쓰기 실패 얼굴의 다시
+   * 시도도 이 가드를 지난다. 입구가 둘이면 가드가 하나여도 소용이 없다(실측: 다시 시도 연타가
+   * 가드 밖에서 요청 넷을 냈다).
+   */
+  function submit(caseId: number, payload: ActionPayload): void {
+    if (sending.current) {
+      return;
+    }
+    sending.current = true;
+    transition.mutate({ caseId, payload });
+  }
 
   // 세션이 없다는 **서버의 답**은 재시도로 풀리지 않는다 — 일시 장애와 같은 얼굴을 내지 않는다.
   if (signedIn === false || isUnauthorized(cases.error)) {
@@ -225,7 +306,7 @@ export function BidBoxScreen() {
           error={transition.error}
           onRetry={() => {
             if (transition.variables !== undefined) {
-              transition.mutate(transition.variables);
+              submit(transition.variables.caseId, transition.variables.payload);
             }
           }}
         />
@@ -241,7 +322,17 @@ export function BidBoxScreen() {
           잃었다. 이제 `<div role="tabpanel">` 가 감싸고 그 안에 빈 얼굴 또는 `<ul>` 이 온다. */}
       <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(tab)}>
         {cases.isSuccess && shown.length === 0 ? (
-          <EmptyFace display={EMPTY_TAB_DISPLAY} testId="bid-box-empty" />
+          /* 빈 얼굴이 **다음 걸음을 준다**(항목 7). 사유는 이미 문면에 있고 없던 것은 「그래서
+             무엇을 하면 되는가」다 — 담을 건을 찾는 자리로 보낸다. */
+          <EmptyFace
+            display={EMPTY_TAB_DISPLAY}
+            testId="bid-box-empty"
+            action={
+              <LinkButton to="/" tone="primary" testId="bid-box-empty-action">
+                오늘의 공고에서 담기
+              </LinkButton>
+            }
+          />
         ) : null}
         {shown.length === 0 ? null : (
           <ul className="flex flex-col gap-3">
@@ -249,14 +340,22 @@ export function BidBoxScreen() {
               <BidBoxCard
                 key={row.caseId}
                 bidCase={row}
-                onSend={(caseId, payload) => transition.mutate({ caseId, payload })}
+                pending={transition.isPending}
+                onSend={submit}
               />
             ))}
           </ul>
         )}
       </div>
 
-      <ToastHost toast={toast} onDismiss={dismiss} />
+      <ToastHost
+        toast={toast}
+        onDismiss={() => {
+          // 토스트가 떠나면 그 기억도 함께 비운다 — 묵은 참이 다음 실패의 판단을 흐린다.
+          undoable.current = false;
+          dismiss();
+        }}
+      />
     </section>
   );
 }

@@ -32,7 +32,8 @@
 // 이 그 꼴이다) 리터럴 쪽을 버리지 않는다(cr P-1). 타입이 **열거할 수 없는 문자열**
 // (넓은 `string`·`any`·템플릿 리터럴)이면 어느 태그인지 증명할 수 없으므로 **보수적으로** 위반이다.
 //
-// **경계**: `createElement` **호출 인자**로 넘긴 핸들러는 이 축 밖이다(JSX 가 아니다).
+// **경계였던 자리 하나가 닫혔다**(M13/13C): `createElement` 의 props 로 넘긴 핸들러도 센다 — 첫
+// 인자가 태그라 JSX 와 같은 타입 판정이 그대로 선다.
 import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -55,8 +56,11 @@ export const TAG_SCOPED_HANDLERS = { form: ['onSubmit', 'onReset'] };
  */
 const HANDLER_ATTRIBUTE = /^on[A-Z]/u;
 
-/** 소문자로 시작하는 태그 == 내장 요소. */
-const isIntrinsicName = (tag) => /^[a-z]/u.test(tag);
+/**
+ * 소문자로 시작하는 태그 == 내장 요소. **점이 들어간 이름은 아니다**(cr L-4) — `styles.Row` 처럼
+ * 한정된 이름은 컴포넌트이고, 그 자리는 검사기 갈래가 타입으로 판정한다(이 축은 글자로 접지 않는다).
+ */
+const isIntrinsicName = (tag) => /^[a-z][^.]*$/u.test(tag);
 
 /**
  * 증명할 수 없는 **문자열 꼴** — 어느 태그인지 열거할 수 없으면 보수적으로 위반이다. 넓은
@@ -156,9 +160,39 @@ const scopedHandlers = (tag) =>
  *  · **수신자**는 타입이 `Element` 계열인지로 본다 — 이름을 어떻게 가려도 타입은 못 가린다.
  *    `document`·`window` 는 `Element` 를 상속하지 않으므로 그대로 빠진다(셸의 Escape 하나).
  *
- * `createElement` 별칭은 **선언된 경계**라 이 축에 넣지 않는다(JSX 가 아니다).
+ * `createElement` 는 **더 이상 경계가 아니다**(M13/13C · 팀장 판정) — 첫 인자가 태그라 같은 타입
+ * 판정을 적용할 수 있고, 그래서 복제(참조 축)와 **다른 자리에서** 센다.
  */
 const CLONE_ELEMENT = 'cloneElement';
+/**
+ * 요소 **생성** 호출(M13/13C · 팀장 판정 2026-11-18). 13B 는 이것을 「JSX 가 아니다」로 경계에
+ * 두었지만 기전은 같다 — 비-상호작용 태그에 누르는 배선을 props 로 넘긴다.
+ *
+ * **복제와 판정이 다른 이유는 증명 가능성이다.** 복제는 이미 만들어진 요소에 props 를 덧붙이므로
+ * 태그를 볼 수 없어 **참조 자체**가 위반이고, 생성은 **첫 인자가 태그**라 JSX 와 같은 타입 판정을
+ * 그대로 적용할 수 있다 — 증명할 수 있을 때는 판정하고, 없을 때는 거절한다.
+ */
+const CREATE_ELEMENT = 'createElement';
+
+/**
+ * 요소를 **만드는** 함수 전수(M13/13C 수정 라운드 1 — v H-3). `createElement` 하나만 보면 같은
+ * 기전이 다른 로더 이름으로 그대로 선다 — `react/jsx-runtime` 의 `jsx`·`jsxs`·`jsxDEV` 가 그것이다.
+ */
+const ELEMENT_FACTORIES = new Set([CREATE_ELEMENT, 'jsx', 'jsxs', 'jsxDEV']);
+
+/** 생성·복제를 **한 묶음**으로 보는 자리(R1-H1) — 글자 키로 꺼내는 길이 둘 다 같다. */
+const ELEMENT_FUNCTION_NAMES = new Set([...ELEMENT_FACTORIES, CLONE_ELEMENT]);
+
+/**
+ * `Object`·`Reflect` 의 **멤버 심볼**로 합치기·반사 축을 묶는다(R1-M1 · cr N-1 · N-6).
+ *
+ * 앞 판은 **적힌 멤버 이름**으로 섰다. 그래서 두 방향으로 틀렸다 — 구조 분해·별칭으로 부르면
+ * 축이 아예 돌지 않았고(미탐), 요소를 키로 쓰는 `Map.get` 이 그 축에 들었다(오탐). 이름 대신
+ * **기본 라이브러리의 그 전역이 가진 멤버 심볼**과 맞댄다.
+ */
+const MERGE_MEMBERS = new Set(['assign', 'defineProperties', 'setPrototypeOf']);
+const KEYED_MEMBERS = new Set(['get', 'set', 'defineProperty', 'getOwnPropertyDescriptor']);
+const GLOBAL_HOLDERS = ['Object', 'Reflect'];
 const LISTENER_MEMBER = 'addEventListener';
 /** 요소에 **직접 대입**하는 인라인 핸들러(`el.onclick = …`) — DOM 의 소문자 이름이다. */
 const INLINE_HANDLER_MEMBER = /^on[a-z]+$/u;
@@ -182,31 +216,214 @@ function inheritsElement(type, depth = 0) {
 }
 
 /**
- * 수신자가 무엇인가 — `element`(요소) · `unprovable`(타입이 없어 **증명 불가**) · `other`.
- * 증명 불가는 **보수적으로** 위반 쪽이다: 타입이 서 있지 않은 자리에서 이 축이 조용히 열리면
- * 「이름을 가리면 된다」가 다시 참이 된다.
+ * **면제되는 수신자는 증명 가능한 문서·창뿐이다**(M13/13C — 13B v M-7b · cr Q-2).
+ *
+ * 앞 판은 「`Element` 를 상속하면 위반」이라는 **허용 쪽 기본값**이었다. 그래서 타입을
+ * `EventTarget`·`Node`·`GlobalEventHandlers` 로 **넓히거나** 타입 매개변수로 두는 것만으로
+ * 빠져나갔다(실측 넷). 뒤집으면 좁히는 쪽이 기본이 된다 — 문서·창임을 증명하지 못하면 위반이다.
+ *
+ * 문서·창은 **누르는 자리를 만들지 않는다**(그 면제가 여는 자리는 위임 핸들러이고, 그것은 이
+ * 축이 아니라 알려진 제한이다).
  */
-function receiverKind(checker, expression) {
-  const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
-  if ((type.getFlags() & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
-    return 'unprovable';
+const EXEMPT_RECEIVER_ROOTS = new Set(['Document', 'Window']);
+
+/**
+ * 면제 앵커 — **기본 라이브러리의 선언 심볼**이다(M13/13C — v H-2).
+ *
+ * 앞 판은 타입 **이름 글자**를 봤다. 그래서 모듈 안에 `interface Document extends HTMLElement` 를
+ * 세우면 캐스트 없이 컴파일되고 면제됐다(실측). 이름은 누구나 쓸 수 있지만 **라이브러리 선언의
+ * 심볼**은 그렇지 않다.
+ *
+ * **앵커가 없으면 던진다.** 없는 채로 돌면 면제가 비어 모든 수신자가 위반이 되거나(거짓 양성),
+ * 반대로 술어가 조용히 꺼진다 — 둘 다 게이트가 자기 말을 그만두는 꼴이다.
+ */
+const anchorCacheByProgram = new WeakMap();
+
+/**
+ * 앵커는 **물어볼 때** 세운다 — 수신자를 한 번도 묻지 않는 원문(태그 축만 쓰는 대조)은 라이브러리
+ * 선언을 들이지 않아도 되고, 묻는 순간에는 앵커가 **반드시** 있어야 한다(fail-closed).
+ */
+function exemptReceiverAnchors(program, checker) {
+  const cached = anchorCacheByProgram.get(program);
+  if (cached !== undefined) {
+    return cached;
   }
-  return inheritsElement(type) ? 'element' : 'other';
+  const anchors = new Set();
+  for (const file of program.getSourceFiles()) {
+    if (!program.isSourceFileDefaultLibrary(file)) {
+      continue;
+    }
+    for (const statement of file.statements) {
+      const named =
+        (ts.isInterfaceDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name !== undefined;
+      if (!named || !EXEMPT_RECEIVER_ROOTS.has(statement.name.text)) {
+        continue;
+      }
+      const symbol = checker.getSymbolAtLocation(statement.name);
+      if (symbol !== undefined) {
+        anchors.add(symbol);
+      }
+    }
+  }
+  const missing = [...EXEMPT_RECEIVER_ROOTS].filter(
+    (name) => ![...anchors].some((symbol) => symbol.getName() === name),
+  );
+  if (missing.length > 0) {
+    throw new Error(`면제 수신자 앵커를 찾지 못했다(기본 라이브러리 선언): ${missing.join(', ')}`);
+  }
+  anchorCacheByProgram.set(program, anchors);
+  return anchors;
 }
 
-/** 그 접근이 가리키는 **멤버 이름** — 점 접근과 대괄호 접근(`el['addEventListener']`) 둘 다. */
-function memberName(node) {
-  if (ts.isPropertyAccessExpression(node)) {
-    return node.name.text;
+const holderCacheByProgram = new WeakMap();
+
+/**
+ * `Object`·`Reflect` 가 가진 멤버 심볼 묶음 — **증명하는 쪽**이다.
+ *
+ * 앞 판의 주석은 「없으면 이 축이 돌지 않아도 좁히는 쪽」이라 적었는데 **그 전건이 거짓이다**
+ * (cr R2-3 실측): lib 에 그 전역이 없고 모듈에만 선언된 프로그램에서도 호출은 성립한다. 그래서
+ * 앵커가 비면 이 묶음은 아무것도 증명하지 못하고, 그 자리는 **이름으로 받는 보수적 갈래**
+ * (`shadowedGlobalMember`)가 위반 쪽에서 받는다. 던지지 않는 이유가 그것이다 — 꺼지는 길이
+ * 없다.
+ */
+function globalMemberAnchors(program, checker) {
+  const cached = holderCacheByProgram.get(program);
+  if (cached !== undefined) {
+    return cached;
   }
-  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
-    return node.argumentExpression.text;
+  const members = new Map();
+  const holders = new Set();
+  for (const file of program.getSourceFiles()) {
+    if (!program.isSourceFileDefaultLibrary(file)) {
+      continue;
+    }
+    for (const statement of file.statements) {
+      if (!ts.isVariableStatement(statement) && !ts.isInterfaceDeclaration(statement)) {
+        continue;
+      }
+      const declarations = ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations
+        : [statement];
+      for (const declaration of declarations) {
+        const name = declaration.name;
+        if (!ts.isIdentifier(name) || !GLOBAL_HOLDERS.includes(name.text)) {
+          continue;
+        }
+        const holderSymbol = checker.getSymbolAtLocation(name);
+        if (holderSymbol !== undefined) {
+          holders.add(holderSymbol);
+        }
+        for (const property of checker.getTypeAtLocation(name).getProperties()) {
+          members.set(property, name.text);
+        }
+      }
+    }
+  }
+  const anchors = { members, holders };
+  holderCacheByProgram.set(program, anchors);
+  return anchors;
+}
+
+/**
+ * 그 호출 대상이 `Object`·`Reflect` 의 **그 멤버**인가 — 이름이 아니라 **심볼**로 본다.
+ *
+ * 값으로 옮긴 꼴(`const merge = Object.assign`)과 구조 분해(`const { assign } = Object`)는 심볼이
+ * 지역 변수라 한 단 더 따라가야 한다 — 복제·생성 축이 쓰는 그 규율(「이름을 더 적는 대신 축을
+ * 옮긴다」)을 이 축에도 그대로 둔다.
+ */
+function globalMemberOf(checker, anchors, callee, names, depth = 0) {
+  if (depth >= BASE_CHAIN_DEPTH) {
+    return null;
+  }
+  const symbol = checker.getSymbolAtLocation(callee);
+  const resolved = symbol === undefined ? undefined : aliasTarget(checker, symbol);
+  if (resolved === undefined) {
+    return null;
+  }
+  if (anchors.members.has(resolved)) {
+    const name = resolved.getName();
+    return names.has(name) ? name : null;
+  }
+  const declaration = resolved.getDeclarations()?.[0];
+  if (declaration === undefined) {
+    return null;
+  }
+  // 값으로 옮긴 꼴 — 초기화식을 따라간다.
+  if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined && ts.isIdentifier(callee)) {
+    return globalMemberOf(checker, anchors, declaration.initializer, names, depth + 1);
+  }
+  // 구조 분해 — 꺼낸 **키**가 멤버 이름이고, 꺼낸 **대상**이 그 전역이면 같은 자리다.
+  // (이름으로 받는 보수적 갈래는 아래 `shadowedGlobalMember` 가 진다.)
+  if (ts.isBindingElement(declaration)) {
+    const key = propertyKeyText(declaration.propertyName ?? declaration.name);
+    const root = declaration.parent?.parent;
+    const source = root !== undefined && ts.isVariableDeclaration(root) ? root.initializer : undefined;
+    const holder = source === undefined ? undefined : aliasTarget(checker, checker.getSymbolAtLocation(source) ?? undefined);
+    if (key !== null && names.has(key) && holder !== undefined && anchors.holders.has(holder)) {
+      return key;
+    }
   }
   return null;
 }
 
+/**
+ * **가려진 전역도 보수적으로 센다**(cr R2-2) — 수신자 축과 **같은 구조**로 맞춘다.
+ *
+ * 모듈에 `declare const Object: {…}` 를 두면 그 식별자는 모듈 심볼로 해소돼 앵커와 맞지 않는다.
+ * 그런데 `declare` 는 **타입 선언일 뿐**이라 런타임에는 진짜 전역이 돌고 합치기는 그대로 일어난다.
+ * 수신자 축은 그 꼴에서 「면제가 서지 않는다 → 위반」으로 더 엄해지는데, 이 축만 「이 축이 아니다」
+ * 로 꺼졌다. 심볼로 증명되지 않으면 **이름으로 받아 위반 쪽에 둔다**(볼 수 없는 것을 통과시키지
+ * 않는 이 파일의 규율과 같은 방향).
+ */
+function shadowedGlobalMember(callee, names) {
+  const access = memberAccess(callee);
+  if (access === null || !access.provable || !names.has(access.name ?? '')) {
+    return null;
+  }
+  const receiver = ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee) ? callee.expression : null;
+  const receiverName = receiver !== null && ts.isIdentifier(receiver) ? receiver.text : null;
+  return receiverName !== null && GLOBAL_HOLDERS.includes(receiverName) ? access.name : null;
+}
+
+function isExemptReceiver(type, anchors, depth = 0) {
+  if (depth >= BASE_CHAIN_DEPTH) {
+    return false;
+  }
+  const parts = type.isUnion() || type.isIntersection() ? type.types : [type];
+  // 유니온은 **전부** 면제여야 면제다 — 하나라도 요소일 수 있으면 그 자리는 요소다.
+  return parts.every((part) => {
+    const symbol = part.getSymbol();
+    if (symbol !== undefined && anchors.has(symbol)) {
+      return true;
+    }
+    // 타입 매개변수는 **제약을 풀어** 본다(태그 축이 같은 라운드에 간 길이다).
+    const constraint = part.getConstraint?.();
+    if (constraint !== undefined && constraint !== part) {
+      return isExemptReceiver(constraint, anchors, depth + 1);
+    }
+    return (part.getBaseTypes?.() ?? []).some((base) => isExemptReceiver(base, anchors, depth + 1));
+  });
+}
+
+/** 그 수신자가 면제인가 — 아니면 전부 위반 쪽이다. */
+function receiverExempt(checker, anchors, expression) {
+  return isExemptReceiver(checker.getNonNullableType(checker.getTypeAtLocation(expression)), anchors);
+}
+
+/** 그 식이 **요소일 수 있는가** — 객체 합치기 축이 대상을 가리는 자리에서 쓴다. */
+function maybeElement(checker, expression) {
+  const type = checker.getNonNullableType(checker.getTypeAtLocation(expression));
+  if ((type.getFlags() & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) {
+    return true;
+  }
+  return inheritsElement(type);
+}
+
 /** 별칭이면 **가리키는 심볼**로 푼다. 풀 수 없으면 `undefined` — 부르는 쪽이 글자로 떨어진다. */
 function aliasTarget(checker, symbol) {
+  if (symbol === undefined) {
+    return undefined;
+  }
   if ((symbol.getFlags() & ts.SymbolFlags.Alias) === 0) {
     return symbol;
   }
@@ -218,37 +435,276 @@ function aliasTarget(checker, symbol) {
   }
 }
 
-/** 부른 대상의 이름 — **심볼을 먼저** 묻고(별칭 해소), 풀리지 않으면 적힌 글자로 떨어진다. */
-function calleeName(checker, callee) {
-  const symbol = checker.getSymbolAtLocation(callee);
+/** 그 이름 자리가 가리키는 **해소된 이름** — 별칭을 풀고, 풀리지 않으면 적힌 글자다. */
+function resolvedName(checker, node) {
+  const symbol = checker.getSymbolAtLocation(node);
   const resolved = symbol === undefined ? undefined : aliasTarget(checker, symbol);
-  return resolved?.getName() ?? memberName(callee) ?? (ts.isIdentifier(callee) ? callee.text : null);
+  return resolved?.getName() ?? (ts.isIdentifier(node) || ts.isStringLiteralLike(node) ? node.text : null);
 }
 
-function wiringOutsideJsx(checker, source) {
+/** 그 접근이 **증명 가능한 멤버 이름**을 가리키는가 — 변수 키는 증명되지 않는다. */
+function memberAccess(node) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return { name: node.name.text, provable: true };
+  }
+  if (ts.isElementAccessExpression(node)) {
+    const argument = node.argumentExpression;
+    return ts.isStringLiteralLike(argument) ? { name: argument.text, provable: true } : { name: null, provable: false };
+  }
+  return null;
+}
+
+/** 대입 토큰 전수 — `=` 하나만 보면 `??=`·`||=` 가 그대로 지나간다(v M-7b). */
+const isAssignmentToken = (kind) => kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+/**
+ * 요소 생성의 **props 자리** — 전수 이름과 누르는 배선을 **따로** 낸다(cr M-1).
+ *
+ * 조건부 면제(`<a href>`)가 JSX 갈래에서는 **전수 이름**으로 서는데, 생성 갈래가 걸러 낸 핸들러
+ * 목록만 넘기면 그 면제가 닿지 않는다 — 같은 기전이 JSX 로는 초록이고 생성으로는 붉는 비대칭이
+ * 된다(실측).
+ *
+ * 리터럴이 아니거나 펼치기가 있으면 **볼 수 없으므로** 거는 것으로 센다(cr M-4 가 JSX 쪽에서
+ * 세운 그 규율이다). `null`·`undefined` 는 React 의 「props 없음」이라 거는 것이 없다.
+ */
+function createElementProps(propsArgument) {
+  if (propsArgument === undefined || propsArgument.kind === ts.SyntaxKind.NullKeyword) {
+    return { names: [], handlers: [] };
+  }
+  if (ts.isIdentifier(propsArgument) && propsArgument.text === 'undefined') {
+    return { names: [], handlers: [] };
+  }
+  if (!ts.isObjectLiteralExpression(propsArgument)) {
+    return { names: [], handlers: ['{증명할 수 없는 props}'] };
+  }
+  const names = [];
+  const handlers = [];
+  for (const property of propsArgument.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      handlers.push('{...spread}');
+      continue;
+    }
+    const text = propertyKeyText(property.name);
+    if (text === null) {
+      handlers.push('{증명할 수 없는 키}');
+      continue;
+    }
+    names.push(text);
+    if (HANDLER_ATTRIBUTE.test(text)) {
+      handlers.push(text);
+    }
+  }
+  return { names, handlers };
+}
+
+/** 속성 키의 **글자** — 식별자·문자열·계산된 문자열 리터럴만 증명된다(cr L-3: 내부 API 를 쓰지 않는다). */
+function propertyKeyText(name) {
+  if (name === undefined) {
+    return null;
+  }
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+    return name.text;
+  }
+  if (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(name.expression)) {
+    return name.expression.text;
+  }
+  return null;
+}
+
+/** 객체 리터럴에 **누르는 배선 키**가 있는가 — 키가 글자로 서는 자리다. */
+function carriesHandlerKey(node) {
+  if (!ts.isObjectLiteralExpression(node)) {
+    return false;
+  }
+  return node.properties.some((one) => {
+    if (ts.isSpreadAssignment(one)) {
+      return true;
+    }
+    const name = propertyKeyText(one.name);
+    return name === null || INLINE_HANDLER_MEMBER.test(name);
+  });
+}
+
+/** 그 값이 **담은 것을 볼 수 없는가** — 합치는 호출의 원본 자리에서만 묻는다. */
+function isOpaqueBag(node) {
+  if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || node.kind === ts.SyntaxKind.NullKeyword) {
+    return false;
+  }
+  return !ts.isObjectLiteralExpression(node);
+}
+
+/** 그 키 인자가 **누르는 배선**인가 — 글자로 증명되지 않으면 `null`(증명 불가). */
+function handlerKeyOf(argument) {
+  if (argument === undefined) {
+    return null;
+  }
+  if (!ts.isStringLiteralLike(argument)) {
+    return null;
+  }
+  return INLINE_HANDLER_MEMBER.test(argument.text) || argument.text === LISTENER_MEMBER || /^on/iu.test(argument.text)
+    ? argument.text
+    : undefined;
+}
+
+/**
+ * JSX 속성 **밖**의 배선. 세 축을 **구성으로** 센다(M13/13C — 13B v M-7b · cr Q-2 · Q-3①).
+ *
+ * ⓐ **부른 대상은 참조로** — 호출 자리가 아니라 그 이름이 **나타나는 자리**를 센다. 값으로
+ *    옮기거나(`const cl = cloneElement`) 구조 분해하거나 `.call`·`.bind` 로 불러도 참조는 남는다.
+ * ⓑ **수신자는 증명된 문서·창만 면제** — 넓히는 것으로 가려지지 않는다.
+ * ⓒ **대입은 꼴 전수** — 복합 대입 · 객체 합치기 · 속성으로 쓰기.
+ */
+function wiringOutsideJsx(program, checker, source) {
+  const anchors = () => exemptReceiverAnchors(program, checker);
   const found = [];
   const at = (node) => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   const hit = (node, tag, handler) => found.push({ file: source.fileName, tag, handler, line: at(node) });
   const visit = (node) => {
-    if (ts.isCallExpression(node) && calleeName(checker, node.expression) === CLONE_ELEMENT) {
-      hit(node, `<${CLONE_ELEMENT}>`, 'props 인자');
+    // ⓐ 참조 축 — 이름이 서는 모든 자리(들여오기 · 속성 접근 · 구조 분해 · 맨 식별자).
+    if ((ts.isIdentifier(node) || ts.isStringLiteralLike(node)) && resolvedName(checker, node) === CLONE_ELEMENT) {
+      hit(node, `<${CLONE_ELEMENT}>`, '참조');
     }
-    // **부르든 묶든** 센다 — `el.addEventListener.bind(el)` 은 호출 자리에 없지만 같은 배선이다.
-    if (
-      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
-      memberName(node) === LISTENER_MEMBER
-    ) {
-      const kind = receiverKind(checker, node.expression);
-      if (kind !== 'other') {
-        hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, LISTENER_MEMBER);
+    /**
+     * **요소 생성 함수도 참조로 센다**(v H-3). 다만 복제와 달리 **판정할 수 있는 직접 호출**은
+     * 태그와 props 를 보고 가른다 — 증명할 수 있을 때는 판정하고, 값으로 옮기거나 다른 함수에
+     * 넘겨 **판정 자리를 없애면** 그 자체가 위반이다(fail-closed).
+     */
+    if (ts.isIdentifier(node) && ELEMENT_FACTORIES.has(resolvedName(checker, node) ?? '') && !isDeclarationName(node)) {
+      if (!isJudgeableFactoryCall(node)) {
+        hit(node, '<요소 생성 함수>', '판정할 수 없는 참조');
       }
     }
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      const name = memberName(node.left);
-      if (name !== null && INLINE_HANDLER_MEMBER.test(name)) {
-        const kind = receiverKind(checker, node.left.expression);
-        if (kind !== 'other') {
-          hit(node, `<${kind === 'element' ? '요소' : '알 수 없는'} 수신자>`, `${name} 대입`);
+    /**
+     * **글자 키로 꺼내는 길**(R1-H1). `React['createElement']` 는 식별자 노드가 아니라 대괄호
+     * 접근이라 위 갈래를 지나갔다. 증명 가능한 키가 그 이름이면 **참조**이고, 그 이름공간에서
+     * 키를 증명할 수 없으면(`React[k]`) 무엇을 꺼내는지 모르므로 **증명 불가**다.
+     */
+    if (ts.isElementAccessExpression(node)) {
+      const key = memberAccess(node);
+      if (key !== null && key.provable && ELEMENT_FUNCTION_NAMES.has(key.name ?? '')) {
+        if (!isJudgeableFactoryCall(node)) {
+          hit(node, '<요소 생성 함수>', '글자 키로 꺼낸 참조');
+        }
+      }
+      if (key !== null && !key.provable && holdsElementFunction(checker, node.expression)) {
+        hit(node, '<요소 생성 함수>', '증명할 수 없는 키');
+      }
+    }
+    /**
+     * 멤버 접근은 **그 멤버가 이 축의 것일 때만** 수신자를 묻는다. 모든 접근에 수신자를 물으면
+     * 평범한 속성 하나가 앵커를 요구하게 되고(합성 대조가 라이브러리를 싣지 않는 자리까지),
+     * 그 요구는 이 축이 재려는 것과 무관하다.
+     */
+    const access = memberAccess(node);
+    const interesting =
+      access !== null &&
+      (!access.provable ||
+        access.name === LISTENER_MEMBER ||
+        access.name === 'setAttribute' ||
+        access.name === 'setAttributeNS');
+    if (interesting && !receiverExempt(checker, anchors(), node.expression)) {
+      // **부르든 묶든** 센다 — `el.addEventListener.bind(el)` 은 호출 자리에 없지만 같은 배선이다.
+      if (access.provable && access.name === LISTENER_MEMBER) {
+        hit(node, '<면제되지 않은 수신자>', LISTENER_MEMBER);
+      }
+      /**
+       * 변수 키는 **무엇을 부르는지 증명할 수 없다**. 다만 이 갈래의 수신자 조건은 위와 **다르다**:
+       * 멤버 이름을 모르는 자리까지 「문서·창이 아니면 위반」으로 보면 표 조회(`TABLE[key](…)`)
+       * 같은 평범한 코드가 전부 걸린다(출하 트리 실측 둘). 이름을 모를 때는 **수신자가 요소일 수
+       * 있을 때만** 센다 — 그 조합이 이 축이 겨누는 꼴이다.
+       */
+      if (!access.provable && maybeElement(checker, node.expression) && (ts.isCallExpression(node.parent) || isAssignmentTarget(node))) {
+        hit(node, '<요소일 수 있는 수신자>', '증명할 수 없는 멤버 이름');
+      }
+      /**
+       * ⓒ 속성으로 쓰기 — `setAttribute('onclick', …)` 와 이름공간 꼴. **이름이 증명되지 않으면
+       * 닫는다**(v M-1): 조립한 글자(`'on' + 'click'`)는 볼 수 없고, 볼 수 없는 것을 통과시키지
+       * 않는 것이 이 파일의 다른 축과 같은 규율이다.
+       */
+      if (access.provable && (access.name === 'setAttribute' || access.name === 'setAttributeNS') && ts.isCallExpression(node.parent)) {
+        const key = node.parent.arguments[access.name === 'setAttribute' ? 0 : 1];
+        const judged = handlerKeyOf(key);
+        if (judged !== undefined) {
+          hit(node, '<면제되지 않은 수신자>', judged === null ? '증명할 수 없는 속성 이름' : '속성으로 건 핸들러');
+        }
+      }
+    }
+    // 구조 분해로 멤버를 꺼내는 길 — 이름이 그 멤버다(계산 키도 글자면 같은 이름이다).
+    if (ts.isBindingElement(node)) {
+      const name = propertyKeyText(node.propertyName ?? node.name);
+      if (name === LISTENER_MEMBER) {
+        hit(node, '<구조 분해>', LISTENER_MEMBER);
+      }
+    }
+    // ⓒ 대입 — **토큰 전수**다(`=` 만 보면 복합 대입이 지나간다).
+    if (ts.isBinaryExpression(node) && isAssignmentToken(node.operatorToken.kind)) {
+      const target = memberAccess(node.left);
+      if (target !== null && target.provable && target.name !== null && INLINE_HANDLER_MEMBER.test(target.name)) {
+        if (!receiverExempt(checker, anchors(), node.left.expression)) {
+          hit(node, '<면제되지 않은 수신자>', `${target.name} 대입`);
+        }
+      }
+    }
+    // 요소 **생성** — 첫 인자가 태그라 JSX 와 **같은 타입 판정**을 그대로 쓴다.
+    const calleeName = ts.isCallExpression(node)
+      ? resolvedName(checker, node.expression) ?? memberAccess(node.expression)?.name ?? null
+      : null;
+    if (ts.isCallExpression(node) && ELEMENT_FACTORIES.has(calleeName ?? '')) {
+      const tagArgument = node.arguments[0];
+      const { names, handlers } = createElementProps(node.arguments[1]);
+      if (tagArgument !== undefined && handlers.length > 0) {
+        const written = tagArgument.getText(source);
+        const tags = intrinsicTagsOf(checker, tagArgument, ts.isStringLiteralLike(tagArgument) ? tagArgument.text : written);
+        const risky =
+          tags === null
+            ? [{ tag: `<알 수 없는 태그 ${written}>`, allowed: new Set() }]
+            : tags
+                // 조건부 면제는 **전수 이름**으로 선다(cr M-1) — JSX 갈래와 같은 기전이다.
+                .filter((one) => isIntrinsicName(one) && !isFullyInteractive(one, names))
+                .map((one) => ({ tag: one, allowed: scopedHandlers(one) }));
+        for (const { tag, allowed } of risky) {
+          for (const handler of handlers) {
+            if (!allowed.has(handler)) {
+              hit(node, tag, handler);
+            }
+          }
+        }
+      }
+    }
+    // ⓒ 객체 합치기 — 요소일 수 있는 대상과 누르는 키가 **같은 호출**에 실린다.
+    if (ts.isCallExpression(node)) {
+      const args = [...node.arguments];
+      const onElement = args.some((one) => maybeElement(checker, one));
+      const holders = globalMemberAnchors(program, checker);
+      /**
+       * **무엇을 하는 호출인가로 가른다**(R1-M1 · cr N-1 · N-6). 앞 판은 적힌 멤버 이름으로 섰다 —
+       * 구조 분해·별칭은 축 밖이었고(미탐), 요소를 키로 쓰는 `Map.get` 은 축 안이었다(오탐).
+       * 이제 `Object`·`Reflect` 의 **그 멤버 심볼**과 맞댄다.
+       */
+      const merging =
+        globalMemberOf(checker, holders, node.expression, MERGE_MEMBERS) ??
+        shadowedGlobalMember(node.expression, MERGE_MEMBERS);
+      if (merging !== null && onElement) {
+        // 합치는 자리의 **원본**은 대상 뒤의 인자들이다(프로토타입 바꿔치기도 같은 자리다).
+        const sources = args.slice(1);
+        if (sources.some((one) => carriesHandlerKey(one))) {
+          hit(node, '<면제되지 않은 수신자>', '객체로 합친 핸들러');
+        } else if (sources.some((one) => isOpaqueBag(one))) {
+          hit(node, '<면제되지 않은 수신자>', '볼 수 없는 값으로 합친 배선');
+        }
+      }
+      /**
+       * **반사·서술자로 키를 숨기는 길**(v M-1). 요소를 넘기면서 키를 함께 싣는 호출은 키가
+       * 글자로 증명돼야 한다 — 증명되지 않으면 닫는다. **인자가 하나뿐인 호출은 이 축이 아니다**
+       * (cr N-6: 키 자리가 없는 호출을 「키를 증명할 수 없다」로 접지 않는다).
+       */
+      const keyed =
+        globalMemberOf(checker, holders, node.expression, KEYED_MEMBERS) ??
+        shadowedGlobalMember(node.expression, KEYED_MEMBERS);
+      if (keyed !== null && onElement && args.length >= 2) {
+        const judged = handlerKeyOf(args[1]);
+        if (judged !== undefined) {
+          hit(node, '<반사·서술자>', judged === null ? '증명할 수 없는 키' : judged);
         }
       }
     }
@@ -256,6 +712,62 @@ function wiringOutsideJsx(checker, source) {
   };
   visit(source);
   return found;
+}
+
+/** 그 이름이 **선언 자리**인가 — 들여오기·내보내기·바인딩 이름은 참조가 아니다. */
+function isDeclarationName(node) {
+  const parent = node.parent;
+  if (parent === undefined) {
+    return false;
+  }
+  // 들여오기·내보내기 자리는 **선언**이다 — 별칭의 원 이름도 쓰는 자리가 아니다. 판정은 그것을
+  // **부르는 자리**에서 한다(두 번 세면 같은 사실이 두 줄이 된다).
+  if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) {
+    return true;
+  }
+  if (ts.isImportClause(parent) || ts.isNamespaceImport(parent)) {
+    return true;
+  }
+  return ts.isBindingElement(parent) && parent.name === node && parent.propertyName !== undefined;
+}
+
+/**
+ * 그 참조가 **판정할 수 있는 직접 호출**의 부름 자리인가.
+ *
+ * 이름공간 꼴(`React.createElement(…)`)은 부모가 속성 접근이라 앞 판이 「판정할 수 없는 참조」로
+ * 발화했다 — 같은 호출을 판정 갈래는 제대로 해소해 **한 호출이 동시에 깨끗하고 더러웠다**
+ * (cr N-3). 접근 한 단을 올라가 그 부모가 호출인지 본다.
+ */
+function isJudgeableFactoryCall(node) {
+  const direct = node.parent;
+  if (direct === undefined) {
+    return false;
+  }
+  if (ts.isCallExpression(direct)) {
+    return direct.expression === node;
+  }
+  const access =
+    (ts.isPropertyAccessExpression(direct) && direct.name === node) || ts.isElementAccessExpression(direct)
+      ? direct
+      : null;
+  return access !== null && access.parent !== undefined && ts.isCallExpression(access.parent) && access.parent.expression === access;
+}
+
+/** 그 값이 **요소 생성·복제 함수를 가진** 이름공간인가 — 키를 증명할 수 없을 때 묻는다. */
+function holdsElementFunction(checker, expression) {
+  const type = checker.getTypeAtLocation(expression);
+  return [...ELEMENT_FUNCTION_NAMES].some((name) => type.getProperty(name) !== undefined);
+}
+
+/** 그 접근이 **대입의 왼쪽**인가. */
+function isAssignmentTarget(node) {
+  const parent = node.parent;
+  return (
+    parent !== undefined &&
+    ts.isBinaryExpression(parent) &&
+    parent.left === node &&
+    isAssignmentToken(parent.operatorToken.kind)
+  );
 }
 
 /** 한 소스 파일의 위반 — 검사기를 **받는다**(태그 판정이 타입이라서). */
@@ -294,10 +806,11 @@ export function handlerBearingTagsIn(program, source) {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return [...found, ...wiringOutsideJsx(checker, source)];
+  return [...found, ...wiringOutsideJsx(program, checker, source)];
 }
 
 const PROBE_FILE = '/probe.tsx';
+const PROBE_LIB_FILE = '/lib.probe.d.ts';
 const probeModulePath = (specifier) => resolve('/', `${specifier.replace(/[^\w.-]/gu, '_')}.d.ts`);
 
 /**
@@ -308,8 +821,8 @@ const probeModulePath = (specifier) => resolve('/', `${specifier.replace(/[^\w.-
  * 한 파일 안에서 흉내 낼 수 없다 — 별칭 해소가 모듈 해소를 거치기 때문이다. 이 자리가 없으면 그
  * 둘을 **심어서만** 잴 수 있고, 심은 것은 측정이지 잠금이 아니다.
  */
-export function handlerBearingTags(text, modules = {}) {
-  const { program, source } = probeProgram(text, modules);
+export function handlerBearingTags(text, modules = {}, lib = undefined) {
+  const { program, source } = probeProgram(text, modules, lib);
   return handlerBearingTagsIn(program, source);
 }
 
@@ -317,8 +830,14 @@ export function handlerBearingTags(text, modules = {}) {
  * 합성 원문 하나로 **가벼운 프로그램**을 세운다 — 표준 라이브러리를 싣지 않고, `modules` 로 준
  * 곁 모듈만 푼다. 레이블 축도 태그 판정에 검사기가 필요해 같은 자리를 쓴다(사본을 만들지 않는다).
  */
-export function probeProgram(text, modules = {}) {
+export function probeProgram(text, modules = {}, lib = undefined) {
   const sources = new Map([[resolve(PROBE_FILE), { text, kind: ts.ScriptKind.TSX }]]);
+  // **기본 라이브러리 자리**(M13/13C — v H-2). 면제 수신자를 이름이 아니라 **심볼**로 보려면
+  // 앵커가 라이브러리 선언에서 와야 한다. `no-default-lib` 지시가 붙은 파일을 프로그램이 기본
+  // 라이브러리로 보므로, 합성 대조도 출하 트리와 **같은 축**으로 선다.
+  if (lib !== undefined) {
+    sources.set(resolve(PROBE_LIB_FILE), { text: lib, kind: ts.ScriptKind.TS });
+  }
   for (const [specifier, body] of Object.entries(modules)) {
     sources.set(probeModulePath(specifier), { text: body, kind: ts.ScriptKind.TS });
   }
@@ -340,7 +859,7 @@ export function probeProgram(text, modules = {}) {
         ? { resolvedFileName: probeModulePath(one), extension: ts.Extension.Dts }
         : undefined,
     );
-  const program = ts.createProgram([PROBE_FILE], options, host);
+  const program = ts.createProgram(lib === undefined ? [PROBE_FILE] : [PROBE_LIB_FILE, PROBE_FILE], options, host);
   const source = program.getSourceFile(PROBE_FILE);
   if (source === undefined) {
     throw new Error(`합성 원문이 프로그램에 없다: ${PROBE_FILE}`);

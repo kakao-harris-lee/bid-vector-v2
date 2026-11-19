@@ -35,6 +35,7 @@ import { BidBoxCard } from './BidBoxCard';
 import { NoticeCard, SuggestionCard } from './NoticeCard';
 import { ResultCard } from './ResultCard';
 import { StrategyEditPanel, StrategyFieldRow, type StrategyEditSession } from './strategyEdit';
+import { KonepsHandoff } from './WorksheetRecord';
 import { WorksheetTimeline } from './WorksheetTimeline';
 
 /**
@@ -317,10 +318,27 @@ function renderCards() {
             action={null}
           />
         ))}
-        <BidBoxCard bidCase={bidCaseRow()} onSend={() => undefined} />
+        <BidBoxCard bidCase={bidCaseRow()} pending={false} onSend={() => undefined} />
       </ul>
       <ResultCardHarness />
       <WorksheetTimeline entries={timelineRows()} />
+      {/*
+        **M13/13C — 넘김 카드가 금액 글자를 그린다.** 한글 병기가 통화 표의 라벨을 싣고 하한 여유가
+        상태 배지를 그리므로 이 카드도 「원문 0」 단언의 대상이다(어휘 장부가 병기를 어휘로 분류한다).
+        여유는 **재어진** 자리로 준다 — 빈 자리로 주면 이 카드가 그리는 글자의 절반이 미측정이다.
+      */}
+      <KonepsHandoff
+        noticeNumber="SYN-M13-HANDOFF-1"
+        amountWon={1_050_000_000}
+        margin={{
+          kind: 'measured',
+          standing: 'ABOVE_ONE',
+          bidRateText: '0.8200',
+          floorRateText: '0.8',
+          criticalRateText: '1.0250',
+          marginPercentText: '+2.50',
+        }}
+      />
       {/*
         **표시층 파일 사이로 금액 문면에 닿는 둘**(M12/12B — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`
         ⓐ). 비공개 조립 함수와 함수 값 표를 지나 그리므로 앞 판의 모집단 판정이 이 둘을 보지
@@ -357,6 +375,8 @@ export const GATE_MOUNTED_CARDS: readonly string[] = [
   // M12/12B — 어휘 도달이 표시층 **파일 사이**로 넓어져 의무가 된 둘(계약이 승인한 +2).
   'screens/strategyEdit.tsx#StrategyFieldRow',
   'screens/strategyEdit.tsx#StrategyEditPanel',
+  // M13/13C — 나라장터 넘김 카드. 한글 금액 병기가 들어와 금액 어휘에 닿는다.
+  'screens/WorksheetRecord.tsx#KonepsHandoff',
 ];
 
 /** 화면 E 카드는 질의 결과를 받으므로 적재가 끝나기를 기다린 뒤 글자를 읽는다. */

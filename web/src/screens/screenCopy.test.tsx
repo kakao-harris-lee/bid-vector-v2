@@ -21,6 +21,7 @@ import { ScreenPlaceholder } from '../ScreenPlaceholder';
 import * as bidBoxDisplay from '../display/bidBoxDisplay';
 import * as caseDisplay from '../display/caseDisplay';
 import * as editSessionDisplay from '../display/editSessionDisplay';
+import * as floorMargin from '../display/floorMargin';
 import * as moneyDisplay from '../display/moneyDisplay';
 import * as myBidResultDisplay from '../display/myBidResultDisplay';
 import * as noticeDisplay from '../display/noticeDisplay';
@@ -37,6 +38,7 @@ import { BidBoxCard } from './BidBoxCard';
 import { NoticeCard, SuggestionCard } from './NoticeCard';
 import { ResultCard } from './ResultCard';
 import { StrategyEditPanel, StrategyFieldRow, type StrategyEditSession } from './strategyEdit';
+import { KonepsHandoff } from './WorksheetRecord';
 import { WorksheetTimeline } from './WorksheetTimeline';
 
 /**
@@ -157,6 +159,7 @@ const DISPLAY_MODULES: Readonly<Record<string, Readonly<Record<string, unknown>>
   'bidBoxDisplay.ts': bidBoxDisplay,
   'caseDisplay.ts': caseDisplay,
   'editSessionDisplay.ts': editSessionDisplay,
+  'floorMargin.ts': floorMargin,
   'moneyDisplay.ts': moneyDisplay,
   'myBidResultDisplay.ts': myBidResultDisplay,
   'noticeDisplay.ts': noticeDisplay,
@@ -380,6 +383,22 @@ function renderAll() {
       </ul>
       <ResultCardHarness />
       <WorksheetTimeline entries={timelineRows()} />
+      {/*
+        **13C 가 세운 카드**(머지 차례에 들어왔다). 카드 의무 등식이 이 자리를 요구한다 — 새
+        카드가 생기면 문면 게이트의 모집단에 자동으로 드는 것이 그 등식의 요점이다. fixture 는
+        최소이고(이 층은 문면만 본다) 하한 여유는 **근거가 선 쪽**을 준다 — 빈 자리만 그리면
+        그 카드의 문면 절반이 미측정으로 남는다.
+      */}
+      <KonepsHandoff
+        noticeNumber={TITLELESS_NUMBER}
+        amountWon={1_100_000_000}
+        margin={floorMargin.floorMarginOf({
+          bidAmountWon: 1_100_000_000,
+          baseAmountWon: 1_200_000_000,
+          publishedFloorRateFraction: '0.87745',
+          floorRateGroundsState: 'USABLE',
+        })}
+      />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />
       {[...screenSlots, notFoundSlot].map((slot) => (

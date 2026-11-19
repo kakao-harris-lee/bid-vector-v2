@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { journeyContext, search, signIn } from './shared';
+import { measureInPage, type Measurement } from './touchMeasure';
 
 /**
  * **터치 타깃 게이트**(M13/13B, 계약 「게이트」 절). 모바일 폭에서 화면마다 **보이는**
@@ -12,6 +13,9 @@ import { journeyContext, search, signIn } from './shared';
  * 착수 실측(2026-11-16, base a338b55b): 보이는 요소 101개 가운데 44px 이상이 **0** 이었다.
  * 그래서 이 spec 은 이관 전 트리에서 **붉고**, 이관이 끝나야 초록이다.
  */
+/** 측정은 **공용 자리**를 지난다(`touchMeasure.ts`) — 합성 대조가 같은 함수를 본다. */
+const measure = async (page: Page): Promise<Measurement> => page.evaluate(measureInPage);
+
 const VIEWPORT = { width: 390, height: 844 } as const;
 
 test.use({ viewport: { ...VIEWPORT } });
@@ -42,7 +46,8 @@ export const TOUCH_TARGET_SCREENS = [
   { slotId: 'home', path: '/', ready: 'screen-home', minCount: 8 },
   // 경로를 **문자열 리터럴**로 적는다 — 등식 게이트가 AST 로 읽는 자리이고, 식으로 적으면 그
   // 게이트가 값을 읽지 못한다. 씨앗과 어긋나지 않는 것은 아래 첫 단언이 든다.
-  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 7 },
+  // M13/13C — 금액 복사 버튼이 늘어 **다시 조였다**(실측 8 · 여유 0). 하한은 올리기만 한다.
+  { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 8 },
   { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 11 },
   { slotId: 'results', path: '/results', ready: 'screen-results', minCount: 7 },
   { slotId: 'inbox', path: '/inbox', ready: 'screen-inbox', minCount: 12 },
@@ -51,165 +56,6 @@ export const TOUCH_TARGET_SCREENS = [
   { slotId: 'login', path: '/login', ready: 'screen-login', minCount: 1 },
   { slotId: 'not-found', path: '/no-such-place', ready: 'screen-not-found', minCount: 5 },
 ] as const;
-
-interface MeasuredTarget {
-  readonly tag: string;
-  readonly name: string;
-  readonly width: number;
-  readonly height: number;
-}
-
-interface Measurement {
-  readonly targets: readonly MeasuredTarget[];
-  readonly overflow: number;
-  /** 뷰포트 **밖으로 삐져나간** 타깃 — 손가락이 그 상자의 일부에 닿지 못하는 자리다. */
-  readonly offscreen: readonly string[];
-  /** 부분 잘라내기가 걸린 타깃 — 눌리는 띠를 상자로 잴 수 없다. */
-  readonly partiallyClipped: readonly string[];
-}
-
-/**
- * 한 화면의 측정 — **상자**로 본다.
- *
- * 「보이지 않는 것」을 빼는 술어가 **computed style** 인 것이 요점이다(착수 판정 ⓘ):
- * `.sr-only` 라는 **클래스 이름**으로 빼면 그 글자 하나로 게이트가 열린다. 시각 은폐의 표준
- * 기법(`clip: rect(0,0,0,0)` · `clip-path: inset(50%)`)을 보면 기법을 쓴 자리만 빠진다.
- *
- * 그 예외가 **진짜 버튼을 숨기는 데** 쓰이면 집합이 줄고, 그때는 화면별 계수 하한이 붉는다.
- */
-async function measure(page: Page): Promise<Measurement> {
-  return page.evaluate(() => {
-    /**
-     * 모집단(팀장 판정 2026-11-16 보충) — 계약의 넷에 **누르는 내장 요소 셋**을 더한다:
-     * `input[type=button|submit|reset]` · `summary` · `select`, 그리고 **체크박스·라디오**
-     * (cr N-1 · 팀장 판정). 손가락이 누르는 자리이고, AST 축이 `input` 을 **무조건** 면제하므로
-     * 이쪽에서 받지 않으면 두 게이트 사이에 틈이 생긴다 — 그 틈에 실물이 있던 쪽이 바로
-     * 체크박스였다(실측 7자리 13px). `label` 은 **선택자에** 넣지 않는다 — 레이블이 혼자 서면
-     * 누르는 자리가 아니고, 감싼 레이블은 아래 `touchBoxOf` 가 그 컨트롤을 통해 집는다.
-     */
-    const nodes = [
-      ...document.querySelectorAll(
-        'button, a, [role="tab"], [role="button"], input[type="button"], input[type="submit"], input[type="reset"], input[type="checkbox"], input[type="radio"], summary, select',
-      ),
-    ];
-    /**
-     * **누르는 자리가 그 요소 자신이 아닐 수 있다**(cr P-3). 체크박스·라디오를 `<label>` 이
-     * 감싸고 **그 레이블이 켜는 컨트롤이 이 노드이면** 레이블 어디를 눌러도 이것이 켜진다 —
-     * 손가락이 닿는 상자는 레이블이다. 그 자리는 레이블을 잰다.
-     *
-     * **`closest('label')` 만으로는 모자란다**(v M-9 · cr Q-4). 레이블이 켜는 것은 자기
-     * **labeled control 하나뿐**이라, 레이블 하나가 컨트롤 둘을 감싸면 뒤의 것은 레이블을 눌러도
-     * 켜지지 않고, `for` 가 다른 곳을 가리키면 감싸고도 켜지지 않는다. 그 자리들의 누르는 상자는
-     * **자기 13px** 인데 감싼 레이블을 재면 44px 로 세 **앞 판보다 느슨해진다**(실측).
-     * `HTMLLabelElement.control` 이 그 피연결 컨트롤을 그대로 주므로 그것으로 가른다.
-     */
-    const touchBoxOf = (node: Element): Element => {
-      if (!(node instanceof HTMLInputElement) || (node.type !== 'checkbox' && node.type !== 'radio')) {
-        return node;
-      }
-      const label = node.closest('label');
-      return label instanceof HTMLLabelElement && label.control === node ? label : node;
-    };
-    const targets = [];
-    const offscreen = [];
-    const partiallyClipped = [];
-    for (const node of nodes) {
-      const measured = touchBoxOf(node);
-      const style = getComputedStyle(measured);
-      let box = measured.getBoundingClientRect();
-      /**
-       * **시각 은폐는 위치 지정된 요소에서만 선다**(v M-2). `clip` 은 absolute·fixed 가 아닌
-       * 요소에 **적용되지 않는데** computed 값에는 그대로 남는다 — 그 값만 보던 앞 판은 보이고
-       * 눌리는 44×29 버튼을 모집단에서 뺐다(실측).
-       */
-      const positioned = style.position === 'absolute' || style.position === 'fixed';
-      const clipped =
-        positioned && (style.clip === 'rect(0px, 0px, 0px, 0px)' || style.clipPath === 'inset(50%)');
-      /**
-       * **상자가 0 이어도 글자가 보일 수 있다**(v M-2). `display: contents` 요소는 자기 상자가
-       * 없지만 글자는 그려지고 클릭이 발화한다. 그 자리는 **글자 범위**로 다시 잰다.
-       */
-      if (!clipped && box.width === 0 && box.height === 0) {
-        const range = document.createRange();
-        range.selectNodeContents(measured);
-        const textBox = range.getBoundingClientRect();
-        if (textBox.width > 0 && textBox.height > 0) {
-          box = textBox;
-        }
-      }
-      const visible =
-        !clipped &&
-        style.visibility !== 'hidden' &&
-        style.display !== 'none' &&
-        Number(style.opacity) > 0 &&
-        box.width > 0 &&
-        box.height > 0;
-      if (!visible) {
-        continue;
-      }
-      const name = (node.getAttribute('aria-label') ?? measured.textContent ?? '').trim().slice(0, 40);
-      /**
-       * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
-       * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
-       * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
-       *
-       * **보이는 것만 센다**(cr P-5) — `display:none`·0 상자처럼 안 보이는 자리까지 보고하면
-       * 「보이는 타깃」을 재는 게이트가 안 보이는 것 때문에 붉는다. 위 `continue` 뒤라 여기 오는
-       * 것은 전부 보이는 자리이고, 그래서 `clipped` 는 이미 거짓이다.
-       */
-      if (style.clipPath !== 'none' || style.clip !== 'auto') {
-        partiallyClipped.push(`${measured.tagName.toLowerCase()} "${name.slice(0, 24)}"`);
-      }
-      targets.push({
-        tag: measured.tagName.toLowerCase(),
-        name,
-        width: Math.round(box.width * 10) / 10,
-        height: Math.round(box.height * 10) / 10,
-      });
-      /**
-       * **가로로 스크롤되는 줄 안의 타깃은 닿을 수 있다** — 운영자가 밀어서 보면 된다. 닿지
-       * 못하는 것은 그런 조상이 없는 채 뷰포트 밖에 **고정된** 자리다(변이 H 가 그 꼴이다).
-       * 그 둘을 조상의 `overflow-x` 와 실제 스크롤 여지로 가른다.
-       */
-      let scrollable = false;
-      for (let parent = measured.parentElement; parent !== null; parent = parent.parentElement) {
-        const overflowX = getComputedStyle(parent).overflowX;
-        if (!((overflowX === 'auto' || overflowX === 'scroll') && parent.scrollWidth > parent.clientWidth)) {
-          continue;
-        }
-        const container = parent.getBoundingClientRect();
-        /**
-         * **그 스크롤 상자 자신이 뷰포트 안**이어야 한다(v M-5). 뷰포트 밖에 고정된 상자에
-         * `overflow-x-auto` 한 줄을 더하는 것만으로 진짜 넘침이 면제되던 자리다.
-         */
-        if (container.left < -0.5 || container.right > window.innerWidth + 0.5) {
-          continue;
-        }
-        // 그리고 타깃이 그 상자의 **스크롤 범위 안**이어야 한다(cr N-6) — 범위 밖은 밀어도 닿지 않는다.
-        const start = box.left - container.left + parent.scrollLeft;
-        const end = box.right - container.left + parent.scrollLeft;
-        if (start >= -0.5 && end <= parent.scrollWidth + 0.5) {
-          scrollable = true;
-          break;
-        }
-      }
-      // 부분 화소 반올림을 0.5px 로 받는다 — 그보다 큰 삐져나감만 센다.
-      if (!scrollable && (box.left < -0.5 || box.right > window.innerWidth + 0.5)) {
-        offscreen.push(
-          `${measured.tagName.toLowerCase()} [${Math.round(box.left)}, ${Math.round(box.right)}] "${name}"`,
-        );
-      }
-    }
-    return {
-      targets,
-      offscreen,
-      partiallyClipped,
-      // **문서와 본문 둘 다** 본다 — 한쪽만 보면 넘침이 다른 쪽에만 서는 꼴을 놓친다.
-      overflow:
-        Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
-    };
-  });
-}
 
 /**
  * 프로필 한 벌 가운데 **이 spec 이 덮는 축**. 두 쓰기(사업 정보 · 자격 사실)가 통째로 교체하는
@@ -460,7 +306,7 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
 
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
-    expect(targets.length, `${screen.slotId}: 보이는 타깃이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
+    expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
       screen.minCount,
     );
     // ② 전수 — 이름으로 고르지 않는다.
