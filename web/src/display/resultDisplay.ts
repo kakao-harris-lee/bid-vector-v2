@@ -63,7 +63,7 @@ export const RESULT_PENDING_SLOTS: readonly PendingSlot[] = [
   {
     id: 'back-calculation',
     label: '역산(이 금액이면?)',
-    why: '지금은 제공하지 않습니다 — 근거가 더 쌓이면 다시 검토합니다',
+    why: '지금은 제공하지 않습니다',
     kind: 'PERMANENT',
   },
   {

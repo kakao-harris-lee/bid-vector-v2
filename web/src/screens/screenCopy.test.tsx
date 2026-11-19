@@ -126,7 +126,11 @@ function forbiddenIn(piece: string): readonly string[] {
  * 여전히 갈린다 — 그 둘을 같은 자리에서 잰다.
  */
 function piecesOf(root: ParentNode): readonly string[] {
-  (root as Node).normalize();
+  // **사본에서 합친다**(cr L-r1-3) — `normalize()` 는 DOM 을 바꾸므로 살아 있는 트리에 걸면
+  // 같은 렌더를 두 번 재는 test 가 서로 다른 트리를 본다. 사본은 `title`·`aria-label` 까지
+  // 함께 복제되고, 이 층이 보는 것은 텍스트와 그 둘뿐이다.
+  const copy = (root as Node).cloneNode(true);
+  copy.normalize();
   const pieces: string[] = [];
   const walk = (node: Node): void => {
     if (node.nodeType === node.TEXT_NODE) {
@@ -146,7 +150,7 @@ function piecesOf(root: ParentNode): readonly string[] {
     }
     node.childNodes.forEach(walk);
   };
-  walk(root);
+  walk(copy);
   return pieces;
 }
 
@@ -239,6 +243,19 @@ const FIXTURE_IDENTIFIERS = [NOTICE_NUMBER, TITLELESS_NUMBER, CASE_NUMBER, SESSI
 const DEADLINE_OFFSETS_IN_DAYS = [0, 1, 14, -3] as const;
 
 const noop = () => undefined;
+
+/**
+ * 넘김 카드의 하한 여유 fixture — **근거가 선 쪽**을 준다. 빈 자리만 그리면 그 카드의 문면
+ * 절반이 미측정으로 남으므로, 아래 비공허 단언이 이 값이 실제로 재어졌는지 본다.
+ */
+const HANDOFF_MARGIN = floorMargin.floorMarginOf({
+  groundsState: 'USABLE',
+  rateFraction: '0.87745',
+  baseAmountWon: 1_200_000_000,
+  baseAmountVatTreatment: 'INCLUSIVE',
+  bidAmountWon: 1_100_000_000,
+  bidVatTreatment: 'INCLUSIVE',
+});
 
 function noticeRow(offsetDays: number): NoticeSummary {
   return {
@@ -379,7 +396,7 @@ function renderAll() {
         {DEADLINE_OFFSETS_IN_DAYS.map((offset) => (
           <SuggestionCard key={`s${offset}`} suggestion={suggestionRow(offset)} now={NOW} action={null} />
         ))}
-        <BidBoxCard bidCase={bidCaseRow()} onSend={noop} />
+        <BidBoxCard bidCase={bidCaseRow()} pending={false} onSend={noop} />
       </ul>
       <ResultCardHarness />
       <WorksheetTimeline entries={timelineRows()} />
@@ -392,12 +409,7 @@ function renderAll() {
       <KonepsHandoff
         noticeNumber={TITLELESS_NUMBER}
         amountWon={1_100_000_000}
-        margin={floorMargin.floorMarginOf({
-          bidAmountWon: 1_100_000_000,
-          baseAmountWon: 1_200_000_000,
-          publishedFloorRateFraction: '0.87745',
-          floorRateGroundsState: 'USABLE',
-        })}
+        margin={HANDOFF_MARGIN}
       />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />
@@ -453,6 +465,21 @@ function renderRouteBoundary() {
 /* ── 단언 ─────────────────────────────────────────────────────────────────────── */
 
 describe('문면 게이트 — 모집단이 비지 않았다', () => {
+  /**
+   * **모듈 표의 값이 서로 다른가**(머지 차례의 변이 T 가 찾았다). 소스 층의 등식은 이 파일의
+   * **import 선언**을 세므로, 키를 그대로 두고 **값만** 다른 모듈로 바꿔치우면 그 모듈의 행이
+   * 조용히 빠지는데도 초록이었다. 값 집합의 크기로 그 자리를 닫는다.
+   */
+  it('넘김 카드의 하한 여유 fixture 가 실제로 재어진다', () => {
+    // 재지 못한 값이면 카드가 빈 자리만 그리고 그 문면이 스윕에 닿지 않는다.
+    expect(HANDOFF_MARGIN.kind).not.toBe('unmeasurable');
+  });
+
+  it('표시층 모듈 표의 값이 서로 다른 모듈이다', () => {
+    const entries = Object.entries(DISPLAY_MODULES);
+    expect(new Set(entries.map(([, module]) => module)).size).toBe(entries.length);
+  });
+
   it('금지 꼴 · 표 행 · 그린 조각의 하한', () => {
     expect(SHAPES.length).toBeGreaterThanOrEqual(7);
     expect(ALL_ROWS.length).toBeGreaterThanOrEqual(100);
