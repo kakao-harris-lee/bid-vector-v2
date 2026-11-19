@@ -557,6 +557,16 @@ type InboxItem = NotificationTestIdParts & { readonly read: boolean };
 
 test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그대로 보인다', async ({ page }) => {
   const watched = watchRequests(page);
+  /**
+   * 알림 읽기의 장부 — **로그인 앞에** 건다. 셸의 안 읽음 배지는 앱이 뜨는 순간 자기 읽기를
+   * 보내므로(어느 화면에서나 서는 값이다), 로그인 뒤에 장부를 걸면 그 한 건을 놓친다(실측).
+   */
+  const notificationReads: string[] = [];
+  page.on('request', (one) => {
+    if (one.url().includes('/api/notifications') && one.method() === 'GET') {
+      notificationReads.push(one.url());
+    }
+  });
   await signIn(page);
 
   /**
@@ -564,15 +574,19 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
    *
    * M13/13B 로 **셸의 탐색 배지**가 같은 operation 을 쓴다(`X-Unread-Count` 는 그 헤더에만
    * 있다). 그 읽기는 본문을 쓰지 않으므로 `size=1` 로 한 행만 받아 오고, 그래서 느슨한 술어는
-   * **그 한 행짜리 응답**을 집었다(실측: 종류 집합이 하나로 줄었다). 화면의 읽기는 쪽 인자를
-   * 주지 않으므로 그 자리로 가른다.
+   * **그 한 행짜리 응답**을 집었다(실측: 종류 집합이 하나로 줄었다).
+   *
+   * **가르는 축이 뒤집혔다**(M13/13E — 13B 알려진 제한 10 이 넘긴 자리). 앞 판의 축은 「화면은
+   * 쪽 인자를 주지 않는다」였는데, 알림함이 「더 보기」를 얻으면서 화면의 읽기가 **쪽을
+   * 명시한다**. 이제 그 **존재**로 가르고, 배지가 쪽을 보내지 않는 것은 아래 음성 단언이 든다 —
+   * 둘이 함께 서야 이 술어가 공허하지 않다(한쪽만으로는 두 읽기가 한 꼴로 접혀도 조용하다).
    */
   const listed = page.waitForResponse(
     (one) =>
       one.url().includes('/api/notifications') &&
       one.request().method() === 'GET' &&
       one.status() === 200 &&
-      new URL(one.url()).searchParams.get('size') === null,
+      new URL(one.url()).searchParams.get('page') !== null,
   );
   await page.getByRole('link', { name: '알림함' }).click();
   await expect(page.getByTestId('screen-inbox')).toBeVisible();
@@ -635,6 +649,16 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
     unreadOnPage,
   );
   await expect(page.getByTestId('inbox-unread-badge')).toHaveText(`안읽음 ${unreadHeader}`);
+
+  /**
+   * **두 읽기가 실제로 갈려 있다**(M13/13E). 위 포착은 「쪽을 명시한 응답」을 집는데, 그 술어가
+   * 뜻을 가지려면 ⓐ 화면의 읽기가 쪽을 보내고 ⓑ 배지의 읽기는 보내지 않아야 한다. 한쪽이라도
+   * 0 이면 술어가 공허하거나 두 읽기가 한 꼴로 접힌 것이다.
+   */
+  const paged = notificationReads.filter((one) => new URL(one).searchParams.get('page') !== null);
+  const unpaged = notificationReads.filter((one) => new URL(one).searchParams.get('page') === null);
+  expect(paged.length, '화면의 읽기가 쪽을 명시하지 않는다 — 포착 술어가 공허하다').toBeGreaterThan(0);
+  expect(unpaged.length, '배지의 읽기가 쪽을 보낸다 — 두 읽기를 가르는 축이 사라졌다').toBeGreaterThan(0);
 
   // 채널 복제는 빈 자리다(R-4) — 입력칸·버튼을 만들지 않는다.
   const channel = page.getByTestId('pending-notification-channel');
