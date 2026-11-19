@@ -29,6 +29,13 @@ const PILL_CLASS = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs fo
  * 하나**라는 것이다 — 펼침은 그 한 노드의 모양을 바꾸는 것이고 사본을 만들지 않는다. 펼친 자리에
  * 문면을 **또 그리면** 보조기기가 설명과 본문에서 같은 말을 두 번 읽는다.
  *
+ * **펼침은 보이는 사용자만의 장치다**(수정 라운드 1 — verifier F-1 · 리뷰 M-2). 사유 노드는
+ * `aria-hidden` 이라 접근성 트리에 **본문 텍스트로 서지 않고**, 보조기기는 접힘·펼침과 무관하게
+ * 버튼의 **설명으로** 같은 문면을 한 번 받는다. 직접 참조된 숨김 노드라 설명 계산은 그대로
+ * 선다 — CDP AX 트리 실측: 앞 판은 설명 1 + 본문 1 로 **둘**, 지금은 접힘·펼침 둘 다 **하나**다.
+ * 그래서 `aria-expanded`·`aria-controls` 를 **걷었다**: 내용이 트리에 늘 있는데 「접혀 있다」고
+ * 선언하면 그 선언이 거짓이고, 숨긴 노드를 가리키는 `aria-controls` 도 뜻이 없다.
+ *
  * **툴팁 속성은 걷었다**(팀장 착수 판정 2026-11-18 ⓑ): 손가락·마우스가 같은 길을 쓰므로 할 일이
  * 없고, 같은 문면이 세 곳(속성·시각 은폐 문면·펼친 자리)에 사는 꼴을 없앤다.
  *
@@ -72,20 +79,23 @@ export function StateBadge({
         type="button"
         data-testid={testId}
         aria-describedby={whyId}
-        aria-expanded={expanded}
-        aria-controls={whyId}
         onClick={() => setExpanded((open) => !open)}
         className="inline-flex min-h-11 items-center rounded-md"
       >
         <span className={pillClass}>{shown.label}</span>
       </button>
       {/*
-        **한 노드다.** 접히면 시각 은폐(보조기기만 읽는다), 펼치면 보이는 글자가 된다 —
-        `aria-describedby` 는 두 상태에서 같은 자리를 가리킨다. `data-expanded` 는 그 상태를
-        클래스 글자에 기대지 않고 재는 자리다(13B 알려진 제한 27).
+        **한 노드다.** 접히면 시각 은폐, 펼치면 보이는 글자 — 바뀌는 것은 **보는 사람의 몫**이고
+        보조기기는 두 상태에서 같은 설명을 받는다. `aria-hidden` 이 그 문면을 본문 텍스트에서
+        빼고, `data-expanded` 는 상태를 클래스 글자에 기대지 않고 재는 자리다(13B 제한 27).
+
+        **그래도 DOM 텍스트 노드로 남는다** — 13A 문면 게이트의 술어는 잎 요소의 `textContent`
+        만 읽고 속성은 모집단에 든 적이 없다(실측). `aria-hidden` 은 접근성 트리의 축이라 그
+        훑기와 무관하다.
       */}
       <span
         id={whyId}
+        aria-hidden="true"
         data-expanded={expanded}
         className={expanded ? 'mt-0.5 text-xs text-ink-soft' : 'sr-only'}
       >

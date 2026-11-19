@@ -12,15 +12,22 @@ import { StateBadge } from './StateBadge';
  * 시각 은폐 문면으로 이미 닫혀 있었고, 손가락만 닫히지 않았다.
  *
  * 이 파일이 잠그는 것은 셋이다.
- * ⓐ **탭하면 펼쳐진다**(터치 경로) — 그 자리는 내장 `button` 이고 `aria-expanded` 를 든다.
+ * ⓐ **탭하면 펼쳐진다**(터치 경로) — 그 자리는 내장 `button` 이다.
  * ⓑ **보조기기 배선을 없애지 않았다**(접힌 상태에서도 `aria-describedby` 가 그 문면을 가리킨다).
- * ⓒ **같은 문면이 두 번 낭독되지 않는다** — 펼침은 **같은 한 노드**의 모양을 바꾸는 것이고,
- *    문면의 사본을 만들지 않는다. 그래서 이 축은 「노드 계수」로 잰다(글자 대조가 아니다).
+ * ⓒ **같은 문면이 접근성 트리에 한 번만 있다** — 사유 노드는 `aria-hidden` 이라 본문 텍스트로는
+ *    서지 않고 **버튼의 설명으로만** 전달된다.
+ *
+ * **왜 `aria-expanded`·`aria-controls` 가 없는가**(수정 라운드 1, verifier F-1 · 리뷰 M-2):
+ * 펼침은 **보이는 사용자를 위한 시각 장치**다. 보조기기 사용자는 접힘·펼침과 무관하게 설명으로
+ * 같은 문면을 받으므로, 「접혀 있다」고 선언하면서 그 내용을 트리에 그대로 두는 것은 모순이고
+ * 실제로 **두 번 전달**됐다(접힌 상태에서도 설명 1 + 본문 텍스트 1 — CDP AX 트리로 실측).
+ *
+ * **이 파일이 재는 층은 DOM 이다.** 접근성 트리의 「정확히 한 번」은 상자와 마찬가지로 브라우저가
+ * 있어야 서므로 **390px 여정**이 CDP 로 재고, 여기서는 그 조건(`aria-hidden` · 설명 배선 · 노드
+ * 하나)을 잠근다.
  *
  * **펼침 여부는 `data-expanded` 로 잰다 — 클래스 글자로 재지 않는다**(13B 알려진 제한 27):
  * Tailwind 의 후보 훑기가 `src/` 에 묶여 있지 않아 test 에 적은 클래스 꼴이 출하 CSS 로 실린다.
- * 실제 상자 높이와 시각 은폐는 **390px 여정의 터치 타깃 게이트**가 재는 축이고 이 파일은
- * 그 축을 복제하지 않는다.
  */
 const WHY = '미달이 아니라 판정하지 못했다';
 
@@ -36,9 +43,9 @@ function nodesWithWhy(root: HTMLElement, why: string): readonly Element[] {
   return [...root.querySelectorAll('*')].filter((one) => one.textContent === why);
 }
 
-/** 아래층 문면의 자리 — `aria-controls` 가 가리키는 바로 그 노드다(사본을 찾지 않는다). */
+/** 아래층 문면의 자리 — **설명으로 가리키는** 바로 그 노드다(사본을 찾지 않는다). */
 function whyNodeOf(badge: HTMLElement): HTMLElement | null {
-  return document.getElementById(badge.getAttribute('aria-controls') ?? '');
+  return document.getElementById(badge.getAttribute('aria-describedby') ?? '');
 }
 
 describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
@@ -47,8 +54,35 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
 
     const badge = screen.getByTestId('badge');
     expect(badge.tagName, 'why 가 있는 배지가 누를 수 없는 자리에 있다').toBe('BUTTON');
-    expect(badge.getAttribute('aria-expanded')).toBe('false');
     expect(whyNodeOf(badge)?.getAttribute('data-expanded'), '접힌 아래층이 처음부터 펼쳐져 있다').toBe('false');
+  });
+
+  /**
+   * **접근성 트리에 두 번 서지 않는다**(F-1 · M-2). 사유 노드는 설명으로만 전달되고 본문
+   * 텍스트로는 서지 않는다 — 그 수단이 `aria-hidden` 이다. 직접 참조된 숨김 노드라 설명 계산은
+   * 그대로 선다(CDP 실측: 접힘·펼침 둘 다 설명 1 · 본문 0).
+   */
+  it('사유 노드가 접힘·펼침 둘 다 접근성 트리에서 숨어 있다', () => {
+    render(<StateBadge display={WITH_WHY} testId="badge" />);
+
+    const badge = screen.getByTestId('badge');
+    expect(whyNodeOf(badge)?.getAttribute('aria-hidden'), '사유가 본문 텍스트로도 읽힌다').toBe('true');
+
+    fireEvent.click(badge);
+
+    expect(whyNodeOf(badge)?.getAttribute('aria-hidden'), '펼치면서 본문 텍스트가 됐다').toBe('true');
+  });
+
+  /**
+   * **「접혀 있다」고 선언하지 않는다**(F-1 처방). 보조기기는 접힘·펼침과 무관하게 설명으로 같은
+   * 문면을 받으므로, 상태를 선언하면 그 선언이 거짓이 된다.
+   */
+  it('펼침 상태를 ARIA 로 선언하지 않는다 — 시각 장치일 뿐이다', () => {
+    render(<StateBadge display={WITH_WHY} testId="badge" />);
+
+    const badge = screen.getByTestId('badge');
+    expect(badge.hasAttribute('aria-expanded'), '내용이 트리에 늘 있는데 접혔다고 선언한다').toBe(false);
+    expect(badge.hasAttribute('aria-controls'), '숨긴 노드를 가리키는 선언이 남았다').toBe(false);
   });
 
   it('누르면 아래층 문면이 펼쳐지고, 다시 누르면 접힌다', () => {
@@ -56,18 +90,16 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
 
     const badge = screen.getByTestId('badge');
     const why = whyNodeOf(badge);
-    expect(why, 'aria-controls 가 펼침 대상을 가리키지 않는다').not.toBeNull();
+    expect(why, 'aria-describedby 가 사유 노드를 가리키지 않는다').not.toBeNull();
 
     fireEvent.click(badge);
 
-    expect(badge.getAttribute('aria-expanded')).toBe('true');
     expect(why?.getAttribute('data-expanded')).toBe('true');
     expect(why?.textContent).toBe(WHY);
 
     // 펼침이 한 방향 문이 아니다 — 접으면 보조기기 경로만 남는다.
     fireEvent.click(badge);
 
-    expect(badge.getAttribute('aria-expanded')).toBe('false');
     expect(why?.getAttribute('data-expanded')).toBe('false');
     expect(why?.textContent, '접으면서 문면까지 사라졌다 — 보조기기가 읽을 것이 없다').toBe(WHY);
   });
@@ -104,8 +136,10 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
 
   /**
    * **툴팁 속성은 걷었다**(팀장 착수 판정 ⓑ). 손가락·마우스가 같은 길을 쓰므로 툴팁이 할 일이
-   * 없다. 다만 그 문면은 **DOM 텍스트 노드로 남아야** 한다 — 문면 게이트(13A)가 읽는 모집단이
-   * 그 속성 **과** 텍스트 노드이고, 둘 다에서 사라지면 게이트의 눈이 줄어든다.
+   * 없다. 다만 그 문면은 **DOM 텍스트 노드로 남아야** 한다 — 문면 게이트(13A)의 술어는 **잎
+   * 요소의 `textContent` 만** 읽고 속성은 모집단에 든 적이 없다(실측, 리뷰 L-6 의 정정). 그래서
+   * 속성으로만 나르면 그 게이트의 눈 밖으로 나간다. `aria-hidden` 은 접근성 트리의 축이고
+   * 이 훑기와 무관하다(같은 실측).
    */
   it('툴팁 속성을 더 쓰지 않으면서 그 문면을 DOM 텍스트로 남긴다', () => {
     const view = render(<StateBadge display={WITH_WHY} testId="badge" />);
@@ -143,6 +177,7 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
     expect(badge.textContent ?? '').toContain('알 수 없는 상태');
     fireEvent.click(badge);
     expect(whyNodeOf(badge)?.textContent ?? '').toContain('아직 모르는 상태');
+    expect(whyNodeOf(badge)?.getAttribute('data-expanded')).toBe('true');
   });
 
   /**
@@ -150,7 +185,7 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
    * 배지를 펼쳤을 때 다른 배지가 함께 펼쳐지면 id 가 겹친 것이다 — 배지는 45 자리에 흩어져
    * 있어 한 화면에 여럿이 서는 것이 보통이다.
    */
-  it('배지 둘이 서로 다른 펼침 대상을 가지고 따로 펼쳐진다', () => {
+  it('배지 둘이 서로 다른 사유 자리를 가지고 따로 펼쳐진다', () => {
     render(
       <>
         <StateBadge display={WITH_WHY} testId="first" />
@@ -160,11 +195,11 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
 
     const first = screen.getByTestId('first');
     const second = screen.getByTestId('second');
-    expect(first.getAttribute('aria-controls')).not.toBe(second.getAttribute('aria-controls'));
+    expect(first.getAttribute('aria-describedby')).not.toBe(second.getAttribute('aria-describedby'));
 
     fireEvent.click(first);
 
-    expect(first.getAttribute('aria-expanded')).toBe('true');
-    expect(second.getAttribute('aria-expanded'), '한 배지를 펼치니 다른 배지도 펼쳐졌다').toBe('false');
+    expect(whyNodeOf(first)?.getAttribute('data-expanded')).toBe('true');
+    expect(whyNodeOf(second)?.getAttribute('data-expanded'), '한 배지를 펼치니 다른 배지도 펼쳐졌다').toBe('false');
   });
 });
