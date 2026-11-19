@@ -414,6 +414,21 @@ export function WorksheetScreen() {
     },
   });
 
+  /**
+   * 내려놓기의 **다시 시도** — 가드를 지나는 입구로 보낸다(cr M-1). 버전 가드는 공용 `writeRetry`
+   * 를 그대로 쓰고(틱을 건넌 재전송을 막는 축) 보내는 자리만 `submitExit` 으로 바꾼다.
+   *
+   * 조립을 **누를 때** 하는 이유: 그 조립이 `submitExit` 을 담고 그것이 가드 ref 를 읽으므로,
+   * render 중에 만들면 「render 중 ref 접근」이 된다(lint 가 그 자리를 든다).
+   */
+  function retryExit(): void {
+    writeRetry({
+      variables: exit.variables,
+      reset: exit.reset,
+      mutate: (sent) => submitExit(sent.caseId, sent.fromVersion, { kind: sent.kind, value: sent.value }),
+    })();
+  }
+
   /** 금액·과세가 **둘 다** 있어야 전이를 부른다 — 없으면 멈추고 무엇이 없는지 말한다. */
   function amountOrBlock(): { readonly amountWon: number; readonly vat: 'INCLUSIVE' | 'EXCLUSIVE' | 'UNKNOWN' } | null {
     const amountWon = parseWon(form.amount);
@@ -584,14 +599,10 @@ export function WorksheetScreen() {
                    멱등이 아니다). */
                 what: `${exit.variables?.kind === 'SKIP' ? '건너뛰지' : '나중에 보기로 돌리지'}`,
                 error: exit.error,
-                /* **가드를 지나는 입구로 보낸다**(cr M-1). `writeRetry` 의 버전 가드는 그대로
-                   쓰고(틱을 건넌 재전송을 막는다) 보내는 자리만 `submitExit` 으로 바꾼다 —
-                   `exit.mutate` 를 직접 부르면 같은 틱의 연타가 가드 밖에서 요청을 더 낸다. */
-                retry: writeRetry({
-                  variables: exit.variables,
-                  reset: exit.reset,
-                  mutate: (sent) => submitExit(sent.caseId, sent.fromVersion, { kind: sent.kind, value: sent.value }),
-                }),
+                /* 이 갈래의 다시 시도는 **가드를 지나는 입구**이고 그 입구가 가드 ref 를 읽는다.
+                   그래서 이 객체에 담지 않고 **그리는 자리에서** 건다 — 담으면 이 객체 자체가
+                   「render 중에 읽는 ref 값」이 되어 그 자리를 보는 lint 가 든다. */
+                retry: null,
               }
             : null;
 
@@ -734,7 +745,11 @@ export function WorksheetScreen() {
       </header>
 
       {writeFailure === null ? null : (
-        <WriteFailureFace what={writeFailure.what} error={writeFailure.error} onRetry={writeFailure.retry} />
+        <WriteFailureFace
+          what={writeFailure.what}
+          error={writeFailure.error}
+          onRetry={writeFailure.retry ?? retryExit}
+        />
       )}
 
       {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
