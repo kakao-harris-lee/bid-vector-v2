@@ -687,7 +687,9 @@ describe('화면 D — 실행 취소는 뜨는 순간부터 살아 있다', () =
 describe('화면 D — 다시 시도도 같은 입구를 지난다', () => {
   it('다시 시도 연타가 요청을 하나만 더 낸다', async () => {
     mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
-    mocked.deferCase.mockReturnValueOnce(Promise.reject(new ApiError(409, 'INVALID_TRANSITION')));
+    // **거절 약속을 미리 만들지 않는다**: `mockReturnValueOnce(Promise.reject(…))` 는 처리자가
+    // 붙기 전에 거절이 서서 vitest 가 「전부 통과인데 exit 1」로 끝난다(실측 — 등록된 서명).
+    mocked.deferCase.mockRejectedValueOnce(new ApiError(409, 'INVALID_TRANSITION'));
     mocked.deferCase.mockReturnValue(new Promise<queries.BidCase>(() => {}));
     renderScreen();
 
