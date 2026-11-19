@@ -7,7 +7,7 @@ range 로 되돌리면 같은 range 에 섞인 남의 커밋까지 지운다.
 
 ```
 git restore --source=433b17b4 --staged --worktree -- \
-  web/src web/config web/e2e/journey reports/evidence/m13/ux-home-inbox \
+  web/src web/config web/e2e reports/evidence/m13/ux-home-inbox \
   docs/discovery/capability-map.md
 ```
 
@@ -25,8 +25,16 @@ SHA `433b17b4`** 이고 움직이는 `origin/main` 이 아니다(착수 base 가
 **빈 출력**이다.
 
 **셋째 단언 — 원천을 바꿨으므로 쟀다.** 복원 대상 blob 이 착수 base(`bd5cd039`)와 새 원천
-(`433b17b4`)에서 **같은가**: 열셋 가운데 **셋만 같고 열은 다르다**(다른 레인이 같은 파일을
-바꿨다). 그래서 목록을 **새 원천 기준으로 다시 산출**했고, 앞 라운드의 목록을 옮기지 않았다.
+(`433b17b4`)에서 **같은가**.
+
+**분모는 두 원천에 모두 있는 파일뿐이다 — 11 개다**(v L-3 의 정정). 앞 판은 13 이라고 적었는데,
+거기에는 **착수 base 에 아예 없던 신설 파일 둘**(이 slice 의 짝 test 와 여정 spec)이 섞여 있었다 —
+없는 것과 있는 것을 「다르다」로 세면 그 비교는 뜻이 없다. 같은 사유로 13C 가 만든 측정 모듈도
+분모 밖이다.
+
+그 11 가운데 **같은 것 셋**(`StateBadge.tsx` · `TodayNoticesScreen.tsx` 와 그 짝 test)과 **다른 것
+여덟**(지도 · 등록부 둘 · 여정 spec 셋 · 알림함 화면과 그 짝 test)이다. 그래서 목록을 **새 원천
+기준으로 다시 산출**했고, 앞 라운드의 목록을 옮기지 않았다.
 
 신설 6 은 짝 test 하나 · 여정 spec 하나 · evidence 넷이다. 새 test 파일과 새 여정 spec 은
 **만드는 커밋에서** 각자의 등록부에 함께 적었다.
@@ -57,7 +65,7 @@ SHA `433b17b4`** 이고 움직이는 `origin/main` 이 아니다(착수 base 가
 
 ## 실측 뒤에 움직인 것
 
-`git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 다섯 경로>` 가 비어 있지 않다면, **그 줄은 전부
+`git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 경로들>` 가 비어 있지 않다면, **그 줄은 전부
 원천(`433b17b4`)에 없는 신설 파일이다** — 이 slice 의 evidence 파일뿐이고 출하 코드는 실측 HEAD
 이후 한 줄도 움직이지 않는다. 그 전칭이 참인지(열거와 원천 부재 확인)는 verifier 가 센다.
 
