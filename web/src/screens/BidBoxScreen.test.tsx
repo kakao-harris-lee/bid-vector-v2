@@ -656,3 +656,53 @@ describe('화면 D — 보류 중에는 다시 보내지 않는다', () => {
     ).toBeTruthy();
   });
 });
+
+/**
+ * 가드가 **실행 취소를 먹지 않는다**(cr r1 HIGH). 토스트는 `onSuccess` 맨 앞에서 뜨는데 그
+ * 함수는 재조회를 기다리며 계속 돈다 — 그 창 안의 누름이 거절되면 **아무것도 가지 않은 채**
+ * 토스트만 사라진다(누르면 `ToastHost` 가 닫는다).
+ */
+describe('화면 D — 실행 취소는 뜨는 순간부터 살아 있다', () => {
+  it('재조회가 아직 안 끝난 창에서 눌러도 되돌림이 간다', async () => {
+    // 첫 적재만 풀고, 무효화가 부르는 재조회는 **해소되지 않는 약속**으로 묶는다.
+    mocked.listBidCases.mockResolvedValueOnce([bidCase({ state: 'WATCHING' })]);
+    mocked.listBidCases.mockReturnValue(new Promise<readonly queries.BidCase[]>(() => {}));
+    mocked.deferCase.mockResolvedValue(bidCase({ caseId: 42, state: 'DEFERRED' }));
+    mocked.resumeCase.mockResolvedValue(bidCase({ caseId: 42, state: 'WATCHING' }));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const toast = await screen.findByTestId('toast');
+    fireEvent.click(within(toast).getByRole('button', { name: '실행 취소' }));
+
+    await waitFor(() => expect(mocked.resumeCase).toHaveBeenCalledWith(42));
+  });
+});
+
+/** 쓰기 입구가 **하나**인가 — 실패 얼굴의 다시 시도도 같은 가드를 지나야 한다(cr r1 MEDIUM). */
+describe('화면 D — 다시 시도도 같은 입구를 지난다', () => {
+  it('다시 시도 연타가 요청을 하나만 더 낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.deferCase.mockReturnValueOnce(Promise.reject(new ApiError(409, 'INVALID_TRANSITION')));
+    mocked.deferCase.mockReturnValue(new Promise<queries.BidCase>(() => {}));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(mocked.deferCase).toHaveBeenCalledTimes(1);
+    const retry = within(face).getByRole('button', { name: '다시 시도' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mocked.deferCase).toHaveBeenCalledTimes(2));
+  });
+});
