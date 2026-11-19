@@ -195,36 +195,29 @@ function withCleared(form: SearchForm, axis: ChipAxis): SearchForm {
 }
 
 /**
- * 칸 하나의 **보이는 값**. 시각은 **표시층의 문면**으로 낸다 — 운영자가 적은 벽시계를 그대로
+ * 조건 하나의 **보이는 값**. 시각은 **표시층의 문면**으로 낸다 — 운영자가 적은 벽시계를 그대로
  * 되비추면 이 저장소가 금지한 원문 자리가 하나 더 생긴다(M9 D-1 · D-4).
  */
-function fieldTextOf(field: ChipField, raw: string): string | null {
-  const text = raw.trim();
-  if (text === '') {
+function conditionTextOf(field: ChipField, value: string | number | undefined): string | null {
+  if (value === undefined) {
     return null;
   }
-  switch (field.kind) {
-    case 'text':
-      return text;
-    // **조건이 되지 못하는 값은 칩에도 서지 않는다**(리뷰 H-1 장면 ⓑ). 「검색 중인가」와 「칩이
-    // 값을 보이는가」가 같은 해석기에서 나와야, 칩은 조건을 말하는데 화면은 제안인 틈이 없다.
-    case 'numeric':
-      return numericInputToInt(text) === null ? null : text;
-    case 'instant': {
-      const iso = localInputToIso(text);
-      return iso === null ? null : instantDisplayOf(iso).text;
-    }
-    default: {
-      const unreachable: never = field.kind;
-      throw new Error(`모르는 칸 종류: ${JSON.stringify(unreachable)}`);
-    }
-  }
+  return field.kind === 'instant' ? instantDisplayOf(String(value)).text : String(value);
 }
 
-/** 칩에 보이는 요약 — **적용된** 조건만이다(적다 만 값은 칩의 얼굴을 바꾸지 않는다). */
+/**
+ * 칩에 보이는 요약 — **보내는 조건 그 자체**에서 유도한다(수정 라운드 1 — 리뷰 H-1 장면 ⓑ).
+ *
+ * 앞 판은 **적용된 폼의 원문**을 읽었고, 그래서 「조건이 되는가」와 「칩이 값을 보이는가」가 서로
+ * 다른 술어였다(숫자 축에서만 어긋났다). 제출 차단이 선 뒤에는 그 엄격함이 **도달할 수 없는
+ * 방어**가 되어 느슨하게 되돌리는 변이가 초록이었다 — 그래서 술어를 하나 더 두는 대신 구조를
+ * 바꿨다. 칩은 `conditionsOf` 가 낸 조건 객체를 그리므로 **칩이 말하는 것과 wire 로 나가는 것이
+ * 같은 객체**다(빈 칸과 「조건 아님」이 그 객체에서만 갈린다).
+ */
 function chipSummaryOf(axis: ChipAxis, applied: SearchForm): string | null {
+  const conditions = conditionsOf(applied) as Readonly<Record<string, string | number | undefined>>;
   const parts = axis.fields
-    .map((one) => fieldTextOf(one, applied[one.field]))
+    .map((one) => conditionTextOf(one, conditions[one.field]))
     .filter((one): one is string => one !== null);
   return parts.length === 0 ? null : parts.join(' ~ ');
 }
