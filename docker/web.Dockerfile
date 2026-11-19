@@ -7,7 +7,7 @@
 #     docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml build web
 #
 # 베이스 셋 다 다이제스트로 고정한다(멀티플랫폼 index 의 다이제스트 — node 는 2026-10-16 실측,
-# golang·alpine 은 2026-10-29 실측). `:latest`·미고정 태그는 쓰지 않는다(6C 위생 기준 (2)).
+# alpine 은 2026-10-29 · golang 은 2026-11-20 실측). `:latest`·미고정 태그는 쓰지 않는다(6C 위생 기준 (2)).
 FROM node:24.12.0-slim@sha256:7326fb2dbdce998edd72140946851be64ef4a643e8715e138ca467e8e9d92c99 AS builder
 
 # `@playwright/test` 의 설치 훅이 브라우저(수백 MB)를 내려받는다 — 이 stage 는 번들만 만들고
@@ -54,7 +54,7 @@ RUN npm run build
 # golang.org/x/net → v0.62.0 둘을 지목해** 올린 것이다 — x/net 의 최소 판 요구로 x/* 다섯이 **따라**
 # 움직이므로 공식 바이너리와의 차이는 **일곱**이다(dep 147 = 147 · 실측은 아래 chore 주석이 가리키는 팩).
 # `go.sum` 이 모듈 체크섬을 고정한다(`-mod=readonly` 라 어긋나면 빌드가 멈춘다). 빌드 방식·플래그는 caddy v2.11.7 의 `.goreleaser.yml` 과 같다(`go mod init caddy` 한
-# 모듈에 `cmd/caddy/main.go`, `-trimpath`·`-ldflags='-s -w'`·CGO 끔·`-tags=nobadger,nomysql,nopgx`). `GOTOOLCHAIN=local` — go.mod 의 `go 1.26.10` 보다 낮은 toolchain 이면
+# 모듈에 `cmd/caddy/main.go`, `-trimpath`·`-ldflags='-s -w'`·CGO 끔·`-tags=nobadger,nomysql,nopgx`). `GOTOOLCHAIN=local` — go.mod 의 `go 1.26.11` 보다 낮은 toolchain 이면
 # 다른 toolchain 을 내려받지 않고 실패한다.
 #
 # chore(2026-11-07) — x/net 을 v0.60.0 → **v0.62.0** 으로 올렸다(CVE-2026-78661 HIGH, 취약점 게이트의 차단
@@ -64,10 +64,18 @@ RUN npm run build
 # (위 빌더 이미지 안에서 `go get golang.org/x/net@v0.62.0 && go mod tidy`, caddy 판은 그대로 v2.11.7).
 # 실측은 `reports/evidence/chore/cve-xnet-78661/`.
 #
+# chore(2026-11-20) — Go toolchain 을 **1.26.10 → 1.26.11** 로 올렸다(CVE-2026-97054 HIGH, 취약점 게이트의
+# 차단 후보였다 — 등재가 아니라 상향으로 닫는다). 결함은 HTTP/1 서버의 `MaxBytesReader` 다: 한도를 넘을
+# 때 자동으로 붙는 `Connection: close` 가 핸들러가 명시로 쓰는 헤더와 경합해(CWE-362) 그 서버가 런타임
+# 패닉으로 죽을 수 있다. 움직인 것은 **둘** — 위 빌더 다이제스트와 `go.mod` 의 `go` 줄이고, runbook §8.3
+# 셋째 갈래 중 `stdlib` 쪽이다(모듈 쪽이 아니다). 모듈은 **집합도 판도 그대로**다: 새 빌더 안에서
+# `go mod tidy` 를 돌렸고 `go.sum` 은 바이트가 같다. caddy 판도 v2.11.7 그대로다.
+# 실측은 `reports/evidence/chore/cve-go-stdlib-97054/`.
+#
 # **이 stage 는 `docker/web.Dockerfile` 과 `docker/proxy.Dockerfile` 에 같은 글자로 있다.** 두 이미지의
 # 바이너리가 같은지는 글자가 아니라 산출물로 잠근다 — `tools/local-tls-build.sh` 가 두 이미지의
 # `/usr/bin/caddy` sha256 이 다르면 실패한다.
-FROM golang:1.26.10-alpine3.23@sha256:34414731924cf2263160f0021f5cf6e1807382d85248f7cb419d4187b96d5e43 AS caddy-build
+FROM golang:1.26.11-alpine3.23@sha256:23f198931d4bd83b4f5a613bd75656257ae8bf832dcbc2db80e1050b5219ca2a AS caddy-build
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-mod=readonly
 WORKDIR /src/caddy
 COPY docker/caddy/go.mod docker/caddy/go.sum docker/caddy/main.go ./
