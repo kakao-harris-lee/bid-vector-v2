@@ -38,12 +38,22 @@ export const APPROVED_OPERATIONS = [
 
   // 화면 D 내 입찰함(M7/7E-2, D-7E2-8) — 「제출함」 뒤의 생애주기 넷. 계약 전이표
   // (`BID_TRANSITIONS`)가 허락하는 쌍만이고 D 의 다음 행동 표가 그 넷을 고른다.
-  // **담기 뒤 전이(`/defer`·`/skip`)와 결과 정정(`/outcome-correction`)은 두지 않는다** —
-  // 요구표의 D 행에 없고, 쓰지 않는 능력을 목록이 품으면 「목록 == 화면의 능력」이 공허해진다.
+  // **결과 정정(`/outcome-correction`)은 두지 않는다** — 요구표의 D 행에 없고, 쓰지 않는 능력을
+  // 목록이 품으면 「목록 == 화면의 능력」이 공허해진다.
   { method: 'POST', path: '/api/bid-cases/{caseId}/await-opening' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/opening' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/qualification-review' },
   { method: 'POST', path: '/api/bid-cases/{caseId}/outcome' },
+
+  // 내려놓기 둘(M13/13D) — 입찰함 카드가 부른다. **이 쌍 둘이 이 slice 의 증분이고** 계약
+  // `milestone-13.md` 의 13D 행이 미리 승인했다. `/resume` 은 이미 위에 있다(7E-2 가 「나중에」
+  // 상태의 되돌림으로 들였다) — 그래서 증분이 셋이 아니라 둘이다.
+  //
+  // 앞 판이 이 둘을 **일부러 뺐다**(요구표 D 행에 없었다). 이제 화면이 그 전이를 실제로 내므로
+  // 들어온다 — 「목록 == 화면의 능력」의 모양은 그대로다. 어느 상태에서 열리는지는 전이표가
+  // 정하고, 그 사본이 정본과 같은지는 `scripts/bid-exit-transitions.test.mjs` 가 등식으로 든다.
+  { method: 'POST', path: '/api/bid-cases/{caseId}/defer' },
+  { method: 'POST', path: '/api/bid-cases/{caseId}/skip' },
 
   // 설정 — 전략(D-7E2-2). 쓰기는 **편집 세션을 지나는 길 하나**다(계약에 전략을 직접 쓰는
   // operation 이 없다). 세션 조회(GET)를 쓰는 이유: 만료를 `expiresAt < now` 로 화면이

@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
+import { measureInPage } from './touchMeasure';
+
 import {
   ABSENT,
   AMOUNT_BASIS_LABEL,
@@ -39,6 +41,17 @@ import {
  *
  * 하네스가 적어 준 실행 맥락은 **Playwright 산출물 밖**이다(D-7E-6).
  */
+
+/** 손가락이 닿아야 하는 최소 변(§6.5) — 터치 타깃 게이트와 같은 수다. */
+const MIN_TOUCH_PX = 44;
+
+/**
+ * 내려놓기 둘의 **기대 어휘**와 그 차례(되돌릴 수 있는 것이 먼저다).
+ *
+ * 출하 표를 들여오지 않는다 — 같은 출처를 자기와 비교하면 아무것도 재지 않는다. 이 spec 의
+ * 다른 문면 단언과 같은 규율이다.
+ */
+const EXIT_LABELS = ['나중에', '건너뜀'];
 
 /** 카드 **전부**를 응답 행과 대조한다(v M-2 — 한 행만 보면 모든 카드가 첫 행을 보여도 초록이다). */
 async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise<void> {
@@ -179,6 +192,20 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
     notice.baseAmountWon!.toLocaleString('ko-KR'),
   );
 
+  /**
+   * **내려놓기 둘이 이 상태에서 실제로 선다**(M13/13C 머지 차례). 단위 test 는 표와 화면의
+   * 집합 등식을 들지만 **상자로 재지 않는다** — 터치 타깃 게이트의 워크시트 자리는 하네스 건이
+   * 종단 상태(낙찰)라 이 줄에 닿지 못한다(실측). 그래서 이 여정이 그 줄을 재는 유일한 자리다.
+   */
+  const measured = await page.evaluate(measureInPage);
+  const exitTargets = measured.targets.filter((one) => EXIT_LABELS.includes(one.name));
+  // 앞 판은 **상수 배열을 자기와 비교**했다(v low) — 무엇도 재지 않는 줄이었다. 재는 것은
+  // **화면이 실제로 낸 이름**이고, 기대 어휘는 이 spec 이 적는다(출하 표를 들여오면 같은 출처를
+  // 자기와 비교하게 된다 — 이 레인의 다른 문면 단언과 같은 규율이다).
+  expect(exitTargets.map((one) => one.name)).toStrictEqual(EXIT_LABELS);
+  // 높이는 **게이트와 같은 함수**로 잰다(조상이 자르면 그만큼만 센다 — 맨 상자보다 보수적이다).
+  expect(exitTargets.filter((one) => one.height < MIN_TOUCH_PX)).toStrictEqual([]);
+
   // 투찰가 요청 — 진행 중 건수를 **선언**해야 간다(CR H-1).
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰가 요청');
   await page.getByTestId('active-bids').fill('2');
@@ -189,6 +216,16 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   const priceResponse = await priced;
   expect(priceResponse.status()).toBe(200);
   const price = (await priceResponse.json()) as PriceBody;
+
+  /**
+   * M13/13C — 근거 다섯 절이 **접힌 상태**로 선다(점진적 공개). 아래 단언은 앞 판과 **같은 값을
+   * 같은 계수로** 보되, 그 전에 펼친다 — 접힌 자리는 역할 질의와 `innerText` 에서 빠지므로
+   * 펼치지 않으면 단언이 조용히 공허해진다(계수 0 · 빈 글자).
+   */
+  for (const section of ['verdict', 'bid-price-menu', 'qualification', 'grounds-section', 'disclosures-section']) {
+    await page.getByTestId(`${section}-summary`).click();
+    await expect(page.getByTestId(section)).toHaveJSProperty('open', true);
+  }
 
   // 선언한 값이 그대로 실려 되돌아오고 화면이 그것을 보인다(CR H-1).
   expect(price.currentActiveBids).toBe(2);
@@ -249,6 +286,10 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
   );
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰 예정 초안');
   await page.getByTestId('worksheet-primary').click();
+  // M13/13C — 초안 앞에 **확인**이 선다(§6.2 C 3). 보낼 금액이 숫자와 한글로 함께 보인다.
+  await expect(page.getByTestId('bid-confirm')).toContainText('이 금액으로 투찰하시겠습니까');
+  await expect(page.getByTestId('bid-confirm')).toContainText('10억 5000만원');
+  await page.getByTestId('bid-confirm-accept').click();
   const draftResponse = await drafted;
   expect(draftResponse.status(), '투찰 예정 초안 쓰기 응답').toBe(200);
   const draftedCase = (await draftResponse.json()) as BidCaseRow;
@@ -371,7 +412,7 @@ test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰
   const listed = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: 'D 내 입찰함' }).click();
+  await page.getByRole('link', { name: '내 입찰함', exact: true }).click();
   await expect(page.getByTestId('screen-bid-box')).toBeVisible();
   const rows = (await (await listed).json()) as BidCaseRow[];
   expect(rows.map((row) => row.noticeNumber), '내 입찰함에 이 여정의 건이 없다').toContain('SYN-7E2-BIDBOX');

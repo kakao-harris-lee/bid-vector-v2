@@ -68,7 +68,9 @@ export function isBidBoxTabId(value: string | null): value is BidBoxTabId {
  */
 export type BidBoxActionKind =
   | 'OPEN_WORKSHEET'
+  | 'DEFER'
   | 'RESUME'
+  | 'SKIP'
   | 'AWAIT_OPENING'
   | 'RECORD_OPENING'
   | 'ENTER_QUALIFICATION_REVIEW'
@@ -82,7 +84,9 @@ export type BidBoxActionKind =
  */
 export const ACTION_OPERATION = {
   OPEN_WORKSHEET: null,
+  DEFER: 'POST /api/bid-cases/{caseId}/defer',
   RESUME: 'POST /api/bid-cases/{caseId}/resume',
+  SKIP: 'POST /api/bid-cases/{caseId}/skip',
   AWAIT_OPENING: 'POST /api/bid-cases/{caseId}/await-opening',
   RECORD_OPENING: 'POST /api/bid-cases/{caseId}/opening',
   ENTER_QUALIFICATION_REVIEW: 'POST /api/bid-cases/{caseId}/qualification-review',
@@ -142,6 +146,49 @@ export function bidBoxActionOf(state: BidCaseState): BidBoxActionRow {
   return BID_BOX_ACTION[state];
 }
 
+/* ── 내려놓기 둘(M13/13D) ─────────────────────────────────────────────────────
+   「나중에」와 「건너뜀」은 **다음 행동이 아니다** — 건을 내려놓는 축이다. 그래서 위의
+   `primary`/`secondary` 를 차지하지 않고 자기 축으로 선다(§6.5 「다음 행동 하나가 화면을
+   지배한다」를 비우지 않는다). 둘을 한 행에 밀어 넣으면 관심 상태에서 행동이 넷이 되고
+   그 가운데 무엇이 다음 걸음인지 화면이 말하지 못한다. */
+
+/** 내려놓기의 종류 — 전체 종류에서 **뽑아 쓴다**(목록을 두 번 적지 않는다). */
+export type ExitActionKind = Extract<BidBoxActionKind, 'DEFER' | 'SKIP'>;
+
+/**
+ * 내려놓기의 **출발 상태 집합** — 계약 전이표(`BID_TRANSITIONS`)의 사본이다.
+ *
+ * **이 사본이 정본과 갈리면 운영자가 409 를 본다.** 그래서 `scripts/bid-exit-transitions.test.mjs`
+ * 가 정본을 읽어 이 표와 **등식**을 걸고, 그 전이를 **사용자가 낼 수 있는지**(주체 축)까지 본다.
+ * 계약에 상태가 늘어 이 표가 모르면 그 등식이 붉는다 — 컴파일이 아니라 게이트가 드는 자리다
+ * (새 상태에 빈 배열을 조용히 내주는 것이 이 표의 기본값이므로).
+ *
+ * 「건너뜀」이 「나중에」보다 넓은 것은 정본의 모양이다 — 나중에 둔 건도 건너뛸 수 있고,
+ * 투찰 예정까지는 내려놓을 수 있다. 반대로 「나중에」는 투찰 예정에서 열리지 않는다.
+ */
+export const EXIT_FROM_STATES = {
+  DEFER: ['WATCHING', 'PRICE_RECEIVED'],
+  SKIP: ['WATCHING', 'DEFERRED', 'PRICE_RECEIVED', 'BID_PLANNED'],
+} as const satisfies Record<ExitActionKind, readonly BidCaseState[]>;
+
+/** 카드에 서는 차례 — **되돌릴 수 있는 것이 먼저**다. */
+const EXIT_ORDER = ['DEFER', 'SKIP'] as const satisfies readonly ExitActionKind[];
+
+const EXIT_ACTION = {
+  DEFER: { label: '나중에', kind: 'DEFER' },
+  SKIP: { label: '건너뜀', kind: 'SKIP' },
+} as const satisfies Record<ExitActionKind, BidBoxAction>;
+
+/**
+ * 그 상태에서 열린 내려놓기 — **표에서 유도한다**. 상태별로 다시 적으면 사본이 둘이 되고
+ * 한쪽만 고쳐진다(이 파일의 선택지 문면이 같은 이유로 상태 표에서 온다).
+ */
+export function exitsOf(state: BidCaseState): readonly BidBoxAction[] {
+  return EXIT_ORDER.filter((kind) => EXIT_FROM_STATES[kind].some((one) => one === state)).map(
+    (kind) => EXIT_ACTION[kind],
+  );
+}
+
 /**
  * 「지난 일정」 경고의 문면 — **판정은 서버가 한다**(`BidCase.overdue`). 이 값은 그 boolean 을
  * 문면으로 옮길 뿐이고 시각을 비교하지 않는다.
@@ -153,7 +200,30 @@ export const OVERDUE_DISPLAY = {
 } as const;
 
 /** 행동이 받아야 하는 입력의 모양. `LINK` 만 서버를 부르지 않는다. */
-export type ActionInputShape = 'LINK' | 'INSTANT' | 'DATETIME' | 'CHOICE';
+export type ActionInputShape = 'LINK' | 'INSTANT' | 'DATETIME' | 'CHOICE' | 'TEXT';
+
+/**
+ * 바이트 순서 표시 — **화면과 서버의 「공백뿐」 판정이 갈리는 유일한 글자**다(실측).
+ *
+ * 서버는 Kotlin 의 공백 판정을 쓰고 그 집합은 JS `trim` 의 집합과 두 방향으로 다르다:
+ * 이 글자를 JS 는 공백으로 보고 **서버는 보지 않으며**, 반대로 제어문자 넷은 서버가 공백으로
+ * 보고 JS 는 보지 않는다. 뒤쪽은 화면이 보내고 서버가 거부하는 꼴이라 **화면이 더 좁은** 쪽이고
+ * 그대로 둔다. 앞쪽은 화면이 서버보다 **많이 거부하는** 꼴이라 맞춰야 한다.
+ */
+const BYTE_ORDER_MARK = '﻿';
+
+/** 위 글자를 셈에서 **보이는 글자로** 바꿔 세울 자리표. 무엇이든 공백만 아니면 된다. */
+const VISIBLE_STAND_IN = '.';
+
+/**
+ * 서버가 **공백뿐**으로 볼 값인가 — 「보내지 않는다」 판정이다. 400 을 쓰기 실패 얼굴로 받는 것은
+ * 운영자에게 무엇이 잘못됐는지 알려 주지 않으므로 화면이 먼저 본다.
+ *
+ * 술어가 `trim` 하나가 아닌 이유는 [BYTE_ORDER_MARK] 의 주석에 있다.
+ */
+export function blankToServer(value: string): boolean {
+  return value.split(BYTE_ORDER_MARK).join(VISIBLE_STAND_IN).trim() === '';
+}
 
 export interface ActionChoice {
   /**
@@ -188,6 +258,25 @@ export interface ActionInput {
   /** 입력 칸의 라벨 — `LINK`·`INSTANT` 에는 칸이 없다. */
   readonly label?: string;
   readonly choices?: readonly ActionChoice[];
+  /**
+   * 자유 텍스트의 **글자 수 상한**(`TEXT` 만). 계약이 그 칸에 선 상한이고 **생성 타입에는 값으로
+   * 오지 않는다**(설명 주석에만 있다) — 그래서 `scripts/bid-exit-transitions.test.mjs` 가 계약
+   * 원문의 그 칸과 **등식**을 건다. 이 파일이 그 수를 적는 **유일한 자리**다.
+   *
+   * 세는 단위가 **서버와** 같다는 것은 실측으로 갈랐다 — 서버와 화면이 둘 다 UTF-16 코드 단위로
+   * 센다(계약의 다른 칸 하나는 서버가 코드포인트로 세는데 이 칸은 아니다).
+   *
+   * **계약 원문의 단위는 또 다르다**(cr LOW): 그 선언은 JSON Schema 규칙상 **코드포인트** 수다.
+   * 그래서 대리쌍이 섞인 사유에서는 화면·서버가 계약보다 **먼저** 거부한다 — 안전한 방향이고,
+   * 화면이 계약이 아니라 **서버와** 맞춘 것이 맞는 선택이다. 등식이 재는 것은 그 두 수가 같다는
+   * 사실이지 단위가 같다는 사실이 아니다.
+   */
+  readonly maxChars?: number;
+  /**
+   * 보내기 전에 한 번 더 묻는 말 — **되돌림 전이가 없는 전이**에만 둔다(D-7E-5 의 짝). 실행
+   * 취소를 줄 수 없는 자리에서 운영자를 멈추는 길이 이것뿐이다.
+   */
+  readonly confirm?: string;
 }
 
 /**
@@ -200,7 +289,18 @@ export interface ActionInput {
  */
 export const ACTION_INPUT: Record<BidBoxActionKind, ActionInput> = {
   OPEN_WORKSHEET: { shape: 'LINK' },
+  // 「나중에」는 **리마인드 시각이 반드시 있어야 한다**(계약) — 「보류」라는 상태가 없고 그
+  // 시각이 다음 확인 시점이 된다. 기본값을 두지 않는 것은 이 표의 규약 그대로다.
+  DEFER: { shape: 'DATETIME', label: '리마인드 시각' },
   RESUME: { shape: 'INSTANT' },
+  // 「건너뜀」은 **유일한 종단**이고 사유가 지울 수 없는 타임라인에 남는다(계약). 그래서 실행
+  // 취소 대신 확인을 두고, 사유는 자유 텍스트다 — 이 카드의 **첫 자유 텍스트 입력**이다.
+  SKIP: {
+    shape: 'TEXT',
+    label: '건너뜀 사유',
+    maxChars: 500,
+    confirm: '이 건을 건너뜁니다. 되돌릴 수 없고 사유가 기록에 남습니다.',
+  },
   AWAIT_OPENING: { shape: 'DATETIME', label: '개찰 일시' },
   RECORD_OPENING: { shape: 'CHOICE', label: '개찰 결과', choices: OPENING_CHOICES },
   ENTER_QUALIFICATION_REVIEW: { shape: 'DATETIME', label: '서류 기한' },

@@ -460,6 +460,21 @@ describe('설정 — 범위 밖 자리', () => {
     expect(notReady.textContent).toContain('페이퍼');
     expect(notReady.textContent).toContain('알림 채널');
   });
+
+  /**
+   * M13/13A — **내부 용어를 걷은 자리**다. 금지 꼴 게이트는 개발 코드를 잡지만 「계약」·「API」
+   * 같은 내부 용어는 열거할 수 없어(그 판단은 사람의 것이다) 고친 자리만 축어로 잠근다.
+   */
+  it('사유 문면에 내부 용어가 돌아오지 않는다', async () => {
+    renderScreen();
+
+    const notReady = await screen.findByTestId('settings-not-ready');
+    const text = notReady.textContent ?? '';
+    expect(text.trim()).not.toBe('');
+    for (const term of ['계약에']) {
+      expect(text).not.toContain(term);
+    }
+  });
 });
 
 /**

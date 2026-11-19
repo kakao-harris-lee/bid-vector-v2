@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { REPORT_RELATIVE } from './scripts/smoke-lane.mjs';
+
 // 7A 의 e2e 는 셸이 뜨는지 하나다(ADR 0011 D-5). 여정 스모크는 7E 가 화면과 함께 들인다.
 //
 // `webServer` 를 둔다 — legacy 는 이 블록이 없어 사람이 서버를 먼저 띄워야 했고(조사 §1.4),
@@ -20,7 +22,19 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: process.env.CI ? 'list' : [['list'], ['html', { open: 'never' }]],
+  /**
+   * **json 리포터는 늘 켠다**(M13/13C r2 · v R1-M5) — `scripts/check-smoke-results.mjs` 가 그
+   * 산출물로 「건너뜀 0 · 등록부와 같은 spec 집합」을 판정하고, 그 파일이 없으면 그 게이트가
+   * **통과가 아니라 실패**다. Playwright 는 건너뛴 test 가 있어도 exit 0 이고 spec 개명 하나로
+   * 수집에서 조용히 빠지므로, 이 자리가 없으면 이 레인은 자기가 무엇을 돌렸는지 말하지 못한다.
+   *
+   * 여정 레인과 **다른 파일 이름**이다 — 같은 `test-results/` 를 쓰는 두 레인이 한 이름을 나눠
+   * 쓰면 뒤에 도는 쪽이 앞 레인의 판정을 덮는다.
+   */
+  reporter: [
+    ...(process.env.CI ? [['list'] as const] : ([['list'], ['html', { open: 'never' }]] as const)),
+    ['json', { outputFile: REPORT_RELATIVE }] as const,
+  ],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   use: {

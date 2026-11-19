@@ -26,6 +26,10 @@ export const VOCABULARY_DECLARATIONS = [
   'display/moneyDisplay.ts#amountProvenanceDisplayOf',
   'display/moneyDisplay.ts#amountQualifierTextOf',
   'display/moneyDisplay.ts#currencyDisplayOf',
+  // M13/13C — 금액을 한글 자리로 끊어 읽은 글자(나라장터 넘김의 병기). 통화 단위를 **통화 표의
+  // 라벨**에서 가져오므로 그 표가 원문을 내면 이 글자에 실린다 — 그래서 어휘이고, 이것을 부르는
+  // 카드는 「원문 0」 단언의 대상이 된다.
+  'display/moneyDisplay.ts#koreanAmountTextOf',
   'display/moneyDisplay.ts#vatTreatmentDisplayOf',
   'display/noticeDisplay.ts#amountDisplayOf',
   'display/timeDisplay.ts#instantDisplayOf',
@@ -55,6 +59,13 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
     why: '숫자와 단위를 한 글자로. 위와 같은 속이고 화면이 직접 부르지 않는다. 표시층 다른 모듈을 지나 화면에 닿는 경로는 이제 폐포가 본다',
   },
   {
+    // M13/13C — 하한 대비 여유. 내는 것은 **비율 글자와 자리 상태**이고 금액 토큰·명령 토큰·
+    // 시각 원문이 아니다. 금액을 **받지만** 그 금액을 글자로 내지 않는다(그 일은 병기가 한다).
+    key: 'display/floorMargin.ts#floorMarginOf',
+    kind: OTHER_AXIS,
+    why: '하한 여유 축 — 비율 글자와 자리 상태를 내고 이 게이트가 금지하는 어휘(금액 토큰·명령 토큰·시각 원문)를 그리지 않는다',
+  },
+  {
     key: 'display/noticeDisplay.ts#noticeStatusDisplayOf',
     kind: OTHER_AXIS,
     why: '공고 상태 축 — 이 게이트가 금지하는 어휘(금액 토큰·명령 토큰·시각 원문)가 아니다',
@@ -79,6 +90,16 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
     key: 'display/bidBoxDisplay.ts#bidBoxActionOf',
     kind: OTHER_AXIS,
     why: '상태 → 그 상태에서 가능한 동작 행. 문면은 상태·명령 표에서 오고 이 함수가 금액·시각 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#exitsOf',
+    kind: OTHER_AXIS,
+    why: '상태 → 열린 내려놓기 행동. 라벨은 표의 상수이고 이 함수가 금액·시각 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#blankToServer',
+    kind: OTHER_AXIS,
+    why: '자유 텍스트가 서버 기준 공백뿐인가 — 보낼지 말지의 판정이고 보이는 글자를 만들지 않는다',
   },
 
   // ── 사건 축 ────────────────────────────────────────────────────────────────

@@ -69,7 +69,7 @@ export const RECONCILIATION_BLOCKER_DISPLAY = {
   },
   OPERATOR_NAME_NORMALIZES_TO_EMPTY: {
     label: '내 상호가 빈 값',
-    why: '법인 표기 토큰만 남아 견줄 이름이 없다 — 설정에서 고칠 수 있다',
+    why: '「주식회사」 같은 법인 표기만 남아 견줄 이름이 없다 — 설정에서 고칠 수 있다',
     tone: 'unjudged',
   },
   WINNER_NAME_NOT_PUBLISHED: {
@@ -79,7 +79,7 @@ export const RECONCILIATION_BLOCKER_DISPLAY = {
   },
   WINNER_NAME_NORMALIZES_TO_EMPTY: {
     label: '낙찰자 상호가 빈 값',
-    why: '공개된 이름이 법인 표기 토큰만이라 견줄 수 없다',
+    why: '공개된 이름이 「주식회사」 같은 법인 표기뿐이라 견줄 수 없다',
     tone: 'absent',
   },
 } as const satisfies Record<ReconciliationBlocker, StateDisplay>;

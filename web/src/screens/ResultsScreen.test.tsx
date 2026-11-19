@@ -213,6 +213,15 @@ describe('화면 E — 결과 단계 건만, 서버 상태 그대로', () => {
     expect(await screen.findByTestId('results-empty')).toBeTruthy();
   });
 
+  /** 빈 얼굴이 **다음 걸음**을 준다(M13/13D, 항목 7) — 사유는 이미 있었고 길이 없었다. */
+  it('빈 얼굴이 그 걸음을 걷는 자리로 가는 길을 준다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    renderScreen();
+
+    const empty = await screen.findByTestId('results-empty');
+    expect(within(empty).getByTestId('results-empty-action').getAttribute('href')).toBe('/bids');
+  });
+
   it('세션이 없다는 답에는 로그인 얼굴이다 — 재시도 얼굴이 아니다', async () => {
     mocked.readSession.mockResolvedValue(null);
     mocked.listBidCases.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));

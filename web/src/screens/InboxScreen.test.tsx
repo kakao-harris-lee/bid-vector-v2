@@ -578,6 +578,10 @@ describe('빈 자리 (R-4)', () => {
     expect(slot.textContent ?? '').toContain('준비 중');
     expect(within(slot).queryAllByRole('button')).toStrictEqual([]);
     expect(within(slot).queryAllByRole('checkbox')).toStrictEqual([]);
+    // M13/13A — 내부 용어를 걷은 자리다. 고친 문면만 축어로 잠근다(일반 축은 열지 않는다).
+    for (const term of ['effect', '발송']) {
+      expect(slot.textContent ?? '').not.toContain(term);
+    }
   });
 });
 

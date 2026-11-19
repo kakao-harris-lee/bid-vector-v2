@@ -241,10 +241,51 @@ export async function recordBid(
   return data;
 }
 
+/* ── 건을 내려놓는 셋(M13/13D) ────────────────────────────────────────────────
+   「나중에」·「다시 보기」·「건너뜀」이 한 축이다. 셋 다 응답이 `BidCase` 하나라 전이 뒤 상태를
+   **서버가 준 값으로** 받는다.
+
+   **인자 꼴이 다른 둘과 같다**(`caseId` + 계약 본문) — 입찰함 카드 전용 어휘를 넣지 않았으므로
+   워크시트도 같은 호출을 쓴다. 어느 상태에서 이 셋이 열리는지는 계약 전이표가 정하고, 화면이
+   든 그 사본은 `scripts/bid-exit-transitions.test.mjs` 가 정본과 등식으로 묶는다. */
+
+/** 나중에 — **리마인드 시각이 필수**다(계약: 「보류」라는 상태가 없다). */
+export async function deferCase(
+  caseId: number,
+  body: components['schemas']['DeferRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/defer', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
 export async function resumeCase(caseId: number): Promise<BidCase> {
   // 되돌림 전이는 **본문이 없다**(계약에 requestBody 가 없다) — 빈 object 를 보내면 415·400 이다.
   const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/resume', {
     params: { path: { caseId: pathCaseId(caseId) } },
+  });
+  if (data === undefined) {
+    raise(response.status, error);
+  }
+  return data;
+}
+
+/**
+ * 건너뜀 — **유일한 종단**이고 사유가 필수다. 그 사유는 지울 수 없는 타임라인에 남으므로
+ * 화면이 빈 값·상한 초과를 **보내기 전에** 거른다(그 판정은 표시 층에 있다).
+ */
+export async function skipCase(
+  caseId: number,
+  body: components['schemas']['SkipRequest'],
+): Promise<BidCase> {
+  const { data, error, response } = await apiClient.POST('/api/bid-cases/{caseId}/skip', {
+    params: { path: { caseId: pathCaseId(caseId) } },
+    body,
   });
   if (data === undefined) {
     raise(response.status, error);

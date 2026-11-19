@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { APPROVED_OPERATIONS } from '../api/approvedOperations';
 import { BID_CASE_STATE_DISPLAY, type BidCaseState } from './caseDisplay';
 import {
+  ACTION_INPUT,
   ACTION_OPERATION,
   BID_BOX_ACTION,
   BID_BOX_TABS,
+  EXIT_FROM_STATES,
   STATE_TAB,
   bidBoxActionOf,
+  blankToServer,
+  exitsOf,
   tabOf,
   type BidBoxActionKind,
   type BidBoxTabId,
@@ -81,7 +85,9 @@ describe('D 내 입찰함의 다음 행동 표', () => {
     const kinds = new Set<BidBoxActionKind>();
     for (const state of CONTRACT_STATES) {
       const row = BID_BOX_ACTION[state];
-      for (const action of [row.primary, row.secondary]) {
+      // 내려놓기도 **이 모집단에 든다**(M13/13D) — 빼면 새 종류 둘이 operation 표에 없어도
+      // 이 단언이 조용하다.
+      for (const action of [row.primary, row.secondary, ...exitsOf(state)]) {
         if (action !== null) {
           kinds.add(action.kind);
         }
@@ -133,5 +139,85 @@ describe('D 내 입찰함의 다음 행동 표', () => {
       expect(bidBoxActionOf(state).primary, state).toBeNull();
       expect(bidBoxActionOf(state).secondary, state).toBeNull();
     }
+  });
+});
+
+/* ── 내려놓기 둘(M13/13D) ─────────────────────────────────────────────────────
+   출발 집합이 계약 전이표와 같은지는 `scripts/bid-exit-transitions.test.mjs` 가 정본을 읽어
+   잰다. 여기서 재는 것은 **그 표를 화면이 어떻게 쓰는가**다. */
+
+describe('내려놓기의 출발 집합과 유도', () => {
+  it('상태 전수에서 내려놓기가 표의 멤버십과 정확히 같다', () => {
+    expect(CONTRACT_STATES.length, '상태 전수가 비면 아래 루프가 공허해진다').toBeGreaterThan(0);
+
+    for (const state of CONTRACT_STATES) {
+      const kinds = exitsOf(state).map((one) => one.kind);
+      const expected = (['DEFER', 'SKIP'] as const).filter((kind) =>
+        (EXIT_FROM_STATES[kind] as readonly string[]).includes(state),
+      );
+
+      expect(kinds, `${state}: 유도가 표와 다르다`).toStrictEqual(expected);
+    }
+  });
+
+  /** §6.5 — 내려놓기는 **다음 행동 하나를 차지하지 않는다**. 그래서 축이 따로 선다. */
+  it('내려놓기가 primary·secondary 에 끼지 않는다', () => {
+    for (const state of CONTRACT_STATES) {
+      const row = bidBoxActionOf(state);
+      const next = [row.primary, row.secondary].filter((one) => one !== null).map((one) => one.kind);
+
+      expect(next, `${state}: 다음 행동 자리에 내려놓기가 있다`).not.toContain('DEFER');
+      expect(next, `${state}: 다음 행동 자리에 내려놓기가 있다`).not.toContain('SKIP');
+    }
+  });
+
+  it('종단과 결과 단계에서는 내려놓기가 열리지 않는다', () => {
+    for (const state of ['SKIPPED', 'WON', 'LOST', 'FAILED_OR_REBID', 'BID_RECORDED'] as const) {
+      expect(exitsOf(state), `${state}: 서버가 받지 않는 전이를 버튼으로 낸다`).toStrictEqual([]);
+    }
+  });
+
+  it('「나중에」는 되돌릴 수 있고 「건너뜀」은 확인을 묻는다', () => {
+    // 되돌림 전이가 있는 쪽은 확인을 두지 않는다 — 실행 취소가 그 자리를 든다(D-7E-5).
+    expect(ACTION_INPUT.DEFER.confirm).toBeUndefined();
+    expect(ACTION_INPUT.SKIP.confirm).toBeDefined();
+    // 「다시 보기」가 그 역전이다 — 그것이 있어 실행 취소가 거짓말이 되지 않는다.
+    expect(ACTION_OPERATION.RESUME).toContain('/resume');
+  });
+
+  it('건너뜀만 자유 텍스트이고 상한을 든다', () => {
+    const shapes = Object.entries(ACTION_INPUT).filter(([, input]) => input.shape === 'TEXT');
+
+    expect(shapes.map(([kind]) => kind)).toStrictEqual(['SKIP']);
+    expect(ACTION_INPUT.SKIP.maxChars, '상한이 없으면 보내기 전 거름이 공허해진다').toBeGreaterThan(0);
+  });
+});
+
+describe('서버 기준 「공백뿐」 판정 — 화면이 서버보다 많이 거부하지 않는다', () => {
+  /** 바이트 순서 표시. 축어로 적지 않고 코드포인트로 짓는다. */
+  const bom = String.fromCodePoint(0xfeff);
+  /** 서버만 공백으로 보는 제어문자 하나(실측 넷 가운데 하나). */
+  const unitSeparator = String.fromCodePoint(0x1f);
+
+  it('빈 값과 공백뿐인 값은 보내지 않는다', () => {
+    expect(blankToServer('')).toBe(true);
+    expect(blankToServer(' \t\n')).toBe(true);
+    expect(blankToServer(String.fromCodePoint(0x3000))).toBe(true);
+  });
+
+  it('서버가 글자로 보는 값은 보낸다 — JS `trim` 만 쓰면 여기서 더 거부한다', () => {
+    // 이 글자 하나가 두 집합의 유일한 차이다(실측). `trim` 술어는 이 둘을 공백으로 보고
+    // 서버는 보지 않으므로, 화면이 거부하면 **서버보다 많이** 거부하는 것이 된다.
+    expect(blankToServer(bom)).toBe(false);
+    expect(blankToServer(`${bom} \t`)).toBe(false);
+  });
+
+  it('서버만 공백으로 보는 제어문자는 화면이 보낸다 — 화면이 더 좁은 쪽이다', () => {
+    // 그 요청은 서버가 400 으로 거부한다. 화면이 **덜** 거부하는 방향이라 그대로 둔다.
+    expect(blankToServer(unitSeparator)).toBe(false);
+  });
+
+  it('평범한 사유는 보낸다', () => {
+    expect(blankToServer('예산이 맞지 않는다')).toBe(false);
   });
 });

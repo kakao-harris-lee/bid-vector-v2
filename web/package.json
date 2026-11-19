@@ -19,7 +19,7 @@
     "api:types:check": "node scripts/check-api-types.mjs",
     "test": "vitest run",
     "gate:tests": "node scripts/check-gate-tests.mjs",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/smoke-run-begin.mjs && playwright test && node scripts/check-smoke-results.mjs",
     "test:e2e:journey": "node scripts/journey-run-begin.mjs && playwright test --config=playwright.journey.config.ts && node scripts/check-journey-results.mjs",
     "capture:usecase": "node e2e/capture/usecase-captures.mjs",
     "probe:kotlin-read": "NODE_ENV=test node scripts/kotlin-read-probe.mjs; true; node scripts/kotlin-read-probe.mjs; env FOO=1 node scripts/kotlin-read-probe.mjs",

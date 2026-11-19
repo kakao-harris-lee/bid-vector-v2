@@ -63,13 +63,13 @@ export const RESULT_PENDING_SLOTS: readonly PendingSlot[] = [
   {
     id: 'back-calculation',
     label: '역산(이 금액이면?)',
-    why: 'SET-03 가 `근거 부족` 이다 — 후속이 아니라 영구 빈 자리다',
+    why: '지금은 제공하지 않습니다',
     kind: 'PERMANENT',
   },
   {
     id: 'recommendation-error',
     label: '추천 오차',
-    why: 'SET-05 가 `후속` 이다 — 이 마일스톤에서 서지 않는다',
+    why: '추천 값이 먼저 서야 잴 수 있습니다 — 지금은 제공하지 않습니다',
     kind: 'PERMANENT',
   },
 ];

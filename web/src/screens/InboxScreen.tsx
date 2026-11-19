@@ -514,7 +514,7 @@ export function InboxScreen() {
           채널 복제(텔레그램·메일) <span className="text-absent-ink">준비 중</span>
         </h3>
         <p className="mt-1 text-xs text-ink-soft">
-          외부 effect 는 알림함 기록까지입니다(R-4) — 채널 발송은 `OPEN-STR-12` 결정 뒤에 섭니다.
+          지금은 이 알림함에만 적습니다. 텔레그램·메일로 보내는 것은 보내는 방법을 정한 뒤에 엽니다.
         </p>
       </section>
     </section>

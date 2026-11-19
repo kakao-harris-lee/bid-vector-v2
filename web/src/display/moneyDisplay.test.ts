@@ -12,6 +12,8 @@ import {
   amountProvenanceDisplayOf,
   amountQualifierTextOf,
   currencyDisplayOf,
+  KOREAN_UNIT_NAMES,
+  koreanAmountTextOf,
   vatTreatmentDisplayOf,
   type AmountBasis,
   type AmountCurrency,
@@ -280,6 +282,69 @@ describe('부속 세 축은 한 문면으로 조립된다 — 화면 B·C·설�
 
     for (const token of MONEY_TOKENS) {
       expect(text, `${token} 이 문면에 남았다`).not.toContain(token);
+    }
+  });
+});
+
+/**
+ * 한글 금액 병기(계약 13C · §6.2 C 4 「원 단위 정수 + 한글 금액 병기」). 나라장터 실수 목록의
+ * 첫 줄이 「0 을 하나 더/덜」이고, 그 실수는 **자리 수를 눈으로 세는 것으로는 잡히지 않는다** —
+ * 억·만으로 끊어 읽는 글자가 그것을 잡는다.
+ */
+describe('한글 금액 병기', () => {
+  it.each([
+    ['0 원', 0, '0원'],
+    ['한 자리', 7, '7원'],
+    ['만 미만', 9_999, '9999원'],
+    ['정확히 만', 10_000, '1만원'],
+    ['만과 끝자리', 10_001, '1만 1원'],
+    ['정확히 억', 100_000_000, '1억원'],
+    ['억과 만', 1_050_000_000, '10억 5000만원'],
+    ['억과 끝자리 — 가운데 빈 자리는 빠진다', 1_000_000_001, '10억 1원'],
+    ['조 단위', 1_234_000_000_000, '1조 2340억원'],
+    ['조와 끝자리 — 가운데 둘이 비어도 자리를 만들지 않는다', 1_000_000_000_001, '1조 1원'],
+  ])('%s', (_label, won, expected) => {
+    expect(koreanAmountTextOf(won)).toBe(expected);
+  });
+
+  /**
+   * **읽을 수 없는 값에 글자를 지어내지 않는다.** 원 단위 정수가 아닌 값은 이 자리의 입력이
+   * 아니고, 그때 「0원」이라고 적으면 화면이 금액을 **지어내는** 것이다.
+   */
+  it.each([
+    ['음수', -1],
+    ['정수가 아님', 1_000.5],
+    ['안전 정수 밖', Number.MAX_SAFE_INTEGER + 2],
+    ['수가 아님', Number.NaN],
+  ])('%s 이면 글자가 없다', (_label, won) => {
+    expect(koreanAmountTextOf(won)).toBeNull();
+  });
+
+  /**
+   * **닿지 않는 자리를 두지 않는다**(cr L-1). 이 함수는 안전 정수 밖을 먼저 `null` 로 돌려보내므로
+   * 조 위의 자리 이름은 **입력이 존재하지 않는다** — 그래서 어휘를 조에서 끝내고, 그 사실을
+   * 여기서 단언한다(죽은 분기를 지울 때 test 는 남기고 주장을 바꾼다).
+   */
+  it('자리 이름이 조에서 끝난다 — 그 위는 입력이 아니다', () => {
+    expect(KOREAN_UNIT_NAMES).toStrictEqual(['조', '억', '만']);
+    expect(koreanAmountTextOf(Number.MAX_SAFE_INTEGER)).toMatch(/^\d+조/u);
+  });
+
+  /** 병기는 **같은 수의 다른 읽기**다 — 숫자 글자와 한글 글자가 같은 값을 말해야 한다. */
+  it('억·만으로 끊은 자리의 합이 원래 수와 같다', () => {
+    for (const won of [0, 1, 9_999, 10_000, 100_000_000, 1_050_000_000, 987_654_321, 1_234_000_000_000]) {
+      const text = koreanAmountTextOf(won) ?? '';
+      const jo = /(\d+)조/u.exec(text);
+      const eok = /(\d+)억/u.exec(text);
+      const man = /(\d+)만/u.exec(text);
+      const rest = /(?:^|\s)(\d+)원/u.exec(text);
+      const sum =
+        Number(jo?.[1] ?? 0) * 1_000_000_000_000 +
+        Number(eok?.[1] ?? 0) * 100_000_000 +
+        Number(man?.[1] ?? 0) * 10_000 +
+        Number(rest?.[1] ?? 0);
+
+      expect(sum, `${won} 의 병기가 다른 값을 말한다: ${text}`).toBe(won);
     }
   });
 });
