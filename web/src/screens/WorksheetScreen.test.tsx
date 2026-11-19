@@ -11,6 +11,8 @@ import { stateDisplayOf } from '../display/caseDisplay';
 import { controlClass } from '../components/Button';
 
 import { SECTION_SUMMARY_CLASS } from './WorksheetGrounds';
+import { BID_CASE_STATE_DISPLAY } from '../display/caseDisplay';
+import { ACTION_INPUT, exitsOf } from '../display/bidBoxDisplay';
 import { WorksheetScreen } from './WorksheetScreen';
 
 vi.mock('../api/queries');
@@ -1318,5 +1320,101 @@ describe('화면 C — 규칙 판본은 시행일로 보인다', () => {
     const cell = await screen.findByTestId('license-policy');
     expect(cell.textContent, '부재를 최초 판이라는 사실로 읽었다').not.toContain('최초 판');
     expect(cell.textContent).toContain('받지 못했');
+  });
+});
+
+/**
+ * **내려놓기 둘이 워크시트에 선다**(M13/13C 머지 차례 · 계약 받는 항목 3 의 잔여).
+ *
+ * 13D 가 화면 D 에 세운 것을 **그 표와 그 쿼리로** 여기 잇는다 — 열린 집합은 `exitsOf` 가 정하고
+ * (상태 전수 루프로 잠근다), 폼은 13D 의 `ActionForm` 하나이며, 「나중에」의 역전이는 이 화면이
+ * 이미 가진 `resumeCase` 다. 새 사본을 만들지 않는 것이 이 자리의 요점이다.
+ */
+describe('화면 C — 건을 내려놓는다', () => {
+  const EXIT_TEST_ID = { DEFER: 'worksheet-exit-DEFER', SKIP: 'worksheet-exit-SKIP' } as const;
+
+  /** 상태 전수 — 표가 정한 집합과 **화면이 그린 집합**이 같은지 본다(화면이 상태를 보고 고르지 않는다). */
+  it.each(Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][])(
+    '%s 에서 그려지는 내려놓기가 표와 같다',
+    async (state) => {
+      mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+      renderScreen();
+      await screen.findByTestId('worksheet-case-state');
+
+      const expected = exitsOf(state).map((one) => one.kind);
+      const drawn = (['DEFER', 'SKIP'] as const).filter(
+        (kind) => screen.queryByTestId(EXIT_TEST_ID[kind]) !== null,
+      );
+
+      expect(drawn).toStrictEqual(expected);
+    },
+  );
+
+  it('나중에는 리마인드 시각을 받아 보내고, 되돌릴 길을 함께 낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockResolvedValue({ ...CASE, state: 'DEFERRED', caseVersion: 1 });
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId(EXIT_TEST_ID.DEFER));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() => expect(mocked.deferCase).toHaveBeenCalledTimes(1));
+    expect(mocked.deferCase.mock.calls[0]?.[0]).toBe(CASE.caseId);
+    // 시각은 **wire 의 ISO** 로 간다 — 입력 글자가 그대로 실리지 않는다.
+    expect(mocked.deferCase.mock.calls[0]?.[1]?.remindAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u);
+    expect((await screen.findByTestId('toast')).textContent).toContain('실행 취소');
+  });
+
+  it('건너뜀은 한 번 더 묻고, 사유를 적힌 그대로 보낸다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    mocked.skipCase.mockResolvedValue({ ...CASE, state: 'SKIPPED', caseVersion: 1 });
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId(EXIT_TEST_ID.SKIP));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.SKIP.label ?? ''), {
+      target: { value: '  예산 초과  ' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    // 되돌릴 수 없는 전이는 **확인 한 단**을 지난다 — 첫 누름은 요청을 보내지 않는다.
+    expect(mocked.skipCase).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() => expect(mocked.skipCase).toHaveBeenCalledTimes(1));
+    expect(mocked.skipCase.mock.calls[0]?.[1]?.reason).toBe('  예산 초과  ');
+  });
+
+  it('연타는 요청을 하나만 낸다 — 동기 가드가 막는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockResolvedValue({ ...CASE, state: 'DEFERRED', caseVersion: 1 });
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId(EXIT_TEST_ID.DEFER));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    const send = screen.getByTestId('action-send');
+    // 같은 틱의 두 누름 — `disabled` 가 올라오는 재렌더보다 빠르다(13D 실측).
+    send.click();
+    send.click();
+
+    await waitFor(() => expect(mocked.deferCase).toHaveBeenCalledTimes(1));
+  });
+
+  it('쓰기가 실패하면 그 얼굴을 내고 건을 다시 읽는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId(EXIT_TEST_ID.DEFER));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    expect(await screen.findByTestId('write-failure')).toBeTruthy();
   });
 });
