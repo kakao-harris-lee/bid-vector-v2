@@ -317,7 +317,7 @@ function renderCards() {
             action={null}
           />
         ))}
-        <BidBoxCard bidCase={bidCaseRow()} onSend={() => undefined} />
+        <BidBoxCard bidCase={bidCaseRow()} pending={false} onSend={() => undefined} />
       </ul>
       <ResultCardHarness />
       <WorksheetTimeline entries={timelineRows()} />
