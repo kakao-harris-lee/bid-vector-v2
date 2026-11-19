@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { measureInPage } from './touchMeasure';
+import { exitTargetsOf, measureInPage } from './touchMeasure';
 
 import {
   ABSENT,
@@ -198,7 +198,13 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
    * 종단 상태(낙찰)라 이 줄에 닿지 못한다(실측). 그래서 이 여정이 그 줄을 재는 유일한 자리다.
    */
   const measured = await page.evaluate(measureInPage);
-  const exitTargets = measured.targets.filter((one) => EXIT_LABELS.includes(one.name));
+  /**
+   * **자리는 testId 로 고르고 이름은 값으로 대조한다**(M13/13E 머지 차례 — v L-1). 이름으로
+   * 고르면 **상태 배지가 같은 낱말을 들 때** 그것까지 센다: 13E 가 2층 라벨을 버튼으로 만들면서
+   * 「나중에」 상태의 건에서는 **배지의 이름이 그 낱말**이 됐다. 그러면 내려놓기 두 컨트롤이
+   * 사라져도 배지가 그 자리를 메워 **거짓 초록**이 된다 — 고르는 축과 재는 축이 같으면 그렇게 된다.
+   */
+  const exitTargets = exitTargetsOf(measured.targets);
   // 앞 판은 **상수 배열을 자기와 비교**했다(v low) — 무엇도 재지 않는 줄이었다. 재는 것은
   // **화면이 실제로 낸 이름**이고, 기대 어휘는 이 spec 이 적는다(출하 표를 들여오면 같은 출처를
   // 자기와 비교하게 된다 — 이 레인의 다른 문면 단언과 같은 규율이다).
