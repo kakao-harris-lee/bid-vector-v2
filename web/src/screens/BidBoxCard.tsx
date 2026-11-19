@@ -250,12 +250,17 @@ function ActionForm({
 function ActionButton({
   action,
   bidCase,
+  formId,
+  expanded,
   pending,
   onOpen,
   onSend,
 }: {
   readonly action: BidBoxAction;
   readonly bidCase: BidCase;
+  readonly formId: string;
+  /** 이 버튼이 연 폼이 지금 떠 있는가 — 폼을 여는 버튼에만 뜻이 있다. */
+  readonly expanded: boolean;
   readonly pending: boolean;
   readonly onOpen: (action: BidBoxAction) => void;
   readonly onSend: (payload: ActionPayload) => void;
@@ -271,22 +276,35 @@ function ActionButton({
       </LinkButton>
     );
   }
+  /**
+   * 이 버튼이 **폼을 여는가**. 한 번만 유도해 클릭 분기와 보조기기 배선이 **같은 판정**을 쓰게
+   * 한다 — 두 자리에 적으면 갈린다.
+   *
+   * 결과 기록은 표에서 `CHOICE` 라 이 자리에 오지 않는다. 표가 바뀌어 오더라도 **결과 없는
+   * 요청을 보내지 않고** 폼을 연다(타입이 그 요청을 만들 수 없게 돼 있다).
+   */
+  const opensForm = shape !== 'INSTANT' || action.kind === 'RECORD_OUTCOME';
+  /*
+    폼을 여는 버튼은 자기 ARIA 배선을 쥐므로 공유 `Button` 이 아니라 **같은 표**를 쓰고 요소만
+    여기서 그린다(내려놓기 버튼과 같은 사유). `aria-controls` 는 **열렸을 때만** 건다.
+  */
   return (
-    <Button
-      tone="primary"
+    <button
+      type="button"
       disabled={pending}
+      aria-expanded={opensForm ? expanded : undefined}
+      aria-controls={opensForm && expanded ? formId : undefined}
       onClick={() => {
-        // 결과 기록은 표에서 `CHOICE` 라 이 자리에 오지 않는다. 표가 바뀌어 오더라도 **결과 없는
-        // 요청을 보내지 않고** 폼을 연다(타입이 그 요청을 만들 수 없게 돼 있다).
-        if (shape !== 'INSTANT' || action.kind === 'RECORD_OUTCOME') {
+        if (opensForm) {
           onOpen(action);
           return;
         }
         onSend({ kind: action.kind, value: 'instant' });
       }}
+      className={controlClass('primary', 'md')}
     >
       {action.label}
-    </Button>
+    </button>
   );
 }
 
@@ -366,6 +384,8 @@ export function BidBoxCard({
                 key={action.kind}
                 action={action}
                 bidCase={bidCase}
+                formId={formId}
+                expanded={open?.kind === action.kind}
                 pending={pending}
                 onOpen={setOpen}
                 onSend={(payload) => onSend(bidCase.caseId, payload)}

@@ -333,3 +333,29 @@ describe('폼을 여는 버튼과 폼의 배선', () => {
     expect(sent).not.toHaveBeenCalled();
   });
 });
+
+/** 같은 폼을 여는 **primary 버튼**에도 같은 배선이 선다(cr r1 LOW). */
+describe('다음 행동 버튼의 배선', () => {
+  it('폼을 여는 primary 는 펼침을 말하고 열렸을 때만 그 자리를 가리킨다', () => {
+    cleanup();
+    renderCard('BID_RECORDED');
+    const open = screen.getByRole('button', { name: '개찰 대기로' });
+
+    expect(open.getAttribute('aria-expanded')).toBe('false');
+    expect(open.getAttribute('aria-controls')).toBeNull();
+
+    fireEvent.click(open);
+    const controls = screen.getByRole('button', { name: '개찰 대기로' }).getAttribute('aria-controls');
+
+    expect(screen.getByRole('button', { name: '개찰 대기로' }).getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById(controls!)).not.toBeNull();
+  });
+
+  /** 이동은 폼을 열지 않는다 — 펼침을 말하지 않는다(거짓말이 된다). */
+  it('워크시트로 가는 이동에는 펼침이 없다', () => {
+    cleanup();
+    renderCard('WATCHING');
+
+    expect(screen.getByRole('link', { name: '공고 워크시트' }).getAttribute('aria-expanded')).toBeNull();
+  });
+});
