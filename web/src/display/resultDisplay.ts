@@ -63,13 +63,13 @@ export const RESULT_PENDING_SLOTS: readonly PendingSlot[] = [
   {
     id: 'back-calculation',
     label: '역산(이 금액이면?)',
-    why: '믿을 만한 근거가 없어 제공하지 않습니다 — 나중에 생기는 자리가 아닙니다',
+    why: '지금은 제공하지 않습니다 — 근거가 더 쌓이면 다시 검토합니다',
     kind: 'PERMANENT',
   },
   {
     id: 'recommendation-error',
     label: '추천 오차',
-    why: '이 서비스가 다루지 않는 자리입니다 — 나중에 생기는 자리가 아닙니다',
+    why: '추천 값이 먼저 서야 잴 수 있습니다 — 지금은 제공하지 않습니다',
     kind: 'PERMANENT',
   },
 ];
