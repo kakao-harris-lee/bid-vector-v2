@@ -51,6 +51,8 @@ const VIEWPORTS = [
 const NOTICE = 'SYN-7E3-RESULT';
 /** 다른 탭에 설 건의 공고 — 상태 탭이 무엇을 하는 자리인지 캡처가 보이려면 계수가 둘 이상이어야 한다. */
 const SECOND_NOTICE = 'SYN-7E2-BIDBOX';
+/** 13D 캡처 — **담기만** 하고 두는 건(제출 전 묶음을 비우지 않는다). */
+const WATCHING_NOTICE = 'SYN-7E1-FLOOR-USABLE';
 
 /**
  * 찍는 화면 여섯. **설정은 없다**(D-7E3b-10) — 「화면 다섯 + 알림함」 밖이고 프로필 화면은
@@ -109,6 +111,14 @@ const SCREENS = [
     faces: ['bid-box-empty'],
   },
   {
+    id: 'd2-bid-box-watching',
+    // 13D 캡처 — 내려놓기 둘은 **제출 전** 묶음에만 선다. 기본 집합의 `tab=closed` 로는 안 잡힌다.
+    path: '/bids?tab=watching',
+    ready: 'screen-bid-box',
+    positive: (seed) => ({ testId: `bid-case-${seed.watchingCaseId}` }),
+    faces: ['bid-box-empty'],
+  },
+  {
     id: 'e-results',
     path: '/results',
     ready: 'screen-results',
@@ -126,7 +136,7 @@ const SCREENS = [
 ];
 
 /** 적재 시점 검사의 탐침 — 실제 씨앗 전에 `positive` 의 모양을 보려고 쓴다. */
-const PROBE_SEED = { wonCaseId: 0 };
+const PROBE_SEED = { wonCaseId: 0, watchingCaseId: 0 };
 
 for (const screen of SCREENS) {
   if (typeof screen.positive !== 'function' || !Array.isArray(screen.faces)) {
@@ -336,6 +346,24 @@ async function seedSecondCase(call, notice) {
   return added.caseId;
 }
 
+/** 담기만 하고 둔다 — 그 건이 **관심**에 남아 제출 전 카드의 얼굴이 선다(13D 캡처). */
+async function seedWatchingCase(call, notice) {
+  const rows = await (await call('GET', `/api/notices?q=${encodeURIComponent(notice)}`)).json();
+  const found = rows.find((one) => one.noticeNumber === notice);
+  if (found === undefined) {
+    throw new Error(`fixture 공고 ${notice} 가 검색에 없다`);
+  }
+  const added = await (
+    await call('POST', '/api/bid-cases', {
+      noticeNumber: notice,
+      noticeRound: found.noticeRound,
+      bidKind: 'REAL',
+    })
+  ).json();
+  log(`fixture 건 ${added.caseId} 를 관심에 둔다(제출 전 묶음)`);
+  return added.caseId;
+}
+
 /**
  * 화면 A 를 **채운 상태로** 찍는다(r1 CR L-3). 0/8 짜리 빈 설정은 새 운영자가 보는 정직한
  * 화면이지만 활용사례로는 흐름을 보이지 못한다.
@@ -454,7 +482,8 @@ async function main() {
         await seedProfile(call);
         const wonCaseId = await seedCase(call);
         await seedSecondCase(call, SECOND_NOTICE);
-        seed = { wonCaseId };
+        const watchingCaseId = await seedWatchingCase(call, WATCHING_NOTICE);
+        seed = { wonCaseId, watchingCaseId };
       }
 
       for (const screen of SCREENS) {
