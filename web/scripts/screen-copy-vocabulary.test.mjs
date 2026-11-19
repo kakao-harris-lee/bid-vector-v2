@@ -207,9 +207,12 @@ export function domReachableStringsOf(root = srcDir, extra = new Map()) {
  * `useRouteError()` 를 부르는 파일은 던진 값을 쥔 파일이고, 그 안에서 `.message` 접근이나
  * `String(…)` 변환은 원문을 글자로 바꾸는 유일한 두 꼴이다.
  *
- * **경계를 적어 둔다**: 오류 값을 다른 파일로 넘겨 그리는 길은 이 축이 보지 못한다(오늘 0).
- * 그리고 이 축은 그 파일 안의 `.message` 를 **쓰임과 무관하게** 문다 — 보수적인 방향이고,
- * 그 값을 쥐어야 하는 날 축을 어디서 재는지는 그때의 결정이다(승인 경계).
+ * **경계를 적어 둔다**(v L-2 로 정정). 이 축이 세는 것은 그 **두 꼴뿐**이고 `const { message } =
+ * useRouteError()` · 템플릿 변환 · `toString()` 은 보지 못한다 — 앞 판의 주석이 그 둘을 「원문을
+ * 글자로 바꾸는 유일한 두 꼴」이라고 적었는데 **거짓이다**. 구조분해 꼴은 **렌더 층의 경계
+ * test 가 잡는다**(verifier 실측) — 두 층 방어가 그 자리를 든다. 오류 값을 다른 파일로 넘겨
+ * 그리는 길도 이 축 밖이다(오늘 0). 이 축은 그 파일 안의 `.message` 를 **쓰임과 무관하게**
+ * 문다 — 보수적인 방향이고, 그 값을 쥐어야 하는 날 축을 어디서 재는지는 그때의 결정이다.
  */
 export function routeErrorRawUsesOf(root = srcDir, extra = new Map()) {
   const found = [];
