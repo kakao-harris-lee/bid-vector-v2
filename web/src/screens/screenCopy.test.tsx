@@ -44,12 +44,15 @@ import { WorksheetTimeline } from './WorksheetTimeline';
  * 전수의 문자열을 보고, 이 층은 **그려진 결과**를 본다 — 중간 변수로 비켜 가도, 값을 런타임에
  * 조립해도, 그려진 글자에 개발 코드가 있으면 여기서 멈춘다.
  *
- * 읽는 방식이 이 층의 요점이다. **텍스트 노드 단위**로 모으고 `title`·`aria-label` 을 **따로**
- * 담는다 — 이어붙이면 「…차이 금액 R」 요소 다음의 「-4,000원」이 붙어 **가짜 요구표 행 ID** 가
- * 선다(아래 「결합 대조」가 그 둘을 같은 자리에서 잰다).
+ * 읽는 방식이 이 층의 요점이고 **두 방향이 함께** 선다. 한 요소 **안**의 인접 텍스트 노드는
+ * 합치고(`normalize` — `<p>SET-{n}</p>` 꼴의 보간이 그렇지 않으면 두 층을 모두 지나간다),
+ * 요소 **사이**는 가른다(「…차이 금액 R」 다음 요소의 「-4,000원」이 붙으면 **가짜 요구표 행
+ * ID** 가 선다). 「보간 대조」와 「결합 대조」가 그 두 방향을 같은 자리에서 잰다.
+ * `title`·`aria-label` 은 따로 담는다 — 눈에 안 보이는 사유가 거기 산다.
  *
- * 금지 꼴은 **두 층이 같은 바이트를 읽는다**(`config/screen-copy-shapes.txt`). 사본을 두지 않는
- * 이유는 두 층이 한 모듈을 import 할 수 없기 때문이다 — W-4 가 `src` 밖 import 를 막는다.
+ * 금지 꼴의 **정본은 아래 `COPY_FORBIDDEN_SHAPES` 선언**이고 소스 층이 그것을 AST 로 읽는다.
+ * 사본을 두지 않으려는 것이다 — 두 층이 한 모듈을 import 할 수 없고(W-4 가 `src` 밖 import 를
+ * 막는다) `src` 의 TS 프로그램에는 node 타입이 없어 이 층이 데이터 파일도 읽을 수 없다.
  */
 afterEach(cleanup);
 
@@ -89,6 +92,16 @@ export const COPY_FORBIDDEN_SHAPES = [
     name: '등록부 접두 ID',
     source: String.raw`\b(?:COL|STR|QUAL|ML|DEC|NOTI|SET|OPS|BID)-[A-Z0-9][A-Z0-9-]*\b`,
   },
+  /**
+   * **맨 slice 토막**(cr MED-1). 「마일스톤 표기」는 슬래시를 요구하므로 `M7/7E` 는 잡고
+   * **`7A`·`7E-2`·`6A3` 은 놓쳤다** — 이 slice 가 지운 문장의 뒷 절이 바로 그 꼴이었다.
+   * 숫자 뒤 대문자 한 자로 시작하는 토막을 잡되 꼬리는 소문자·숫자까지만 받는다.
+   *
+   * **넓히지 않은 자리**: 대문자 꼬리를 받으면 `1GB` 꼴을 물고, `[A-Z]` 를 `[A-Z]+` 로 열면
+   * 단위 표기와 부딪힌다. 지금 꼴은 음성 대조 스물(그 가운데 D-day 넷 · 금액 셋 · 합성
+   * 공고번호 셋 · 한국어 수량 넷)과 소스 코퍼스 4208 조각에서 **위양성 0** 이다(실측).
+   */
+  { name: '맨 slice 토막', source: String.raw`\b\d{1,2}[A-H][0-9a-z]*\b` },
 ] as const;
 
 const SHAPES: readonly { readonly name: string; readonly source: string }[] = COPY_FORBIDDEN_SHAPES;
@@ -101,8 +114,17 @@ function forbiddenIn(piece: string): readonly string[] {
   });
 }
 
-/** 눈에 보이는 글자와 **보이지 않는 사유**(`title`·`aria-label`)를 조각으로 모은다. */
+/**
+ * 눈에 보이는 글자와 **보이지 않는 사유**(`title`·`aria-label`)를 조각으로 모은다.
+ *
+ * **먼저 인접 텍스트 노드를 합친다**(`normalize`). React 는 `<p>SET-{n}</p>` 를 **한 요소 안의
+ * 텍스트 노드 둘**로 그리므로, 노드마다 따로 보면 `SET-` 과 `03` 이 각각 아무 꼴에도 걸리지
+ * 않는다(실측 — 그 꼴이 두 층을 모두 지나갔다). 계약이 말한 구분자는 **요소 경계**이지 노드
+ * 경계가 아니다. 합치면 한 요소 안의 보간은 한 조각이 되고, 형제 요소(「…R」 + 「-4,000원」)는
+ * 여전히 갈린다 — 그 둘을 같은 자리에서 잰다.
+ */
 function piecesOf(root: ParentNode): readonly string[] {
+  (root as Node).normalize();
   const pieces: string[] = [];
   const walk = (node: Node): void => {
     if (node.nodeType === node.TEXT_NODE) {
@@ -413,7 +435,7 @@ function renderRouteBoundary() {
 
 describe('문면 게이트 — 모집단이 비지 않았다', () => {
   it('금지 꼴 · 표 행 · 그린 조각의 하한', () => {
-    expect(SHAPES.length).toBeGreaterThanOrEqual(6);
+    expect(SHAPES.length).toBeGreaterThanOrEqual(7);
     expect(ALL_ROWS.length).toBeGreaterThanOrEqual(100);
     expect(ROWS_BY_MODULE.filter((one) => one.rows.length > 0).length).toBeGreaterThanOrEqual(8);
     const { container } = renderAll();
@@ -526,6 +548,20 @@ describe('문면 게이트 — 양성·음성 대조', () => {
     expect(sweep(container).length).toBeGreaterThan(0);
   });
 
+  /**
+   * **맨 slice 토막의 양성·음성**(cr MED-1). 이 slice 가 지운 문장의 뒷 절(「7A 는 자리만 둔다」)이
+   * 앞 판의 꼴 여섯을 모두 지나갔다 — 그 자리를 심은 문면으로 잠근다.
+   */
+  it('맨 slice 토막이 심어지면 붉는다', () => {
+    const { container } = render(<p>이 화면은 7E 에서 섭니다. 7A 는 자리만 둡니다.</p>);
+    expect(sweep(container).length).toBeGreaterThan(0);
+  });
+
+  it('맨 slice 토막 꼴이 수량·금액·D-day 를 물지 않는다', () => {
+    const notTokens = ['3안', '4.2억', '12건', '1,200,000,000원', 'D-0', 'D+3', '44px', '1GB', '4 / 8 완료'];
+    expect(notTokens.filter((one) => forbiddenIn(one).length > 0)).toEqual([]);
+  });
+
   it('D-day 네 값이 실제 배지로 그려지고 걸리지 않는다', () => {
     const { container } = renderAll();
     const drawn = piecesOf(container);
@@ -534,6 +570,19 @@ describe('문면 게이트 — 양성·음성 대조', () => {
       expect(expected).not.toBeNull();
       expect(drawn.some((piece) => piece.includes(expected ?? ''))).toBe(true);
     }
+  });
+
+  /**
+   * **보간 대조**(v H-1). 한 요소 **안**의 보간은 React 가 텍스트 노드 둘로 그린다 — 노드마다
+   * 따로 보면 어느 쪽도 꼴에 걸리지 않아 두 층이 모두 초록이었다(실측). 합치면 붉는다.
+   *
+   * 이 대조와 아래 결합 대조는 **반대 방향**이라 짝으로 둔다: 요소 **안**은 합쳐야 하고 요소
+   * **사이**는 갈라야 한다. 한쪽만 재면 고치는 사람이 다른 쪽을 깨뜨린다.
+   */
+  it('보간 대조 — 한 요소 안의 보간은 합쳐져 붉는다', () => {
+    const code = '03';
+    const { container } = render(<p>이 주소는 SET-{code} 에 따라 화면이 없습니다.</p>);
+    expect(sweep(container).length).toBeGreaterThan(0);
   });
 
   it('결합 대조 — 이어붙이면 붉고 노드 단위로는 초록이다', () => {
