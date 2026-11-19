@@ -225,3 +225,9 @@ CI 에서 붉었을 자리다(「부분 게이트는 안 돌린 것과 같다」
 
 W-1~W-13 **각각 exit 0** · 스크립트 자기 종료 코드 **0**. vitest **53 파일 · 1201 test**(라운드
 전 1198 에서 대조 셋이 늘었다) · 여정 **18 통과 · flaky 0 · 건너뜀 0 · 중단 0 · spec 6/6**.
+
+### Kotlin `check` — 수정 라운드 1
+
+`BUILD SUCCESSFUL in 24s` · **exit 0**(424 actionable · 35 실행 · 389 up-to-date). evidence 가 누출
+패턴 게이트의 스캔 뿌리에 들어 경로가 닿는다 — **`leakPatternGate` 는 실행된 쪽**이고(UP-TO-DATE ·
+FROM-CACHE · SKIPPED 표지 **0**) 그래서 이 초록은 캐시가 아니라 측정이다.
