@@ -161,47 +161,43 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
    *
    * DOM 노드 계수로는 이 축이 서지 않는다 — 한 노드가 **설명과 본문 둘로** 쓰이면 사본이 없어도
    * 두 번 전달된다(앞 판 실측: 접힘·펼침 둘 다 설명 1 + 본문 1). 낭독은 접근성 트리를 따르므로
-   * 그 트리를 직접 센다. 접힘·펼침 **두 상태 모두**에서 설명 하나뿐이어야 한다.
+   * 그 트리를 직접 본다.
+   *
+   * **자리를 특정한다** — 전체 트리에서 같은 문면을 세면 다른 묶음의 같은 배지까지 잡힌다(투찰
+   * 종류 문면은 묶음마다 같다). 설명은 `aria-describedby` 로 그 노드를 찍어 읽고, 본문 쪽은
+   * **묶음의 접근성 스냅숏**으로 본다(그 스냅숏은 `aria-hidden` 을 뺀 트리다).
    */
-  const announcedCounts = async (): Promise<{ description: number; text: number }> => {
+  const describedAs = async (): Promise<string> => {
     const client = await page.context().newCDPSession(page);
     await client.send('Accessibility.enable');
-    const { nodes } = (await client.send('Accessibility.getFullAXTree')) as {
-      nodes: readonly {
-        ignored?: boolean;
-        role?: { value?: string };
-        name?: { value?: string };
-        description?: { value?: string };
-      }[];
-    };
+    const { root } = (await client.send('DOM.getDocument')) as { root: { nodeId: number } };
+    const { nodeId } = (await client.send('DOM.querySelector', {
+      nodeId: root.nodeId,
+      selector: `[aria-describedby="${whyId}"]`,
+    })) as { nodeId: number };
+    const { nodes } = (await client.send('Accessibility.getPartialAXTree', {
+      nodeId,
+      fetchRelatives: false,
+    })) as { nodes: readonly { description?: { value?: string } }[] };
     await client.detach();
-    let description = 0;
-    let text = 0;
-    for (const node of nodes) {
-      if (node.ignored === true) {
-        continue;
-      }
-      if ((node.description?.value ?? '') === whyText) {
-        description += 1;
-      }
-      if ((node.name?.value ?? '') === whyText && node.role?.value !== 'button') {
-        text += 1;
-      }
-    }
-    return { description, text };
+    return nodes.map((one) => one.description?.value ?? '').find((one) => one !== '') ?? '';
   };
 
-  const beforeTap = await announcedCounts();
-  expect(beforeTap.description, '접힌 배지의 설명이 사라졌다 — 보조기기 경로가 닫혔다').toBe(1);
-  expect(beforeTap.text, '같은 문면이 본문 텍스트로도 선다 — 두 번 낭독된다').toBe(0);
+  expect(await describedAs(), '접힌 배지의 설명이 사라졌다 — 보조기기 경로가 닫혔다').toBe(whyText);
+  expect(
+    await group.ariaSnapshot(),
+    '같은 문면이 본문 텍스트로도 선다 — 두 번 낭독된다',
+  ).not.toContain(whyText);
 
   await badge.click();
 
   const expanded = await why.boundingBox();
   expect(expanded!.height, '탭했는데 아래층이 보이지 않는다').toBeGreaterThan(collapsed!.height);
-  const afterTap = await announcedCounts();
-  expect(afterTap.description, '펼치면서 설명이 사라졌다').toBe(1);
-  expect(afterTap.text, '펼치면서 같은 문면이 본문으로도 섰다 — 두 번 낭독된다').toBe(0);
+  expect(await describedAs(), '펼치면서 설명이 사라졌다').toBe(whyText);
+  expect(
+    await group.ariaSnapshot(),
+    '펼치면서 같은 문면이 본문으로도 섰다 — 두 번 낭독된다',
+  ).not.toContain(whyText);
 
   /**
    * **링크를 열면 읽음**(받는 항목 9). 쓰기를 걸고 **바로 이동**하므로, 성공의 신호는 알림함
