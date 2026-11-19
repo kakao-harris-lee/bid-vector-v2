@@ -351,7 +351,12 @@ export function BidBoxCard({
       )}
 
       {open === null ? null : (
+        /* **폼의 정체를 행동에 묶는다**(cr HIGH). 내려놓기 버튼 줄은 폼이 열려 있어도 계속
+           그려지므로 「닫지 않고 다른 것을 연다」가 평범한 조작이다. `key` 가 없으면 같은 자리·
+           같은 타입이라 React 가 컴포넌트를 유지하고 앞의 값·확인 상태가 살아남는다 — 그러면
+           빈 값 가드가 걸리지 않은 채 **되돌릴 수 없는 전이**가 앞 폼의 입력을 싣고 나간다. */
         <ActionForm
+          key={open.kind}
           action={open}
           onCancel={() => setOpen(null)}
           onSend={(payload) => {

@@ -238,3 +238,44 @@ describe('나중에 — 리마인드 시각을 받는다', () => {
     expect(screen.queryByTestId('action-confirm')).toBeNull();
   });
 });
+
+/**
+ * 폼을 **닫지 않고 다른 내려놓기를 열 때**(cr HIGH). 내려놓기 버튼 줄은 폼이 열려 있어도 계속
+ * 그려지므로 이 길은 평범한 조작이다. 폼의 정체가 행동에 묶이지 않으면 앞 입력과 확인 상태가
+ * 그대로 넘어가고, 그러면 **빈 값 가드가 걸리지 않은 채** 되돌릴 수 없는 전이가 나간다.
+ */
+describe('폼을 닫지 않고 다른 내려놓기를 열면 앞 상태가 남지 않는다', () => {
+  it('나중에 → 건너뜀: 앞의 시각 입력이 사유 칸에 남지 않는다', () => {
+    const { sent } = renderCard('WATCHING');
+    fireEvent.click(screen.getByTestId(`exit-DEFER-${CASE_ID}`));
+    fireEvent.change(screen.getByLabelText(ACTION_INPUT.DEFER.label!), {
+      target: { value: '2099-02-03T10:30' },
+    });
+
+    fireEvent.click(screen.getByTestId(`exit-SKIP-${CASE_ID}`));
+
+    expect((screen.getByLabelText(ACTION_INPUT.SKIP.label!) as HTMLTextAreaElement).value).toBe('');
+    expect(screen.getByTestId('action-length').textContent).toBe(`0 / ${ACTION_INPUT.SKIP.maxChars}`);
+    // 빈 값 가드가 **걸려야** 한다 — 앞 값이 남으면 걸리지 않고 그대로 나간다.
+    send();
+    expect(screen.getByTestId('action-missing')).toBeDefined();
+    expect(sent, '앞 폼의 값이 건너뜀 사유로 나갔다').not.toHaveBeenCalled();
+  });
+
+  it('건너뜀 → 나중에: 앞의 확인 상태가 남지 않는다', () => {
+    const { sent } = renderCard('WATCHING');
+    fireEvent.click(screen.getByTestId(`exit-SKIP-${CASE_ID}`));
+    fireEvent.change(screen.getByLabelText(ACTION_INPUT.SKIP.label!), { target: { value: '예산이 맞지 않는다' } });
+    send();
+    expect(screen.getByTestId('action-confirm')).toBeDefined();
+
+    fireEvent.click(screen.getByTestId(`exit-DEFER-${CASE_ID}`));
+
+    // 빈 확인 문장과 「확인」 글자를 단 위험 어조 버튼이라는 자기모순 화면을 만들지 않는다.
+    expect(screen.queryByTestId('action-confirm')).toBeNull();
+    expect(screen.getByTestId('action-send').textContent).toBe('보내기');
+    expect((screen.getByLabelText(ACTION_INPUT.DEFER.label!) as HTMLInputElement).value).toBe('');
+    send();
+    expect(sent, '앞 폼의 사유가 리마인드 시각으로 나갔다').not.toHaveBeenCalled();
+  });
+});
