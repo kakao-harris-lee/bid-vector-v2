@@ -48,8 +48,11 @@ function isOutcome(value: string): value is Outcome {
  * 그린다 — 행동마다 `if` 를 더하지 않는다.
  *
  * **기본값이 없다**: 고르기 전에 보내면 무엇이 빠졌는지 말하고 요청을 보내지 않는다.
+ *
+ * **화면 C 도 이 폼을 쓴다**(M13/13C 머지 차례) — 워크시트의 내려놓기 둘이 같은 입력 꼴·같은
+ * 빈 값 가드·같은 확인 한 단을 지나야 하고, 그것을 두 번 적으면 한쪽만 고쳐진다. 그래서 내보낸다.
  */
-function ActionForm({
+export function ActionForm({
   action,
   formId,
   pending,

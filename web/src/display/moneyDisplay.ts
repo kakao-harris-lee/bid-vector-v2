@@ -136,6 +136,52 @@ export function amountTextOf(won: number, token: string | null | undefined): str
 }
 
 /**
+ * 한글 금액의 자리 단위 — 큰 자리부터다. 자리 이름은 **이 표 한 자리**에만 있다.
+ *
+ * **조에서 끝난다**(cr L-1). 이 함수는 안전 정수 밖을 먼저 `null` 로 돌려보내므로 조 위의 자리는
+ * **입력이 존재하지 않는다** — 닿지 않는 행을 표에 두면 다음 사람이 그것을 살아 있는 분기로 읽는다.
+ * 짝 test 가 「조가 최대」를 주장으로 든다.
+ */
+const KOREAN_UNITS: readonly { readonly unit: number; readonly name: string }[] = [
+  { unit: 1_000_000_000_000, name: '조' },
+  { unit: 100_000_000, name: '억' },
+  { unit: 10_000, name: '만' },
+];
+
+/** 자리 이름 전수 — 짝 test 가 이 목록으로 「조가 최대」를 잰다(사본을 만들지 않는다). */
+export const KOREAN_UNIT_NAMES: readonly string[] = KOREAN_UNITS.map((one) => one.name);
+
+/**
+ * 금액을 **한글 자리로 끊어 읽은 글자**(M13/13C · §6.2 C 4 「원 단위 정수 + 한글 금액 병기」).
+ *
+ * 나라장터 실수 목록의 첫 줄이 「0 을 하나 더/덜」이고, 그 실수는 숫자의 자리 수를 눈으로 세는
+ * 것으로는 잡히지 않는다 — 억·만으로 끊어 읽는 글자가 잡는다. 그래서 이 글자는 **같은 수의 다른
+ * 읽기**이고(짝 test 가 자리의 합을 원래 수와 대조한다) 비어 있는 자리는 **빠진다**(「0만」을
+ * 적지 않는다).
+ *
+ * **읽을 수 없는 값에는 글자를 지어내지 않는다** — 원 단위 정수가 아니면 `null` 이다(그때
+ * 「0원」이라고 적으면 화면이 금액을 지어내는 것이다).
+ */
+export function koreanAmountTextOf(won: number): string | null {
+  if (!Number.isSafeInteger(won) || won < 0) {
+    return null;
+  }
+  const parts: string[] = [];
+  let left = won;
+  for (const { unit, name } of KOREAN_UNITS) {
+    const count = Math.floor(left / unit);
+    if (count > 0) {
+      parts.push(`${count}${name}`);
+      left -= count * unit;
+    }
+  }
+  if (left > 0 || parts.length === 0) {
+    parts.push(`${left}`);
+  }
+  return `${parts.join(' ')}${AMOUNT_CURRENCY_DISPLAY.KRW.label}`;
+}
+
+/**
  * 금액 부속 토큰의 **전수 집합**(D-4). 「DOM 에 원문 토큰 0」 게이트가 이 목록을 금지 목록으로
  * 쓴다 — 네 표의 키에서 **유도하므로** 어휘가 늘면 금지 목록도 함께 는다(손으로 적은 목록은
  * 어휘가 늘 때 조용히 뒤처진다).

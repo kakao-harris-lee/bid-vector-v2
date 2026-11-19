@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  MIN_HEIGHT_DISPLAY_TOKENS,
   MIN_TOUCH_CLASS,
   scanControls,
   unwrappedControls,
@@ -195,5 +196,125 @@ describe('음성 대조 — 걸리면 안 되는 것', () => {
 
   it('종류 표가 비어 있지 않다 — 비면 이 축이 공허하다', () => {
     expect([...WRAPPED_CONTROL_TYPES].sort()).toStrictEqual(['checkbox', 'radio']);
+  });
+});
+
+/**
+ * M13/13C — **최소 높이가 실제로 서는가**(13B v M-11). 레이블의 기본 display 는 inline 이고
+ * `min-height` 는 inline 요소에 **적용되지 않는다** — 그래서 `min-h-11` 을 들고도 17px 로 서는
+ * 꼴이 이 축을 지났다(verifier 가 Chromium 으로 실측했다). 어휘를 하나 더 요구해 그 틈을 닫는다.
+ */
+describe('실효 높이 — min-height 가 서는 display 를 함께 요구한다 (v M-11)', () => {
+  it(`display 어휘가 없으면 ${MIN_TOUCH_CLASS} 를 들어도 걸린다`, () => {
+    const found = unwrappedControls(
+      `export const X = () => (\n  <label className="${MIN_TOUCH_CLASS}">\n    <input type="radio" />\n  </label>\n);\n`,
+    );
+
+    expect(found).toHaveLength(1);
+  });
+
+  it.each([
+    ['상자가 없는 display', 'contents'],
+    ['줄 안에 서는 display', 'inline'],
+    ['그리지 않는 display', 'hidden'],
+  ])('%s 은 증명이 되지 않는다', (_label, token) => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="${token} ${MIN_TOUCH_CLASS}">\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  /** 변형 접두가 붙은 display 는 **그 폭에서만** 선다 — 390px 에서 선다고 증명할 수 없다. */
+  it('변형 접두가 붙은 display 는 증명이 되지 않는다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="md:flex ${MIN_TOUCH_CLASS}">\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    ['flex'],
+    ['grid'],
+    ['block'],
+    ['inline-flex'],
+    ['inline-block'],
+    ['flow-root'],
+    ['table'],
+  ])('음성 — %s 는 min-height 가 서는 display 다', (token) => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="${token} ${MIN_TOUCH_CLASS}">\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /**
+   * **컴포넌트도 labelable 일 수 있다.** 레이블이 켜는 것은 첫 labelable 자손 하나인데, 그 자리에
+   * 컴포넌트가 있으면 그것이 무엇을 그리는지 이 축은 모른다 — 보수적으로 **센다**.
+   */
+  it('레이블 안의 컴포넌트가 컨트롤보다 앞서면 걸린다', () => {
+    const found = unwrappedControls(
+      `declare const Thing: () => unknown;\nexport const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}">\n    <Thing />\n    <input type="radio" />\n  </label>\n);\n`,
+    );
+
+    expect(found).toHaveLength(1);
+  });
+
+  /**
+   * **자리를 보지 않고 센다 — 과차단 쪽이다.** 컨트롤 **뒤**의 컴포넌트는 HTML 상 켜지는 자리를
+   * 바꾸지 않지만, 이 축은 「labelable 이 둘 이상이면 어느 것이 켜지는지 증명할 수 없다」는 앞
+   * 판의 규칙(13B v M-9 · cr Q-4)을 그대로 쓴다. 문서 순서로 첫째를 고르는 쪽이 더 정밀하지만
+   * 그것은 앞 판이 **일부러 막아 둔 자리를 푸는** 변경이라 이 slice 에서 하지 않는다.
+   * 오늘 출하 트리에 레이블 안 컴포넌트가 0 이라 비용이 없다 — 알려진 제한으로 등재한다.
+   */
+  it('컨트롤 뒤의 컴포넌트도 보수적으로 센다 — 과차단', () => {
+    expect(
+      unwrappedControls(
+        `declare const Thing: () => unknown;\nexport const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}">\n    <input type="radio" />\n    <Thing />\n  </label>\n);\n`,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('음성 — 글자만 담은 span 은 labelable 이 아니다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}">\n    <span>이름</span>\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /** 어휘 집합이 **비어 있지 않다** — 비면 이 축이 모든 레이블을 거짓으로 센다. */
+  it('display 어휘 집합이 비어 있지 않다', () => {
+    expect(MIN_HEIGHT_DISPLAY_TOKENS.size).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * M13/13C 수정 라운드 1 — verifier M-3. 설계 검토 B (2) 가 「display 를 `style` 로 주면 증명 불가」
+ * 라고 적었는데 구현이 없었다. 덮어쓰는 display 어휘(변형 접두·우선 표시)도 같은 자리다 —
+ * min-height 쪽은 이미 그렇게 센다(비대칭을 없앤다).
+ */
+describe('실효 높이 — 덮어쓰는 display 를 증명 불가로 센다 (v M-3)', () => {
+  it.each([
+    ['인라인 style 로 display 를 준 꼴', `<label className="flex ${MIN_TOUCH_CLASS}" style={{ display: 'inline' }}>`],
+    ['인라인 style 로 최소 높이를 덮은 꼴', `<label className="flex ${MIN_TOUCH_CLASS}" style={{ minHeight: 0 }}>`],
+    ['변형 접두로 덮은 display', `<label className="flex max-md:inline ${MIN_TOUCH_CLASS}">`],
+    ['우선 표시로 덮은 display', `<label className="flex !inline ${MIN_TOUCH_CLASS}">`],
+    ['그리지 않는 display 를 덧붙인 꼴', `<label className="flex hidden ${MIN_TOUCH_CLASS}">`],
+    ['상자를 없애는 display 를 덧붙인 꼴', `<label className="flex contents ${MIN_TOUCH_CLASS}">`],
+  ])('%s 은 증명이 되지 않는다', (_label, opening) => {
+    expect(unwrappedControls(`export const X = () => (\n  ${opening}\n    <input type="checkbox" />\n  </label>\n);\n`)).toHaveLength(
+      1,
+    );
+  });
+
+  it('음성 — 덮어쓰지 않는 style 은 그대로 둔다', () => {
+    expect(
+      unwrappedControls(
+        `export const X = () => (\n  <label className="flex ${MIN_TOUCH_CLASS}" style={{ gap: 4 }}>\n    <input type="checkbox" />\n  </label>\n);\n`,
+      ),
+    ).toStrictEqual([]);
   });
 });

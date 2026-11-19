@@ -1,0 +1,13 @@
+# 셸 스모크 레인(CI `web` job 의 `npm run test:e2e`)이 **돌려야 하는 spec 집합**.
+#
+# `scripts/check-smoke-results.mjs` 가 리포터 산출물의 spec 파일 집합과 **양방향 등식**을 건다.
+# 왜 필요한가(M13/13C r2 · v R1-M5): Playwright 는 건너뛴 test 가 있어도 exit 0 이고, spec 이
+# `testMatch` 밖으로 **개명**되거나 통째로 빠져도 나머지가 돌면 초록이다. 여정 레인은 이 등식을
+# 2026-10 에 세웠는데 스모크 레인에는 없어서, 이 레인의 판정이 「무엇이 돌았는지」를 말하지
+# 못했다 — 터치 타깃 합성 대조가 그 레인에 서면서 그 사각이 커졌다.
+#
+# 경로는 `playwright.config.ts` 의 `testDir` 기준 상대 경로다. spec 을 더하거나 지우면 **같은
+# 커밋에서** 이 파일을 고친다.
+kotlin-read-guard.spec.ts
+shell.spec.ts
+touch-measure.spec.ts
