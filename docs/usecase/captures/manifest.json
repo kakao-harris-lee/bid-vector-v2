@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-11-05T16:00:06.289Z",
-  "head": "931c933c4cf50cc0a46a4863f23526e6f93ac86f",
-  "totalBytes": 1009304,
+  "capturedAt": "2026-11-19T21:01:08.633Z",
+  "head": "a4ce60e22a40c9cd3ef71a6d9bfb30ddf06ac8d6",
+  "totalBytes": 1113593,
   "files": [
     {
       "path": "a-start-desktop.png",
@@ -10,9 +10,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1407,
-      "bytes": 108611,
-      "sha256": "a9e898f3e6eda1f1c60910f70f4f774d86fdb37d6f36a6882f66c0cd91196b74"
+      "imageHeight": 1527,
+      "bytes": 112368,
+      "sha256": "d69f1a056eed5397e36b827d8a30b334e43db74863067d0dc2d9bed752a913b6"
     },
     {
       "path": "b-notices-desktop.png",
@@ -22,8 +22,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 55402,
-      "sha256": "a01dd82d39156b2a0f8341051fc0fd977b02a3946d0ca5620576ac1d4c5841ca"
+      "bytes": 47387,
+      "sha256": "fb987bd8ca3d83ebdd54203732f6a5146dcd8517a371fd2085a2dcc374b69b8d"
     },
     {
       "path": "c-worksheet-desktop.png",
@@ -32,9 +32,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1482,
-      "bytes": 127211,
-      "sha256": "61279a8253d997c641772de43c135cd68329da4a808fb8b92f6694d243acb245"
+      "imageHeight": 1653,
+      "bytes": 129776,
+      "sha256": "da8786223844c15daabaa43bce4251b8a444fd45e5caabe0d4689ee7fc3a260b"
     },
     {
       "path": "d-bid-box-desktop.png",
@@ -44,8 +44,19 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 28786,
-      "sha256": "7886660376fa38b0d0fff0f6ee6af106ca32c42ce4b36a84566813c8110994c3"
+      "bytes": 29937,
+      "sha256": "a1fca38f9003102fbffaf1a93dff64d0597f60eba48ea5f476954570320981cf"
+    },
+    {
+      "path": "d2-bid-box-watching-desktop.png",
+      "screen": "d2-bid-box-watching",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 800,
+      "bytes": 34277,
+      "sha256": "d967570393daba8d05638ccf31cade7f09cff498f06b6758010c5ce67876e249"
     },
     {
       "path": "e-results-desktop.png",
@@ -54,9 +65,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1359,
-      "bytes": 130240,
-      "sha256": "ed1bf23836a5185884ce55f71a30ee63103f12a5bfc6f29c54fa3d773ea0c0c3"
+      "imageHeight": 1529,
+      "bytes": 147003,
+      "sha256": "c32a53ce1692672b87ff10ac06d4c8200b29b42dbdc534a4c887b2c51496dba8"
     },
     {
       "path": "inbox-desktop.png",
@@ -65,9 +76,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 800,
-      "bytes": 69951,
-      "sha256": "1aa9c2b501ca6b12b8650f2ac336a0b84241bbf74ecd24a4731935edd86e3a1d"
+      "imageHeight": 813,
+      "bytes": 88184,
+      "sha256": "f4c912e4e4072d37182815f8e53ada3c936dd8e22758918efbc585fc2cbcc2b3"
     },
     {
       "path": "a-start-mobile.png",
@@ -76,9 +87,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 1653,
-      "bytes": 99002,
-      "sha256": "5f359a968eed185f5978d52d90c9eaef224e34337b63955cec7ba507a078bc56"
+      "imageHeight": 1867,
+      "bytes": 99925,
+      "sha256": "80d20c32c38fda2cf8b2ec9d28cbcea6a0622f236fefe3615f0c3c54e78f92d7"
     },
     {
       "path": "b-notices-mobile.png",
@@ -87,9 +98,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 847,
-      "bytes": 49614,
-      "sha256": "72bfc49ada825068928d17792889f1f0b15ecee7a547f31e4cec60d0d3ddf2fb"
+      "imageHeight": 844,
+      "bytes": 40421,
+      "sha256": "f90f71ff6f71cb37e55b1fd34c0dc82f9ce744fd9b36c8b43325c55ff4e6b70f"
     },
     {
       "path": "c-worksheet-mobile.png",
@@ -98,9 +109,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 1746,
-      "bytes": 115819,
-      "sha256": "6940bcf4297dfaa230bb36169b6200245b6d02d7b839326b80c34e1290f189d5"
+      "imageHeight": 1961,
+      "bytes": 115253,
+      "sha256": "2633b008b4e670affc15716f9be4de14cb7785ae7ece59d38b10ddf173f8f401"
     },
     {
       "path": "d-bid-box-mobile.png",
@@ -110,8 +121,19 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 844,
-      "bytes": 22711,
-      "sha256": "0011aca649764faa9c501a06214d2da41e336870cef6af8fb63031f0f3224c4f"
+      "bytes": 22011,
+      "sha256": "5166aaa11f1c4c666d10bb22aa6b0e9d1cb2a4835983b6e9a4eebc947839a037"
+    },
+    {
+      "path": "d2-bid-box-watching-mobile.png",
+      "screen": "d2-bid-box-watching",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 844,
+      "bytes": 26435,
+      "sha256": "be7e64930f71c15c2c7339a90d825969eebe3d380f856d8384f52181e953e993"
     },
     {
       "path": "e-results-mobile.png",
@@ -120,9 +142,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 2239,
-      "bytes": 138321,
-      "sha256": "a16886db7297ab160dd7a6a30519c49046cc40eb2019c870b8902f280437a7e9"
+      "imageHeight": 2525,
+      "bytes": 143226,
+      "sha256": "a60b4b5da3d5f92baee45b03b3aee3c003695fba275eea2785c85d9fe1400d07"
     },
     {
       "path": "inbox-mobile.png",
@@ -131,9 +153,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 844,
-      "bytes": 63636,
-      "sha256": "e82ffb482e5fb00571d523b684b598ee165c4e2cced802352d837a295417c882"
+      "imageHeight": 1225,
+      "bytes": 77390,
+      "sha256": "3f89dbfa228ecc35a7710180201c787fdccf85a6ef226e91bfc6d1057ae37549"
     }
   ]
 }

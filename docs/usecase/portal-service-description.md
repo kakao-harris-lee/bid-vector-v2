@@ -59,6 +59,7 @@ id 나 OPEN 홀더 id 를 인용한다 — 그 홀더가 닫히면 **그 slice �
 | B 오늘의 공고 | `captures/b-notices-desktop.png` · `captures/b-notices-mobile.png` |
 | C 공고 워크시트 | `captures/c-worksheet-desktop.png` · `captures/c-worksheet-mobile.png` |
 | D 내 입찰함 | `captures/d-bid-box-desktop.png` · `captures/d-bid-box-mobile.png` |
+| D 내 입찰함(제출 전 묶음 — 「나중에」·「건너뜀」) | `captures/d2-bid-box-watching-desktop.png` · `captures/d2-bid-box-watching-mobile.png` |
 | E 결과 확인 | `captures/e-results-desktop.png` · `captures/e-results-mobile.png` |
 | 알림함 | `captures/inbox-desktop.png` · `captures/inbox-mobile.png` |
 
