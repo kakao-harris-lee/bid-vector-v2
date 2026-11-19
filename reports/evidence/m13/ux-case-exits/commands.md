@@ -124,3 +124,26 @@ diff 로 단언했다(한 줄 교체이지 추가가 아님을 수로 확인).
 캡처 묶음(운영자 검토용, scratch):
 `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-13d/captures-before/`
 `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-13d/captures-after/`
+
+## acceptance 전건 실행 기록 (cr LOW — 이 줄이 없었다)
+
+`scope.md` 가 선언한 CI `web` job 전건을 **그 명령 그대로 그 차례로** 돌렸다. 종료 코드는
+스크립트 자기 것이고, 끊긴 뒤의 step 은 「미실행」으로 남아 초록으로 세지 않는다.
+
+| 실행 | 결과 |
+| --- | --- |
+| 동결 전(수정 라운드 전) | W-1~W-13 **전부 0** · `SCRIPT_EXIT=0` · 여정 20 통과 · flaky 0 · 건너뜀 0 · spec 7/7 |
+| Kotlin `check` | **EXIT=0** · 누출 패턴 게이트가 **실행**됐다(줄 끝에 `UP-TO-DATE`·`FROM-CACHE` 접미 없음을 확인) |
+| **수정 라운드 1 뒤** | W-1~W-13 **전부 0** · `SCRIPT_EXIT=0` · 여정 20 통과 · spec 7/7 |
+
+## 수정 라운드 1 의 변이 셋 (전부 교체·제거로 걸었다)
+
+| # | 무엇을 바꿨나 | 결과 |
+| --- | --- | --- |
+| ⑦ | 폼의 `key` 제거 | **붉음** — 두 전환 방향 test 가 동시에(17 중 2) |
+| ⑧ | 쓰기 입구의 **동기 가드만** 제거(`disabled` 는 그대로) | **붉음** — 연타가 다시 요청 셋이 됐다 |
+| ⑨ | 실패 시 **무조건** 토스트 걷기로 복귀 | **붉음** — 실행 취소가 실패와 함께 사라진다 |
+
+**⑧ 이 이 라운드의 값이다**: `disabled` 를 남긴 채로도 붉다 — 가시 상태는 방어가 아니라 **보이는
+몫**이고, 같은 틱의 연타를 막는 것은 동기 가드라는 사실이 측정으로 선다. 리뷰의 처방(`disabled`)
+만 적용했다면 test 는 여전히 붉었을 것이고, 그 사실을 고치는 중에 실측으로 알았다.
