@@ -10,6 +10,12 @@ export interface MeasuredTarget {
   readonly name: string;
   readonly width: number;
   readonly height: number;
+  /**
+   * 그 자리의 `data-testid`(없으면 빈 글자). **이름으로 고르는 자리**가 이 칸을 쓴다 — 이름은
+   * 화면의 문면이라 **다른 요소가 같은 이름을 가질 수 있고**(M13/13E: 상태 배지가 버튼이 되면서
+   * 상태 낱말을 이름으로 들었다), 그때 이름 필터는 **엉뚱한 자리를 세고도 초록**이 된다.
+   */
+  readonly testId: string;
 }
 
 export interface Measurement {
@@ -192,6 +198,7 @@ export function measureInPage(): Measurement {
       targets.push({
         tag: measured.tagName.toLowerCase(),
         name,
+        testId: measured.getAttribute('data-testid') ?? '',
         width: Math.round(box.width * 10) / 10,
         // **보이는 띠**의 높이다(v M-8 · H-4) — 조상이 자르면 그만큼만, 스크롤러 안이면 그 상자
         // 높이까지만 한 번에 닿는다.
@@ -265,4 +272,20 @@ export function measureInPage(): Measurement {
         Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
     };
   }
+}
+
+/**
+ * **내려놓기 두 자리**(M13/13D 의 「나중에」·「건너뜀」)를 고르는 한 자리.
+ *
+ * 이름으로 고르면 **상태 배지가 같은 이름을 들 때** 그것까지 센다 — 13E 가 2층 라벨을 버튼으로
+ * 만들면서 생긴 자리다(「나중에」 상태의 건에서는 배지의 이름이 그 낱말이다). 그러면 두 컨트롤이
+ * 사라져도 배지가 그 자리를 메워 **거짓 초록**이 된다.
+ *
+ * 그래서 **testId 로 고른다** — 그 자리는 `exit-<행동>-<건>` 꼴이고 배지는 그 접두를 갖지 않는다
+ * (이 저장소의 「행은 testId 로」와 같은 축). 이름은 그 뒤에 **값으로** 대조한다.
+ */
+export const EXIT_TARGET_TESTID_PREFIX = 'exit-';
+
+export function exitTargetsOf(targets: readonly MeasuredTarget[]): readonly MeasuredTarget[] {
+  return targets.filter((one) => one.testId.startsWith(EXIT_TARGET_TESTID_PREFIX));
 }
