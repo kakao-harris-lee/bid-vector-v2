@@ -208,7 +208,11 @@ function NotificationGroupBlock({
         {/* **투찰 종류 축**(M9/paper-bid) — 서면 연습의 소식과 실제 투찰의 소식이 **다른
             묶음**이고, 그 구분이 화면에 보이지 않으면 갈라 놓은 뜻이 없다. 세 값 전부에 문면이
             있으므로 「어느 값에 그리는가」를 이 자리가 따로 정하지 않는다. */}
-        <StateBadge display={displayOrUnknown(NOTIFICATION_BID_KIND_DISPLAY, group.bidKind)} />
+        {/* testId 를 준다 — 여정이 이 배지를 **차례가 아니라 이름으로** 집는다(리뷰 L). */}
+        <StateBadge
+          display={displayOrUnknown(NOTIFICATION_BID_KIND_DISPLAY, group.bidKind)}
+          testId="group-bid-kind"
+        />
 
         {/* **「공고 행이 없다」와 「행은 있고 제목이 비었다」는 다른 사실이다**(계약). 전자는
             보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고, 후자는 행이 있다. */}
@@ -354,9 +358,14 @@ export function InboxScreen() {
   /**
    * **링크를 열면 읽음**(받는 항목 9) — 쓰기를 **걸고 바로 이동한다**.
    *
-   * 그래서 이 경로는 `useMutation` 을 쓰지 않는다: 응답은 화면이 **언마운트된 뒤에** 오고, 그때
-   * 컴포넌트에 매인 콜백이 서는지는 보장되지 않는다. app 수준 `queryClient` 를 쥔 평범한 호출이
-   * 그 수명과 무관하게 선다.
+   * 그래서 이 경로는 **머무는 경로의 뮤테이션을 쓰지 않는다**: 공유 `read` 의 `isPending`·
+   * `isError`·포커스 복귀 배선은 알림함에 **남아 있는 사람**의 것이다. 떠나는 길이 그것을
+   * 건드리면 전 행이 잠기고 볼 사람도 없는 실패 얼굴이 뜬다. app 수준 `queryClient` 를 쥔
+   * 평범한 호출은 그 상태를 건드리지 않는다.
+   *
+   * (수정 라운드 1 — 리뷰 L-1 의 정정. 앞 판 주석은 「언마운트 뒤 콜백이 서는지 보장되지
+   * 않는다」였는데 설치본에서 **틀렸다**: v5 의 훅 수준 콜백은 Mutation 인스턴스에 붙어 마운트와
+   * 무관하게 선다. 마운트에 매인 것은 `mutate(vars, { … })` 의 per-call 콜백뿐이다.)
    *
    * **실패는 무효화하지 않는다.** 떠난 뒤라 알림함 안의 실패 얼굴은 볼 수 없고, 쓰기가 실패한
    * 사실은 **셸의 안 읽음 배지가 줄지 않는 것**으로 보인다(계약 13E 행). 실패에서도 다시 읽으면
@@ -392,8 +401,26 @@ export function InboxScreen() {
   /**
    * 받은 쪽들을 **이어 붙여** 묶는다. 묶음은 **연속 접기**라(계약) 쪽 경계에 걸쳐 있던 묶음이
    * 다음 쪽을 받으면 한 묶음이 되고, 그때 「이 페이지에 다 오지 않았습니다」가 스스로 사라진다.
+   *
+   * **같은 항목이 두 쪽에 걸칠 수 있다**(수정 라운드 1 — 리뷰 M-3): offset 쪽 사이에 알림이
+   * 적재되면 목록이 밀려 다음 쪽이 앞 쪽의 마지막 항목을 다시 낸다. 행의 신원은 네 칸
+   * (종류·번호·차수·투찰 종류)이 전부이므로 접지 않으면 React key 가 겹치고 같은 `data-testid`
+   * 가 문서에 둘이 되어 strict locator 가 모호해진다. **먼저 온 자리를 남긴다** — 서버가 준
+   * 차례가 그 자리이고, 뒤에 온 사본을 남기면 항목이 제 자리보다 아래로 내려간다.
+   *
+   * **접는 것은 쪽 경계뿐이다.** 한 쪽 **안**의 같은 신원은 말없이 합치지 않는다 — 그것은 쪽
+   * 꼴이 만든 사본이 아니라 서버가 그렇게 보낸 것이고, 이 화면의 관례는 「어긋남은 화면에
+   * 보이는 쪽이 낫다」다(떨어진 같은 묶음을 둘로 남기는 결정과 같은 자리).
    */
-  const groups = groupNotifications((inboxPages ?? []).flatMap((one) => one.rows));
+  const fromEarlierPages = new Set<string>();
+  const rows = (inboxPages ?? []).flatMap((one) => {
+    const kept = one.rows.filter((row) => !fromEarlierPages.has(notificationItemTestId(row)));
+    for (const row of one.rows) {
+      fromEarlierPages.add(notificationItemTestId(row));
+    }
+    return kept;
+  });
+  const groups = groupNotifications(rows);
 
   return (
     <section data-testid="screen-inbox" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">

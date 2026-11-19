@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
-import { notificationsUnreadQueryKey } from '../api/queryKeys';
+import { NOTIFICATIONS_QUERY_KEY, notificationsUnreadQueryKey } from '../api/queryKeys';
 import {
   NOTIFICATION_BID_KIND_DISPLAY,
   NOTIFICATION_DETAIL_DISPLAY,
@@ -654,6 +654,32 @@ describe('링크로 읽음 (받는 항목 9)', () => {
     expect(await screen.findByText('워크시트 자리'), '읽음 쓰기가 이동을 삼켰다').toBeTruthy();
   });
 
+  /**
+   * **「걸고 **바로** 이동」의 순서를 잠근다**(수정 라운드 1, verifier F-3). 앞 판의 test 는
+   * 즉시 resolve 되는 mock 위에서 이동을 기다려, 「쓰기가 **끝난 뒤에** 이동」으로 바꾼 변이가
+   * 초록이었다. 쓰기를 **보류한 채로** 워크시트가 이미 서 있는지를 본다.
+   */
+  it('쓰기가 아직 끝나지 않았는데 워크시트가 이미 서 있다', async () => {
+    let release: (value: queries.MarkReadResult) => void = () => {};
+    mocked.markNotificationRead.mockReturnValue(
+      new Promise<queries.MarkReadResult>((resolve) => {
+        release = resolve;
+      }),
+    );
+    renderScreen();
+
+    const row = await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
+    fireEvent.click(within(row).getByRole('link', { name: /워크시트/u }));
+
+    await waitFor(() => expect(mocked.markNotificationRead).toHaveBeenCalled());
+    expect(
+      screen.getByText('워크시트 자리'),
+      '쓰기가 끝나기를 기다렸다가 이동했다 — 운영자를 붙들어 두었다',
+    ).toBeTruthy();
+
+    release({ markedCount: 1, unreadCount: 0 });
+  });
+
   /** 이미 읽은 행에서는 **다시 쓰지 않는다** — 같은 사실을 두 번 보내지 않는다. */
   it('이미 읽은 행의 링크는 쓰기를 더 보내지 않는다', async () => {
     mocked.listNotifications.mockResolvedValue(
@@ -691,6 +717,15 @@ describe('링크로 읽음 (받는 항목 9)', () => {
       '서버가 답하기 전에 배지 값을 깎았다 — 낙관 갱신이다',
     ).toBe(3);
     expect(badgeInvalidated(), '응답 전에 배지를 다시 읽혔다').toBe(false);
+    /**
+     * **목록 캐시까지 본다**(수정 라운드 1, verifier F-2). 배지만 재면 「어디서도」라는 이름이
+     * 거짓이 된다 — 목록 캐시의 그 행을 미리 읽음으로 바꾸는 변이가 **초록**이었다(그 변이를
+     * verifier 가 실제로 넣어 보였다). 알림함으로 돌아왔을 때 보이는 것이 이 캐시다.
+     */
+    const cached = client.getQueryData(NOTIFICATIONS_QUERY_KEY) as
+      | { readonly pages: readonly queries.NotificationPage[] }
+      | undefined;
+    expect(cached?.pages[0]?.rows[0]?.read, '응답 전에 목록 캐시가 읽음으로 바뀌었다').toBe(false);
 
     release({ markedCount: 1, unreadCount: 2 });
     await waitFor(() => expect(badgeInvalidated()).toBe(true));
@@ -766,6 +801,26 @@ describe('알림함 — 「더 보기」', () => {
     expect(screen.getByTestId('notice-group-0-A-000-REAL')).toBeTruthy();
     expect(mocked.listNotifications).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
     await waitFor(() => expect(screen.queryByTestId('inbox-more')).toBeNull());
+  });
+
+  /**
+   * **offset 쪽 사이에 적재가 생기면 같은 항목이 두 쪽에 걸친다**(수정 라운드 1, 리뷰 M-3).
+   * 그 넷(종류·번호·차수·투찰 종류)이 행의 신원 전부라, 접지 않으면 React key 가 겹치고 같은
+   * `data-testid` 가 문서에 둘이 되어 여정의 strict locator 가 모호해진다.
+   */
+  it('쪽 둘이 같은 항목을 내도 행은 하나다', async () => {
+    const shared = item({ noticeNumber: 'A', noticeItemCount: 2, noticeUnreadCount: 2 });
+    mocked.listNotifications.mockResolvedValueOnce(page([shared], 2, 3));
+    mocked.listNotifications.mockResolvedValueOnce(page([shared, item({ noticeNumber: 'B' })], 2, 3));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('inbox-more'));
+
+    await waitFor(() => expect(screen.queryByTestId('notice-group-1-B-000-REAL')).not.toBeNull());
+    expect(
+      screen.getAllByTestId('notification-OPENING_COMPLETED-A-000-REAL'),
+      '같은 항목이 두 줄로 섰다',
+    ).toHaveLength(1);
   });
 
   it('받은 수가 전체와 같으면 「더 보기」가 없다', async () => {

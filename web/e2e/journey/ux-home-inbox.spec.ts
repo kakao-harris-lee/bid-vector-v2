@@ -46,9 +46,16 @@ test('홈 — 기본은 제안이고, 조건 칩이 서버의 기존 파라미�
 
   // 칩은 접힌 채로 서고, 누르면 자기 칸이 나온다(§6.5 「필터는 칩」).
   const chip = page.getByTestId('chip-agency');
-  await expect(chip).toHaveAttribute('aria-expanded', 'false');
-  await chip.click();
   const panel = page.getByTestId('chip-panel-agency');
+  await expect(chip).toHaveAttribute('aria-expanded', 'false');
+  /**
+   * **접힌 칸이 실제로 보이지 않는다**(수정 라운드 1 — 리뷰 M-4). vitest 는 `hidden` **속성**만
+   * 재고, 그 속성이 그리기에 닿는 것은 전역 CSS 의 `display:none !important` 에 달려 있다 —
+   * 의존성 쪽 전제다. 그 전제가 깨지면(배치 클래스가 덮거나 preflight 가 꺼지면) 칸 셋이 늘
+   * 펼쳐진 화면이 되는데, 상자를 재는 자리는 여기뿐이다.
+   */
+  await expect(panel, '접힌 칸이 보인다 — 숨김이 그리기에 닿지 않았다').not.toBeVisible();
+  await chip.click();
   await expect(panel).toBeVisible();
 
   // 그 공고의 **발주기관 이름**으로 좁힌다 — 기관 파라미터가 실제로 서버에 가 닿는지를 본다.
@@ -134,23 +141,67 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
    * 에서만 설 수 있다(jsdom 은 상자를 모른다).
    */
   // 아래층을 든 배지는 **묶음 머리의 투찰 종류**다(행의 종류 배지에는 아래층이 없다). 그 묶음은
-  // 차례를 testId 에 담으므로 이름으로 짓지 않고 **내 행을 품은 묶음**으로 집는다.
+  // 차례를 testId 에 담으므로 이름으로 짓지 않고 **내 행을 품은 묶음**으로 집고, 배지도
+  // **이름으로** 집는다(DOM 차례에 기대지 않는다 — 수정 라운드 1, 리뷰 L).
   const group = page
     .locator('[data-testid^="notice-group-"]')
     .filter({ has: page.getByTestId(rowId!) });
-  const badge = group.locator('[aria-expanded]').first();
-  const whyId = await badge.getAttribute('aria-controls');
-  expect(whyId, '2층 라벨이 펼침 대상을 가리키지 않는다').not.toBeNull();
+  const badge = group.getByTestId('group-bid-kind');
+  const whyId = await badge.getAttribute('aria-describedby');
+  expect(whyId, '2층 라벨이 설명 자리를 가리키지 않는다').not.toBeNull();
   const why = page.locator(`[id="${whyId}"]`);
+  const whyText = (await why.textContent())?.trim() ?? '';
+  expect(whyText, '아래층 문면이 DOM 에 없다 — 문면 게이트의 눈에서도 사라진다').not.toBe('');
   const collapsed = await why.boundingBox();
   expect(collapsed, '아래층 문면이 DOM 에 없다 — 보조기기 경로가 닫혔다').not.toBeNull();
   expect(collapsed!.height, '접힌 아래층이 처음부터 자리를 차지한다').toBeLessThan(2);
 
+  /**
+   * **접근성 트리에 그 문면이 정확히 한 번**(수정 라운드 1 — verifier F-1 · 리뷰 M-2).
+   *
+   * DOM 노드 계수로는 이 축이 서지 않는다 — 한 노드가 **설명과 본문 둘로** 쓰이면 사본이 없어도
+   * 두 번 전달된다(앞 판 실측: 접힘·펼침 둘 다 설명 1 + 본문 1). 낭독은 접근성 트리를 따르므로
+   * 그 트리를 직접 센다. 접힘·펼침 **두 상태 모두**에서 설명 하나뿐이어야 한다.
+   */
+  const announcedCounts = async (): Promise<{ description: number; text: number }> => {
+    const client = await page.context().newCDPSession(page);
+    await client.send('Accessibility.enable');
+    const { nodes } = (await client.send('Accessibility.getFullAXTree')) as {
+      nodes: readonly {
+        ignored?: boolean;
+        role?: { value?: string };
+        name?: { value?: string };
+        description?: { value?: string };
+      }[];
+    };
+    await client.detach();
+    let description = 0;
+    let text = 0;
+    for (const node of nodes) {
+      if (node.ignored === true) {
+        continue;
+      }
+      if ((node.description?.value ?? '') === whyText) {
+        description += 1;
+      }
+      if ((node.name?.value ?? '') === whyText && node.role?.value !== 'button') {
+        text += 1;
+      }
+    }
+    return { description, text };
+  };
+
+  const beforeTap = await announcedCounts();
+  expect(beforeTap.description, '접힌 배지의 설명이 사라졌다 — 보조기기 경로가 닫혔다').toBe(1);
+  expect(beforeTap.text, '같은 문면이 본문 텍스트로도 선다 — 두 번 낭독된다').toBe(0);
+
   await badge.click();
 
-  await expect(badge).toHaveAttribute('aria-expanded', 'true');
   const expanded = await why.boundingBox();
   expect(expanded!.height, '탭했는데 아래층이 보이지 않는다').toBeGreaterThan(collapsed!.height);
+  const afterTap = await announcedCounts();
+  expect(afterTap.description, '펼치면서 설명이 사라졌다').toBe(1);
+  expect(afterTap.text, '펼치면서 같은 문면이 본문으로도 섰다 — 두 번 낭독된다').toBe(0);
 
   /**
    * **링크를 열면 읽음**(받는 항목 9). 쓰기를 걸고 **바로 이동**하므로, 성공의 신호는 알림함
