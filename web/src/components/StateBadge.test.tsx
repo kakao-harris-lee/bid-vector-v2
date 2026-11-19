@@ -85,6 +85,34 @@ describe('2층 라벨 — 아래층이 터치에서도 선다', () => {
     expect(badge.hasAttribute('aria-controls'), '숨긴 노드를 가리키는 선언이 남았다').toBe(false);
   });
 
+  /**
+   * **그 버튼 자신의 두 상태는 말한다**(cr N-5). `aria-expanded` 를 걷은 것과 **다른 축**이다 —
+   * 저쪽은 「가리키는 묶음이 숨겨져 있다」라서 거짓이었고, 이쪽은 「이 토글이 지금 눌려 있다」라서
+   * 참이다. 설명은 두 상태에서 같으므로 이 선언이 두 번 낭독을 만들지 않는다.
+   */
+  it('토글 상태를 `aria-pressed` 로 말한다', () => {
+    render(<StateBadge display={WITH_WHY} testId="badge" />);
+
+    const badge = screen.getByTestId('badge');
+    expect(badge.getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(badge);
+
+    expect(badge.getAttribute('aria-pressed'), '눌렸는데 그 사실을 말하지 않는다').toBe('true');
+    expect(whyNodeOf(badge)?.getAttribute('data-expanded')).toBe('true');
+
+    fireEvent.click(badge);
+
+    expect(badge.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  /** 아래층이 없는 배지는 토글이 아니다 — 그 상태를 말할 것도 없다. */
+  it('`why` 가 없으면 토글 상태도 선언하지 않는다', () => {
+    render(<StateBadge display={WITHOUT_WHY} testId="badge" />);
+
+    expect(screen.getByTestId('badge').hasAttribute('aria-pressed')).toBe(false);
+  });
+
   it('누르면 아래층 문면이 펼쳐지고, 다시 누르면 접힌다', () => {
     render(<StateBadge display={WITH_WHY} testId="badge" />);
 

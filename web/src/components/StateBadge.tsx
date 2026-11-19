@@ -79,6 +79,13 @@ export function StateBadge({
         type="button"
         data-testid={testId}
         aria-describedby={whyId}
+        /*
+          **`aria-pressed` 는 `aria-expanded` 와 다른 축이다**(cr N-5). `aria-expanded` 는 「가리키는
+          묶음이 숨겨져 있다」는 선언이라, 내용이 트리에 늘 있는 이 자리에서는 거짓이었다. 반면
+          `aria-pressed` 는 **그 버튼 자신의 두 상태**를 말한다 — 눌린 동안 아래층이 눈에 보이는
+          토글이라는 사실은 참이고, 설명은 두 상태에서 같으므로 두 번 낭독되지도 않는다.
+        */
+        aria-pressed={expanded}
         onClick={() => setExpanded((open) => !open)}
         className="inline-flex min-h-11 items-center rounded-md"
       >

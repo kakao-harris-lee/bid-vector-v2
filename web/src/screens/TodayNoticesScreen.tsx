@@ -215,7 +215,7 @@ function conditionTextOf(field: ChipField, value: string | number | undefined): 
  * 같은 객체**다(빈 칸과 「조건 아님」이 그 객체에서만 갈린다).
  */
 function chipSummaryOf(axis: ChipAxis, applied: SearchForm): string | null {
-  const conditions = conditionsOf(applied) as Readonly<Record<string, string | number | undefined>>;
+  const conditions = conditionsOf(applied);
   const parts = axis.fields
     .map((one) => conditionTextOf(one, conditions[one.field]))
     .filter((one): one is string => one !== null);
