@@ -7,7 +7,7 @@
 #     docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml build web
 #
 # 베이스 셋 다 다이제스트로 고정한다(멀티플랫폼 index 의 다이제스트 — node 는 2026-10-16 실측,
-# golang·alpine 은 2026-10-29 실측). `:latest`·미고정 태그는 쓰지 않는다(6C 위생 기준 (2)).
+# alpine 은 2026-10-29 · golang 은 2026-11-20 실측). `:latest`·미고정 태그는 쓰지 않는다(6C 위생 기준 (2)).
 FROM node:24.12.0-slim@sha256:7326fb2dbdce998edd72140946851be64ef4a643e8715e138ca467e8e9d92c99 AS builder
 
 # `@playwright/test` 의 설치 훅이 브라우저(수백 MB)를 내려받는다 — 이 stage 는 번들만 만들고
