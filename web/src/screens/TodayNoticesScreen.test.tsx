@@ -299,6 +299,101 @@ describe('화면 B — 조건 칩', () => {
     });
   });
 
+  /**
+   * **숫자 칸의 해석기가 하나다**(수정 라운드 1, 리뷰 H-1). 앞 판은 `conditionsOf` 가
+   * `parseInt` 로 앞부분만 읽어 `100,000,000` 을 **100** 으로 보냈고, 칩 얼굴은 원문을 그대로
+   * 보였다 — 운영자는 「1억 이상」을 보고 있다고 믿는데 wire 는 「100원 이상」이었다. 서버 계약이
+   * 같은 자리에서 「정수 칸은 숫자와 선택적 부호만 받는다 · 형식 오류는 조용히 절삭·변환하지
+   * 않고 400」이라고 못박은 자리다.
+   */
+  it('쉼표가 섞인 금액은 조용히 절삭되지 않고 요청이 나가지 않는다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('amount', /하한/u, '100,000,000');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    expect(await screen.findByTestId('filter-problems')).toBeTruthy();
+    expect(mocked.searchNotices, '잘린 값으로 요청이 나갔다').not.toHaveBeenCalled();
+  });
+
+  /**
+   * **장면 ⓑ 의 음성**(리뷰 H-1): 「검색 중인가」와 「칩이 값을 보이는가」가 **같은 답**이어야
+   * 한다. 앞 판은 숫자 축에서만 두 술어가 갈려, 칩은 값과 지우기를 보이는데 화면은 제안인
+   * 틈이 생겼다.
+   */
+  it('숫자가 아닌 금액은 칩도 값을 보이지 않는다 — 조건과 얼굴이 같은 답이다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('amount', /하한/u, '₩1억');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    expect(await screen.findByTestId('filter-problems')).toBeTruthy();
+    // 조건이 서지 않았으므로 화면은 제안 그대로다.
+    expect(screen.getByTestId('suggestions-empty')).toBeTruthy();
+    // 그렇다면 칩도 값을 보이지 않아야 한다(둘이 같은 답이다).
+    expect(screen.getByTestId('chip-amount').textContent ?? '', '조건이 아닌 값이 칩 얼굴에 섰다').not.toContain('1억');
+    expect(screen.queryByTestId('chip-clear-amount'), '조건이 없는데 지우기가 섰다').toBeNull();
+    expect(screen.queryByTestId('search-clear')).toBeNull();
+  });
+
+  /**
+   * **서버가 400 으로 못박은 조합은 화면이 먼저 안다**(리뷰 M-1). 그 400 은 어느 입력이 틀렸는지
+   * 싣지 않으므로, 보내고 나면 운영자가 받는 것은 **영원히 실패하는 「다시 시도」** 하나다.
+   */
+  it('범위가 뒤집힌 금액은 보내지 않고 사유를 보인다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('amount', /하한/u, '900000000');
+    fillChip('amount', /상한/u, '100000000');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    expect((await screen.findByTestId('filter-problems')).textContent ?? '').toContain('하한');
+    expect(mocked.searchNotices).not.toHaveBeenCalled();
+  });
+
+  it('음수 금액은 보내지 않고 사유를 보인다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('amount', /하한/u, '-1');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    expect(await screen.findByTestId('filter-problems')).toBeTruthy();
+    expect(mocked.searchNotices).not.toHaveBeenCalled();
+  });
+
+  it('마감일 범위가 뒤집히면 보내지 않고 사유를 보인다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('deadline', /부터/u, '2099-02-02T09:00');
+    fillChip('deadline', /까지/u, '2099-01-01T09:00');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    expect((await screen.findByTestId('filter-problems')).textContent ?? '').toContain('마감일');
+    expect(mocked.searchNotices).not.toHaveBeenCalled();
+  });
+
+  /** **음성 대조** — 규칙이 참을 막지 않는다. 제대로 적은 범위는 그대로 나간다. */
+  it('제대로 적은 금액 범위는 그대로 나가고 사유 자리가 없다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fillChip('amount', /하한/u, '100000000');
+    fillChip('amount', /상한/u, '900000000');
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    await waitFor(() =>
+      expect(mocked.searchNotices).toHaveBeenCalledWith(
+        expect.objectContaining({ amountMin: 100_000_000, amountMax: 900_000_000 }),
+      ),
+    );
+    expect(screen.queryByTestId('filter-problems'), '올바른 입력에 사유가 섰다').toBeNull();
+  });
+
   it('값이 없는 칩에는 지우기가 없다', async () => {
     renderScreen();
 
@@ -567,14 +662,15 @@ describe('화면 B — 제안 목록', () => {
 
     const card = await screen.findByTestId(`suggestion-card-${SUGGESTION.noticeNumber}`);
     const badge = within(card).getByTestId('suggestion-license');
-    expect(badge.getAttribute('aria-expanded')).toBe('false');
+    const why = document.getElementById(badge.getAttribute('aria-describedby') ?? '');
+    expect(why?.getAttribute('data-expanded')).toBe('false');
 
     fireEvent.click(badge);
 
-    expect(badge.getAttribute('aria-expanded')).toBe('true');
-    expect(
-      document.getElementById(badge.getAttribute('aria-controls') ?? '')?.textContent ?? '',
-    ).toContain('미달이 아니라');
+    expect(why?.getAttribute('data-expanded')).toBe('true');
+    expect(why?.textContent ?? '').toContain('미달이 아니라');
+    // 보조기기 쪽은 접힘·펼침과 무관하게 **설명 하나**다(F-1 처방).
+    expect(why?.getAttribute('aria-hidden')).toBe('true');
   });
 });
 

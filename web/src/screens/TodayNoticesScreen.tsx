@@ -97,6 +97,20 @@ const FIELD_INPUT = {
 } as const satisfies Record<FieldKind, { readonly type: string; readonly inputMode?: 'numeric' }>;
 
 /**
+ * 숫자 칸의 **유일한 해석기**(수정 라운드 1 — 리뷰 H-1). 표시 값과 wire 값이 같은 함수에서 온다.
+ *
+ * 앞 판은 `Number.parseInt` 였고 그것은 **앞부분만** 읽는다 — `100,000,000` 이 `100` 이 되어
+ * 칩은 「1억」을, wire 는 「100원」을 말했다. 서버 계약이 같은 자리에서 반대를 못박았다: 정수
+ * 칸은 **숫자와 선택적 부호만** 받고, 형식 오류는 조용히 절삭·변환하지 않고 400 이다. 그래서
+ * 화면도 **고쳐 주지 않는다** — 받지 않고 사유를 보인다(쉼표를 몰래 걷으면 그 다음은 단위와
+ * 한글이고, 그때마다 운영자가 보낸 것과 보이는 것이 갈린다).
+ */
+function numericInputToInt(raw: string): number | null {
+  const text = raw.trim();
+  return /^-?\d+$/u.test(text) ? Number(text) : null;
+}
+
+/**
  * 빈 칸은 **조건이 아니다** — 빈 문자열·0 을 조건으로 보내면 서버가 다른 질문을 받는다.
  *
  * **이 함수가 「검색 중인가」의 유일한 출처이기도 하다**: 조건 집합이 비면 기본 화면(제안)이고,
@@ -104,19 +118,67 @@ const FIELD_INPUT = {
  * 보인다」 같은 틈이 생긴다.
  */
 function conditionsOf(form: SearchForm): Omit<NoticeSearchQuery, 'page' | 'size'> {
-  const amountMin = Number.parseInt(form.amountMin, 10);
-  const amountMax = Number.parseInt(form.amountMax, 10);
+  const amountMin = numericInputToInt(form.amountMin);
+  const amountMax = numericInputToInt(form.amountMax);
   // 운영자가 적은 지역 시각 → wire 의 순간. 그 변환은 `timeDisplay` 한 자리다(M9 D-1).
   const deadlineFrom = localInputToIso(form.deadlineFrom);
   const deadlineTo = localInputToIso(form.deadlineTo);
   return {
     ...(form.q.trim() === '' ? {} : { q: form.q.trim() }),
     ...(form.agency.trim() === '' ? {} : { agency: form.agency.trim() }),
-    ...(Number.isNaN(amountMin) ? {} : { amountMin }),
-    ...(Number.isNaN(amountMax) ? {} : { amountMax }),
+    ...(amountMin === null ? {} : { amountMin }),
+    ...(amountMax === null ? {} : { amountMax }),
     ...(deadlineFrom === null ? {} : { deadlineFrom }),
     ...(deadlineTo === null ? {} : { deadlineTo }),
   };
+}
+
+/**
+ * 보내기 전에 **화면이 먼저 아는 것**(수정 라운드 1 — 리뷰 M-1). 서버가 400 으로 못박은 조합을
+ * 그대로 보내면, 그 400 은 **어느 입력이 틀렸는지 싣지 않으므로** 운영자가 받는 것은 영원히
+ * 실패하는 「다시 시도」 하나다. 규칙을 한 벌 더 적는 것이 아니라 **같은 계약을 읽는 것**이다 —
+ * 값(0 이상 · 역전 금지)은 서버 schema 의 조건 그대로다.
+ */
+interface FilterProblem {
+  readonly axis: string;
+  readonly message: string;
+}
+
+function problemsOf(form: SearchForm): readonly FilterProblem[] {
+  const problems: FilterProblem[] = [];
+  for (const axis of FILTER_CHIPS) {
+    for (const field of axis.fields) {
+      const raw = form[field.field].trim();
+      if (raw === '') {
+        continue;
+      }
+      if (field.kind === 'numeric' && numericInputToInt(raw) === null) {
+        problems.push({ axis: axis.label, message: `${field.label}: 숫자만 적어 주십시오` });
+      }
+      if (field.kind === 'instant' && localInputToIso(raw) === null) {
+        problems.push({ axis: axis.label, message: `${field.label}: 날짜와 시각을 다 적어 주십시오` });
+      }
+    }
+  }
+  const amountMin = numericInputToInt(form.amountMin);
+  const amountMax = numericInputToInt(form.amountMax);
+  for (const [label, value] of [
+    ['기초금액 하한', amountMin],
+    ['기초금액 상한', amountMax],
+  ] as const) {
+    if (value !== null && value < 0) {
+      problems.push({ axis: '금액대', message: `${label}: 0 이상만 받습니다` });
+    }
+  }
+  if (amountMin !== null && amountMax !== null && amountMin > amountMax) {
+    problems.push({ axis: '금액대', message: '하한이 상한보다 큽니다' });
+  }
+  const deadlineFrom = localInputToIso(form.deadlineFrom);
+  const deadlineTo = localInputToIso(form.deadlineTo);
+  if (deadlineFrom !== null && deadlineTo !== null && deadlineFrom > deadlineTo) {
+    problems.push({ axis: '마감일', message: '시작이 끝보다 늦습니다' });
+  }
+  return problems;
 }
 
 function queryOf(form: SearchForm, page: number): NoticeSearchQuery {
@@ -137,14 +199,26 @@ function withCleared(form: SearchForm, axis: ChipAxis): SearchForm {
  * 되비추면 이 저장소가 금지한 원문 자리가 하나 더 생긴다(M9 D-1 · D-4).
  */
 function fieldTextOf(field: ChipField, raw: string): string | null {
-  if (raw.trim() === '') {
+  const text = raw.trim();
+  if (text === '') {
     return null;
   }
-  if (field.kind !== 'instant') {
-    return raw.trim();
+  switch (field.kind) {
+    case 'text':
+      return text;
+    // **조건이 되지 못하는 값은 칩에도 서지 않는다**(리뷰 H-1 장면 ⓑ). 「검색 중인가」와 「칩이
+    // 값을 보이는가」가 같은 해석기에서 나와야, 칩은 조건을 말하는데 화면은 제안인 틈이 없다.
+    case 'numeric':
+      return numericInputToInt(text) === null ? null : text;
+    case 'instant': {
+      const iso = localInputToIso(text);
+      return iso === null ? null : instantDisplayOf(iso).text;
+    }
+    default: {
+      const unreachable: never = field.kind;
+      throw new Error(`모르는 칸 종류: ${JSON.stringify(unreachable)}`);
+    }
   }
-  const iso = localInputToIso(raw);
-  return iso === null ? null : instantDisplayOf(iso).text;
 }
 
 /** 칩에 보이는 요약 — **적용된** 조건만이다(적다 만 값은 칩의 얼굴을 바꾸지 않는다). */
@@ -300,6 +374,7 @@ export function TodayNoticesScreen() {
   // 「지금」으로 남은 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
   const [now] = useState(readClock);
   const searching = hasConditions(submitted);
+  const problems = problemsOf(form);
 
   /**
    * CR M-1 — 앞 판은 첫 쪽만 불러 **전체 42건**을 보이면서 카드 20장만 냈다(나머지로 가는 길이
@@ -345,8 +420,15 @@ export function TodayNoticesScreen() {
     },
   });
 
+  /**
+   * **사유가 있으면 보내지 않는다**(리뷰 M-1). 서버가 400 으로 돌려줄 조합을 보내 봐야 운영자는
+   * 어느 칩을 고쳐야 하는지 알 수 없다 — 그 400 은 틀린 입력을 싣지 않는다.
+   */
   function submit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
+    if (problems.length > 0) {
+      return;
+    }
     setSubmitted(form);
   }
 
@@ -428,6 +510,19 @@ export function TodayNoticesScreen() {
             />
           ))}
         </div>
+        {/*
+          적은 것이 **사라지는 것보다 사라졌다고 말하는 쪽**이 낫다 — 조용히 걷거나 절삭하지
+          않고 그대로 두고 사유를 보인다(서버 계약과 같은 방향).
+        */}
+        {problems.length === 0 ? null : (
+          <ul data-testid="filter-problems" role="alert" className="flex flex-col gap-1 text-xs text-bad-ink">
+            {problems.map((problem) => (
+              <li key={`${problem.axis}/${problem.message}`}>
+                {problem.axis} — {problem.message}
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button type="submit" tone="primary">
             검색
