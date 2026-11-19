@@ -346,6 +346,13 @@ export function WorksheetScreen() {
     onSuccess: async (updated, sent) => {
       // **가드를 여기서 푼다** — 실행 취소가 살아나는 시점과 같아야 한다(13D 의 그 자리와 같은 사유).
       exitSending.current = false;
+      /*
+       * **실행 취소가 붙은 토스트인가.** 오늘 이 값은 도달 가능한 자리에서 늘 참이다 — 성공 뒤
+       * 내려놓기가 또 열리는 상태는 「나중에」가 만든 그 상태 하나뿐이고(「건너뜀」은 종단이라
+       * 그 뒤로 열린 내려놓기가 없다), 그래서 이 줄을 `true` 로 바꾸는 변이가 **초록이다**(실측).
+       * 그래도 종류에서 유도한다: 종류가 늘면(예: 되돌릴 수 없는 셋째 내려놓기) 그 순간부터
+       * 두 값이 갈리고, 그때 이 줄이 이미 맞는 쪽에 서 있다.
+       */
       exitUndoable.current = sent.kind === 'DEFER';
       show(
         sent.kind === 'DEFER'
