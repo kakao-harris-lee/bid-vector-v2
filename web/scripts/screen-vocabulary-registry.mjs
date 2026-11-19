@@ -91,6 +91,16 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
     kind: OTHER_AXIS,
     why: '상태 → 그 상태에서 가능한 동작 행. 문면은 상태·명령 표에서 오고 이 함수가 금액·시각 글자를 만들지 않는다',
   },
+  {
+    key: 'display/bidBoxDisplay.ts#exitsOf',
+    kind: OTHER_AXIS,
+    why: '상태 → 열린 내려놓기 행동. 라벨은 표의 상수이고 이 함수가 금액·시각 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#blankToServer',
+    kind: OTHER_AXIS,
+    why: '자유 텍스트가 서버 기준 공백뿐인가 — 보낼지 말지의 판정이고 보이는 글자를 만들지 않는다',
+  },
 
   // ── 사건 축 ────────────────────────────────────────────────────────────────
   {

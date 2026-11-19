@@ -3,6 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { isUnauthorized as isSessionGone } from '../api/apiError';
 import { listBidCases, readMyBidResults, readOpeningResult, type BidCase } from '../api/queries';
 import { bidCasesQueryKey, MY_BID_RESULTS_QUERY_KEY, openingResultQueryKey } from '../api/queryKeys';
+import { LinkButton } from '../components/Button';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import { caseResultsById, type CaseResult } from '../display/myBidResultDisplay';
@@ -131,7 +132,17 @@ export function ResultsScreen() {
         <ErrorFace testId="results-error" onRetry={() => void cases.refetch()} />
       ) : null}
       {cases.isSuccess && shown.length === 0 ? (
-        <EmptyFace display={EMPTY_DISPLAY} testId="results-empty" />
+        /* 빈 얼굴이 **다음 걸음을 준다**(항목 7). 사유는 이미 문면에 있다 — 없던 것은 그
+           걸음을 걷는 자리로 가는 길이고, 그 자리가 입찰함이다. */
+        <EmptyFace
+          display={EMPTY_DISPLAY}
+          testId="results-empty"
+          action={
+            <LinkButton to="/bids" tone="primary" testId="results-empty-action">
+              내 입찰함 열기
+            </LinkButton>
+          }
+        />
       ) : null}
 
       {sessionGone ? <SignedOutFace /> : null}

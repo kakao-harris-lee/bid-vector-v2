@@ -56,8 +56,11 @@ import { runWithInFlightText } from './kotlin-read-guard.mjs';
  * 여기 전수로 서는 덕에 「읽기 집합 전부가 읽힌다」를 게이트 test 가 들 수 있다 — 앞 판까지
  * 그 목록은 어디에도 전수로 없었고, 확인하려면 손으로 적어야 했다.
  *
- * **일곱이다.** 착수 때는 여덟이었고 그중 명령 축(`BidCommand.kt`)은 10B(#149)가 openapi `enum`
- * 으로 올려 web 이 더 이상 읽지 않는다 — 읽지 않는 파일을 표에 남기면 「읽기 집합」이 거짓이 된다.
+ * **여덟이다.** M10 때 일곱으로 줄었다 — 착수 때 여덟이었고 그중 명령 축(`BidCommand.kt`)은
+ * 10B(#149)가 openapi `enum` 으로 올려 web 이 더 이상 읽지 않는다(읽지 않는 파일을 표에 남기면
+ * 「읽기 집합」이 거짓이 된다). M13/13D 가 **전이표**를 더해 다시 여덟이다: 내려놓기 둘의 출발
+ * 상태와 주체를 계약이 응답으로 내주지 않으므로(응답에 열린 명령 집합 칸이 없다) 화면이 사본을
+ * 들고, 그 사본을 정본에 묶는 등식이 이 읽기를 쓴다.
  */
 const KOTLIN_SOURCES = {
   basis: 'shared-kernel/src/main/kotlin/bidvector/sharedkernel/Basis.kt',
@@ -67,6 +70,7 @@ const KOTLIN_SOURCES = {
   noticeEndpoints: 'app/src/main/kotlin/bidvector/app/collection/CollectionProperties.kt',
   detailAxes: 'workflow/src/main/kotlin/bidvector/workflow/collection/CollectOpeningResultsUseCase.kt',
   progressPolicy: 'workflow/src/main/kotlin/bidvector/workflow/opening/OpeningProgressPolicyData.kt',
+  bidTransitions: 'bidding/src/main/kotlin/bidvector/bidding/BidTransitions.kt',
 };
 
 /** 읽기 집합의 **키 전수** — 경로가 아니라 키다(위 표를 내보내지 않는 사유와 같다). */
