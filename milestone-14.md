@@ -77,7 +77,7 @@ head CI 가 설 수 없다). 14E 가 멈추면(DB 마이그레이션 필요 → 
 
 | slice | 무엇을 하는가 |
 | --- | --- |
-| **14A** `wf-shell` (먼저 · 혼자) | ① 토큰을 캔버스 팔레트로 바꾼다(`index.css` 한 자리 · 어조 다섯 쌍은 **값만** · 다크 쌍). ② md 이상 **왼쪽 사이드바**(항목 여섯 · 입찰함 배지 = REAL 계수 · 알림함 배지 · 사업자명). md 미만 하단 탭 다섯 칸은 유지한다. ③ 배치 원시 요소: `PageHeader`(제목 · 요약 한 줄 · 행동) · `TwoColumn`(본문 + 300px 레일, md 미만 한 단 — 레일은 본문 **뒤**) · `SummaryTile` · `StatusPill`(2층 라벨 모델 위, 색만으로 말하지 않는다) · `KeyValueRow`. ④ **부재값 어휘 한 자리**: 「값 없음」을 그리는 길을 전부 지우고 부재를 **사유를 지닌 타입**으로 바꾼다. 그래서 그 글자를 그리는 길이 컴파일에서 닫힌다. **acceptance 는 열거가 아니라 측정이다** — 착수 커밋에서 `web/src` · `web/e2e` · `web/scripts` 의 「값 없음」 전수 grep 을 세고, 이 slice 끝에 0 이다(열거는 낡지만 grep 은 낡지 않는다). 계획 리뷰 r2 실측(2026-11-20)의 모집단: 상수 넷(`display/timeDisplay.ts` · `display/noticeDisplay.ts` · `screens/ResultCard.tsx` · `screens/InboxScreen.tsx`) · 호출부 다섯(`StateBadge` · `NoticeCard` · `WorksheetGrounds` · `WorksheetRecord` · `InstantText`) · 여정 공유 상수 하나(`e2e/journey/shared.ts`) · 그것을 단언하는 **등록부 test 일곱**(`timeDisplay.test.ts` · `noticeDisplay.test.ts` · `TodayNoticesScreen.test.tsx` · `ResultsScreen.test.tsx` · `ProfileSection.test.tsx` · `SettingsScreen.test.tsx` · `InboxScreen.test.tsx`) + **여정 spec 둘**(`onboarding.spec.ts` · `settings.spec.ts`). 이 test 들의 **주장을 같은 커밋에서** 사유 문면으로 바꾸는 것은 승인 경계 「기존 게이트 술어 변경」의 **사전 승인된 예외**다. **「아직 모른다(적재 중)」는 「없다」와 다른 값으로 남긴다** — 알림함 배지의 「응답 전」 단언이 그 차이를 잰다. 14A 는 다른 slice 소유 파일(`NoticeCard` · `Worksheet*` · `ResultCard`)을 **문면만** 고친다. 배치는 각 소유 slice 의 일이고, 뒤 레인은 그 문면을 되돌리지 않는다. ⑤ 공유 컴포넌트는 만드는 커밋에서 게이트 모집단·짝 test 에 등재한다 |
+| **14A** `wf-shell` (먼저 · 혼자) | ① 토큰을 캔버스 팔레트로 바꾼다(`index.css` 한 자리 · 어조 다섯 쌍은 **값만** · 다크 쌍). ② md 이상 **왼쪽 사이드바**(항목 여섯 · 입찰함 배지 = REAL 계수 · 알림함 배지 · 사업자명). md 미만 하단 탭 다섯 칸은 유지한다. ③ 배치 원시 요소: `PageHeader`(제목 · 요약 한 줄 · 행동) · `TwoColumn`(본문 + 300px 레일, md 미만 한 단 — 레일은 본문 **뒤**) · `SummaryTile` · `StatusPill`(2층 라벨 모델 위, 색만으로 말하지 않는다) · `KeyValueRow`. ④ **부재값 어휘 한 자리**: 「값 없음」을 그리는 길을 전부 지우고 부재를 **사유를 지닌 타입**으로 바꾼다. 그래서 그 글자를 그리는 길이 컴파일에서 닫힌다. **acceptance 는 열거가 아니라 측정이다** — 착수 커밋에서 `web/src` · `web/e2e` · `web/scripts` 의 「값 없음」 전수 grep 을 세되 **생성 타입 `api/generated/**` 는 뺀다**(그 글은 OpenAPI 설명에서 오고 「지어낸 기본값 없음」 같은 부분 일치가 걸린다 — 바꾸는 것은 14E 몫이자 승인 경계다). 기준선은 뽑은 수까지 적는다(계획 리뷰 r3 실측: 전수 35 · 생성 타입 제외 34 · 제외분 1). 이 slice 끝에 좁힌 전수가 0 이다(열거는 낡지만 grep 은 낡지 않는다). 계획 리뷰 r2 실측(2026-11-20)의 모집단: 상수 넷(`display/timeDisplay.ts` · `display/noticeDisplay.ts` · `screens/ResultCard.tsx` · `screens/InboxScreen.tsx`) · 호출부 다섯(`StateBadge` · `NoticeCard` · `WorksheetGrounds` · `WorksheetRecord` · `InstantText`) · 여정 공유 상수 하나(`e2e/journey/shared.ts`) · 그것을 단언하는 **등록부 test 일곱**(`timeDisplay.test.ts` · `noticeDisplay.test.ts` · `TodayNoticesScreen.test.tsx` · `ResultsScreen.test.tsx` · `ProfileSection.test.tsx` · `SettingsScreen.test.tsx` · `InboxScreen.test.tsx`) + **여정 spec 둘**(`onboarding.spec.ts` · `settings.spec.ts`). 이 test 들의 **주장을 같은 커밋에서** 사유 문면으로 바꾸는 것은 승인 경계 「기존 게이트 술어 변경」의 **사전 승인된 예외**다. **「아직 모른다(적재 중)」는 「없다」와 다른 값으로 남긴다** — 알림함 배지의 「응답 전」 단언이 그 차이를 잰다. 14A 는 다른 slice 소유 파일(`NoticeCard` · `Worksheet*` · `ResultCard`)을 **문면만** 고친다. 배치는 각 소유 slice 의 일이고, 뒤 레인은 그 문면을 되돌리지 않는다. ⑤ 공유 컴포넌트는 만드는 커밋에서 게이트 모집단·짝 test 에 등재한다 |
 | **14B** `wf-today-start` | 오늘의 공고: 머리 요약(「감시 조건 통과」 · 분모 = `total` · 상한 초과는 기존 공시가 말한다) · 칩은 인자에 닿는 것만 · 카드 재배치(제목 + 판정 배지 / 기관 · 기초금액 · 방식 / 오른쪽 D-day · 담기) · 모바일 압축 카드. **압축 금액 꼴은 14B 가 새로 만든다**(13C 의 `koreanAmountTextOf` 는 무손실 읽기라 재사용이 아니다): 근사임을 표지(「약」)로 말하고, 자리는 **내림**(지어낸 큰 수를 보이지 않는다)이며, 카드에서 정확한 금액에 닿는 길을 남긴다. 새 꼴은 금액 어휘 표에 **키를 더하지 않는다**(금액 어휘 DOM 게이트와 교차 언어 등식은 키 집합을 재므로 움직이지 않는다 — 키를 억지로 더하면 그것이 술어 변경이다). 새 꼴의 문면과 내림 방향은 그 함수의 짝 test 가 잠근다. 시작하기: 번호 절 다섯 + 상태 알약 + 레일의 「지금 맞는 공고 미리보기」(기존 제안 질의 · 없을 때의 사유는 서버가 주는 만큼만). M13 잔여: 홈 **기본 상태**를 터치 타깃 게이트에 넣는다(13E ⓗ) |
 | **14C** `wf-worksheet` | 머리 블록 · 오른쪽 레일(카운트다운 · 자격 = 판정 + 미판정 축 목록 + 근거 원문 · 다음 확인 시점 · 타임라인) · 본문 순서를 여정 순서로 · 「나중에 · 건너뜀」은 아래. 13C 의 기능(복사 · 병기 · 하한 여유 · 확인 · 접기)은 **옮기기만** 한다(거동 0 — 기존 test 그대로 초록). 「필드명 / 값 없음」 격자를 걷는다(부재 표현은 14A 의 타입). M13 잔여: 「되돌릴 길 기억」이 다른 토스트 자리에서 지워지지 않는 것(§12.3 (x) ⓒ) |
 | **14D** `wf-bidbox-results` | 입찰함: 상태별 개수 탭(REAL · 탭 분할의 정본은 `display/bidBoxDisplay.ts` 의 표 — 와이어프레임 여덟 탭과 먼저 대조하고, 표를 바꾸면 표시 계약 변경으로 보고) · 「페이퍼 따로 보기」 · 카드(제목 + 상태 알약 / 기관 · 내 투찰 / 다음 확인) · 레일 「이번 주 일정」(줄의 사건 낱말은 `nextCheckpointKind` 열거에서만 유도한다 — 열거에 없는 「참가신청」 같은 낱말을 지어내지 않는다) · 「상태 뜻」. 결과: 타일 ① · ③(두 축 병기를 지키는 모양) · ②④ 빈 자리 + 사유 · 잠정 1위 경고 카드 · 결과 카드. **열린 결정**: 역산 · 추천 오차 자리의 배지가 사유와 다른 말을 한다(13A OPEN ⓖ — M7 결정 D-7E3a-3 ↔ G3 채택). 추천은 장부 쪽이다 — 배지를 사유와 맞는 문면으로 바꾸고, `kind` 는 그 기능 마일스톤이 값을 낼 때 정한다 |
@@ -100,7 +100,7 @@ head CI 가 설 수 없다). 14E 가 멈추면(DB 마이그레이션 필요 → 
 
 **겹치는 자리** — 머지 차례마다 키·행 계수와 이름으로 합집합을 확인한다.
 - `api/generated/operator-api.ts`(14E 가 만들고 14D 가 쓴다)
-- `display/moneyDisplay.ts`(14B 가 압축 꼴을 더한다 · 13C 의 무손실 읽기는 그대로)와 금액 토큰 게이트 · 교차 언어 등식
+- `display/moneyDisplay.ts`(14B 가 압축 꼴을 더한다 · 13C 의 무손실 읽기는 그대로 · 키를 더하지 않으므로 금액 어휘 게이트의 키 등식은 움직이지 않는다)
 - `api/approvedOperations.ts` · `queries.ts`(셸 배지가 `listBidCases` 를 부르면 호출 집합 등식이 움직인다 — 쌍은 이미
   승인돼 있다)
 - `scripts/screen-card-coverage` 의 카드 모집단(14B · 14D 의 새 카드가 자동으로 든다) · `screenVocabulary` ·
@@ -122,7 +122,8 @@ head CI 가 설 수 없다). 14E 가 멈추면(DB 마이그레이션 필요 → 
   「0건」이 늘 참인 꼴을 막는다).
 - **대비(14A)** — `index.css` **그 파일에서** 토큰을 파싱해 대비가 AA(4.5:1, 큰 글자 3:1)를 넘는지 잰다(값을 test 에
   복사하지 않는다). **쌍은 파일에서 유도한다**: 모든 `--color-*-skin` 과 짝 `*-ink`, `page`·`card` 와 `ink`·`ink-soft`,
-  `accent` 와 `accent-ink`(새 청록이 가장 센 색이다). 비공허: 유도한 쌍마다 두 토큰이 다 있다(짝 없는 skin/ink 는
+  `accent` 와 `accent-ink`(새 청록이 가장 센 색이다). 텍스트 축과 따로, `line` 과 `page`·`card` 를 비텍스트 기준(3:1)으로 잰다
+  — 새 팔레트에서 카드 경계를 가르는 것이 그 선이다. 비공허: 유도한 쌍마다 두 토큰이 다 있다(짝 없는 skin/ink 는
   붉다) · 라이트와 다크 블록 **둘 다** · 일부러 떨어뜨린 쌍이 잡히는 음성 대조.
 - **읽기 화면은 쓰기를 부르지 않는다(14D)** — 결과 화면이 하한율을 얻으려고 `requestBidPrice`(POST, 알림함 기록을
   낳는다)를 부르지 않는다. 오늘의 승인 쌍 등식은 `queries.ts` 를 **한 집합**으로 재서 이것을 잡지 못한다(계획 리뷰 r2
@@ -144,12 +145,15 @@ head CI 가 설 수 없다). 14E 가 멈추면(DB 마이그레이션 필요 → 
 1. slice 다섯이 각자 PR 로 머지됐다 — verifier `ready-for-review` · code-reviewer(`model: sonnet`) approve · head CI 초록 ·
    판정 PR 코멘트. 14E 는 백엔드 slice 라 Kotlin `check` 전건이 acceptance 에 든다.
 2. 대조표 행마다 처분이 **정렬됨 · 데이터로 막힘(사유) · 범위 밖 · 이탈(이유)** 가운데 하나로 닫혔다(팀장 판정).
-3. 새 OPEN 은 capability map §12.3 새 하위 절에 머지 순서 글자로 등재됐다.
+3. 새 OPEN 은 capability map §12.3 새 하위 절에 머지 순서 글자로 등재됐다. M13 의 OPEN 후보 가운데 이 마일스톤이 닫은 것(이미 출하된
+   §12.3 (w) ⓐ 를 포함)은 같은 절에 「닫힘」으로 적는다.
 4. **운영자가 와이어프레임 · 구현 나란히 묶음을 보고 승인했다**(서체 차이 제외).
 5. **전체 리뷰(M13 + M14).** 모집단은 `routes.tsx` 의 자리 일곱(시작하기 · 오늘의 공고 · 워크시트 · 내 입찰함 · 결과 확인 ·
    알림함 · 설정)에 로그인 · 없는 주소를 더한 **아홉 × 폭 둘(1280 · 390)** 이다. 축은 다섯이다(와이어프레임 대조 · 문면 ·
-   접근성 · 모바일 · 상태 정직성). **적용표를 먼저 그린다**: 와이어프레임 대조 축은 와이어프레임이 있는 화면(1280 은
-   다섯, 390 은 B 하나)에만, 모바일 축은 390 에만 적용하고 나머지 칸은 「해당 없음(사유)」으로 미리 채운다.
+   접근성 · 모바일 · 상태 정직성). **적용표를 먼저 그린다**: 와이어프레임 대조 축은 화면 아트보드가 있는 칸(1280 은
+   다섯, 390 은 B 하나)에서 화면 전체를 대조하고, **알림함 · 설정 · 없는 주소는 「셸·카드 문법 대조」**로 잰다(셸은 모든
+   아트보드에 같은 꼴로 그려져 있다). 셸이 없는 로그인만 그 축이 「해당 없음」이다. 모바일 축은 390 에만 적용한다. 나머지
+   칸은 「해당 없음(사유)」으로 미리 채운다.
    verifier 와 code-reviewer(sonnet)가 **따로** 적용 칸마다 「정렬됨 / 데이터로 막힘 / 범위 밖 / 이탈 / 결함」 한 줄을
    근거와 함께 쓴다. 산출물은 종결 PR 코멘트 둘이다. **통과 조건: 적용 칸 빈 칸 0 · 열린 blocker·high 0.** 결함은
    이 마일스톤 안에서 고치거나 운영자 동의로 넘긴다.
