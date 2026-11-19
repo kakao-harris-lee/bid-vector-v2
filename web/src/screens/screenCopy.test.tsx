@@ -537,6 +537,15 @@ describe('문면 — 걷어 낸 내부 용어가 그 자리에 돌아오지 않�
     for (const term of ['배선', '커널', '스키마', '토큰']) {
       expect(fixed.filter((one) => one.includes(term))).toEqual([]);
     }
+    /**
+     * **영구 부재 단언도 돌아오면 안 된다**(cr MED-2 · 수정 라운드 1 의 변이 Q 가 찾았다).
+     * 그 문장은 내부 용어가 아니라 **장부와 어긋나는 주장**이라 어느 꼴도 잡지 못한다 —
+     * 되돌리는 변이가 조용히 초록이었다. 두 자리 모두 「나중에 오는 자리」이므로(하나는 채택
+     * 뒤 구현 대기, 하나는 후속 분류) 그 주장만 축어로 막는다.
+     */
+    for (const claim of ['나중에 생기는 자리가 아닙니다', '영영', '다루지 않는 자리입니다']) {
+      expect(fixed.filter((one) => one.includes(claim))).toEqual([]);
+    }
     // 비공허: 고친 행이 비어 있지 않다(빈 글자는 어느 금지 어휘도 담지 않아 위 단언이 공허하다).
     expect(fixed.filter((one) => one.trim() === '')).toEqual([]);
   });
