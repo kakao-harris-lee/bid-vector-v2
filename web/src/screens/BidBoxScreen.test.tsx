@@ -606,3 +606,53 @@ describe('화면 D — 화면이 보낸 사유를 서버가 거부할 때', () =
     expect(within(face).getByRole('button', { name: '다시 시도' })).toBeTruthy();
   });
 });
+
+/**
+ * 쓰기가 **보류 중일 때** 버튼이 살아 있으면 연타가 그대로 요청이 된다(cr MEDIUM). 이 slice
+ * 전에는 화면이 `DEFERRED` 를 만드는 길이 없어 그 버튼이 사실상 닿지 않았고, 13D 가 그것을 켠다.
+ */
+describe('화면 D — 보류 중에는 다시 보내지 않는다', () => {
+  it('「다시 보기」 연타가 요청을 늘리지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'DEFERRED', nextCheckpointKind: 'REMINDER' })]);
+    // 보류를 **해소되지 않는 약속**으로 고정한다 — 시간을 흉내 내지 않는다.
+    mocked.resumeCase.mockReturnValue(new Promise<queries.BidCase>(() => {}));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    const again = within(card).getByRole('button', { name: '다시 보기' });
+    fireEvent.click(again);
+    fireEvent.click(again);
+    fireEvent.click(again);
+
+    await waitFor(() => expect(mocked.resumeCase).toHaveBeenCalledTimes(1));
+  });
+
+  /**
+   * 실패가 **성공한 쓰기의 실행 취소를 지우지 않는다**. 되돌릴 수 있는데 되돌릴 길이 화면에서
+   * 사라지는 것이 가장 비싼 손해다 — 실패 얼굴은 따로 선다.
+   */
+  it('뒤이은 쓰기가 실패해도 실행 취소 토스트가 남는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    mocked.deferCase.mockResolvedValue(bidCase({ state: 'DEFERRED' }));
+    mocked.skipCase.mockRejectedValue(new ApiError(409, 'INVALID_TRANSITION'));
+    renderScreen();
+
+    const card = await screen.findByTestId('bid-case-11');
+    fireEvent.click(within(card).getByTestId('exit-DEFER-11'));
+    fireEvent.change(screen.getByLabelText('리마인드 시각'), { target: { value: '2099-02-03T10:30' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+    const toast = await screen.findByTestId('toast');
+    expect(within(toast).getByRole('button', { name: '실행 취소' })).toBeTruthy();
+
+    fireEvent.click(within(card).getByTestId('exit-SKIP-11'));
+    fireEvent.change(screen.getByLabelText('건너뜀 사유'), { target: { value: '예산이 맞지 않는다' } });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    await waitFor(() => expect(screen.getByTestId('write-failure')).toBeTruthy());
+    expect(
+      within(screen.getByTestId('toast')).getByRole('button', { name: '실행 취소' }),
+      '성공한 쓰기의 되돌릴 길이 실패와 함께 사라졌다',
+    ).toBeTruthy();
+  });
+});

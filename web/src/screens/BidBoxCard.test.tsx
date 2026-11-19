@@ -47,7 +47,7 @@ function renderCard(state: BidCaseState): { readonly sent: ReturnType<typeof vi.
   const sent = vi.fn();
   const router = createMemoryRouter(
     [
-      { path: '/bids', element: <BidBoxCard bidCase={bidCase(state)} onSend={sent} /> },
+      { path: '/bids', element: <BidBoxCard bidCase={bidCase(state)} pending={false} onSend={sent} /> },
       { path: '/notices/:noticeNumber/:noticeRound', element: <p>워크시트 자리</p> },
     ],
     { initialEntries: ['/bids'] },

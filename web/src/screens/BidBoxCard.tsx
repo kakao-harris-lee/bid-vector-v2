@@ -51,10 +51,13 @@ function isOutcome(value: string): value is Outcome {
  */
 function ActionForm({
   action,
+  pending,
   onSend,
   onCancel,
 }: {
   readonly action: BidBoxAction;
+  /** 쓰기가 보류 중인가 — 보류 중에는 **다시 보내지 않는다**(cr MEDIUM). */
+  readonly pending: boolean;
   readonly onSend: (payload: ActionPayload) => void;
   readonly onCancel: () => void;
 }) {
@@ -206,7 +209,12 @@ function ActionForm({
       <div className="mt-3 flex flex-wrap gap-2">
         {/* 확인 단계에서는 **어조와 글자가 함께** 바뀐다 — 같은 버튼이 같은 모양으로 두 뜻을
             가지면 운영자가 두 번째 누름이 무엇인지 모른다. */}
-        <Button tone={confirming ? 'danger' : 'primary'} onClick={send} testId="action-send">
+        <Button
+          tone={confirming ? 'danger' : 'primary'}
+          onClick={send}
+          disabled={pending}
+          testId="action-send"
+        >
           {confirming ? '확인' : '보내기'}
         </Button>
         <Button onClick={onCancel}>그만두기</Button>
@@ -219,11 +227,13 @@ function ActionForm({
 function ActionButton({
   action,
   bidCase,
+  pending,
   onOpen,
   onSend,
 }: {
   readonly action: BidBoxAction;
   readonly bidCase: BidCase;
+  readonly pending: boolean;
   readonly onOpen: (action: BidBoxAction) => void;
   readonly onSend: (payload: ActionPayload) => void;
 }) {
@@ -241,6 +251,7 @@ function ActionButton({
   return (
     <Button
       tone="primary"
+      disabled={pending}
       onClick={() => {
         // 결과 기록은 표에서 `CHOICE` 라 이 자리에 오지 않는다. 표가 바뀌어 오더라도 **결과 없는
         // 요청을 보내지 않고** 폼을 연다(타입이 그 요청을 만들 수 없게 돼 있다).
@@ -262,9 +273,16 @@ function ActionButton({
  */
 export function BidBoxCard({
   bidCase,
+  pending,
   onSend,
 }: {
   readonly bidCase: BidCase;
+  /**
+   * 쓰기가 보류 중인가. 보류 중에는 버튼을 잠근다 — `RESUME` 은 폼 없이 바로 가는 유일한
+   * 행동이라 연타가 그대로 요청 셋이 된다(cr MEDIUM 실측). 둘째·셋째는 409 이고 그 실패
+   * 얼굴이 **성공한 쓰기 위에** 뜬다.
+   */
+  readonly pending: boolean;
   readonly onSend: (caseId: number, payload: ActionPayload) => void;
 }) {
   const [open, setOpen] = useState<BidBoxAction | null>(null);
@@ -323,6 +341,7 @@ export function BidBoxCard({
                 key={action.kind}
                 action={action}
                 bidCase={bidCase}
+                pending={pending}
                 onOpen={setOpen}
                 onSend={(payload) => onSend(bidCase.caseId, payload)}
               />
@@ -342,6 +361,7 @@ export function BidBoxCard({
             <Button
               key={action.kind}
               testId={`exit-${action.kind}-${bidCase.caseId}`}
+              disabled={pending}
               onClick={() => setOpen(action)}
             >
               {action.label}
@@ -358,6 +378,7 @@ export function BidBoxCard({
         <ActionForm
           key={open.kind}
           action={open}
+          pending={pending}
           onCancel={() => setOpen(null)}
           onSend={(payload) => {
             setOpen(null);

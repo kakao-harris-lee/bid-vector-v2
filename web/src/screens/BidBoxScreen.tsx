@@ -135,6 +135,17 @@ export function BidBoxScreen() {
    * 탭으로 끌려갔다. 카드의 `datetime-local` 을 채우는 중 전이 응답이 오면 입력에서 빠진다.
    */
   const pendingFocus = useRef<BidBoxTabId | null>(null);
+  /** 지금 떠 있는 토스트가 **실행 취소를 들었는가** — 실패가 그것을 지우지 않게 하는 자리다. */
+  const undoable = useRef(false);
+  /**
+   * 쓰기가 날아가 있는가 — **동기 가드**다(cr MEDIUM).
+   *
+   * 버튼의 `disabled` 만으로는 모자란다: 같은 틱에 들어온 연타는 `isPending` 이 올린 재렌더보다
+   * **빠르다**(실측 — 세 클릭이 요청 셋이 됐다). 손가락·더블클릭이 한 프레임 안에 두 번 닿는
+   * 것은 평범하므로, 막는 자리는 상태가 아니라 **이 ref** 여야 한다. `disabled` 는 그 사실을
+   * 눈과 보조기기에 **보이는** 몫이다.
+   */
+  const sending = useRef(false);
 
   useEffect(() => {
     const target = pendingFocus.current;
@@ -147,6 +158,15 @@ export function BidBoxScreen() {
   }, [tab]);
 
   const cases = useQuery({ queryKey: QUERY_KEY, queryFn: () => listBidCases(BID_KIND) });
+
+  /** 쓰기로 가는 **한 입구** — 카드의 버튼도 토스트의 실행 취소도 이 가드를 지난다. */
+  function submit(caseId: number, payload: ActionPayload): void {
+    if (sending.current) {
+      return;
+    }
+    sending.current = true;
+    transition.mutate({ caseId, payload });
+  }
 
   const transition = useMutation({
     mutationFn: send,
@@ -161,6 +181,8 @@ export function BidBoxScreen() {
        *
        * 되돌릴 건의 식별자는 **서버가 준 응답**에서 온다 — 화면이 쥔 값이 아니다.
        */
+      // 실행 취소를 **든 토스트인가** — 실패가 그것을 지우지 않게 기억한다(아래 `onError`).
+      undoable.current = sent.payload.kind === 'DEFER';
       show(
         sent.payload.kind === 'DEFER'
           ? {
@@ -168,7 +190,7 @@ export function BidBoxScreen() {
               undo: {
                 label: '실행 취소',
                 run: () => {
-                  transition.mutate({ caseId: updated.caseId, payload: { kind: 'RESUME', value: 'instant' } });
+                  submit(updated.caseId, { kind: 'RESUME', value: 'instant' });
                 },
               },
             }
@@ -183,8 +205,19 @@ export function BidBoxScreen() {
     },
     // 실패는 **서버 상태를 다시 읽고** 얼굴을 낸다 — 카드가 옛 버튼을 계속 보이면 운영자가
     // 다시 누르고, 그 사이 실제로 전이됐는지는 아무도 모른다.
+    onSettled: () => {
+      sending.current = false;
+    },
     onError: async () => {
-      dismiss();
+      /*
+       * 뒤이은 쓰기가 실패해도 **성공한 쓰기의 되돌릴 길**은 지우지 않는다(cr MEDIUM).
+       * 되돌릴 수 있는데 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다 — 실패는 쓰기 실패
+       * 얼굴이 따로 말한다. 실행 취소가 없는 토스트(「보냈습니다」)만 걷는다: 그것이 실패 얼굴
+       * 옆에 남으면 무엇이 성공이고 무엇이 실패인지 흐려진다.
+       */
+      if (!undoable.current) {
+        dismiss();
+      }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
   });
@@ -288,7 +321,8 @@ export function BidBoxScreen() {
               <BidBoxCard
                 key={row.caseId}
                 bidCase={row}
-                onSend={(caseId, payload) => transition.mutate({ caseId, payload })}
+                pending={transition.isPending}
+                onSend={submit}
               />
             ))}
           </ul>

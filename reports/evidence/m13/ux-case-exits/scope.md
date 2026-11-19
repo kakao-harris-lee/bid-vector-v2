@@ -28,6 +28,7 @@ in_scope:
   - web/scripts/kotlin-source-ownership.test.mjs   # 그 키 계수 단언 7 → 8
   - web/scripts/screen-vocabulary-registry.mjs     # 새 표시 함수 둘의 분류(전수 등식이 요구한다)
   - web/src/screens/BidBoxCard.test.tsx            # 신설 — 상태 전수 루프(설계 검토 우회 ⑤)
+  - web/src/screens/screenVocabulary.test.tsx      # 계약 갱신 (6) — 카드의 새 필수 prop 한 칸(수정 라운드 1)
   - docs/discovery/capability-map.md    # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
   - reports/evidence/m13/ux-case-exits/
 out_of_scope:
@@ -173,6 +174,11 @@ base `bd5cd039` 의 worktree 에서 쟀다. **백엔드 변경 0 이 선다** �
 
 씨앗 공고는 **앞·뒤 양쪽에 있는 기존 fixture** 다. 이 slice 가 더한 공고를 쓰면 앞 캡처가 검색
 부재로 죽고 앞·뒤가 서로 다른 건을 보이게 되어 비교가 성립하지 않는다.
+
+**(6) in_scope 에 어휘 게이트의 마운트 자리가 든다**(수정 라운드 1). 카드에 「쓰기가 보류
+중인가」를 **필수 prop** 으로 내렸고, 필수이므로 그것을 마운트하는 **모든** 자리가 컴파일에서
+멈춘다 — 그 자리 하나가 공유 어휘 게이트의 test 다. 선택 prop 으로 두면 배선을 잊은 호출부가
+조용히 「잠기지 않음」이 되므로 필수를 택했고, 그 대가가 이 한 칸이다(값만 더하고 거동 0).
 
 ## 갱신 이력
 
