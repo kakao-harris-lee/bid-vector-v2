@@ -84,7 +84,7 @@ async function readSuggestions(page: Page): Promise<SuggestionsRead> {
   const read = page.waitForResponse(
     (one) => one.url().endsWith('/api/suggestions') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: 'B 오늘의 공고' }).click();
+  await page.getByRole('link', { name: '오늘의 공고', exact: true }).click();
   await expect(page.getByTestId('screen-home')).toBeVisible();
   const response = await read;
   return {

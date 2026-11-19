@@ -406,7 +406,7 @@ test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰
   const listed = page.waitForResponse(
     (one) => one.url().includes('/api/bid-cases?') && one.request().method() === 'GET' && one.status() === 200,
   );
-  await page.getByRole('link', { name: 'D 내 입찰함' }).click();
+  await page.getByRole('link', { name: '내 입찰함', exact: true }).click();
   await expect(page.getByTestId('screen-bid-box')).toBeVisible();
   const rows = (await (await listed).json()) as BidCaseRow[];
   expect(rows.map((row) => row.noticeNumber), '내 입찰함에 이 여정의 건이 없다').toContain('SYN-7E2-BIDBOX');

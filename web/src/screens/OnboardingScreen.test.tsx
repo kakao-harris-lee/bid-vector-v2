@@ -371,6 +371,21 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
   });
 
   /**
+   * M13/13A — **내부 용어를 걷은 자리**다. 금지 꼴 게이트는 개발 코드를 잡지만 「계약」·「API」
+   * 같은 내부 용어는 열거할 수 없어(그 판단은 사람의 것이다) 고친 자리만 축어로 잠근다.
+   */
+  it('사유 문면에 내부 용어가 돌아오지 않는다', async () => {
+    renderScreen();
+
+    const notReady = await screen.findByTestId('onboarding-not-ready');
+    const text = notReady.textContent ?? '';
+    expect(text.trim()).not.toBe('');
+    for (const term of ['계약에', 'API']) {
+      expect(text).not.toContain(term);
+    }
+  });
+
+  /**
    * 체크리스트는 읽혔는데 **프로필만 401** 이면 앞 판은 단계 본문이 말 없이 비었다(CR r1 LOW).
    * 화면 머리의 401 분기는 체크리스트 오류만 보기 때문이다 — 그 자리에 로그인 길을 낸다.
    */
