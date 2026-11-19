@@ -279,3 +279,57 @@ describe('폼을 닫지 않고 다른 내려놓기를 열면 앞 상태가 남�
     expect(sent, '앞 폼의 사유가 리마인드 시각으로 나갔다').not.toHaveBeenCalled();
   });
 });
+
+/** 새 폼·버튼의 보조기기 배선과 거절의 피드백(cr LOW 셋). */
+describe('폼을 여는 버튼과 폼의 배선', () => {
+  it('닫혀 있으면 펼침이 거짓이고 가리키는 자리가 없다', () => {
+    renderCard('WATCHING');
+    const open = screen.getByTestId(`exit-SKIP-${CASE_ID}`);
+
+    expect(open.getAttribute('aria-expanded')).toBe('false');
+    // 없는 id 를 가리키면 보조기기가 빈 자리를 듣는다.
+    expect(open.getAttribute('aria-controls')).toBeNull();
+  });
+
+  it('열면 펼침이 참이고 **있는 자리**를 가리킨다', () => {
+    renderCard('WATCHING');
+    fireEvent.click(screen.getByTestId(`exit-SKIP-${CASE_ID}`));
+    const open = screen.getByTestId(`exit-SKIP-${CASE_ID}`);
+    const controls = open.getAttribute('aria-controls');
+
+    expect(open.getAttribute('aria-expanded')).toBe('true');
+    expect(controls).not.toBeNull();
+    expect(document.getElementById(controls!), 'aria-controls 가 없는 id 를 가리킨다').not.toBeNull();
+  });
+
+  it('열면 포커스가 입력칸으로 간다 — Tab 으로 찾아 내려가지 않는다', () => {
+    renderCard('WATCHING');
+    fireEvent.click(screen.getByTestId(`exit-SKIP-${CASE_ID}`));
+
+    expect(document.activeElement).toBe(screen.getByLabelText(ACTION_INPUT.SKIP.label!));
+  });
+
+  it('세는 칸은 낭독을 조르지 않는다', () => {
+    renderCard('WATCHING');
+    fireEvent.click(screen.getByTestId(`exit-SKIP-${CASE_ID}`));
+
+    expect(screen.getByTestId('action-length').getAttribute('aria-live')).toBe('off');
+  });
+
+  /**
+   * 경고는 글자를 넘긴 **순간부터** 떠 있다(그 사실을 먼저 적는다). 그래서 누름이 고칠 자리로
+   * 데려가지 않으면 화면이 전혀 바뀌지 않는다.
+   */
+  it('상한을 넘긴 채 누르면 고칠 자리로 포커스가 간다', () => {
+    const { sent } = renderCard('WATCHING');
+    const limit = ACTION_INPUT.SKIP.maxChars!;
+    openSkipWith('가'.repeat(limit + 1));
+    expect(screen.getByTestId('action-too-long'), '경고는 누르기 전부터 떠 있다').toBeDefined();
+
+    (document.activeElement as HTMLElement | null)?.blur();
+    send();
+
+    expect(document.activeElement).toBe(screen.getByLabelText(ACTION_INPUT.SKIP.label!));
+    expect(sent).not.toHaveBeenCalled();
+  });
+});

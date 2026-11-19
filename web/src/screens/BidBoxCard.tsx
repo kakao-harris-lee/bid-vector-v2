@@ -1,10 +1,10 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import type { components } from '../api/generated/operator-api';
 import type { BidCase } from '../api/queries';
 
 type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
-import { Button, LinkButton } from '../components/Button';
+import { Button, LinkButton, controlClass } from '../components/Button';
 import { Card } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -51,11 +51,14 @@ function isOutcome(value: string): value is Outcome {
  */
 function ActionForm({
   action,
+  formId,
   pending,
   onSend,
   onCancel,
 }: {
   readonly action: BidBoxAction;
+  /** 이 폼의 자리 — 내려놓기 버튼이 `aria-controls` 로 가리킨다. */
+  readonly formId: string;
   /** 쓰기가 보류 중인가 — 보류 중에는 **다시 보내지 않는다**(cr MEDIUM). */
   readonly pending: boolean;
   readonly onSend: (payload: ActionPayload) => void;
@@ -71,6 +74,18 @@ function ActionForm({
   const groupId = useId();
   /** 세는 칸의 id — 입력과 **묶어** 둔다(그 값이 칸의 이름이 되지 않게 하면서 낭독에 남긴다). */
   const lengthId = `${groupId}-length`;
+  const formRef = useRef<HTMLDivElement>(null);
+
+  /** 이 폼의 첫 입력칸 — 열었을 때와 거절했을 때 둘 다 그리로 보낸다. */
+  function focusInput(): void {
+    formRef.current?.querySelector<HTMLElement>('input, textarea')?.focus();
+  }
+
+  /**
+   * 폼이 열리면 **입력칸으로 간다**. 키보드 운영자가 Tab 으로 찾아 내려가지 않게 한다.
+   * 폼의 정체가 행동에 묶여 있으므로(`key`) 다른 내려놓기를 열면 이 자리가 다시 선다.
+   */
+  useEffect(focusInput, []);
 
   /**
    * 「값이 없다」의 뜻이 꼴마다 다르다 — 고르는 입력은 **빈 문자열**이고 자유 텍스트는 **서버가
@@ -96,7 +111,12 @@ function ActionForm({
     }
     // **자르지 않는다**(팀장 판정): 네이티브 길이 제약으로 붙여넣기를 조용히 자르면 운영자가
     // 잘린 줄 모른 채 기록을 남긴다. 넘으면 보내지 않고 말한다.
+    //
+    // 경고는 글자를 넘긴 순간부터 이미 떠 있다 — 그래서 누른 순간 **화면이 전혀 바뀌지 않는
+    // 것**이 문제였다(cr LOW). 고칠 자리로 보낸다(이 파일이 같은 꼴을 한 번 고친 적이 있다:
+    // 「앞 판은 setMissing 만 해서 아무 말도 없이 아무 일도 일어나지 않았다」).
     if (tooLong) {
+      focusInput();
       return;
     }
     // 되돌림 전이가 없는 전이는 한 번 더 묻는다(D-7E-5 의 짝 — 실행 취소를 줄 수 없는 자리다).
@@ -121,7 +141,7 @@ function ActionForm({
   }
 
   return (
-    <div className="mt-3 rounded-md border border-line p-3">
+    <div id={formId} ref={formRef} className="mt-3 rounded-md border border-line p-3">
       <p className="text-xs font-medium">{action.label}</p>
       {input.shape === 'DATETIME' ? (
         <label className="mt-2 flex flex-col gap-1">
@@ -177,6 +197,9 @@ function ActionForm({
             <span
               id={lengthId}
               data-testid="action-length"
+              // 타자마다 값이 바뀌는 칸이다 — **낭독을 조르지 않는다**(cr LOW). 설명으로 묶여
+              // 있으므로 포커스가 올 때 읽히고, 그것으로 충분하다.
+              aria-live="off"
               className={`text-xs ${tooLong ? 'text-bad-ink' : 'text-ink-soft'}`}
             >
               {value.length} / {input.maxChars}
@@ -289,6 +312,8 @@ export function BidBoxCard({
   const row = bidBoxActionOf(bidCase.state);
   /** 이 상태에서 열린 내려놓기 — **표에서 유도된다**(카드가 상태를 보고 고르지 않는다). */
   const exits = exitsOf(bidCase.state);
+  /** 카드마다 하나 — 폼과 그것을 여는 버튼을 묶는 자리다. */
+  const formId = `${useId()}-exit-form`;
 
   return (
     <Card as="li" testId={`bid-case-${bidCase.caseId}`}>
@@ -358,14 +383,26 @@ export function BidBoxCard({
       {exits.length === 0 ? null : (
         <div className="mt-2 flex flex-wrap gap-2">
           {exits.map((action) => (
-            <Button
+            /*
+              자기 ARIA 배선(`aria-expanded`·`aria-controls`)을 쥐므로 공유 `Button` 이 아니라
+              **같은 표**를 쓰고 요소만 여기서 그린다 — 이 저장소의 선 패턴이다(탭 줄·쓰기 실패
+              얼굴의 링크). 사본이 생기지 않는 것이 요점이다.
+
+              `aria-controls` 는 **열렸을 때만** 건다: 없는 id 를 가리키면 보조기기가 빈 자리를
+              듣는다(같은 꼴을 탭 패널에서 한 번 고쳤다).
+            */
+            <button
               key={action.kind}
-              testId={`exit-${action.kind}-${bidCase.caseId}`}
+              type="button"
+              data-testid={`exit-${action.kind}-${bidCase.caseId}`}
               disabled={pending}
+              aria-expanded={open?.kind === action.kind}
+              aria-controls={open?.kind === action.kind ? formId : undefined}
               onClick={() => setOpen(action)}
+              className={controlClass('secondary', 'md')}
             >
               {action.label}
-            </Button>
+            </button>
           ))}
         </div>
       )}
@@ -378,6 +415,7 @@ export function BidBoxCard({
         <ActionForm
           key={open.kind}
           action={open}
+          formId={formId}
           pending={pending}
           onCancel={() => setOpen(null)}
           onSend={(payload) => {
