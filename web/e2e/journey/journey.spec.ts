@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
+import { measureInPage } from './touchMeasure';
+
 import {
   ABSENT,
   AMOUNT_BASIS_LABEL,
@@ -39,6 +41,17 @@ import {
  *
  * 하네스가 적어 준 실행 맥락은 **Playwright 산출물 밖**이다(D-7E-6).
  */
+
+/** 손가락이 닿아야 하는 최소 변(§6.5) — 터치 타깃 게이트와 같은 수다. */
+const MIN_TOUCH_PX = 44;
+
+/**
+ * 내려놓기 둘의 **기대 어휘**와 그 차례(되돌릴 수 있는 것이 먼저다).
+ *
+ * 출하 표를 들여오지 않는다 — 같은 출처를 자기와 비교하면 아무것도 재지 않는다. 이 spec 의
+ * 다른 문면 단언과 같은 규율이다.
+ */
+const EXIT_LABELS = ['나중에', '건너뜀'];
 
 /** 카드 **전부**를 응답 행과 대조한다(v M-2 — 한 행만 보면 모든 카드가 첫 행을 보여도 초록이다). */
 async function assertCardsMatch(page: Page, rows: readonly NoticeRow[]): Promise<void> {
@@ -178,14 +191,14 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
    * 집합 등식을 들지만 **상자로 재지 않는다** — 터치 타깃 게이트의 워크시트 자리는 하네스 건이
    * 종단 상태(낙찰)라 이 줄에 닿지 못한다(실측). 그래서 이 여정이 그 줄을 재는 유일한 자리다.
    */
-  const exitBoxes = await Promise.all(
-    ['worksheet-exit-DEFER', 'worksheet-exit-SKIP'].map(async (testId) => {
-      const box = await page.getByTestId(testId).boundingBox();
-      return { testId, height: box === null ? 0 : Math.round(box.height) };
-    }),
-  );
-  expect(exitBoxes.map((one) => one.testId)).toStrictEqual(['worksheet-exit-DEFER', 'worksheet-exit-SKIP']);
-  expect(exitBoxes.filter((one) => one.height < 44)).toStrictEqual([]);
+  const measured = await page.evaluate(measureInPage);
+  const exitTargets = measured.targets.filter((one) => EXIT_LABELS.includes(one.name));
+  // 앞 판은 **상수 배열을 자기와 비교**했다(v low) — 무엇도 재지 않는 줄이었다. 재는 것은
+  // **화면이 실제로 낸 이름**이고, 기대 어휘는 이 spec 이 적는다(출하 표를 들여오면 같은 출처를
+  // 자기와 비교하게 된다 — 이 레인의 다른 문면 단언과 같은 규율이다).
+  expect(exitTargets.map((one) => one.name)).toStrictEqual(EXIT_LABELS);
+  // 높이는 **게이트와 같은 함수**로 잰다(조상이 자르면 그만큼만 센다 — 맨 상자보다 보수적이다).
+  expect(exitTargets.filter((one) => one.height < MIN_TOUCH_PX)).toStrictEqual([]);
 
   // 투찰가 요청 — 진행 중 건수를 **선언**해야 간다(CR H-1).
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰가 요청');
