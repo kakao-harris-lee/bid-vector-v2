@@ -588,7 +588,7 @@ test('알림함 — 앞선 여정이 실제로 만든 항목을 서버 값 그�
       one.status() === 200 &&
       new URL(one.url()).searchParams.get('page') !== null,
   );
-  await page.getByRole('link', { name: '알림함' }).click();
+  await page.getByRole('link', { name: '알림함', exact: true }).click();
   await expect(page.getByTestId('screen-inbox')).toBeVisible();
 
   const response = await listed;

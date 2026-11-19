@@ -108,7 +108,7 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
   const watched = watchRequests(page);
   await signIn(page);
 
-  await page.getByRole('link', { name: '알림함' }).click();
+  await page.getByRole('link', { name: '알림함', exact: true }).click();
   await expect(page.getByTestId('screen-inbox')).toBeVisible();
 
   /**
@@ -218,7 +218,7 @@ test('알림함 — 2층 라벨이 탭으로 펼쳐지고, 링크를 열면 읽�
     .toBe(before - 1);
 
   // 돌아오면 그 행은 **서버가 준 값**으로 읽음이다(낙관 갱신이 아니라 재조회의 결과다).
-  await page.getByRole('link', { name: '알림함' }).click();
+  await page.getByRole('link', { name: '알림함', exact: true }).click();
   await expect(page.getByTestId(rowId!).getByTestId('read-state')).toHaveText('읽음');
 
   expect(watched.outside).toStrictEqual([]);
