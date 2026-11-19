@@ -173,6 +173,20 @@ test('여정 ③ — 투찰가 요청 → 「아직 산출 안 함」과 근거 
     notice.baseAmountWon!.toLocaleString('ko-KR'),
   );
 
+  /**
+   * **내려놓기 둘이 이 상태에서 실제로 선다**(M13/13C 머지 차례). 단위 test 는 표와 화면의
+   * 집합 등식을 들지만 **상자로 재지 않는다** — 터치 타깃 게이트의 워크시트 자리는 하네스 건이
+   * 종단 상태(낙찰)라 이 줄에 닿지 못한다(실측). 그래서 이 여정이 그 줄을 재는 유일한 자리다.
+   */
+  const exitBoxes = await Promise.all(
+    ['worksheet-exit-DEFER', 'worksheet-exit-SKIP'].map(async (testId) => {
+      const box = await page.getByTestId(testId).boundingBox();
+      return { testId, height: box === null ? 0 : Math.round(box.height) };
+    }),
+  );
+  expect(exitBoxes.map((one) => one.testId)).toStrictEqual(['worksheet-exit-DEFER', 'worksheet-exit-SKIP']);
+  expect(exitBoxes.filter((one) => one.height < 44)).toStrictEqual([]);
+
   // 투찰가 요청 — 진행 중 건수를 **선언**해야 간다(CR H-1).
   await expect(page.getByTestId('worksheet-primary')).toHaveText('투찰가 요청');
   await page.getByTestId('active-bids').fill('2');
