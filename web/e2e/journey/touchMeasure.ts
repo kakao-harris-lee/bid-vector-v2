@@ -281,11 +281,16 @@ export function measureInPage(): Measurement {
  * 만들면서 생긴 자리다(「나중에」 상태의 건에서는 배지의 이름이 그 낱말이다). 그러면 두 컨트롤이
  * 사라져도 배지가 그 자리를 메워 **거짓 초록**이 된다.
  *
- * 그래서 **testId 로 고른다** — 그 자리는 `exit-<행동>-<건>` 꼴이고 배지는 그 접두를 갖지 않는다
- * (이 저장소의 「행은 testId 로」와 같은 축). 이름은 그 뒤에 **값으로** 대조한다.
+ * 그래서 **testId 로 고른다** — 배지는 어떤 testId 도 갖지 않는다(이 저장소의 「행은 testId 로」와
+ * 같은 축). 이름은 그 뒤에 **값으로** 대조한다.
+ *
+ * **접두는 부르는 자리가 준다**: 같은 두 행동이 화면마다 다른 꼴을 쓴다(워크시트는
+ * `worksheet-exit-<행동>`, 입찰함 카드는 `exit-<행동>-<건>`). 한 접두를 고르면 다른 화면에서
+ * **빈 집합**이 되고, 빈 집합은 「컨트롤이 없다」와 구별되지 않는다(실측으로 밟은 자리다).
  */
-export const EXIT_TARGET_TESTID_PREFIX = 'exit-';
-
-export function exitTargetsOf(targets: readonly MeasuredTarget[]): readonly MeasuredTarget[] {
-  return targets.filter((one) => one.testId.startsWith(EXIT_TARGET_TESTID_PREFIX));
+export function exitTargetsOf(
+  targets: readonly MeasuredTarget[],
+  testIdPrefix: string,
+): readonly MeasuredTarget[] {
+  return targets.filter((one) => one.testId.startsWith(testIdPrefix));
 }
