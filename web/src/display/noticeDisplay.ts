@@ -1,5 +1,6 @@
 import type { components, operations } from '../api/generated/operator-api';
 
+import { absenceTextOf } from './absence';
 import { amountQualifierTextOf, amountTextOf } from './moneyDisplay';
 import { unknownStateDisplay, type StateDisplay } from './stateDisplay';
 
@@ -70,7 +71,11 @@ type AmountFields = Pick<
   'baseAmountWon' | 'baseAmountCurrency' | 'baseAmountBasis' | 'baseAmountVatTreatment' | 'baseAmountProvenance'
 >;
 
-const ABSENT_AMOUNT = '값 없음';
+/**
+ * 없는 금액의 문면 — **부재 어휘 한 자리**에서 온다(M14/14A ④). 사유는 「응답이 그 칸을 싣지
+ * 않았다」다: 이 함수가 도는 때는 공고 한 벌을 **이미 받아** 읽는 중이다.
+ */
+const ABSENT_AMOUNT = absenceTextOf('notSent');
 
 /**
  * 값이 없으면 **빈 자리**다(§6.5 가짜 기본값 금지) — `0원`·`미정`을 지어내지 않는다. 통화가

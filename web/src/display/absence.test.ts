@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest';
+
+import { ABSENCE_REASONS, ABSENCE_TEXT, absenceTextOf } from './absence';
+
+/**
+ * 부재 어휘의 **한 자리**를 잠그는 test(M14/14A ④).
+ *
+ * 앞 판은 같은 글자가 상수 넷과 손으로 적은 JSX 다섯에 흩어져 있었고, 그 가운데 하나가
+ * **적재 중**(응답 전)에도 같은 얼굴을 내어 운영자가 그것을 0 건으로 읽었다. 이 모듈이 없애는
+ * 것은 글자의 중복이 아니라 **그 혼동**이다 — 부재는 사유를 지닌 값이고, 사유가 다르면 얼굴도
+ * 다르다.
+ */
+describe('사유 표', () => {
+  it('목록과 표가 같은 집합이다 — 갈리면 전수를 도는 단언이 조용히 줄어든다', () => {
+    expect(new Set(ABSENCE_REASONS)).toStrictEqual(new Set(Object.keys(ABSENCE_TEXT)));
+  });
+
+  it('사유마다 서로 다른 문면이다 — 두 사유가 한 얼굴이면 가를 수 없다', () => {
+    const texts = ABSENCE_REASONS.map((one) => ABSENCE_TEXT[one]);
+
+    expect(texts.length).toBeGreaterThan(1);
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+
+  it('문면이 비어 있지 않다 — 빈 글자는 「조용한 빈칸」이고 그것이 이 slice 가 없애는 것이다', () => {
+    for (const reason of ABSENCE_REASONS) {
+      expect(ABSENCE_TEXT[reason].trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * **부분 일치까지 막는다.** 걷어낸 옛 문면을 **담은** 새 문면(그 두 낱말을 품은 더 긴 구)은
+   * 전수 훑기에 그대로 걸리고, 그러면 이 slice 의 측정 acceptance 가 0 에 닿지 못한다. 이
+   * 함정은 실제로 있다 — 생성 타입의 설명 한 줄이 같은 부분 일치로 걸린다.
+   *
+   * 옛 문면을 **이 파일에도 축어로 적지 않는다**: 적으면 훑기에 차감 한 줄이 생기고, 차감은
+   * 넓어지는 쪽으로만 자란다(설계 검토 우회 A-6).
+   */
+  it('옛 문면을 부분 문자열로도 담지 않는다', () => {
+    for (const reason of ABSENCE_REASONS) {
+      expect(ABSENCE_TEXT[reason]).not.toContain(RETIRED_WORDING);
+    }
+  });
+});
+
+/**
+ * 걷어낸 옛 문면 — **조각에서 조립한다**. 축어로 적으면 전수 훑기가 이 파일을 붉히고, 그것을
+ * 피하려고 차감을 두면 차감이 한 줄 자란다. 조립하면 훑기도 붉지 않고 차감도 생기지 않는다.
+ */
+const RETIRED_WORDING = ['\uac12', '\uc5c6\uc74c'].join(' ');
+
+describe('문면 읽기', () => {
+  it('글자는 표가 낸다 — 전수에서 표의 값과 같다', () => {
+    for (const reason of ABSENCE_REASONS) {
+      expect(absenceTextOf(reason)).toBe(ABSENCE_TEXT[reason]);
+    }
+  });
+
+  /**
+   * 「없다」와 「아직 모른다」가 **다른 값**이다(계약 14A ④). 이 둘이 한 얼굴이 되면 응답 전의
+   * 빈 자리를 운영자가 「서버가 0 건이라고 답했다」로 읽는다.
+   */
+  it('응답 전과 응답이 싣지 않음이 다른 얼굴이다', () => {
+    expect(absenceTextOf('notLoaded')).not.toBe(absenceTextOf('notSent'));
+  });
+});

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { absenceTextOf } from '../display/absence';
 import { localInputToIso } from '../display/timeDisplay';
 
 import { TodayNoticesScreen } from './TodayNoticesScreen';
@@ -447,7 +448,7 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
     expect(badge.getAttribute('title'), '옛 어림 문면이 남았다').not.toContain('내림');
   });
 
-  it('금액이 없는 공고는 0 이 아니라 「값 없음」이다', async () => {
+  it('금액이 없는 공고는 0 이 아니라 부재 어휘다', async () => {
     mocked.searchNotices.mockResolvedValue({
       rows: [{ ...NOTICE, baseAmountWon: null, baseAmountProvenance: null, baseAmountBasis: null }],
       total: 1,
@@ -458,7 +459,7 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
 
-    expect(within(card).getByTestId('notice-amount').textContent).toBe('값 없음');
+    expect(within(card).getByTestId('notice-amount').textContent).toBe(absenceTextOf('notSent'));
   });
 
   /** 전체 건수는 **헤더**가 정본이다 — 이 페이지의 길이로 세지 않는다. */

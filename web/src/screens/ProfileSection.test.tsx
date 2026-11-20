@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { absenceTextOf } from '../display/absence';
 import { NARA_REGISTRATION_DISPLAY, QUALIFICATION_STATE_DISPLAY } from '../display/profileDisplay';
 
 import { ProfileSection } from './ProfileSection';
@@ -67,7 +68,7 @@ describe('프로필 — 보이는 값은 API 가 준 값이다', () => {
     expect((await screen.findByTestId('qualification-state')).textContent).toContain(
       QUALIFICATION_STATE_DISPLAY.UNSET.label,
     );
-    expect((await screen.findByTestId('profile-business-types')).textContent).toBe('값 없음');
+    expect((await screen.findByTestId('profile-business-types')).textContent).toBe(absenceTextOf('notSent'));
   });
 
   /** 빈 목록은 **신고된 빈 값이 아니다** — 두 얼굴이 달라야 한다. */

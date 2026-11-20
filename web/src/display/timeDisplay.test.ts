@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { absenceTextOf } from './absence';
 import {
   ABSENT_INSTANT,
   UNREADABLE_INSTANT,
@@ -71,9 +72,11 @@ describe('없는 시각과 읽히지 않는 시각은 다른 얼굴이다 (D-1)'
    * 참이다 — 그리고 이 글자는 **저장소의 다른 없음 자리와 같아야 하는 값**이라 그 사실을
    * 여기서 잠근다(시각 칸만 다른 말을 쓰면 이 slice 가 없애려는 불일치를 만든다).
    */
-  it('없음 표지가 화면 전반의 「값 없음」과 같은 글자다', () => {
-    expect(ABSENT_INSTANT).toBe('값 없음');
-    expect(instantDisplayOf(null).text).toBe('값 없음');
+  it('없음 표지가 화면 전반의 부재 어휘에서 온다 — 이 모듈이 자기 글자를 들지 않는다', () => {
+    expect(ABSENT_INSTANT).toBe(absenceTextOf('notSent'));
+    expect(instantDisplayOf(null).text).toBe(absenceTextOf('notSent'));
+    // **적재 중과 다른 글자다** — 시각 칸의 `null` 은 응답을 읽은 뒤의 사실이다(M14/14A ④).
+    expect(ABSENT_INSTANT).not.toBe(absenceTextOf('notLoaded'));
   });
 
   /**

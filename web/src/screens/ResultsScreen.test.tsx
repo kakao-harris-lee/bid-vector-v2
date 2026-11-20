@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { absenceTextOf } from '../display/absence';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
 import { VAT_TREATMENT_DISPLAY } from '../display/moneyDisplay';
@@ -185,7 +186,7 @@ describe('화면 E — 결과 단계 건만, 서버 상태 그대로', () => {
   });
 
   /** D-7E3a-7 — 「없음」은 빈 칸이 아니라 **답**이다. */
-  it('다음 확인 시점이 NONE 이면 「없음」을 답으로 그리고 시각 자리는 값 없음이다', async () => {
+  it('다음 확인 시점이 NONE 이면 「없음」을 답으로 그리고 시각 자리는 부재 어휘다', async () => {
     mocked.listBidCases.mockResolvedValue([
       bidCase({ state: 'WON', nextCheckpointKind: 'NONE', nextCheckpointAt: null }),
     ]);
@@ -194,7 +195,7 @@ describe('화면 E — 결과 단계 건만, 서버 상태 그대로', () => {
     const kind = await screen.findByTestId('result-checkpoint-kind-51');
     expect(kind.textContent ?? '').toContain(NEXT_CHECKPOINT_DISPLAY.NONE.label);
     // 시각 칸의 없음도 **같은 말**이다(D-1 갱신) — 축어로 적어 글자가 바뀌면 여기가 먼저 틀린다.
-    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toBe('값 없음');
+    expect(screen.getByTestId('result-checkpoint-at-51').textContent ?? '').toBe(absenceTextOf('notSent'));
   });
 
   it('시점이 있으면 서버가 준 값 그대로 그린다 — 남은 날을 세지 않는다', async () => {
@@ -278,7 +279,7 @@ describe('잠정은 확정 자리에 서지 않는다 (SET-02)', () => {
     const confirmed = (await screen.findByTestId('confirmed-award-51')).textContent ?? '';
     expect(confirmed).not.toContain('1,310,000,000');
     expect(confirmed).not.toContain('1310000000');
-    expect(confirmed).toContain('값 없음');
+    expect(confirmed).toContain(absenceTextOf('notSent'));
   });
 
   it('그 잠정 금액은 잠정 칸에 통화·과세와 함께 선다', async () => {
@@ -905,11 +906,11 @@ describe('개찰 결과의 칸 전수 (r1 CR M-3)', () => {
     expect(at.getAttribute('dateTime')).toBe('2026-11-02T03:04:05Z');
   });
 
-  it('두 칸이 없으면 「값 없음」이다 — 0 이나 빈 칸으로 지어내지 않는다', async () => {
+  it('두 칸이 없으면 부재 어휘다 — 0 이나 빈 칸으로 지어내지 않는다', async () => {
     renderScreen();
 
-    expect((await screen.findByTestId('provisional-duplicate-51')).textContent ?? '').toContain('값 없음');
+    expect((await screen.findByTestId('provisional-duplicate-51')).textContent ?? '').toContain(absenceTextOf('notSent'));
     // 시각 칸과 금액 칸이 **같은 말**을 쓴다(D-1 갱신 2026-11-05) — 바로 위 줄과 같은 글자다.
-    expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe('값 없음');
+    expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe(absenceTextOf('notSent'));
   });
 });

@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from 'react';
 
 import { unknownStateDisplay, type StateDisplay } from '../display/stateDisplay';
 
+import { AbsentValue } from './AbsentValue';
 import { StatusPill, pillClass } from './StatusPill';
 
 /**
@@ -154,7 +155,9 @@ export function Field({
       {/* sr-only 문면은 **그 `<dd>` 안**에 둔다(CR r3 L-10) — 둘째 `<dd>` 로 두면 `dl` 의 내용
           모형에서 한 용어에 값이 둘이 되고, 보조기기가 설명을 값으로 읽는다. */}
       <dd aria-describedby={describedBy} className="text-sm">
-        <span data-testid={testId}>{value ?? <span className="text-absent-ink">값 없음</span>}</span>
+        {/* 값이 `null` 인 것은 **응답을 읽은 뒤** 그 칸이 비었다는 뜻이다(적재 중의 자리가
+            아니다 — 그 자리는 자기 사유를 따로 고른다). */}
+        <span data-testid={testId}>{value ?? <AbsentValue reason="notSent" />}</span>
         {hintNode}
       </dd>
     </div>

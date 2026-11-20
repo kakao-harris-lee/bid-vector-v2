@@ -5,6 +5,7 @@ import type { BidCase, MyBidCase, OpeningResultView } from '../api/queries';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { LinkButton } from '../components/Button';
 import { Card } from '../components/Card';
+import { AbsentValue } from '../components/AbsentValue';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
@@ -35,16 +36,9 @@ import { instantDisplayOf } from '../display/timeDisplay';
 
 import { InstantText } from './InstantText';
 
-/** 값이 없는 자리의 **한 문면** — 화면 D·C 와 같은 말이다(같은 뜻에 두 말을 두지 않는다). */
-const ABSENT = '값 없음';
-
 /** 원 단위 정수를 자릿점과 함께. **단위·통화는 이 함수가 붙이지 않는다** — 부르는 자리가 칸으로 싣는다. */
 function amountText(amountWon: number): string {
   return amountWon.toLocaleString('ko-KR');
-}
-
-function AbsentText() {
-  return <span className="text-absent-ink">{ABSENT}</span>;
 }
 
 /**
@@ -68,7 +62,7 @@ function MoneyAxis<T extends { readonly amountWon: number }>({
     case 'ABSENT':
       return (
         <span data-testid={testId}>
-          <AbsentText />
+          <AbsentValue reason="notSent" />
         </span>
       );
     case 'INCOMPLETE':
@@ -131,7 +125,7 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
         <span data-testid={`provisional-duplicate-${caseId}`} className="font-numeric">
           {view.provisionalRankOneDuplicateCount === null ||
           view.provisionalRankOneDuplicateCount === undefined ? (
-            <AbsentText />
+            <AbsentValue reason="notSent" />
           ) : (
             view.provisionalRankOneDuplicateCount
           )}
@@ -140,7 +134,7 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
       <ResultField label="참가자 수">
         <span data-testid={`participants-${caseId}`} className="font-numeric">
           {view.participantCount === null || view.participantCount === undefined ? (
-            <AbsentText />
+            <AbsentValue reason="notSent" />
           ) : (
             view.participantCount
           )}
@@ -182,7 +176,7 @@ function OpeningSection({ caseId, view }: { readonly caseId: number; readonly vi
         <span data-testid={`provisional-rate-${caseId}`} className="font-numeric">
           {view.provisionalRankOneBidRateFraction === null ||
           view.provisionalRankOneBidRateFraction === undefined ? (
-            <AbsentText />
+            <AbsentValue reason="notSent" />
           ) : (
             view.provisionalRankOneBidRateFraction
           )}

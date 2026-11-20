@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { BidPriceRequestResponse } from '../api/queries';
+import { AbsentValue } from '../components/AbsentValue';
 import { cardClass } from '../components/Card';
 import { Field, StateBadge } from '../components/StateBadge';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -166,7 +167,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
           <dt className="text-xs text-ink-soft">기초금액이 정해진 방식</dt>
           <dd data-testid="base-amount-resolution">
             {price.baseAmountResolution === null || price.baseAmountResolution === undefined ? (
-              <span className="text-sm text-absent-ink">값 없음</span>
+              <AbsentValue reason="notSent" className="text-sm" />
             ) : (
               <StateBadge display={displayOrUnknown(BASE_AMOUNT_RESOLUTION_DISPLAY, price.baseAmountResolution)} />
             )}

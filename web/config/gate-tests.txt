@@ -152,6 +152,10 @@ src/components/StateBadge.test.tsx
 # 것 — 레일 없는 두 단을 허용하면 게이트가 건너뛸 자리가 생긴다), 머리의 층위(한 문서에 `h1` 이
 # 둘이 되지 않는다)와 「없는 자리는 그리지 않는다」, 요약 타일의 **두 얼굴이 타입으로 갈린
 # 것**(없는 값이 빈 숫자 칸으로 서지 않는다), 알약 어조 표의 전수와 「색만으로 말하지 않는다」.
+# M14/14A ④ — **부재 어휘 한 자리**. 사유 표의 전수와 「응답 전 ≠ 응답이 싣지 않음」, 그리고
+# 새 문면이 걷어낸 옛 문면을 **부분 문자열로도 담지 않는 것**이 이 slice 의 게이트 술어다
+# (부분 일치가 측정 acceptance 를 0 에 닿지 못하게 만드는 자리는 실제로 있다).
+src/display/absence.test.ts
 src/components/TwoColumn.test.tsx
 src/components/PageHeader.test.tsx
 src/components/SummaryTile.test.tsx

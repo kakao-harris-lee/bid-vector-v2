@@ -2,7 +2,7 @@ import type { InstantDisplay } from '../display/timeDisplay';
 
 /**
  * 시각 한 칸의 **그리는 자리**(M9/screen-display D-1·D-2). 문면은 `timeDisplay` 가 만들고 이
- * 컴포넌트는 세 갈래를 **다른 얼굴로** 낸다 — 앞 판은 다섯 화면이 각자 `<time>` 과 「값 없음」
+ * 컴포넌트는 세 갈래를 **다른 얼굴로** 낸다 — 앞 판은 다섯 화면이 각자 `<time>` 과 부재
  * 분기를 손으로 적었고 그 가운데 넷이 ISO 원문을 그대로 그렸다.
  *
  * **display 를 받고 `*At` 을 받지 않는다**: `at={entry.occurredAt}` 꼴이면 원문이 다시 화면

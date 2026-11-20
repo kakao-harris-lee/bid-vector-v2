@@ -70,6 +70,13 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
     kind: OTHER_AXIS,
     why: '공고 상태 축 — 이 게이트가 금지하는 어휘(금액 토큰·명령 토큰·시각 원문)가 아니다',
   },
+  // M14/14A — 부재 어휘. 내는 것은 **사유의 평범한 한국어**이고 이 게이트가 금지하는 셋(금액
+  // 토큰·명령 토큰·시각 원문)이 아니다. 시각·금액 모듈이 이것을 부르므로 폐포가 닿는다.
+  {
+    key: 'display/absence.ts#absenceTextOf',
+    kind: OTHER_AXIS,
+    why: '부재 사유의 문면 — 금액 토큰·명령 토큰·시각 원문이 아니다. 값을 받지 않고 사유만 받는다',
+  },
   { key: 'display/timeDisplay.ts#daysUntil', kind: OTHER_AXIS, why: '달력일 차를 수로 낸다. 글자를 만들지 않는다' },
   { key: 'display/timeDisplay.ts#dayCountText', kind: OTHER_AXIS, why: 'D-day 문면. 시각 원문을 그리는 자리가 아니다' },
   {

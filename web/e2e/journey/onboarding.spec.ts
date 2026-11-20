@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 
 import {
+  ABSENT,
   assertOnlyAllowedOperations,
   clearStrategyTerms,
   journeyContext,
@@ -557,7 +558,7 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   expect(afterBudgetCleared.pending, '비우면 금액대가 미완으로 돌아온다').toContain('BUDGET_RANGE');
   // 적용 뒤 단계가 옮겨 가므로 다시 그 단계로 온다(위 ⑥ 과 같은 사유).
   await page.getByTestId('onboarding-step-BUDGET').click();
-  await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText('값 없음');
+  await expect(page.getByTestId('strategy-value-MIN_BUDGET')).toHaveText(ABSENT);
   const strategyAfterClear = (await (await page.request.get('/api/strategy')).json()) as {
     readonly minBudgetWon: number | null;
   };

@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
+import { AbsentValue } from '../components/AbsentValue';
 import { Card } from '../components/Card';
 import { StateBadge, useHint } from '../components/StateBadge';
 import { amountDisplayOf, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
@@ -75,7 +76,7 @@ export function NoticeCard({
         <div className="flex flex-col gap-0.5">
           <dt className="text-xs text-ink-soft">발주기관</dt>
           <dd data-testid="notice-agency" className="text-sm break-words">
-            {notice.demandAgencyName ?? notice.noticeAgencyName ?? <span className="text-absent-ink">값 없음</span>}
+            {notice.demandAgencyName ?? notice.noticeAgencyName ?? <AbsentValue reason="notSent" />}
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">

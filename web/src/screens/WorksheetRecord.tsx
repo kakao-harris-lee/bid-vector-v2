@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 
+import { AbsentValue } from '../components/AbsentValue';
 import { Button, controlClass } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
@@ -205,7 +206,7 @@ export function KonepsHandoff({
         <dt className="text-xs text-ink-soft">투찰 입력값(원 단위 정수)</dt>
         <dd data-testid="handoff-amount" className="font-numeric">
           {amountWon === null ? (
-            <span className="text-absent-ink">값 없음</span>
+            <AbsentValue reason="notSent" />
           ) : usable ? (
             amountWon.toLocaleString('ko-KR')
           ) : (

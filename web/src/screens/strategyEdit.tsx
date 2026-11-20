@@ -388,7 +388,7 @@ export function StrategyEditPanel({
   const currentView = STRATEGY_FIELD_VALUE[open.field](strategy);
   /**
    * 보낸 값의 문면. 둘을 가른다.
-   *  · `open.sent === null` — **아직 값을 보내지 않았다** → `Field` 가 「값 없음」을 낸다.
+   *  · `open.sent === null` — **아직 값을 보내지 않았다** → `Field` 가 **부재 어휘**를 낸다(사유: 응답이 그 칸을 싣지 않았다).
    *  · 보냈는데 그 본문의 값이 비었다(어휘 0개) — **조건을 지우려고 비워 보낸 것**이다. 빈 칸으로
    *    그리면 위와 같은 얼굴이 되어 무엇을 적용하려는지 말하지 못한다(여정이 잡은 자리).
    *
