@@ -740,7 +740,7 @@ export function WorksheetScreen() {
         </div>
         {/* **마감 카운트다운은 두 단 밖이다** — 와이어프레임이 그것을 머리 행의 오른쪽에 둔다.
             좁은 화면에서는 머리 아래로 내려온다(줄바꿈 하나, 뒤집지 않는다). */}
-        <div className={`${cardClass('sm')} flex shrink-0 flex-col gap-1`}>
+        <div className={`${cardClass('sm')} flex w-full flex-col gap-1 md:w-auto md:shrink-0`}>
           <span className="text-xs text-ink-soft">투찰 마감까지</span>
           <span data-testid="worksheet-deadline" className="font-numeric text-base font-semibold">
             {deadlineText === null ? <AbsentValue reason="notSent" /> : deadlineText}
