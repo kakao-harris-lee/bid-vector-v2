@@ -102,6 +102,31 @@ export function isBidBoxSelection(value: string | null): value is BidBoxSelectio
   return value !== null && BID_BOX_SELECTIONS.some((one) => one.id === value);
 }
 
+/**
+ * 종단 탭 — 「다 끝난 건」의 묶음이다. **이 이름이 한 자리**이고 셸도 화면도 여기서 읽는다.
+ */
+export const TERMINAL_TAB: BidBoxTabId = 'closed';
+
+/**
+ * **지금 들여다볼 건의 수** — 사이드바 배지가 세는 축이다(M14/14A 가 세우고 14D 가 여기로
+ * 옮겼다).
+ *
+ * 왜 표시층에 있나(cr M-2): 입찰함 레일의 문장이 「왼쪽 배지는 지금 들여다볼 건만 셉니다」라고
+ * **배지에 대해 주장한다**. 앞 판은 셸이 자기 안에서 이 셈을 들었고 레일의 문장과 그것을 잇는
+ * 자리가 없었다 — 셸이 셈을 바꾸면 그 문장이 조용히 거짓이 되고 아무것도 붉지 않았다. 이제
+ * 셸과 레일과 짝 test 가 **같은 자리**를 읽는다.
+ *
+ * **꼴이 계약과 다르면 아무 말도 하지 않는다.** 배지는 「모르면 그리지 않는다」로 서 있고,
+ * 받은 것이 배열이 아니라는 것도 모르는 것의 한 갈래다 — 그 가드가 없으면 배지 하나가 셸
+ * 전체를 무너뜨린다(실측).
+ */
+export function openCaseCountOf(cases: readonly { readonly state: BidCaseState }[] | undefined): number {
+  if (!Array.isArray(cases)) {
+    return 0;
+  }
+  return cases.filter((one) => tabOf(one.state) !== TERMINAL_TAB).length;
+}
+
 /* ── 레일 둘(M14/14D · 와이어프레임 D 의 오른쪽) ───────────────────────────────── */
 
 /**

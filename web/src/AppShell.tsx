@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router';
 
 import { rememberCsrf } from './api/client';
-import { listBidCases, listNotifications, readProfile, signOut, type BidCase } from './api/queries';
+import { listBidCases, listNotifications, readProfile, signOut } from './api/queries';
 import { bidCasesQueryKey, notificationsUnreadQueryKey, PROFILE_QUERY_KEY } from './api/queryKeys';
-import { tabOf } from './display/bidBoxDisplay';
+import { openCaseCountOf } from './display/bidBoxDisplay';
 import { AbsentValue } from './components/AbsentValue';
 import { Button } from './components/Button';
 import { queryClient } from './queryClient';
@@ -49,24 +49,6 @@ const BID_BOX_SLOT_ID = 'bid-box';
 
 /** 사이드바가 세는 종류 — 입찰함 화면과 **같은 질의 키**라 담기·전이의 무효화가 배지에 닿는다. */
 const BADGE_BID_KIND = 'REAL';
-
-/** 세지 않는 탭 — **표시 계약의 표**가 어느 상태를 여기 넣는지 정한다(사본을 들지 않는다). */
-const CLOSED_TAB = 'closed';
-
-/**
- * 지금 들여다볼 건의 수 — 종단 탭의 건을 뺀다.
- *
- * **꼴이 계약과 다르면 아무 말도 하지 않는다.** 배지는 이미 「모르면 그리지 않는다」로 서 있고,
- * 받은 것이 배열이 아니라는 것도 모르는 것의 한 갈래다. 이 가드가 없으면 배지 하나가 **셸 전체**를
- * 무너뜨린다 — 그러면 모든 화면이 함께 사라진다(실측: 목록 자리에 객체를 답하는 stub 에서
- * 로그인 화면까지 오류 경계로 갔다).
- */
-function openCaseCountOf(data: readonly BidCase[] | undefined): number {
-  if (!Array.isArray(data)) {
-    return 0;
-  }
-  return data.filter((one) => tabOf(one.state) !== CLOSED_TAB).length;
-}
 
 function navLinkClass({ isActive }: { readonly isActive: boolean }): string {
   const tone = isActive ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin';
@@ -236,8 +218,8 @@ function ShellFrame() {
    * 들여다볼 건**이다. 앞 판은 받은 배열의 길이라, 1년간 40건을 돌린 운영자에게 0 이 되는 날이
    * 없는 수가 박혀 있었다.
    *
-   * 종단 집합을 **여기 적지 않는다** — 표시 계약의 표(`bidBoxDisplay` 의 상태 → 탭)에서
-   * 유도한다. 사본을 들면 계약에 상태가 느는 날 둘이 갈린다.
+   * **셈이 표시층 한 자리에 산다**(M14/14D cr M-2). 입찰함 레일의 문장이 이 배지에 대해
+   * 주장하므로, 셸과 그 문장과 짝 test 가 같은 자리를 읽어야 셈이 바뀌는 날 함께 움직인다.
    */
   const bidBoxCount = openCaseCountOf(bidCases.data);
 

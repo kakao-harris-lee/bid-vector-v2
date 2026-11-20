@@ -1060,3 +1060,16 @@ describe('화면 E — 결과 카드의 머리도 공고명이다 (14E 투영)',
     expect(rowAbsent, '두 사실이 한 문면으로 접혔다').not.toBe(titleAbsent);
   });
 });
+
+describe('화면 E — 수정 라운드 1 의 자리', () => {
+  it('공백뿐인 수요기관은 자리를 만들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 51, state: 'AWAITING_OPENING', demandAgencyName: '  ' }),
+    ]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    await screen.findByTestId('result-case-51');
+    expect(screen.queryByTestId('result-demand-agency-51'), '공백뿐인 값이 자리를 만들었다').toBeNull();
+  });
+});

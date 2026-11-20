@@ -16,7 +16,9 @@ import {
   checkpointRowsOf,
   exitsOf,
   isBidBoxSelection,
+  openCaseCountOf,
   selectionShows,
+  TERMINAL_TAB,
   stateMeaningsOf,
   tabOf,
   type BidBoxActionKind,
@@ -134,11 +136,26 @@ describe('고르기의 축 — 「전체」와 상태 탭', () => {
     const fixture: readonly BidCaseState[] = ['WATCHING', 'BID_PLANNED', 'WON', 'LOST', 'SKIPPED'];
 
     const all = fixture.filter((state) => selectionShows(ALL_SELECTION.id, state));
-    // 배지가 세는 축 — 셸이 **같은 표에서** 종단 탭을 빼 유도한다(사본을 두지 않는다).
-    const nonTerminal = fixture.filter((state) => tabOf(state) !== 'closed');
+    // **배지가 세는 그 함수를 그대로 부른다**(cr M-2). 앞 판은 여기서 `tabOf(state) !== 'closed'`
+    // 를 **다시 유도**했고, 그래서 셸이 셈을 바꿔도 레일의 문장이 조용히 거짓이 될 수 있었다.
+    const badge = openCaseCountOf(fixture.map((state) => ({ state })));
 
     expect(all.length).toBe(fixture.length);
-    expect(nonTerminal.length, '종단이 빠지지 않으면 이 대조가 공허하다').toBeLessThan(all.length);
+    expect(badge, '종단이 빠지지 않으면 이 대조가 공허하다').toBeLessThan(all.length);
+  });
+
+  it('배지 셈이 종단 탭의 상태를 전부 뺀다 — 표에서 유도한다', () => {
+    const terminal = CONTRACT_STATES.filter((state) => tabOf(state) === TERMINAL_TAB);
+    const open = CONTRACT_STATES.filter((state) => tabOf(state) !== TERMINAL_TAB);
+
+    expect(terminal.length, '종단 상태가 0 이면 이 단언이 공허하다').toBeGreaterThan(0);
+    expect(openCaseCountOf(terminal.map((state) => ({ state })))).toBe(0);
+    expect(openCaseCountOf(CONTRACT_STATES.map((state) => ({ state })))).toBe(open.length);
+  });
+
+  /** 꼴이 계약과 다르면 **아무 말도 하지 않는다** — 배지 하나가 셸 전체를 무너뜨리지 않게. */
+  it('배열이 아닌 답에는 0 을 낸다', () => {
+    expect(openCaseCountOf(undefined)).toBe(0);
   });
 
   it('바깥에서 온 문자열은 「전체」와 상태 탭만 받는다', () => {

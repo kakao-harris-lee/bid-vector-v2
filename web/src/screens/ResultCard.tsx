@@ -12,6 +12,7 @@ import {
   BID_CASE_STATE_DISPLAY,
   NEXT_CHECKPOINT_DISPLAY,
   NOTICE_ROW_ABSENT_TEXT,
+  shownText,
 } from '../display/caseDisplay';
 import {
   GAP_STATE_DISPLAY,
@@ -396,7 +397,7 @@ export function ResultCard({
         />
       </div>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-ink-soft">
-        {bidCase.demandAgencyName === null ? null : (
+        {shownText(bidCase.demandAgencyName) === undefined ? null : (
           <span data-testid={`result-demand-agency-${bidCase.caseId}`}>{bidCase.demandAgencyName}</span>
         )}
         <span className="font-numeric">{bidCase.noticeNumber}</span>

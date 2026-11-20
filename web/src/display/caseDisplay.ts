@@ -53,6 +53,15 @@ export function stateDisplayOf(state: string): StateDisplay {
 }
 
 /**
+ * 보이는 글자가 있는가 — 집 안 원시 요소(`KeyValueRow`·`SummaryTile`)와 **같은 술어**다
+ * (cr LOW). `=== null` 하나로는 `''`·공백뿐인 값이 지나가고, 그 값은 닿을 수 있다:
+ * 기관명 칸에는 공백류 CHECK 가 없다(제목 칸만 그것을 진다).
+ */
+export function shownText(value: string | null | undefined): string | undefined {
+  return value === null || value === undefined || value.trim() === '' ? undefined : value;
+}
+
+/**
  * 공고 행이 **없을 때**의 문면 — `noticeKnown` 이 거짓인 자리의 한 자리다(M14/14D).
  *
  * 이것은 **부재 어휘가 아니다**: 「주어지지 않음」은 응답이 그 칸을 싣지 않았다는 말이고, 이쪽은

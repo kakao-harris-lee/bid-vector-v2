@@ -1124,3 +1124,45 @@ describe('화면 D — 페이퍼 따로 보기', () => {
     await waitFor(() => expect(screen.getByTestId('bid-box-header-summary').textContent).not.toContain('페이퍼'));
   });
 });
+
+describe('화면 D — 수정 라운드 1 의 자리들', () => {
+  it('공백뿐인 수요기관은 자리를 만들지 않는다 — 보이지 않는 틈을 남기지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, demandAgencyName: '   ' }),
+      bidCase({ caseId: 22, demandAgencyName: '합성 수요기관' }),
+    ]);
+    renderScreen();
+
+    await screen.findByTestId('bid-case-11');
+    expect(screen.queryByTestId('demand-agency-11'), '공백뿐인 값이 자리를 만들었다').toBeNull();
+    expect(screen.getByTestId('demand-agency-22')).toBeTruthy();
+  });
+
+  it('탭의 낭독 이름에 단위가 있다 — 보이는 글자는 수만 든다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    renderScreen();
+
+    const tab = await screen.findByRole('tab', { name: '관심 1건' });
+    expect(tab.textContent).toContain('관심 1');
+  });
+
+  it('Home·End 가 줄의 양 끝으로 간다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WATCHING' })]);
+    renderScreen();
+
+    const first = await screen.findByRole('tab', { selected: true });
+    fireEvent.keyDown(first, { key: 'End' });
+    expect(screen.getByRole('tab', { selected: true }).textContent).toContain('종료');
+
+    fireEvent.keyDown(screen.getByRole('tab', { selected: true }), { key: 'Home' });
+    expect(screen.getByRole('tab', { selected: true }).textContent).toContain('전체');
+  });
+
+  /** 좁은 폭에서 레일이 본문 뒤로 가므로 두 수를 화해시키는 문장이 탭 곁에도 선다. */
+  it('두 수를 화해시키는 문장이 탭 곁에도 있다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WON' })]);
+    renderScreen();
+
+    expect((await screen.findByTestId('bid-box-all-count-note')).textContent).toContain('종료한 건까지');
+  });
+});

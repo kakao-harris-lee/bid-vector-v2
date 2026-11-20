@@ -12,6 +12,7 @@ import {
   BID_CASE_STATE_DISPLAY,
   NEXT_CHECKPOINT_DISPLAY,
   NOTICE_ROW_ABSENT_TEXT,
+  shownText,
 } from '../display/caseDisplay';
 import {
   ACTION_INPUT,
@@ -376,7 +377,7 @@ export function BidBoxCard({
       {/* 기관·내 투찰·식별 — 와이어프레임의 둘째 줄이다. **없는 값은 자리도 없다**: 선택 자리에
           부재 문면을 그리면 화면이 「서버가 그 칸을 빚졌다」고 주장하게 된다(14A 인계). */}
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-ink-soft">
-        {bidCase.demandAgencyName === null ? null : (
+        {shownText(bidCase.demandAgencyName) === undefined ? null : (
           <span data-testid={`demand-agency-${bidCase.caseId}`}>{bidCase.demandAgencyName}</span>
         )}
         {/* 내 투찰 금액은 **이 응답의 칸이 아니다** — 투찰 기록이 있는 건만 결과 조회가 낸다.

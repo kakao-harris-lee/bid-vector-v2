@@ -341,7 +341,7 @@ export function BidBoxScreen() {
                 `aria-selected` 까지만 두어 보조기술이 「탭 1/n, 선택됨」이라 읽고도 **그 탭이
                 무엇을 여는지 말할 수 없었다**. `aria-controls` ↔ `tabpanel` 로 묶고, 비선택
                 탭은 tab 순서에서 빼고(roving tabindex) 좌우 화살표로 옮긴다. */}
-            <div role="tablist" aria-label="상태" className="flex gap-1 overflow-x-auto text-sm">
+            <div role="tablist" aria-label="상태" className="flex flex-wrap gap-1 text-sm">
               {BID_BOX_SELECTIONS.map((one, index) => {
                 const count = rows.filter((row) => selectionShows(one.id, row.state)).length;
                 const selected = tab === one.id;
@@ -355,23 +355,32 @@ export function BidBoxScreen() {
                     aria-controls={PANEL_ID}
                     tabIndex={selected ? 0 : -1}
                     onKeyDown={(event) => {
+                      // `Home`·`End` 는 APG 의 선택 사항이고, 탭이 여덟으로 늘어 값이 생겼다.
+                      const at =
+                        event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? BID_BOX_SELECTIONS.length - 1
+                            : undefined;
                       const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-                      if (step === 0) {
+                      if (at === undefined && step === 0) {
                         return;
                       }
                       event.preventDefault();
                       // 줄 끝에서 감싼다 — 그것이 그 패턴이 요구하는 이동이다.
                       const next =
                         BID_BOX_SELECTIONS[
-                          (index + step + BID_BOX_SELECTIONS.length) % BID_BOX_SELECTIONS.length
+                          at ?? (index + step + BID_BOX_SELECTIONS.length) % BID_BOX_SELECTIONS.length
                         ]!;
                       pendingFocus.current = next.id;
                       setTab(next.id);
                     }}
                     onClick={() => setTab(one.id)}
+                    // 낭독에 **단위**를 준다(cr LOW) — 보이는 글자는 와이어프레임대로 수만 든다.
+                    aria-label={`${one.label} ${count}건`}
                     // 탭은 자기 ARIA 배선(선택·방향키·패널)을 쥐므로 공유 `Button` 이 아니다 —
                     // **터치 타깃 하한만** 같이 쓴다(M13/13B).
-                    className={`inline-flex min-h-11 shrink-0 items-center rounded-md px-3 ${
+                    className={`inline-flex min-h-11 shrink-0 items-center rounded-md px-2.5 ${
                       selected ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin'
                     }`}
                   >
@@ -381,6 +390,13 @@ export function BidBoxScreen() {
                 );
               })}
             </div>
+
+            {/* **좁은 폭에서는 이 문장이 탭 곁에 선다**(cr LOW): `TwoColumn` 이 레일을 본문
+                뒤로 보내므로, 두 수가 가장 가까이 보이는 폭에서 설명이 가장 멀었다. 넓은
+                폭에서는 레일의 「상태 뜻」이 그 자리를 들므로 여기서는 숨는다. */}
+            <p className="text-xs text-ink-soft md:hidden" data-testid="bid-box-all-count-note">
+              {ALL_COUNT_NOTE}
+            </p>
 
             {transition.isError ? (
               <WriteFailureFace
