@@ -81,10 +81,66 @@ async function openTab(label: RegExp): Promise<void> {
   fireEvent.click(await screen.findByRole('tab', { name: label }));
 }
 
+/** 결과 조회의 건 하나 — 이 화면이 읽는 칸은 `caseId` 와 투찰 금액뿐이다. */
+function myBidCase(overrides: Partial<queries.MyBidCase> = {}): queries.MyBidCase {
+  return {
+    caseId: 11,
+    noticeNumber: 'SYN-7E2-CASE-1',
+    noticeRound: '000',
+    recordedState: 'BID_RECORDED',
+    submittedAmountWon: 1_350_000_000,
+    submittedAmountCurrency: 'KRW',
+    submittedAmountVatTreatment: 'INCLUSIVE',
+    submittedAmountOrigin: 'OPERATOR_ENTERED',
+    chosenOptionRef: null,
+    submittedAt: '2026-10-31T03:20:31.073Z',
+    confirmedAt: '2026-10-31T03:20:31.082Z',
+    openingState: 'NOT_OPENED_YET',
+    confirmedAwardAmountWon: null,
+    confirmedAwardAmountCurrency: null,
+    confirmedAwardAmountBasis: null,
+    confirmedAwardAmountVatTreatment: null,
+    confirmedAwardAmountProvenance: null,
+    reconciledOutcome: 'UNDECIDABLE',
+    reconciliationBlocker: 'NOT_OPENED_YET',
+    outcomeAgreement: 'NOT_COMPARABLE',
+    gapState: 'AWARD_ABSENT',
+    gapWon: null,
+    gapCurrency: null,
+    ...overrides,
+  };
+}
+
+/** 결과 조회의 빈 답 — 카드의 「내 투찰」은 **그 응답**에서만 온다(M14/14D). */
+function emptyMyBidResults(): queries.MyBidResults {
+  return {
+    cases: [],
+    aggregate: {
+      sampleSize: 0,
+      recordedRateState: 'ABSENT_NO_RECORDED_BIDS',
+      recordedAwardRate: null,
+      recordedWonCount: 0,
+      recordedLostCount: 0,
+      recordedDenominator: 0,
+      recordedFailedOrRebidCount: 0,
+      recordedUndecidedCount: 0,
+      reconciledRateState: 'ABSENT_NO_RECORDED_BIDS',
+      reconciledAwardRate: null,
+      reconciledWonCount: 0,
+      reconciledLostCount: 0,
+      reconciledDenominator: 0,
+      reconciledFailedOrRebidCount: 0,
+      reconciledUndecidedCount: 0,
+      reconciliationBlockers: [],
+    },
+  };
+}
+
 beforeEach(() => {
   vi.resetAllMocks();
   mocked.readSession.mockResolvedValue({ csrf: 'csrf-value', expiresAt: '2099-01-01T00:00:00Z' });
   mocked.listBidCases.mockResolvedValue([bidCase()]);
+  mocked.readMyBidResults.mockResolvedValue(emptyMyBidResults());
 });
 
 afterEach(() => {
@@ -177,6 +233,12 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
     ]);
     renderScreen();
 
+    // 처음은 「전체」라 둘 다 선다(M14/14D).
+    await screen.findByTestId('bid-case-11');
+    expect(screen.queryByTestId('bid-case-22')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: /관심/u }));
+
     await screen.findByTestId('bid-case-11');
     expect(screen.queryByTestId('bid-case-22')).toBeNull();
 
@@ -184,6 +246,32 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
 
     await screen.findByTestId('bid-case-22');
     expect(screen.queryByTestId('bid-case-11')).toBeNull();
+  });
+
+  /**
+   * **「전체」는 상태 탭이 아니다**(M14/14D). 그 고르기에서는 상태와 무관하게 전부 서고, 그
+   * 수가 상태 탭 수의 합과 같다 — 겹치는 묶음이 아니라는 뜻이다.
+   */
+  it('「전체」에서는 상태가 다른 건이 함께 서고 수가 상태 탭의 합이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, state: 'WATCHING' }),
+      bidCase({ caseId: 22, state: 'BID_RECORDED' }),
+      bidCase({ caseId: 33, state: 'WON' }),
+    ]);
+    renderScreen();
+
+    expect(await screen.findByTestId('bid-case-11')).toBeTruthy();
+    expect(screen.getByTestId('bid-case-22')).toBeTruthy();
+    // 종단 건도 「전체」에는 선다 — 사이드바 배지와 다른 축이다.
+    expect(screen.getByTestId('bid-case-33')).toBeTruthy();
+
+    const sum = BID_BOX_TABS.map((one) => {
+      const text = screen.getByRole('tab', { name: new RegExp(`^${one.label} `, 'u') }).textContent ?? '';
+      return Number(text.replace(/[^0-9]/gu, ''));
+    }).reduce((left, right) => left + right, 0);
+
+    expect(sum).toBe(3);
+    expect(screen.getByRole('tab', { name: /^전체 /u }).textContent).toContain('3');
   });
 
   /**
@@ -258,16 +346,17 @@ describe('화면 D — 탭은 API 상태의 묶음이다', () => {
     mocked.listBidCases.mockResolvedValue([bidCase({ state: 'BID_RECORDED' })]);
     renderScreen();
 
-    const first = await screen.findByRole('tab', { name: /관심/u });
+    // 줄의 첫 자리는 「전체」다(M14/14D) — 화살표의 출발도 거기다.
+    const first = await screen.findByRole('tab', { name: /^전체 /u });
     fireEvent.keyDown(first, { key: 'ArrowRight' });
     const moved = screen.getByRole('tab', { selected: true });
-    expect(moved.textContent).toContain('투찰가 받음');
+    expect(moved.textContent).toContain('관심');
     // 옮긴 탭에 **포커스가 간다**(그것이 roving tabindex 의 뜻이다).
     expect(document.activeElement).toBe(moved);
 
     // 첫 탭에서 왼쪽은 **마지막 탭**으로 감싼다.
-    fireEvent.keyDown(screen.getByRole('tab', { name: /투찰가 받음/u }), { key: 'ArrowLeft' });
     fireEvent.keyDown(screen.getByRole('tab', { name: /관심/u }), { key: 'ArrowLeft' });
+    fireEvent.keyDown(screen.getByRole('tab', { name: /^전체 /u }), { key: 'ArrowLeft' });
     expect(screen.getByRole('tab', { selected: true }).textContent).toContain('종료');
   });
 
@@ -473,12 +562,16 @@ describe('첫 탭을 URL 이 정한다 (r1 M-2)', () => {
     expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('개찰 대기');
   });
 
-  it('칸이 없으면 지금까지의 기본(관심)이다', async () => {
+  /**
+   * **기본이 「전체」다**(M14/14D · 와이어프레임의 선 탭). 앞 판의 기본은 첫 상태 탭(관심)이라
+   * 담은 건 대부분이 첫 화면에 없었다.
+   */
+  it('칸이 없으면 「전체」다', async () => {
     mocked.listBidCases.mockResolvedValue([bidCase()]);
     renderScreen();
 
     expect(await screen.findByRole('tab', { selected: true })).toBeTruthy();
-    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('전체');
   });
 
   /** 바깥에서 온 문자열에 탭을 **지어내지 않는다** — 모르는 값은 기본으로 떨어진다. */
@@ -487,7 +580,15 @@ describe('첫 탭을 URL 이 정한다 (r1 M-2)', () => {
     renderScreen('/bids?tab=존재하지-않는-탭');
 
     expect(await screen.findByRole('tab', { selected: true })).toBeTruthy();
-    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('관심');
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('전체');
+  });
+
+  /** 상태 이름은 고르기가 아니다 — URL 에 그것이 와도 탭을 지어내지 않는다. */
+  it('상태 이름을 보내도 기본으로 떨어진다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase()]);
+    renderScreen('/bids?tab=WATCHING');
+
+    expect(screen.getByRole('tab', { selected: true }).textContent ?? '').toContain('전체');
   });
 
   it('URL 로 연 뒤에도 운영자의 클릭이 탭을 옮긴다 — URL 이 다시 덮지 않는다', async () => {
@@ -821,5 +922,205 @@ describe('건너뜀 사유는 다듬지 않고 보낸다', () => {
     fireEvent.click(screen.getByTestId('action-send'));
 
     await waitFor(() => expect(mocked.skipCase).toHaveBeenCalledWith(11, { reason: typed }));
+  });
+});
+
+/* ── M14/14D — 와이어프레임 D 의 머리·레일·카드 ─────────────────────────────── */
+
+describe('화면 D — 카드의 머리는 공고명이다 (14E 투영)', () => {
+  it('공고명이 머리에 서고 수요기관이 그 아래 줄이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({
+        caseId: 11,
+        noticeKnown: true,
+        noticeTitle: '합성 공고명',
+        demandAgencyName: '합성 수요기관',
+      }),
+    ]);
+    renderScreen();
+
+    expect((await screen.findByTestId('notice-title-11')).textContent).toContain('합성 공고명');
+    expect(screen.getByTestId('demand-agency-11').textContent).toContain('합성 수요기관');
+  });
+
+  /**
+   * **「공고 행이 없다」와 「행은 있고 제목이 비었다」는 다른 사실이다**(14E 계약). 앞쪽은 서버가
+   * 적극적으로 답한 사실이라 자기 문면을 가지고, 뒤쪽은 부재 어휘다. 한 값으로 접으면 그 둘이
+   * 같은 얼굴이 된다.
+   */
+  it('공고 행이 없을 때와 제목만 빈 때가 다른 문면이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, noticeKnown: false, noticeTitle: null }),
+      bidCase({ caseId: 22, noticeKnown: true, noticeTitle: null }),
+    ]);
+    renderScreen();
+
+    const rowAbsent = (await screen.findByTestId('notice-title-11')).textContent ?? '';
+    const titleAbsent = screen.getByTestId('notice-title-22').textContent ?? '';
+
+    expect(rowAbsent.length, '공고 행 부재가 빈 글자다').toBeGreaterThan(0);
+    expect(titleAbsent.length, '제목 부재가 빈 글자다').toBeGreaterThan(0);
+    expect(rowAbsent, '두 사실이 한 문면으로 접혔다').not.toBe(titleAbsent);
+  });
+
+  it('수요기관이 없으면 그 자리가 아예 없다 — 부재 문면을 그리지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, demandAgencyName: null })]);
+    renderScreen();
+
+    await screen.findByTestId('bid-case-11');
+    expect(screen.queryByTestId('demand-agency-11')).toBeNull();
+  });
+
+  it('내 투찰은 결과 조회가 그 건을 낼 때만 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, state: 'BID_RECORDED' }),
+      bidCase({ caseId: 22, state: 'WATCHING' }),
+    ]);
+    const results = emptyMyBidResults();
+    mocked.readMyBidResults.mockResolvedValue({
+      ...results,
+      cases: [myBidCase({ caseId: 11, submittedAmountWon: 128400000 })],
+    });
+    renderScreen();
+
+    await waitFor(() => expect(screen.getByTestId('submitted-amount-11').textContent).toContain('128,400,000'));
+    // 투찰 기록이 없는 건에는 **자리가 없다** — 0 이나 부재 문면을 지어내지 않는다.
+    expect(screen.queryByTestId('submitted-amount-22')).toBeNull();
+  });
+
+  /** 결과 조회가 한 건에 행을 여럿 내면 **고르지 않는다** — 모르는 것을 금액으로 보이지 않는다. */
+  it('한 건에 결과 행이 둘이면 내 투찰을 그리지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, state: 'BID_RECORDED' })]);
+    const results = emptyMyBidResults();
+    mocked.readMyBidResults.mockResolvedValue({
+      ...results,
+      cases: [
+        myBidCase({ caseId: 11, submittedAmountWon: 100 }),
+        myBidCase({ caseId: 11, submittedAmountWon: 200 }),
+      ],
+    });
+    renderScreen();
+
+    await screen.findByTestId('bid-case-11');
+    expect(screen.queryByTestId('submitted-amount-11')).toBeNull();
+  });
+});
+
+describe('화면 D — 레일 둘', () => {
+  it('일정 줄의 사건 낱말이 전부 `nextCheckpointKind` 표의 라벨이다', async () => {
+    const kinds = Object.keys(NEXT_CHECKPOINT_DISPLAY).filter((one) => one !== 'NONE');
+    mocked.listBidCases.mockResolvedValue(
+      kinds.map((kind, at) =>
+        bidCase({
+          caseId: 100 + at,
+          nextCheckpointKind: kind as BidCase['nextCheckpointKind'],
+          nextCheckpointAt: `2099-01-0${at + 1}T00:00:00Z`,
+        }),
+      ),
+    );
+    renderScreen();
+
+    await screen.findByTestId('schedule-kind-100');
+    const rail = screen.getByTestId('bid-box-schedule');
+    const allowed = new Set(Object.values(NEXT_CHECKPOINT_DISPLAY).map((one) => one.label));
+    const drawn = kinds.map((_, at) => within(rail).getByTestId(`schedule-kind-${100 + at}`).textContent ?? '');
+
+    expect(drawn.length, '줄이 없으면 이 단언이 공허하다').toBeGreaterThan(0);
+    for (const one of drawn) {
+      expect(allowed, `${one} 은 열거 밖의 낱말이다`).toContain(one);
+    }
+  });
+
+  it('확인 시점이 없는 건은 일정 줄을 만들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, nextCheckpointKind: 'NONE', nextCheckpointAt: null }),
+    ]);
+    renderScreen();
+
+    await screen.findByTestId('bid-box-schedule');
+    expect(screen.queryByTestId('schedule-11')).toBeNull();
+  });
+
+  /** 레일은 **묶음이 아니라 입찰함 전체**를 본다 — 탭을 옮겨도 같은 사실이다. */
+  it('탭을 옮겨도 일정 줄이 그대로다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, state: 'WATCHING' }),
+      bidCase({ caseId: 22, state: 'BID_RECORDED' }),
+    ]);
+    renderScreen();
+
+    await screen.findByTestId('schedule-11');
+    expect(screen.getByTestId('schedule-22')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: /관심/u }));
+
+    expect(screen.getByTestId('schedule-11')).toBeTruthy();
+    expect(screen.getByTestId('schedule-22'), '탭을 옮기자 일정이 줄었다').toBeTruthy();
+  });
+
+  it('「상태 뜻」의 문면이 상태 표의 것이다 — 레일이 자기 글을 들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, state: 'OPENED_PROVISIONAL_FIRST' })]);
+    renderScreen();
+
+    const meaning = await screen.findByTestId('state-meaning-OPENED_PROVISIONAL_FIRST');
+    const display: { readonly why?: string } = BID_CASE_STATE_DISPLAY.OPENED_PROVISIONAL_FIRST;
+
+    expect(display.why, '상태 표에 뜻이 없으면 이 단언이 공허하다').toBeDefined();
+    expect(meaning.textContent).toContain(display.why);
+  });
+
+  it('보이지 않는 상태의 뜻은 서지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, state: 'WATCHING' })]);
+    renderScreen();
+
+    await screen.findByTestId('state-meaning-WATCHING');
+    expect(screen.queryByTestId('state-meaning-SKIPPED')).toBeNull();
+  });
+
+  /** 「전체」가 배지와 다른 수를 내는 까닭을 레일이 **한 줄로** 말한다(팀장 판정 2026-11-20). */
+  it('「전체」와 사이드바 배지가 다른 수라는 것을 레일이 말한다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ caseId: 11, state: 'WON' })]);
+    renderScreen();
+
+    expect((await screen.findByTestId('bid-box-state-meanings')).textContent).toContain('종료한 건까지');
+  });
+});
+
+describe('화면 D — 페이퍼 따로 보기', () => {
+  it('처음은 실투찰이고 누르면 페이퍼를 묻는다 — 한 목록에 섞지 않는다', async () => {
+    renderScreen();
+    await screen.findByTestId('bid-case-11');
+    expect(mocked.listBidCases).toHaveBeenCalledWith('REAL');
+
+    fireEvent.click(screen.getByTestId('bid-kind-switch'));
+
+    await waitFor(() => expect(mocked.listBidCases).toHaveBeenCalledWith('PAPER'));
+    // 두 종류가 **같은 호출**에 섞이지 않는다 — 계약이 `kind` 를 필수로 받는다.
+    for (const call of mocked.listBidCases.mock.calls) {
+      expect(call.length).toBe(1);
+    }
+  });
+
+  it('페이퍼를 보는 동안 머리가 그 사실을 말한다 — 빈 목록과 헷갈리지 않게', async () => {
+    renderScreen();
+    await screen.findByTestId('bid-case-11');
+
+    fireEvent.click(screen.getByTestId('bid-kind-switch'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('bid-box-header-summary').textContent).toContain('페이퍼(가상)'),
+    );
+  });
+
+  it('되돌아오는 버튼이 서고 다시 실투찰을 묻는다', async () => {
+    renderScreen();
+    await screen.findByTestId('bid-case-11');
+
+    fireEvent.click(screen.getByTestId('bid-kind-switch'));
+    await waitFor(() => expect(mocked.listBidCases).toHaveBeenCalledWith('PAPER'));
+
+    fireEvent.click(screen.getByTestId('bid-kind-switch'));
+
+    await waitFor(() => expect(screen.getByTestId('bid-box-header-summary').textContent).not.toContain('페이퍼'));
   });
 });

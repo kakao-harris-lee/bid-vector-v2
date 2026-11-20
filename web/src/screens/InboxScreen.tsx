@@ -16,6 +16,7 @@ import { cardClass } from '../components/Card';
 import { AbsentValue } from '../components/AbsentValue';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
+import { NOTICE_ROW_ABSENT_TEXT } from '../display/caseDisplay';
 import {
   NOTIFICATION_BID_KIND_DISPLAY,
   NOTIFICATION_DETAIL_DISPLAY,
@@ -214,11 +215,12 @@ function NotificationGroupBlock({
         />
 
         {/* **「공고 행이 없다」와 「행은 있고 제목이 비었다」는 다른 사실이다**(계약). 전자는
-            보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고, 후자는 행이 있다. */}
+            보존 기한이 지나 파기됐거나 아직 수집되지 않은 것이고, 후자는 행이 있다.
+            앞쪽의 글자는 **한 자리**에서 온다(M14/14D) — 입찰함 카드가 같은 사실을 말한다. */}
         {group.noticeKnown ? (
           <span className="text-sm">{group.noticeTitle ?? <AbsentValue reason="notSent" />}</span>
         ) : (
-          <span className="text-xs text-absent-ink">공고를 모름 — 파기됐거나 아직 수집되지 않았습니다</span>
+          <span className="text-xs text-absent-ink">{NOTICE_ROW_ABSENT_TEXT}</span>
         )}
 
         {/* 계수는 **서버 값**이다 — 이 페이지의 행을 세지 않는다. */}

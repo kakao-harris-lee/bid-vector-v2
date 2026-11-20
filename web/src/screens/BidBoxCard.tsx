@@ -4,10 +4,15 @@ import type { components } from '../api/generated/operator-api';
 import type { BidCase } from '../api/queries';
 
 type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
+import { AbsentValue } from '../components/AbsentValue';
 import { Button, LinkButton, controlClass } from '../components/Button';
 import { Card } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
-import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
+import {
+  BID_CASE_STATE_DISPLAY,
+  NEXT_CHECKPOINT_DISPLAY,
+  NOTICE_ROW_ABSENT_TEXT,
+} from '../display/caseDisplay';
 import {
   ACTION_INPUT,
   OUTCOME_VALUES,
@@ -317,10 +322,16 @@ function ActionButton({
  */
 export function BidBoxCard({
   bidCase,
+  submittedAmount,
   pending,
   onSend,
 }: {
   readonly bidCase: BidCase;
+  /**
+   * 내 투찰 금액의 **보이는 글자** — 서식은 부르는 자리가 짓는다(카드가 숫자를 받으면 그
+   * 서식이 자리마다 갈린다). 투찰 기록이 없는 건에서는 `undefined` 이고 그 자리는 서지 않는다.
+   */
+  readonly submittedAmount?: string;
   /**
    * 쓰기가 보류 중인가. 보류 중에는 버튼을 잠근다 — `RESUME` 은 폼 없이 바로 가는 유일한
    * 행동이라 연타가 그대로 요청 셋이 된다(cr MEDIUM 실측). 둘째·셋째는 409 이고 그 실패
@@ -338,15 +349,45 @@ export function BidBoxCard({
 
   return (
     <Card as="li" testId={`bid-case-${bidCase.caseId}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-numeric text-sm font-medium">{bidCase.noticeNumber}</span>
-        <span className="text-xs text-ink-soft">차수 {bidCase.noticeRound}</span>
-        <StateBadge
-          display={displayOrUnknown(BID_CASE_STATE_DISPLAY, bidCase.state)}
-          testId={`state-${bidCase.caseId}`}
-        />
-        {/* 경고는 **서버의 판정 하나**에서만 뜬다 — 시각 비교가 이 자리에 없다. */}
-        {bidCase.overdue ? <StateBadge display={OVERDUE_DISPLAY} testId={`overdue-${bidCase.caseId}`} /> : null}
+      {/* 머리는 **제목 + 상태 알약**이다(M14/14D · 와이어프레임 D). 앞 판은 공고번호가 가장 큰
+          글자였고 공고명이 아예 없었다 — 운영자가 건을 알아보는 것은 번호가 아니라 이름이다.
+          번호·차수는 아래 식별 줄로 내려간다(사라지지 않는다). */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <h3 className="min-w-0 text-sm font-semibold" data-testid={`notice-title-${bidCase.caseId}`}>
+          {/* **「공고 행이 없다」와 「행은 있고 제목이 비었다」는 다른 사실이다**(14E 투영의 계약).
+              앞쪽은 서버가 적극적으로 답한 사실이라 자기 문면을 가지고, 뒤쪽은 응답이 그 칸을
+              싣지 않은 것이라 부재 어휘다. */}
+          {bidCase.noticeKnown ? (
+            (bidCase.noticeTitle ?? <AbsentValue reason="notSent" />)
+          ) : (
+            <span className="text-xs font-normal text-absent-ink">{NOTICE_ROW_ABSENT_TEXT}</span>
+          )}
+        </h3>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <StateBadge
+            display={displayOrUnknown(BID_CASE_STATE_DISPLAY, bidCase.state)}
+            testId={`state-${bidCase.caseId}`}
+          />
+          {/* 경고는 **서버의 판정 하나**에서만 뜬다 — 시각 비교가 이 자리에 없다. */}
+          {bidCase.overdue ? <StateBadge display={OVERDUE_DISPLAY} testId={`overdue-${bidCase.caseId}`} /> : null}
+        </div>
+      </div>
+
+      {/* 기관·내 투찰·식별 — 와이어프레임의 둘째 줄이다. **없는 값은 자리도 없다**: 선택 자리에
+          부재 문면을 그리면 화면이 「서버가 그 칸을 빚졌다」고 주장하게 된다(14A 인계). */}
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-ink-soft">
+        {bidCase.demandAgencyName === null ? null : (
+          <span data-testid={`demand-agency-${bidCase.caseId}`}>{bidCase.demandAgencyName}</span>
+        )}
+        {/* 내 투찰 금액은 **이 응답의 칸이 아니다** — 투찰 기록이 있는 건만 결과 조회가 낸다.
+            그래서 값이 있을 때만 서고, 없을 때는 「아직 투찰하지 않았다」를 **상태**가 말한다. */}
+        {submittedAmount === undefined ? null : (
+          <span data-testid={`submitted-amount-${bidCase.caseId}`}>
+            내 투찰 <span className="font-numeric text-ink">{submittedAmount}</span>
+          </span>
+        )}
+        <span className="font-numeric">{bidCase.noticeNumber}</span>
+        <span>차수 {bidCase.noticeRound}</span>
       </div>
 
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
