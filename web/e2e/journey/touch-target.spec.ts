@@ -1,6 +1,13 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { expect, test, type Page } from '@playwright/test';
 
+// @ts-expect-error — 게이트 술어는 `scripts/` 의 평범한 ESM 이고 이 레인은 타입 선언을 두지 않는다.
+import { readPalette } from '../../scripts/contrast.mjs';
+
 import { journeyContext, search, signIn } from './shared';
+import { measureControlBordersInPage } from './controlBorderMeasure';
 import { measureInPage, type Measurement } from './touchMeasure';
 
 /**
@@ -13,6 +20,48 @@ import { measureInPage, type Measurement } from './touchMeasure';
  * 착수 실측(2026-11-16, base a338b55b): 보이는 요소 101개 가운데 44px 이상이 **0** 이었다.
  * 그래서 이 spec 은 이관 전 트리에서 **붉고**, 이관이 끝나야 초록이다.
  */
+/**
+ * 컨트롤 경계로 **허용되는 색**(v M-1 · cr L-2) — `index.css` 에서 **유도한다**.
+ *
+ * 값을 여기 적지 않는 이유는 대비 게이트와 같다: 적으면 파일을 고쳐도 이 집합이 옛 값을 들고,
+ * 그 둘이 갈린 날 아무도 붉지 않는다.
+ *
+ * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **어조 자신의 글자색**(`danger` 의 경고 테두리가
+ * 그 꼴이다. 그 색은 경계가 아니라 그 버튼이 무엇인지를 말한다). **카드 선은 들어 있지 않다** —
+ * 그것이 이 축이 잡으려는 바로 그 값이다.
+ *
+ * 투명·없음도 받는다: 테두리를 그리지 않는 컨트롤(`primary` 버튼)은 위에서 두께로 이미 빠지지만,
+ * 브라우저가 색만 투명으로 주는 꼴도 있어 함께 둔다.
+ */
+function allowedBorderColorSet(): ReadonlySet<string> {
+  const { light } = readPalette(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'index.css'));
+  const allowed = new Set<string>(['rgba(0, 0, 0, 0)', 'transparent']);
+  const add = (hex: string | undefined, alpha?: number): void => {
+    if (hex === undefined) {
+      return;
+    }
+    const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(hex.trim());
+    if (match === null) {
+      return;
+    }
+    const [red, green, blue] = [match[1], match[2], match[3]].map((one) => Number.parseInt(one ?? '0', 16));
+    allowed.add(alpha === undefined ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`);
+  };
+  add(light.get('control-line'));
+  for (const [name, value] of light) {
+    if (name.endsWith('-ink')) {
+      add(value);
+      // 어조 테두리는 투명도를 함께 쓸 수 있다(`border-bad-ink/40`).
+      for (const alpha of [0.4]) {
+        add(value, alpha);
+      }
+    }
+  }
+  return allowed;
+}
+
+const allowedBorderColors = allowedBorderColorSet();
+
 /** 측정은 **공용 자리**를 지난다(`touchMeasure.ts`) — 합성 대조가 같은 함수를 본다. */
 const measure = async (page: Page): Promise<Measurement> => page.evaluate(measureInPage);
 
@@ -293,6 +342,11 @@ test('이 레인은 모바일 폭으로 돌고, 워크시트 자리가 이 spec 
 
 test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 넘침이 0 이다', async ({ page }) => {
   await prepare(page);
+  /**
+   * 경계를 **그리는** 컨트롤의 전수(v M-1 의 비공허). 화면마다 세지 않는다 — 입찰함처럼
+   * 테두리 없는 버튼만 선 화면이 있어서 화면별 하한은 거짓으로 붉는다. 모집단 전체로 센다.
+   */
+  let borderedControls = 0;
   for (const screen of TOUCH_TARGET_SCREENS) {
     await page.goto(screen.path);
     await expect(page.getByTestId(screen.ready)).toBeVisible();
@@ -304,6 +358,21 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     await page.waitForLoadState('networkidle');
 
     const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
+
+    /**
+     * **컨트롤의 경계가 그려진 색**(v M-1 · cr L-2). AST 축은 className **리터럴**만 보므로
+     * 클래스 글자가 상수나 헬퍼에 들어가면 아무 말도 하지 않는다 — 이 층은 브라우저가 실제로
+     * 그린 색을 본다. 허용 집합은 `index.css` 에서 **유도한다**(값을 여기 복사하지 않는다):
+     * 컨트롤 선이거나 어조 자신의 글자색이다. 카드 선은 그 집합에 없다.
+     */
+    const borders = await page.evaluate(measureControlBordersInPage);
+    const drawn = borders.filter((one) => one.width > 0);
+    borderedControls += drawn.length;
+    const wrong = drawn.filter((one) => !allowedBorderColors.has(one.color));
+    expect(
+      wrong.map((one) => `${one.tag}[${one.testId}] ${one.color} "${one.name}"`),
+      `${screen.slotId}: 컨트롤 경계가 허용 토큰 밖의 색이다(카드 선을 쓴 자리일 수 있다)`,
+    ).toStrictEqual([]);
 
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
     expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
@@ -334,6 +403,13 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     expect(partiallyClipped, `${screen.slotId}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
     expect(overflow, `${screen.slotId}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
   }
+
+  /**
+   * **비공허(v M-1)** — 경계 색 단언이 **무엇인가를 실제로 봤는가**. 모집단 전체로 센다:
+   * 화면마다 세면 테두리 없는 버튼만 선 화면(입찰함)에서 거짓으로 붉는다(실측).
+   * 하한은 오늘의 수보다 넉넉히 낮게 두어 화면이 바뀔 때 잡음으로 흔들리지 않는다.
+   */
+  expect(borderedControls, '경계를 그리는 컨트롤을 하나도 보지 못했다 — 색 단언이 공허하다').toBeGreaterThan(10);
 });
 
 /**

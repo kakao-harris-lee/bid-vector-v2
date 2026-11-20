@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { measureControlBordersInPage } from './journey/controlBorderMeasure';
 import { measureInPage } from './journey/touchMeasure';
 
 /**
@@ -286,4 +287,54 @@ test('음성 대조 — 두 변이 다 넉넉하면 그대로 읽힌다', async 
 
   expect(result.targets[0]?.height).toBe(48);
   expect(result.targets[0]?.width).toBe(48);
+});
+
+/**
+ * **컨트롤 경계 색 축의 대조**(M14/14A · v M-1 · cr L-2).
+ *
+ * 게이트 자신(390px 여정)은 출하 화면을 재고, 이 spec 은 같은 함수를 **합성 페이지**에서 잰다.
+ * 여기서 세우는 것이 리뷰가 찾은 바로 그 구멍이다 — 클래스 글자가 **헬퍼**에서 와도 그려진 색은
+ * 같으므로, AST 축이 못 보는 꼴을 이 층이 본다.
+ */
+test('헬퍼가 만든 클래스여도 그려진 경계 색을 본다 — AST 축이 못 보는 꼴', async ({ page: browserPage }) => {
+  await browserPage.setContent(
+    `<!doctype html><html><head><meta charset="utf-8" /><style>
+       .card-line { border: 1px solid #d9d6cf; }
+       .control-line { border: 1px solid #8a877f; }
+     </style></head><body>
+       <input id="a" />
+       <input id="b" />
+       <script>
+         const helper = () => 'card-line';
+         document.getElementById('a').className = helper();
+         document.getElementById('b').className = 'control-line';
+       </script>
+     </body></html>`,
+  );
+  const measured = await browserPage.evaluate(measureControlBordersInPage);
+
+  expect(measured).toHaveLength(2);
+  // 앞이 **헬퍼가 만든** 카드 선, 뒤가 컨트롤 선. 둘이 다른 값으로 읽히는 것이 이 축의 전부다 —
+  // 게이트는 허용 집합(컨트롤 선 · 어조 색)에 앞엣것이 없어서 붉는다.
+  expect(measured.map((one) => one.color)).toStrictEqual(['rgb(217, 214, 207)', 'rgb(138, 135, 127)']);
+  expect(measured.every((one) => one.width > 0)).toBe(true);
+});
+
+test('테두리를 그리지 않는 컨트롤은 두께 0 으로 읽힌다 — 음성 대조', async ({ page: browserPage }) => {
+  await browserPage.setContent(
+    '<!doctype html><html><head><meta charset="utf-8" /></head><body><button style="border:none">누르기</button></body></html>',
+  );
+  const measured = await browserPage.evaluate(measureControlBordersInPage);
+
+  expect(measured).toHaveLength(1);
+  expect(measured[0]?.width).toBe(0);
+});
+
+test('숨은 컨트롤은 모집단 밖이다', async ({ page: browserPage }) => {
+  await browserPage.setContent(
+    '<!doctype html><html><head><meta charset="utf-8" /></head><body><input style="display:none" /><input /></body></html>',
+  );
+  const measured = await browserPage.evaluate(measureControlBordersInPage);
+
+  expect(measured).toHaveLength(1);
 });
