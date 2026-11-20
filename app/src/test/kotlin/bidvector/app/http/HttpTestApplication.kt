@@ -177,6 +177,10 @@ open class HttpTestApplication {
     @Bean
     open fun movableNoticeDeadlines(clock: FixedClock): MovableNoticeDeadlines = MovableNoticeDeadlines(clock)
 
+    /** M14/14E — 공고 표시 칸의 이중체. test 가 「행 없음」·「칸 빔」을 옮긴다. */
+    @Bean
+    open fun movableNoticeProjections(): MovableNoticeProjections = MovableNoticeProjections()
+
     /**
      * 알림함 이중체는 **`BidPriceTestWiring` 의 빈 하나**를 받는다(M7/7C③-b) — 건 전이와 투찰가
      * 요청이 같은 알림함을 보므로, 표면 test 가 두 경로의 항목을 한자리에서 센다.
@@ -187,7 +191,14 @@ open class HttpTestApplication {
         movableNoticeDeadlines: MovableNoticeDeadlines,
         clock: FixedClock,
         notificationInbox: InMemoryNotificationInbox,
-    ) = testBidCaseWorkflow(inMemoryBidCaseStore, movableNoticeDeadlines, clock, notificationInbox)
+        movableNoticeProjections: MovableNoticeProjections,
+    ) = testBidCaseWorkflow(
+        inMemoryBidCaseStore,
+        movableNoticeDeadlines,
+        clock,
+        notificationInbox,
+        movableNoticeProjections,
+    )
 
     /** 7C①b — 제안 목록의 이중체 원천(기본 빈 목록)과 면허 게이트(기본 미결). */
     @Bean

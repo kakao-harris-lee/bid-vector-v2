@@ -2,6 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.adapters.bidding.JdbcBidCaseStore
 import bidvector.adapters.bidding.JdbcNoticeDeadlineQuery
+import bidvector.adapters.bidding.JdbcNoticeProjectionQuery
 import bidvector.adapters.bidding.JdbcNoticeSnapshotQuery
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.bidding.BidCaseStorePort
@@ -9,6 +10,7 @@ import bidvector.workflow.bidding.BidCaseWorkflow
 import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
 import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
+import bidvector.workflow.bidding.NoticeProjectionQueryPort
 import bidvector.workflow.bidding.NoticeSnapshotQueryPort
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
@@ -44,6 +46,11 @@ open class BidCaseWiring {
     @Bean
     open fun noticeDeadlineQuery(dataSource: DataSource): NoticeDeadlineQueryPort = JdbcNoticeDeadlineQuery(dataSource)
 
+    /** 입찰함 카드의 공고 표시 칸(M14/14E) — 읽기 전용 질의 하나. 쓰기 경로가 없다. */
+    @Bean
+    open fun noticeProjectionQuery(dataSource: DataSource): NoticeProjectionQueryPort =
+        JdbcNoticeProjectionQuery(dataSource)
+
     @Bean
     open fun noticeSnapshotQuery(dataSource: DataSource): NoticeSnapshotQueryPort = JdbcNoticeSnapshotQuery(dataSource)
 
@@ -57,6 +64,7 @@ open class BidCaseWiring {
     open fun bidCaseWorkflow(
         bidCaseStore: BidCaseStorePort,
         noticeDeadlineQuery: NoticeDeadlineQueryPort,
+        noticeProjectionQuery: NoticeProjectionQueryPort,
         noticeSnapshotQuery: NoticeSnapshotQueryPort,
         clock: Clock,
         resolvedEvidenceRetentionPolicy: Resolution.Resolved<EvidenceRetentionPolicyData>,
@@ -65,6 +73,7 @@ open class BidCaseWiring {
         BidCaseWorkflow(
             cases = bidCaseStore,
             deadlines = noticeDeadlineQuery,
+            noticeProjections = noticeProjectionQuery,
             snapshots = noticeSnapshotQuery,
             clock = clock,
             retentionPolicy = resolvedEvidenceRetentionPolicy,

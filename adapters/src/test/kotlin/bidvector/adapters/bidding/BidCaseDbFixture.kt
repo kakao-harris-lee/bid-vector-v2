@@ -45,6 +45,7 @@ abstract class BidCaseDbFixture : PersistenceTestSupport() {
         BidCaseWorkflow(
             cases = JdbcBidCaseStore(source),
             deadlines = JdbcNoticeDeadlineQuery(source),
+            noticeProjections = JdbcNoticeProjectionQuery(source),
             snapshots = JdbcNoticeSnapshotQuery(source),
             clock = { now },
             retentionPolicy =

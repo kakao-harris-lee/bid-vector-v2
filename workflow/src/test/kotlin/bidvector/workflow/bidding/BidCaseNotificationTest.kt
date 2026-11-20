@@ -51,6 +51,7 @@ class BidCaseNotificationTest {
         inbox: NotificationInboxPort,
     ) = BidCaseWorkflow(
         cases = store,
+        noticeProjections = { emptyMap() },
         deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
         snapshots = { _, takenAt ->
             bidvector.bidding.NoticeSnapshot(
@@ -308,6 +309,7 @@ class BidCaseNotificationTest {
         deadlineAt: Instant,
     ) = BidCaseWorkflow(
         cases = store,
+        noticeProjections = { emptyMap() },
         deadlines = { keys -> keys.associateWith { NoticeDeadline(deadlineAt) } },
         snapshots = { _, _ -> null },
         clock = { now },

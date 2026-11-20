@@ -38,6 +38,12 @@ data class BidCaseView(
     val nextCheckpoint: NextCheckpoint,
     val overdue: Boolean,
     val reconciliationCandidate: Boolean,
+    /**
+     * 저장된 공고에서 **읽어 온** 표시 칸(M14/14E) — 건에 저장된 값이 아니다. `null` 은 그 키의
+     * 공고 행이 **없다**는 뜻이고(파기 또는 미수집), 행은 있는데 칸이 비어 있는 것은 다른
+     * 사실이다([NoticeProjection]).
+     */
+    val notice: NoticeProjection?,
 )
 
 /**
@@ -89,6 +95,7 @@ sealed interface BidCommandResult {
 class BidCaseWorkflow(
     private val cases: BidCaseStorePort,
     private val deadlines: NoticeDeadlineQueryPort,
+    private val noticeProjections: NoticeProjectionQueryPort,
     private val snapshots: NoticeSnapshotQueryPort,
     private val clock: Clock,
     private val retentionPolicy: Resolution.Resolved<EvidenceRetentionPolicyData>,
@@ -114,7 +121,7 @@ class BidCaseWorkflow(
         // 같은 요청 쌍(담기 → 읽기)이 두 답을 주지 않는다.
         val case = settlement.settle(account, opened, noticeDeadline, now)
         return OpenedCase(
-            view(case, effectiveDeadline(case, noticeDeadline), now),
+            view(case, effectiveDeadline(case, noticeDeadline), now, projectionOf(notice)),
             created = result is OpenCaseResult.Opened,
         )
     }
@@ -125,7 +132,12 @@ class BidCaseWorkflow(
     ): BidCaseView? {
         val now = clock.now()
         val settled = settlement.load(account, caseId, now) ?: return null
-        return view(settled.case, effectiveDeadline(settled.case, settled.noticeDeadline), now)
+        return view(
+            settled.case,
+            effectiveDeadline(settled.case, settled.noticeDeadline),
+            now,
+            projectionOf(settled.case.notice),
+        )
     }
 
     /** 내 입찰함 — [kind] 가 **필수**라 페이퍼와 실투찰이 한 목록에 들 수 없다. */
@@ -142,7 +154,11 @@ class BidCaseWorkflow(
         // ② 판정 **뒤에** 상태 탭을 DB 가 거른다 — 판정이 상태를 바꿨으므로 그 다음에 묻는다.
         val found = cases.list(account, kind, state)
         val byNotice = deadlines.deadlines(found.map { it.notice }.toSet())
-        return found.map { view(it, effectiveDeadline(it, byNotice[it.notice]), now) }
+        // 공고 표시 칸도 **키 집합 한 번**이다 — 건마다 물으면 목록이 N+1 이 된다(마감과 같은 축).
+        val projections = noticeProjections.projections(found.map { it.notice }.toSet())
+        return found.map {
+            view(it, effectiveDeadline(it, byNotice[it.notice]), now, projections[it.notice])
+        }
     }
 
     fun timeline(
@@ -270,10 +286,18 @@ class BidCaseWorkflow(
             .ofInstant(submittedAt, EVIDENCE_RETENTION_ZONE)
             .plus(retentionPolicy.value.retainFor)
 
+    /**
+     * 단건 경로의 공고 표시 칸 — 키 하나짜리 집합으로 **같은 포트**를 부른다(단건 전용 서명을
+     * 따로 두지 않는다: 그러면 「행이 없다」의 약속이 두 자리에 생긴다).
+     */
+    private fun projectionOf(notice: NoticeKey): NoticeProjection? =
+        noticeProjections.projections(setOf(notice))[notice]
+
     private fun view(
         case: BidCase,
         deadline: Instant?,
         now: Instant,
+        projection: NoticeProjection?,
     ): BidCaseView {
         val checkpoint = nextCheckpoint(case.state, deadline, case.outcomeNoticeExpectedAt)
         return BidCaseView(
@@ -281,6 +305,7 @@ class BidCaseWorkflow(
             nextCheckpoint = checkpoint,
             overdue = isOverdue(checkpoint, now),
             reconciliationCandidate = case.asReal()?.let(::isReconciliationCandidate) ?: false,
+            notice = projection,
         )
     }
 }
