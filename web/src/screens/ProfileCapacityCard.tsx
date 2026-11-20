@@ -36,7 +36,7 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
   return (
     <>
       <ProfileWriteFailure attempts={[attemptOf(save), attemptOf(drop)]} />
-      <div className="rounded-md border border-line p-3">
+      <div data-testid="capacity-card" className="rounded-md border border-line p-3">
         <span className="text-sm font-medium">시공능력평가액</span>
         {capacities.isError && !isUnauthorized(capacities.error) ? (
           <ErrorFace testId="capacity-error" onRetry={() => void capacities.refetch()} />
