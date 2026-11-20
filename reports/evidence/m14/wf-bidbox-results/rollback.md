@@ -1,6 +1,6 @@
 # M14 / wf-bidbox-results (14D) — rollback
 
-**실측 HEAD: `0b4fd03439b60ae7ce874e183bbce4b7081556ba`** (수정 라운드 3 의 마지막 산출물 커밋).
+**실측 HEAD: `ac6e2a82678fab726694490ec0b4a37386c9a9e9`** (수정 라운드 4 의 마지막 산출물 커밋).
 이 파일을 담은 커밋은 그 뒤에 오므로 두 SHA 는 영원히 다르다 — 재는 것은 **그 사이에 되돌림
 대상이 움직였는가**다(아래 「유효성」).
 
@@ -12,7 +12,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-status 056f405c..0b4fd034` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
+`git diff --name-status 056f405c..ac6e2a82` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
 재산출한다.
 
 | 상태 | 경로 |
@@ -22,6 +22,8 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | A | `reports/evidence/m14/wf-bidbox-results/design-review.md` |
 | A | `reports/evidence/m14/wf-bidbox-results/rollback.md` |
 | A | `reports/evidence/m14/wf-bidbox-results/scope.md` |
+| A | `web/scripts/screen-write-reach-bypass.test.mjs` |
+| A | `web/scripts/screen-write-reach-inject.test.mjs` |
 | A | `web/scripts/screen-write-reach.mjs` |
 | A | `web/scripts/screen-write-reach.test.mjs` |
 | M | `docs/discovery/capability-map.md` |
@@ -43,7 +45,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | M | `web/src/screens/ResultsScreen.test.tsx` |
 | M | `web/src/screens/ResultsScreen.tsx` |
 
-전수 25(신설 7 · 수정 18).
+전수 27(신설 9 · 수정 18).
 
 ## 공유 파일
 
@@ -56,12 +58,12 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 실측 ①~⑥ — 버릴 clone 에서
 
-`git clone` 한 뒤 `0b4fd034` 로 체크아웃하고 위 복원을 돌렸다.
+`git clone` 한 뒤 `ac6e2a82` 로 체크아웃하고 위 복원을 돌렸다.
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 종료 코드 | **0** |
-| ② | `git status --porcelain` 의 D/M 수 | **D 7 · M 18**(복원 목록의 신설 7 · 수정 18 과 같다) |
+| ② | `git status --porcelain` 의 D/M 수 | **D 9 · M 18**(복원 목록의 신설 9 · 수정 18 과 같다) |
 | ③ | 복원 뒤 그 경로들의 base 대비 diff | **빈 출력** — 트리가 base 와 동일하다 |
 | ④ | `npm run typecheck` | **0** |
 | ⑤ | `npm run test` | **0**(70 파일 · 1669 통과 — 이 slice 의 증분이 사라진 수) |
@@ -74,7 +76,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 | 계수 | 결과 |
 | --- | --- |
-| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일**. 항목 **열하나**로 센다: 앞의 열 + `runsAtLoad`(라운드 3 이 더했다). **열하나 전부 base 계수 0 임을 먼저 확인했다** |
+| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일**. 항목 **열넷**으로 센다: 앞의 열하나 + `followNamespace` · `outletCacheKey` · `ROUTER_PACKAGE`(라운드 4 가 더했다). **열넷 전부 base 계수 0 임을 먼저 확인했다** |
 | **남의 표지 보존** — 14A·14E 의 것이 살아 있는가 | **17 파일** (두 단 원시 요소 · 두 축 타일 · 공고 투영) |
 
 **표지 목록을 한 번 고쳤다**(이 라운드의 실측). 처음 센 목록에 `openCaseCountOf` 가 들어 있어
@@ -85,12 +87,12 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 유효성 (verifier 가 대조하는 것)
 
-`git diff --name-only 0b4fd034..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
+`git diff --name-only ac6e2a82..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
 한 줄이라도 나오면 **그 경로가 전부 원천(base `056f405c`)에 없는 신설 파일일 때만** 유효하다 —
 이 slice 에서 그에 해당하는 것은 `reports/evidence/m14/wf-bidbox-results/**` 뿐이고, 열거와
 원천 부재 확인은 verifier 가 한다.
 
-`git rev-list --merges 0b4fd034..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
+`git rev-list --merges ac6e2a82..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
 실측 자리가 그 병합 커밋이다).
 
 복원 원천을 `056f405c` 에서 바꾸면 **셋째 단언**을 다시 잰다 — 복원 대상 blob 이 착수 base 와 새
