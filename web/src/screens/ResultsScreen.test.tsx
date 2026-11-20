@@ -921,3 +921,107 @@ describe('개찰 결과의 칸 전수 (r1 CR M-3)', () => {
     expect(screen.getByTestId('observed-at-51').textContent ?? '').toBe(absenceTextOf('notSent'));
   });
 });
+
+/* ── M14/14D — 와이어프레임 E 의 타일 넷과 잠정 1위 경고 ─────────────────────── */
+
+describe('화면 E — 요약 타일 넷', () => {
+  it('투찰 타일이 서버의 표본 수이고 그 정의를 함께 적는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults([myBidCase()], { sampleSize: 12 }));
+    renderScreen();
+
+    const tile = await screen.findByTestId('tile-submitted');
+    expect(within(tile).getByTestId('tile-submitted-value').textContent).toBe('12');
+    // 「최근 90일」 같은 창을 **지어내지 않는다** — 서버가 그 창을 선언하지 않는다.
+    expect(tile.textContent).not.toContain('90일');
+  });
+
+  /**
+   * **②④ 는 빈 자리 + 사유다**(계약 「데이터」). 숫자 칸을 아예 갖지 않는 것이 요점이다 —
+   * 0 을 그리면 운영자가 「적격이 0 건」으로 읽는다.
+   */
+  it.each([
+    ['tile-eligible', '적격'],
+    ['tile-floor-position', '하한'],
+  ])('%s 는 숫자 칸이 없고 사유를 든다', async (testId, word) => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    const tile = await screen.findByTestId(testId);
+    expect(within(tile).queryByTestId(`${testId}-value`), '없는 값에 숫자 칸이 섰다').toBeNull();
+    expect(within(tile).getByTestId(`${testId}-unavailable`).textContent).toContain(word);
+  });
+
+  /**
+   * **낙찰 타일은 두 축 병기다**(계약 · 등록부 게이트). 한 축만 그리면 운영자가 그 수를 유일한
+   * 사실로 읽는다 — 두 축은 서로 다른 수를 낼 수 있다.
+   */
+  it('낙찰 타일이 두 축을 나란히 낸다 — 한 축으로 접지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockResolvedValue(
+      myBidResults([myBidCase()], { recordedWonCount: 2, reconciledWonCount: 1 }),
+    );
+    renderScreen();
+
+    const tile = await screen.findByTestId('tile-won');
+    expect(within(tile).getByTestId('tile-won-axis-0').textContent).toBe('2');
+    expect(within(tile).getByTestId('tile-won-axis-1').textContent).toBe('1');
+    // 두 축 얼굴이라 `beside`(같은 한 값의 일부) 자리로 새지 않는다.
+    expect(within(tile).queryByTestId('tile-won-value')).toBeNull();
+  });
+
+  it('집계를 받기 전에는 타일이 서지 않는다 — 받지 못한 수를 0 으로 그리지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockRejectedValue(new ApiError(500, '서버 오류'));
+    renderScreen();
+
+    await screen.findByTestId('my-bid-results-error');
+    expect(screen.queryByTestId('results-tiles')).toBeNull();
+  });
+});
+
+describe('화면 E — 잠정 1위 경고 카드', () => {
+  it('잠정 1위 건이 있으면 낙찰과 다르다는 말이 상태 표에서 온다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 51, state: 'OPENED_PROVISIONAL_FIRST', noticeKnown: true, noticeTitle: '합성 공고명' }),
+    ]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    const card = await screen.findByTestId('provisional-first-warning');
+    const display: { readonly why?: string } = BID_CASE_STATE_DISPLAY.OPENED_PROVISIONAL_FIRST;
+
+    expect(display.why, '상태 표에 뜻이 없으면 이 단언이 공허하다').toBeDefined();
+    expect(card.textContent).toContain(display.why);
+    expect(within(card).getByTestId('provisional-first-51').textContent).toContain('합성 공고명');
+  });
+
+  it('잠정 1위 건이 없으면 카드가 서지 않는다 — 경고할 것이 없다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    await screen.findByTestId('results-tiles');
+    expect(screen.queryByTestId('provisional-first-warning')).toBeNull();
+  });
+});
+
+describe('화면 E — 아직 없는 자리의 배지가 사유와 같은 말을 한다 (13A OPEN ⓖ)', () => {
+  it('배지가 영구를 주장하지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'AWAITING_OPENING' })]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    const pending = await screen.findByTestId('results-pending');
+
+    expect(RESULT_PENDING_SLOTS.length, '자리가 0 이면 이 단언이 공허하다').toBeGreaterThan(0);
+    for (const slot of RESULT_PENDING_SLOTS) {
+      const drawn = within(pending).getByTestId(`pending-${slot.id}`).textContent ?? '';
+      expect(drawn, `${slot.id}: 사유가 그려지지 않았다`).toContain(slot.why);
+      expect(drawn, `${slot.id}: 배지가 「다루지 않음」이라 사유의 「지금은」과 어긋난다`).not.toContain(
+        '다루지 않음',
+      );
+    }
+  });
+});
