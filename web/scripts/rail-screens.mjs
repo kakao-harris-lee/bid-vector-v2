@@ -40,7 +40,7 @@ import { screenProgram } from './screen-card-coverage.mjs';
  * **머지 차례의 한 줄**: 14C·14D 가 레일을 붙이면 유도 집합이 늘어 등식이 깨진다 — 먼저 머지하는
  * 쪽이 자기 자리 이름을 여기 더한다. 이름순으로 둔다(사람이 읽는 목록이고 차례가 뜻을 갖지 않는다).
  */
-export const RAIL_SCREEN_FLOOR = Object.freeze(['onboarding', 'worksheet']);
+export const RAIL_SCREEN_FLOOR = Object.freeze(['bid-box', 'onboarding', 'worksheet']);
 
 /** `as const`·`satisfies` 를 벗겨 알맹이 식을 낸다. */
 function unwrap(node) {

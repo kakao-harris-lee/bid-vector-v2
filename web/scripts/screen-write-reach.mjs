@@ -758,34 +758,17 @@ const ROUTER_MODULES = Symbol('router-modules');
  */
 const routerSymbolCache = new WeakMap();
 
-/** 위 축의 답 — 키는 [outletCacheKey] 가 짓는다. */
-const outletCache = new Map();
-
 /**
- * 그 축의 답을 바꿀 수 **있는** 오버레이 항목만 추린 키.
+ * 위 축의 답 — **프로그램마다** 센다.
  *
- * **건전성 조건**: 어떤 파일이 router 의 그 심볼들에 닿으려면 ⓐ `react-router` 를 **이름으로**
- * 수입하거나(패키지 이름이 그 모듈의 정체다 — 경로 별칭 설정이 0 이다) ⓑ 그것을 재수출하는
- * 우리 모듈을 수입해야 한다. 그래서 키는 **그 패키지 이름을 담은 항목**과 **우리 트리에서 그
- * 심볼을 노출하거나 닿는 파일의 경로**를 담은 항목으로 충분하다.
+ * 앞 판은 키를 「그 축에 닿을 수 있는 오버레이 항목」으로 지었다. 그 좁힘은 **이미 센 뒤**에야
+ * 아는 사실(어느 출하 파일이 닿는가)에 기대서 **첫 호출에서는 더 약했다**(cr MEDIUM) — 재수출
+ * shim 과 그것을 쓰는 소비자를 함께 심은 오버레이가 기준선 답을 그대로 받을 수 있었다.
  *
- * ⓑ 의 재수출 모듈이 **오버레이 밖에 이미 있고** 오버레이가 그것을 새로 수입하는 경우만
- * 이 키가 놓친다. 오늘 그런 모듈은 0 이고(출하 트리의 노출 모듈은 패키지 자신뿐이다), 생기면
- * 그 파일이 곧 ⓐ 를 담으므로 같은 커밋에서 키에 든다.
+ * 이제 키가 **프로그램 객체**다. 프로그램이 다르면 다시 세고, 같으면 답도 같다 — 오버레이는
+ * 프로그램에 이미 반영돼 있으므로 이 등식이 **순서에 기대지 않는다**.
  */
-function outletCacheKey(overlay, srcRoot) {
-  return [...overlay]
-    .filter(([path, text]) => {
-      const body = typeof text === 'string' ? text : '';
-      return body.includes(ROUTER_PACKAGE) || outletSensitivePaths.has(path) || !path.startsWith(`${srcRoot}/`);
-    })
-    .map(([path, text]) => `${path}\u0000${typeof text === 'string' ? text : ''}`)
-    .sort()
-    .join('\u0001');
-}
-
-/** 그 축에 닿는 **출하 파일**의 경로 — 축을 한 번 셀 때 함께 적어 둔다. */
-const outletSensitivePaths = new Set();
+const outletCache = new WeakMap();
 
 /** 그 패키지를 가리키는 지정자인가 — 패키지 이름은 그 모듈의 **정체**다(별칭 경로 설정 0). */
 const ROUTER_PACKAGE = 'react-router';
@@ -857,15 +840,14 @@ function routerSymbols(program, checker, names, srcRoot) {
  * 받는 쪽(`useOutletContext`)도 **쓰는 것만으로** 센다 — 그 훅이 읽는 값은 이 축에서 어디서
  * 왔는지 알 수 없다. 오늘 그 둘 다 출하 트리에 0 이다.
  */
-export function outletContextSites(program, webRoot, overlay = new Map()) {
+export function outletContextSites(program, webRoot) {
   /**
-   * 캐시 키는 [outletCacheKey] 가 짓는다 — 그 주석이 건전성 조건을 적는다.
+   * 캐시는 **프로그램마다** 선다([outletCache] 의 주석).
    *
    * **디스크가 바뀌면 이 캐시는 무효가 되지 않는다**(cr LOW). 한 프로세스 안의 게이트 실행을
    * 위한 것이고, 디스크를 고치는 쪽은 새 프로세스에서 다시 잰다.
    */
-  const key = outletCacheKey(overlay, resolve(webRoot, 'src'));
-  const cached = outletCache.get(key);
+  const cached = outletCache.get(program);
   if (cached !== undefined) {
     return cached;
   }
@@ -928,7 +910,6 @@ export function outletContextSites(program, webRoot, overlay = new Map()) {
     if (!canReach(source)) {
       continue;
     }
-    outletSensitivePaths.add(source.fileName);
     const where = relative(srcRoot, source.fileName);
     const visit = (node) => {
       if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
@@ -966,7 +947,7 @@ export function outletContextSites(program, webRoot, overlay = new Map()) {
     visit(source);
   }
   const answer = [...new Set(sites)].sort();
-  outletCache.set(key, answer);
+  outletCache.set(program, answer);
   return answer;
 }
 
@@ -1049,7 +1030,7 @@ export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy =
     injected,
     screens,
     clientBindingImporters: clientBindingImporters(program, webRoot),
-    outletContext: outletContextSites(program, webRoot, normalized),
+    outletContext: outletContextSites(program, webRoot),
   };
 }
 

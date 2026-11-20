@@ -13,13 +13,12 @@ import {
 /**
  * **주입·정책 축의 양성 대조**(수정 라운드 4): 대조마다 TS 프로그램을 새로 세워야 하고
  * (별칭·재수출을 선언까지 풀려면 검사기가 필요하다) 한 파일에 전부 두면 그 파일 하나가 30초
- * 예산의 절반을 넘는다. 주장과 대조를 **두 파일로** 갈라 각 파일이 예산 안에 선다 — 둘 다
+ * 예산의 절반을 넘는다. 주장과 대조를 **세 파일로** 갈라 각 파일이 예산 안에 선다 — 둘 다
  * 등록부에 있고, 어느 쪽이 수집에서 빠져도 `gate:tests` 가 붉는다.
  *
- * **이 파일만의 시간 예산**(v M-4). 이 게이트는 별칭을 선언까지 풀어야 해서 호출마다 TS
- * 프로그램을 세운다 — 원문 캐시와 앞 프로그램 재사용을 넣어 한 파일 47초를 13초로 줄였고,
- * 가장 느린 **개별 test 는 0.7초**라 기본 5초 예산 안이다(실측). 그래도 병렬 수집에서 호스트가
- * 붐비면 이 파일이 먼저 밀리므로, **다른 test 를 건드리지 않고** 이 자리만 넉넉히 둔다.
+ * **이 파일만의 시간 예산.** 대조마다 TS 프로그램을 세워야 해서(별칭·재수출을 선언까지
+ * 풀려면 검사기가 필요하다) 한 파일에 전부 두면 예산을 넘는다. 주장과 대조를 **세 파일로**
+ * 갈라 각 파일이 예산 안에 선다 — 셋 다 등록부에 있고 어느 쪽이 수집에서 빠져도 붉는다.
  */
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -56,6 +55,49 @@ describe('양성 대조 — 주입과 정책', () => {
     const planted = collectScreenWriteReach({ webRoot: WEB_ROOT, overlay: new Map([[shell, patched]]) });
 
     expect(violationsOf(planted).join('\n')).toContain(expected);
+  });
+
+  /**
+   * **캐시가 두 답을 한 키로 접지 않는다**(cr MEDIUM).
+   *
+   * 앞 판의 키는 「그 패키지 이름을 담은 오버레이 항목 + 이미 닿는다고 **센** 파일」이었다.
+   * 「닿는다」는 **한 번 센 뒤**에야 아는 사실이라 첫 호출에서는 그 좁힘이 더 약했고, 그래서
+   * **그 낱말을 담지 않는 중간 shim** 만 달라지는 두 호출이 **같은 키**를 받을 수 있었다 —
+   * 뒤 호출이 앞 호출의 답을 그대로 받는 거짓 초록이다.
+   *
+   * 이 대조는 그 두 호출을 **차례로** 한다: 중간 shim 만 바뀌고 나머지는 같다. 키가 프로그램
+   * 객체인 지금은 두 호출이 서로 다른 프로그램이라 각자 센다.
+   */
+  it('중간 shim 만 다른 두 호출이 서로 다른 답을 낸다', () => {
+    const shell = resolve(SRC, 'AppShell.tsx');
+    const hop = resolve(SRC, 'session', '__planted_hop__.ts');
+    const shim = resolve(SRC, 'session', '__planted_shim__.ts');
+    const original = read(shell);
+    // 셸과 shim 은 **두 호출에서 같다**. 바뀌는 것은 중간 hop 하나뿐이고 그 글에는 패키지
+    // 이름이 없다 — 앞 판의 키가 보지 못하던 자리다.
+    const patched = `import { Slot } from './session/__planted_hop__';\n${original.replace('<Outlet />', '<Slot context={{ load: 1 }} />')}`;
+    expect(patched, '태그 치환이 빗나갔다').not.toBe(original);
+
+    const shimText = "export { Outlet as Alias } from 'react-router';\nexport const Plain = () => null;\n";
+    const ask = (hopText) =>
+      violationsOf(
+        collectScreenWriteReach({
+          webRoot: WEB_ROOT,
+          overlay: new Map([
+            [shim, shimText],
+            [hop, hopText],
+            [shell, patched],
+          ]),
+        }),
+      ).join('\n');
+
+    // ① 무해한 hop — `Slot` 이 router 와 무관하다.
+    const harmless = ask("export { Plain as Slot } from './__planted_shim__';\n");
+    // ② 같은 자리에서 hop 만 바꾼다 — 이제 `Slot` 이 `Outlet` 이다.
+    const injected = ask("export { Alias as Slot } from './__planted_shim__';\n");
+
+    expect(harmless, '무해한 hop 인데 주입으로 셌다').not.toContain('Outlet 이');
+    expect(injected, '두 답이 한 키로 접혔다').toContain('Outlet 이');
   });
 
   /** 그 낱말을 **숨긴 재수출**을 거쳐도 심볼이 같다. */
