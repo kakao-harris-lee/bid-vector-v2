@@ -851,6 +851,9 @@ paths:
         `kind` 가 **필수**다. 페이퍼(가상) 투찰과 실투찰을 한 응답에 함께 내는 길이 없다
         (§6.1 「같은 목록에 섞이지 않는다」) — 그 분리는 질의 인자의 선택이 아니라 **계약의
         모양**이다. 다음 확인 시점과 지난 일정 경고는 **서버가 한 시각 기준으로 판정해** 싣는다.
+
+        공고 표시 칸 넷(`noticeKnown` 과 셋)은 **저장된 공고에서 읽어 온 값**이다(M14/14E) —
+        건 수와 무관하게 **한 번의 질의**로 합쳐 오므로 목록 길이가 질의 수를 늘리지 않는다.
       security:
         - browserSession: []
       parameters:
@@ -2643,6 +2646,10 @@ components:
         - nextCheckpointKind
         - overdue
         - reconciliationCandidate
+        - noticeKnown
+        - noticeTitle
+        - demandAgencyName
+        - noticeAgencyName
       properties:
         caseId:
           type: integer
@@ -2681,6 +2688,34 @@ components:
           description: >-
             개찰 대사(SET-02)의 후보인가 — 「투찰 기록됨」 **실투찰** 건만 참이다.
             페이퍼 건은 항상 거짓이다(타입이 막는다).
+        noticeKnown:
+          type: boolean
+          description: >-
+            **공고 칸 셋은 저장된 값이 아니라 읽을 때 합쳐 온 값이다**(M14/14E). 건은 공고를 FK 로
+            참조하지 않으므로(보존 파기와 충돌한다) 그 행이 없을 수 있다. 이 값이 `false` 면 그
+            키의 공고 행이 **없다**는 뜻이고(보존 기한이 지나 파기됐거나 아직 수집되지 않았다 —
+            **둘을 구분하지 않는다**) `noticeTitle`·`demandAgencyName`·`noticeAgencyName` 이
+            전부 `null` 이다. 건 자체는 남는다.
+
+            `true` 인데 `noticeTitle` 이 `null` 인 것은 **다른 사실**이다(공고 행은 있고 제목 칸이
+            비었다). 세 칸을 nullable 스칼라로만 접으면 그 둘이 같은 값이 되므로 이 boolean 이
+            구분을 들고 간다 — 알림함 `NotificationItem` 이 같은 꼴을 쓴다.
+
+            값은 **라이브**다(담을 때의 사본이 아니다) — 공고가 정정되면 제목·기관도 따라 바뀐다.
+        noticeTitle:
+          type: string
+          nullable: true
+          description: >-
+            공고명. `noticeKnown` 이 `false` 면 `null` 이고, `true` 인데 `null` 이면 공고 행은 있고
+            제목 칸이 비어 있다.
+        demandAgencyName:
+          type: string
+          nullable: true
+          description: 수요기관명. 저장 층에서 nullable 이라 없는 값을 지어내지 않는다.
+        noticeAgencyName:
+          type: string
+          nullable: true
+          description: 공고기관명. 저장 층에서 nullable 이라 없는 값을 지어내지 않는다.
     BidTimelineEntry:
       type: object
       required:

@@ -125,4 +125,16 @@ internal object BiddingSql {
     const val SELECT_NOTICE_DEADLINE =
         "SELECT notice_number, notice_round, deadline_at FROM notice " +
             "WHERE (notice_number, notice_round) IN (SELECT * FROM unnest(?::text[], ?::text[]))"
+
+    /**
+     * 입찰함 카드의 공고 표시 칸(M14/14E) — **읽기만 한다.** 위 마감 질의와 같은 표 · 같은 키
+     * 모양이고 계정 축이 없는 사유도 같다(`NoticeProjectionQueryPort` KDoc).
+     *
+     * 키 열 둘을 **함께 뽑는다** — 결과 map 의 키 유무가 「공고 행이 있는가」를 나르므로,
+     * 값 셋만 뽑으면 세 칸이 전부 NULL 인 행과 없는 행이 같아진다.
+     */
+    const val SELECT_NOTICE_PROJECTION =
+        "SELECT notice_number, notice_round, notice_title, demand_agency_name, notice_agency_name " +
+            "FROM notice " +
+            "WHERE (notice_number, notice_round) IN (SELECT * FROM unnest(?::text[], ?::text[]))"
 }

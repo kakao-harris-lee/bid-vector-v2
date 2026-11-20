@@ -699,6 +699,13 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
       nextCheckpointAt: NOTICE.deadlineAt,
       overdue: false,
       reconciliationCandidate: false,
+      // M14/14E — 공고 읽기 투영. 이 고정물은 그 축을 모델링하지 않으므로
+      // 「공고 행이 없다」를 둔다(새 문면을 들이지 않는다). 카드가 그 칸을
+      // 쓰기 시작하면 그 slice 가 값을 세운다.
+      noticeKnown: false,
+      noticeTitle: null,
+      demandAgencyName: null,
+      noticeAgencyName: null,
     });
     renderScreen();
     await searchFor('SYN-7E1');
@@ -818,6 +825,13 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
       nextCheckpointAt: NOTICE.deadlineAt,
       overdue: false,
       reconciliationCandidate: false,
+      // M14/14E — 공고 읽기 투영. 이 고정물은 그 축을 모델링하지 않으므로
+      // 「공고 행이 없다」를 둔다(새 문면을 들이지 않는다). 카드가 그 칸을
+      // 쓰기 시작하면 그 slice 가 값을 세운다.
+      noticeKnown: false,
+      noticeTitle: null,
+      demandAgencyName: null,
+      noticeAgencyName: null,
     });
     renderScreen();
     await searchFor('SYN-7E1');
@@ -844,6 +858,13 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
       nextCheckpointAt: SUGGESTION.deadlineAt,
       overdue: false,
       reconciliationCandidate: false,
+      // M14/14E — 공고 읽기 투영. 이 고정물은 그 축을 모델링하지 않으므로
+      // 「공고 행이 없다」를 둔다(새 문면을 들이지 않는다). 카드가 그 칸을
+      // 쓰기 시작하면 그 slice 가 값을 세운다.
+      noticeKnown: false,
+      noticeTitle: null,
+      demandAgencyName: null,
+      noticeAgencyName: null,
     });
     renderScreen();
 

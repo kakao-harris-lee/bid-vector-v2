@@ -5,8 +5,10 @@ import bidvector.bidding.BidStateTag
 import bidvector.bidding.OPEN_CASE_COMMAND
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
+import java.lang.reflect.Modifier
 
 /**
  * M10/10B — 입찰 건 응답 계열의 **문서 ↔ Kotlin 어휘 등식**. 처음 든 축은 타임라인의 명령 칸
@@ -30,6 +32,40 @@ import org.junit.jupiter.api.Test
  */
 class OpenApiBidCaseContractTest {
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
+
+    /**
+     * **키 집합 등식의 두 방향**(M14/14E 가 세운다 — 그전까지 이 계열에 이 축이 **없었다**).
+     * 어휘 축(위·아래 test)은 enum 의 값을 재지 칸의 **집합**을 재지 않는다. 그래서 응답 DTO 에
+     * 칸을 더하고 문서를 놔두면(또는 그 반대) 이 계열에서 아무것도 붉지 않았다 — 같은 저장소의
+     * `NotificationItem`·`SuggestedNotice`·`NoticeSummary` 는 이미 그 등식을 들고 있다.
+     *
+     * 두 방향을 묶는다: 문서 ↔ **축어 집합**(문서가 조용히 줄어드는 쪽) · 문서 ↔ **DTO 필드
+     * 전수**(DTO 가 조용히 늘어나는 쪽, 즉 문서에 없는 칸이 wire 에 닿는 경로). 한쪽만 두면
+     * 둘 다 같은 방향으로 바꾸는 편집이 지나간다.
+     *
+     * `kotlin-reflect` 를 들이지 않고 순수 Java reflection 을 쓴다(app 모듈에 그 의존이 없다).
+     * 이 DTO 도 `companion object` 를 가져 `declaredFields` 에 정적 `Companion` 필드가 섞이므로
+     * synthetic 과 static 을 함께 걷어낸다 — 걷지 않으면 「문서에 `Companion` 키가 없다」는
+     * 엉뚱한 이유로 붉는다.
+     */
+    @Test
+    fun `건 응답의 키 집합이 Kotlin DTO 와 완전히 일치한다 — 여분 필드가 생기면 깨진다`() {
+        val dtoFieldNames =
+            BidCaseResponse::class.java.declaredFields
+                .filterNot { it.isSynthetic || Modifier.isStatic(it.modifiers) }
+                .map { it.name }
+                .toSet()
+
+        spec.propertyKeys("BidCase") shouldBe CASE_KEYS
+        spec.propertyKeys("BidCase") shouldBe dtoFieldNames
+        // **required 는 전수가 아니다** — `nextCheckpointAt` 하나가 빠져 있다(착수 실측). 서버는
+        // 그 칸을 언제나 싣지만(DTO 의 필드이고 직렬화가 null 을 생략하지 않는다) 문서가 그것을
+        // 선언하지 않아 생성 타입에서만 선택 칸이다. 이 slice 는 **그 줄을 고치지 않는다** — 기존
+        // 칸의 선언을 바꾸면 생성 타입이 움직여 이 slice 밖의 자리가 함께 흔들린다(OPEN 후보로
+        // 보고한다). 여기서는 **오늘의 사실을 그대로** 못박아, 이 slice 가 더한 넷이 required 에
+        // 들어 있음과 그 하나의 예외가 늘지 않음을 함께 잰다.
+        spec.requiredKeys("BidCase") shouldBe CASE_KEYS - "nextCheckpointAt"
+    }
 
     /**
      * 전수는 **전이표의 열 키 열넷 + 건을 여는 명령 하나**다. 여는 명령은 출발 상태가 없어 전이표의
@@ -211,5 +247,31 @@ class OpenApiBidCaseContractTest {
         shouldThrow<IllegalArgumentException> {
             nonStringVocabulary.propertyEnum("Probe", "command")
         }.message.orEmpty() shouldContain "문자열이 아닌 값"
+    }
+
+    private companion object {
+        /**
+         * 건 응답의 칸 전수 — **축어**다. 이 집합이 DTO 에서 유도되면 등식의 두 변이 같은
+         * 자리에서 와서 공허해진다(한쪽은 손으로 적어야 「둘 다 바꾸는」 편집이 눈에 띈다).
+         *
+         * 뒤 넷은 저장된 값이 아니라 읽을 때 합쳐 온 공고 칸이다(M14/14E).
+         */
+        val CASE_KEYS =
+            setOf(
+                "caseId",
+                "noticeNumber",
+                "noticeRound",
+                "bidKind",
+                "state",
+                "caseVersion",
+                "nextCheckpointKind",
+                "nextCheckpointAt",
+                "overdue",
+                "reconciliationCandidate",
+                "noticeKnown",
+                "noticeTitle",
+                "demandAgencyName",
+                "noticeAgencyName",
+            )
     }
 }

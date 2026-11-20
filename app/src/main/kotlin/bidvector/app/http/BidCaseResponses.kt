@@ -16,6 +16,11 @@ import bidvector.workflow.bidding.TimelineEntry
  *
  * [overdue] 도 서버가 판정해 싣는다(계약 산출물 2 「서버가 한 시각 기준으로」) — 화면이 각자의
  * 시계로 재면 사용자마다 다른 답이 나온다.
+ *
+ * **공고 칸 넷은 저장된 값이 아니라 읽을 때 합쳐 온 값이다**(M14/14E) — 건은 공고를 FK 로
+ * 참조하지 않으므로(V21 머리말) 그 행이 없을 수 있다. 응답이 평탄해야 해서 표시 칸이
+ * 납작해지는데, 그러면 「행이 없다」와 「행은 있고 제목 칸이 비었다」가 같은 `null` 셋이 된다 —
+ * [noticeKnown] 이 그 구분을 들고 간다(알림함 `NotificationItem` 과 같은 꼴).
  */
 data class BidCaseResponse(
     val caseId: Long,
@@ -28,6 +33,10 @@ data class BidCaseResponse(
     val nextCheckpointAt: String?,
     val overdue: Boolean,
     val reconciliationCandidate: Boolean,
+    val noticeKnown: Boolean,
+    val noticeTitle: String?,
+    val demandAgencyName: String?,
+    val noticeAgencyName: String?,
 ) {
     companion object {
         /** 「없음」의 어휘 — 빈 문자열이 아니라 **이름**이다. */
@@ -54,6 +63,11 @@ data class BidCaseResponse(
                     },
                 overdue = view.overdue,
                 reconciliationCandidate = view.reconciliationCandidate,
+                // `notice` 가 null 인 것은 **그 키의 공고 행이 없다**는 뜻이다 — 칸이 빈 것과 다르다.
+                noticeKnown = view.notice != null,
+                noticeTitle = view.notice?.title,
+                demandAgencyName = view.notice?.demandAgencyName,
+                noticeAgencyName = view.notice?.noticeAgencyName,
             )
         }
     }

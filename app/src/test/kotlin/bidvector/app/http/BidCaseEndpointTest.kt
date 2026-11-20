@@ -35,20 +35,25 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
     private lateinit var deadlines: MovableNoticeDeadlines
 
     @Autowired
+    private lateinit var projections: MovableNoticeProjections
+
+    @Autowired
     private lateinit var clock: FixedClock
 
     private lateinit var session: SessionTestClient
 
-    /** 마감 이중체는 같은 Spring 문맥을 쓰는 다른 test class 와 공유된다 — 바꾼 값을 남기지 않는다. */
+    /** 두 이중체는 같은 Spring 문맥을 쓰는 다른 test class 와 공유된다 — 바꾼 값을 남기지 않는다. */
     @AfterEach
-    fun restoreDeadlines() {
+    fun restoreDoubles() {
         deadlines.reset()
+        projections.reset()
     }
 
     @BeforeEach
     fun signIn() {
         access.reset()
         deadlines.reset()
+        projections.reset()
         session = SessionTestClient(restTemplate, ::url).signIn()
     }
 
@@ -167,6 +172,52 @@ class BidCaseEndpointTest : HttpIntegrationTestBase() {
             "\"state\":\"DEADLINE_PASSED_UNRECORDED\""
         commandsOf(session.get("${AccountScopedRoutes.BID_CASES}/$id/timeline").body.orEmpty()) shouldBe
             listOf("ADD_TO_BID_BOX", "MARK_DEADLINE_PASSED", "REVOKE_DEADLINE_PASSED", "MARK_DEADLINE_PASSED")
+    }
+
+    /**
+     * M14/14E — **세 사실이 wire 에서 다른 응답이 된다.** 한 test 에서 나란히 재는 이유는 따로
+     * 재면 「셋 다 null 을 내는」 구현이 단언을 모두 지나가기 때문이다.
+     *
+     * ⓐ 행이 있고 칸이 차 있다 → `noticeKnown` 이 참이고 칸 셋에 값이 있다.
+     * ⓑ 행은 있고 제목 칸이 비었다 → `noticeKnown` 은 **참**이고 제목만 null 이다.
+     * ⓒ 행이 없다 → `noticeKnown` 이 거짓이고 칸 셋이 전부 null 이다.
+     */
+    @Test
+    fun `공고 투영이 행 없음과 칸 빔을 다른 응답으로 가른다`() {
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R14E-ENDPOINT-1")).body.orEmpty())
+
+        val full = session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty()
+        full shouldContain "\"noticeKnown\":true"
+        full shouldContain "\"noticeTitle\":\"세종 청사 공조설비 교체\""
+        full shouldContain "\"demandAgencyName\":\"행정중심복합도시건설청\""
+        full shouldContain "\"noticeAgencyName\":\"조달청\""
+
+        projections.title = null
+        val blankTitle = session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty()
+        // 행은 **있다** — 제목만 비었다. 이 줄이 ⓒ 와 같아지면 두 사실이 접힌 것이다.
+        blankTitle shouldContain "\"noticeKnown\":true"
+        blankTitle shouldContain "\"noticeTitle\":null"
+        blankTitle shouldContain "\"demandAgencyName\":\"행정중심복합도시건설청\""
+
+        projections.rowPresent = false
+        val missing = session.get("${AccountScopedRoutes.BID_CASES}/$id").body.orEmpty()
+        missing shouldContain "\"noticeKnown\":false"
+        missing shouldContain "\"noticeTitle\":null"
+        missing shouldContain "\"demandAgencyName\":null"
+        missing shouldContain "\"noticeAgencyName\":null"
+    }
+
+    /** 목록과 전이 응답도 같은 칸을 싣는다 — 카드가 전이 직후 제목을 잃지 않는다. */
+    @Test
+    fun `목록과 전이 응답에도 공고 투영이 실린다`() {
+        val id = idOf(session.post(AccountScopedRoutes.BID_CASES, openBody("R14E-ENDPOINT-2")).body.orEmpty())
+
+        session.get("${AccountScopedRoutes.BID_CASES}?kind=REAL").body.orEmpty() shouldContain
+            "\"noticeTitle\":\"세종 청사 공조설비 교체\""
+        session
+            .post("${AccountScopedRoutes.BID_CASES}/$id/defer", """{"remindAt":"2099-01-01T00:00:00Z"}""")
+            .body
+            .orEmpty() shouldContain "\"noticeTitle\":\"세종 청사 공조설비 교체\""
     }
 
     private fun commandsOf(body: String): List<String> = COMMAND.findAll(body).map { it.groupValues[1] }.toList()
