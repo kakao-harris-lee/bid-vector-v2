@@ -1,21 +1,14 @@
 import { useId, useState, type ReactNode } from 'react';
 
-import { unknownStateDisplay, type DisplayTone, type StateDisplay } from '../display/stateDisplay';
+import { unknownStateDisplay, type StateDisplay } from '../display/stateDisplay';
+
+import { StatusPill, pillClass } from './StatusPill';
 
 /**
- * 어조 → 토큰. **다섯 어조 전수**이고 `satisfies` 가 그 등식을 든다 — 어조가 늘면 이 자리가
- * 컴파일에서 멈춘다. 색 리터럴은 `index.css` 의 토큰에만 있다(D-7E-5 「토큰은 한 자리」).
+ * 알약의 **모양과 어조 표는 `StatusPill` 한 자리**다(M14/14A). 앞 판은 그 표가 이 파일에
+ * 있었고, 와이어프레임 정렬에서 같은 알약을 쓰는 자리가 늘면서 사본이 생길 참이었다.
+ * 여기 남는 것은 그 알약을 **2층 라벨로 감싸는 일**뿐이다.
  */
-const TONE_CLASS = {
-  neutral: 'bg-neutral-skin text-neutral-ink',
-  absent: 'bg-absent-skin text-absent-ink',
-  unjudged: 'bg-unjudged-skin text-unjudged-ink',
-  good: 'bg-good-skin text-good-ink',
-  bad: 'bg-bad-skin text-bad-ink',
-} as const satisfies Record<DisplayTone, string>;
-
-/** 알약 하나의 모양 — 어조 토큰만 갈린다. */
-const PILL_CLASS = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
 
 /**
  * 상태 하나의 표시. **2층 라벨**(§6.4)이다.
@@ -55,16 +48,11 @@ export function StateBadge({
   const generatedId = useId();
   const [expanded, setExpanded] = useState(false);
   const shown = display ?? unknownStateDisplay('표에 없음');
-  const pillClass = `${PILL_CLASS} ${TONE_CLASS[shown.tone]}`;
 
   // **아래층이 없으면 펼칠 것이 없다** — 빈 펼침 버튼을 두면 운영자가 눌러 보고 아무 일도
   // 일어나지 않는다(가짜 affordance). 그 배지는 앞 판 그대로 글자다.
   if (shown.why === undefined) {
-    return (
-      <span data-testid={testId} className={pillClass}>
-        {shown.label}
-      </span>
-    );
+    return <StatusPill tone={shown.tone} label={shown.label} testId={testId} />;
   }
 
   const whyId = `state-why-${generatedId}`;
@@ -89,7 +77,7 @@ export function StateBadge({
         onClick={() => setExpanded((open) => !open)}
         className="inline-flex min-h-11 items-center rounded-md"
       >
-        <span className={pillClass}>{shown.label}</span>
+        <span className={pillClass(shown.tone)}>{shown.label}</span>
       </button>
       {/*
         **한 노드다.** 접히면 시각 은폐, 펼치면 보이는 글자 — 바뀌는 것은 **보는 사람의 몫**이고

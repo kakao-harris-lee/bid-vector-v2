@@ -147,6 +147,15 @@ src/components/Card.test.tsx
 # 재므로 여기서 복제하지 않고(그 축을 클래스 글자로 재면 13B 제한 27 의 자리로 돌아간다), 이 파일은
 # 구조와 배선을 맡는다.
 src/components/StateBadge.test.tsx
+# M14/14A — 와이어프레임 정렬의 **배치 원시 요소 넷**. 실제 상자는 배치 게이트(1280/390)가 재고,
+# 이 파일들은 그것이 재지 못하는 축을 맡는다: 두 단의 **문서 순서**와 표지(레일이 선택이 아닌
+# 것 — 레일 없는 두 단을 허용하면 게이트가 건너뛸 자리가 생긴다), 머리의 층위(한 문서에 `h1` 이
+# 둘이 되지 않는다)와 「없는 자리는 그리지 않는다」, 요약 타일의 **두 얼굴이 타입으로 갈린
+# 것**(없는 값이 빈 숫자 칸으로 서지 않는다), 알약 어조 표의 전수와 「색만으로 말하지 않는다」.
+src/components/TwoColumn.test.tsx
+src/components/PageHeader.test.tsx
+src/components/SummaryTile.test.tsx
+src/components/StatusPill.test.tsx
 # M13/13B — 터치 타깃 게이트의 **모집단을 벗어나는 길**을 요소 쪽에서 닫는 축(설계 검토 우회 2 ·
 # 팀장 판정 2026-11-16). 포인터·키 핸들러는 내장 상호작용 요소나 공유 `Button` 이 든다 —
 # `role="button"` 을 단 `div` 도 면제하지 않는다. 착수 실측 위반 0 이라 오늘의 출하 코드는
