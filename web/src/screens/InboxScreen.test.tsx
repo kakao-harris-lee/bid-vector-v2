@@ -616,7 +616,7 @@ describe('로딩·오류 얼굴과 적재 중 배지 (r1 v M-1 · CR M-2)', () =
    * 기다리는 중이라고 말하면 운영자가 조금 더 기다린다.
    */
   it('목록이 실패하면 배지가 「아직 받지 못함」이라고 말하지 않는다', async () => {
-    mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL', '서버 오류'));
+    mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL'));
     renderScreen();
 
     await screen.findByTestId('inbox-error');
