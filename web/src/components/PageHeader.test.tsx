@@ -57,6 +57,50 @@ describe('요약 한 줄', () => {
   });
 });
 
+/**
+ * **요약은 `ReactNode` 다**(cr L-4) — 뒤 레인이 요약 줄 안에 부재 값이나 강조를 실을 수 있어야
+ * 한다. 넓히면서 cr L-1 의 구멍(빈 자리를 그리는 꼴)을 다시 열지 않는 것이 이 묶음의 요점이다.
+ */
+describe('요약이 글자가 아닐 때 (cr L-4)', () => {
+  it('요소를 그대로 그린다', () => {
+    render(
+      <PageHeader
+        title="오늘의 공고"
+        summary={<span data-testid="inner">감시 조건 통과 7건</span>}
+        testId="probe"
+      />,
+    );
+
+    expect(screen.getByTestId('probe-summary').contains(screen.getByTestId('inner'))).toBe(true);
+  });
+
+  it('여러 조각을 담은 배열도 그린다', () => {
+    render(
+      <PageHeader title="오늘의 공고" summary={['통과 ', <b key="n">7</b>, '건']} testId="probe" />,
+    );
+
+    expect(screen.getByTestId('probe-summary').textContent).toBe('통과 7건');
+  });
+
+  /** **빈 자리로 읽히는 값은 그리지 않는다** — 넓힌 뒤에도 cr L-1 의 구멍이 닫혀 있다. */
+  it('빈 자리로 읽히는 값에는 자리를 만들지 않는다', () => {
+    for (const blank of [undefined, null, false, true, '', '   ', [], ['', null]]) {
+      cleanup();
+      render(<PageHeader title="결과 확인" summary={blank} testId="probe" />);
+
+      expect(screen.queryByTestId('probe-summary'), String(blank)).toBeNull();
+      expect(screen.getByTestId('probe').textContent, String(blank)).toBe('결과 확인');
+    }
+  });
+
+  /** 숫자 0 은 **값**이다 — 빈 글자와 다르다. */
+  it('숫자 0 은 그린다', () => {
+    render(<PageHeader title="결과 확인" summary={0} testId="probe" />);
+
+    expect(screen.getByTestId('probe-summary').textContent).toBe('0');
+  });
+});
+
 describe('행동', () => {
   it('주면 머리 안에 든다', () => {
     render(<PageHeader title="내 입찰함" actions={<button type="button">새로 고침</button>} testId="probe" />);

@@ -11,6 +11,31 @@ const slotTestId = (testId: string | undefined, slot: string): string | undefine
   testId === undefined ? undefined : `${testId}-${slot}`;
 
 /**
+ * **빈 자리로 읽히는 노드인가**(cr L-1 의 구멍을 `ReactNode` 로 넓힌 뒤에도 닫아 둔다).
+ *
+ * 없음·참/거짓은 React 가 아무것도 그리지 않는 값이고, 공백뿐인 글자·숫자 0 자리는 **글자로는
+ * 비어 있다**. 배열은 그 안이 전부 비어 있을 때만 비었다.
+ *
+ * **알려진 제한**: 요소(`<></>` 처럼 비어 있는 조각)는 그려 봐야 비었는지 알 수 있어 여기서
+ * 가리지 못한다 — 그 꼴은 호출부의 실수이고 이 술어가 잡는 범위 밖이다.
+ */
+function isBlankNode(node: ReactNode): boolean {
+  if (node === undefined || node === null || typeof node === 'boolean') {
+    return true;
+  }
+  if (typeof node === 'string') {
+    return node.trim() === '';
+  }
+  if (typeof node === 'number') {
+    return false;
+  }
+  if (Array.isArray(node)) {
+    return node.every((one) => isBlankNode(one));
+  }
+  return false;
+}
+
+/**
  * 화면 머리의 **한 자리**(M14/14A · 와이어프레임의 머리). 제목 · 요약 한 줄 · 행동 셋이
  * 화면마다 다른 글자 크기와 다른 배치로 복제되던 자리를 모은다.
  *
@@ -31,10 +56,14 @@ export function PageHeader({
   /**
    * 제목 곁의 한 줄 — 그 화면이 지금 무엇을 말하는지. 없으면 그리지 않는다.
    *
+   * **`ReactNode` 다**(cr L-4 · 팀장 판정 2026-11-20). 글자만 받으면 뒤 레인이 요약 줄 안에
+   * 부재 값이나 강조를 실을 수 없다 — 14B 의 상한 초과 공시가 그런 자리다.
+   *
    * **빈 글자도 「없음」이다**(cr L-1): `''` 를 그대로 그리면 빈 문단이 서고, 그것은 변이 5 가
-   * 찾은 바로 그 모양이 호출부 인자 하나로 되살아난 것이다.
+   * 찾은 바로 그 모양이 호출부 인자 하나로 되살아난 것이다. 넓힌 뒤에도 그 구멍을 열지 않는다 —
+   * 빈 자리로 읽히는 값(없음 · 참/거짓 · 공백뿐인 글자 · 그것들만 담은 배열)은 **그리지 않는다**.
    */
-  readonly summary?: string;
+  readonly summary?: ReactNode;
   /** 머리의 오른쪽에 서는 행동. 제목 **뒤**라 탭 차례가 제목을 건너뛰지 않는다. */
   readonly actions?: ReactNode;
   readonly testId?: string;
@@ -43,7 +72,7 @@ export function PageHeader({
     <div data-testid={testId} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-        {summary === undefined || summary.trim() === '' ? null : (
+        {isBlankNode(summary) ? null : (
           <p data-testid={slotTestId(testId, 'summary')} className="text-sm text-ink-soft">
             {summary}
           </p>

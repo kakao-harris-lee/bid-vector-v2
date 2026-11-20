@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SummaryTile, tileUnavailable, tileValue } from './SummaryTile';
+import { SummaryTile, tileTwoAxis, tileUnavailable, tileValue } from './SummaryTile';
 
 /**
  * 요약 타일의 짝 test(M14/14A). 이 컴포넌트의 요점은 **두 얼굴이 타입으로 갈려 있는 것**이다.
@@ -93,5 +93,71 @@ describe('빈 값 (cr L-1)', () => {
     render(<SummaryTile label="적격" face={tileValue('  ')} testId="probe" />);
 
     expect(screen.queryByTestId('probe-value')).toBeNull();
+  });
+});
+
+/**
+ * **두 축을 한 타일에**(cr L-4 · 14D 가 쓸 자리).
+ *
+ * 낙찰률은 운영자 기록 축과 서버 대사 축이 서로 다른 수를 낼 수 있고, 계약은 「타일 하나에 한
+ * 축만 쓰는 것」을 금지한다. `beside` 는 그 자리가 아니다 — 그 칸의 뜻은 「분모처럼 같은 한
+ * 값의 일부」다.
+ *
+ * **축 하나로는 부를 수 없다**: 인자가 길이 둘의 튜플이라 그 꼴이 타입에서 선다. 아래 단언은
+ * 그것이 **그려진 결과에서도** 참인지를 본다.
+ */
+describe('두 축 얼굴 (cr L-4)', () => {
+  const axes = [
+    { label: '운영자 기록', text: '12.5%' },
+    { label: '서버 대사', text: '11.8%' },
+  ] as const;
+
+  it('두 축의 이름과 값을 모두 그린다', () => {
+    render(<SummaryTile label="낙찰" face={tileTwoAxis(axes)} testId="probe" />);
+    const tile = screen.getByTestId('probe');
+
+    for (const axis of axes) {
+      expect(tile.textContent).toContain(axis.label);
+      expect(tile.textContent).toContain(axis.text);
+    }
+  });
+
+  /** 두 축이 **서로 다른 자리**다 — 한 자리에 접히면 어느 수가 어느 축인지 읽을 수 없다. */
+  it('축마다 자기 표지를 가진다', () => {
+    render(<SummaryTile label="낙찰" face={tileTwoAxis(axes)} testId="probe" />);
+
+    expect(screen.getByTestId('probe-axis-0').textContent).toBe('12.5%');
+    expect(screen.getByTestId('probe-axis-1').textContent).toBe('11.8%');
+  });
+
+  /** 한 축만 그리는 얼굴이 **없다** — 값 얼굴의 자리가 서지 않는다. */
+  it('한 축짜리 값 자리를 만들지 않는다', () => {
+    render(<SummaryTile label="낙찰" face={tileTwoAxis(axes)} testId="probe" />);
+
+    expect(screen.queryByTestId('probe-value')).toBeNull();
+    expect(screen.queryByTestId('probe-unavailable')).toBeNull();
+  });
+
+  /** 한 축이 비면 **그 축이 사유를 말한다** — 빈 칸을 0 으로 읽는 자리를 만들지 않는다. */
+  it('빈 축은 사유를 말한다', () => {
+    render(
+      <SummaryTile
+        label="낙찰"
+        face={tileTwoAxis([
+          { label: '운영자 기록', text: '12.5%' },
+          { label: '서버 대사', text: '', whenEmpty: '분모에 드는 건이 없음' },
+        ])}
+        testId="probe"
+      />,
+    );
+
+    expect(screen.getByTestId('probe-axis-0').textContent).toBe('12.5%');
+    expect(screen.getByTestId('probe-axis-1').textContent).toBe('분모에 드는 건이 없음');
+  });
+
+  it('각주를 함께 실을 수 있다', () => {
+    render(<SummaryTile label="낙찰" face={tileTwoAxis(axes, { note: '최근 90일' })} testId="probe" />);
+
+    expect(screen.getByTestId('probe').textContent).toContain('최근 90일');
   });
 });
