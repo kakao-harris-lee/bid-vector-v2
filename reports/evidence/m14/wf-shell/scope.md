@@ -23,7 +23,12 @@ in_scope:
   - web/src/screens/strategyEdit.tsx       # ④ 주석 안의 옛 어휘 한 줄(착수 실측이 찾은 모집단 밖 자리)
   - web/src/api/queries.ts                 # 셸 배지·사업자명이 **기존** 함수를 쓴다(새 호출 0 — 아래 실측)
   - web/src/api/queryKeys.ts               # 셸 배지 둘의 질의 키
-  - web/e2e/journey/                       # ⑤ 배치 단언 spec 신설 · 터치 타깃 가로 축(M13 잔여 ⓑ)
+  - web/e2e/journey/                       # ⑤ 터치 타깃 가로 축(M13 잔여 ⓑ)
+  - web/e2e/layout.spec.ts                 # ⑤ 배치 게이트(스모크 레인 — 백엔드가 필요 없다)
+  - web/config/smoke-specs.txt             # 그 spec 을 **같은 커밋에서** 등재
+  - web/src/components/twoColumnShape.ts   # 배치 게이트가 읽는 표지·클래스 한 자리(React 없음)
+  - web/src/screens/profileWrites.tsx      # PROFILE_QUERY_KEY 를 질의 키의 한 자리로 옮김(거동 0)
+  - web/src/screens/Profile*.tsx           # 그 import 한 줄(거동 0)
   - web/e2e/harness/                       # ⑤ 배치 단언·대비 게이트의 순수 술어와 그 짝 test
   - web/scripts/                           # ⑤ 대비 게이트(index.css 파싱) · 부재값 전수 grep 게이트
   - web/config/gate-tests.txt              # 새 vitest 게이트 test 를 **만드는 커밋에서** 등재
@@ -116,6 +121,24 @@ rollback: rollback.md
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신 (구현 중 실측으로 드러난 것 — 팀장 보고 대상)
+
+**(1) 배치 게이트가 스모크 레인에 선다**(여정 레인이 아니다). 그 레인은 출하 번들을 preview 로
+띄우고 백엔드가 없는데, 세션 없이도 셸과 화면이 서므로(기존 셸 스모크가 그 사실을 든다) 셸 축을
+실화면에서 잴 수 있다. 여정 레인에 두면 하네스 비용을 아무 이득 없이 문다. 그래서 in_scope 에
+`web/e2e/layout.spec.ts` 와 `web/config/smoke-specs.txt` 가 든다.
+
+**(2) 레일 축은 합성 마운트다**(알려진 제한). 레일을 쓰는 출하 화면이 14A 시점에 없다 — 화면
+배치는 14B·14C·14D 소유다. 합성은 **같은 문서**(출하 CSS 적재 상태)에 꽂고 클래스를 출하
+모듈에서 가져온다. 출하 화면의 레일은 **표지 전수**라 뒤 레인이 붙이면 같은 단언이 자동으로
+그것을 든다. 그 때문에 `web/src/components/twoColumnShape.ts`(React 를 들이지 않는 모듈)가 선다.
+
+**(3) `PROFILE_QUERY_KEY` 를 질의 키의 한 자리로 옮겼다**(거동 0). 셸의 사업자명이 그 키를
+쓰는데, 앞 판은 그 키가 화면 모듈에 살아 셸이 화면을 import 해야 했다. **그 결과 `OnboardingScreen.tsx`
+의 import 한 줄을 고쳤다 — 그 파일은 14B 소유이고 변경은 문면도 배치도 아니다(import 한 줄).**
+팀장 판정 대상으로 보고했다. 되돌리라 하면 되돌린다.
+
 ## 갱신 이력
 
 - 2026-11-20 초판(착수 보고와 함께).
+- 2026-11-20 구현 중 계약 갱신 (1)~(3) 등재.
