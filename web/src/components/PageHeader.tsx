@@ -28,7 +28,12 @@ export function PageHeader({
   testId,
 }: {
   readonly title: string;
-  /** 제목 곁의 한 줄 — 그 화면이 지금 무엇을 말하는지. 없으면 그리지 않는다. */
+  /**
+   * 제목 곁의 한 줄 — 그 화면이 지금 무엇을 말하는지. 없으면 그리지 않는다.
+   *
+   * **빈 글자도 「없음」이다**(cr L-1): `''` 를 그대로 그리면 빈 문단이 서고, 그것은 변이 5 가
+   * 찾은 바로 그 모양이 호출부 인자 하나로 되살아난 것이다.
+   */
   readonly summary?: string;
   /** 머리의 오른쪽에 서는 행동. 제목 **뒤**라 탭 차례가 제목을 건너뛰지 않는다. */
   readonly actions?: ReactNode;
@@ -38,7 +43,7 @@ export function PageHeader({
     <div data-testid={testId} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-        {summary === undefined ? null : (
+        {summary === undefined || summary.trim() === '' ? null : (
           <p data-testid={slotTestId(testId, 'summary')} className="text-sm text-ink-soft">
             {summary}
           </p>

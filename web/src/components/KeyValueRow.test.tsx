@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { absenceTextOf } from '../display/absence';
 import { KeyValueRow } from './KeyValueRow';
 
 afterEach(() => {
@@ -110,5 +111,43 @@ describe('용어 줄의 아래층 — KeyValueRow (M14/14A)', () => {
     );
 
     expect([...container.querySelectorAll('[title]')]).toStrictEqual([]);
+  });
+});
+
+/**
+ * **빈 글자도 부재다**(cr L-1). `?? ` 만 두면 `''` 가 그 분기를 비켜 가 아무것도 그리지 않는다 —
+ * 이 slice 가 없애려는 「조용한 빈칸」이 호출부 인자 하나로 되살아나는 자리다.
+ */
+describe('빈 값 (cr L-1)', () => {
+  const absent = absenceTextOf('notSent');
+
+  it('빈 글자를 부재로 그린다', () => {
+    render(
+      <dl>
+        <KeyValueRow label="상호" value="" testId="probe" />
+      </dl>,
+    );
+
+    expect(screen.getByTestId('probe').textContent).toBe(absent);
+  });
+
+  it('공백뿐인 값도 부재다', () => {
+    render(
+      <dl>
+        <KeyValueRow label="상호" value="   " testId="probe" />
+      </dl>,
+    );
+
+    expect(screen.getByTestId('probe').textContent).toBe(absent);
+  });
+
+  it('값이 있으면 그대로 그린다 — 음성 대조', () => {
+    render(
+      <dl>
+        <KeyValueRow label="상호" value="제주바다건설(주)" testId="probe" />
+      </dl>,
+    );
+
+    expect(screen.getByTestId('probe').textContent).toBe('제주바다건설(주)');
   });
 });

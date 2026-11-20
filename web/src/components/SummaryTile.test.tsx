@@ -70,3 +70,28 @@ describe('표지', () => {
     expect(container.querySelectorAll('[data-testid]')).toHaveLength(0);
   });
 });
+
+/**
+ * **빈 글자는 값이 아니다**(cr L-1). `tileValue('')` 가 빈 숫자 칸을 그리면 두 얼굴을 타입으로
+ * 가른 뜻이 그 자리에서 사라진다 — 없는 값 얼굴로 접고 사유를 요구한다.
+ */
+describe('빈 값 (cr L-1)', () => {
+  it('빈 글자는 없는 값 얼굴로 접힌다', () => {
+    render(<SummaryTile label="적격" face={tileValue('')} testId="probe" />);
+
+    expect(screen.queryByTestId('probe-value')).toBeNull();
+    expect(screen.getByTestId('probe-unavailable')).not.toBeNull();
+  });
+
+  it('그 사유를 부르는 자리가 정할 수 있다', () => {
+    render(<SummaryTile label="적격" face={tileValue('', { whenEmpty: '서버가 계수를 내지 않는다' })} testId="probe" />);
+
+    expect(screen.getByTestId('probe-unavailable').textContent).toBe('서버가 계수를 내지 않는다');
+  });
+
+  it('공백뿐인 값도 같다', () => {
+    render(<SummaryTile label="적격" face={tileValue('  ')} testId="probe" />);
+
+    expect(screen.queryByTestId('probe-value')).toBeNull();
+  });
+});

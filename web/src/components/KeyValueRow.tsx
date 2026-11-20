@@ -86,8 +86,13 @@ export function KeyValueRow({
           모형에서 한 용어에 값이 둘이 되고, 보조기기가 설명을 값으로 읽는다. */}
       <dd aria-describedby={describedBy} className="text-sm">
         {/* 값이 `null` 인 것은 **응답을 읽은 뒤** 그 칸이 비었다는 뜻이다(적재 중의 자리가
-            아니다 — 그 자리는 자기 사유를 따로 고른다). */}
-        <span data-testid={testId}>{value ?? <AbsentValue reason="notSent" />}</span>
+            아니다 — 그 자리는 자기 사유를 따로 고른다).
+
+            **빈 글자도 같은 자리다**(cr L-1). `?? ` 만 두면 `''` 가 그 분기를 비켜 가 아무것도
+            그리지 않는다 — 이 slice 가 없애려는 「조용한 빈칸」 그대로다. 공백뿐인 값도 같다. */}
+        <span data-testid={testId}>
+          {value === null || value.trim() === '' ? <AbsentValue reason="notSent" /> : value}
+        </span>
         {hintNode}
       </dd>
     </div>

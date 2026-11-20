@@ -41,6 +41,14 @@ describe('요약 한 줄', () => {
    * **자리의 존재를 잰다**(변이 실측). 글자로만 재면 빈 노드를 늘 그리는 변이가 지나간다 —
    * 빈 문단의 `textContent` 는 빈 글자라 제목만 남은 글자와 구분되지 않는다.
    */
+  /** 빈 글자는 **없음**이다(cr L-1) — 그대로 그리면 빈 문단이 선다. */
+  it('빈 글자를 주면 자리를 만들지 않는다', () => {
+    render(<PageHeader title="결과 확인" summary="" testId="probe" />);
+
+    expect(screen.queryByTestId('probe-summary')).toBeNull();
+    expect(screen.getByTestId('probe').textContent).toBe('결과 확인');
+  });
+
   it('주지 않으면 빈 자리를 만들지 않는다 — 제목 글자가 머리의 전부다', () => {
     render(<PageHeader title="결과 확인" testId="probe" />);
 

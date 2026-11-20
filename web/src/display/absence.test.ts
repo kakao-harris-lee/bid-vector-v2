@@ -49,6 +49,22 @@ describe('사유 표', () => {
  */
 const RETIRED_WORDING = ['\uac12', '\uc5c6\uc74c'].join(' ');
 
+describe('문면 — 축어로 한 자리에 박는다 (cr M-3)', () => {
+  /**
+   * **재는 쪽과 재어지는 쪽이 같으면 대조가 공허하다.** 등록부 test 일곱은 이제
+   * `absenceTextOf(…)` 와 맞대므로, 표의 값을 바꾸면 둘이 **함께** 움직여 전부 초록이다.
+   * 문면 퇴행을 붉히는 자리가 W-13 여정 둘뿐이었다 — acceptance 의 가장 비싼 마지막 단계다.
+   *
+   * 그래서 글자를 **여기 한 번** 축어로 박는다. 단위 레인이 여정보다 먼저 말한다.
+   * (이 파일은 걷어낸 옛 어휘를 조각에서 조립하므로, **새** 문면은 그냥 적어도 훑기에 걸리지
+   * 않는다.)
+   */
+  it('사유 둘의 글자가 이것이다', () => {
+    expect(absenceTextOf('notSent')).toBe('주어지지 않음');
+    expect(absenceTextOf('notLoaded')).toBe('아직 받지 못함');
+  });
+});
+
 describe('문면 읽기', () => {
   it('글자는 표가 낸다 — 전수에서 표의 값과 같다', () => {
     for (const reason of ABSENCE_REASONS) {

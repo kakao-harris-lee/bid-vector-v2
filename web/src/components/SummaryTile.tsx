@@ -21,10 +21,18 @@ export type TileFace =
     }
   | { readonly kind: 'unavailable'; readonly why: string };
 
+/**
+ * 값 얼굴을 만든다. **빈 글자는 값이 아니다**(cr L-1) — `tileValue('')` 는 빈 숫자 칸을 그려
+ * `tileUnavailable` 과 타입으로 가른 뜻을 그 자리에서 없앤다. 그래서 빈 글자가 오면 **없는 값
+ * 얼굴로 접고** 사유를 요구한다: 왜 비었는지는 부르는 자리가 안다.
+ */
 export function tileValue(
   text: string,
-  options?: { readonly beside?: string; readonly note?: string },
+  options?: { readonly beside?: string; readonly note?: string; readonly whenEmpty?: string },
 ): TileFace {
+  if (text.trim() === '') {
+    return tileUnavailable(options?.whenEmpty ?? '값이 비어 있다');
+  }
   return { kind: 'value', text, beside: options?.beside, note: options?.note };
 }
 
