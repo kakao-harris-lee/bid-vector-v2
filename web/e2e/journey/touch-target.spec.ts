@@ -309,11 +309,18 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
       screen.minCount,
     );
-    // ② 전수 — 이름으로 고르지 않는다.
-    const small = targets.filter((one) => one.height < MIN_TOUCH_PX);
+    /**
+     * ② 전수 — 이름으로 고르지 않는다.
+     *
+     * **두 변을 함께 잰다**(M14/14A — M13 잔여 §12.3 (w) ⓑ). 앞 판은 **세로만** 보았고, 측정
+     * 함수는 가로도 내는데 아무도 단언하지 않았다. 짧은 라벨의 알약 버튼은 세로만 키우면
+     * 44×40 꼴이 되어 손가락이 옆으로 빗나간다 — 하한은 「최소 **변**」이므로 두 변 모두다.
+     * 이 축을 더하는 것은 하한을 **올리는** 변경이다(계약 「올리기만」).
+     */
+    const small = targets.filter((one) => one.height < MIN_TOUCH_PX || one.width < MIN_TOUCH_PX);
     expect(
-      small.map((one) => `${one.tag} ${one.height}px "${one.name}"`),
-      `${screen.slotId}: 터치 타깃이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
+      small.map((one) => `${one.tag} ${one.width}x${one.height}px "${one.name}"`),
+      `${screen.slotId}: 터치 타깃의 변이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
     ).toStrictEqual([]);
     /**
      * ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.

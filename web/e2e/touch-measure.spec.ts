@@ -268,3 +268,22 @@ test('음성 대조 — 뷰포트 안에 든 고정 요소는 그대로다', asy
   expect(result.offscreen).toStrictEqual([]);
   expect(result.targets[0]?.height).toBe(44);
 });
+
+/**
+ * **가로 축의 대조**(M14/14A — M13 잔여 §12.3 (w) ⓑ). 게이트가 두 변을 함께 보게 됐으므로,
+ * 측정 함수가 **가로를 실제로 내는지**를 같은 함수로 잰다. 세로만 키운 꼴이 어떤 값으로
+ * 읽히는지가 이 대조의 요점이다 — 앞 판에서 그 값은 아무도 읽지 않았다.
+ */
+test('세로만 키운 버튼은 가로가 그대로 읽힌다 — 두 변이 따로 선다', async ({ page: browserPage }) => {
+  const result = await measured(browserPage, page({ button: 'height:44px; width:30px' }));
+
+  expect(result.targets[0]?.height).toBe(44);
+  expect(result.targets[0]?.width).toBe(30);
+});
+
+test('음성 대조 — 두 변이 다 넉넉하면 그대로 읽힌다', async ({ page: browserPage }) => {
+  const result = await measured(browserPage, page({ button: 'height:48px; width:48px' }));
+
+  expect(result.targets[0]?.height).toBe(48);
+  expect(result.targets[0]?.width).toBe(48);
+});

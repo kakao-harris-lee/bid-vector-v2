@@ -76,7 +76,7 @@ export function StateBadge({
         */
         aria-pressed={expanded}
         onClick={() => setExpanded((open) => !open)}
-        className="inline-flex min-h-11 items-center rounded-md"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md"
       >
         <span className={pillClass(shown.tone)}>{shown.label}</span>
       </button>
