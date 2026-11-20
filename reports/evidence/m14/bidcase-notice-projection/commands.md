@@ -52,8 +52,26 @@ r5 는 17초에 끝났고 **test task 전부가 `UP-TO-DATE`** 였다. 종료 �
 | 정적 게이트 전부 | `check -x test` | **exit 0** (58초) — ktlint · detekt · cpd · size · architecture · contract 포함 |
 | test 축 | 표적 test task `--rerun` | **exit 0** — task 줄에 `UP-TO-DATE` 가 없음을 확인 |
 
-「전건 한 번의 초록」을 들고 싶으면 **차가운 재실행이 필요하다**. 이 사실을 숨기지 않고 알려진
-제한에 등재한다.
+**그 뒤 캐시를 끄고 실제로 돌렸다.** `test --rerun --no-build-cache` 가 판정 SHA 에서 모듈
+전부의 test 를 **캐시 표지 없이** 실행했다 — **exit 0 · 4612 test · 실패 0 · 에러 0 · 스킵 0**
+(36m37s). 이것이 test 축의 정본이고, 위의 증분 초록들(r5 의 `UP-TO-DATE` 아홉 · `clean check`
+의 `FROM-CACHE` 아홉)은 그것을 갈음하지 않는다.
+
+`clean` 만으로는 차가워지지 않는다는 것도 실측했다 — `clean check` 가 33초에 끝났고 test 가
+전부 `FROM-CACHE` 였다(`clean` 은 빌드 **캐시**를 비우지 않는다).
+
+### 낡은 리포트 둘 — **로컬 전용**
+
+변이가 소스의 mtime 만 올려 `cpdCheck` 가 `UP-TO-DATE` 가 되고 리포트는 그 전 것이 남았다.
+`cpdReportPresenceGate` 가 그것을 **설계대로** 잡았다(`:adapters` · `:app` 각 1회). **CI 는 차가운
+체크아웃이라 재현되지 않는다** — 변이 측정이 로컬에 남기는 찌꺼기다. 리포트를 지우고 재생성해
+해소했고 중복 계수는 0 이다.
+
+### `leakPatternGate` 는 **실제로 돌렸다**
+
+이 게이트는 앞선 모든 실행에서 `UP-TO-DATE` 였다(= 돌지 않았다). evidence 세 파일이 모두 선
+HEAD 에서 `leakPatternGate --rerun` 을 돌려 **task 줄에 접미사가 없음**을 확인했다 — **exit 0**.
+evidence 가 누출 패턴 스캔 뿌리에 들므로 이 확인이 없으면 그 축은 미측정이다.
 
 ## acceptance — CI `web` job 전건 (W-1 ~ W-13)
 
@@ -88,8 +106,8 @@ cache 적중이 실행을 갈음하지 않게 했다. 변이 전 porcelain 이 �
 
 ## 누출 패턴
 
-evidence 를 편집한 HEAD 에서 `grep -rniE -f config/quality/leak-patterns.txt` 축을 포함하는
-Kotlin `check` 를 재실측했다(위 표). 이 slice 가 더한 문면에 비밀값 어휘가 없다 — 응답의 자유
+evidence 세 파일이 모두 선 HEAD 에서 `leakPatternGate --rerun` 을 **실제 실행**으로 확인했다
+(위 절 — 접미사 없는 task 줄 · exit 0). 이 slice 가 더한 문면에 비밀값 어휘가 없다 — 응답의 자유
 문면은 전부 공개 조달 데이터인 공고 칸뿐이고, 운영자 PII 가 실릴 자리를 더하지 않았다.
 
 ## clean-tree
