@@ -28,7 +28,7 @@ in_scope:
   - app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt   # 계약 갱신 (1) — 이중체 빈 하나
   - config/quality/gate-tests.properties   # 새 Kotlin test class 를 **만드는 커밋에서** 등재
   # ── 계약과 생성 타입 ────────────────────────────────────────────────────
-  - openapi/bidvector-operator-api.yaml    # `BidCase` 스키마 + 두 operation 의 설명
+  - openapi/bidvector-operator-api.yaml    # `BidCase` 스키마 + `listBidCases` 의 설명
   - web/src/api/generated/operator-api.ts  # 재생성(바이트 등식 W-5)
   - docs/discovery/capability-map.md       # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
   - reports/evidence/m14/bidcase-notice-projection/
@@ -103,7 +103,7 @@ base `af6d9c0f` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
 | 목록의 N+1 위험 | `BidCaseWorkflow.list` | **구조적으로 없다** — 오늘의 마감 조회가 이미 건별이 아니라 **키 집합 한 번**이다(`deadlines(found.map{…}.toSet())`). 같은 꼴을 따르면 건 수와 무관하게 질의 수가 고정이다 |
 | 오늘의 질의 수(목록 1회) | `list` 의 호출 | 3 — 판정 후보 · 후보 마감 · 건 목록, 그리고 목록의 마감 조회 1 = 총 4. 투영을 **새 포트**로 두면 5, **마감 포트에 얹으면** 4 |
 | `readBidCase` 의 web 소비자 | `approvedOperations.ts` | **없다**. 승인 쌍에 `GET /api/bid-cases/{caseId}` 가 없다 → 이 slice 는 operation 집합을 **바꾸지 않는다**(승인 쌍 등식 불변) |
-| 응답 칸 이름의 선례 | 기존 OpenAPI · 컨트롤러 | `noticeTitle` · `demandAgencyName` · `noticeAgencyName` — 세 이름이 이미 출하돼 있다(제안 · 검색 카드). 새 이름을 만들지 않는다 |
+| 응답 칸 이름의 선례 | 기존 OpenAPI · 컨트롤러 | 세 이름이 이미 출하돼 있다 — `demandAgencyName` · `noticeAgencyName` 는 제안 · 검색 카드, **`noticeTitle` 은 알림함**(`NotificationItem`)이다. 새 이름을 만들지 않는다 |
 | 평탄 계약 | `OpenApiContractTest` | 응답 칸은 스칼라여야 한다(D-6A1-20 ⓑ) → 중첩 object 가 아니라 **평탄한 칸 넷**(`noticeKnown` + 셋) |
 | 생성 타입을 쓰는 web 고정물 | `BidCase` 를 짓는 자리 전수 | **7 자리**(아래 OPEN-1). 필수 칸을 더하면 `tsc`(W-3)가 그 일곱을 멈춘다 |
 
@@ -156,7 +156,11 @@ web 은 그 operation 을 부르지 않는다(승인 쌍에 없다) — 소비�
 3. **기초금액·마감은 투영하지 않는다**(계약 14E 행). 건은 담을 때의 마감 **사본**을 이미
    들고 있고 응답이 그것으로 판정한 `nextCheckpoint*`·`overdue` 를 낸다 — 공고의 라이브
    마감을 한 칸 더 싣는 것은 두 마감이 응답에 함께 서는 일이라 새 결정이다.
-4. 투영은 **라이브 값**이다(초안 스냅샷의 사본이 아니다). 공고가 정정돼 제목이 바뀌면 카드의
+4. **마감 읽기와 투영 읽기는 두 스냅샷이다**(v L-3) — `list` 가 그 둘을 다른 질의로 부르므로,
+   사이에 공고가 파기되면 한 응답에서 마감(담을 때의 사본)과 `noticeKnown = false` 가 서로 다른
+   시점을 본다. 표시 전용이고 판정에 쓰이지 않아 해악이 작다. 합치려면 포트를 섞는 것이 아니라
+   어댑터에서 한 문장으로 읽고 두 포트에 나눠 주는 길이다.
+5. 투영은 **라이브 값**이다(초안 스냅샷의 사본이 아니다). 공고가 정정돼 제목이 바뀌면 카드의
    제목도 바뀐다 — 마감 조회가 이미 같은 축이다.
 
 ## 승인 경계 (계약 「승인 경계」 절의 이 slice 몫)
@@ -181,10 +185,34 @@ web 은 그 operation 을 부르지 않는다(승인 쌍에 없다) — 소비�
 줄이 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에
 있다. 귀속은 라운드마다 기계로 재산출해 확인한다.
 
-## 머지 차례
+## 머지 차례 (2026-11-20)
 
-capability map §12.3 의 이 slice 몫은 **머지 차례에 정한다**(계약 「capability map letter」).
-상호 참조에는 글자를 쓰지 않는다 — 이 줄이 그 글자를 적는 유일한 자리가 된다.
+capability map §12.3 의 이 slice 몫은 **(y)** 다(하위 절 24 → 25 · 글자 중복 0). 상호 참조에는
+글자를 쓰지 않는다 — 이 줄이 그 글자를 적는 유일한 자리다. main 이 착수 base `af6d9c0f` 그대로라
+**병합 없이 14E 가 먼저 머지**한다.
+
+## 리뷰·검증 지적의 처분 (머지 차례)
+
+verifier `ready-for-review`(산출물 blocker/high 0) · code-review `approve`(blocker 0 · high 0).
+
+| 지적 | 처분 |
+| --- | --- |
+| v L-1 — cold test 를 「스킵 0」이라 적었다 | **고침** — 실측 스킵 4(`RealServerIntegrationTest`, 환경 조건부 · 기존). `commands.md` |
+| v L-2 — 실측 뒤 움직인 경로 문장 | **고침** — `rollback.md` 의 전칭식을 evidence 전체로 일반화했다 |
+| v L-3 — 마감 질의와 투영 질의가 두 스냅샷 | **알려진 제한에 등재**(아래 7) · §12.3 (y) ⓒ |
+| cr M-1 — 병렬 레인 소유 파일의 머지 접힘 위험 | **머지 차례의 확인 항목**으로 등재(§12.3 (y) 끝 · 계수 `1,1,1,3,1,1,1`) |
+| cr M-2 — in_scope 가 「두 operation 의 설명」이라 적었다 | **고침** — 실제로 바뀐 것은 `listBidCases` 의 설명 하나다. **yaml 은 건드리지 않는다**(기존 칸의 선언을 바꾸면 생성 타입이 움직인다) |
+| cr L-1 — 상수 시간 비교 표의 정당화 문면이 낡았다 | **등재**(§12.3 (y) ⓖ) — 고치는 것은 그 표의 소유 slice 몫이다 |
+| cr L-2 — 등식이 선언을 재지 wire 이름을 재지 않는다 | **등재**(§12.3 (y) ⓓ) — 오늘 이 DTO 에 해당 주석 0 이라 실효는 같다 |
+| cr L-3 — 이름 선례 귀속이 한 칸 틀렸다 | **고침** — 위 착수 실측 표. 고른 이름 자체는 옳다 |
+| cr L-4 — 조립 헬퍼의 기본값이 이 slice 논거와 어긋난다 | **등재**(§12.3 (y) ⓕ) — 호출자가 하나뿐이라 오늘은 무해하고 기존 인자가 같은 꼴이다 |
+| cr L-5 — HTTP 이중체가 목록의 「섞인」 경우를 못 연다 | **등재**(§12.3 (y) ⓔ) — use case 축이 그 경우를 잠근다 |
+| cr L-6 — 목록이 `notice` 를 같은 키로 두 번 읽는다 | **등재**(§12.3 (y) ⓑ) — OPEN-2 가 받은 의도된 경계다 |
+| cr L-7 — capability map 이 in_scope 인데 diff 에 없다 | **해소** — 이 머지 차례에 (y) 를 썼다 |
+| cr L-8 — 「세 파일이 모두 선 HEAD」 | **고침** — 「작업 트리」로 적었다(`commands.md`) |
+
+**고치지 않은 것과 그 사유**: cr L-1·L-2·L-4·L-5·L-6 과 v L-3 은 **산출물 변경이 필요하거나
+다른 slice 소유**라 장부에 등재만 한다. 지금 고치면 승인된 판정 SHA 의 산출물이 움직인다.
 
 ## 계약 갱신
 

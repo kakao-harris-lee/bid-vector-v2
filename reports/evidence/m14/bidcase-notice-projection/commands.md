@@ -53,8 +53,9 @@ r5 는 17초에 끝났고 **test task 전부가 `UP-TO-DATE`** 였다. 종료 �
 | test 축 | 표적 test task `--rerun` | **exit 0** — task 줄에 `UP-TO-DATE` 가 없음을 확인 |
 
 **그 뒤 캐시를 끄고 실제로 돌렸다.** `test --rerun --no-build-cache` 가 판정 SHA 에서 모듈
-전부의 test 를 **캐시 표지 없이** 실행했다 — **exit 0 · 4612 test · 실패 0 · 에러 0 · 스킵 0**
-(36m37s). 이것이 test 축의 정본이고, 위의 증분 초록들(r5 의 `UP-TO-DATE` 아홉 · `clean check`
+전부의 test 를 **캐시 표지 없이** 실행했다 — **exit 0 · 4612 test · 실패 0 · 에러 0 · 스킵 4**
+(36m37s). **스킵 4 는 0 이 아니다**(v L-1 — 앞 판이 「0」이라 적었다): `RealServerIntegrationTest`
+가 환경 조건부라 이 호스트에서 건너뛴다. 이 slice 가 만든 것이 아니고 CI 에서도 같은 축이다. 이것이 test 축의 정본이고, 위의 증분 초록들(r5 의 `UP-TO-DATE` 아홉 · `clean check`
 의 `FROM-CACHE` 아홉)은 그것을 갈음하지 않는다.
 
 `clean` 만으로는 차가워지지 않는다는 것도 실측했다 — `clean check` 가 33초에 끝났고 test 가
@@ -70,8 +71,14 @@ r5 는 17초에 끝났고 **test task 전부가 `UP-TO-DATE`** 였다. 종료 �
 ### `leakPatternGate` 는 **실제로 돌렸다**
 
 이 게이트는 앞선 모든 실행에서 `UP-TO-DATE` 였다(= 돌지 않았다). evidence 세 파일이 모두 선
-HEAD 에서 `leakPatternGate --rerun` 을 돌려 **task 줄에 접미사가 없음**을 확인했다 — **exit 0**.
-evidence 가 누출 패턴 스캔 뿌리에 들므로 이 확인이 없으면 그 축은 미측정이다.
+**작업 트리**에서 `leakPatternGate --rerun` 을 돌려 **task 줄에 접미사가 없음**을 확인했다 —
+**exit 0**. evidence 가 누출 패턴 스캔 뿌리에 들므로 이 확인이 없으면 그 축은 미측정이다.
+
+「HEAD」가 아니라 **작업 트리**라고 적는다(cr L-8). 이 게이트는 `reports/evidence` **디렉터리를
+훑지** `git ls-files` 를 쓰지 않으므로 커밋 전 파일도 스캔 대상이다 — 그래서 「추적 전엔 눈이
+없다」 함정이 여기 해당하지 않는다. 그리고 evidence 를 고치면 그 HEAD 의 결과가 또 낡는데,
+규율이 그것을 이미 처분했다: **마지막 HEAD 의 결과 정본은 verifier 와 PR 조치 코멘트**이고
+evidence 에 넣으려는 시도가 커밋을 또 낳는다.
 
 ## acceptance — CI `web` job 전건 (W-1 ~ W-13)
 
@@ -106,8 +113,8 @@ cache 적중이 실행을 갈음하지 않게 했다. 변이 전 porcelain 이 �
 
 ## 누출 패턴
 
-evidence 세 파일이 모두 선 HEAD 에서 `leakPatternGate --rerun` 을 **실제 실행**으로 확인했다
-(위 절 — 접미사 없는 task 줄 · exit 0). 이 slice 가 더한 문면에 비밀값 어휘가 없다 — 응답의 자유
+evidence 세 파일이 모두 선 **작업 트리**에서 `leakPatternGate --rerun` 을 **실제 실행**으로
+확인했다(위 절 — 접미사 없는 task 줄 · exit 0). 이 slice 가 더한 문면에 비밀값 어휘가 없다 — 응답의 자유
 문면은 전부 공개 조달 데이터인 공고 칸뿐이고, 운영자 PII 가 실릴 자리를 더하지 않았다.
 
 ## clean-tree
