@@ -317,6 +317,27 @@ describe('양성 대조 — 심으면 붉는다', () => {
   });
 
   /**
+   * **단축 속성이 유일한 간선인 자리.** 위의 네 꼴 가운데 단축 속성 꼴은 그 모듈의 **수입
+   * 문장**이 같은 선언을 가리켜서, 값 심볼을 묻지 않아도 붉었다(실측). 그래서 간선이 단축
+   * 속성 **하나뿐**인 자리를 따로 세운다 — 쓰기와 그것을 담는 객체가 **같은 모듈**에 있어
+   * 수입 간선이 아예 없는 꼴이다.
+   */
+  it('단축 속성이 유일한 간선이어도 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [QUERIES_PATH, `${read(QUERIES_PATH)}\nexport function makeFloorHelpers() {\n  return { requestBidPrice };\n}\n`],
+        [
+          RESULTS_SCREEN,
+          `import { makeFloorHelpers } from '../api/queries';\n${read(RESULTS_SCREEN)}\nexport const plantedWrite = makeFloorHelpers;\n`,
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
+  });
+
+  /**
    * **router 가 값을 아래로 내리는 자리** — 철자가 아니라 **심볼**로 센다(cr HIGH · v M).
    * 앞 판은 JSX 태그 글자만 보아 별칭과 훅 꼴이 그대로 지나갔다.
    */
