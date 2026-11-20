@@ -21,6 +21,12 @@
 # **부분 실행은 이 등식이 막는다**: `--grep` 으로 일부만 돌리면 집합이 모자라 붉다. 여정 레인은
 # 전건으로만 판정한다.
 journey.spec.ts
+# M14/14B — **출하 레일의 자리**를 세션을 쥐고 잰다. 스모크 레인(`e2e/layout.spec.ts`)이 같은 술어를
+# 세션 없이 걸지만, 거기서는 **데이터가 있어야 서는 레일**이 그려지지 않는다 — 뒤 레인이 레일을
+# 데이터 뒤에 두면 그 레일을 영영 못 보면서 비공허 하한은 `/start` 하나로 만족된다. 이 레인이 그
+# 자리를 받는다. 술어와 모집단 구성은 `e2e/railMeasure.ts` 한 자리다. 이 spec 은 읽기만 하므로
+# 공유 하네스에 남기는 상태가 0 이다.
+layout-rails.spec.ts
 onboarding.spec.ts
 results.spec.ts
 settings.spec.ts
