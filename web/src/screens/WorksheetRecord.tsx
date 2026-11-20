@@ -152,11 +152,21 @@ export function KonepsHandoff({
   noticeNumber,
   amountWon,
   margin,
+  marginAbsence,
 }: {
   readonly noticeNumber: string;
   readonly amountWon: number | null;
   /** 투찰가를 요청하기 **전에는 자리 자체가 없다** — 하한율이 아직 응답에 없다. */
   readonly margin: FloorMargin | null;
+  /**
+   * 여유를 **다시 잴 수 없는데** 그 자리를 비워 둘 수 없을 때의 사유(v H-1). `null` 은 「아직
+   * 묻지 않았다」이고 그때는 자리 자체가 없다 — 묻지 않은 축을 「재지 못함」으로 그리면 화면이
+   * 묻지 않은 것에 답한다.
+   *
+   * **선택 인자가 아니다**: 기본값을 두면 「사유를 고르지 않고 빈칸으로 접는」 자리가 다시
+   * 생기고 그것이 정확히 H-1 이 가리킨 결함이다. 두 사실을 부르는 자리가 가려 적는다.
+   */
+  readonly marginAbsence: string | null;
 }) {
   const query = new URLSearchParams({ bidNtceNo: noticeNumber }).toString();
   const [attempt, setAttempt] = useState<CopyAttempt | null>(null);
@@ -205,8 +215,11 @@ export function KonepsHandoff({
       <dl className="mt-3 flex flex-col gap-1 text-sm">
         <dt className="text-xs text-ink-soft">투찰 입력값(원 단위 정수)</dt>
         <dd data-testid="handoff-amount" className="font-numeric">
+          {/* **이 칸은 응답의 칸이 아니라 위 입력칸을 비추는 읽기 자리**다(v L-3). 서버 축의
+              사유(「응답은 왔고 그 칸이 비었다」)를 쓰면 화면이 서버에게 없는 빚을 지우고,
+              운영자는 「기다리면 온다」로 읽는다 — 할 일은 자기가 적는 것이다. */}
           {amountWon === null ? (
-            <AbsentValue reason="notSent" />
+            <AbsentValue reason="notEntered" />
           ) : usable ? (
             amountWon.toLocaleString('ko-KR')
           ) : (
@@ -255,11 +268,16 @@ export function KonepsHandoff({
           className="mt-2 min-h-11 w-full rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
         />
       )}
-      {margin === null ? null : (
+      {margin === null && marginAbsence === null ? null : (
         <dl className="mt-3 flex flex-col gap-1 text-sm">
           <dt className="text-xs text-ink-soft">하한 대비 여유</dt>
           <dd data-testid="floor-margin" className="flex flex-col gap-1">
-            {margin.kind === 'measured' ? (
+            {margin === null ? (
+              /* **다시 잴 수 없는 자리가 사유를 든다**(v H-1) — 이 줄이 통째로 없으면 「하한
+                 미달 즉시 실격」 가드가 빈칸으로 접히고, 그것을 운영자가 「문제없다」로 읽는다.
+                 축을 **자기 글자로** 말한다: 다른 카드를 가리키면 폭이 바뀔 때 거짓이 된다. */
+              <span className="text-absent-ink">{marginAbsence}</span>
+            ) : margin.kind === 'measured' ? (
               <>
                 <span className="flex flex-wrap items-center gap-2">
                   <StateBadge display={CRITICAL_RATE_STANDING_DISPLAY[margin.standing]} />

@@ -415,10 +415,13 @@ function renderAll() {
         최소이고(이 층은 문면만 본다) 하한 여유는 **근거가 선 쪽**을 준다 — 빈 자리만 그리면
         그 카드의 문면 절반이 미측정으로 남는다.
       */}
+      {/* M14/14F — 「다시 잴 수 없다」 쪽 사유는 **부르는 자리가 적는 글자**라(prop) 이 층의
+          모집단이 아니다. 그 문면은 소스 층(`screen-copy-vocabulary`)이 전수에서 본다. */}
       <KonepsHandoff
         noticeNumber={TITLELESS_NUMBER}
         amountWon={1_100_000_000}
         margin={HANDOFF_MARGIN}
+        marginAbsence={null}
       />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />

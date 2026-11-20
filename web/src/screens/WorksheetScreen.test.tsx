@@ -1030,12 +1030,188 @@ describe('화면 C — 하한 대비 여유', () => {
     expect(margin.textContent).not.toContain('0%');
   });
 
-  /** 투찰가를 요청하기 **전에는** 하한율 자체가 없다 — 그 자리를 만들지 않는다. */
-  it('요청 전에는 여유 자리가 없다', async () => {
+  /**
+   * 투찰가를 **요청할 수 있는 상태**에서는 하한율 자체가 없다 — 그 자리를 만들지 않는다.
+   * 없는 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다(13C 의 판단).
+   *
+   * **다시 요청할 수 없는 상태는 다른 사실이다** — 아래 v H-1 묶음이 그 자리를 잰다.
+   */
+  it('요청할 수 있는 상태에서는 여유 자리가 없다', async () => {
     renderScreen();
     await screen.findByTestId('handoff-amount');
 
     expect(screen.queryByTestId('floor-margin')).toBeNull();
+  });
+});
+
+/**
+ * **다시 연 화면의 빈 자리는 사유를 든다**(v H-1 high · cr D14 low — 같은 계열).
+ *
+ * 투찰가 응답은 **그것을 받은 화면에서만** 산다(계약에 다시 읽는 operation 이 없고, 상태를 민
+ * 뒤에는 요청 경로도 없다). 초안을 만든 날과 나라장터에 내는 날이 다른 것이 보통 흐름이라,
+ * 그 날 화면을 다시 열면 자격 카드와 「하한 대비 여유」가 **빈칸으로 접혔다** — 운영자는
+ * 「여유 표시가 없다」를 「문제없다」로 읽는다. 해를 입는 자리가 투찰 금액이다.
+ *
+ * 사유는 **다음 전이의 표에서 유도한다**(`nextActionOf`) — 상태 집합을 화면이 한 벌 더 적지
+ * 않고, 상태가 늘어도 이 자리가 따라온다. 두 축이 갈린다: **요청할 수 있는가**(그러면 다음
+ * 걸음을 말한다) ↔ **다시 요청할 수 없는가**(그러면 그 사실을 말한다).
+ */
+describe('화면 C — 투찰가 응답 없이 다시 연 화면 (v H-1 · cr D14)', () => {
+  const STATES = Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][];
+
+  /** 받은 응답이 손에 없는 자리 전수 — 그 가운데 **빈칸으로 접히는 자리가 없다**. */
+  it.each(STATES)('%s — 응답이 없으면 자격 자리가 사유를 든다(빈칸으로 접지 않는다)', async (state) => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    // 응답이 손에 없으므로 자격 카드 자신은 서지 않는다 — 그 자리가 **사유**를 든다.
+    expect(screen.queryByTestId('qualification'), '응답 없이 자격 카드가 섰다').toBeNull();
+    const absent = await screen.findByTestId('qualification-absent');
+    expect((absent.textContent ?? '').trim().length, '사유가 비었다').toBeGreaterThan(0);
+  });
+
+  /**
+   * **사유가 상태에 따라 갈린다.** 한 문장으로 접으면 「요청하면 온다」와 「다시 못 받는다」가
+   * 같은 얼굴이 되고, 그 둘은 운영자가 할 일이 다르다.
+   */
+  it('요청 전 · 다시 못 받음 · 다음 걸음 없음이 서로 다른 사유다', async () => {
+    const textOf = async (state: queries.BidCase['state']): Promise<string> => {
+      cleanup();
+      mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+      renderScreen();
+      await screen.findByTestId('worksheet-case-state');
+      return (await screen.findByTestId('qualification-absent')).textContent ?? '';
+    };
+
+    const canAsk = await textOf('WATCHING');
+    const cannotAsk = await textOf('BID_PLANNED');
+    const settled = await textOf('WON');
+
+    expect(new Set([canAsk, cannotAsk, settled]).size, '사유가 한 얼굴로 접혔다').toBe(3);
+    // 요청할 수 있는 자리는 **다음 걸음**을 말한다 — 「다시 못 받는다」가 아니다.
+    expect(canAsk).toContain('투찰가를 요청하면');
+    // 다시 못 받는 자리는 **그 사실**을 말한다. 전제는 세 자리가 같은 글자를 쓴다.
+    expect(cannotAsk).toContain('받은 화면에서만');
+    expect(settled).toContain('받은 화면에서만');
+  });
+
+  /**
+   * **H-1 의 핵심 자리** — 「하한 미달 즉시 실격」 가드가 다시 연 화면에서 빈칸으로 접혔다.
+   * 투찰 예정 건(다시 요청할 수 없다)에서 그 자리가 사유를 든다.
+   */
+  it('투찰 예정 건을 다시 열면 하한 여유 자리가 사유를 든다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('받은 화면에서만');
+    expect(margin.textContent).toContain('하한 대비 여유');
+    // 숫자를 지어내지 않는다 — 재지 못한 자리에 0% 를 그리지 않는다.
+    expect(margin.textContent).not.toContain('%');
+  });
+
+  /** 기록할 금액을 다시 적어야 하는 사실도 그 자리에서 말한다 — 초안 금액을 되읽는 표면이 없다. */
+  it('투찰 예정 건의 투찰가 카드가 초안 금액을 되읽을 수 없다고 말한다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    const card = await screen.findByTestId('worksheet-price-card');
+    expect(card.textContent).toContain('기록할 금액은 다시 적으십시오');
+  });
+
+  /**
+   * **음성 대조** — 응답이 손에 있으면 이 사유들이 하나도 서지 않는다. 더하기만 한 변경이면
+   * 위 단언들은 응답이 있는 자리에서도 통과한다.
+   */
+  it('응답이 손에 있으면 사유 자리가 전부 걷힌다', async () => {
+    mocked.requestBidPrice.mockResolvedValue(PRICED_WITH_FLOOR);
+    renderScreen();
+    await askPrice();
+    fillAmount('820000000');
+
+    expect(await screen.findByTestId('qualification')).not.toBeNull();
+    expect(screen.queryByTestId('qualification-absent'), '응답이 있는데 사유가 섰다').toBeNull();
+    const margin = await screen.findByTestId('floor-margin');
+    expect(margin.textContent).toContain('임계 사정률');
+    expect(margin.textContent).not.toContain('받은 화면에서만');
+    expect(screen.getByTestId('worksheet-price-card').textContent).not.toContain('기록할 금액은 다시 적으십시오');
+  });
+});
+
+/**
+ * **종단 건의 투찰가 카드에 쓸 수 없는 입력이 남지 않는다**(cr D6 · §12.3 (aa) ⓖ).
+ *
+ * 머리가 「할 걸음이 없다」고 말하는 바로 아래에서 카드가 「초안과 기록이 같은 입력을 씁니다」와
+ * 입력 넷을 내밀면 — 누를 자리가 하나도 없는데 — 운영자가 금액을 적고 보낼 자리를 찾는다.
+ * 조건은 **다음 전이의 표**에서 유도하고, 근거 절(읽는 표면)은 함께 걷지 않는다.
+ */
+describe('화면 C — 종단 건의 투찰가 입력 (cr D6)', () => {
+  const STATES = Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][];
+
+  it.each(STATES)('%s — 입력 묶음이 서는지는 다음 전이가 있는지와 같다', async (state) => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    const hasNext = nextActionOf(state) !== null;
+    expect(screen.queryByTestId('record-amount') !== null, '투찰 금액 입력').toBe(hasNext);
+    expect(screen.queryByTestId('record-vat') !== null, '과세 구분').toBe(hasNext);
+    expect(screen.queryByTestId('record-draw-numbers') !== null, '추첨번호').toBe(hasNext);
+    expect(screen.queryByTestId('record-memo') !== null, '메모').toBe(hasNext);
+    // 입력에 쓸 곳이 있다고 말하는 그 문장도 같은 표를 따른다(cr N-4 — 거짓 약속은 문장이다).
+    expect(screen.queryByText(/초안과 기록이 같은 입력을 씁니다/u) !== null, '그 문장').toBe(hasNext);
+  });
+
+  /** **근거 절은 읽는 표면이다** — 입력을 걷는 가드가 그것까지 걷지 않는다. */
+  it('응답이 손에 있으면 근거 절은 서고 입력과 함께 걷히지 않는다', async () => {
+    renderScreen();
+    await askPrice();
+
+    expect(await screen.findByTestId('grounds-section')).not.toBeNull();
+    expect(screen.getByTestId('bid-price-menu')).not.toBeNull();
+    expect(screen.getByTestId('verdict')).not.toBeNull();
+  });
+
+  /** 종단에서도 **카드 자신은 선다** — 통째로 걷으면 투찰가에 대해 아무 말도 하지 않는다. */
+  it('종단에서 투찰가 카드는 서고 그 자리에 사유가 있다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WON' }]);
+    renderScreen();
+
+    const card = await screen.findByTestId('worksheet-price-card');
+    expect(card.textContent).toContain('받은 화면에서만');
+    expect(screen.queryByTestId('record-amount')).toBeNull();
+  });
+});
+
+/** 전체 리뷰의 low 둘 — 머리의 개발 어휘와 넘김 금액의 **틀린 사유**(v L-3). */
+describe('화면 C — 문면 low 둘 (v L-3)', () => {
+  /**
+   * 「전이」는 **상태 기계의 낱말**이고 운영자의 낱말이 아니다. 그리고 그 자리의 상태 집합에는
+   * 개찰 대기처럼 **끝나지 않은** 건도 들어 있어, 「끝났다」로 적으면 그것도 거짓이다.
+   */
+  it('다음 걸음이 없는 자리에 개발 어휘가 없다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'AWAITING_OPENING' }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    const head = document.querySelector('header')!;
+    expect(head.textContent, '개발 어휘가 남았다').not.toContain('전이');
+    // 비공허 — 그 자리가 **무언가는** 말한다(문장을 지워서 통과하지 않게).
+    expect(head.textContent).toContain('이 화면에서');
+  });
+
+  /**
+   * 넘김 카드의 투찰 금액은 **입력칸을 비추는 읽기 자리**다. 운영자가 아직 적지 않은 칸에
+   * 「응답은 왔고 그 칸이 비었다」를 쓰면 화면이 서버에게 없는 빚을 지운다.
+   */
+  it('아직 적지 않은 투찰 금액의 사유가 서버 축이 아니다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    const amount = await screen.findByTestId('handoff-amount');
+    expect(amount.textContent).toBe(absenceTextOf('notEntered'));
+    expect(amount.textContent).not.toBe(absenceTextOf('notSent'));
   });
 });
 
