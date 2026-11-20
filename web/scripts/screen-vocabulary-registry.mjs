@@ -30,6 +30,9 @@ export const VOCABULARY_DECLARATIONS = [
   // 라벨**에서 가져오므로 그 표가 원문을 내면 이 글자에 실린다 — 그래서 어휘이고, 이것을 부르는
   // 카드는 「원문 0」 단언의 대상이 된다.
   'display/moneyDisplay.ts#koreanAmountTextOf',
+  // M14/14B — 압축 읽기(모바일 카드의 「약 4.2억원」). 병기와 **같은 이유로** 어휘다: 단위 글자가
+  // 통화 표의 라벨에서 오므로 그 표가 원문을 내면 이 글자에 실린다.
+  'display/moneyDisplay.ts#compactAmountTextOf',
   'display/moneyDisplay.ts#vatTreatmentDisplayOf',
   'display/noticeDisplay.ts#amountDisplayOf',
   'display/timeDisplay.ts#instantDisplayOf',

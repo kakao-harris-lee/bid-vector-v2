@@ -31,6 +31,20 @@ export const SUGGESTIONS_RESULT_STATE_DISPLAY = {
   NO_MATCH: { label: '열린 공고는 있으나 통과한 공고가 없습니다', tone: 'absent' },
 } as const satisfies Record<SuggestionsResultState, StateDisplay>;
 
+/**
+ * 제안 목록이 **어떤 차례로 오는가**(M14/14B 수정 라운드 1 · cr M-4 · 와이어프레임 B 의 「정렬:
+ * 마감 임박순」).
+ *
+ * **컨트롤이 아니라 사실의 진술이다.** `listSuggestions` 에는 정렬 인자가 없고(승인 경계),
+ * 서버가 §6.2 B 의 차례로 준다 — 화면이 고를 수 있는 것이 없으므로 고르는 자리를 그리면
+ * 가짜 affordance 다. 운영자가 알아야 하는 것은 **지금 보고 있는 차례가 무엇인가**이고,
+ * 이 한 줄이 그것을 말한다.
+ *
+ * 문면이 **표시층 상수 하나**인 것이 요점이다: 화면이 자기 자리에서 지어내면 서버의 차례가
+ * 바뀔 때 두 말이 갈린다.
+ */
+export const SUGGESTIONS_ORDER_TEXT = '정렬: 마감 임박 × 감시 조건 통과 — 서버가 준 차례입니다';
+
 /** 제안 카드는 **면허 축만** 판정한다 — 두 값이고 판정 불가가 미달이 아니다. */
 export const SUGGESTION_LICENSE_VERDICT_DISPLAY = {
   ELIGIBLE: { label: '면허 충족', tone: 'good' },

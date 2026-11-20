@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { absenceTextOf } from '../display/absence';
+import { SUGGESTIONS_ORDER_TEXT } from '../display/noticeDisplay';
 import { localInputToIso } from '../display/timeDisplay';
 
 import { TodayNoticesScreen } from './TodayNoticesScreen';
@@ -878,5 +879,344 @@ describe('화면 B — 담기(여정 ②의 마지막 걸음)', () => {
         bidKind: 'REAL',
       }),
     );
+  });
+});
+
+/** 마감이 **가까운** 공고 하나 — 「곧 마감」 축을 재는 자리다(먼 마감은 위 `NOTICE` 가 든다). */
+function soonNotice(days: number): queries.SuggestedNotice {
+  return {
+    ...SUGGESTION,
+    noticeNumber: `SYN-SOON-${days}`,
+    deadlineAt: new Date(Date.now() + days * 86_400_000).toISOString(),
+  };
+}
+
+/**
+ * **머리 요약**(M14/14B · 와이어프레임 B 의 머리 한 줄).
+ *
+ * 이름이 「감시 조건 통과」다 — 제안 집합은 **자격 통과 집합이 아니다**(면허 판정이
+ * `ELIGIBLE | UNCERTAIN` 둘이고 판정 불가는 미달이 아니다). 분모는 서버의 `total` 이고,
+ * 분자는 **상한 초과가 없을 때만** 붙는다: 보이는 m 장에서 센 수를 전체 분모에 걸면 거짓이 된다.
+ */
+describe('화면 B — 머리 요약 (M14/14B)', () => {
+  it('기본 상태의 요약이 「감시 조건 통과」와 서버의 전체 건수를 말한다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 7, resultState: 'MATCHED' });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('감시 조건 통과');
+    expect(summary.textContent).toContain('7');
+    // 제안을 「자격 통과」로 부르면 정직성 퇴행이다(계약 「데이터」 절).
+    expect(summary.textContent, '제안 집합을 자격 통과로 불렀다').not.toContain('자격 통과');
+  });
+
+  it('상한 초과가 없으면 곧 마감인 수를 함께 말한다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [soonNotice(2), soonNotice(3), { ...SUGGESTION, noticeNumber: 'SYN-FAR' }],
+      total: 3,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('3');
+    expect(summary.textContent).toContain('2');
+    expect(summary.textContent).toContain('곧 마감');
+  });
+
+  /**
+   * **경계를 양쪽에서 밟는다**(v M-1 · cr M-2). 앞 판은 +2·+3 과 2099 만 보아, 그 사이의 어떤
+   * 값도 같은 답을 냈다 — 상수를 27 년으로 올리거나 `>= 0` 을 지워도 조용했다(실측).
+   *
+   * 한 칸에 공고 **하나**만 둔다. 그래야 분자가 0 이냐 1 이냐로 갈리고, 그 수가 곧 「이 날이
+   * 곧인가」의 답이다.
+   */
+  it.each([
+    ['경계 당일은 든다', 7, true],
+    ['경계 다음 날은 빠진다', 8, false],
+    ['어제 마감(거울상)은 빠진다', -1, false],
+  ])('%s', async (_label, days, counted) => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [soonNotice(days)],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('감시 조건 통과 1건');
+    expect(summary.textContent?.includes('곧 마감'), `${days}일: 곧 마감 ${counted ? '이어야' : '이 아니어야'} 한다`).toBe(
+      counted,
+    );
+  });
+
+  /**
+   * **상한 가드의 경계**(v M-1 의 V11). 앞 판은 9 대 1 만 보아 「`rows + 5` 보다 클 때만」으로
+   * 느슨해지는 변이가 초록이었다. 한 건만 더 통과해도 분자를 말하지 않는다.
+   */
+  it('통과가 받은 행보다 한 건만 많아도 분자를 말하지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [soonNotice(2)],
+      total: 2,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('감시 조건 통과 2건');
+    expect(summary.textContent, '보이지 않는 건까지 센 척했다').not.toContain('곧 마감');
+  });
+
+  /**
+   * **상한을 넘으면 분자를 붙이지 않는다.** 분자는 받은 m 장에서만 셀 수 있는데 분모는 통과한
+   * 전체다 — 둘을 한 문장에 걸면 화면이 세지 않은 것을 센 척한다.
+   */
+  it('상한을 넘으면 곧 마감 수를 말하지 않는다 — 세지 않은 것을 센 척하지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [soonNotice(2)], total: 9, resultState: 'MATCHED' });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('9');
+    expect(summary.textContent, '보이지 않는 건까지 센 척했다').not.toContain('곧 마감');
+  });
+
+  /** 머리 요약은 기존 상한 초과 공시를 **대신하지 않는다**(계약 14B 행 · M13 잔여 ⓐ). */
+  it('상한 초과 공시가 머리 요약과 함께 선다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 9, resultState: 'MATCHED' });
+    renderScreen();
+
+    await screen.findByTestId('home-header-summary');
+    const disclosure = await screen.findByTestId('suggestion-total');
+
+    expect(disclosure.textContent).toContain('9');
+    expect(screen.getByRole('link', { name: /상한 넓히기/u }).getAttribute('href')).toBe('/settings');
+  });
+
+  /** 검색 중에는 요약이 **제안 수를 말하지 않는다** — 그 자리의 답은 결과 건수다. */
+  it('검색 중에는 제안 요약이 서지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 7, resultState: 'MATCHED' });
+    renderScreen();
+
+    await screen.findByTestId('home-header-summary');
+    await searchFor('SYN-7E1');
+
+    await waitFor(() => expect(screen.queryByTestId('home-header-summary')).toBeNull());
+  });
+});
+
+/**
+ * **「전체」 칩**(M14/14B · 팀장 판정 ②). 뜻은 이미 있는 `clearAll` 이고 새 질의 인자가 없다.
+ * 구간 프리셋(「이번 주」·「1억~30억」)은 더하지 않는다 — 그 값이 화면에 사는 정책 상수가 되고
+ * KST 날 경계 셈을 화면이 다시 짓는다(13E 가 적은 사유).
+ */
+/**
+ * **정렬 표시**(M14/14B 수정 라운드 1 · cr M-4 · 와이어프레임 B 의 「정렬: 마감 임박순」).
+ *
+ * 사실의 진술이고 컨트롤이 아니다 — 그 operation 에 정렬 인자가 없다(승인 경계). 문면은
+ * 표시층 상수 하나에서 오고, 화면이 자기 자리에서 지어내지 않는다.
+ */
+describe('화면 B — 정렬 표시 (M14/14B)', () => {
+  /**
+   * 문면을 **축어로** 박는다(v L1). 상수와 맞대면 동어반복이라, 그 상수를 「정렬: 공고일
+   * 최신순」으로 바꿔도 초록이다 — 서버가 주는 차례와 **어긋난 말**이 그대로 선다.
+   */
+  it('제안 목록이 서면 그 차례를 말한다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    const order = await screen.findByTestId('suggestion-order');
+
+    expect(order.textContent).toBe('정렬: 마감 임박 × 감시 조건 통과 — 서버가 준 차례입니다');
+    // 화면이 **그 상수를 쓴다**는 사실도 함께 든다(사본을 손으로 적지 않았다).
+    expect(order.textContent).toBe(SUGGESTIONS_ORDER_TEXT);
+  });
+
+  /** **고르는 자리를 그리지 않는다** — 고를 수 있는 것이 없는 컨트롤은 가짜 affordance 다. */
+  it('정렬 표시에 컨트롤이 없다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    const order = await screen.findByTestId('suggestion-order');
+
+    expect(within(order).queryAllByRole('button')).toStrictEqual([]);
+    expect(within(order).queryAllByRole('link')).toStrictEqual([]);
+    expect(within(order).queryAllByRole('combobox')).toStrictEqual([]);
+  });
+
+  /** 목록이 없으면 차례도 없다 — 빈 자리에 「무엇의 차례」를 말하지 않는다(음성 대조). */
+  it('제안이 비면 정렬 표시도 없다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('suggestions-empty');
+
+    expect(screen.queryByTestId('suggestion-order')).toBeNull();
+  });
+});
+
+describe('화면 B — 「전체」 칩 (M14/14B)', () => {
+  it('조건이 없으면 눌린 얼굴이다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('suggestions-empty');
+
+    expect(screen.getByTestId('chip-all').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('조건이 서면 눌린 얼굴이 풀리고, 누르면 조건이 전부 지워진다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    await searchFor('SYN-7E1');
+    await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    expect(screen.getByTestId('chip-all').getAttribute('aria-pressed')).toBe('false');
+
+    fireEvent.click(screen.getByTestId('chip-all'));
+
+    expect(await screen.findByTestId(`suggestion-card-${SUGGESTION.noticeNumber}`)).not.toBeNull();
+    expect(screen.getByTestId('chip-all').getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+/**
+ * **카드 재배치**(M14/14B · 와이어프레임 B 의 카드). 상자 좌표는 배치 게이트가 재고, 이 자리는
+ * 그것이 재지 못하는 **묶음**을 본다 — D-day 와 담기가 한 자리에 서는 것이 그 배치의 사실이다.
+ */
+describe('화면 B — 카드의 배치와 자격 슬롯 (M14/14B)', () => {
+  it('D-day 와 다음 행동이 한 묶음에 선다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const aside = within(card).getByTestId('notice-aside');
+
+    expect(within(aside).getByTestId('notice-deadline')).not.toBeNull();
+    expect(within(aside).getByRole('button', { name: /담기/u })).not.toBeNull();
+  });
+
+  /**
+   * **검색 결과 카드의 자격 판정은 범위 밖이다**(계약 「범위 밖」 · M13 승계). 빈 자리로 두면
+   * 운영자가 「판정했는데 통과다」로 읽는다 — 그 자리가 **왜 비었는지**를 말한다.
+   */
+  it('검색 결과 카드의 자격 자리는 판정이 아니라 상태 문면이다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+
+    expect(within(card).getByTestId('notice-qualification').textContent).toBe('제안 목록에서만 판정합니다');
+  });
+
+  /** 제안 카드의 그 자리는 **서버가 준 판정**이다 — 같은 자리가 두 사실을 가른다. */
+  it('제안 카드의 자격 자리는 서버의 면허 판정이다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    const card = await screen.findByTestId(`suggestion-card-${SUGGESTION.noticeNumber}`);
+
+    expect(within(card).getByTestId('suggestion-license').textContent).toContain('면허 충족');
+    expect(within(card).queryByTestId('notice-qualification'), '제안 카드에 상태 문면이 섰다').toBeNull();
+  });
+
+  /**
+   * **압축 금액은 모바일 배치의 글자**이고, 정확 금액에 닿는 길이 카드 안에 남는다(팀장 판정 ⑤).
+   * 정확 금액 노드(`notice-amount`)는 **건드리지 않는다** — 여정 게이트가 그 축어를 든다.
+   */
+  it('압축 금액이 서고 누르면 정확 금액이 아래층에 펼쳐진다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const compact = within(card).getByTestId('notice-amount-compact');
+
+    expect(compact.textContent).toBe('12억원');
+    const exact = document.getElementById(compact.getAttribute('aria-describedby') ?? '');
+    expect(exact?.textContent, '압축 글자에서 정확 금액으로 가는 길이 없다').toContain('1,200,000,000원');
+
+    expect(exact?.getAttribute('data-expanded')).toBe('false');
+    fireEvent.click(compact);
+    expect(exact?.getAttribute('data-expanded')).toBe('true');
+  });
+
+  /**
+   * 금액이 없으면 압축할 것도 없다 — 「약 0원」을 지어내지 않는다. 그러나 **자리째 사라지지도
+   * 않는다**(v M-2): 정확 금액의 부재 어휘는 `md` 이상에서만 서는 `dl` 안에 있어, 좁은 화면에서
+   * 압축 자리를 비우면 「금액이 없다」와 「배치가 숨겼다」가 같은 얼굴이 된다.
+   */
+  it('금액이 없는 공고는 압축 자리에서 사유를 말한다 — 수를 지어내지도 자리를 비우지도 않는다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, baseAmountWon: null, baseAmountProvenance: null, baseAmountBasis: null }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+
+    expect(within(card).queryByTestId('notice-amount-compact'), '없는 금액에 압축 글자를 지어냈다').toBeNull();
+    expect(within(card).getByTestId('notice-amount-compact-absent').textContent).toBe(absenceTextOf('notSent'));
+    expect(within(card).getByTestId('notice-amount').textContent).toBe(absenceTextOf('notSent'));
+  });
+
+  /**
+   * **읽을 수 없는 값에서 두 폭이 같은 말을 한다**(cr N-3). 압축 셈은 「값이 없다」와 「값을
+   * 읽을 수 없다」 둘 다에 `null` 을 내는데, 뒤엣것에 「주어지지 않음」을 붙이면 **거짓**이다 —
+   * 서버는 보냈고 이쪽이 못 읽었다. 넓은 쪽 `dl` 은 그때 숫자를 그대로 그린다.
+   */
+  it('읽을 수 없는 금액은 부재가 아니라 숫자 그대로다 — 두 폭이 같은 술어다', async () => {
+    const unreadable = Number.MAX_SAFE_INTEGER + 2;
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, baseAmountWon: unreadable }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+
+    expect(within(card).queryByTestId('notice-amount-compact-absent'), '보낸 값을 안 보냈다고 말했다').toBeNull();
+    expect(within(card).getByTestId('notice-amount-compact-raw').textContent).toBe(
+      within(card).getByTestId('notice-amount').textContent,
+    );
+  });
+
+  /**
+   * **압축 금액은 좁은 화면의 것이다**(팀장 판정 ⑤ · v M-3). jsdom 은 CSS 를 풀지 않으므로
+   * 「보이는가」로는 설 수 없다 — 그 자리를 **클래스 선언**으로 잰다. 넓은 화면에서 압축과
+   * 정확 금액이 함께 서면 어느 쪽이 금액인지 흐려진다.
+   */
+  it('압축 금액 묶음이 넓은 화면에서 숨는다 — 정확 금액과 겹치지 않는다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const compact = within(card).getByTestId('notice-amount-compact');
+    const wrapper = compact.closest('span.md\\:hidden');
+
+    expect(wrapper, '압축 금액이 md 이상에서 숨는 묶음 안에 있지 않다').not.toBeNull();
+    expect(wrapper?.contains(compact)).toBe(true);
+    // 그 짝 — 정확 금액의 `dl` 은 반대로 **좁은 화면에서** 숨는다.
+    expect(within(card).getByTestId('notice-amount').closest('dl')?.className).toContain('md:flex');
+  });
+
+  /**
+   * 좁은 화면의 금액에도 **축 이름**이 붙는다(와이어프레임의 「기초 4.2억」 · v M-2).
+   *
+   * **자기 노드로 잰다**: 묶음의 글자로 재면 아래층(정확 금액 + 부속 축)이 「기초금액」을 담고
+   * 있어 라벨을 지워도 초록이다(실측 — 그 변이가 지나갔다).
+   */
+  it('압축 금액에 기초 축 이름이 붙는다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+
+    expect(within(card).getByTestId('notice-amount-compact-label').textContent).toBe('기초');
   });
 });

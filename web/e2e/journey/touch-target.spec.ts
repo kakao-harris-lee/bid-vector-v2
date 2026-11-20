@@ -78,7 +78,31 @@ const OWN_NOTICES = ['SYN-M9-OPEN-NOT-OPENED', 'SYN-M9-OPEN-REBID'] as const;
  */
 export const TOUCH_TARGET_SCREENS = [
   { slotId: 'onboarding', path: '/start', ready: 'screen-onboarding', minCount: 13 },
-  { slotId: 'home', path: '/', ready: 'screen-home', minCount: 8 },
+  /**
+   * 홈은 **두 상태로** 선다(M14/14B — M13 잔여 §12.3 (w) ⓗ).
+   *
+   * 앞 판은 측정 **전에** 검색을 걸어 **검색 결과 상태만** 쟀다. 그런데 운영자가 매일 여는 것은
+   * 기본 상태(제안 목록)이고, 그 상태의 카드·칩은 이 게이트의 눈 밖이었다 — 거기에 하한에 못
+   * 미치는 컨트롤이 있어도 아무도 붉지 않았다.
+   *
+   * 화면 모집단은 자리 표와 **집합 등식**이라(`journey-screen-table.test.mjs`) 행을 더할 수 없다.
+   * 그래서 **한 행 안에서 두 상태**를 돈다 — `minCount` 는 기본 상태의 하한이고, `searchState` 가
+   * 그 뒤에 이어 도는 둘째 상태와 그 하한을 든다. 검색 상태의 하한 8 은 **앞 판 그대로**다
+   * (하한은 올리기만 한다 — 실측 49 라 여유가 넉넉하고, 그 수를 하한으로 박으면 카드 속내가
+   * 바뀔 때마다 이 줄이 흔들린다).
+   *
+   * 기본 상태의 하한 10 은 **실측 12 보다 낮게** 둔다(`borderedControls` 하한과 같은 판단).
+   * 이 수가 하는 일은 「보이는 것」 필터가 집합을 비우지 않았음을 보는 것이고, 제안 목록은
+   * 계정의 감시 조건에 매여 **한 장 늘고 주는** 자리라 실측값을 박으면 잡음으로 붉는다.
+   * 셸의 하단 탭 다섯과 검색 폼만으로도 이 하한을 넘으므로 공허해지지 않는다.
+   */
+  {
+    slotId: 'home',
+    path: '/',
+    ready: 'screen-home',
+    minCount: 10,
+    searchState: { minCount: 8, query: '합성' },
+  },
   // 경로를 **문자열 리터럴**로 적는다 — 등식 게이트가 AST 로 읽는 자리이고, 식으로 적으면 그
   // 게이트가 값을 읽지 못한다. 씨앗과 어긋나지 않는 것은 아래 첫 단언이 든다.
   // M13/13C — 금액 복사 버튼이 늘어 **다시 조였다**(실측 8 · 여유 0). 하한은 올리기만 한다.
@@ -91,6 +115,42 @@ export const TOUCH_TARGET_SCREENS = [
   { slotId: 'login', path: '/login', ready: 'screen-login', minCount: 1 },
   { slotId: 'not-found', path: '/no-such-place', ready: 'screen-not-found', minCount: 5 },
 ] as const;
+
+/**
+ * 화면 하나가 **서는 상태** — 들어가는 걸음과 그 상태의 하한.
+ *
+ * 상태가 둘인 화면은 자기 행이 `searchState` 를 **선언한다**. 루프가 자리 이름을 열거하지 않는
+ * 것이 요점이다 — 뒤 레인이 다른 화면에 둘째 상태를 붙여도 루프를 고치지 않는다.
+ */
+interface ScreenState {
+  /** 실패 메시지에 붙는 이름. 상태가 하나뿐인 화면은 빈 글자라 앞 판과 같은 메시지가 선다. */
+  readonly id: string;
+  readonly minCount: number;
+  readonly enter: (page: Page) => Promise<void>;
+}
+
+function statesOf(screen: (typeof TOUCH_TARGET_SCREENS)[number]): readonly ScreenState[] {
+  const base: ScreenState = {
+    id: 'searchState' in screen ? '기본' : '',
+    minCount: screen.minCount,
+    enter: async () => undefined,
+  };
+  if (!('searchState' in screen)) {
+    return [base];
+  }
+  const { minCount, query } = screen.searchState;
+  return [
+    base,
+    {
+      id: '검색 결과',
+      minCount,
+      // 빈 목록은 카드 안의 타깃을 하나도 내지 않는다 — 그래서 둘째 상태는 **검색을 지난다**.
+      enter: async (page) => {
+        await search(page, query);
+      },
+    },
+  ];
+}
 
 /**
  * 프로필 한 벌 가운데 **이 spec 이 덮는 축**. 두 쓰기(사업 정보 · 자격 사실)가 통째로 교체하는
@@ -339,67 +399,66 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
    */
   let matchedAllowed = new Set<string>();
   for (const screen of TOUCH_TARGET_SCREENS) {
-    await page.goto(screen.path);
-    await expect(page.getByTestId(screen.ready)).toBeVisible();
-    // 홈은 **검색 결과가 선 상태**로 잰다 — 빈 목록은 카드 안의 타깃을 하나도 내지 않는다.
-    // 각 화면을 한 번만 돌므로 「이미 검색했는가」를 기억할 자리가 없다(cr L-6).
-    if (screen.slotId === 'home') {
-      await search(page, '합성');
+    for (const state of statesOf(screen)) {
+      const where = `${screen.slotId}${state.id === '' ? '' : `/${state.id}`}`;
+      await page.goto(screen.path);
+      await expect(page.getByTestId(screen.ready)).toBeVisible();
+      await state.enter(page);
+      await page.waitForLoadState('networkidle');
+
+      const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
+
+      /**
+       * **컨트롤의 경계가 그려진 색**(v M-1 · cr L-2). AST 축은 className **리터럴**만 보므로
+       * 클래스 글자가 상수나 헬퍼에 들어가면 아무 말도 하지 않는다 — 이 층은 브라우저가 실제로
+       * 그린 색을 본다. 허용 집합은 `index.css` 에서 **유도한다**(값을 여기 복사하지 않는다):
+       * 컨트롤 선이거나 어조 자신의 글자색이다. 카드 선은 그 집합에 없다.
+       */
+      // 허용 색은 **그 페이지에서** 계산한다 — 출하 CSS 와 같은 파서를 지난다(cr M-1).
+      const allowed = new Set([
+        ...(await page.evaluate(computeBorderColorsInPage, ALLOWED_BORDER_CLASSES)),
+        'rgba(0, 0, 0, 0)',
+        'transparent',
+      ]);
+      const borders = await page.evaluate(measureControlBordersInPage);
+      const drawn = borders.filter((one) => one.width > 0);
+      borderedControls += drawn.length;
+      matchedAllowed = new Set([...matchedAllowed, ...drawn.map((one) => one.color).filter((one) => allowed.has(one))]);
+      const wrong = drawn.filter((one) => !allowed.has(one.color));
+      expect(
+        wrong.map((one) => `${one.tag}[${one.testId}] ${one.color} "${one.name}"`),
+        `${where}: 컨트롤 경계가 허용 토큰 밖의 색이다(카드 선을 쓴 자리일 수 있다)`,
+      ).toStrictEqual([]);
+
+      // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
+      expect(targets.length, `${where}: 보이는 타깃 ${targets.length} 이 하한 ${state.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
+        state.minCount,
+      );
+      /**
+       * ② 전수 — 이름으로 고르지 않는다.
+       *
+       * **두 변을 함께 잰다**(M14/14A — M13 잔여 §12.3 (w) ⓑ). 앞 판은 **세로만** 보았고, 측정
+       * 함수는 가로도 내는데 아무도 단언하지 않았다. 짧은 라벨의 알약 버튼은 세로만 키우면
+       * 44×40 꼴이 되어 손가락이 옆으로 빗나간다 — 하한은 「최소 **변**」이므로 두 변 모두다.
+       * 이 축을 더하는 것은 하한을 **올리는** 변경이다(계약 「올리기만」).
+       */
+      const small = targets.filter((one) => one.height < MIN_TOUCH_PX || one.width < MIN_TOUCH_PX);
+      expect(
+        small.map((one) => `${one.tag} ${one.width}x${one.height}px "${one.name}"`),
+        `${where}: 터치 타깃의 변이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
+      ).toStrictEqual([]);
+      /**
+       * ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.
+       *
+       * **문서 폭만으로는 모자란다**(cr L-8 대조에서 실측): 뷰포트보다 넓은 **고정 배치** 요소는
+       * 흐름 밖이라 `scrollWidth` 를 늘리지 않아, 500px 짜리 하단 탐색을 390px 에 심은 변이가
+       * 그대로 초록이었다. 그래서 **타깃 상자 자체가 뷰포트 밖으로 나가는지**를 함께 센다 — 그것이
+       * 이 게이트가 재려는 것(손가락이 상자 전체에 닿는가)에 더 가깝다.
+       */
+      expect(offscreen, `${where}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
+      expect(partiallyClipped, `${where}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
+      expect(overflow, `${where}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
     }
-    await page.waitForLoadState('networkidle');
-
-    const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
-
-    /**
-     * **컨트롤의 경계가 그려진 색**(v M-1 · cr L-2). AST 축은 className **리터럴**만 보므로
-     * 클래스 글자가 상수나 헬퍼에 들어가면 아무 말도 하지 않는다 — 이 층은 브라우저가 실제로
-     * 그린 색을 본다. 허용 집합은 `index.css` 에서 **유도한다**(값을 여기 복사하지 않는다):
-     * 컨트롤 선이거나 어조 자신의 글자색이다. 카드 선은 그 집합에 없다.
-     */
-    // 허용 색은 **그 페이지에서** 계산한다 — 출하 CSS 와 같은 파서를 지난다(cr M-1).
-    const allowed = new Set([
-      ...(await page.evaluate(computeBorderColorsInPage, ALLOWED_BORDER_CLASSES)),
-      'rgba(0, 0, 0, 0)',
-      'transparent',
-    ]);
-    const borders = await page.evaluate(measureControlBordersInPage);
-    const drawn = borders.filter((one) => one.width > 0);
-    borderedControls += drawn.length;
-    matchedAllowed = new Set([...matchedAllowed, ...drawn.map((one) => one.color).filter((one) => allowed.has(one))]);
-    const wrong = drawn.filter((one) => !allowed.has(one.color));
-    expect(
-      wrong.map((one) => `${one.tag}[${one.testId}] ${one.color} "${one.name}"`),
-      `${screen.slotId}: 컨트롤 경계가 허용 토큰 밖의 색이다(카드 선을 쓴 자리일 수 있다)`,
-    ).toStrictEqual([]);
-
-    // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
-    expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
-      screen.minCount,
-    );
-    /**
-     * ② 전수 — 이름으로 고르지 않는다.
-     *
-     * **두 변을 함께 잰다**(M14/14A — M13 잔여 §12.3 (w) ⓑ). 앞 판은 **세로만** 보았고, 측정
-     * 함수는 가로도 내는데 아무도 단언하지 않았다. 짧은 라벨의 알약 버튼은 세로만 키우면
-     * 44×40 꼴이 되어 손가락이 옆으로 빗나간다 — 하한은 「최소 **변**」이므로 두 변 모두다.
-     * 이 축을 더하는 것은 하한을 **올리는** 변경이다(계약 「올리기만」).
-     */
-    const small = targets.filter((one) => one.height < MIN_TOUCH_PX || one.width < MIN_TOUCH_PX);
-    expect(
-      small.map((one) => `${one.tag} ${one.width}x${one.height}px "${one.name}"`),
-      `${screen.slotId}: 터치 타깃의 변이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
-    ).toStrictEqual([]);
-    /**
-     * ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.
-     *
-     * **문서 폭만으로는 모자란다**(cr L-8 대조에서 실측): 뷰포트보다 넓은 **고정 배치** 요소는
-     * 흐름 밖이라 `scrollWidth` 를 늘리지 않아, 500px 짜리 하단 탐색을 390px 에 심은 변이가
-     * 그대로 초록이었다. 그래서 **타깃 상자 자체가 뷰포트 밖으로 나가는지**를 함께 센다 — 그것이
-     * 이 게이트가 재려는 것(손가락이 상자 전체에 닿는가)에 더 가깝다.
-     */
-    expect(offscreen, `${screen.slotId}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
-    expect(partiallyClipped, `${screen.slotId}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
-    expect(overflow, `${screen.slotId}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
   }
 
   /**
@@ -407,6 +466,8 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
    * 화면마다 세면 테두리 없는 버튼만 선 화면(입찰함)에서 거짓으로 붉는다(실측).
    * 하한은 오늘의 수보다 넉넉히 낮게 두어 화면이 바뀔 때 잡음으로 흔들리지 않는다.
    */
+  // 홈이 두 상태로 돌므로 그 화면 몫이 **두 번** 든다(cr L-11). 하한의 뜻(「경계를 그린 컨트롤을
+  // 어디선가 보기는 했다」)은 그대로지만, 이 수는 화면 수와 더는 대응하지 않는다.
   expect(borderedControls, '경계를 그리는 컨트롤을 하나도 보지 못했다 — 색 단언이 공허하다').toBeGreaterThan(10);
   /**
    * **허용 색이 실제로 쓰였는가**(cr M-1). 이 수가 0 이면 허용 집합이 그려진 경계와 한 번도

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { absenceTextOf } from '../display/absence';
-import { KeyValueRow } from './KeyValueRow';
+import { KeyValueRow, useTermHint } from './KeyValueRow';
 
 afterEach(() => {
   cleanup();
@@ -149,5 +149,37 @@ describe('빈 값 (cr L-1)', () => {
     );
 
     expect(screen.getByTestId('probe').textContent).toBe('제주바다건설(주)');
+  });
+});
+
+/**
+ * **표지를 받는 자리**(M14/14B 가 더한 인자). 더하는 쪽으로만 넓혔으므로 ⓐ 주지 않으면 앞과
+ * 같고 ⓑ 주면 **배선을 쥔 그 버튼**에 붙는다 — 바깥에 두르면 `aria-describedby` 를 표지 노드에서
+ * 읽을 수 없어 「아래층으로 가는 길」을 한 자리에서 잴 수 없다.
+ */
+describe('용어 줄의 표지 인자 — useTermHint (M14/14B)', () => {
+  function Probe({ testId }: { readonly testId?: string }) {
+    const hint = useTermHint('아래층 문면', testId === undefined ? undefined : { testId });
+    return (
+      <p>
+        {hint.termNode('라벨')}
+        {hint.hintNode}
+      </p>
+    );
+  }
+
+  it('표지를 주지 않으면 앞과 같다 — 음성 대조', () => {
+    render(<Probe />);
+
+    expect(screen.getByRole('button', { name: '라벨' }).getAttribute('data-testid')).toBeNull();
+  });
+
+  it('표지가 배선을 쥔 버튼에 붙는다', () => {
+    render(<Probe testId="probe-term" />);
+
+    const button = screen.getByTestId('probe-term');
+    expect(button.tagName).toBe('BUTTON');
+    const described = document.getElementById(button.getAttribute('aria-describedby') ?? '');
+    expect(described?.textContent).toBe('아래층 문면');
   });
 });

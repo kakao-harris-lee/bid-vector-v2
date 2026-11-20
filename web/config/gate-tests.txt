@@ -240,3 +240,8 @@ src/screens/BidBoxCard.test.tsx
 # 읽어 런타임 조립을 받고, 라우트 경계가 던진 값의 원문을 보이지 않는 것도 여기 있다.
 scripts/screen-copy-vocabulary.test.mjs
 src/screens/screenCopy.test.tsx
+# M14/14B 수정 라운드 1 (v HIGH-1) — **레일을 그리는 자리 전수**를 자리 표에서 구성하는 술어.
+# 레일 축의 비공허가 합계 하나면, 레일이 둘 이상 선 뒤에는 어느 하나가 측정에서 빠져도 나머지가
+# 그 수를 떠받친다(머지한 트리에서 실측됨). 집합이 소스에서 나오는 것과, 손으로 짠 두 단이
+# 그 집합을 조용히 줄이지 못하는 것(래칫)을 여기서 잰다. 술어의 양성·음성 대조도 같은 파일에 있다.
+scripts/rail-screens.test.mjs
