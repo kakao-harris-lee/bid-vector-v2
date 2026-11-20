@@ -128,6 +128,70 @@ test('여정 — 나중에 → 실행 취소 → 원상태', async ({ page }) =>
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
+/**
+ * **다시 연 워크시트의 빈 자리가 사유를 든다**(M14/14F · v H-1 high).
+ *
+ * 받은 투찰가 응답은 **그것을 받은 화면에서만** 산다 — 계약에 다시 읽는 operation 이 없고 상태를
+ * 민 뒤에는 요청 경로도 없다. 앞 판은 그 자리를 **빈칸으로 접었고**, 운영자는 「하한 대비 여유
+ * 표시가 없다」를 「문제없다」로 읽는다(해를 입는 자리가 투찰 금액이다).
+ *
+ * **왜 「나중에」로 재는가**: 그 상태의 다음 행동은 「다시 보기」이고 **투찰가 요청이 아니다** —
+ * 곧 「다시 요청할 수 없는」 갈래에 들면서 넘김 카드가 서는 상태다(종단에서는 그 카드 자체가
+ * 없어 하한 여유 자리를 잴 수 없다). 그리고 이 여정이 **이미 만들고 되돌리는** 상태라 새
+ * fixture 도 남는 상태 변화도 없다.
+ *
+ * **음성 대조가 같은 test 안에 있다**: 되돌린 뒤(관심) 같은 화면에서 하한 여유 자리는 **없어야**
+ * 한다 — 아직 묻지 않은 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다. 더하기만 한
+ * 변경이면 그 단언이 붉는다.
+ */
+test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 든다', async ({ page }) => {
+  const watched = watchRequests(page);
+  await signIn(page);
+
+  const { row, card } = await openOwnCase(page);
+  expect(row.state, '앞 여정이 건을 관심으로 되돌려 놓는다').toBe('WATCHING');
+
+  const deferred = await defer(page, card, row.caseId);
+  expect(deferred.state).toBe('DEFERRED');
+
+  // 그 건의 워크시트로 간다 — 주소는 **카드의 링크**에서 온다(경로를 손으로 적지 않는다).
+  await card.getByRole('link').first().click();
+  await expect(page.getByTestId('screen-worksheet')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+
+  // 자격 자리: 카드가 걷히는 대신 **사유**가 선다.
+  await expect(page.getByTestId('qualification-absent'), '자격 자리가 사유 없이 사라졌다').toHaveCount(1);
+  await expect(page.getByTestId('qualification'), '응답 없이 자격 카드가 섰다').toHaveCount(0);
+
+  // 하한 여유 자리: **그 줄이 통째로 없어지지 않는다**. H-1 의 핵심 자리다.
+  const margin = page.getByTestId('floor-margin');
+  await expect(margin, '하한 대비 여유가 빈칸으로 접혔다').toHaveCount(1);
+  await expect(margin).toContainText('받은 화면에서만');
+  // 숫자를 지어내지 않는다 — 재지 못한 자리에 비율을 그리지 않는다.
+  await expect(margin).not.toContainText('%');
+
+  // 되돌린다 — 그 상태의 다음 행동 하나가 「다시 보기」다(머리 자리).
+  const resumed = page.waitForResponse(
+    (one) => one.url().includes('/resume') && one.request().method() === 'POST',
+  );
+  await page.getByTestId('worksheet-primary').click();
+  const back = (await (await resumed).json()) as BidCaseRow;
+  expect(back.state, '되돌림이 관심으로 돌린다').toBe('WATCHING');
+
+  /**
+   * **음성 대조** — 요청할 수 있는 상태에서는 하한 여유 자리가 **없다**. 그리고 자격 자리의
+   * 사유가 **다른 글자**로 바뀐다(「요청하면 온다」는 참인 안내이고 「다시 못 받는다」는 그
+   * 상태에서 거짓이다).
+   */
+  await expect(page.getByTestId('floor-margin'), '묻지 않은 축을 재지 못함으로 그렸다').toHaveCount(0);
+  await expect(page.getByTestId('qualification-absent')).toContainText('투찰가를 요청하면');
+
+  await expect(page.getByTestId('write-failure')).toHaveCount(0);
+  expect(watched.outside).toStrictEqual([]);
+  expect(watched.unexpectedSameOrigin, '문서·번들 자산 밖의 같은 출처 요청').toStrictEqual([]);
+  assertOnlyAllowedOperations(watched.apiPaths);
+});
+
 test('여정 — 나중에 → 다시 보기', async ({ page }) => {
   const watched = watchRequests(page);
   await signIn(page);
