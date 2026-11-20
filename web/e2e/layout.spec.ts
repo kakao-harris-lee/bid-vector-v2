@@ -282,11 +282,15 @@ test.describe('두 단 — 레일의 자리', () => {
  * 공용 술어), 잴 묶음은 표지 전수다. 그래서 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는
  * 순간 이 spec 을 고치지 않아도 든다.
  *
- * **이 레인의 모집단은 「세션 없이 그려지는 레일」이다.** 백엔드가 없어 화면은 자기 얼굴
- * (적재 중·오류)을 내고(실측: 아홉 자리 전부 자기 `screen-*` 를 그리고 로그인 얼굴은 0), 레일은
- * 본문의 얼굴과 무관하게 서야 여기 든다. **데이터가 있어야 서는 레일은 세션을 쥔 여정 레인**
- * (`journey/layout-rails.spec.ts`)이 받는다 — 두 레인이 같은 술어(`railMeasure`)를 다른 모집단에
- * 건다. 아래 비공허 하한이 이 레인의 자리를 지킨다.
+ * **이 레인의 모집단은 「데이터 없이 그려지는 레일」이다.** preview 서버는 모든 `/api/*` 에
+ * **`200 text/html`** 를 돌려준다(SPA 폴백) — 그래서 화면은 401 을 받는 것이 **아니라** 파싱
+ * 실패를 받고, 로그인 얼굴 대신 적재 중·오류 얼굴을 낸다(실측: 아홉 자리 전부 자기 `screen-*` ·
+ * 로그인 얼굴 0). 레일이 본문의 얼굴과 무관하게 서야 여기 든다.
+ *
+ * **화면마다의 보증은 이 레인이 지지 않는다.** 데이터가 있어야 서는 레일(워크시트의 건 레일)은
+ * 여기서 영영 안 그려지기 때문이다. 그 의무는 세션과 씨앗을 쥔 **여정 레인**
+ * (`journey/layout-rails.spec.ts`)이 `railScreenSlots` 전수로 진다. 여기 남는 것은 자리 판정과
+ * 「적어도 하나는 봤다」뿐이다.
  *
  * **재는 것은 레일의 자리뿐이다.** 가로 넘침은 **다른 축**이고 정책도 다르다 — 일부러 가로로
  * 스크롤되는 줄(입찰함의 상태 탭)이 출하에 있고 그것은 위반이 아니다. 그 축을 여기서 함께 재면
@@ -301,16 +305,19 @@ const SHIPPED_ADDRESSES = shippedAddresses();
 test.describe('출하 화면의 레일', () => {
   test('자리 표를 실제로 읽었다 — 빈 목록은 아래 단언을 공허하게 만든다', () => {
     expect(SHIPPED_ADDRESSES.length).toBeGreaterThan(5);
-    expect(SHIPPED_ADDRESSES.every((one) => one.startsWith('/'))).toBe(true);
-    expect(SHIPPED_ADDRESSES).toContain(CATCH_ALL_ADDRESS);
+    expect(SHIPPED_ADDRESSES.every((one) => one.address.startsWith('/'))).toBe(true);
+    expect(SHIPPED_ADDRESSES.map((one) => one.address)).toContain(CATCH_ALL_ADDRESS);
   });
 
   test('1280px 에서 출하 레일이 본문 오른쪽이다', async ({ page }) => {
     await page.setViewportSize({ ...WIDE });
     let seen = 0;
-    for (const address of SHIPPED_ADDRESSES) {
+    for (const { address } of SHIPPED_ADDRESSES) {
       await page.goto(address);
       await expect(page.getByTestId('app-shell')).toBeVisible();
+      // 느린 러너에서 라우트 컴포넌트가 아직 안 붙었으면 계수가 0 이 된다(cr Open Q) — 그려질
+      // 기회를 준 뒤 잰다.
+      await page.waitForLoadState('networkidle');
 
       const groups = await measureRails(page);
       seen += groups.length;
@@ -324,9 +331,10 @@ test.describe('출하 화면의 레일', () => {
   test('390px 에서 출하 레일이 한 단으로 본문 아래에 선다', async ({ page }) => {
     await page.setViewportSize({ ...NARROW });
     let seen = 0;
-    for (const address of SHIPPED_ADDRESSES) {
+    for (const { address } of SHIPPED_ADDRESSES) {
       await page.goto(address);
       await expect(page.getByTestId('app-shell')).toBeVisible();
+      await page.waitForLoadState('networkidle');
 
       const groups = await measureRails(page);
       seen += groups.length;

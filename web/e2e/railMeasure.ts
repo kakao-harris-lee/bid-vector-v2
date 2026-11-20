@@ -100,11 +100,17 @@ export function railViolations(groups: readonly RailGroup[], viewport: RailViewp
   return broken;
 }
 
-/** 경로 인자를 채우는 토큰 — **주소를 만드는 값**이고 판정하는 값이 아니다. */
+/** 경로 인자의 **기본값** — 값을 주지 않은 인자를 채운다(주소를 만드는 값이고 판정 값이 아니다). */
 const PATH_PARAM_TOKEN = 'SYN-LAYOUT-PROBE';
 
 /** catch-all 자리가 도는 주소 — 어느 자리도 받지 않는 것이 그 자리의 뜻이다. */
 export const CATCH_ALL_ADDRESS = '/no-such-place';
+
+export interface ShippedAddress {
+  /** 자리 이름 — 레일 의무를 **화면마다** 거는 쪽이 이 값으로 짝을 짓는다. */
+  readonly id: string;
+  readonly address: string;
+}
 
 /**
  * 출하 화면의 주소 전수 — **자리 표에서 구성한다**(열거하지 않는다).
@@ -112,22 +118,24 @@ export const CATCH_ALL_ADDRESS = '/no-such-place';
  * `appScreenSlots` 는 자리 표를 못 읽거나 비면 **던진다** — 조용한 빈 집합이 되지 않는다.
  * 그래서 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는 순간 두 레인 모두에 자동으로 든다.
  *
- * 경로 인자를 채우는 토큰이 **그 자리의 값과 맞지 않아도 된다**: 이 축이 재는 것은 「그려진 레일이
- * 제자리인가」이고, 값이 없어 레일이 안 그려지면 그 화면은 묶음 0 으로 빠진다(비공허 하한이
- * 전체에서 그 자리를 지킨다). 값이 **있어야** 서는 레일은 세션을 쥔 레인이 받는다.
+ * [params] 는 경로 인자에 **실제 값**을 꽂는다. 값이 없는 인자는 기본 토큰으로 채워지고, 그
+ * 주소는 데이터를 싣지 못한다 — **데이터가 있어야 서는 레일**을 재려면 그 값을 쥔 레인이
+ * (세션과 씨앗을 가진 여정 레인) 여기에 자기 값을 준다.
  */
-export function shippedAddresses(): readonly string[] {
+export function shippedAddresses(params: Readonly<Record<string, string>> = {}): readonly ShippedAddress[] {
   const routesText = readFileSync(
     resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'routes.tsx'),
     'utf8',
   );
   const slots = appScreenSlots(routesText);
-  return slots.map((slot: { readonly path: string }) =>
-    slot.path === '*'
-      ? CATCH_ALL_ADDRESS
-      : slot.path
-          .split('/')
-          .map((one) => (one.startsWith(':') ? PATH_PARAM_TOKEN : one))
-          .join('/'),
-  );
+  return slots.map((slot: { readonly id: string; readonly path: string }) => ({
+    id: slot.id,
+    address:
+      slot.path === '*'
+        ? CATCH_ALL_ADDRESS
+        : slot.path
+            .split('/')
+            .map((one) => (one.startsWith(':') ? (params[one.slice(1)] ?? PATH_PARAM_TOKEN) : one))
+            .join('/'),
+  }));
 }
