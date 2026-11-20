@@ -242,16 +242,27 @@ Kotlin `check` 는 evidence 가 누출 패턴 게이트의 훑기 뿌리에 드�
 HEAD** 에서 따로 돈다. 그 결과의 정본은 verifier 와 PR 조치 코멘트다(여기 적으면 그 기록이 또
 커밋을 낳는다).
 
-### 4.1 Kotlin `check`
+### 4.1 Kotlin 축
 
-evidence 커밋 HEAD 에서 **두 벌**로 돌았다.
-- `check -x test`(빠른 쓸기) — **BUILD SUCCESSFUL** · `leakPatternGate` **실행됨**. 그 task 의
-  스캔 뿌리가 `reports/evidence` 라, evidence 를 실제로 훑은 것은 이 실행이다.
-- `check`(전건) — **BUILD SUCCESSFUL** · `FAILED` 0건. 14초인 것은 앞 쓸기와 앞 라운드의 전건이
-  이미 돌아 Kotlin 입력이 하나도 바뀌지 않았기 때문이고(이 slice 의 Kotlin 편집은 **0**),
-  `leakPatternGate` 는 그래서 UP-TO-DATE 다 — **앞 쓸기가 같은 HEAD 에서 실행한 결과**다.
+**빠른 쓸기를 `check -x test` 로 하지 않는다**(팀장 2026-11-20 · 14E 실측). 그 꼴은
+`:adapters:gateExecutionGate` 가 **낡거나 없는 test 결과**를 읽어 우연히 초록이 되거나 까닭 없이
+붉을 수 있다. 쓸기는 **task 이름으로** 건다.
+
+| 실행 | 결과 |
+| --- | --- |
+| `ktlintCheck detekt cpdCheck leakPatternGate`(판정 SHA 에서) | 종료 코드 **0** · `leakPatternGate` **실행됨**(UP-TO-DATE 아님) |
+| `cpdCheck --rerun` | 종료 코드 **0** — 변이를 돌린 뒤라 리포트를 **다시 만든다**(낡은 리포트는 presence 게이트를 **로컬에서만** 붉힌다) |
+| `cpdReportPresenceGate` | 종료 코드 **0** · 모듈 전수 **실행됨** |
+| `check`(전건, 앞 커밋에서) | **BUILD SUCCESSFUL** · `FAILED` 0건 |
+
+`leakPatternGate` 의 스캔 뿌리가 `reports/evidence` 라, **evidence 를 실제로 훑은 것은 판정 SHA
+에서 돈 그 실행**이다. 나머지 Kotlin task 가 UP-TO-DATE 인 것은 이 slice 의 Kotlin 편집이 **0**
+이기 때문이고, 그 사실 자체가 전건이 14초에 끝난 이유다.
 
 참조값: 수정 라운드 1 **이전**의 전건은 `1da17c04` 에서 BUILD SUCCESSFUL(35m 33s)이었다.
+
+**기록 정정**: 앞 판은 이 자리에 `check -x test` 를 적었다. 그 실행도 초록이었지만 위 사유로
+**판정의 근거로 삼지 않는다** — 근거는 이름으로 건 네 축과 전건이다.
 
 ## 5. 부재값 재실측 (종결)
 
