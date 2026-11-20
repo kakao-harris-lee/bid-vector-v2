@@ -1166,3 +1166,19 @@ describe('화면 D — 수정 라운드 1 의 자리들', () => {
     expect((await screen.findByTestId('bid-box-all-count-note')).textContent).toContain('종료한 건까지');
   });
 });
+
+describe('화면 D — 두 수를 화해시키는 문장은 폭마다 하나다 (수정 라운드 2)', () => {
+  it('탭 곁의 것과 레일의 것이 서로 다른 폭에서만 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([bidCase({ state: 'WON' })]);
+    renderScreen();
+
+    const beside = await screen.findByTestId('bid-box-all-count-note');
+    const rail = screen.getByTestId('bid-box-rail-count-note');
+
+    // 같은 문장이고, 서로 **반대 폭**에서만 보인다 — 한 화면에 두 번 서지 않는다.
+    expect(beside.textContent).toBe(rail.textContent);
+    expect(beside.className, '탭 곁의 것이 넓은 폭에서도 선다').toContain('md:hidden');
+    expect(rail.className, '레일의 것이 좁은 폭에서도 선다').toContain('hidden');
+    expect(rail.className).toContain('md:block');
+  });
+});

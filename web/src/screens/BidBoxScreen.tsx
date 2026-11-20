@@ -480,7 +480,11 @@ export function BidBoxScreen() {
             {/* 「상태 뜻」 — 문면은 **상태 표의 `why`** 다(레일이 자기 글을 들지 않는다). */}
             <Card as="section" testId="bid-box-state-meanings">
               <h3 className="text-sm font-semibold">상태 뜻</h3>
-              <p className="mt-1 text-xs text-ink-soft">{ALL_COUNT_NOTE}</p>
+              {/* 좁은 폭에서는 **탭 곁의 것 하나만** 선다(cr LOW): 레일이 본문 뒤로 내려와
+                  같은 문장이 한 화면에 두 번 보였다. 넓은 폭에서는 여기만 선다. */}
+              <p className="mt-1 hidden text-xs text-ink-soft md:block" data-testid="bid-box-rail-count-note">
+                {ALL_COUNT_NOTE}
+              </p>
               {meanings.length === 0 ? null : (
                 <dl className="mt-2 flex flex-col gap-1.5">
                   {meanings.map((one) => (
