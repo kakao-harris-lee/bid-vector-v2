@@ -1021,12 +1021,18 @@ describe('화면 B — 머리 요약 (M14/14B)', () => {
  * 표시층 상수 하나에서 오고, 화면이 자기 자리에서 지어내지 않는다.
  */
 describe('화면 B — 정렬 표시 (M14/14B)', () => {
-  it('제안 목록이 서면 그 차례를 말한다 — 표시층 상수 그대로', async () => {
+  /**
+   * 문면을 **축어로** 박는다(v L1). 상수와 맞대면 동어반복이라, 그 상수를 「정렬: 공고일
+   * 최신순」으로 바꿔도 초록이다 — 서버가 주는 차례와 **어긋난 말**이 그대로 선다.
+   */
+  it('제안 목록이 서면 그 차례를 말한다', async () => {
     mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
     renderScreen();
 
     const order = await screen.findByTestId('suggestion-order');
 
+    expect(order.textContent).toBe('정렬: 마감 임박 × 감시 조건 통과 — 서버가 준 차례입니다');
+    // 화면이 **그 상수를 쓴다**는 사실도 함께 든다(사본을 손으로 적지 않았다).
     expect(order.textContent).toBe(SUGGESTIONS_ORDER_TEXT);
   });
 
@@ -1155,6 +1161,29 @@ describe('화면 B — 카드의 배치와 자격 슬롯 (M14/14B)', () => {
     expect(within(card).queryByTestId('notice-amount-compact'), '없는 금액에 압축 글자를 지어냈다').toBeNull();
     expect(within(card).getByTestId('notice-amount-compact-absent').textContent).toBe(absenceTextOf('notSent'));
     expect(within(card).getByTestId('notice-amount').textContent).toBe(absenceTextOf('notSent'));
+  });
+
+  /**
+   * **읽을 수 없는 값에서 두 폭이 같은 말을 한다**(cr N-3). 압축 셈은 「값이 없다」와 「값을
+   * 읽을 수 없다」 둘 다에 `null` 을 내는데, 뒤엣것에 「주어지지 않음」을 붙이면 **거짓**이다 —
+   * 서버는 보냈고 이쪽이 못 읽었다. 넓은 쪽 `dl` 은 그때 숫자를 그대로 그린다.
+   */
+  it('읽을 수 없는 금액은 부재가 아니라 숫자 그대로다 — 두 폭이 같은 술어다', async () => {
+    const unreadable = Number.MAX_SAFE_INTEGER + 2;
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, baseAmountWon: unreadable }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+
+    expect(within(card).queryByTestId('notice-amount-compact-absent'), '보낸 값을 안 보냈다고 말했다').toBeNull();
+    expect(within(card).getByTestId('notice-amount-compact-raw').textContent).toBe(
+      within(card).getByTestId('notice-amount').textContent,
+    );
   });
 
   /**

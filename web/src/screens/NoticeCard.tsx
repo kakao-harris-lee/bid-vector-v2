@@ -84,8 +84,15 @@ function CompactAmount({ notice }: { readonly notice: NoticeSummary }) {
         어휘는 `md` 이상에서만 서는 `dl` 안에 있기 때문이다. 「약 0원」을 지어내지 않는 규율은
         그대로다: 지어내는 것이 아니라 **없다고 말하는** 것이다.
       */}
-      {compact === null ? (
+      {!amount.present ? (
         <AbsentValue reason="notSent" testId="notice-amount-compact-absent" />
+      ) : compact === null ? (
+        /*
+          **값은 왔는데 이쪽이 못 읽은 경우**(cr N-3). 「주어지지 않음」을 붙이면 거짓이다 —
+          서버는 보냈다. 넓은 쪽 `dl` 은 이때 숫자를 그대로 그리므로, 좁은 쪽도 같은 글자를
+          보인다. 두 폭이 같은 술어를 쓰는 것이 요점이다.
+        */
+        <span data-testid="notice-amount-compact-raw">{amount.amount}</span>
       ) : (
         <>
           {hint.termNode(compact)}
