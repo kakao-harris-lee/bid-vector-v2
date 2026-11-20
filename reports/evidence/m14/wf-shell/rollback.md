@@ -1,6 +1,6 @@
 # M14 / wf-shell (14A) — rollback
 
-**실측 HEAD: `b8b1203f7b0c3f11018f1e4d7035e94c825cff7e`**(이 slice 의 **마지막 산출물 커밋**).
+**실측 HEAD: `564f91c4a7e3c2d3d06a28e15766c2daf6327eba`**(이 slice 의 **마지막 산출물 커밋**).
 뒤에 오는 evidence 커밋은 아래 복원 목록 안의 경로를 건드리지 않는다 — 그 사실은 verifier 가
 `git diff --name-only <실측 HEAD>..<판정 SHA> -- <복원 경로들>` 로 확인한다.
 
@@ -28,8 +28,8 @@ slice 는 `docs/discovery/capability-map.md` 를 아직 건드리지 않았고(�
 
 ## 실측 (임시 clone, 저장소 밖)
 
-`b8b1203f` 를 체크아웃한 버릴 clone 에서 ①~⑥ 을 돌렸다(수정 라운드 2 뒤 재실측 — 앞 판의
-수를 옮기지 않았다).
+`564f91c4` 를 체크아웃한 버릴 clone 에서 ①~⑥ 을 돌렸다(원시 요소 API 라운드 뒤 재실측 —
+앞 판의 수를 옮기지 않았다).
 
 | 단계 | 결과 |
 | --- | --- |
