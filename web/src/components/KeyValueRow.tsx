@@ -21,7 +21,16 @@ import { AbsentValue } from './AbsentValue';
  * 아래층 노드는 호출자가 **값 요소 안**에 둔다. 형제 `<dd>` 로 두면 `dl` 의 내용 모형에서 한
  * 용어에 값이 둘이 된다.
  */
-export function useTermHint(hint: string | undefined): {
+export function useTermHint(
+  hint: string | undefined,
+  /**
+   * **M14/14B 가 더한 자리**(더하는 쪽으로만 넓힌다 — 기존 호출부는 그대로 컴파일된다).
+   * 누를 수 있는 라벨에 표지를 붙여야 하는 자리가 생겼다: 모바일 카드의 압축 금액이 그 꼴인데,
+   * 바깥에 표지를 두르면 `aria-describedby` 를 **그 바깥 노드에서 읽을 수 없다**(배선은 버튼이
+   * 쥔다). 표지와 배선이 같은 노드에 있어야 「아래층으로 가는 길」을 한 자리에서 잰다.
+   */
+  options?: { readonly testId?: string },
+): {
   readonly describedBy: string | undefined;
   /** `<dt>` 안에 들어갈 것 — 아래층이 있으면 누를 수 있는 라벨, 없으면 그냥 글자다. */
   readonly termNode: (label: string) => ReactNode;
@@ -39,6 +48,7 @@ export function useTermHint(hint: string | undefined): {
     termNode: (label) => (
       <button
         type="button"
+        data-testid={options?.testId}
         aria-describedby={describedBy}
         aria-pressed={expanded}
         onClick={() => setExpanded((open) => !open)}

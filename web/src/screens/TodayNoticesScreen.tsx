@@ -12,11 +12,12 @@ import {
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
 import { Button, LinkButton } from '../components/Button';
+import { PageHeader } from '../components/PageHeader';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
-import { instantDisplayOf, localInputToIso, readClock } from '../display/timeDisplay';
+import { daysUntil, instantDisplayOf, localInputToIso, readClock } from '../display/timeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
@@ -28,6 +29,47 @@ const PAGE_SIZE = 20;
 
 /** 담기는 **실투찰 건**으로 연다 — 페이퍼는 별 화면이고 섞지 않는다(SET-03). */
 const BID_KIND: BidCase['bidKind'] = 'REAL';
+
+/**
+ * 「곧 마감」의 경계 — **표시층의 값 하나**다(M14/14B · 팀장 판정 ④).
+ *
+ * 와이어프레임은 「이번 주 마감」이라고 적지만 **주의 경계는 서버가 선언한 축이 아니다**(요일
+ * 기준도, 달력 주도 계약에 없다). 그래서 화면이 주를 짓는 대신 **날 수**로 말한다 — 셈은
+ * `daysUntil` 하나(KST 달력일 차)를 지나고, 이 값이 그 셈의 유일한 문턱이다.
+ *
+ * 질의 인자가 아니다: 이 수는 **요약 한 줄의 문면**에만 쓰이고 서버로 나가지 않는다(마감일
+ * 칩은 운영자가 적은 값을 그대로 보낸다). 칩 프리셋을 두지 않는 13E 의 판단과 어긋나지 않는
+ * 이유가 그것이다.
+ */
+const DEADLINE_SOON_DAYS = 7;
+
+/**
+ * 머리 요약 한 줄(와이어프레임 B 의 머리) — **감시 조건을 통과한 전체 건수**와, 셀 수 있을
+ * 때에만 그 가운데 곧 마감인 수.
+ *
+ * 이름이 「감시 조건 통과」인 것이 계약의 조건이다(「데이터」 절): 제안의 면허 판정은
+ * `ELIGIBLE | UNCERTAIN` 둘이고 **판정 불가는 미달이 아니므로**, 이 집합을 「자격 통과」로
+ * 부르면 화면이 하지 않은 판정을 했다고 말하게 된다.
+ *
+ * **분자는 상한을 넘지 않을 때만 붙인다.** 분모는 서버가 준 `total`(표시 상한 적용 **전**)이고
+ * 분자는 받은 행에서만 셀 수 있다 — 둘을 한 문장에 걸면 화면이 **보지 못한 건까지 센 척**한다.
+ * 상한을 넘었다는 사실 자체는 기존 공시가 따로 말하므로(M13 잔여 ⓐ) 여기서 대신하지 않는다.
+ */
+function watchSummaryTextOf(
+  listed: { readonly rows: readonly { readonly deadlineAt?: string | null }[]; readonly total: number },
+  now: Date,
+): string {
+  const head = `감시 조건 통과 ${listed.total}건`;
+  if (listed.total !== listed.rows.length) {
+    return head;
+  }
+  const soon = listed.rows.filter((row) => {
+    const days = daysUntil(row.deadlineAt, now);
+    // 이미 지난 마감(`D+1`)은 「곧」이 아니다 — 거울상을 같은 수에 섞지 않는다.
+    return days !== null && days >= 0 && days <= DEADLINE_SOON_DAYS;
+  }).length;
+  return soon === 0 ? head : `${head} · 그 가운데 ${soon}건이 곧 마감`;
+}
 
 /** 운영자가 적는 칸 — **서버 파라미터 이름 그대로**다(사본을 두면 둘이 갈린다). */
 type FieldId = 'q' | 'agency' | 'amountMin' | 'amountMax' | 'deadlineFrom' | 'deadlineTo';
@@ -474,7 +516,16 @@ export function TodayNoticesScreen() {
 
   return (
     <section data-testid="screen-home" className="mx-auto flex max-w-3xl flex-col gap-6 p-4">
-      <h2 className="text-lg font-semibold">오늘의 공고</h2>
+      {/*
+        머리는 **한 자리**다(M14/14A 의 원시 요소). 요약은 **기본 상태에서만** 선다 — 검색 중에는
+        그 자리의 답이 제안 수가 아니라 결과 건수이고, 그것은 목록 위의 공시가 말한다. 빈 자리로
+        읽히는 값은 `PageHeader` 가 **그리지 않는다**.
+      */}
+      <PageHeader
+        testId="home-header"
+        title="오늘의 공고"
+        summary={searching || suggestions.data === undefined ? undefined : watchSummaryTextOf(suggestions.data, now)}
+      />
 
       {/* 시작하기로 가는 **진입 하나**(M7/7E-2b, D-7E2b-4) — 서버의 미완이 0 이면 뜨지 않는다. */}
       <OnboardingBanner />
@@ -490,6 +541,24 @@ export function TodayNoticesScreen() {
           />
         </label>
         <div className="flex flex-wrap items-start gap-2">
+          {/*
+            **「전체」 칩**(M14/14B · 팀장 판정 ②) — 와이어프레임 칩 줄의 맨 왼쪽이고, 뜻은 이미
+            있는 `clearAll` 이다. 새 질의 인자도 새 정책 상수도 없다.
+
+            `aria-pressed` 다: 이 칩은 **지금 조건이 없다는 상태**를 말하는 토글이고, 펼칠 묶음을
+            가리키지 않으므로 `aria-expanded` 는 거짓이 된다(상태 배지·용어 줄과 같은 판단).
+          */}
+          <button
+            type="button"
+            data-testid="chip-all"
+            aria-pressed={!searching}
+            onClick={clearAll}
+            className={`inline-flex min-h-11 items-center rounded-full border border-control-line px-3 text-sm ${
+              searching ? '' : 'bg-neutral-skin font-medium text-neutral-ink'
+            }`}
+          >
+            전체
+          </button>
           {FILTER_CHIPS.map((axis) => (
             <FilterChip
               key={axis.id}
