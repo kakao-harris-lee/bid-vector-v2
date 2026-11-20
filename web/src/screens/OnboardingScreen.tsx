@@ -161,6 +161,12 @@ const STEP_STRATEGY_FIELDS: Readonly<Record<'BUDGET' | 'WATCH', readonly Strateg
 const PREVIEW_ROWS = 3;
 
 /**
+ * 곁다리에 **실제로 서는 줄 수** — 받은 행과 곁다리 크기 가운데 작은 쪽이다. 공시의 술어가
+ * 이 수를 쓰므로 「보이는 것」과 「말하는 것」이 한 자리에서 나온다.
+ */
+const shownRows = (received: number): number => Math.min(received, PREVIEW_ROWS);
+
+/**
  * 화면 A 시작하기 — **항목의 진행 상태는 서버가 판정한다**(7C④-3 · D-7E2b-1). 이 화면은 세
  * 목록을 그리고, 「해당 없음」은 그 여집합으로 안다. 프로필·전략 값에서 완료를 추론하는 코드가
  * 없다 — 폼이 그 값을 **출발값으로** 쓸 뿐이고, 쓰기 뒤에는 체크리스트를 **다시 읽는다**
@@ -457,16 +463,22 @@ function SuggestionPreview() {
       ) : (
         <>
           <ul className="mt-2 flex flex-col gap-2">
-            {suggestions.data.rows.slice(0, PREVIEW_ROWS).map((row) => (
+            {suggestions.data.rows.slice(0, shownRows(suggestions.data.rows.length)).map((row) => (
               <PreviewRow key={`${row.noticeNumber}/${row.noticeRound}`} suggestion={row} now={now} />
             ))}
           </ul>
-          {/* 곁다리가 **전부가 아니라는 사실**을 말한다 — 몇 장만 보이고 끝나면 운영자가 그것을
-              전수로 읽는다. 전체는 오늘의 공고가 든다(그 화면이 상한 초과까지 공시한다). */}
-          {suggestions.data.rows.length > PREVIEW_ROWS ? (
+          {/*
+            곁다리가 **전부가 아니라는 사실**을 말한다 — 몇 장만 보이고 끝나면 운영자가 그것을
+            전수로 읽는다. 전체는 오늘의 공고가 든다(그 화면이 상한 초과까지 공시한다).
+
+            **견주는 것은 보이는 수와 `total` 이다**(cr M-1). 앞 판은 받은 행 수를 화면 상수와
+            견주어 **분모가 비교에 없었다** — 운영자의 표시 상한이 3 이하이면(전략의 그 값은
+            1 도 적법하다) 받은 행이 3 장뿐이라 공시가 서지 않았고, 통과 50 건이 조용히 사라졌다.
+          */}
+          {suggestions.data.total > shownRows(suggestions.data.rows.length) ? (
             <p data-testid="onboarding-preview-more" className="mt-2 text-xs text-ink-soft">
               통과 <span className="font-numeric">{suggestions.data.total}</span>건 가운데{' '}
-              <span className="font-numeric">{PREVIEW_ROWS}</span>건입니다 —{' '}
+              <span className="font-numeric">{shownRows(suggestions.data.rows.length)}</span>건입니다 —{' '}
               <Link to="/" className="underline">
                 오늘의 공고
               </Link>

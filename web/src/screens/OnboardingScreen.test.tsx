@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
-import { ITEM_STATE_DISPLAY, ONBOARDING_ITEM_DISPLAY, ONBOARDING_ITEM_ORDER } from '../display/onboardingDisplay';
+import {
+  ITEM_STATE_DISPLAY,
+  ONBOARDING_ITEM_DISPLAY,
+  ONBOARDING_ITEM_ORDER,
+  ONBOARDING_STEPS,
+} from '../display/onboardingDisplay';
 
 import { ONBOARDING_QUERY_KEY, OnboardingBanner, OnboardingScreen } from './OnboardingScreen';
 
@@ -808,6 +813,30 @@ describe('시작하기 — 번호 절 다섯 (M14/14B)', () => {
     for (const [at, id] of SECTION_ORDER.entries()) {
       expect(screen.getByTestId(`onboarding-section-${id}`).textContent, id).toContain(`${at + 1}.`);
     }
+  });
+
+  /**
+   * **절이 쓰기 단계 전수를 덮는가**(cr M-3). 오늘 결함은 없고, 없는 것은 그 사실을 잠그는
+   * 단언이었다 — `ONBOARDING_ITEM_STEP` 은 **항목**의 전수를 컴파일에서 드는데 **단계 → 절**
+   * 쪽에는 같은 장치가 없다.
+   *
+   * 빠지면 그 단계 버튼이 어느 절에도 안 그려지고, 더 나쁘게는 `nextStepWithPending` 이 그
+   * 미배정 단계를 `current` 로 고를 수 있어 **단계 본문이 어디에도 서지 않는다**(머리는 미완을
+   * 세는데 채울 폼이 화면에 없다).
+   *
+   * 집합을 **원천에서** 돈다(절별 목록을 축어로 적지 않는다) — 그래야 빼는 쪽만이 아니라
+   * **더하고 배정 안 한 쪽**도 걸린다.
+   */
+  it('쓰기 단계 전수가 어느 절엔가 그려진다 — 집합 등식', () => {
+    renderScreen();
+
+    return waitFor(() => {
+      const missing = ONBOARDING_STEPS.map((step) => step.id).filter(
+        (id) => screen.queryByTestId(`onboarding-step-${id}`) === null,
+      );
+
+      expect(missing, '어느 절에도 그려지지 않은 쓰기 단계가 있다').toStrictEqual([]);
+    });
   });
 
   /** 쓰기 단계는 **절 안**에 산다 — 그 배정이 와이어프레임의 「한 곳에서」다. */
