@@ -388,6 +388,9 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
     expect(section.textContent).toContain(label);
     expect(within(section).queryAllByRole('textbox')).toStrictEqual([]);
     expect(within(section).queryAllByRole('button')).toStrictEqual([]);
+    // **링크도 걸음이다**(v L1 실측: 버튼만 보던 앞 판은 심은 링크를 지나보냈다). 적을 칸이 없는
+    // 절에서 어디론가 보내는 자리는 그 자체로 가짜 걸음이다.
+    expect(within(section).queryAllByRole('link')).toStrictEqual([]);
   });
 
   it.each(NOT_READY_SECTIONS)('$label 절은 「준비 중」이라고 말한다', async ({ id }) => {
