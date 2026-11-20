@@ -1,7 +1,7 @@
 # M14 / wf-today-start (14B) — 되돌리기
 
 ```
-실측 HEAD: 5de68f21067e1c611f0899f1857dd3de5be8b78c
+실측 HEAD: 38053140f649e901a0b7d0e6df1516d5bed8d4b7
 base:      056f405c9e5659b9a068288f1104f9e04a6de016
 ```
 
@@ -16,7 +16,11 @@ git restore --source=056f405c --staged --worktree -- $(cat /tmp/rb-changed.txt |
 ```
 
 **복원 목록 등식**: 기계 산출과 되돌린 집합이 같다(`comm -23` · `comm -13` 둘 다 빈 출력).
-목록은 **16 경로**다 — 산출물 12 · evidence 4.
+목록은 **20 경로**다 — 산출물 15 · evidence 5.
+
+**재측정이다**(팀장 추가 지시로 산출물 커밋이 더 왔다). 앞 라운드의 실측을 옮기지 않고 새 HEAD 에서
+처음부터 다시 쟀다 — 늘어난 넷은 `web/e2e/railMeasure.ts` · `web/e2e/journey/layout-rails.spec.ts` ·
+`web/config/journey-specs.txt` · `reports/evidence/.../rollback.md` 다.
 
 **공유 파일 주의**: 이 slice 의 복원 목록에 **다른 레인과 겹치는 파일이 없다**. `web/e2e/layout.spec.ts`
 와 `web/e2e/journey/touch-target.spec.ts` 는 팀장 판정으로 **14B 소유**이고 14C·14D 가 만지지 않는다.
@@ -27,7 +31,7 @@ git restore --source=056f405c --staged --worktree -- $(cat /tmp/rb-changed.txt |
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | `git restore …` 종료 코드 | **0** |
-| ② | 되돌린 뒤 `git status --porcelain` 의 상태 계수 | **D 4 · M 12**(= 신설 4 + 수정 12, 복원 목록 16 과 같다) |
+| ② | 되돌린 뒤 `git status --porcelain` 의 상태 계수 | **D 7 · M 13**(= 신설 7 + 수정 13, 복원 목록 20 과 같다) |
 | ③ | 복원 목록 한정 `git diff <base>` 줄 수 | **0** — 그리고 **트리 전체** `git diff <base>` 도 빈 출력이다(**트리 동일성**) |
 | ④ | 컴파일 — `npm run typecheck` | exit **0** |
 | ⑤ | test — `npm run test` | exit **0** · 1669 통과(이 slice 가 더한 49 가 빠진 수다) |
@@ -43,8 +47,11 @@ git restore --source=056f405c --staged --worktree -- $(cat /tmp/rb-changed.txt |
 
 | 축 | 항목 | 되돌린 뒤 |
 | --- | --- | --- |
-| 내 표지 | `notice-amount-compact` · `notice-qualification` · `notice-aside` · `chip-all` · `onboarding-section-` · `onboarding-preview` · `compactAmountTextOf` · `DEADLINE_SOON_DAYS` · `searchState` · `SHIPPED_RAIL_FLOOR` | **전부 0 파일** |
-| 남의 표지 | `notice-amount` 3 · `notice-agency` 3 · `chip-agency` 2 · `onboarding-step-body` 2 · `TWO_COLUMN_ATTRIBUTE` 3 · `koreanAmountTextOf` 5 · `TOUCH_TARGET_SCREENS` 3 · `absenceTextOf` 18 | **전부 보존** |
+| 내 표지(13) | `notice-amount-compact` · `notice-qualification` · `notice-aside` · `chip-all` · `onboarding-section-` · `onboarding-preview` · `compactAmountTextOf` · `DEADLINE_SOON_DAYS` · `searchState` · `SHIPPED_RAIL_FLOOR` · `railViolations` · `measureRails` · `layout-rails` | **전부 0 파일** |
+| 남의 표지(9) | `notice-amount` 3 · `notice-agency` 3 · `chip-agency` 2 · `onboarding-step-body` 2 · `TWO_COLUMN_ATTRIBUTE` 3 · `koreanAmountTextOf` 5 · `TOUCH_TARGET_SCREENS` 3 · `absenceTextOf` 18 · `touchMeasure` 5 | **전부 보존** |
+
+`layout-rails` 가 0 인 것이 **등록부까지 되돌아갔다**는 뜻이다 — spec 파일과 `journey-specs.txt` 의
+줄이 함께 사라져야 여정 레인의 집합 등식이 되돌린 트리에서도 선다.
 
 ## 실측 HEAD 와 판정 SHA 사이
 
