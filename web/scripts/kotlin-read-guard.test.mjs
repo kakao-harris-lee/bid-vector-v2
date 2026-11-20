@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { isKotlinSourcePath } from './kotlin-read-guard.mjs';
 import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
@@ -43,13 +43,6 @@ import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
  * 층 아래인지는 `e2e/kotlin-read-guard.spec.ts` 가 잰다. 남는 자리(`eval: true` worker · 자식
  * 프로세스 텍스트 검색 · npm 밖에서 직접 띄운 node)는 capability map §12.3 의 신설 OPEN 이 등재한다.
  */
-
-// **이 파일 하나의 문턱만** 올린다. 전건(`npm run test`)은 워커 수십 개를 함께 돌리고, 그 부하
-// 아래에서 아래 묶음(하위 프로세스를 띄우는 칸들)이 기본 5s 에 닿아 `Test timed out in 5000ms`
-// 로 끊겼다 — 혼자 돌리면 그대로 통과하므로 거동이 아니라 문턱 문제다. `vi.setConfig` 의 범위는
-// **이 파일**이다: 같은 워커에 `--no-isolate` 로 올려도 옆 파일은 5s 에서 그대로 끊긴다(실측).
-// 전역 `testTimeout` 은 건드리지 않는다.
-vi.setConfig({ testTimeout: 60_000 });
 
 const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(webRoot, '..');

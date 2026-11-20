@@ -33,13 +33,6 @@ import { KOTLIN_SOURCE_KEYS, withKotlinSource } from './kotlin-source.mjs';
  * (AST 술어의 대소문자가 그 가운데 하나다 — 데이터 파일 쪽과 **짝이 맞지 않는다**).
  */
 
-// **이 파일 하나의 문턱만** 올린다. 전건(`npm run test`)은 워커 수십 개를 함께 돌리고, 그 부하
-// 아래에서 아래 묶음(추적 파일 전수를 AST 로 훑는 칸들)이 기본 5s 에 닿아 `Test timed out in
-// 5000ms` 로 끊겼다 — 혼자 돌리면 그대로 통과하므로 거동이 아니라 문턱 문제다. `vi.setConfig` 의
-// 범위는 **이 파일**이다: 같은 워커에 `--no-isolate` 로 올려도 옆 파일은 5s 에서 그대로
-// 끊긴다(실측). 전역 `testTimeout` 은 건드리지 않는다.
-vi.setConfig({ testTimeout: 60_000 });
-
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, '..');
 

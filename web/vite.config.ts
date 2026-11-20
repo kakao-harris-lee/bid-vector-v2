@@ -45,6 +45,12 @@ export default defineConfig({
   publicDir: false,
   build: { outDir: 'dist', emptyOutDir: true },
   test: {
+    // 기본 문턱 5s 는 **이 스위트 전체**에 좁다 — 파일 70 개를 `maxWorkers`(이 호스트 16 · CI
+    // 러너 4)로 나눠 도는 부하에서 최악 칸이 11.9s 였고, 무거운 게이트 test 말고 화면 test
+    // 여럿도 그 예산의 80% 를 쓰고 있었다(리뷰 실측). 30s 는 그 최악의 약 2.5 배다. 동기 블록
+    // 안의 진짜 hang 은 타이머가 발화하지 못해 5s 로도 못 잡으므로 CI job 의 `timeout-minutes`
+    // 가 그 자리를 든다 — 이 값이 지키는 것은 **부하 아래 느려진 칸**뿐이다.
+    testTimeout: 30_000,
     // M7/7D — **test 에서만** API 기준 주소를 절대 URL 로 둔다. 브라우저는 상대 주소(`/`)를
     // 문서 기준으로 풀지만 Node·jsdom 의 `Request` 는 **절대 URL 을 요구한다**(실측:
     // `ERR_INVALID_URL input: '/api/session'`). production 번들의 기본값은 그대로 상대 주소다
