@@ -769,18 +769,20 @@ export function WorksheetScreen() {
         </div>
         {/* **마감 카운트다운은 두 단 밖이다** — 와이어프레임이 그것을 머리 행의 오른쪽에 둔다.
             좁은 화면에서는 머리 아래로 내려온다(줄바꿈 하나, 뒤집지 않는다). */}
-        <div className={`${cardClass('sm')} flex w-full flex-col gap-1 md:w-auto md:shrink-0`}>
-          {/* 라벨과 값을 **프로그램적으로** 묶는다(cr L-2). 앞 판은 `dt`/`dd` 였고 지금은 형제
-              둘이라, 그대로 두면 보조기기가 둘을 「인접한 두 글자」로만 받는다. `dl` 로 되돌리면
-              머리의 용어 줄이 둘이 되어 격자 하나 규율과 부딪히므로 `aria-labelledby` 로 묶는다. */}
+        {/* 라벨과 값을 **프로그램적으로** 묶는다(cr L-2 · N-1). 앞 판은 `dt`/`dd` 였고 그 뒤
+            판은 값 `<span>` 에 `aria-labelledby` 를 걸었는데, **역할 없는 일반 요소에는 그
+            속성이 이름을 세우지 못한다**(이름 계산은 역할을 가진 자리에서만 선다). 카드를
+            `group` 으로 두고 그 자리에 이름을 건다 — `dl` 로 되돌리면 머리의 용어 줄이 둘이
+            되어 격자 하나 규율과 부딪힌다. */}
+        <div
+          role="group"
+          aria-labelledby={deadlineLabelId}
+          className={`${cardClass('sm')} flex w-full flex-col gap-1 md:w-auto md:shrink-0`}
+        >
           <span id={deadlineLabelId} className="text-xs text-ink-soft">
             투찰 마감까지
           </span>
-          <span
-            data-testid="worksheet-deadline"
-            aria-labelledby={deadlineLabelId}
-            className="font-numeric text-base font-semibold"
-          >
+          <span data-testid="worksheet-deadline" className="font-numeric text-base font-semibold">
             {deadlineText === null ? <AbsentValue reason="notSent" /> : deadlineText}
           </span>
         </div>

@@ -1836,16 +1836,18 @@ describe('화면 C — 수정 라운드의 LOW 셋', () => {
     expect(await screen.findByText(/투찰했나요/u)).not.toBeNull();
   });
 
-  /** cr L-2 — 라벨과 값이 **프로그램적으로** 묶인다(형제 두 글자가 아니다). */
-  it('카운트다운의 값이 자기 라벨을 든다', async () => {
+  /**
+   * cr L-2 · N-1 — 라벨과 값이 **프로그램적으로** 묶인다. 속성이 **있는지**가 아니라 계산된
+   * **접근 가능한 이름**을 잰다: 역할 없는 일반 요소에 `aria-labelledby` 를 걸면 속성은 있어도
+   * 이름이 서지 않는다(앞 판의 단언이 그 꼴을 통과시켰다).
+   */
+  it('카운트다운 묶음이 자기 이름으로 선다', async () => {
     renderScreen();
 
-    const value = await screen.findByTestId('worksheet-deadline');
-    const labelId = value.getAttribute('aria-labelledby');
-    expect(labelId, 'aria-labelledby 가 없으면 형제 두 글자로 돌아간 것이다').not.toBeNull();
-    expect(document.getElementById(labelId ?? '')?.textContent).toContain('투찰 마감까지');
+    const group = await screen.findByRole('group', { name: '투찰 마감까지' });
+    expect(group.contains(await screen.findByTestId('worksheet-deadline')), '값이 그 묶음 밖이다').toBe(true);
     // 머리의 용어 줄은 여전히 하나다 — 격자 하나 규율을 지킨 채 묶었다.
-    expect(value.closest('header')!.querySelectorAll('dt')).toHaveLength(1);
+    expect(group.closest('header')!.querySelectorAll('dt')).toHaveLength(1);
   });
 
   /**
