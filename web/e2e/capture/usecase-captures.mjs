@@ -54,6 +54,9 @@ const SECOND_NOTICE = 'SYN-7E2-BIDBOX';
 /** 13D 캡처 — **담기만** 하고 두는 건(제출 전 묶음을 비우지 않는다). */
 const WATCHING_NOTICE = 'SYN-7E1-FLOOR-USABLE';
 
+/** 감시 조건의 필수 키워드 — 하네스 공고 제목에 실제로 들어 있는 말이다(여정과 같은 값). */
+const WATCH_TERM = '합성';
+
 /**
  * 찍는 화면 여섯. **설정은 없다**(D-7E3b-10) — 「화면 다섯 + 알림함」 밖이고 프로필 화면은
  * 사업 정보 표면이라 캡처 대상으로 두지 않는다.
@@ -91,6 +94,20 @@ const SCREENS = [
     ready: 'screen-home',
     positive: () => ({ testId: `notice-card-${NOTICE}` }),
     faces: ['notices-loading', 'notices-error', 'notices-empty'],
+  },
+  {
+    /**
+     * **오늘의 공고의 기본 상태**(M14/14B). 바로 위 `b-notices` 는 검색 결과를 찍는다 — 이 자리는
+     * 운영자가 **매일 여는 화면**이고, 머리 요약·칩 줄·정렬 표시·제안 카드가 거기서만 선다.
+     *
+     * 양성 표지가 **제안 카드**다(빈 얼굴이 아니다): 빈 얼굴을 표지로 쓰면 씨앗이 늘 때 그
+     * 표지가 조용히 거짓이 된다(저장소 선례 — 알림함이 그렇게 깨졌다).
+     */
+    id: 'b2-notices-default',
+    path: '/',
+    ready: 'screen-home',
+    positive: (seed) => ({ testId: `suggestion-card-${seed.suggestedNotice}` }),
+    faces: ['suggestions-loading', 'suggestions-error', 'suggestions-empty'],
   },
   {
     id: 'c-worksheet',
@@ -136,7 +153,7 @@ const SCREENS = [
 ];
 
 /** 적재 시점 검사의 탐침 — 실제 씨앗 전에 `positive` 의 모양을 보려고 쓴다. */
-const PROBE_SEED = { wonCaseId: 0, watchingCaseId: 0 };
+const PROBE_SEED = { wonCaseId: 0, watchingCaseId: 0, suggestedNotice: 'SYN-PROBE' };
 
 for (const screen of SCREENS) {
   if (typeof screen.positive !== 'function' || !Array.isArray(screen.faces)) {
@@ -372,6 +389,48 @@ async function seedWatchingCase(call, notice) {
  * 뒤 상호가 입력칸에 실리므로 **개인정보 술어가 폼 값까지 보도록 고친 뒤에야** 의미가 있다
  * (CR M-2 가 L-3 의 선행인 이유).
  */
+/**
+ * 감시 조건 하나를 세운다 — **기본 상태의 오늘의 공고**를 찍기 위해서다(M14/14B · 팀장 승인).
+ *
+ * 조건이 없으면 제안이 0 이고, 홈의 기본 상태가 빈 얼굴로만 찍힌다. 그러면 이 마일스톤이 그
+ * 화면에서 바꾼 것(머리 요약 · 눌린 「전체」 칩 · 정렬 표시 · 제안 카드)이 **활용사례에 하나도
+ * 안 남는다**.
+ *
+ * 축은 **필수 키워드**다(분류 코드가 아니다): 하네스 공고에는 분류가 실리지 않아 분류 축으로는
+ * 어떤 값을 넣어도 통과가 0 이다(실측). 키워드는 수집된 제목에 실제로 들어 있는 말을 쓴다 —
+ * 여정 `settings.spec.ts` 가 같은 축으로 제안을 세운다.
+ *
+ * 편집 세션 셋을 **출하 API 로** 지난다(계약에 전략을 직접 쓰는 operation 이 없다).
+ */
+async function seedWatchCondition(call) {
+  const field = 'REQUIRED_KEYWORD';
+  const stamp = Date.now();
+  const begun = await (await call('POST', '/api/strategy/edit-sessions', { field })).json();
+  const sessionId = begun.sessionId;
+  if (typeof sessionId !== 'string') {
+    throw new Error(`편집 세션 응답에 sessionId 가 없다: ${JSON.stringify(begun).slice(0, 200)}`);
+  }
+  const strategy = await (await call('GET', '/api/strategy')).json();
+  await call('POST', `/api/strategy/edit-sessions/${sessionId}/value`, {
+    commandId: `capture-value-${stamp}`,
+    field,
+    terms: [WATCH_TERM],
+  });
+  await call('POST', `/api/strategy/edit-sessions/${sessionId}/confirm`, {
+    commandId: `capture-confirm-${stamp}`,
+    seenRevision: strategy.revision,
+  });
+
+  // **통과가 실제로 섰는지 확인한다** — 안 보면 빈 얼굴을 찍고도 초록이다.
+  const suggestions = await call('GET', '/api/suggestions');
+  const rows = await suggestions.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(`감시 조건을 세웠는데 통과가 0 이다 — 「${WATCH_TERM}」 가 수집 제목에 없다`);
+  }
+  log(`감시 조건을 세웠다(필수 키워드 「${WATCH_TERM}」 · 통과 ${rows.length}건)`);
+  return rows[0].noticeNumber;
+}
+
 async function seedProfile(call) {
   await call('POST', '/api/profile/business-details', {
     tradeName: '합성건설 주식회사',
@@ -483,7 +542,8 @@ async function main() {
         const wonCaseId = await seedCase(call);
         await seedSecondCase(call, SECOND_NOTICE);
         const watchingCaseId = await seedWatchingCase(call, WATCHING_NOTICE);
-        seed = { wonCaseId, watchingCaseId };
+        const suggestedNotice = await seedWatchCondition(call);
+        seed = { wonCaseId, watchingCaseId, suggestedNotice };
       }
 
       for (const screen of SCREENS) {
