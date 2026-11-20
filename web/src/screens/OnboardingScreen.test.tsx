@@ -923,6 +923,40 @@ describe('시작하기 — 레일 미리보기 (M14/14B)', () => {
     expect(screen.queryByTestId('onboarding-preview-SYN-PREVIEW-4')).toBeNull();
   });
 
+  /**
+   * **세션이 끝난 자리에서 레일이 「일시 장애」를 말하지 않는다**(cr HIGH 회귀 test).
+   *
+   * 레일이 본문의 얼굴과 무관하게 서게 된 뒤 생긴 자리다: 본문은 「로그인하십시오」인데 곁에서
+   * 「다시 시도」를 내밀면 그 재시도는 401 이라 영원히 실패하고, 화면이 한 사실(세션 없음)을
+   * 두 사실(세션 없음 + 일시 장애)로 말한다.
+   */
+  it('세션이 끝나면 레일도 로그인 길을 내고 재시도를 내밀지 않는다', async () => {
+    mocked.readOnboardingChecklist.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    mocked.listSuggestions.mockRejectedValue(new ApiError(401, 'UNAUTHENTICATED'));
+    renderScreen();
+
+    // 질의가 **가라앉기를 기다린다** — 적재 중에는 어느 얼굴도 없어 단언이 공허하다. 노드는
+    // 가라앉은 **뒤에** 집는다(앞서 집어 둔 참조는 다시 그려지면 떨어져 나간 자리를 가리킨다).
+    await screen.findByTestId('onboarding-preview-signed-out');
+    const preview = screen.getByTestId('onboarding-preview');
+
+    expect(within(preview).queryByTestId('onboarding-preview-error'), '레일이 일시 장애 얼굴을 냈다').toBeNull();
+    expect(within(preview).queryAllByRole('button', { name: /다시 시도/u })).toStrictEqual([]);
+  });
+
+  /** 401 이 **아닌** 실패는 여전히 일시 장애다 — 두 사실을 한 얼굴로 접지 않는다(음성 대조). */
+  it('401 이 아닌 실패에는 레일이 재시도를 낸다', async () => {
+    mocked.listSuggestions.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
+    renderScreen();
+
+    // 적재 중에는 어느 얼굴도 없다 — 가라앉기를 기다린 **뒤** 음성 단언을 건다. 노드는 다시
+    // 집는다(앞서 집어 둔 참조는 다시 그려지면 떨어져 나간 자리를 가리킬 수 있다).
+    const error = await screen.findByTestId('onboarding-preview-error');
+
+    expect(within(screen.getByTestId('onboarding-preview')).queryByTestId('signed-out')).toBeNull();
+    expect(error).toBeTruthy();
+  });
+
   it('비면 서버가 준 사유를 그대로 말한다 — 화면이 짐작하지 않는다', async () => {
     mocked.listSuggestions.mockResolvedValue({ rows: [], total: 0, resultState: 'NO_OPEN_NOTICES' });
     renderScreen();

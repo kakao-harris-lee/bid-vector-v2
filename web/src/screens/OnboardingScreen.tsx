@@ -435,7 +435,18 @@ function SuggestionPreview() {
     <div data-testid="onboarding-preview" className={cardClass('sm')}>
       <h3 className="text-sm font-semibold">지금 맞는 공고 미리보기</h3>
       {suggestions.isPending ? <Skeleton testId="onboarding-preview-loading" rows={2} /> : null}
-      {suggestions.isError ? (
+      {/*
+        **세션이 없다는 답은 일시 장애가 아니다**(cr HIGH · 같은 파일의 프로필·전략 401 과 같은 꼴).
+        레일이 본문의 얼굴과 무관하게 서게 된 뒤(계약 갱신 (3)), 세션이 끝난 운영자의 `/start` 는
+        본문에 「로그인하십시오」를 띄우면서 **곁에서는 「다시 시도」 버튼**을 내밀었다. 그 재시도는
+        401 이라 영원히 실패하고, 화면이 한 사실을 두 사실로 말한다.
+      */}
+      {suggestions.isError && isUnauthorized(suggestions.error) ? (
+        <div data-testid="onboarding-preview-signed-out">
+          <SignedOutFace />
+        </div>
+      ) : null}
+      {suggestions.isError && !isUnauthorized(suggestions.error) ? (
         <ErrorFace testId="onboarding-preview-error" onRetry={() => void suggestions.refetch()} />
       ) : null}
       {suggestions.data === undefined ? null : suggestions.data.rows.length === 0 ? (
