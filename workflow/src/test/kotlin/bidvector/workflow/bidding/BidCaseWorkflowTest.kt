@@ -74,25 +74,25 @@ class BidCaseWorkflowTest {
         store: FakeBidCaseStore,
         projections: NoticeProjectionQueryPort = RecordingProjections(),
     ) = BidCaseWorkflow(
-            cases = store,
-            noticeProjections = projections,
-            deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
-            // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
-            snapshots = { _, takenAt ->
-                bidvector.bidding.NoticeSnapshot(
-                    noticeRevisionNumber = 1L,
-                    takenAt = takenAt,
-                    deadlineAt = deadline,
-                    floorRate = null,
-                    baseAmount = null,
-                )
-            },
-            clock = { now },
-            retentionPolicy = policy(),
-            // 되비춤 자체는 `BidCaseNotificationTest` 가 잰다 — 여기서는 전이가 알림 포트에
-            // 기대지 않는다는 사실만 유지한다(무엇을 돌려주든 이 파일의 단언이 흔들리지 않는다).
-            notifications = { NotificationInboxOutcome.Created },
-        )
+        cases = store,
+        noticeProjections = projections,
+        deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
+        // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
+        snapshots = { _, takenAt ->
+            bidvector.bidding.NoticeSnapshot(
+                noticeRevisionNumber = 1L,
+                takenAt = takenAt,
+                deadlineAt = deadline,
+                floorRate = null,
+                baseAmount = null,
+            )
+        },
+        clock = { now },
+        retentionPolicy = policy(),
+        // 되비춤 자체는 `BidCaseNotificationTest` 가 잰다 — 여기서는 전이가 알림 포트에
+        // 기대지 않는다는 사실만 유지한다(무엇을 돌려주든 이 파일의 단언이 흔들리지 않는다).
+        notifications = { NotificationInboxOutcome.Created },
+    )
 
     private fun submission(evidence: EvidenceRef? = null) =
         BidSubmission(
