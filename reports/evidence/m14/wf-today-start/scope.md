@@ -19,7 +19,8 @@ in_scope:
   - web/e2e/journey/layout-rails.spec.ts     # 같은 축의 **세션 쥔 모집단** · 화면마다의 의무(v HIGH-1)
   - web/scripts/rail-screens.mjs             # 레일 의무 집합을 자리 표에서 구성하는 술어 + 래칫
   - web/scripts/rail-screens.test.mjs        # 그 술어의 짝 test(양성·음성 대조)
-  - web/src/display/noticeDisplay.ts         # 정렬 표시 문면 상수 하나(cr M-4)
+  - web/src/display/noticeDisplay.ts         # 정렬 표시 문면 상수 하나(cr M-4). **계약 소유는 14A** · 더하기만(아래 「겹치는 자리」)
+  - web/e2e/capture/usecase-captures.mjs     # 기본 상태 캡처의 감시 조건 씨앗 + 화면 하나(팀장 승인)
   - web/config/journey-specs.txt             # 그 spec 을 **만드는 커밋에서** 등재
   - web/config/gate-tests.txt                # 새 게이트 test 를 **만드는 커밋에서** 등재
   - docs/discovery/capability-map.md         # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
@@ -171,13 +172,26 @@ rollback: rollback.md
 | `web/src/components/KeyValueRow.tsx` · `.test.tsx` | 계약 갱신 (2) — 표지 인자를 더하고 짝 test 를 같은 커밋에서 넓혔다 |
 | `web/scripts/screen-vocabulary-registry.mjs` | 압축 금액 꼴이 **어휘**라 등재 의무가 있다(통화 표의 라벨이 그 글자에 실린다). 안 적으면 `screen-card-coverage` 가 붉는다 |
 
+## 겹치는 자리 (머지 차례에 보는 목록)
+
+계약의 「겹치는 자리」 목록에 **없는데** 이 slice 가 건드린 파일이 둘이다 — 머지 차례에 함께 본다.
+
+| 파일 | 무엇 | 왜 겹치나 |
+| --- | --- | --- |
+| `web/src/display/noticeDisplay.ts` | 정렬 표시 문면 상수 하나 | 계약 「소유」가 **14A** 로 적은 파일이다(cr N-5). 더하기 하나이고 14A 는 이미 머지됐지만, 14C·14D 가 같은 파일을 건드리면 아무도 미리 보지 않는다 |
+| `web/e2e/capture/usecase-captures.mjs` | 씨앗 하나 + 화면 하나 | 세 레인이 모두 캡처를 뜬다. **산출물 PNG 는 커밋하지 않는다**(실행마다 전부 바뀌어 바이너리 충돌이 확실하다) — 도구만 커밋하고 종결에서 한 번에 다시 뜬다 |
+| `web/config/gate-tests.txt` · `web/scripts/screen-vocabulary-registry.mjs` | 꼬리에 한 줄 | 14C·14D 와 **덧붙임 충돌**이 난다(머지 probe 실측 — 합집합으로 푼다) |
+
 ## 알려진 제한
 
 - **「조건 지우기」 버튼과 「전체」 칩이 같은 일을 한다**(검색 중일 때 둘 다 선다). 버튼을 걷으면
   `TodayNoticesScreen.test.tsx` 의 등재된 주장 둘(「조건이 없으면 조건 지우기가 없다」)을 바꿔야 하고
   그것은 **승인 경계**라, 이 slice 에서는 손대지 않고 사실로 적는다.
-- **레일 축의 비공허 하한이 두 레인 모두 1 이다.** 14C·14D 가 레일을 붙이면 그 수를 올려야 하는데,
-  올리는 것은 그 레인의 일이고 이 slice 가 강제할 자리가 없다(계수가 늘어도 하한 1 로 통과한다).
+- **스모크 레인의 하한만 전역 1 이다.** 여정 레인은 **자리마다 1** 이고 의무 집합이 소스에서
+  구성되므로 14C·14D 는 하한을 올릴 일이 없다 — 레일을 붙이면 자기 자리가 의무에 든다. 대신
+  **래칫 등식**이 깨지므로 먼저 머지하는 쪽이 `RAIL_SCREEN_FLOOR` 에 자기 이름 한 줄을 더한다.
+- **레일을 자기 모듈 밖에서 그리면** 술어가 못 본다 — 그 자리는 래칫 등식이 받는다(유도 집합에서
+  빠지는 순간 깨진다). 짝 test 가 그 제한을 거동으로 고정한다.
 - **가로 넘침은 레일 축에서 함께 재지 않는다** — 일부러 가로 스크롤되는 줄(입찰함 상태 탭)이 출하에
   있어 거짓으로 붉는다(실측).
 - 카드의 **「방식」 칸은 그리지 않는다** — 응답 스키마에 칸이 없다(대조표 B 행 「데이터로 막힘」).
