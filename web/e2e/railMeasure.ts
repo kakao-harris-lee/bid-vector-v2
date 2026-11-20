@@ -13,7 +13,7 @@ import {
 } from '../src/components/twoColumnShape';
 
 /**
- * 레일 축의 **술어 한 자리**(M14/14B).
+ * **배치 축의 측정 한 자리**(M14/14B).
  *
  * 두 레인이 같은 축을 **다른 모집단**으로 잰다: 스모크 레인은 세션 없이(백엔드 0), 여정 레인은
  * 세션과 씨앗을 쥐고. 술어를 각 spec 에 적으면 그 둘이 갈리고, 갈린 날 어느 쪽이 맞는지 아무도
@@ -21,6 +21,9 @@ import {
  *
  * 단언은 여기서 하지 않는다. 위반 목록을 **값으로** 내고 spec 이 그것을 빈 목록과 맞댄다 —
  * 실패 메시지에 그 레인의 주소가 실려야 하고, 그 주소는 spec 이 안다.
+ *
+ * 레일의 자리 말고 **폭이 정하는 다른 사실**(어느 묶음이 그려지는가)도 여기서 잰다 — 같은
+ * 브라우저 측정이고, spec 마다 적으면 재는 법이 갈린다.
  */
 
 export interface RailBox {
@@ -116,7 +119,9 @@ export interface ShippedAddress {
  * 출하 화면의 주소 전수 — **자리 표에서 구성한다**(열거하지 않는다).
  *
  * `appScreenSlots` 는 자리 표를 못 읽거나 비면 **던진다** — 조용한 빈 집합이 되지 않는다.
- * 그래서 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는 순간 두 레인 모두에 자동으로 든다.
+ * 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는 순간 **여정 레인**의 의무에 자동으로 든다.
+ * 스모크 레인은 데이터가 없어 **그 가운데 데이터 없이 그려지는 것만** 본다(워크시트의 건 레일은
+ * 거기서 영영 안 그려진다).
  *
  * [params] 는 경로 인자에 **실제 값**을 꽂는다. 값이 없는 인자는 기본 토큰으로 채워지고, 그
  * 주소는 데이터를 싣지 못한다 — **데이터가 있어야 서는 레일**을 재려면 그 값을 쥔 레인이
@@ -138,4 +143,21 @@ export function shippedAddresses(params: Readonly<Record<string, string>> = {}):
             .map((one) => (one.startsWith(':') ? (params[one.slice(1)] ?? PATH_PARAM_TOKEN) : one))
             .join('/'),
   }));
+}
+
+/**
+ * 표지를 단 요소 전수의 **브라우저가 계산한 `display`**(v MEDIUM).
+ *
+ * 클래스 이름으로 「숨는다」를 재면 **스타일 변종이 지나간다**: `md:hidden` 을 그대로 둔 채
+ * `md:inline-flex!` 를 더하면 출하 CSS 가 `display:inline-flex!important` 를 내고 넓은 화면에서
+ * 압축 금액이 선다 — 클래스 글자를 읽는 단언은 그것을 초록으로 지나보냈다(실측).
+ *
+ * 그래서 **그려진 값**을 본다. 찾지 못하면 빈 배열이라, 부르는 자리가 계수를 먼저 단언해야
+ * 공허해지지 않는다.
+ */
+export async function computedDisplaysOf(page: Page, testId: string): Promise<readonly string[]> {
+  return page.evaluate(
+    (one) => [...document.querySelectorAll(`[data-testid="${one}"]`)].map((node) => getComputedStyle(node).display),
+    testId,
+  );
 }

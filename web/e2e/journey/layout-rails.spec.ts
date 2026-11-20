@@ -1,9 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { railScreenSlots } from '../../scripts/rail-screens.mjs';
-import { measureRails, railViolations, shippedAddresses } from '../railMeasure';
+import { RAIL_SCREEN_FLOOR, railScreenSlots } from '../../scripts/rail-screens.mjs';
+import { computedDisplaysOf, measureRails, railViolations, shippedAddresses } from '../railMeasure';
 
-import { signIn } from './shared';
+import { search, signIn } from './shared';
 
 /**
  * **출하 레일의 자리 — 화면마다의 보증**(M14/14B 수정 라운드 1 · v HIGH-1).
@@ -18,10 +18,11 @@ import { signIn } from './shared';
  * 합계로는 그 회귀를 다시 못 잡는다 — 실제로 14D 를 머지한 트리에서 `/start` 를 망가뜨린 변이가
  * **초록**이었다.
  *
- * **의무 집합은 소스에서 구성한다**(`railScreenSlots`): 자리 표의 element → 그 모듈의 import
- * 폐포 → `components/TwoColumn` 에 닿는 자리들. 14C·14D 가 레일을 붙이면 **아무 줄도 안 적고**
- * 이 의무에 들어온다. 그 집합이 **줄어드는** 쪽은 짝 test 의 래칫이 막는다(손으로 짠 두 단은
- * 구성에서 조용히 빠지기 때문이다 — §12.3 (z) ⓓ).
+ * **의무 집합은 소스에서 구성한다**(`railScreenSlots`): 자리 표의 element → 그 태그가 가리키는
+ * 화면 모듈 → 그 모듈이 `TwoColumn` 을 **JSX 로 그리는가**(신원은 심볼이라 별칭·네임스페이스도
+ * 같은 답이다). 14C·14D 가 레일을 붙이면 **아무 줄도 안 적고** 이 의무에 들어온다. 그 집합이
+ * **줄어드는** 쪽은 짝 test 의 **등식 래칫**이 막는다(손으로 짠 두 단은 구성에서 조용히 빠지기
+ * 때문이다 — §12.3 (z) ⓓ).
  *
  * **쓰기는 자기 공고 하나뿐이다.** 경로 인자를 쥔 자리(워크시트)는 **건이 있어야** 레일이 서므로
  * 이 spec 이 자기 공고에 건을 하나 연다. 다른 여정이 쓰지 않는 공고를 고르고(공유 하네스 규율),
@@ -69,7 +70,8 @@ test.describe.configure({ mode: 'serial' });
 
 test('의무 집합을 소스에서 **실제로** 읽었다 — 빈 집합은 아래 단언을 공허하게 만든다', () => {
   expect(RAIL_SLOT_IDS.length).toBeGreaterThan(0);
-  expect(RAIL_SLOT_IDS).toContain('onboarding');
+  // 이름을 **사본으로 적지 않는다**(cr N-4): 래칫 목록이 한 자리이고 여기는 그것을 읽는다.
+  expect([...RAIL_SLOT_IDS].sort()).toStrictEqual([...RAIL_SCREEN_FLOOR].sort());
 });
 
 test('레일을 그리는 자리마다 레일이 두 폭에서 하나 이상 제자리다', async ({ page }) => {
@@ -111,4 +113,43 @@ test('레일을 그리는 자리마다 레일이 두 폭에서 하나 이상 제
       `${viewport}: 레일을 그려야 하는 자리가 레일을 내지 않았다`,
     ).toStrictEqual([]);
   }
+});
+
+/**
+ * **압축 금액은 좁은 화면의 것이다**(팀장 판정 ⑤ · v MEDIUM).
+ *
+ * jsdom 은 CSS 를 풀지 않아 그 자리를 **클래스 이름**으로 쟀는데, 그 단언은 스타일 변종을
+ * 지나보냈다(실측): `md:hidden` 을 그대로 둔 채 `md:inline-flex!` 를 더하면 출하 CSS 가
+ * `display:inline-flex!important` 를 내고 넓은 화면에서 압축이 선다. 반대쪽도 같다 — 정확 금액
+ * `dl` 에서 `hidden` 을 떼면 좁은 화면에서 둘이 겹쳐 선다.
+ *
+ * 그래서 **브라우저가 계산한 값**을 두 폭에서 본다. 여기(여정 레인)에 두는 까닭은 금액이 실린
+ * 카드가 필요하기 때문이다 — 검색 결과가 그 카드를 낸다.
+ */
+test('압축 금액과 정확 금액이 폭에 따라 하나씩만 그려진다', async ({ page }) => {
+  await signIn(page);
+  await page.setViewportSize({ ...WIDE });
+  await page.goto('/');
+  await search(page, '합성');
+  await page.waitForLoadState('networkidle');
+
+  const wideCompact = await computedDisplaysOf(page, 'notice-amount-compact-box');
+  const wideFacts = await computedDisplaysOf(page, 'notice-facts');
+
+  // **비공허가 비교 앞에 선다** — 카드를 하나도 못 찾았으면 아래 단언은 공집합 위에서 참이다.
+  expect(wideCompact.length, '압축 금액 묶음을 하나도 찾지 못했다').toBeGreaterThan(0);
+  expect(wideFacts.length, '정확 금액 묶음을 하나도 찾지 못했다').toBeGreaterThan(0);
+  expect(wideCompact.filter((one) => one !== 'none'), '넓은 화면에서 압축 금액이 그려졌다').toStrictEqual([]);
+  expect(wideFacts.filter((one) => one === 'none'), '넓은 화면에서 정확 금액이 숨었다').toStrictEqual([]);
+
+  await page.setViewportSize({ ...NARROW });
+  await page.waitForLoadState('networkidle');
+
+  const narrowCompact = await computedDisplaysOf(page, 'notice-amount-compact-box');
+  const narrowFacts = await computedDisplaysOf(page, 'notice-facts');
+
+  expect(narrowCompact.length, '좁은 화면에서 압축 금액 묶음을 찾지 못했다').toBeGreaterThan(0);
+  expect(narrowFacts.length, '좁은 화면에서 정확 금액 묶음을 찾지 못했다').toBeGreaterThan(0);
+  expect(narrowCompact.filter((one) => one === 'none'), '좁은 화면에서 압축 금액이 숨었다').toStrictEqual([]);
+  expect(narrowFacts.filter((one) => one !== 'none'), '좁은 화면에서 정확 금액이 그려졌다').toStrictEqual([]);
 });

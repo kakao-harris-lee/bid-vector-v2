@@ -69,7 +69,7 @@ function CompactAmount({ notice }: { readonly notice: NoticeSummary }) {
   const hint = useTermHint(compact === null ? undefined : exact, { testId: 'notice-amount-compact' });
 
   return (
-    <span className="inline-flex flex-col items-start text-xs md:hidden">
+    <span data-testid="notice-amount-compact-box" className="inline-flex flex-col items-start text-xs md:hidden">
       {/*
         **금액의 축을 좁은 화면에서도 말한다**(v M-2 · 와이어프레임의 「기초 4.2억」). 압축 글자만
         두면 그 수가 무슨 금액인지 탭하기 전에는 알 수 없는데, 기초금액과 추정가격을 혼동하면
@@ -154,7 +154,7 @@ function NoticeCardBody({
           없다(nullable 도 아니다). 부재 사유를 지어 그리면 화면이 「서버가 방식을 빚졌다」고
           주장하게 된다 — 대조표 B 행의 처분이 「방식 = 데이터로 막힘」이다.
         */}
-        <dl className="hidden flex-wrap items-baseline gap-x-2 gap-y-1 text-sm md:flex">
+        <dl data-testid="notice-facts" className="hidden flex-wrap items-baseline gap-x-2 gap-y-1 text-sm md:flex">
           {/* 발주기관은 **값만** 보인다(와이어프레임의 사실 줄) — 라벨은 보조기기에만 남긴다.
               `dl` 의 내용 모형을 지키려면 `dt` 가 있어야 하고, 그 글자를 눈에까지 두면 와이어프레임
               한 줄이 라벨 둘로 늘어난다. */}
