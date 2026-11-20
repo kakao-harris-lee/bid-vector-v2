@@ -179,6 +179,17 @@ fun interface NoticeProjectionQueryPort {
 }
 
 /**
+ * 키 **하나**로 묻는 자리. 포트의 서명이 집합인 것은 목록이 건마다 묻지 않게 하기 위해서이고,
+ * 단건 경로도 같은 서명을 쓴다 — 포트에 단건 서명을 따로 두면 「키가 없으면 행이 없다」는
+ * 약속이 **두 서명**에 생긴다. 그 되풀이를 여기 한 자리에 둔다.
+ *
+ * use case 의 멤버가 아니라 **포트 옆의 확장**인 이유: 이 관용구는 포트를 쓰는 모든 자리의
+ * 것이지 특정 use case 의 것이 아니다.
+ */
+internal fun NoticeProjectionQueryPort.projectionOf(notice: NoticeKey): NoticeProjection? =
+    projections(setOf(notice))[notice]
+
+/**
  * 공고 행이 **있다**는 사실과 그 행의 표시 칸 셋. 칸이 전부 nullable 인 것은 저장 층에서 그
  * 세 열이 nullable 이기 때문이고(`notice_title`(V14) · `demand_agency_name` ·
  * `notice_agency_name`(V7)), 없는 값을 지어내지 않는다.

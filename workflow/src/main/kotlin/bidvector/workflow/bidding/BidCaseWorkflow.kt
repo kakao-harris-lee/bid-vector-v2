@@ -121,7 +121,7 @@ class BidCaseWorkflow(
         // 같은 요청 쌍(담기 → 읽기)이 두 답을 주지 않는다.
         val case = settlement.settle(account, opened, noticeDeadline, now)
         return OpenedCase(
-            view(case, effectiveDeadline(case, noticeDeadline), now, projectionOf(notice)),
+            view(case, effectiveDeadline(case, noticeDeadline), now, noticeProjections.projectionOf(notice)),
             created = result is OpenCaseResult.Opened,
         )
     }
@@ -136,7 +136,7 @@ class BidCaseWorkflow(
             settled.case,
             effectiveDeadline(settled.case, settled.noticeDeadline),
             now,
-            projectionOf(settled.case.notice),
+            noticeProjections.projectionOf(settled.case.notice),
         )
     }
 
@@ -285,13 +285,6 @@ class BidCaseWorkflow(
         LocalDate
             .ofInstant(submittedAt, EVIDENCE_RETENTION_ZONE)
             .plus(retentionPolicy.value.retainFor)
-
-    /**
-     * 단건 경로의 공고 표시 칸 — 키 하나짜리 집합으로 **같은 포트**를 부른다(단건 전용 서명을
-     * 따로 두지 않는다: 그러면 「행이 없다」의 약속이 두 자리에 생긴다).
-     */
-    private fun projectionOf(notice: NoticeKey): NoticeProjection? =
-        noticeProjections.projections(setOf(notice))[notice]
 
     private fun view(
         case: BidCase,
