@@ -11,8 +11,19 @@ import { readFileSync } from 'node:fs';
 /** 본문 글자의 기준(WCAG AA). 큰 글자 예외는 쓰지 않는다 — 이 팔레트의 쌍은 전부 본문·배지다. */
 export const TEXT_RATIO = 4.5;
 
-/** 비텍스트 기준(WCAG 1.4.11). 카드와 바탕을 가르는 **선**이 이 축이다. */
+/**
+ * 비텍스트 기준(WCAG 1.4.11). **UI 컴포넌트의 경계**가 이 축이다 — 입력칸 · 버튼 · 선택 ·
+ * 체크박스의 테두리. 내용을 **묶는** 카드의 테두리는 이 기준의 대상이 아니라서 측정 밖이다
+ * (팀장 판정 2026-11-20).
+ */
 export const NON_TEXT_RATIO = 3;
+
+/**
+ * 카드가 바탕에서 **떨어져 보이는 정도**의 하한. 3:1 이 아니라 **지금 값을 지키는 래칫**이다 —
+ * 두 면이 같은 값으로 접히면 카드 테두리(측정 밖)만 남아 카드가 바탕에 녹는다. 그 퇴행을 막는
+ * 것이 이 축이고, 접근성 기준을 흉내 내는 것이 아니다.
+ */
+export const CARD_SEPARATION_FLOOR = 1.05;
 
 /**
  * 토큰 선언 하나 — `--color-이름: 값;`. **줄 머리에서만** 읽는다.
@@ -133,14 +144,22 @@ export function pairsOf(tokens) {
     }
   }
   pairs.push({ name: 'accent/accent-ink', background: need('accent'), foreground: need('accent-ink'), floor: TEXT_RATIO });
+  // **컨트롤의 경계만** 비텍스트 기준을 받는다. 카드 테두리(`line`)는 측정 밖이다.
   for (const surface of ['page', 'card']) {
     pairs.push({
-      name: `line/${surface}`,
+      name: `control-line/${surface}`,
       background: need(surface),
-      foreground: need('line'),
+      foreground: need('control-line'),
       floor: NON_TEXT_RATIO,
     });
   }
+  // 카드와 바탕이 **면으로** 갈려 있는가 — 선이 아니라 이 차이가 카드를 세운다.
+  pairs.push({
+    name: 'card/page 면 차이',
+    background: need('page'),
+    foreground: need('card'),
+    floor: CARD_SEPARATION_FLOOR,
+  });
   return pairs;
 }
 

@@ -148,7 +148,7 @@ export function LoginScreen() {
             autoComplete="username"
             value={loginName}
             onChange={(event) => setLoginName(event.target.value)}
-            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -159,7 +159,7 @@ export function LoginScreen() {
             autoComplete="current-password"
             value={passphrase}
             onChange={(event) => setPassphrase(event.target.value)}
-            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           />
         </label>
         <Button type="submit" tone="primary" disabled={pending} fullWidth>

@@ -166,6 +166,11 @@ scripts/absence-vocabulary.test.mjs
 # 고쳐도 게이트가 옛 값을 재고 그 둘이 갈린 날 아무도 붉지 않는다. 라이트·다크 **둘 다** 재고,
 # 다크는 상속을 접은 뒤 쌓는다(일부만 재선언하면 나머지가 어두운 면 위에 그대로 선다).
 scripts/contrast.test.mjs
+# M14/14A ⑤ — 대비 게이트의 **비공허 짝**(팀장 판정 2026-11-20). 그 게이트가 재는 것은
+# `control-line` 인데 컨트롤이 **다른 토큰**을 쓰면 그 측정이 아무것도 지키지 못한다. 카드
+# 테두리는 `line` 을 **써야 하므로**(측정 밖이 그 판정이다) 토큰 이름만 세는 판으로는 둘을 가를
+# 수 없고, 술어가 **어느 요소의 class 인가**를 AST 로 본다.
+scripts/control-line.test.mjs
 src/components/TwoColumn.test.tsx
 src/components/PageHeader.test.tsx
 src/components/SummaryTile.test.tsx

@@ -26,7 +26,7 @@ export type ButtonSize = (typeof BUTTON_SIZES)[number];
 
 const TONE_CLASS = {
   primary: 'bg-accent text-accent-ink hover:opacity-90',
-  secondary: 'border border-line bg-card text-ink hover:bg-neutral-skin',
+  secondary: 'border border-control-line bg-card text-ink hover:bg-neutral-skin',
   danger: 'border border-bad-ink/40 bg-bad-skin text-bad-ink hover:opacity-90',
 } as const satisfies Record<ButtonTone, string>;
 

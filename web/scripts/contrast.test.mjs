@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CARD_SEPARATION_FLOOR,
   NON_TEXT_RATIO,
   TEXT_RATIO,
   contrastOf,
@@ -24,8 +25,8 @@ import {
  */
 const cssPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'index.css');
 
-/** 어조 다섯 + 면 둘 × 글자 둘 + 강조 + 선 둘 = 열둘. 하한이라 어조가 늘면 따라 오른다. */
-const MIN_PAIRS = 12;
+/** 어조 여섯 + 면 둘 × 글자 둘 + 강조 + 컨트롤 선 둘 + 면 차이 = 열넷. 하한이라 늘면 따라 오른다. */
+const MIN_PAIRS = 13;
 
 describe('출하 팔레트', () => {
   it('라이트에서 기준을 넘지 못하는 쌍이 없다', () => {
@@ -70,10 +71,22 @@ describe('비공허 — 쌍이 실제로 섰다', () => {
     }
   });
 
-  it('비텍스트 축이 텍스트 축과 다른 기준을 쓴다', () => {
+  /** 축이 셋이다 — 본문 글자 · 컨트롤 경계 · **면 차이**(접근성 기준이 아니라 래칫). */
+  it('세 축이 서로 다른 기준을 쓴다', () => {
     const floors = new Set(pairsOf(readPalette(cssPath).light).map((one) => one.floor));
 
-    expect(floors).toStrictEqual(new Set([TEXT_RATIO, NON_TEXT_RATIO]));
+    expect(floors).toStrictEqual(new Set([TEXT_RATIO, NON_TEXT_RATIO, CARD_SEPARATION_FLOOR]));
+  });
+
+  /**
+   * **카드 테두리는 측정 밖이다**(팀장 판정). 그 사실이 글로만 있지 않도록 모집단에서 그
+   * 이름이 **없다는 것**을 센다 — 다시 들어오면 이 단언이 먼저 말한다.
+   */
+  it('카드 테두리는 측정 모집단에 없다', () => {
+    const names = pairsOf(readPalette(cssPath).light).map((one) => one.name);
+
+    expect(names.filter((one) => one.startsWith('line/'))).toStrictEqual([]);
+    expect(names.filter((one) => one.startsWith('control-line/'))).toHaveLength(2);
   });
 });
 
@@ -96,11 +109,12 @@ ${Object.entries(dark)
 `;
 
 const BASE = {
-  page: '#ffffff',
+  page: '#f6f5f2',
   card: '#ffffff',
   ink: '#111111',
   'ink-soft': '#444444',
-  line: '#767676',
+  line: '#d9d6cf',
+  'control-line': '#767676',
   accent: '#0f5f5a',
   'accent-ink': '#ffffff',
   'neutral-skin': '#eeeeee',
@@ -119,18 +133,30 @@ describe('양성·음성 대조 — 술어 자신', () => {
     expect(found[0]).toContain('neutral skin/ink');
   });
 
-  /** 선은 **비텍스트 기준**이라 텍스트 기준으로 재면 붉어야 할 것이 지나거나 그 반대가 된다. */
-  it('선이 비텍스트 기준에 못 미치면 잡힌다', () => {
-    const found = failingPairs(paletteOf(synthetic({ ...BASE, line: '#e5e5e5' })).light);
+  /** 컨트롤 선은 **비텍스트 기준**이라 텍스트 기준으로 재면 붉어야 할 것이 지나거나 그 반대가 된다. */
+  it('컨트롤 선이 비텍스트 기준에 못 미치면 잡힌다', () => {
+    const found = failingPairs(paletteOf(synthetic({ ...BASE, 'control-line': '#e5e5e5' })).light);
 
-    expect(found.filter((one) => one.startsWith('line/'))).toHaveLength(2);
+    expect(found.filter((one) => one.startsWith('control-line/'))).toHaveLength(2);
   });
 
-  it('선이 텍스트 기준에는 못 미쳐도 비텍스트 기준을 넘으면 지난다 — 축을 섞지 않는다', () => {
-    const found = failingPairs(paletteOf(synthetic({ ...BASE, line: '#8c8c8c' })).light);
+  it('컨트롤 선이 텍스트 기준에는 못 미쳐도 비텍스트 기준을 넘으면 지난다 — 축을 섞지 않는다', () => {
+    const found = failingPairs(paletteOf(synthetic({ ...BASE, 'control-line': '#8c8c8c' })).light);
 
-    expect(found.filter((one) => one.startsWith('line/'))).toStrictEqual([]);
+    expect(found.filter((one) => one.startsWith('control-line/'))).toStrictEqual([]);
     expect(contrastOf('#8c8c8c', '#ffffff')).toBeLessThan(TEXT_RATIO);
+  });
+
+  /** **카드 테두리는 아무리 옅어도 지난다** — 측정 밖이라는 판정이 거동으로 선다. */
+  it('카드 테두리가 옅어도 붉지 않는다', () => {
+    expect(failingPairs(paletteOf(synthetic({ ...BASE, line: '#fdfdfc' })).light)).toStrictEqual([]);
+  });
+
+  /** 대신 **면 차이**가 사라지면 붉는다 — 카드가 바탕에 녹는 퇴행을 그 축이 받는다. */
+  it('카드와 바탕이 같은 값이면 붉는다', () => {
+    const found = failingPairs(paletteOf(synthetic({ ...BASE, page: '#ffffff' })).light);
+
+    expect(found.filter((one) => one.includes('면 차이'))).toHaveLength(1);
   });
 
   it('짝 없는 skin 은 던진다 — 쌍이 조용히 모집단에서 빠지지 않는다', () => {

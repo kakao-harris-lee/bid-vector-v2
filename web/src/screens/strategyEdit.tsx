@@ -418,7 +418,7 @@ export function StrategyEditPanel({
               inputMode={input.kind === 'TERMS' ? 'text' : 'numeric'}
               value={session.raw}
               onChange={(event) => session.onRaw(event.target.value)}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
           {session.missing ? (

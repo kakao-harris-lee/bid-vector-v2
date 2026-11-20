@@ -86,7 +86,7 @@ export function ProfileFactsCard({
               aria-label="업종"
               value={form.businessTypes}
               onChange={(event) => setFacts({ ...form, businessTypes: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -96,7 +96,7 @@ export function ProfileFactsCard({
               disabled={!form.licensesDeclared}
               value={form.licenseNames}
               onChange={(event) => setFacts({ ...form, licenseNames: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm disabled:opacity-50"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm disabled:opacity-50"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -105,7 +105,7 @@ export function ProfileFactsCard({
               aria-label="지역어"
               value={form.regionTerms}
               onChange={(event) => setFacts({ ...form, regionTerms: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
         </div>
