@@ -1,6 +1,7 @@
 import type { components } from '../api/generated/operator-api';
 
-import { BID_CASE_STATE_DISPLAY, type BidCaseState } from './caseDisplay';
+import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY, type BidCaseState } from './caseDisplay';
+import { instantDisplayOf } from './timeDisplay';
 
 type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
 
@@ -12,10 +13,11 @@ type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
  * 비교하는 추론이 없다(D-7E-4). 계약에 상태가 늘면 두 표의 `satisfies` 가 컴파일에서 멈춘다.
  */
 
-/** 요구표 「D. 내 입찰함」의 상태별 목록 여섯 — 탭의 **정본 순서**가 이 배열이다. */
+/** 와이어프레임 D 의 **상태 탭 일곱** — 탭의 **정본 순서**가 이 배열이다. */
 export const BID_BOX_TABS = [
   { id: 'watching', label: '관심' },
   { id: 'price-received', label: '투찰가 받음' },
+  { id: 'bid-planned', label: '투찰 예정' },
   { id: 'recorded', label: '투찰함' },
   { id: 'awaiting-opening', label: '개찰 대기' },
   { id: 'under-review', label: '심사 중' },
@@ -25,17 +27,21 @@ export const BID_BOX_TABS = [
 export type BidBoxTabId = (typeof BID_BOX_TABS)[number]['id'];
 
 /**
- * 상태 14 → 탭 6. 요구표의 여섯 이름을 그대로 쓰므로 **정확히 들어맞지 않는 두 자리**를
- * 팀장이 문면으로 정했다(D-7E2-8):
- *  · `BID_PLANNED`(투찰 예정)는 「투찰가 받음」에 둔다 — 둘 다 제출 전이고 투찰가를 쥔 단계다.
- *  · `DEADLINE_PASSED_UNRECORDED` 는 「종료」에 둔다 — 소급 기록 간선이 남아 있지만 운영자가
- *    매일 보는 묶음은 아니다. 그 사실은 카드의 `bad` 어조 배지가 나른다.
+ * 상태 14 → 상태 탭 7. **정확히 들어맞지 않는 한 자리**를 팀장이 문면으로 정했다 —
+ * `DEADLINE_PASSED_UNRECORDED` 는 「종료」에 둔다(D-7E2-8). 소급 기록 간선이 남아 있지만
+ * 운영자가 매일 보는 묶음은 아니고, 그 사실은 카드의 `bad` 어조 배지가 나른다.
+ *
+ * **M14/14D 가 D-7E2-8 의 다른 한 자리를 뒤집었다**(팀장 판정 2026-11-20 · 표시 계약 변경).
+ * 앞 판은 `BID_PLANNED`(투찰 예정)를 「투찰가 받음」에 접었다 — 「둘 다 제출 전이고 투찰가를 쥔
+ * 단계」라는 문면 판정이었다. 와이어프레임이 둘을 가르고, 2026-11-19 운영자 지시가 그 그림을
+ * 정보 구조의 정본으로 세웠다. 운영자가 할 일도 같지 않다 — 투찰가를 **받은** 건과 낼 값을
+ * **정한** 건은 다음 걸음이 다르다.
  */
 export const STATE_TAB = {
   WATCHING: 'watching',
   DEFERRED: 'watching',
   PRICE_RECEIVED: 'price-received',
-  BID_PLANNED: 'price-received',
+  BID_PLANNED: 'bid-planned',
   BID_RECORDED: 'recorded',
   AWAITING_OPENING: 'awaiting-opening',
   OPENED_PROVISIONAL_FIRST: 'under-review',
@@ -60,6 +66,130 @@ export function tabOf(state: BidCaseState): BidBoxTabId {
  */
 export function isBidBoxTabId(value: string | null): value is BidBoxTabId {
   return value !== null && BID_BOX_TABS.some((one) => one.id === value);
+}
+
+/* ── 「전체」는 상태 탭이 아니라 다른 축이다(M14/14D) ───────────────────────────
+   와이어프레임의 탭 줄 맨 앞이 「전체」인데 **어느 상태도 그리로 가지 않는다**. 상태 → 탭 표에
+   넣으면 그 표의 `satisfies` 가 재던 것(「모든 상태가 어느 탭에 속하는가」)이 뜻을 잃고,
+   「전체」가 다른 탭과 겹치는 묶음이 되어 같은 건이 두 번 세어진다. 그래서 **고르기의 축**으로
+   따로 선다 — 고른 것이 「전체」면 거르지 않고, 아니면 표 조회로 거른다. */
+
+/**
+ * 「전체」 고르기. **종단까지 센다**(팀장 판정 2026-11-20).
+ *
+ * 와이어프레임은 사이드바 배지(9)와 「전체」(9)를 같게 두고 「종료 12」를 따로 세운다 — 그림의
+ * 「전체」는 종단을 뺀 수다. 그러나 라벨이 「전체」인데 종료를 빼면 거짓말이다. 배지는 **지금
+ * 들여다볼 건**을 세고(셸이 종단 탭을 이 표에서 유도해 뺀다) 이 축은 **전부**를 센다. 두 수가
+ * 다르다는 사실은 레일 「상태 뜻」이 한 줄로 말한다.
+ */
+export const ALL_SELECTION = { id: 'all', label: '전체' } as const;
+
+/** 탭 줄에 서는 차례 — 「전체」가 먼저고 그 뒤가 상태 탭의 정본 순서다. */
+export const BID_BOX_SELECTIONS = [ALL_SELECTION, ...BID_BOX_TABS] as const;
+
+export type BidBoxSelection = (typeof BID_BOX_SELECTIONS)[number]['id'];
+
+/** 고른 것이 그 상태의 건을 보이는가 — 거르기의 **유일한 자리**다. */
+export function selectionShows(selection: BidBoxSelection, state: BidCaseState): boolean {
+  return selection === ALL_SELECTION.id || tabOf(state) === selection;
+}
+
+/**
+ * 바깥에서 온 문자열이 고르기인가 — URL 질의가 그 자리다. 집합을 손으로 적지 않고
+ * [BID_BOX_SELECTIONS] 에서 파생하므로 축이 늘면 이 가드가 함께 넓어진다.
+ */
+export function isBidBoxSelection(value: string | null): value is BidBoxSelection {
+  return value !== null && BID_BOX_SELECTIONS.some((one) => one.id === value);
+}
+
+/* ── 레일 둘(M14/14D · 와이어프레임 D 의 오른쪽) ───────────────────────────────── */
+
+/**
+ * 일정 줄이 읽는 칸 — `BidCase` 가 이 모양을 만족한다(그 타입을 여기로 끌어오지 않는다).
+ *
+ * 시각 칸이 `undefined` 까지 받는 까닭: 계약이 그 칸을 `required` 에 넣지 않아 생성 타입에서만
+ * 선택 칸이다(14E 가 등재한 OPEN). 서버는 **언제나** 싣지만, 그 사실에 기대지 않고 둘 다 받아
+ * 같은 답(일정이 아니다)을 낸다.
+ */
+export interface CheckpointSource {
+  readonly caseId: number;
+  readonly nextCheckpointKind: NextCheckpointKind;
+  readonly nextCheckpointAt?: string | null;
+}
+
+type NextCheckpointKind = keyof typeof NEXT_CHECKPOINT_DISPLAY;
+
+/**
+ * 일정이 **아닌** 어휘 — 「다음 확인 시점이 없다」는 답이지 사건이 아니다.
+ *
+ * `satisfies` 로 적는 까닭: 타입 주석(`: NextCheckpointKind`)을 달면 값이 유니온 전체로 넓어져
+ * 아래 걸러내기가 **좁히지 못한다**. 어휘에서 이 이름이 사라지면 여기가 컴파일에서 멈춘다.
+ */
+const NO_CHECKPOINT = 'NONE' as const satisfies NextCheckpointKind;
+
+export interface CheckpointRow {
+  readonly caseId: number;
+  readonly kind: Exclude<NextCheckpointKind, typeof NO_CHECKPOINT>;
+  /** 사건 낱말 — **열거의 표에서만** 온다. 「참가신청」처럼 표에 없는 말을 지어내지 않는다. */
+  readonly label: string;
+  /** 시각 원문. 서식은 `timeDisplay` 한 자리의 일이고 그리는 것은 화면이다. */
+  readonly at: string;
+}
+
+/**
+ * 레일 「다음 확인 시점」의 줄 — 서버가 준 확인 시점을 이른 것부터 늘어놓는다.
+ *
+ * **제목이 「이번 주」가 아닌 까닭**(와이어프레임 이탈 · 사유를 남긴다): 「이번 주」를 말하려면
+ * 지금이 언제인지를 알아야 하는데, 이 저장소는 화면·표시층의 벽시계 읽기를 lint 로 막는다
+ * (`timeDisplay` 하나가 예외다 — D-1). 브라우저 시계로 주를 가르면 사용자마다 답이 다르고,
+ * 서버의 `overdue` 판정과 어긋난 말을 하게 된다(그 사고를 이 저장소가 이미 한 번 겪었다).
+ * 그래서 **거르지 않고 늘어놓는다** — 늘어놓는 데 쓰는 것은 서로의 시각뿐이고 「지금」이 아니다.
+ *
+ * 정렬 키가 `instantDisplayOf(...).text` 인 것도 같은 규율이다: KST 고정폭 글자라 사전식
+ * 비교가 곧 시각 순이고, 읽히지 않는 값은 그 글자가 숫자가 아니라 **뒤로 밀린다**. 원문
+ * (`date-time`)을 그대로 비교하면 오프셋이 섞일 때 차례가 어긋난다.
+ */
+export function checkpointRowsOf(cases: readonly CheckpointSource[]): readonly CheckpointRow[] {
+  return cases
+    .flatMap<CheckpointRow>((one) => {
+      const kind = one.nextCheckpointKind;
+      const at = one.nextCheckpointAt;
+      if (kind === NO_CHECKPOINT || at === null || at === undefined) {
+        return [];
+      }
+      return [{ caseId: one.caseId, kind, label: NEXT_CHECKPOINT_DISPLAY[kind].label, at }];
+    })
+    .sort((left, right) => {
+      const a = instantDisplayOf(left.at).text;
+      const b = instantDisplayOf(right.at).text;
+      return a < b ? -1 : a > b ? 1 : 0;
+    });
+}
+
+/** 「상태 뜻」 한 줄 — 상태와 그 표의 문면이다. 레일이 자기 글을 따로 들지 않는다. */
+export interface StateMeaning {
+  readonly state: BidCaseState;
+  readonly label: string;
+  readonly why: string;
+}
+
+/**
+ * 레일 「상태 뜻」 — **보이는 상태의 뜻만**, 그리고 **상태 표의 `why` 에서만** 온다.
+ *
+ * 뜻이 없는 상태는 줄을 만들지 않는다(빈 설명을 지어내지 않는다). 목록에 없는 상태의 뜻도
+ * 서지 않는다 — 운영자가 자기 입찰함에 없는 상태를 읽을 까닭이 없다.
+ *
+ * 차례는 **상태 표의 선언 순서**다(건이 들어온 차례가 아니다) — 같은 화면이 목록 차례에 따라
+ * 다른 순서로 설명을 늘어놓으면 읽는 사람이 그 차례에 뜻이 있다고 읽는다.
+ */
+export function stateMeaningsOf(states: readonly BidCaseState[]): readonly StateMeaning[] {
+  const shown = new Set(states);
+  return (Object.keys(BID_CASE_STATE_DISPLAY) as readonly BidCaseState[])
+    .filter((state) => shown.has(state))
+    .flatMap((state) => {
+      const display: { readonly label: string; readonly why?: string } = BID_CASE_STATE_DISPLAY[state];
+      return display.why === undefined ? [] : [{ state, label: display.label, why: display.why }];
+    });
 }
 
 /**

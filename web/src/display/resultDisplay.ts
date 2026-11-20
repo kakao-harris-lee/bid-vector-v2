@@ -54,9 +54,32 @@ export function isResultStage(state: BidCaseState): boolean {
 export interface PendingSlot {
   readonly id: string;
   readonly label: string;
-  /** 왜 비어 있는가 — 「다루지 않음」만 적지 않는다. */
+  /** 왜 비어 있는가 — 배지만 적지 않는다. */
   readonly why: string;
   readonly kind: 'LATER' | 'PERMANENT';
+}
+
+/**
+ * 자리의 분류 → **배지 문면**(M14/14D — 13A OPEN ⓖ 를 닫는 자리).
+ *
+ * 앞 판은 한 카드에서 두 말을 했다. 배지는 「다루지 않음」(영영 오지 않는다), 사유는 「지금은
+ * 제공하지 않습니다」(지금은 아니다). 갈림의 뿌리는 **기록된 결정이 채택 장부보다 낡은 것**이다 —
+ * M7 결정이 역산·추천 오차를 영구 빈 자리로 분류했고, 그 뒤 2026-11-14 에 페이퍼 투찰 정산이
+ * **채택**됐다(구현 대기). 13A 는 **사유만** 장부에 맞췄고 배지는 낡은 결정 쪽에 남았다.
+ *
+ * 팀장 판정(2026-11-20): 추천은 장부 쪽이므로 **배지를 사유와 맞는 문면으로** 옮기고, `kind` 는
+ * 그 기능 마일스톤이 값을 낼 때 정한다. 그래서 이 slice 가 움직이는 것은 **문면 한 칸**이고
+ * 분류 축은 그대로다 — 「뒤에 오는 것」과 「지금 없는 것」의 구별이 여전히 둘을 가른다.
+ */
+const PENDING_BADGE = {
+  LATER: '준비 중',
+  // 「다루지 않음」이 아니다 — 그 말은 영영 오지 않는다는 주장이고, 사유의 「지금은」과 어긋난다.
+  PERMANENT: '지금은 없음',
+} as const satisfies Record<PendingSlot['kind'], string>;
+
+/** 배지 조회의 **유일한 자리** — 화면이 분류를 보고 글자를 고르지 않는다. */
+export function pendingBadgeOf(kind: PendingSlot['kind']): string {
+  return PENDING_BADGE[kind];
 }
 
 export const RESULT_PENDING_SLOTS: readonly PendingSlot[] = [
