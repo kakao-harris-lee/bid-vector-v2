@@ -438,15 +438,61 @@ describe('화면 B — 카드가 보이는 값은 API 응답의 값이다', () =
    * 「KST 달력일의 차」로 바뀌었는데, 운영자가 그 뜻을 읽는 **유일한 산출물 문면**이 아직
    * 「내림」이라고 말하고 있었다. 모듈 주석·test·evidence 는 갱신됐고 화면 문면만 남았던 자리다.
    */
-  it('D-day 의 설명 문면이 달력일 기준이라고 말한다 — 옛 「내림」이 아니다', async () => {
+  /**
+   * **그 뜻에 닿는 길이 `title` 하나가 아니다**(cr D13). 14A 가 §12.3 (w) ⓖ 를 닫으면서
+   * `title` 하나짜리 용어 힌트를 걷고 2층 라벨로 옮겼는데(「손가락이 볼 수 없다」), **같은
+   * 파일의** 기초금액만 그 길을 쓰고 D-day 는 `title` 로 남았다.
+   */
+  it('D-day 의 뜻이 누를 수 있는 자리에서 온다 — title 하나가 아니다', async () => {
     renderScreen();
     await searchFor('SYN-7E1');
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
     const badge = within(card).getByTestId('notice-deadline');
 
-    expect(badge.getAttribute('title')).toBe('마감일까지의 KST 달력일 차');
-    expect(badge.getAttribute('title'), '옛 어림 문면이 남았다').not.toContain('내림');
+    // 손가락과 보조기기가 닿는 자리다 — 누를 수 있고, 아래층을 **프로그램적으로** 가리킨다.
+    expect(badge.tagName).toBe('BUTTON');
+    const describedBy = badge.getAttribute('aria-describedby');
+    expect(describedBy, '아래층으로 가는 배선이 없다').not.toBeNull();
+    const hint = card.ownerDocument.getElementById(describedBy!);
+    expect(hint, '배선이 없는 id 를 가리킨다').not.toBeNull();
+    expect(hint!.textContent).toBe('마감일까지의 KST 달력일 차');
+    expect(hint!.textContent, '옛 어림 문면이 남았다').not.toContain('내림');
+    // `title` 로 **되돌아가지 않았다** — 그 속성은 손가락이 볼 수 없다.
+    expect(badge.getAttribute('title'), 'title 로 돌아갔다').toBeNull();
+  });
+
+  /**
+   * **빈 글자 기관명이 조용한 빈칸이 되지 않는다**(cr D1). `??` 는 `null`/`undefined` 만 보므로
+   * `''`·공백뿐인 값이 비켜 가고, 그때 (a) 칸이 빈 채로 그려져 운영자는 가운뎃점만 보고
+   * (b) 값이 들어 있을 수 있는 **공고기관 칸이 영영 조회되지 않는다**.
+   *
+   * 닿을 수 있는 입력이다 — 기관명 칸에는 공백류 CHECK 가 없다(제목 칸만 그것을 진다).
+   */
+  it('수요기관이 공백뿐이면 공고기관으로 넘어간다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: '   ', noticeAgencyName: '합성 공고기관' }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    expect(within(card).getByTestId('notice-agency').textContent).toBe('합성 공고기관');
+  });
+
+  it('두 기관 칸이 다 공백뿐이면 조용한 빈칸이 아니라 부재 어휘다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: '', noticeAgencyName: '   ' }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    expect(within(card).getByTestId('notice-agency').textContent).toBe(absenceTextOf('notSent'));
   });
 
   it('금액이 없는 공고는 0 이 아니라 부재 어휘다', async () => {
@@ -647,6 +693,31 @@ describe('화면 B — 제안 목록', () => {
     expect(within(card).getByTestId('suggestion-license').textContent).toContain('면허 판정 불가');
     expect(within(card).getByTestId('suggestion-unjudged').textContent).toContain('지역');
     expect(within(card).getByTestId('suggestion-unjudged').textContent).toContain('시공능력평가금액');
+  });
+
+  /**
+   * **표제 없는 알약 줄은 뜻이 없다**(v L-2). 워크시트와 설정은 같은 축 목록에 「아직 판정하지
+   * 않는 (자격) 축」 표제를 다는데, 카드의 그 줄만 알약 셋이 맨으로 서 있었다 — 둘째 층을 열기
+   * 전에는 「통과한 축」인지 「판정하지 않은 축」인지 알 수 없다(그 혼동이 이 축의 존재 이유다).
+   */
+  it('미판정 축 알약 줄이 자기 표제를 든다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [{ ...SUGGESTION, licenseVerdict: 'UNCERTAIN', licenseUncertainReason: 'REQUIREMENT_DATA_ABSENT' }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const card = await screen.findByTestId(`suggestion-card-${NOTICE.noticeNumber}`);
+    const heading = within(card).getByTestId('suggestion-unjudged-label');
+    expect(heading.textContent).toContain('아직 판정하지 않는');
+    /**
+     * **계산된 접근 가능한 이름으로 잰다**(§12.3 (aa) 의 네 번째 함정): 역할 없는 요소에
+     * `aria-labelledby` 를 걸면 속성은 있어도 이름이 서지 않는다. 역할을 가진 묶음에 걸어야
+     * 보조기기가 「이 알약들은 미판정 축이다」를 말한다.
+     */
+    const group = within(card).getByRole('group', { name: heading.textContent! });
+    expect(group).toBe(within(card).getByTestId('suggestion-unjudged'));
   });
 
   /**

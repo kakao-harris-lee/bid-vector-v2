@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
@@ -6,6 +6,7 @@ import { AbsentValue } from '../components/AbsentValue';
 import { Card } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
 import { useTermHint } from '../components/KeyValueRow';
+import { shownText } from '../display/caseDisplay';
 import { compactAmountTextOf } from '../display/moneyDisplay';
 import { amountDisplayOf, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -32,12 +33,21 @@ const DEADLINE_HINT = '마감일까지의 KST 달력일 차';
  */
 function DeadlineBadge({ days }: { readonly days: number | null }) {
   const text = dayCountText(days);
+  /**
+   * **아래층으로 가는 길은 `title` 이 아니다**(cr D13). 14A 가 §12.3 (w) ⓖ 를 닫으면서 `title`
+   * 하나짜리 용어 힌트를 걷었다 — 손가락이 볼 수 없다. **같은 파일의** 기초금액은 그때 이 길로
+   * 옮겼고 D-day 만 남아 있었다(「D-5」는 그 자체로 뜻을 말하지 않는다).
+   *
+   * 훅이 조건보다 **앞에** 선다 — 「마감 없음」 갈래에서 건너뛰면 렌더마다 훅 수가 달라진다.
+   */
+  const hint = useTermHint(text === null ? undefined : DEADLINE_HINT, { testId: 'notice-deadline' });
   if (text === null) {
     return <span className="text-xs text-absent-ink">마감 없음</span>;
   }
   return (
-    <span data-testid="notice-deadline" className="font-numeric text-xs" title={DEADLINE_HINT}>
-      {text}
+    <span className="inline-flex flex-col items-end font-numeric text-xs">
+      {hint.termNode(text)}
+      {hint.hintNode}
     </span>
   );
 }
@@ -167,8 +177,15 @@ function NoticeCardBody({
               한 줄이 라벨 둘로 늘어난다. */}
           <div className="flex min-w-0 items-baseline gap-1">
             <dt className="sr-only">발주기관</dt>
+            {/* **부재 판정을 글자 기준으로** 한다(cr D1). `??` 는 `null`/`undefined` 만 보므로
+                `''`·공백뿐인 값이 비켜 가고, 그때 (a) 이 칸이 빈 채로 그려져 운영자는 가운뎃점
+                하나만 보고 (b) 값이 들어 있을 수 있는 **공고기관 칸이 영영 조회되지 않는다**.
+                닿을 수 있는 입력이다 — 기관명 칸에는 공백류 CHECK 가 없다(제목 칸만 그것을
+                진다). 같은 값을 쓰는 다른 네 자리는 이미 이 술어를 쓴다. */}
             <dd data-testid="notice-agency" className="break-words">
-              {notice.demandAgencyName ?? notice.noticeAgencyName ?? <AbsentValue reason="notSent" />}
+              {shownText(notice.demandAgencyName) ?? shownText(notice.noticeAgencyName) ?? (
+                <AbsentValue reason="notSent" />
+              )}
             </dd>
           </div>
           <span aria-hidden="true" className="text-ink-soft">
@@ -245,6 +262,32 @@ export function NoticeCard({
 }
 
 /**
+ * 미판정 축 알약 줄 — **표제가 붙는다**(v L-2).
+ *
+ * 앞 판은 알약 셋이 맨으로 서 있었다. 둘째 층을 열기 전에는 그것이 「통과한 축」인지 「판정하지
+ * 않은 축」인지 알 수 없는데, **그 혼동이 이 축의 존재 이유다**(「면허만 보면 끝」으로 읽히지
+ * 않게 하려고 서버가 내는 목록이다). 워크시트와 설정은 이미 같은 표제를 단다.
+ *
+ * 표제를 **역할 있는 묶음**에 건다 — 역할 없는 요소의 `aria-labelledby` 는 속성만 있고 이름을
+ * 세우지 못한다(§12.3 (aa) 가 적은 네 번째 함정이고, 단언이 속성의 존재를 재면 그 꼴이 통과한다).
+ */
+function UnjudgedAxes({ axes }: { readonly axes: readonly string[] }) {
+  const labelId = useId();
+  return (
+    <div className="mt-1 flex flex-col gap-0.5">
+      <span id={labelId} data-testid="suggestion-unjudged-label" className="text-xs text-ink-soft">
+        아직 판정하지 않는 자격 축
+      </span>
+      <p role="group" aria-labelledby={labelId} data-testid="suggestion-unjudged" className="flex flex-wrap gap-1">
+        {axes.map((axis) => (
+          <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
+        ))}
+      </p>
+    </div>
+  );
+}
+
+/**
  * 제안 카드 — 공고 카드와 **같은 배치**에 면허 축 판정을 더한다(§6.2 B 「검색 결과와 제안
  * 목록이 같은 카드」). 지역·실적·시공능력은 아직 판정하지 않으므로 그 사실을 함께 싣는다.
  */
@@ -269,13 +312,7 @@ export function SuggestionCard({
             testId="suggestion-license"
           />
         }
-        footer={
-          <p data-testid="suggestion-unjudged" className="mt-1 flex flex-wrap gap-1">
-            {suggestion.unjudgedAxes.map((axis) => (
-              <StateBadge key={axis} display={displayOrUnknown(UNJUDGED_AXIS_DISPLAY, axis)} />
-            ))}
-          </p>
-        }
+        footer={<UnjudgedAxes axes={suggestion.unjudgedAxes} />}
       />
     </Card>
   );
