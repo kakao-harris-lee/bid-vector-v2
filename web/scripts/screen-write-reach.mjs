@@ -12,12 +12,18 @@
 //  · 화면 모집단 — `routes.tsx` 의 자리 표에서 유도한다(`journey-screen-table.mjs` 와 같은 출처).
 //  · 어느 화면이 읽기 전용인가 — **이것만 선언**이다(사람의 판단). 대신 **집합 등식**을 건다:
 //    선언 표의 키 == 유도한 자리 id. 새 화면은 선언하지 않으면 붉는다.
-//  · 무엇이 쓰기인가 — **메서드에서 유도**한다. 이름 술어(「그 함수 금지」)면 개명 한 번에 열린다.
-//  · 도달 — 폐포 **둘**이 겹친다. 모듈 사이(간선이 **내보낸 이름**을 나른다)와 `queries.ts`
-//    **안**(얇은 포장이 쓰기를 감추지 못하게).
+//  · 무엇이 쓰기인가 — **`apiClient` 호출 자리**에서 심볼 동일성과 메서드로 정한다. 이름
+//    술어(「그 함수 금지」)면 개명 한 번에 열린다.
+//  · 도달 — **폐포 둘이 겹친다**(수정 라운드 3). ⓐ **적재 폐포**: 값 수입으로 닿는 모듈 전수의
+//    **적재 때 도는 최상위 문장**이 씨앗이다(모듈이 그래프에 들면 그 최상위는 이미 실행된 것이다).
+//    ⓑ **호출 그래프**: 식별자가 가리키는 선언을 **파일 경계를 묻지 않고** 따라간다. 특별한
+//    경계가 없으므로 `queries.ts` 는 그래프 위의 한 마디일 뿐이다.
 //
-// **모르는 것은 통과시키지 않는다.** 해소되지 않는 지정자·비리터럴 경로·네임스페이스 수입은
-// 전부 위반이다(fail-closed).
+// **모르는 것은 통과시키지 않는다.** 해소되지 않는 지정자 · 비리터럴 경로·메서드 · 네임스페이스
+// 수입 · 리터럴 동적 수입 · 어느 선언도 가리키지 않는 수입 이름은 전부 위반이다(fail-closed).
+//
+// **이 게이트가 닿지 않는 자리**는 `design-review.md` 의 「건전성 경계」 표가 정본이다 — 거기
+// 적히지 않은 꼴을 발견하면 그 표를 먼저 고친다.
 import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
@@ -80,6 +86,9 @@ const sourceCache = new Map();
  */
 let previousProgram;
 
+/** 오버레이가 **없는** 프로그램 — 출하 트리 판정과 여러 단위 test 가 같은 것을 쓴다. */
+let basePrograms = new Map();
+
 function cachedSourceFile(fileName, text, languageVersion) {
   const key = `${fileName}\u0000${text}`;
   const found = sourceCache.get(key);
@@ -106,6 +115,12 @@ function cachedSourceFile(fileName, text, languageVersion) {
  * `overlay` 는 합성 원문을 실제 트리 위에 얹는다(디스크를 건드리지 않는다).
  */
 export function writeReachProgram(webRoot, overlay = new Map()) {
+  if (overlay.size === 0) {
+    const cached = basePrograms.get(webRoot);
+    if (cached !== undefined) {
+      return cached;
+    }
+  }
   const configPath = resolve(webRoot, 'tsconfig.json');
   const read = ts.readConfigFile(configPath, ts.sys.readFile);
   if (read.error !== undefined) {
@@ -141,6 +156,9 @@ export function writeReachProgram(webRoot, overlay = new Map()) {
     host,
     previousProgram,
   );
+  if (overlay.size === 0) {
+    basePrograms.set(webRoot, previousProgram);
+  }
   return previousProgram;
 }
 
@@ -190,7 +208,15 @@ function resolvedSymbol(checker, symbol) {
 export function clientCallsIn(source, checker, clientSymbol) {
   const operations = [];
   const unresolved = [];
-  const path = source.fileName;
+  // 문장을 받기도 하므로 **그 문장이 사는 파일**을 묻는다(`source.fileName` 은 문장에 없다).
+  const file = ts.isSourceFile(source) ? source : source.getSourceFile();
+  const path = file.fileName;
+  /**
+   * **정의 자리에서는 「모르는 꼴」을 세지 않는다.** 클라이언트 모듈 자신은 그 값을 만들고
+   * 미들웨어를 붙인다(`apiClient.use(…)`) — 화면의 호출이 아니다. HTTP 메서드 호출이라면
+   * 아래에서 operation 으로 여전히 잡힌다.
+   */
+  const definitionSite = path.endsWith(`/src/${CLIENT_MODULE}`);
   const visit = (node) => {
     if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) {
       const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
@@ -220,7 +246,7 @@ export function clientCallsIn(source, checker, clientSymbol) {
             } else {
               unresolved.push(`${path}: ${CLIENT_EXPORT} 호출의 경로가 리터럴이 아니다`);
             }
-          } else {
+          } else if (!definitionSite) {
             unresolved.push(`${path}: ${CLIENT_EXPORT} 의 모르는 사용 꼴`);
           }
         }
@@ -419,6 +445,47 @@ export function screenModulesOf(routesText, routesPath, readText) {
  * 선언 단위라 **모듈을 통째로 삼키지 않는다**: 결과 화면이 질의 모듈을 수입해도 부르지 않는
  * 쓰기 선언은 그래프에 들지 않는다.
  */
+/**
+ * 그 문장이 **적재 때 실행되는가**.
+ *
+ * 함수 선언과 타입 선언은 실행되지 않는다 — 몸통은 **불릴 때** 돈다(그 자리는 호출 그래프가
+ * 든다). 초기값이 전부 함수인 변수 선언(`export const f = () => …`)도 같다. 그 밖(변수
+ * 초기값 · 식 문장 · 클래스의 static 초기화 · 수입)은 **적재가 곧 실행**이다.
+ *
+ * 이 구별이 없으면 둘 중 하나가 된다: 전부 씨앗으로 두면 질의 모듈의 쓰기 함수 몸통까지
+ * 읽혀 출하 트리가 거짓으로 붉고, 아무것도 안 두면 **적재 때 도는 쓰기**를 놓친다(v H-2r).
+ */
+function runsAtLoad(statement) {
+  if (
+    ts.isFunctionDeclaration(statement) ||
+    ts.isInterfaceDeclaration(statement) ||
+    ts.isTypeAliasDeclaration(statement) ||
+    ts.isModuleDeclaration(statement)
+  ) {
+    return false;
+  }
+  if (ts.isVariableStatement(statement)) {
+    // 초기값이 **전부** 함수면 선언일 뿐이다. 하나라도 아니면 그 식이 적재 때 돈다.
+    return !statement.declarationList.declarations.every(
+      (one) => one.initializer !== undefined && ts.isFunctionLike(one.initializer),
+    );
+  }
+  return true;
+}
+
+/**
+ * 한 화면 모듈이 닿는 **operation 집합**과 **해소 불가 목록**.
+ *
+ * **폐포가 둘이다**(수정 라운드 3 · v H-2r).
+ *  ⓐ **적재 폐포** — 값 수입 간선으로 닿는 모듈 전수의 **적재 때 도는 최상위 문장**을 씨앗으로
+ *    둔다. 모듈이 그래프에 들어오면 그 최상위는 **이미 실행된 것**이다. 라운드 2 가 선언
+ *    단위로 바꾸면서 이 사실을 잃었고, 그래서 적재 때 도는 쓰기 둘이 모든 게이트를 지났다.
+ *  ⓑ **호출 그래프** — 식별자가 가리키는 선언을 파일 경계를 묻지 않고 따라간다. 함수 몸통은
+ *    불릴 때 도므로 이쪽이 든다.
+ *
+ * 쓰기인지는 **`apiClient` 호출 자리**에서 심볼 동일성과 메서드로 정한다 — `queries.ts` 는
+ * 그래프 위의 한 마디일 뿐이다.
+ */
 export function reachFrom(entry, { program, srcRoot }) {
   const checker = program.getTypeChecker();
   const clientSymbol = clientExportSymbol(program, checker);
@@ -429,22 +496,43 @@ export function reachFrom(entry, { program, srcRoot }) {
 
   const seen = new Set();
   const modules = new Set();
+  /**
+   * **적재한 모듈** — `modules`(닿은 모듈)와 **다른 집합**이다. 둘을 한 집합으로 쓰면, 어떤
+   * 선언을 먼저 따라가다 그 모듈을 「닿았다」로 표시하는 순간 **적재 씨앗이 통째로 건너뛰어진다**
+   * (실측: 적재 때 도는 쓰기가 그 길로 사라졌다). 큐가 LIFO 라 그 순서가 실제로 일어난다.
+   */
+  const loaded = new Set();
   const operations = new Set();
   const unresolved = [];
-  // 씨앗은 **진입 모듈의 최상위 문장 전수**다 — 수입 문장도 든다(그 이름이 가리키는 선언으로
-  // 이어진다).
-  const queue = [...source.statements];
+  const queue = [];
+
+  const ours = (file) => file.fileName.startsWith(`${srcRoot}/`);
+
+  /** 그 모듈을 **적재한다** — 적재 때 도는 최상위 문장 전수가 씨앗이 된다. */
+  const load = (file) => {
+    if (!ours(file) || loaded.has(file.fileName)) {
+      return;
+    }
+    loaded.add(file.fileName);
+    modules.add(file.fileName);
+    for (const statement of file.statements) {
+      if (runsAtLoad(statement)) {
+        queue.push(statement);
+      }
+    }
+  };
 
   /** 그 선언이 **우리 트리 안**이면 그것을 담은 최상위 문장을 큐에 민다. */
   const follow = (declaration) => {
     const file = declaration.getSourceFile();
-    if (!file.fileName.startsWith(`${srcRoot}/`)) {
+    if (!ours(file)) {
       // 의존 패키지의 선언 — 이 축의 밖이다(번들 경계 게이트가 든다).
       return;
     }
     if (ts.isSourceFile(declaration)) {
-      // **모듈 통째로**(`import * as q`) — 어느 이름을 쓸지 이 축에서 알 수 없으므로 전수를
-      // 민다(fail-closed). 속성 접근으로 실제로 부르는 자리는 아래 식별자 축이 따로 든다.
+      // **모듈 통째로**(`import * as q` · `await import(리터럴)`) — 어느 이름을 쓸지 이 축에서
+      // 알 수 없으므로 적재하고 전수를 민다(fail-closed).
+      load(declaration);
       queue.push(...declaration.statements);
       return;
     }
@@ -453,6 +541,24 @@ export function reachFrom(entry, { program, srcRoot }) {
       queue.push(top);
     }
   };
+
+  /** 수입 지정자가 가리키는 모듈을 적재한다(타입 전용은 적재가 아니다). */
+  const loadFrom = (specifier, isTypeOnly) => {
+    if (isTypeOnly === true || !ts.isStringLiteralLike(specifier)) {
+      return;
+    }
+    const target = resolvedSymbol(checker, checker.getSymbolAtLocation(specifier));
+    for (const declaration of target?.declarations ?? []) {
+      if (ts.isSourceFile(declaration)) {
+        load(declaration);
+      }
+    }
+  };
+
+  // 진입 모듈은 **전수**가 씨앗이다 — 그 화면의 코드는 전부 그 화면의 것이다.
+  loaded.add(source.fileName);
+  modules.add(source.fileName);
+  queue.push(...source.statements);
 
   while (queue.length > 0) {
     const statement = queue.pop();
@@ -469,27 +575,27 @@ export function reachFrom(entry, { program, srcRoot }) {
     }
     unresolved.push(...calls.unresolved);
 
-    // **부작용 수입**(`import './x'`)은 이름을 가져오지 않는다 — 그 모듈의 최상위가 통째로
-    // 실행되므로 전수를 민다.
-    if (
-      ts.isImportDeclaration(statement) &&
-      statement.importClause === undefined &&
-      ts.isStringLiteralLike(statement.moduleSpecifier)
-    ) {
-      const target = resolvedSymbol(checker, checker.getSymbolAtLocation(statement.moduleSpecifier));
-      for (const declaration of target?.declarations ?? []) {
-        if (ts.isSourceFile(declaration) && declaration.fileName.startsWith(`${srcRoot}/`)) {
-          queue.push(...declaration.statements);
-        }
-      }
-    }
-
     const visit = (node) => {
-      // 동적 수입의 지정자가 리터럴이 아니면 **모르는 것**이다.
+      // **값 수입은 그 모듈을 적재한다**(부작용 수입도 이 길로 든다).
+      if (ts.isImportDeclaration(node)) {
+        loadFrom(node.moduleSpecifier, node.importClause?.isTypeOnly);
+      }
+      if (ts.isExportDeclaration(node) && node.moduleSpecifier !== undefined) {
+        loadFrom(node.moduleSpecifier, node.isTypeOnly);
+      }
       if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         const first = node.arguments[0];
         if (first === undefined || !ts.isStringLiteralLike(first)) {
           unresolved.push(`${statement.getSourceFile().fileName}: 동적 import 의 지정자가 리터럴이 아니다`);
+        } else {
+          // **리터럴 동적 수입은 네임스페이스다**(v H-2r): 어느 이름을 꺼낼지 이 축에서 알 수
+          // 없으므로 정적 `import * as` 와 같은 대접을 한다.
+          const target = resolvedSymbol(checker, checker.getSymbolAtLocation(first));
+          for (const declaration of target?.declarations ?? []) {
+            if (ts.isSourceFile(declaration)) {
+              follow(declaration);
+            }
+          }
         }
       }
       // 상대 지정자가 해소되지 않으면 **모르는 것**이다.
@@ -504,10 +610,9 @@ export function reachFrom(entry, { program, srcRoot }) {
           `${statement.getSourceFile().fileName}: ${node.moduleSpecifier.text} 가 어느 파일인지 해소되지 않는다`,
         );
       }
-      // **수입한 이름이 아무것도 가리키지 않으면 모르는 것이다**(fail-closed). 좁게 본다 —
-      // 수입 지정자 자리만이고, 전역·JSX 내장 이름은 이 술어에 들지 않는다.
+      // **수입한 이름이 아무것도 가리키지 않으면 모르는 것이다**(fail-closed).
       if (ts.isImportSpecifier(node) || ts.isImportClause(node)) {
-        const name = ts.isImportSpecifier(node) ? node.name : node.name;
+        const name = node.name;
         const bound = name === undefined ? undefined : resolvedSymbol(checker, checker.getSymbolAtLocation(name));
         if (name !== undefined && (bound?.declarations ?? []).length === 0) {
           unresolved.push(
@@ -516,7 +621,13 @@ export function reachFrom(entry, { program, srcRoot }) {
         }
       }
       if (ts.isIdentifier(node)) {
-        const target = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
+        // **단축 속성**(`{ requestBidPrice }`)은 이름이 가리키는 것이 속성 심볼이다(v H-2r) —
+        // 값 심볼을 따로 묻지 않으면 그 간선이 통째로 사라진다.
+        const shorthand =
+          node.parent !== undefined && ts.isShorthandPropertyAssignment(node.parent)
+            ? checker.getShorthandAssignmentValueSymbol(node.parent)
+            : undefined;
+        const target = resolvedSymbol(checker, shorthand ?? checker.getSymbolAtLocation(node));
         for (const declaration of target?.declarations ?? []) {
           follow(declaration);
         }
@@ -593,51 +704,135 @@ export function elementPropsOf(routesText, routesPath) {
   return bySlot;
 }
 
+/** router 가 값을 아래로 내리는 자리의 이름들 — 심볼로 고르므로 **철자에 기대지 않는다**. */
+const ROUTER_OUTLET_EXPORTS = ['Outlet', 'useOutlet'];
+const ROUTER_CONTEXT_HOOK = 'useOutletContext';
+
 /**
- * `Outlet` 이 **리터럴이 아닌 값을 아래로 내려 주는** 자리 전수(`src` 기준 상대 경로).
+ * 프로그램마다 한 번만 세는 router 심볼 — `getExportsOfModule` 을 호출마다 돌면 그 자체가
+ * 가장 비싼 자리였다(실측 1.2초/호출 가운데 대부분).
+ */
+const routerSymbolCache = new WeakMap();
+
+/** 위 축의 답 — 키는 **그 축에 닿을 수 있는 오버레이 내용**이다(아래 주석 참조). */
+const outletCache = new Map();
+
+/** 그 이름들의 **심볼** — `react-router` 가 내보낸 것으로 고정한다. */
+function routerSymbols(program, checker, names) {
+  const key = names.join('·');
+  const perProgram = routerSymbolCache.get(program) ?? new Map();
+  const cached = perProgram.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const found = new Map();
+  for (const source of program.getSourceFiles()) {
+    if (!/[\\/]node_modules[\\/]react-router[\\/]/u.test(source.fileName)) {
+      continue;
+    }
+    const moduleSymbol = checker.getSymbolAtLocation(source);
+    if (moduleSymbol === undefined) {
+      continue;
+    }
+    for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+      if (names.includes(exported.getName())) {
+        found.set(exported.getName(), resolvedSymbol(checker, exported));
+      }
+    }
+  }
+  perProgram.set(key, found);
+  routerSymbolCache.set(program, perProgram);
+  return found;
+}
+
+/**
+ * router 가 **리터럴이 아닌 값을 아래로 내리는** 자리 전수(`src` 기준 상대 경로).
  *
  * 왜 자리 표와 따로 서나(v M-1r): router context 는 route `element` 의 prop 이 아니라 **셸의
- * `<Outlet context={…} />`** 로 내려가고, 받는 쪽은 `useOutletContext()` 다. 그래서 읽기 화면의
- * import 폐포에도, element prop 축에도 걸리지 않는다 — 실측에서 네 게이트가 모두 초록이었다.
+ * `<Outlet context={…} />`** 로 내려가고 받는 쪽은 `useOutletContext()` 다. 그래서 읽기 화면의
+ * import 폐포에도, element prop 축에도 걸리지 않는다.
  *
- * 술어는 **그 요소 전수**다(읽기 화면만 보지 않는다): 셸은 화면 모두의 조상이라 한 번 꽂으면
- * 어느 화면이든 받을 수 있고, 어느 화면이 받는지는 이 축에서 알 수 없다. 오늘 그 요소는
- * **prop 을 하나도 들지 않는다**(실측) — 들기 시작하면 그 변경이 이 게이트를 지나야 한다.
+ * **철자가 아니라 심볼로 고른다**(cr HIGH · v M). 앞 판은 JSX 태그 글자가 `Outlet` 인지 보았고,
+ * 그래서 `import { Outlet as Slot }` 과 훅 꼴(`useOutlet`)이 그대로 지나갔다(실측 초록).
+ *
+ * 받는 쪽(`useOutletContext`)도 **쓰는 것만으로** 센다 — 그 훅이 읽는 값은 이 축에서 어디서
+ * 왔는지 알 수 없다. 오늘 그 둘 다 출하 트리에 0 이다.
  */
-export function outletContextSites(program, webRoot) {
+export function outletContextSites(program, webRoot, overlay = new Map()) {
+  /**
+   * **이 축의 답은 「Outlet 글자를 담은 파일들의 내용」에만 달려 있다.** 오버레이가 그런 파일을
+   * 하나도 건드리지 않으면 답이 바뀔 수 없으므로 앞서 센 것을 그대로 쓴다 — 대조마다 프로그램을
+   * 새로 세우는 이 게이트에서 그 재계산이 가장 비싼 자리였다(실측 0.8초/호출).
+   */
+  const key = [...overlay]
+    .filter(([, text]) => typeof text === 'string' && text.includes('Outlet'))
+    .map(([path, text]) => `${path}\u0000${text}`)
+    .sort()
+    .join('\u0001');
+  const cached = outletCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const checker = program.getTypeChecker();
   const srcRoot = resolve(webRoot, 'src');
+  const outlets = routerSymbols(program, checker, ROUTER_OUTLET_EXPORTS);
+  const receivers = routerSymbols(program, checker, [ROUTER_CONTEXT_HOOK]);
+  if (outlets.size === 0 || receivers.size === 0) {
+    // 심볼을 못 얻으면 이 축이 **조용히** 비어 버린다 — 조용한 초록을 두지 않는다.
+    throw new Error('react-router 의 Outlet·useOutletContext 심볼을 얻지 못했다 — 주입 축이 조용해진다');
+  }
+  const outletSymbols = new Set(outlets.values());
+  const receiverSymbols = new Set(receivers.values());
   const sites = [];
+
   for (const source of program.getSourceFiles()) {
     if (!source.fileName.startsWith(`${srcRoot}/`) || /\.test\.tsx?$/u.test(source.fileName)) {
       continue;
     }
+    // **글자로 건너뛰기만 한다**(판정은 아래 심볼이 한다). 이 축이 찾는 세 이름은 별칭으로
+    // 가려도 수입 자리에 **그 철자가 남으므로**(`Outlet as Slot`) 건너뛰기가 건전하다.
+    if (!source.text.includes('Outlet')) {
+      continue;
+    }
+    const where = relative(srcRoot, source.fileName);
     const visit = (node) => {
-      const opening = ts.isJsxSelfClosingElement(node)
-        ? node
-        : ts.isJsxOpeningElement(node)
-          ? node
-          : undefined;
-      if (
-        opening !== undefined &&
-        ts.isIdentifier(opening.tagName) &&
-        opening.tagName.text === 'Outlet'
-      ) {
-        for (const attribute of opening.attributes.properties) {
-          const risky = ts.isJsxSpreadAttribute(attribute)
-            ? '…전개'
-            : attribute.initializer !== undefined && !ts.isStringLiteral(attribute.initializer)
-              ? attribute.name.getText(source)
-              : undefined;
-          if (risky !== undefined) {
-            sites.push(`${relative(srcRoot, source.fileName)}: Outlet 이 ${risky} 를 아래로 내린다`);
+      if (ts.isIdentifier(node)) {
+        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
+        if (symbol !== undefined && receiverSymbols.has(symbol)) {
+          sites.push(`${where}: ${ROUTER_CONTEXT_HOOK} 로 내려온 값을 받는다`);
+        }
+      }
+      // `<Outlet context={…} />` — 태그의 **심볼**이 그 내보내기인가.
+      const opening = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
+      if (opening !== undefined && ts.isIdentifier(opening.tagName)) {
+        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(opening.tagName));
+        if (symbol !== undefined && outletSymbols.has(symbol)) {
+          for (const attribute of opening.attributes.properties) {
+            const risky = ts.isJsxSpreadAttribute(attribute)
+              ? '…전개'
+              : attribute.initializer !== undefined && !ts.isStringLiteral(attribute.initializer)
+                ? attribute.name.getText(source)
+                : undefined;
+            if (risky !== undefined) {
+              sites.push(`${where}: Outlet 이 ${risky} 를 아래로 내린다`);
+            }
           }
+        }
+      }
+      // `useOutlet(…)` — 인자를 주면 그것이 곧 context 다.
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node.expression));
+        if (symbol !== undefined && outletSymbols.has(symbol) && node.arguments.length > 0) {
+          sites.push(`${where}: useOutlet 이 값을 아래로 내린다`);
         }
       }
       ts.forEachChild(node, visit);
     };
     visit(source);
   }
-  return sites.sort();
+  const answer = [...new Set(sites)].sort();
+  outletCache.set(key, answer);
+  return answer;
 }
 
 /** 정책 표와 자리 표의 **집합 등식** — 어느 쪽이 더 많아도 그 이름을 낸다. */
@@ -719,7 +914,7 @@ export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy =
     injected,
     screens,
     clientBindingImporters: clientBindingImporters(program, webRoot),
-    outletContext: outletContextSites(program, webRoot),
+    outletContext: outletContextSites(program, webRoot, normalized),
   };
 }
 

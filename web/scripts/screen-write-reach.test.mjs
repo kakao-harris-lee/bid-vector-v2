@@ -274,15 +274,89 @@ describe('양성 대조 — 심으면 붉는다', () => {
     expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
   });
 
-  /** **Outlet context** — 셸이 아래로 내려 주는 값(v M-1r 가 초록으로 재던 자리). */
-  it('Outlet 이 리터럴 아닌 값을 내리면 붉다', () => {
-    const shell = resolve(SRC, 'AppShell.tsx');
+  /**
+   * **적재 때 도는 쓰기와 값으로 건너가는 쓰기**(v H-2r 가 네 꼴로 쟀다). 라운드 2 가 선언
+   * 단위로 바꾸면서 앞의 둘이 **회귀**로 열렸다 — 모듈이 그래프에 들어오면 그 최상위는 이미
+   * 실행된 것인데 그 사실을 잃었다.
+   */
+  it.each([
+    [
+      '단축 속성으로 건너간다',
+      "import { requestBidPrice } from '../api/queries';\nexport const helpers = { requestBidPrice };\n",
+      "import { helpers } from '../session/__planted_load__';",
+      'export const plantedWrite = helpers.requestBidPrice;',
+    ],
+    [
+      '적재 때 돈다 — 쓰는 이름을 수입하지 않아도',
+      "import { requestBidPrice } from '../api/queries';\nexport const sideLabel = '합성';\nvoid Promise.resolve()\n  .then(() => requestBidPrice({ noticeNumber: 'x', noticeRound: '0' }))\n  .catch(() => undefined);\n",
+      "import { sideLabel } from '../session/__planted_load__';",
+      'export const plantedWrite = sideLabel;',
+    ],
+    [
+      '적재 때 객체 속성에 꽂는다',
+      "import { requestBidPrice } from '../api/queries';\nexport const floorRegistry: { load?: typeof requestBidPrice } = {};\nfloorRegistry.load = requestBidPrice;\n",
+      "import { floorRegistry } from '../session/__planted_load__';",
+      'export const plantedWrite = floorRegistry.load;',
+    ],
+    [
+      '리터럴 동적 수입을 셈한 키로 읽는다',
+      "export const dynamicKey = 'requestBidPrice';\n",
+      "import { dynamicKey } from '../session/__planted_load__';",
+      "export const plantedWrite = async (key: string) => {\n  const mod: Record<string, unknown> = await import('../api/queries');\n  return [mod[key], dynamicKey];\n};",
+    ],
+  ])('%s — 그 쓰기가 붉는다', (_label, writerText, importLine, useLine) => {
     const planted = collectScreenWriteReach({
       webRoot: WEB_ROOT,
-      overlay: new Map([[shell, read(shell).replace('<Outlet />', '<Outlet context={{ load: 1 }} />')]]),
+      overlay: new Map([
+        [resolve(SRC, 'session', '__planted_load__.ts'), writerText],
+        [RESULTS_SCREEN, `${importLine}\n${read(RESULTS_SCREEN)}\n${useLine}\n`],
+      ]),
     });
 
-    expect(violationsOf(planted).join('\n')).toContain('Outlet 이');
+    expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
+  });
+
+  /**
+   * **router 가 값을 아래로 내리는 자리** — 철자가 아니라 **심볼**로 센다(cr HIGH · v M).
+   * 앞 판은 JSX 태그 글자만 보아 별칭과 훅 꼴이 그대로 지나갔다.
+   */
+  it.each([
+    ['그대로', '<Outlet />', '<Outlet context={{ load: 1 }} />', 'Outlet 이'],
+    [
+      '별칭으로 가려도',
+      "import { NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router';",
+      "import { NavLink, Outlet as Slot, useLocation, useMatches, useNavigate } from 'react-router';",
+      'Outlet 이',
+    ],
+  ])('Outlet 이 %s 값을 내리면 붉다', (_label, from, to, expected) => {
+    const shell = resolve(SRC, 'AppShell.tsx');
+    const original = read(shell);
+    const patched =
+      _label === '별칭으로 가려도'
+        ? original.replace(from, to).replace('<Outlet />', '<Slot context={{ load: 1 }} />')
+        : original.replace(from, to);
+
+    // **바꿔치운 것이 실제로 바뀌었는가**(cr MEDIUM) — `.replace` 가 빗나가면 이 대조가 공허하다.
+    expect(patched, '심은 글이 원문과 같다').not.toBe(original);
+
+    const planted = collectScreenWriteReach({ webRoot: WEB_ROOT, overlay: new Map([[shell, patched]]) });
+
+    expect(violationsOf(planted).join('\n')).toContain(expected);
+  });
+
+  /** 받는 쪽도 센다 — 그 훅이 읽는 값이 어디서 왔는지 이 축에서 알 수 없다. */
+  it('useOutletContext 로 받으면 붉다', () => {
+    const original = read(RESULTS_SCREEN);
+    const patched = `import { useOutletContext } from 'react-router';\n${original}\nexport const plantedWrite = () => useOutletContext();\n`;
+
+    expect(patched).not.toBe(original);
+
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([[RESULTS_SCREEN, patched]]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('useOutletContext');
   });
 
   /** 내보내기 전수에 **없는 이름**을 수입하면 모르는 것이라 붉는다(fail-closed). */
@@ -337,13 +411,18 @@ describe('양성 대조 — 심으면 붉는다', () => {
    * 없다(v M-1). 싼 값에 닫는 축: 읽기 전용 화면의 element 는 리터럴 아닌 prop 을 받지 않는다.
    */
   it('읽기 화면의 route element 가 리터럴 아닌 prop 을 받으면 붉다', () => {
+    const plantedRoutes = read(ROUTES).replace(
+      'element: <ResultsScreen />',
+      'element: <ResultsScreen requestFloor={undefined} />',
+    );
+
+    // **바꿔치운 것이 실제로 바뀌었는가**(cr MEDIUM).
+    expect(plantedRoutes, '심은 글이 원문과 같다').not.toBe(read(ROUTES));
+
     const planted = collectScreenWriteReach({
       webRoot: WEB_ROOT,
       overlay: new Map([
-        [
-          ROUTES,
-          read(ROUTES).replace('element: <ResultsScreen />', 'element: <ResultsScreen requestFloor={undefined} />'),
-        ],
+        [ROUTES, plantedRoutes],
       ]),
     });
 
