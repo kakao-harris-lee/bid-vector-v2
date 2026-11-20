@@ -1,13 +1,14 @@
 import { useState } from 'react';
 
 import { replaceQualificationFacts, type Profile } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
 import { Field, StateBadge } from '../components/StateBadge';
 import { termsOf } from '../display/editSessionDisplay';
 import { QUALIFICATION_STATE_DISPLAY, qualificationStateOf } from '../display/profileDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
-import { attemptOf, PROFILE_QUERY_KEY, ProfileWriteFailure, useProfileWrite } from './profileWrites';
+import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
 
 /** 자격 사실 폼 — 세 어휘 배열과 신고 여부. 기본값을 지어내지 않는다. */
 interface FactsForm {

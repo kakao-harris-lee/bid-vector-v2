@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { replaceBusinessDetails, type Profile } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
 import { Field, StateBadge } from '../components/StateBadge';
 import {
@@ -14,7 +15,7 @@ import {
 } from '../display/profileDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
-import { attemptOf, PROFILE_QUERY_KEY, ProfileWriteFailure, useProfileWrite } from './profileWrites';
+import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
 
 function detailsFormOf(profile: Profile): BusinessDetailsForm {
   return {
