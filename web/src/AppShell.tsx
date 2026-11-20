@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatches, useNavigate } from 'react-router';
 
 import { rememberCsrf } from './api/client';
-import { listBidCases, listNotifications, readProfile, signOut } from './api/queries';
+import { listBidCases, listNotifications, readProfile, signOut, type BidCase } from './api/queries';
 import { bidCasesQueryKey, notificationsUnreadQueryKey, PROFILE_QUERY_KEY } from './api/queryKeys';
+import { tabOf } from './display/bidBoxDisplay';
 import { AbsentValue } from './components/AbsentValue';
 import { Button } from './components/Button';
 import { queryClient } from './queryClient';
@@ -49,6 +50,24 @@ const BID_BOX_SLOT_ID = 'bid-box';
 /** 사이드바가 세는 종류 — 입찰함 화면과 **같은 질의 키**라 담기·전이의 무효화가 배지에 닿는다. */
 const BADGE_BID_KIND = 'REAL';
 
+/** 세지 않는 탭 — **표시 계약의 표**가 어느 상태를 여기 넣는지 정한다(사본을 들지 않는다). */
+const CLOSED_TAB = 'closed';
+
+/**
+ * 지금 들여다볼 건의 수 — 종단 탭의 건을 뺀다.
+ *
+ * **꼴이 계약과 다르면 아무 말도 하지 않는다.** 배지는 이미 「모르면 그리지 않는다」로 서 있고,
+ * 받은 것이 배열이 아니라는 것도 모르는 것의 한 갈래다. 이 가드가 없으면 배지 하나가 **셸 전체**를
+ * 무너뜨린다 — 그러면 모든 화면이 함께 사라진다(실측: 목록 자리에 객체를 답하는 stub 에서
+ * 로그인 화면까지 오류 경계로 갔다).
+ */
+function openCaseCountOf(data: readonly BidCase[] | undefined): number {
+  if (!Array.isArray(data)) {
+    return 0;
+  }
+  return data.filter((one) => tabOf(one.state) !== CLOSED_TAB).length;
+}
+
 function navLinkClass({ isActive }: { readonly isActive: boolean }): string {
   const tone = isActive ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin';
   return `inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 text-sm ${tone}`;
@@ -67,6 +86,20 @@ function tabLinkClass({ isActive }: { readonly isActive: boolean }): string {
 }
 
 /**
+ * 배지의 어조 — **두 종류의 사실을 같은 얼굴로 그리지 않는다**(cr M-2).
+ *
+ * 알림함의 「3」은 **읽을 것이 셋 남았다**는 요구이고 0 이 되는 날이 온다. 입찰함의 수는
+ * **지금 들여다볼 건이 몇인가**라는 사실이고 요구가 아니다. 앞 판은 둘 다 경보 어조(옅은 빨강
+ * 면에 빨강 글자)로 그려서, 아무것도 요구하지 않는 수가 영구히 빨강으로 박혀 있었다.
+ */
+const BADGE_TONE_CLASS = {
+  alarm: 'bg-bad-skin text-bad-ink',
+  neutral: 'bg-neutral-skin text-neutral-ink',
+} as const;
+
+type BadgeTone = keyof typeof BADGE_TONE_CLASS;
+
+/**
  * 탐색 배지 — **0 이면 그리지 않는다**(0 을 보이면 「있다」와 「다 읽었다·비었다」가 같은 모양이
  * 된다). 읽지 못했을 때도 그리지 않는다: 배지는 **서버가 센 값**만 보인다.
  *
@@ -74,14 +107,22 @@ function tabLinkClass({ isActive }: { readonly isActive: boolean }): string {
  * 배지는 한 자리 수를 담는 칸이라 사유가 들어갈 자리가 아니고, 없는 배지는 아무것도 주장하지
  * 않는다. 사유를 말해야 하는 자리(알림함 화면의 배지)는 자기 자리에서 그렇게 한다.
  */
-function CountBadge({ count, testId }: { readonly count: number; readonly testId: string }) {
+function CountBadge({
+  count,
+  testId,
+  tone,
+}: {
+  readonly count: number;
+  readonly testId: string;
+  readonly tone: BadgeTone;
+}) {
   if (count <= 0) {
     return null;
   }
   return (
     <span
       data-testid={testId}
-      className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-bad-skin px-1.5 text-xs font-medium text-bad-ink"
+      className={`ml-auto inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium ${BADGE_TONE_CLASS[tone]}`}
     >
       {count}
     </span>
@@ -102,10 +143,10 @@ function SlotBadge({
   readonly place: string;
 }) {
   if (slotId === INBOX_SLOT_ID) {
-    return <CountBadge count={unread} testId={`${place}-unread`} />;
+    return <CountBadge count={unread} testId={`${place}-unread`} tone="alarm" />;
   }
   if (slotId === BID_BOX_SLOT_ID) {
-    return <CountBadge count={bidBox} testId={`${place}-bid-box`} />;
+    return <CountBadge count={bidBox} testId={`${place}-bid-box`} tone="neutral" />;
   }
   return null;
 }
@@ -189,7 +230,16 @@ function ShellFrame() {
     queryFn: () => listBidCases(BADGE_BID_KIND),
     enabled: !atLogin,
   });
-  const bidBoxCount = bidCases.data?.length ?? 0;
+  /**
+   * **종단 건은 세지 않는다**(cr M-2 · 팀장 판정 2026-11-20). 와이어프레임의 「내 입찰함 9」는
+   * 「전체 9」이고 「종료 12」는 **따로 선 탭**이다 — 배지가 세는 것은 평생 누적이 아니라 **지금
+   * 들여다볼 건**이다. 앞 판은 받은 배열의 길이라, 1년간 40건을 돌린 운영자에게 0 이 되는 날이
+   * 없는 수가 박혀 있었다.
+   *
+   * 종단 집합을 **여기 적지 않는다** — 표시 계약의 표(`bidBoxDisplay` 의 상태 → 탭)에서
+   * 유도한다. 사본을 들면 계약에 상태가 느는 날 둘이 갈린다.
+   */
+  const bidBoxCount = openCaseCountOf(bidCases.data);
 
   const profile = useQuery({ queryKey: PROFILE_QUERY_KEY, queryFn: readProfile, enabled: !atLogin });
 
@@ -391,7 +441,7 @@ function ShellFrame() {
               >
                 <span className="inline-flex items-center gap-1">
                   더 보기
-                  <CountBadge count={unreadCount} testId="nav-tab-unread" />
+                  <CountBadge count={unreadCount} testId="nav-tab-unread" tone="alarm" />
                 </span>
               </button>
             </li>

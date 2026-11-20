@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { apiClient, hasCsrf, rememberCsrf } from './api/client';
 import { NOTIFICATIONS_QUERY_KEY } from './api/queryKeys';
 import { absenceTextOf } from './display/absence';
+import { tabOf } from './display/bidBoxDisplay';
 import { appRoutes } from './AppRoot';
 import { queryClient } from './queryClient';
 import { screenSlots } from './routes';
@@ -36,6 +37,7 @@ function stub({
   unreadAfterRefetch,
   realCases = 0,
   tradeName = null,
+  bidCasesBody,
 }: {
   unread?: number;
   signOutStatus?: number;
@@ -45,6 +47,8 @@ function stub({
   realCases?: number;
   /** 사이드바 발치의 사업자명. `null` 은 계약의 「미설정」이다. */
   tradeName?: string | null;
+  /** 목록 자리의 답을 통째로 갈아 끼운다 — 꼴이 계약과 다른 경우를 세우는 자리다. */
+  bidCasesBody?: unknown;
 } = {}): void {
   let notificationReads = 0;
   // 서버를 **상태 있게** 흉내 낸다. 로그아웃이 성공하면 그 뒤의 세션 조회는 404 다(계약) —
@@ -84,19 +88,12 @@ function stub({
       }
       // 입찰함 배지(M14/14A) — 건의 **배열**이다. 화면 D 와 같은 질의라 꼴이 같아야 한다.
       if (path === '/api/bid-cases') {
-        // **상태가 서로 다르다**(변이 실측). 모두 같은 꼴로 답하면 「길이」와 「상태로 거른
-        // 길이」를 가를 수 없어, 배지가 클라이언트에서 거르는 변이가 초록이었다. 종단 상태를
-        // 섞어 두면 어떤 거르기도 수를 바꾼다.
-        const states = ['WATCHING', 'BID_RECORDED', 'WON', 'LOST', 'SKIPPED'];
-        return new Response(
-          JSON.stringify(
-            Array.from({ length: realCases }, (_unused, index) => ({
-              caseId: `case-${index}`,
-              state: states[index % states.length],
-            })),
-          ),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
+        // **표본이 종단과 비종단을 함께 든다**(cr M-2). 한쪽만 담으면 「종단을 뺀다」가 공허하고,
+        // 모두 같은 꼴이면 「거르지 않는다」가 공허하다 — 두 축이 같은 표본을 쓴다.
+        return new Response(JSON.stringify(bidCasesBody ?? bidCaseSample(realCases)), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
       }
       // 사이드바 발치의 사업자명 — 프로필 한 벌이다(빈 배열이 아니다).
       if (path === '/api/profile') {
@@ -373,18 +370,58 @@ describe('사이드바 (M14/14A)', () => {
   });
 });
 
+/**
+ * 배지 표본 — **종단과 비종단을 번갈아** 담는다. 기대값은 수를 박지 않고 **표시 계약의 표**에서
+ * 유도한다(`tabOf`), 그래서 계약에 상태가 늘어도 단언이 따라간다.
+ */
+const SAMPLE_STATES = ['WATCHING', 'WON', 'BID_RECORDED', 'LOST', 'AWAITING_OPENING', 'SKIPPED'] as const;
+
+/** 표본이 비면 모든 단언이 공허해진다 — 인덱스가 빗나가면 **던진다**. */
+const stateAt = (index: number): (typeof SAMPLE_STATES)[number] => {
+  const found = SAMPLE_STATES[index % SAMPLE_STATES.length];
+  if (found === undefined) {
+    throw new Error('배지 표본이 비었다');
+  }
+  return found;
+};
+
+const bidCaseSample = (count: number) =>
+  Array.from({ length: count }, (_unused, index) => ({ caseId: `case-${index}`, state: stateAt(index) }));
+
+const openCountOf = (count: number): number =>
+  bidCaseSample(count).filter((one) => tabOf(one.state) !== 'closed').length;
+
 describe('입찰함 배지 (M14/14A)', () => {
   /**
-   * **상태로 거르지 않는다.** fixture 의 건들이 서로 다른 상태를 들고 있으므로(종단 포함) 어떤
-   * 거르기도 이 수를 바꾼다 — 변이 실측이 그 전제를 세웠다. 수가 아니라 **받은 배열의 길이**와
-   * 맞댄다.
+   * **종단 건을 뺀 수다**(cr M-2). 와이어프레임의 「내 입찰함 9」는 「전체 9」이고 「종료 12」는
+   * 따로 선 탭이다 — 배지는 **지금 들여다볼 건**을 센다.
+   *
+   * 기대값을 박지 않고 **표시 계약의 표**에서 유도한다. 표본이 종단을 담으므로 거르지 않는
+   * 변이는 수가 커져 붉고, 더 걸러도 작아져 붉는다.
    */
-  it('받은 목록의 **길이**가 배지 수다 — 화면이 상태로 거르지 않는다', async () => {
-    const realCases = 5;
+  it('종단 건을 뺀 수가 배지 수다', async () => {
+    const realCases = 6;
     stub({ realCases });
     await renderAt('/');
 
-    await waitFor(() => expect(screen.getByTestId('nav-bid-box').textContent).toBe(String(realCases)));
+    const open = openCountOf(realCases);
+    expect(open, '표본에 비종단이 없다').toBeGreaterThan(0);
+    expect(open, '표본에 종단이 없다 — 「뺀다」가 공허하다').toBeLessThan(realCases);
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box').textContent).toBe(String(open)));
+  });
+
+  /** 어조가 알림함과 **다르다**(cr M-2) — 요구가 아닌 수를 경보로 그리지 않는다. */
+  it('알림함 배지와 다른 어조다', async () => {
+    stub({ realCases: 6, unread: 3 });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box')).not.toBeNull());
+    const bidBox = screen.getByTestId('nav-bid-box').className;
+    const inbox = screen.getByTestId('nav-unread').className;
+
+    expect(bidBox).not.toBe(inbox);
+    expect(bidBox, '입찰함 배지가 경보 어조다').not.toContain('bad');
+    expect(inbox, '알림함 배지가 경보 어조를 잃었다').toContain('bad');
   });
 
   /** 페이퍼를 섞지 않는다 — 그 operation 은 `kind` 를 필수로 받고 계약이 둘을 섞지 않는다. */
@@ -409,10 +446,27 @@ describe('입찰함 배지 (M14/14A)', () => {
   });
 
   it('좁은 화면의 탭에도 같은 수가 선다 — 폭에 따라 아는 것이 달라지지 않는다', async () => {
-    stub({ realCases: 2 });
+    const realCases = 6;
+    stub({ realCases });
     await renderAt('/');
 
-    await waitFor(() => expect(screen.getByTestId('nav-tab-bid-box').textContent).toBe('2'));
+    await waitFor(() =>
+      expect(screen.getByTestId('nav-tab-bid-box').textContent).toBe(String(openCountOf(realCases))),
+    );
+  });
+
+  /**
+   * **배지 하나가 셸을 무너뜨리지 않는다.** 목록 자리에 배열이 아닌 답이 오면(계약 위반이거나
+   * 200 에 실린 오류 본문) 앞 판은 셸 전체가 오류 경계로 갔다 — 모든 화면이 함께 사라진다.
+   * 「모르면 그리지 않는다」가 이 경우에도 선다.
+   */
+  it('배열이 아닌 답에서도 셸이 서고 배지만 빠진다', async () => {
+    stub({ realCases: 0, bidCasesBody: { message: '배열이 아니다' } });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-trade-name')).not.toBeNull());
+    expect(screen.getByTestId('app-shell')).not.toBeNull();
+    expect(screen.queryByTestId('nav-bid-box')).toBeNull();
   });
 
   it('로그인 자리에서는 묻지 않는다', async () => {

@@ -611,6 +611,22 @@ describe('로딩·오류 얼굴과 적재 중 배지 (r1 v M-1 · CR M-2)', () =
     expect(badge).not.toMatch(/\d/u);
   });
 
+  /**
+   * **실패한 뒤의 「아직 받지 못함」은 거짓이다**(v L-2). 답이 **왔고** 그것이 실패였다 —
+   * 기다리는 중이라고 말하면 운영자가 조금 더 기다린다.
+   */
+  it('목록이 실패하면 배지가 「아직 받지 못함」이라고 말하지 않는다', async () => {
+    mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL', '서버 오류'));
+    renderScreen();
+
+    await screen.findByTestId('inbox-error');
+    const badge = screen.getByTestId('inbox-unread-badge').textContent ?? '';
+
+    expect(badge, '실패한 뒤에도 기다리는 중이라고 말했다').not.toContain(absenceTextOf('notLoaded'));
+    expect(badge, '실패를 「없다」로 접었다').not.toContain(absenceTextOf('notSent'));
+    expect(badge, '실패인데 수를 지어냈다').not.toMatch(/\d/u);
+  });
+
   it('목록이 실패하면 오류 얼굴이고 「다시 시도」가 다시 읽는다', async () => {
     mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR'));
     renderScreen();

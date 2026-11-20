@@ -439,8 +439,19 @@ export function InboxScreen() {
             **응답 전은 「없다」가 아니다**(M14/14A ④). 앞 판은 이 자리가 부재와 **같은 글자**를
             내어, 아직 묻고 기다리는 동안의 빈 자리를 「서버가 0 건이라고 답했다」로 읽을 수
             있었다. 사유를 가르면 두 사실이 다른 얼굴을 낸다.
+
+            **실패한 뒤의 「아직 받지 못함」은 거짓이다**(v L-2). 답이 **왔고** 그것이 실패였다 —
+            기다리는 중이라고 말하면 운영자가 조금 더 기다린다. 그 자리는 실패를 말한다(오류
+            얼굴이 아래에 이미 서 있으므로 배지는 짧게 말한다).
           */}
-          안읽음 {unread === undefined ? <AbsentValue reason="notLoaded" /> : unread}
+          안읽음{' '}
+          {inbox.isError ? (
+            <span className="text-bad-ink">읽지 못함</span>
+          ) : unread === undefined ? (
+            <AbsentValue reason="notLoaded" />
+          ) : (
+            unread
+          )}
         </span>
       </div>
 
