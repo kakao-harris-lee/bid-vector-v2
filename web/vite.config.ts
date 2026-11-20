@@ -50,6 +50,11 @@ export default defineConfig({
     // 여럿도 그 예산의 80% 를 쓰고 있었다(리뷰 실측). 30s 는 그 최악의 약 2.5 배다. 동기 블록
     // 안의 진짜 hang 은 타이머가 발화하지 못해 5s 로도 못 잡으므로 CI job 의 `timeout-minutes`
     // 가 그 자리를 든다 — 이 값이 지키는 것은 **부하 아래 느려진 칸**뿐이다.
+    // 11E 의 규율은 그대로다(서명 A · PR #154): **측정이 아닌 예열**은 칸에도 hook 에도 싣지
+    // 않고 모듈 적재 단계로 옮긴다 — 예산을 늘리는 것은 그 결함의 처방이 아니고, 그 보호는 이
+    // 값이 아니라 **구조**가 든다(`display-gate-selectors` 의 `lintCallsDuringModuleEvaluation`
+    // 단언 · top-level await · 모듈 스코프 프로그램). 이 값이 덮는 것은 부하 아래의 **옮길 수
+    // 없는 측정 비용**뿐이다.
     testTimeout: 30_000,
     // M7/7D — **test 에서만** API 기준 주소를 절대 URL 로 둔다. 브라우저는 상대 주소(`/`)를
     // 문서 기준으로 풀지만 Node·jsdom 의 `Request` 는 **절대 URL 을 요구한다**(실측:
