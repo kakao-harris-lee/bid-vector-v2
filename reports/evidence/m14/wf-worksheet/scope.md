@@ -11,7 +11,7 @@ in_scope:
   - web/src/screens/WorksheetScreen.test.tsx  # **새 배치의 새 단언만** 더한다 — 13C 의 기존 주장은 그대로
   - web/src/components/PageHeader.tsx      # 판정 ⑤ — 제목 자리 표지 하나(additive)
   - web/src/components/PageHeader.test.tsx # 판정 ⑤ — 짝 test 를 **같은 커밋에서** 넓힌다
-  - docs/discovery/capability-map.md       # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다((aa) 이후)
+  - docs/discovery/capability-map.md       # §12.3 **(aa)** — 머지 차례에 붙였다(그때 main 은 base 에서 움직이지 않았다)
   - reports/evidence/m14/wf-worksheet/
 not_touched:   # in_scope 로 열어 두었으나 **편집 0** 으로 끝났다(기계 diff 가 정본이다)
   - web/src/screens/WorksheetRecord.tsx    # 넘김 카드·기록 폼은 자리만 옮겼고 그 자리는 화면 모듈이 정한다
