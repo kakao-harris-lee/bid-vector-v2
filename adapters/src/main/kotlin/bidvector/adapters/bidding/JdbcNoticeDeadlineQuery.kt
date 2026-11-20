@@ -3,7 +3,6 @@ package bidvector.adapters.bidding
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.DataSourceConnectionSource
 import bidvector.bidding.NoticeKey
-import bidvector.sharedkernel.NoticeRound
 import bidvector.workflow.bidding.NoticeDeadline
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
 import javax.sql.DataSource
@@ -27,32 +26,8 @@ class JdbcNoticeDeadlineQuery(
     /** 조립이 쓰는 생성자 — `DataSource` 하나를 받는다(`ConnectionSource` 는 adapters 안의 타입이다). */
     constructor(dataSource: DataSource) : this(DataSourceConnectionSource(dataSource))
 
-    override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, NoticeDeadline> {
-        if (notices.isEmpty()) return emptyMap()
-        val keys = notices.toList()
-        return connections.withConnection { connection ->
-            connection.prepareStatement(BiddingSql.SELECT_NOTICE_DEADLINE).use { statement ->
-                statement.setArray(
-                    1,
-                    connection.createArrayOf("text", keys.map { it.noticeNumber }.toTypedArray()),
-                )
-                statement.setArray(
-                    2,
-                    connection.createArrayOf("text", keys.map { it.noticeRound.value }.toTypedArray()),
-                )
-                statement.executeQuery().use { rs ->
-                    buildMap {
-                        while (rs.next()) {
-                            val key =
-                                NoticeKey(
-                                    rs.getString("notice_number"),
-                                    NoticeRound.of(rs.getString("notice_round")),
-                                )
-                            put(key, NoticeDeadline(rs.getTimestamp("deadline_at")?.toInstant()))
-                        }
-                    }
-                }
-            }
+    override fun deadlines(notices: Set<NoticeKey>): Map<NoticeKey, NoticeDeadline> =
+        connections.readByNoticeKeys(BiddingSql.SELECT_NOTICE_DEADLINE, notices) { rs ->
+            NoticeDeadline(rs.getTimestamp("deadline_at")?.toInstant())
         }
-    }
 }

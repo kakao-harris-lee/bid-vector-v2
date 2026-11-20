@@ -54,26 +54,45 @@ class BidCaseWorkflowTest {
             PolicyVersion(EffectiveFrom.Initial, "test"),
         )
 
-    private fun workflow(store: FakeBidCaseStore) =
-        BidCaseWorkflow(
-            cases = store,
-            deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
-            // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
-            snapshots = { _, takenAt ->
-                bidvector.bidding.NoticeSnapshot(
-                    noticeRevisionNumber = 1L,
-                    takenAt = takenAt,
-                    deadlineAt = deadline,
-                    floorRate = null,
-                    baseAmount = null,
-                )
-            },
-            clock = { now },
-            retentionPolicy = policy(),
-            // 되비춤 자체는 `BidCaseNotificationTest` 가 잰다 — 여기서는 전이가 알림 포트에
-            // 기대지 않는다는 사실만 유지한다(무엇을 돌려주든 이 파일의 단언이 흔들리지 않는다).
-            notifications = { NotificationInboxOutcome.Created },
-        )
+    /**
+     * 공고 표시 칸의 이중체(M14/14E) — **키가 없으면 공고 행이 없다**는 포트의 약속을 그대로
+     * 쓴다. 호출마다 받은 키 집합을 [calls] 에 쌓아 「목록이 건마다 묻지 않는가」를 잴 수 있게
+     * 한다(그 축이 없으면 N+1 이 조용히 들어온다).
+     */
+    private class RecordingProjections(
+        private val rows: Map<NoticeKey, NoticeProjection> = emptyMap(),
+    ) : NoticeProjectionQueryPort {
+        val calls = mutableListOf<Set<NoticeKey>>()
+
+        override fun projections(notices: Set<NoticeKey>): Map<NoticeKey, NoticeProjection> {
+            calls += notices
+            return rows.filterKeys(notices::contains)
+        }
+    }
+
+    private fun workflow(
+        store: FakeBidCaseStore,
+        projections: NoticeProjectionQueryPort = RecordingProjections(),
+    ) = BidCaseWorkflow(
+        cases = store,
+        noticeProjections = projections,
+        deadlines = { keys -> keys.associateWith { NoticeDeadline(deadline) } },
+        // 스냅샷은 **서버가 뜬다** — 이 fake 가 그 자리를 메운다(요청이 실어 오지 않는다).
+        snapshots = { _, takenAt ->
+            bidvector.bidding.NoticeSnapshot(
+                noticeRevisionNumber = 1L,
+                takenAt = takenAt,
+                deadlineAt = deadline,
+                floorRate = null,
+                baseAmount = null,
+            )
+        },
+        clock = { now },
+        retentionPolicy = policy(),
+        // 되비춤 자체는 `BidCaseNotificationTest` 가 잰다 — 여기서는 전이가 알림 포트에
+        // 기대지 않는다는 사실만 유지한다(무엇을 돌려주든 이 파일의 단언이 흔들리지 않는다).
+        notifications = { NotificationInboxOutcome.Created },
+    )
 
     private fun submission(evidence: EvidenceRef? = null) =
         BidSubmission(
@@ -306,6 +325,80 @@ class BidCaseWorkflowTest {
         first.created shouldBe true
         second.created shouldBe false
         store.countOf(mine) shouldBe 1
+    }
+
+    // --- 공고 읽기 투영(M14/14E) -----------------------------------------------
+
+    /**
+     * **두 사실이 다른 값으로 선다.** 행이 없는 것(파기 · 미수집)과 행은 있고 제목 칸이 빈 것을
+     * 한 값으로 접으면 화면이 사유를 말할 수 없다 — 알림함이 같은 자리에서 같은 결론에 닿았다.
+     *
+     * 한 test 에서 **나란히** 잰다: 둘을 따로 재면 「둘 다 `null` 을 내는」 구현이 두 단언을 모두
+     * 지나간다.
+     */
+    @Test
+    fun `공고 행 없음과 제목 칸 빔이 다른 값으로 선다`() {
+        val titled = NoticeKey("R00TEST0000002", NoticeRound.of("000"))
+        val untitled = NoticeKey("R00TEST0000003", NoticeRound.of("000"))
+        val store = FakeBidCaseStore()
+        val missing = store.seed(mine, notice, BidKind.REAL, BidState.Watching) // 공고 행이 없는 건
+        val withTitle = store.seed(mine, titled, BidKind.REAL, BidState.Watching)
+        val withoutTitle = store.seed(mine, untitled, BidKind.REAL, BidState.Watching)
+        val rows =
+            mapOf(
+                titled to NoticeProjection("세종시 도로 보수", "세종특별자치시", "조달청"),
+                untitled to NoticeProjection(null, "행정안전부", null),
+            )
+
+        val flow = workflow(store, RecordingProjections(rows))
+
+        // 행이 없다 — 값 자체가 null 이다.
+        flow.read(mine, missing.id)?.notice shouldBe null
+        // 행이 있고 칸이 차 있다.
+        flow.read(mine, withTitle.id)?.notice shouldBe
+            NoticeProjection("세종시 도로 보수", "세종특별자치시", "조달청")
+        // 행은 있고 제목 칸이 비었다 — **값은 있고** 칸만 null 이다.
+        val blank = flow.read(mine, withoutTitle.id)?.notice
+        requireNotNull(blank)
+        blank.title shouldBe null
+        blank.demandAgencyName shouldBe "행정안전부"
+        blank.noticeAgencyName shouldBe null
+    }
+
+    /**
+     * 목록은 **키 집합으로 한 번** 묻는다 — 건마다 묻는 구현이면 호출이 건 수만큼이고 각 호출의
+     * 키가 하나다. 계수와 **키 집합**을 함께 재야 「한 번 부르고 결과를 버리는」 꼴도 걸린다.
+     */
+    @Test
+    fun `목록은 공고 투영을 건마다 묻지 않고 키 집합으로 한 번 묻는다`() {
+        val second = NoticeKey("R00TEST0000004", NoticeRound.of("000"))
+        val third = NoticeKey("R00TEST0000005", NoticeRound.of("000"))
+        val store = FakeBidCaseStore()
+        store.seed(mine, notice, BidKind.REAL, BidState.Watching)
+        store.seed(mine, second, BidKind.REAL, BidState.Watching)
+        store.seed(mine, third, BidKind.REAL, BidState.Watching)
+        val projections =
+            RecordingProjections(mapOf(second to NoticeProjection("둘째 공고", null, null)))
+
+        val listed = workflow(store, projections).list(mine, BidKind.REAL, null)
+
+        listed.size shouldBe 3
+        projections.calls.size shouldBe 1
+        projections.calls.single() shouldBe setOf(notice, second, third)
+        listed.single { it.case.notice == second }.notice shouldBe
+            NoticeProjection("둘째 공고", null, null)
+        listed.filter { it.notice == null }.map { it.case.notice }.toSet() shouldBe setOf(notice, third)
+    }
+
+    /** 담기 응답도 같은 칸을 싣는다 — 담은 직후의 카드가 제목 없이 서지 않는다. */
+    @Test
+    fun `담기 응답에도 공고 표시 칸이 실린다`() {
+        val store = FakeBidCaseStore()
+        val projections =
+            RecordingProjections(mapOf(notice to NoticeProjection("담은 공고", "수요기관", "공고기관")))
+
+        workflow(store, projections).open(mine, notice, BidKind.REAL).view.notice shouldBe
+            NoticeProjection("담은 공고", "수요기관", "공고기관")
     }
 
     @Test

@@ -19,6 +19,8 @@ import bidvector.workflow.bidding.EVIDENCE_RETENTION_POLICY
 import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import bidvector.workflow.bidding.NoticeDeadline
 import bidvector.workflow.bidding.NoticeDeadlineQueryPort
+import bidvector.workflow.bidding.NoticeProjection
+import bidvector.workflow.bidding.NoticeProjectionQueryPort
 import bidvector.workflow.bidding.OpenCaseResult
 import bidvector.workflow.bidding.TimelineEntry
 import bidvector.workflow.bidding.TransitionWrite
@@ -204,19 +206,60 @@ class MovableNoticeDeadlines(
 }
 
 /**
+ * test 가 옮기는 공고 표시 칸(M14/14E) — [MovableNoticeDeadlines] 와 **같은 꼴**이다. [rowPresent] 를
+ * 끄면 그 키의 공고 행이 없는 것(파기 · 미수집)이고, 켠 채 [title] 만 비우면 행은 있고 제목 칸이 빈
+ * 것이다. 그 둘이 HTTP 층에서 다른 응답이 되는지가 이 이중체가 여는 축이다.
+ */
+class MovableNoticeProjections : NoticeProjectionQueryPort {
+    @Volatile
+    var rowPresent: Boolean = true
+
+    @Volatile
+    var title: String? = DEFAULT_TITLE
+
+    @Volatile
+    var demandAgencyName: String? = DEFAULT_DEMAND_AGENCY
+
+    @Volatile
+    var noticeAgencyName: String? = DEFAULT_NOTICE_AGENCY
+
+    fun reset() {
+        rowPresent = true
+        title = DEFAULT_TITLE
+        demandAgencyName = DEFAULT_DEMAND_AGENCY
+        noticeAgencyName = DEFAULT_NOTICE_AGENCY
+    }
+
+    override fun projections(notices: Set<NoticeKey>): Map<NoticeKey, NoticeProjection> =
+        if (!rowPresent) {
+            emptyMap()
+        } else {
+            notices.associateWith { NoticeProjection(title, demandAgencyName, noticeAgencyName) }
+        }
+
+    private companion object {
+        const val DEFAULT_TITLE = "세종 청사 공조설비 교체"
+        const val DEFAULT_DEMAND_AGENCY = "행정중심복합도시건설청"
+        const val DEFAULT_NOTICE_AGENCY = "조달청"
+    }
+}
+
+/**
  * HTTP test 조립의 입찰 건 워크플로 — 출하 조립(`BidCaseWiring`)과 같은 형태(controller 가 받는 단 하나의 협력자, 저장소를 controller 에
  * 직접 주지 않는다). `HttpTestSupport.kt` 의 빈이 이것을 부른다(그 파일의 크기 상한 — 두 slice 병합 뒤 500 줄을 넘었다).
  */
-@Suppress("UNCHECKED_CAST")
+@Suppress("UNCHECKED_CAST", "LongParameterList")
 fun testBidCaseWorkflow(
     store: InMemoryBidCaseStore,
     deadlines: MovableNoticeDeadlines,
     clock: FixedClock,
     notifications: InMemoryNotificationInbox = InMemoryNotificationInbox(),
+    projections: NoticeProjectionQueryPort = MovableNoticeProjections(),
 ): BidCaseWorkflow =
     BidCaseWorkflow(
         cases = store,
         deadlines = deadlines,
+        noticeProjections = projections,
         snapshots = { _, takenAt -> fixedNoticeSnapshot(takenAt) },
         clock = clock,
         retentionPolicy =

@@ -164,6 +164,50 @@ data class NoticeDeadline(
 )
 
 /**
+ * 입찰함 카드가 보이는 **공고 표시 칸** — 저장된 공고에서 읽기만 한다(M14/14E).
+ *
+ * [NoticeDeadlineQueryPort] 와 **같은 표 · 같은 키 · 같은 부재 약속**이고, 계정 축이 없는 것도
+ * 같은 사유다(공고는 사용자 소유 데이터가 아니다). 두 포트를 가른 것은 값의 성질이 다르기
+ * 때문이다: 마감은 [DeadlineSettlement] 가 **판정에 쓰는 입력**이고 이쪽은 화면이 **읽기만
+ * 하는 표시 칸**이다. 한 값에 섞으면 판정 경로가 자기가 쓰지 않는 데이터를 들고 다니고,
+ * 마감만 재는 이중체 전부가 표시 값을 지어내야 한다.
+ *
+ * **키 집합을 한 번에 받는다** — 목록이 건마다 묻지 않는다(N+1 을 서명이 막는다).
+ */
+fun interface NoticeProjectionQueryPort {
+    fun projections(notices: Set<NoticeKey>): Map<NoticeKey, NoticeProjection>
+}
+
+/**
+ * 키 **하나**로 묻는 자리. 포트의 서명이 집합인 것은 목록이 건마다 묻지 않게 하기 위해서이고,
+ * 단건 경로도 같은 서명을 쓴다 — 포트에 단건 서명을 따로 두면 「키가 없으면 행이 없다」는
+ * 약속이 **두 서명**에 생긴다. 그 되풀이를 여기 한 자리에 둔다.
+ *
+ * use case 의 멤버가 아니라 **포트 옆의 확장**인 이유: 이 관용구는 포트를 쓰는 모든 자리의
+ * 것이지 특정 use case 의 것이 아니다.
+ */
+internal fun NoticeProjectionQueryPort.projectionOf(notice: NoticeKey): NoticeProjection? =
+    projections(setOf(notice))[notice]
+
+/**
+ * 공고 행이 **있다**는 사실과 그 행의 표시 칸 셋. 칸이 전부 nullable 인 것은 저장 층에서 그
+ * 세 열이 nullable 이기 때문이고(`notice_title`(V14) · `demand_agency_name` ·
+ * `notice_agency_name`(V7)), 없는 값을 지어내지 않는다.
+ *
+ * **이 값이 `null` 인 것과 칸이 `null` 인 것은 다른 사실이다.** 포트 결과 map 에 키가 없으면
+ * 공고 행이 없고(보존 파기 또는 미수집 — 저장소에 묘비가 없어 둘을 가르지 못한다), 키가
+ * 있는데 [title] 이 `null` 이면 행은 있고 제목 칸이 비었다. 세 칸을 nullable 스칼라로만
+ * 접으면 그 둘이 같은 값이 된다 — 알림함이 같은 자리에서 같은 결론에 닿았고(`NoticeDisplay`),
+ * HTTP 응답은 평탄해야 해서 실제로 납작해지므로 그 층에서는 `noticeKnown` boolean 이 이
+ * 구분을 들고 간다.
+ */
+data class NoticeProjection(
+    val title: String?,
+    val demandAgencyName: String?,
+    val noticeAgencyName: String?,
+)
+
+/**
  * 초안이 얼릴 **공고 스냅샷을 서버가 뜬다** — 요청이 실어 오지 않는다.
  *
  * 이것이 위협 ③(초안 스냅샷 변조)의 차단면이다: 스냅샷을 요청 본문으로 받으면 운영자가

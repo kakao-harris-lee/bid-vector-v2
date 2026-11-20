@@ -58,6 +58,7 @@ class BidCaseOwnershipTest : PersistenceTestSupport() {
         BidCaseWorkflow(
             cases = store,
             deadlines = deadlines,
+            noticeProjections = JdbcNoticeProjectionQuery(dataSource()),
             snapshots = JdbcNoticeSnapshotQuery(dataSource()),
             clock = { now },
             retentionPolicy =
