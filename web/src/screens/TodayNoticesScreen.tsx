@@ -16,7 +16,11 @@ import { PageHeader } from '../components/PageHeader';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
-import { NOTICES_RESULT_STATE_DISPLAY, SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
+import {
+  NOTICES_RESULT_STATE_DISPLAY,
+  SUGGESTIONS_ORDER_TEXT,
+  SUGGESTIONS_RESULT_STATE_DISPLAY,
+} from '../display/noticeDisplay';
 import { daysUntil, instantDisplayOf, localInputToIso, readClock } from '../display/timeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
@@ -679,6 +683,14 @@ export function TodayNoticesScreen() {
                   <LinkButton to="/settings">설정에서 표시 상한 넓히기</LinkButton>
                 </div>
               ) : null}
+              {/*
+                **차례를 말한다**(cr M-4 · 와이어프레임 B 의 정렬 표시). 고르는 자리가 아니라
+                사실의 진술이다 — 그 operation 에 정렬 인자가 없어 화면이 고를 수 있는 것이
+                없고, 고르는 꼴을 그리면 가짜 affordance 가 된다.
+              */}
+              <p data-testid="suggestion-order" className="text-xs text-ink-soft">
+                {SUGGESTIONS_ORDER_TEXT}
+              </p>
               <ul className="flex flex-col gap-3">
                 {suggestions.data.rows.map((suggestion) => (
                   <SuggestionCard

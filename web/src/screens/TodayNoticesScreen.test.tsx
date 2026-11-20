@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { absenceTextOf } from '../display/absence';
+import { SUGGESTIONS_ORDER_TEXT } from '../display/noticeDisplay';
 import { localInputToIso } from '../display/timeDisplay';
 
 import { TodayNoticesScreen } from './TodayNoticesScreen';
@@ -1013,6 +1014,44 @@ describe('화면 B — 머리 요약 (M14/14B)', () => {
  * 구간 프리셋(「이번 주」·「1억~30억」)은 더하지 않는다 — 그 값이 화면에 사는 정책 상수가 되고
  * KST 날 경계 셈을 화면이 다시 짓는다(13E 가 적은 사유).
  */
+/**
+ * **정렬 표시**(M14/14B 수정 라운드 1 · cr M-4 · 와이어프레임 B 의 「정렬: 마감 임박순」).
+ *
+ * 사실의 진술이고 컨트롤이 아니다 — 그 operation 에 정렬 인자가 없다(승인 경계). 문면은
+ * 표시층 상수 하나에서 오고, 화면이 자기 자리에서 지어내지 않는다.
+ */
+describe('화면 B — 정렬 표시 (M14/14B)', () => {
+  it('제안 목록이 서면 그 차례를 말한다 — 표시층 상수 그대로', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    const order = await screen.findByTestId('suggestion-order');
+
+    expect(order.textContent).toBe(SUGGESTIONS_ORDER_TEXT);
+  });
+
+  /** **고르는 자리를 그리지 않는다** — 고를 수 있는 것이 없는 컨트롤은 가짜 affordance 다. */
+  it('정렬 표시에 컨트롤이 없다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [SUGGESTION], total: 1, resultState: 'MATCHED' });
+    renderScreen();
+
+    const order = await screen.findByTestId('suggestion-order');
+
+    expect(within(order).queryAllByRole('button')).toStrictEqual([]);
+    expect(within(order).queryAllByRole('link')).toStrictEqual([]);
+    expect(within(order).queryAllByRole('combobox')).toStrictEqual([]);
+  });
+
+  /** 목록이 없으면 차례도 없다 — 빈 자리에 「무엇의 차례」를 말하지 않는다(음성 대조). */
+  it('제안이 비면 정렬 표시도 없다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('suggestions-empty');
+
+    expect(screen.queryByTestId('suggestion-order')).toBeNull();
+  });
+});
+
 describe('화면 B — 「전체」 칩 (M14/14B)', () => {
   it('조건이 없으면 눌린 얼굴이다', async () => {
     renderScreen();
