@@ -163,29 +163,39 @@ export function OnboardingScreen() {
   const checklist = useQuery({ queryKey: ONBOARDING_QUERY_KEY, queryFn: readOnboardingChecklist });
 
   if (signedIn === false || isUnauthorized(checklist.error)) {
-    return (
-      <section data-testid="screen-onboarding" className="mx-auto max-w-5xl p-4">
-        <SignedOutFace />
-      </section>
-    );
+    return <OnboardingFrame body={<SignedOutFace />} />;
   }
   if (checklist.isPending) {
-    return (
-      <section data-testid="screen-onboarding" className="mx-auto max-w-5xl p-4">
-        <Skeleton testId="onboarding-loading" />
-      </section>
-    );
+    return <OnboardingFrame body={<Skeleton testId="onboarding-loading" />} />;
   }
   if (checklist.isError) {
     // **빈 체크리스트로 접지 않는다** — 그러면 미완 0 이 되어 「전부 끝났다」로 보인다.
     return (
-      <section data-testid="screen-onboarding" className="mx-auto max-w-5xl p-4">
-        <ErrorFace testId="onboarding-error" onRetry={() => void checklist.refetch()} />
-      </section>
+      <OnboardingFrame body={<ErrorFace testId="onboarding-error" onRetry={() => void checklist.refetch()} />} />
     );
   }
 
   return <OnboardingWizard checklist={checklist.data} />;
+}
+
+/**
+ * 화면의 **틀** — 머리와 두 단은 본문의 얼굴이 무엇이든 선다.
+ *
+ * 얼굴마다 틀을 따로 두던 앞 판은 **적재 중·오류·세션 없음에서 레일이 통째로 사라졌다**. 그것은
+ * 배치 게이트의 눈에도 안 보이는 자리였고(그 레인은 백엔드가 없어 늘 오류 얼굴이다), 운영자에게는
+ * 화면이 통째로 모양을 바꾸는 것으로 보였다. 레일의 미리보기는 **자기 질의**를 쓰므로 본문이
+ * 실패해도 설 수 있다 — 두 사실을 한 실패로 접지 않는다.
+ *
+ * 요약은 **선택**이다: 체크리스트를 읽기 전에는 진행률이 없고, 없는 수를 그리지 않는다
+ * (`PageHeader` 가 빈 자리를 그리지 않는다).
+ */
+function OnboardingFrame({ body, summary }: { readonly body: ReactNode; readonly summary?: ReactNode }) {
+  return (
+    <section data-testid="screen-onboarding" className="mx-auto flex max-w-5xl flex-col gap-6 p-4">
+      <PageHeader testId="onboarding-header" title="시작하기" summary={summary} />
+      <TwoColumn testId="onboarding-layout" body={body} rail={<SuggestionPreview />} />
+    </section>
+  );
 }
 
 function OnboardingWizard({ checklist }: { readonly checklist: OnboardingChecklist }) {
@@ -231,80 +241,71 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
   );
 
   return (
-    <section data-testid="screen-onboarding" className="mx-auto flex max-w-5xl flex-col gap-6 p-4">
-      <PageHeader
-        testId="onboarding-header"
-        title="시작하기"
-        // 저장 뒤 이 수가 바뀐다 — 보조기술이 그 변화를 읽게 한다(§6.5 · CR r1 LOW).
-        summary={
-          <span data-testid="onboarding-progress" aria-live="polite">
-            <span className="font-numeric">
-              {progress.done} / {progress.total}
-            </span>{' '}
-            완료
-          </span>
-        }
-      />
-
-      <TwoColumn
-        testId="onboarding-layout"
-        body={
-          <>
-            {checklist.pending.length === 0 ? (
-              /* **다음 행동 하나**(§6.5 · D-7E2b-4) — 미완이 0 이면 오늘의 공고로 간다. */
-              <div data-testid="onboarding-complete" className="rounded-lg border border-accent/40 bg-card p-4">
-                <p className="text-sm font-medium">걸리는 항목을 모두 채웠습니다.</p>
-                <div className="mt-3">
-                  <LinkButton to="/" tone="primary">
-                    오늘의 공고 보기
-                  </LinkButton>
-                </div>
+    <OnboardingFrame
+      // 저장 뒤 이 수가 바뀐다 — 보조기술이 그 변화를 읽게 한다(§6.5 · CR r1 LOW).
+      summary={
+        <span data-testid="onboarding-progress" aria-live="polite">
+          <span className="font-numeric">
+            {progress.done} / {progress.total}
+          </span>{' '}
+          완료
+        </span>
+      }
+      body={
+        <>
+          {checklist.pending.length === 0 ? (
+            /* **다음 행동 하나**(§6.5 · D-7E2b-4) — 미완이 0 이면 오늘의 공고로 간다. */
+            <div data-testid="onboarding-complete" className="rounded-lg border border-accent/40 bg-card p-4">
+              <p className="text-sm font-medium">걸리는 항목을 모두 채웠습니다.</p>
+              <div className="mt-3">
+                <LinkButton to="/" tone="primary">
+                  오늘의 공고 보기
+                </LinkButton>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {/*
-              절은 **번호가 붙은 차례**다(와이어프레임 A). `ol` 이라 그 차례가 보조기기에도 서고,
-              번호는 선언 순서에서 나온다 — 손으로 적으면 절을 끼울 때 둘이 갈린다.
-            */}
-            <ol data-testid="onboarding-items" className="flex flex-col gap-3">
-              {ONBOARDING_SECTIONS.map((section, at) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  ordinal={at + 1}
-                  rows={rows.filter((row) =>
-                    section.steps.some((step) => ONBOARDING_ITEM_STEP[row.item] === step),
-                  )}
-                  current={current}
-                  sessionOpen={sessionOpen}
-                  stepBody={stepBody}
-                  onPick={setPicked}
-                />
-              ))}
-            </ol>
+          {/*
+            절은 **번호가 붙은 차례**다(와이어프레임 A). `ol` 이라 그 차례가 보조기기에도 서고,
+            번호는 선언 순서에서 나온다 — 손으로 적으면 절을 끼울 때 둘이 갈린다.
+          */}
+          <ol data-testid="onboarding-items" className="flex flex-col gap-3">
+            {ONBOARDING_SECTIONS.map((section, at) => (
+              <SectionCard
+                key={section.id}
+                section={section}
+                ordinal={at + 1}
+                rows={rows.filter((row) =>
+                  section.steps.some((step) => ONBOARDING_ITEM_STEP[row.item] === step),
+                )}
+                current={current}
+                sessionOpen={sessionOpen}
+                stepBody={stepBody}
+                onPick={setPicked}
+              />
+            ))}
+          </ol>
 
-            {/*
-              live region 은 **비어 있는 채 먼저 서 있어야** 변화가 확실히 읽힌다(CR r3 L-6) — 내용째
-              삽입되는 노드의 낭독은 스크린리더마다 갈린다. 그래서 문단은 늘 그리고 **글만 바꾼다**.
+          {/*
+            live region 은 **비어 있는 채 먼저 서 있어야** 변화가 확실히 읽힌다(CR r3 L-6) — 내용째
+            삽입되는 노드의 낭독은 스크린리더마다 갈린다. 그래서 문단은 늘 그리고 **글만 바꾼다**.
 
-              편집 세션이 **진행 중인 동안**에는 단계를 옮기지 않는다(v r1 L-1). 옮기면 전략 단계가
-              언마운트되어 **보낸 값이 적용되지도 취소되지도 않은 세션**이 서버에 남는다. 술어가
-              「열린」이 아니라 「진행 중」인 이유(CR·v r2 MEDIUM): 서버가 이미 끝낸 세션에서는 그 뒤
-              모든 명령이 409 라 `open` 이 비워지지 않아 **마법사가 갇혔다**.
-            */}
-            <p
-              id={STEP_LOCK_REASON_ID}
-              data-testid="onboarding-step-lock"
-              role="status"
-              className="text-xs text-ink-soft"
-            >
-              {sessionOpen ? '편집을 마치거나 그만두면 단계를 옮길 수 있습니다.' : ''}
-            </p>
-          </>
-        }
-        rail={<SuggestionPreview />}
-      />
-    </section>
+            편집 세션이 **진행 중인 동안**에는 단계를 옮기지 않는다(v r1 L-1). 옮기면 전략 단계가
+            언마운트되어 **보낸 값이 적용되지도 취소되지도 않은 세션**이 서버에 남는다. 술어가
+            「열린」이 아니라 「진행 중」인 이유(CR·v r2 MEDIUM): 서버가 이미 끝낸 세션에서는 그 뒤
+            모든 명령이 409 라 `open` 이 비워지지 않아 **마법사가 갇혔다**.
+          */}
+          <p
+            id={STEP_LOCK_REASON_ID}
+            data-testid="onboarding-step-lock"
+            role="status"
+            className="text-xs text-ink-soft"
+          >
+            {sessionOpen ? '편집을 마치거나 그만두면 단계를 옮길 수 있습니다.' : ''}
+          </p>
+        </>
+      }
+    />
   );
 }
 
