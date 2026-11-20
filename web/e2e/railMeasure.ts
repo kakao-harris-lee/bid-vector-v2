@@ -161,3 +161,53 @@ export async function computedDisplaysOf(page: Page, testId: string): Promise<re
     testId,
   );
 }
+
+/** 칸 하나의 상자 — 줄을 세는 데 쓰는 것은 윗변과 폭뿐이다. */
+export interface CellBox {
+  readonly top: number;
+  readonly width: number;
+}
+
+/**
+ * 묶음 안 **직계 자식 칸들의 상자**(M14/14F · cr D2 · v M-2).
+ *
+ * **왜 새 축인가**: 결과 확인의 요약 타일 넷이 390px 에서 **줄바꿈하지 않고** 네 칸으로 눌려
+ * 글자가 줄당 3~5자로 쪼개졌다. `flex-wrap` 은 있었지만 타일이 `min-w-0 flex-1` 이라 0 까지
+ * 줄어들 수 있었고, 그러면 **wrap 이 영영 발화하지 않는다**. 배치 축의 기존 단언(한 단 ·
+ * 가로 넘침 0)은 그 꼴을 보지 못한다 — 줄어드는 flex 자식은 넘치지도 두 단이 되지도 않는다.
+ *
+ * **클래스 이름으로 재지 않는다**: 같은 레인이 압축 금액에서 실측한 함정이다(`md:hidden` 을 둔
+ * 채 `md:inline-flex!` 를 더하면 클래스 글자를 읽는 단언이 그것을 지나보낸다). 그래서 **그려진
+ * 상자**를 읽고 줄 수를 윗변으로 센다.
+ *
+ * 레일 축과 **같은 모듈에 두는 까닭**은 재는 법이 갈리지 않게 하려는 것이다 — 이 모듈이 자기
+ * 몫으로 적어 둔 「폭이 정하는 다른 사실」이 여기 든다. 레일 축의 술어·모집단은 건드리지 않는다.
+ *
+ * 찾지 못하면 **던진다** — 빈 배열은 아래 줄 세기를 공허하게 만든다.
+ */
+export async function measureCells(page: Page, testId: string): Promise<readonly CellBox[]> {
+  return page.evaluate((one) => {
+    const group = document.querySelector(`[data-testid="${one}"]`);
+    if (group === null) {
+      throw new Error(`묶음 ${one} 을 찾지 못했다 — 줄 세기가 공허해진다`);
+    }
+    return [...group.children].map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { top: rect.top, width: rect.width };
+    });
+  }, testId);
+}
+
+/**
+ * 상자들이 **몇 줄로 섰는가**. 윗변을 묶어 센다 — 같은 줄의 칸은 윗변이 같다(반올림 오차만큼
+ * 어긋나므로 1px 안을 같은 줄로 본다).
+ */
+export function rowCountOf(cells: readonly CellBox[]): number {
+  const tops: number[] = [];
+  for (const cell of cells) {
+    if (!tops.some((one) => Math.abs(one - cell.top) < 1)) {
+      tops.push(cell.top);
+    }
+  }
+  return tops.length;
+}

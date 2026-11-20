@@ -1,7 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { RAIL_SCREEN_FLOOR, railScreenSlots } from '../../scripts/rail-screens.mjs';
-import { computedDisplaysOf, measureRails, railViolations, shippedAddresses } from '../railMeasure';
+import {
+  computedDisplaysOf,
+  measureCells,
+  measureRails,
+  railViolations,
+  rowCountOf,
+  shippedAddresses,
+} from '../railMeasure';
 
 import { search, signIn } from './shared';
 
@@ -155,4 +162,44 @@ test('압축 금액과 정확 금액이 폭에 따라 하나씩만 그려진다'
   expect(narrowFacts.length, '좁은 화면에서 정확 금액 묶음을 찾지 못했다').toBeGreaterThan(0);
   expect(narrowCompact.filter((one) => one === 'none'), '좁은 화면에서 압축 금액이 숨었다').toStrictEqual([]);
   expect(narrowFacts.filter((one) => one !== 'none'), '좁은 화면에서 정확 금액이 그려졌다').toStrictEqual([]);
+});
+
+/**
+ * **요약 타일은 좁은 화면에서 줄을 바꾼다**(M14/14F · cr D2 · v M-2).
+ *
+ * 앞 판은 타일 넷이 390px 에서 **한 줄에 눌려** 칸 하나가 ≈70px 였고, 「서버가 적격 계수를 내지
+ * 않습니다」가 다섯 줄로 쪼개졌다. `flex-wrap` 은 있었지만 타일이 0 까지 줄어들 수 있어 **wrap 이
+ * 발화하지 않았다**.
+ *
+ * 그 꼴은 **기존 배치 단언 어디에도 걸리지 않는다** — 줄어드는 flex 자식은 가로로 넘치지도
+ * 두 단이 되지도 않는다. 그래서 **상자 좌표**로 줄 수를 센다(클래스 글자로 재면 스타일 변종
+ * 하나가 지나간다 — 바로 위 test 가 그 함정을 실측한 자리다).
+ *
+ * 타일은 **집계 응답이 서면** 그려지므로(건이 0 건이어도 선다) 이 test 는 씨앗을 심지 않는다.
+ */
+test('결과 요약 타일이 좁은 화면에서 2×2 로 선다', async ({ page }) => {
+  await signIn(page);
+
+  await page.setViewportSize({ ...WIDE });
+  await page.goto('/results');
+  await expect(page.getByTestId('results-tiles')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+
+  const wide = await measureCells(page, 'results-tiles');
+  // **비공허가 비교 앞에 선다** — 칸을 하나도 못 찾으면 아래 줄 세기는 공집합 위에서 참이다.
+  expect(wide.length, '넓은 화면에서 타일 넷이 아니다').toBe(4);
+  expect(rowCountOf(wide), '넓은 화면에서는 한 줄이다').toBe(1);
+
+  await page.setViewportSize({ ...NARROW });
+  await page.waitForLoadState('networkidle');
+
+  const narrow = await measureCells(page, 'results-tiles');
+  expect(narrow.length, '좁은 화면에서 타일 넷이 아니다').toBe(4);
+  expect(rowCountOf(narrow), '좁은 화면에서 타일이 2×2 로 서지 않았다').toBe(2);
+  /**
+   * **줄 수만으로는 모자라다**: 칸이 0 까지 줄어든 채 두 줄이 되는 꼴도 2 를 낸다. 그래서 칸의
+   * **폭 하한**도 함께 본다 — 390px 에서 2열이면 한 칸이 적어도 화면의 3분의 1 은 된다.
+   */
+  const tooNarrow = narrow.filter((one) => one.width < NARROW.width / 3);
+  expect(tooNarrow, `좁은 화면에서 타일이 눌렸다: ${JSON.stringify(narrow)}`).toStrictEqual([]);
 });

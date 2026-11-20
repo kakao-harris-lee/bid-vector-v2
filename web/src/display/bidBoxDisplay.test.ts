@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { APPROVED_OPERATIONS } from '../api/approvedOperations';
-import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY, type BidCaseState } from './caseDisplay';
+import {
+  BID_CASE_STATE_DISPLAY,
+  NEXT_CHECKPOINT_DISPLAY,
+  NOTICE_ROW_ABSENT_TEXT,
+  type BidCaseState,
+} from './caseDisplay';
 import {
   ACTION_INPUT,
   ACTION_OPERATION,
@@ -215,6 +220,41 @@ describe('레일의 일정 줄 — 사건 낱말은 열거에서만', () => {
 
   it('빈 목록은 빈 일정이다 — 줄을 지어내지 않는다', () => {
     expect(checkpointRowsOf([])).toStrictEqual([]);
+  });
+
+  /**
+   * **줄이 어느 건인지 말한다**(M14/14F · v M-1). 앞 판의 줄은 `caseId · kind · label · at` 뿐이라
+   * 건이 둘 이상이면 「투찰 마감 · 시각」이 여러 개 나란히 서서 **서로 구별되지 않았다**. 더
+   * 나쁜 것은 보는 탭과 무관하다는 점이다 — 레일은 입찰함 전체를 보므로 「종료」 탭을 보는 중에
+   * **관심 탭 건의** 마감 시각이 선다. 와이어프레임의 줄은 건을 부르고, 계약 「데이터」 절도 그
+   * 줄이 공고명을 든다고 적었다(14E 투영이 이미 그 값을 싣는다).
+   */
+  it('줄이 공고명을 든다 — 건이 둘 이상이면 서로 구별된다', () => {
+    const rows = checkpointRowsOf([
+      { ...source(1, 'DEADLINE', '2099-01-01T00:00:00Z'), noticeKnown: true, noticeTitle: '합성 공고 가' },
+      { ...source(2, 'DEADLINE', '2099-01-02T00:00:00Z'), noticeKnown: true, noticeTitle: '합성 공고 나' },
+    ]);
+
+    expect(rows.map((one) => one.title)).toStrictEqual(['합성 공고 가', '합성 공고 나']);
+  });
+
+  /**
+   * **세 사실을 가른다**: 공고 행이 없다 ↔ 행은 있고 제목이 비었다 ↔ 제목이 공백뿐이다. 글자
+   * 기준으로 보지 않으면 마지막이 **조용한 빈칸**으로 선다(이 마일스톤이 같은 꼴을 세 번 고쳤다).
+   */
+  it('제목이 없는 세 꼴이 각자 사유를 든다', () => {
+    const rows = checkpointRowsOf([
+      { ...source(1, 'DEADLINE', '2099-01-01T00:00:00Z'), noticeKnown: false, noticeTitle: null },
+      { ...source(2, 'DEADLINE', '2099-01-02T00:00:00Z'), noticeKnown: true, noticeTitle: null },
+      { ...source(3, 'DEADLINE', '2099-01-03T00:00:00Z'), noticeKnown: true, noticeTitle: '   ' },
+    ]);
+
+    const titles = rows.map((one) => one.title);
+    expect(titles[0], '공고 행이 없는 사실을 말하지 않는다').toBe(NOTICE_ROW_ABSENT_TEXT);
+    expect(titles[1], '행은 있고 제목이 빈 자리').toBeNull();
+    expect(titles[2], '공백뿐인 제목이 조용한 빈칸으로 섰다').toBeNull();
+    // 앞의 둘은 **다른 사실**이다 — 한 얼굴로 접으면 운영자가 가를 수 없다.
+    expect(titles[0]).not.toBe(titles[1]);
   });
 });
 

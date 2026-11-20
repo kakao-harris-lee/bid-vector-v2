@@ -397,12 +397,18 @@ function ShellFrame() {
             {PRIMARY_SLOTS.map((slot) => (
               <li key={slot.id} className="flex flex-1 items-stretch">
                 <NavLink to={slot.path} end={slot.path === '/'} className={tabLinkClass}>
-                  {/* 배지가 **같은 자리에서** 선다 — 넓은 화면에만 수가 보이면 좁은 화면의
-                      운영자는 같은 사실을 알 길이 없다. 한 줄이라 라벨 곁에 둔다. */}
-                  <span className="inline-flex items-center gap-1">
-                    {slot.label}
-                    <SlotBadge slotId={slot.id} unread={unreadCount} bidBox={bidBoxCount} place="nav-tab" />
-                  </span>
+                  {/*
+                    배지가 **같은 자리에서** 선다 — 넓은 화면에만 수가 보이면 좁은 화면의
+                    운영자는 같은 사실을 알 길이 없다.
+
+                    **라벨 곁이 아니라 아래다**(v L-1 · cr D9). 390px / 다섯 칸이면 칸당 ≈78px
+                    인데 「내 입찰함」 다섯 자와 배지를 한 줄에 두면 「내 입찰 / 함」으로 꺾였다.
+                    배지가 그려지지 않는 화면에서는 꺾이지 않는 것이 그 **음성 대조**였다. 탭은
+                    이미 세로 묶음이라 안쪽 한 줄 묶음을 걷으면 둘이 쌓이고, 라벨 혼자는 그 폭에
+                    들어간다. 상자(`min-h-14`)와 타깃 수는 그대로다.
+                  */}
+                  {slot.label}
+                  <SlotBadge slotId={slot.id} unread={unreadCount} bidBox={bidBoxCount} place="nav-tab" />
                 </NavLink>
               </li>
             ))}

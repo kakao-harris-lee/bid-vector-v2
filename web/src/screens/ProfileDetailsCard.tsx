@@ -91,7 +91,6 @@ export function ProfileDetailsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">상호</span>
             <input
-              aria-label="상호"
               value={form.tradeName}
               onChange={(event) => setDetails({ ...form, tradeName: event.target.value })}
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
@@ -100,7 +99,6 @@ export function ProfileDetailsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">본사 소재지</span>
             <select
-              aria-label="본사 소재지"
               value={form.headquartersRegion}
               onChange={(event) => setDetails({ ...form, headquartersRegion: event.target.value })}
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
@@ -117,7 +115,6 @@ export function ProfileDetailsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">나라장터 준비</span>
             <select
-              aria-label="나라장터 준비"
               value={form.naraRegistration}
               onChange={(event) =>
                 setDetails({ ...form, naraRegistration: event.target.value as NaraRegistration })
@@ -137,7 +134,6 @@ export function ProfileDetailsCard({
               <span className="text-xs text-ink-soft">인증서 만료일</span>
               <input
                 type="date"
-                aria-label="인증서 만료일"
                 value={form.businessCertificateExpiresOn}
                 onChange={(event) => setDetails({ ...form, businessCertificateExpiresOn: event.target.value })}
                 className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
@@ -154,7 +150,6 @@ export function ProfileDetailsCard({
                 <label key={value} className="flex min-h-11 items-center gap-1 text-sm">
                   <input
                     type="checkbox"
-                    aria-label={display.label}
                     checked={form.naraRegisteredFields.includes(value as NaraField)}
                     onChange={(event) =>
                       setDetails({

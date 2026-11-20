@@ -7,6 +7,41 @@ import { computeBorderColorsInPage, measureControlBordersInPage } from './contro
 import { measureInPage, type Measurement } from './touchMeasure';
 
 /**
+ * **이름이 서지 않는 역할 줄**(r2 v G2) — 판정은 **브라우저의 접근성 트리**가 한다.
+ *
+ * `ariaSnapshot` 의 한 줄은 `- <역할> "<이름>"` 이고(자식이 있으면 끝에 `:`), 이름이 서지 않으면
+ * **그 따옴표가 없다**. 역할 뒤에 바로 따옴표가 오는지로 가른다 — 줄 어딘가의 따옴표를 세면
+ * `[disabled]` 같은 꼬리나 자식 줄의 글자가 섞인다.
+ *
+ * 역할 집합은 **이름이 필요한 것**들이다(장식 역할은 들지 않는다).
+ */
+const NAMED_ROLES = [
+  'button',
+  'link',
+  'tab',
+  'textbox',
+  'searchbox',
+  'combobox',
+  'checkbox',
+  'radio',
+  'spinbutton',
+  'slider',
+  'menuitem',
+] as const;
+
+async function namelessRolesOf(page: Page): Promise<{ readonly lines: readonly string[]; readonly total: number }> {
+  const snapshot = await page.locator('body').ariaSnapshot();
+  const roles = NAMED_ROLES.join('|');
+  const withRole = new RegExp(`^- (?:${roles})\\b`, 'u');
+  const withName = new RegExp(`^- (?:${roles}) "`, 'u');
+  const lines = snapshot
+    .split('\n')
+    .map((one) => one.trim())
+    .filter((one) => withRole.test(one));
+  return { lines: lines.filter((one) => !withName.test(one)), total: lines.length };
+}
+
+/**
  * **터치 타깃 게이트**(M13/13B, 계약 「게이트」 절). 모바일 폭에서 화면마다 **보이는**
  * `button` · `a` · `[role="tab"]` · `[role="button"]` **전수**의 실제 상자 높이가 44px 이상이고
  * 가로 넘침이 0 인가.
@@ -462,6 +497,29 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
       expect(offscreen, `${where}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
       expect(partiallyClipped, `${where}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
       expect(overflow, `${where}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
+      /**
+       * ④ **이름 없는 컨트롤 0**(M14/14F r1 · cr M② · r2 v G2).
+       *
+       * 이 축은 **선언만 있고 재는 자리가 없었다**: 14F 의 AST 술어가 자기 설계 검토에서 과잉
+       * (글자 없는 레이블이 감싼 컨트롤)을 **의도로** 선언하고 그 과잉을 받는 층으로 「여정
+       * 레인의 이름 없는 컨트롤 0」을 들었는데, 저장소에 그런 단언이 없었다. 그래서 술어의 말을
+       * 따라 `aria-label` 을 떼면 **이름 없는 컨트롤이 출하되고 CI 는 초록**이었다.
+       *
+       * **이름을 브라우저에게 묻는다**(r2 v G2). 첫 판은 DOM 문자열로 근사했고 — `aria-label` ·
+       * `textContent` · 몇 속성 — 그래서 `aria-hidden` 글리프만 든 아이콘 버튼(이름 없는 컨트롤의
+       * 가장 흔한 실제 꼴)과 숨은 라벨이 지나갔다. 근사를 넓히는 대신 **접근성 트리**를 본다:
+       * `ariaSnapshot` 의 줄은 `- <역할> "<이름>"` 이고, 이름이 서지 않으면 그 따옴표가 없다.
+       *
+       * **모집단이 함께 넓어진다**(cr MEDIUM 의 선택지 (c)): 스냅샷은 글자 입력(`textbox`)까지
+       * 역할 전수를 내므로, 터치 축의 모집단(누르는 자리)에 들지 않던 컨트롤도 이 단언이 든다.
+       */
+      const nameless = await namelessRolesOf(page);
+      expect(
+        nameless.lines,
+        `${where}: 접근 가능한 이름이 서지 않는 컨트롤이 있다(역할 줄 ${nameless.total})`,
+      ).toStrictEqual([]);
+      // **비공허** — 역할 줄을 하나도 못 찾으면 위 전수 단언이 공집합 위에서 참이다.
+      expect(nameless.total, `${where}: 접근성 트리에서 역할 줄을 하나도 찾지 못했다`).toBeGreaterThan(0);
     }
   }
 

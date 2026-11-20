@@ -59,6 +59,13 @@ function AbsenceSample() {
       <SummaryTile label="투찰" face={tileValue('12')} testId="submitted" />
       <InstantText display={instantDisplayOf(null)} testId="checkpoint-at" />
       <AbsentValue reason="notLoaded" testId="pending" />
+      {/*
+        M14/14F — **운영자가 아직 적지 않은 칸**(v L-3). 그 사유에 닿는 길은 입력칸을 비추는 읽기
+        자리다(넘김 카드의 투찰 금액). 사유가 늘면 아래 「전수가 적어도 한 번씩」 단언이 **그
+        자리에서 멈추고**, 이 줄이 그 요구에 답한다 — 표본이 어휘보다 뒤처지지 않는 것이 그
+        단언의 일이다.
+      */}
+      <AbsentValue reason="notEntered" testId="not-entered" />
     </div>
   );
 }

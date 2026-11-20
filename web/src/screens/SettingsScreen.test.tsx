@@ -93,6 +93,23 @@ describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
     expect(row.textContent).toBe(absenceTextOf('notSent'));
   });
 
+  /**
+   * **머리 문장에 개발 어휘가 없다**(M14/14F · v L-6). 「편집 세션」은 계약의 낱말이고 「개정 2」는
+   * 무엇의 2 인지 말하지 않았다. 운영자가 알아야 하는 것은 걸음 세 개와 지금 적용된 판이고,
+   * 그 둘은 개발 낱말 없이 말할 수 있다.
+   */
+  it('전략 절의 머리 문장에 개발 어휘가 없다', async () => {
+    renderScreen();
+
+    const head = (await screen.findByTestId('settings-strategy')).textContent ?? '';
+    for (const term of ['편집 세션', '개정']) {
+      expect(head, `${term} 이 남았다`).not.toContain(term);
+    }
+    // 비공허 — 그 문장이 여전히 **걸음 셋과 판 번호**를 말한다(지워서 통과하지 않게).
+    expect(head).toContain('고치기 → 값 → 확인');
+    expect(head).toContain('지금 적용된 판');
+  });
+
   it('어휘·금액·수를 API 가 준 그대로 보인다', async () => {
     mocked.readStrategy.mockResolvedValue(
       strategy({
@@ -143,6 +160,32 @@ describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
 });
 
 describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
+  /**
+   * **힌트가 낭독에 남는다**(M14/14F r1 · v F2 · cr D4 의 열째 자리).
+   *
+   * 앞 판은 보이는 글자가 힌트이고 `aria-label` 이 칸 이름이어서, 이름 계산에서 `aria-label` 이
+   * 이기며 **힌트가 낭독에서 사라졌다** — 그 힌트에 「비우면 그 조건을 지웁니다」가 들어 있다
+   * (파괴적 결과 경고다). 이름은 칸 이름이 주고 힌트는 `aria-describedby` 가 주는 꼴로 바꿨는데,
+   * **그 배선을 지키는 단언이 없었다**(verifier 변이 V10 이 초록이었다).
+   *
+   * 속성의 **존재**가 아니라 그 속성이 가리키는 **글자**를 본다 — 없는 id 를 가리키는 배선은
+   * 속성만 있고 설명이 서지 않는다(§12.3 (aa) 의 같은 계열 함정).
+   */
+  it('값 입력의 설명에 파괴적 결과 경고가 남는다', async () => {
+    mocked.beginEditSession.mockResolvedValue(session({ field: 'REQUIRED_KEYWORD' }));
+    renderScreen();
+    await beginEdit('REQUIRED_KEYWORD');
+
+    const input = screen.getByLabelText(STRATEGY_FIELD_DISPLAY.REQUIRED_KEYWORD.label);
+    const describedBy = input.getAttribute('aria-describedby');
+    expect(describedBy, '설명으로 가는 배선이 없다').not.toBeNull();
+    const hint = input.ownerDocument.getElementById(describedBy!);
+    expect(hint, '배선이 없는 id 를 가리킨다').not.toBeNull();
+    expect(hint!.textContent, '비움이 조건을 지운다는 경고가 빠졌다').toContain('비우면');
+    // 이름은 **칸 이름**이다 — 힌트가 이름을 덮으면 그 경고가 다시 낭독에서 빠진다.
+    expect(input.getAttribute('aria-label'), '이름 덮어쓰기가 돌아왔다').toBeNull();
+  });
+
   it('고치기가 세션을 시작하고 그 칸을 싣는다', async () => {
     mocked.beginEditSession.mockResolvedValue(session({ field: 'MAX_ACTIVE_BIDS' }));
     renderScreen();

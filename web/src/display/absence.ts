@@ -9,11 +9,12 @@
  * 그래서 부재는 **사유를 지닌 값**이다. 값은 사유만 들고 글자는 표가 낸다 — 값에 글자를 싣는
  * 칸이 없으므로 「사유는 붙였는데 글자는 옛것」이 타입에서 설 수 없다.
  *
- * **사유가 늘면 이 표가 한 자리에서 늘어난다.** 오늘 둘인 것은 오늘 일어나는 일이 둘이기
- * 때문이고, 셋째가 필요해지는 자리(「그 종류에는 해당 값이 없다」 같은)는 그것을 아는 호출부가
- * 사유를 **인자로** 받게 되는 날이다.
+ * **사유가 늘면 이 표가 한 자리에서 늘어난다.** 셋째가 선 날이 M14/14F 다 — 사유 둘은 **서버
+ * 축**이고(답이 그 칸을 싣지 않았다 · 아직 답을 기다린다) 나라장터 넘김 카드의 투찰 금액은
+ * **응답의 칸이 아니라 입력칸**이다. 그 자리에 서버 축의 사유를 쓰면 화면이 서버에게 없는 빚을
+ * 지우고, 운영자가 「기다리면 온다」로 읽는다(v L-3).
  */
-export const ABSENCE_REASONS = ['notSent', 'notLoaded'] as const;
+export const ABSENCE_REASONS = ['notSent', 'notLoaded', 'notEntered'] as const;
 
 export type AbsenceReason = (typeof ABSENCE_REASONS)[number];
 
@@ -27,10 +28,14 @@ export type AbsenceReason = (typeof ABSENCE_REASONS)[number];
  *  · `notSent` — **응답은 왔고 그 칸이 비었다.** 세상에 그 값이 없다는 뜻이 아니라, 우리가 받은
  *    답에 그것이 실려 있지 않다는 뜻이다. 화면이 아는 것은 거기까지다.
  *  · `notLoaded` — **아직 묻고 답을 기다린다.** 0 이 아니고 없음도 아니다.
+ *  · `notEntered` — **운영자가 아직 적지 않았다.** 서버가 빚진 것이 하나도 없는 칸이다. 위 둘과
+ *    가르는 까닭은 **운영자가 할 일이 다르기** 때문이다: 서버 축의 둘은 기다리거나 다시 묻는
+ *    일이고, 이쪽은 자기가 적는 일이다. 쓰는 자리는 **입력칸을 비추는 읽기 자리**뿐이다.
  */
 export const ABSENCE_TEXT = {
   notSent: '주어지지 않음',
   notLoaded: '아직 받지 못함',
+  notEntered: '아직 적지 않음',
 } as const satisfies Record<AbsenceReason, string>;
 
 /**

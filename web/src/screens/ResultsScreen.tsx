@@ -81,7 +81,20 @@ function SummaryTiles({ aggregate }: { readonly aggregate: MyBidAggregate }) {
   const [recorded, reconciled] = rateAxesOf(aggregate);
 
   return (
-    <div data-testid="results-tiles" className="flex flex-wrap gap-3">
+    /*
+      **격자다 — `flex-wrap` 이 아니다**(cr D2 · v M-2). 앞 판은 `flex flex-wrap` 이었고 타일이
+      `min-w-0 flex-1` 이라 0 까지 줄어들 수 있었다: 그러면 **wrap 이 영영 발화하지 않는다**.
+      390px 에서 칸 하나가 ≈70px 가 되어 「서버가 적격 계수를 내지 않습니다」가 다섯 줄로
+      쪼개졌다.
+
+      격자는 **칸 수를 폭이 정한다** — 줄바꿈이 「칸이 더 줄어들 수 없을 때」가 아니라 선언으로
+      일어난다. 타일 쪽(`SummaryTile`)은 건드리지 않는다: 격자 자식에게 `flex-1` 은 아무 일도
+      하지 않고, 그 원시 요소를 쓰는 화면은 오늘 이 하나다.
+
+      그 자리는 상자 좌표로 잠겨 있다(여정 레인의 배치 축) — 클래스 글자를 읽는 단언은 스타일
+      변종 하나로 열린다.
+    */
+    <div data-testid="results-tiles" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <SummaryTile
         label="투찰 (기록됨)"
         face={tileValue(String(aggregate.sampleSize), { note: SAMPLE_NOTE })}

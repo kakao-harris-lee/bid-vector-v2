@@ -367,5 +367,12 @@ describe('표본 정의 문면 (D-7E3b-7 ⒟)', () => {
   it('표본이 카드 수가 아님을 말한다', () => {
     expect(SAMPLE_NOTE.length).toBeGreaterThan(0);
     expect(SAMPLE_NOTE).toContain('카드');
+    /**
+     * **방향을 말하지 않는다**(M14/14F · cr D8). 같은 글자가 두 자리에 선다 — 타일(화면 **맨
+     * 위**, 카드는 그 아래)과 집계(화면 **맨 아래**, 카드는 그 위). 「위 카드」는 그 가운데 한
+     * 자리에서 반드시 거짓이고, 앞 판은 타일 쪽에서 거짓이었다. 자리를 가리키는 말로 바꿨다.
+     */
+    expect(SAMPLE_NOTE, '방향을 말하는 낱말이 남았다').not.toMatch(/위 카드|아래 카드/u);
+    expect(SAMPLE_NOTE).toContain('이 화면의');
   });
 });

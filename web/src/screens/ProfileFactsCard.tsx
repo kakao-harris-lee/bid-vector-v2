@@ -84,7 +84,6 @@ export function ProfileFactsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">업종(쉼표)</span>
             <input
-              aria-label="업종"
               value={form.businessTypes}
               onChange={(event) => setFacts({ ...form, businessTypes: event.target.value })}
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
@@ -93,7 +92,6 @@ export function ProfileFactsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">면허(쉼표)</span>
             <input
-              aria-label="면허"
               disabled={!form.licensesDeclared}
               value={form.licenseNames}
               onChange={(event) => setFacts({ ...form, licenseNames: event.target.value })}
@@ -103,7 +101,6 @@ export function ProfileFactsCard({
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">지역어(쉼표)</span>
             <input
-              aria-label="지역어"
               value={form.regionTerms}
               onChange={(event) => setFacts({ ...form, regionTerms: event.target.value })}
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
@@ -118,7 +115,6 @@ export function ProfileFactsCard({
         <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
           <input
             type="checkbox"
-            aria-label="면허를 신고함"
             checked={form.licensesDeclared}
             onChange={(event) => setFacts({ ...form, licensesDeclared: event.target.checked })}
           />

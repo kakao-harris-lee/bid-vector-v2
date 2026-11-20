@@ -345,6 +345,7 @@ function renderCards() {
           criticalRateText: '1.0250',
           marginPercentText: '+2.50',
         }}
+        marginAbsence={null}
       />
       {/*
         **표시층 파일 사이로 금액 문면에 닿는 둘**(M12/12B — `OPEN-M11-SCREEN-COVERAGE-CROSS-FILE-VOCAB`

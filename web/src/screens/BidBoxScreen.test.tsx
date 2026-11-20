@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { absenceTextOf } from '../display/absence';
 import { ACTION_OPERATION, BID_BOX_TABS, STATE_TAB, tabOf, type BidBoxActionKind } from '../display/bidBoxDisplay';
 import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY, type BidCaseState } from '../display/caseDisplay';
 
@@ -1039,6 +1040,42 @@ describe('화면 D — 레일 둘', () => {
 
     await screen.findByTestId('bid-box-schedule');
     expect(screen.queryByTestId('schedule-11')).toBeNull();
+  });
+
+  /**
+   * **줄이 어느 건인지 말한다**(M14/14F · v M-1). 앞 판은 사건 낱말과 시각뿐이라 건이 둘
+   * 이상이면 같은 꼴의 줄이 나란히 서서 **서로 구별되지 않았다**. 레일은 보는 탭과 무관하게
+   * 입찰함 전체를 보므로(바로 아래 test 가 그 사실을 잠근다) 「종료」 탭을 보는 중에 **관심 탭
+   * 건의** 마감 시각이 서기도 한다 — 그때 그 줄이 어느 건인지 말하지 않으면 운영자는 보고 있는
+   * 건의 일정으로 읽는다.
+   */
+  it('일정 줄이 건을 부른다 — 둘이면 서로 다른 이름이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, noticeKnown: true, noticeTitle: '합성 공고 가' }),
+      bidCase({ caseId: 22, noticeKnown: true, noticeTitle: '합성 공고 나' }),
+    ]);
+    renderScreen();
+
+    const rail = screen.getByTestId('bid-box-schedule');
+    expect((await within(rail).findByTestId('schedule-title-11')).textContent).toBe('합성 공고 가');
+    expect(within(rail).getByTestId('schedule-title-22').textContent).toBe('합성 공고 나');
+  });
+
+  /** 제목이 없는 두 꼴이 레일에서도 **다른 사실**이다(카드와 같은 규율). */
+  it('일정 줄에서도 공고 행 부재와 제목 부재가 다른 문면이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 11, noticeKnown: false, noticeTitle: null }),
+      bidCase({ caseId: 22, noticeKnown: true, noticeTitle: null }),
+    ]);
+    renderScreen();
+
+    const rail = screen.getByTestId('bid-box-schedule');
+    const rowAbsent = (await within(rail).findByTestId('schedule-title-11')).textContent ?? '';
+    const titleAbsent = within(rail).getByTestId('schedule-title-22').textContent ?? '';
+
+    expect(rowAbsent.length, '공고 행 부재가 빈 글자다').toBeGreaterThan(0);
+    expect(titleAbsent, '제목 부재가 부재 어휘가 아니다').toBe(absenceTextOf('notSent'));
+    expect(rowAbsent, '두 사실이 한 문면으로 접혔다').not.toBe(titleAbsent);
   });
 
   /** 레일은 **묶음이 아니라 입찰함 전체**를 본다 — 탭을 옮겨도 같은 사실이다. */

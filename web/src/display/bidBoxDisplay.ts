@@ -1,6 +1,12 @@
 import type { components } from '../api/generated/operator-api';
 
-import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY, type BidCaseState } from './caseDisplay';
+import {
+  BID_CASE_STATE_DISPLAY,
+  NEXT_CHECKPOINT_DISPLAY,
+  NOTICE_ROW_ABSENT_TEXT,
+  shownText,
+  type BidCaseState,
+} from './caseDisplay';
 import { instantDisplayOf } from './timeDisplay';
 
 type Outcome = components['schemas']['RecordOutcomeRequest']['outcome'];
@@ -140,6 +146,15 @@ export interface CheckpointSource {
   readonly caseId: number;
   readonly nextCheckpointKind: NextCheckpointKind;
   readonly nextCheckpointAt?: string | null;
+  /**
+   * 줄의 **신원**을 만드는 두 칸(M14/14F · v M-1). 14E 투영이 싣는 값이고 입찰함·결과 카드가
+   * 이미 같은 둘을 읽는다 — 레일만 그것 없이 서 있었다.
+   *
+   * 선택 칸인 까닭은 이 모듈이 **모양을 받는다**는 규율이다(`BidCase` 타입을 끌어오지 않는다).
+   * 주지 않으면 신원이 `null` 이고, 그 답은 「제목 자리가 비었다」와 같다.
+   */
+  readonly noticeKnown?: boolean;
+  readonly noticeTitle?: string | null;
 }
 
 type NextCheckpointKind = keyof typeof NEXT_CHECKPOINT_DISPLAY;
@@ -159,6 +174,12 @@ export interface CheckpointRow {
   readonly label: string;
   /** 시각 원문. 서식은 `timeDisplay` 한 자리의 일이고 그리는 것은 화면이다. */
   readonly at: string;
+  /**
+   * **이 줄이 어느 건인가**(M14/14F · v M-1). 공고명, 또는 공고 행이 없으면 그 사실의 문면.
+   * `null` 은 「행은 있고 제목 자리가 비었다」이고 그때 그리는 것은 **부재 어휘**다 — 그 선택은
+   * 화면의 일이다(이 층은 글자를 지어내지 않는다).
+   */
+  readonly title: string | null;
 }
 
 /**
@@ -190,7 +211,15 @@ export function checkpointRowsOf(cases: readonly CheckpointSource[]): readonly C
       if (kind === NO_CHECKPOINT || at === null || at === undefined) {
         return [];
       }
-      return [{ caseId: one.caseId, kind, label: NEXT_CHECKPOINT_DISPLAY[kind].label, at }];
+      /**
+       * 신원은 **세 사실을 가른다**(v M-1): 공고 행이 없다 ↔ 행은 있고 제목이 비었다 ↔ 제목이
+       * 공백뿐이다. 마지막을 글자 기준으로 보지 않으면 **조용한 빈칸**이 선다(이 마일스톤이 같은
+       * 꼴을 세 번 고쳤다). 「행이 없다」의 문면은 **한 자리**에서 온다 — 알림함·입찰함·결과가
+       * 같은 글자를 쓴다.
+       */
+      const title =
+        one.noticeKnown === false ? NOTICE_ROW_ABSENT_TEXT : (shownText(one.noticeTitle) ?? null);
+      return [{ caseId: one.caseId, kind, label: NEXT_CHECKPOINT_DISPLAY[kind].label, at, title }];
     })
     .sort((left, right) => {
       const a = instantDisplayOf(left.at).text;

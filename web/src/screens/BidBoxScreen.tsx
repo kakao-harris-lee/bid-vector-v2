@@ -14,6 +14,7 @@ import {
   skipCase,
   type BidCase,
 } from '../api/queries';
+import { AbsentValue } from '../components/AbsentValue';
 import { Button, LinkButton } from '../components/Button';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
@@ -71,10 +72,14 @@ const KIND_SWITCH = {
 const PAPER_NOTE = '페이퍼(가상) 건만 보고 있습니다 — 실측과 섞지 않습니다.';
 
 /**
- * 「전체」의 수가 사이드바 배지와 **다른 까닭**을 한 줄로 말한다(팀장 판정 2026-11-20).
+ * 「전체」의 수가 탐색의 배지와 **다른 까닭**을 한 줄로 말한다(팀장 판정 2026-11-20).
  * 배지는 지금 들여다볼 건을 세고 이 탭은 전부를 센다 — 두 수가 다른 것이 정상이다.
+ *
+ * **자리를 가리키지 않는다**(v L-4). 앞 판은 「왼쪽 배지」였고 이 문장이 서는 자리는
+ * `md:hidden`, 곧 **390px 전용**이다 — 그 폭에서 배지는 왼쪽이 아니라 **하단 탭**에 있다.
+ * 폭에 따라 참·거짓이 바뀌는 안내는 가장 좁은 폭에서 거짓이었다. 신원으로 부른다.
  */
-const ALL_COUNT_NOTE = '「전체」는 종료한 건까지 셉니다. 왼쪽 배지는 지금 들여다볼 건만 셉니다.';
+const ALL_COUNT_NOTE = '「전체」는 종료한 건까지 셉니다. 탐색의 입찰함 배지는 지금 들여다볼 건만 셉니다.';
 
 /** 탭이 비었을 때의 문면 — 「이 묶음에 건이 없다」는 **사실**이고 사유를 지어내지 않는다. */
 const EMPTY_TAB_DISPLAY = {
@@ -465,6 +470,18 @@ export function BidBoxScreen() {
                 <ul className="mt-2 flex flex-col gap-2">
                   {schedule.map((row) => (
                     <li key={row.caseId} data-testid={`schedule-${row.caseId}`} className="flex flex-col gap-0.5">
+                      {/*
+                        **줄이 어느 건인지 말한다**(v M-1). 앞 판은 사건 낱말과 시각뿐이라 건이
+                        둘 이상이면 같은 꼴의 줄이 나란히 서서 **서로 구별되지 않았다**. 레일은
+                        보는 탭과 무관하게 입찰함 전체를 보므로, 「종료」 탭을 보는 중에 **관심
+                        탭 건의** 마감 시각이 서기도 한다.
+
+                        신원은 **표시층이 가른 세 사실**을 그대로 받는다 — 공고명 · 「공고 행이
+                        없다」(그 문면은 한 자리에서 온다) · 제목 자리가 비었다(부재 어휘).
+                      */}
+                      <span data-testid={`schedule-title-${row.caseId}`} className="text-xs font-medium">
+                        {row.title === null ? <AbsentValue reason="notSent" /> : row.title}
+                      </span>
                       <span className="flex flex-wrap items-baseline gap-1 text-xs">
                         {/* 사건 낱말은 **열거의 표에서만** 온다 — 「참가신청」처럼 표에 없는
                             말을 지어내지 않는다. */}

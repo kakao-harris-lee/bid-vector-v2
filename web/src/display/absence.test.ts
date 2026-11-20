@@ -59,9 +59,10 @@ describe('문면 — 축어로 한 자리에 박는다 (cr M-3)', () => {
    * (이 파일은 걷어낸 옛 어휘를 조각에서 조립하므로, **새** 문면은 그냥 적어도 훑기에 걸리지
    * 않는다.)
    */
-  it('사유 둘의 글자가 이것이다', () => {
+  it('사유 셋의 글자가 이것이다', () => {
     expect(absenceTextOf('notSent')).toBe('주어지지 않음');
     expect(absenceTextOf('notLoaded')).toBe('아직 받지 못함');
+    expect(absenceTextOf('notEntered')).toBe('아직 적지 않음');
   });
 });
 
@@ -78,5 +79,21 @@ describe('문면 읽기', () => {
    */
   it('응답 전과 응답이 싣지 않음이 다른 얼굴이다', () => {
     expect(absenceTextOf('notLoaded')).not.toBe(absenceTextOf('notSent'));
+  });
+
+  /**
+   * **서버가 말한 부재와 운영자가 아직 안 적은 칸이 다른 얼굴이다**(M14/14F · v L-3).
+   *
+   * 셋째 사유가 필요해진 자리는 나라장터 넘김 카드의 투찰 금액이다. 그 칸은 **응답의 칸이
+   * 아니라 입력칸**이고, 거기에 「응답은 왔고 그 칸이 비었다」를 쓰면 화면이 **서버에게 없는
+   * 빚을 지운다**. 운영자가 할 일도 갈린다 — 서버 축의 둘은 기다리거나 다시 묻는 일이고,
+   * 이쪽은 **자기가 적는** 일이다.
+   */
+  it('운영자가 아직 적지 않음이 서버 축 둘과 다른 얼굴이다', () => {
+    // **비공허가 비교 앞에 선다** — 사유가 표에 없으면 글자가 `undefined` 이고 아래 두 비교는
+    // 저절로 참이다(그 꼴이 이 test 를 RED 에서 한 번 지나갔다).
+    expect(ABSENCE_REASONS).toContain('notEntered');
+    expect(absenceTextOf('notEntered')).not.toBe(absenceTextOf('notSent'));
+    expect(absenceTextOf('notEntered')).not.toBe(absenceTextOf('notLoaded'));
   });
 });

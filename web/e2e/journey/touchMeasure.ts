@@ -294,3 +294,113 @@ export function exitTargetsOf(
 ): readonly MeasuredTarget[] {
   return targets.filter((one) => one.testId.startsWith(testIdPrefix));
 }
+
+/** 이름이 **어디서 오는가**와 그 자리의 상자 — 「보이는 라벨」을 상자로 재는 자리다. */
+export interface NameSource {
+  /** 그 컨트롤의 `name` 속성(없으면 빈 글자) — 실패 메시지가 어느 칸인지 말한다. */
+  readonly control: string;
+  /** `label`(감싼·명시 레이블의 글자) · `aria`(속성) · `none`(이름이 서지 않는다). */
+  readonly from: 'label' | 'aria' | 'none';
+  readonly width: number;
+  readonly height: number;
+  /** 시각 은폐 기법이 걸려 있는가 — `sr-only` 는 상자를 1px 로 줄이고 잘라낸다. */
+  readonly clipped: boolean;
+  /**
+   * **브라우저가 「보인다」고 보는가**(r2 v G3). 상자와 잘라내기만으로는 `invisible`
+   * (`visibility:hidden`)·`opacity-0` 이 지나간다 — 둘 다 상자를 그대로 두기 때문이다. 그 둘을
+   * **브라우저에게 묻는다**(열거를 늘리는 대신).
+   */
+  readonly shown: boolean;
+}
+
+/**
+ * 한 묶음 안 컨트롤들의 **이름 출처와 그 상자**(M14/14F r1 보강 · verifier 변이 V9).
+ *
+ * 「보이는 라벨을 세웠다」는 **그려진 상자의 사실**이다. jsdom 은 CSS 를 풀지 않아 그 층의 단언이
+ * `sr-only` 를 통과시킨다(실측: 이름도 글자도 그대로이고 눈에만 안 보인다) — 그 변이가 단위
+ * 레인에서 초록이었다. 그래서 **브라우저에서** 잰다.
+ *
+ * 클래스 이름으로 재지 않는 까닭은 같은 레인이 압축 금액에서 실측한 함정이다 — 은폐 기법은
+ * 여럿이고 그 가운데 하나를 글자로 집으면 나머지가 지나간다. 상자와 계산된 잘라내기를 본다.
+ */
+export function nameSourcesInPage(containerTestId: string): readonly NameSource[] {
+  const container = document.querySelector(`[data-testid="${containerTestId}"]`);
+  if (container === null) {
+    throw new Error(`${containerTestId} 묶음을 찾지 못했다 — 아래 단언이 공허해진다`);
+  }
+  const boxOf = (node: Element): { width: number; height: number; clipped: boolean; shown: boolean } => {
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    /**
+     * **`overflow:hidden` 은 은폐가 아니다**(r1 cr LOW). `text-ellipsis`(Tailwind `truncate`)가
+     * **요구하는** 값이라, 뒤 레인이 라벨을 한 줄로 줄이면 **보이는 라벨인데** 이 축이 붉는다.
+     * `sr-only` 는 상자 쪽(1px)에서 이미 걸리므로 그 칸이 더해 주는 것이 없다.
+     */
+    return {
+      width: Math.round(rect.width * 10) / 10,
+      height: Math.round(rect.height * 10) / 10,
+      clipped: style.clip !== 'auto' || style.clipPath !== 'none',
+      /**
+       * `checkVisibility` 는 `visibility`·`opacity`·`content-visibility` 를 **브라우저가** 본다 —
+       * 기법을 열거하지 않고 묻는 자리다. 쓸 수 없는 환경이면 **모른다를 보인다로 접지 않는다**.
+       */
+      shown:
+        typeof node.checkVisibility === 'function'
+          ? node.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+          : false,
+    };
+  };
+  const found: NameSource[] = [];
+  for (const control of container.querySelectorAll('input, select, textarea')) {
+    const name = control.getAttribute('name') ?? '';
+    if ((control.getAttribute('aria-label') ?? '').trim() !== '' || (control.getAttribute('aria-labelledby') ?? '').trim() !== '') {
+      found.push({ control: name, from: 'aria', width: 0, height: 0, clipped: false });
+      continue;
+    }
+    // 이름을 **주는 노드**를 찾는다 — 명시 연결이 먼저이고 그다음이 감싼 레이블이다.
+    const id = control.getAttribute('id') ?? '';
+    let label: Element | null = id === '' ? null : document.querySelector(`label[for="${id}"]`);
+    if (label === null) {
+      label = control.closest('label');
+    }
+    if (label === null || (label.textContent ?? '').trim() === '') {
+      found.push({ control: name, from: 'none', width: 0, height: 0, clipped: false });
+      continue;
+    }
+    /**
+     * 글자를 **담은 자리**를 잰다. 레이블 전체는 입력까지 품어 상자가 크므로, 그 안에서 글자만
+     * 든 자식이 있으면 그것을 본다 — `sr-only` 가 걸리는 자리가 바로 그 자식이다.
+     *
+     * **맨 텍스트 노드도 자식이다**(r1 cr LOW): `children` 은 요소만 내므로, 라벨의 주된 글자가
+     * 맨 텍스트면 그것을 지나치고 **뒤의 다른 요소**(괄호 힌트 등)를 재게 된다. 이 저장소에 그
+     * 꼴이 있다(자격 사실의 체크박스 라벨) — 그 자리에 이 helper 를 쓰면 주된 글자를 숨겨도
+     * 초록이었을 것이다. `childNodes` 로 보고 맨 텍스트는 `Range` 로 상자를 잡는다.
+     */
+    const holdsControl = (one: Node): boolean =>
+      one.nodeType === Node.ELEMENT_NODE &&
+      (one as Element).querySelector('input, select, textarea') !== null;
+    const textNode = [...label.childNodes].find(
+      (one) => (one.textContent ?? '').trim() !== '' && !holdsControl(one),
+    );
+    if (textNode !== undefined && textNode.nodeType === Node.TEXT_NODE) {
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      const rect = range.getBoundingClientRect();
+      const style = getComputedStyle(label);
+      found.push({
+        control: name,
+        from: 'label',
+        width: Math.round(rect.width * 10) / 10,
+        height: Math.round(rect.height * 10) / 10,
+        clipped: style.clip !== 'auto' || style.clipPath !== 'none',
+        shown:
+          typeof label.checkVisibility === 'function'
+            ? label.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+            : false,
+      });
+      continue;
+    }
+    found.push({ control: name, from: 'label', ...boxOf((textNode as Element | undefined) ?? label) });
+  }
+  return found;
+}

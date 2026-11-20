@@ -115,7 +115,7 @@ const ONBOARDING_SECTIONS = [
     label: '지금 맞는 공고 미리보기',
     steps: [],
     // **준비 중이 아니다**: 미리보기는 곁에서 돌고 있고, 아직 없는 것은 「어느 입력이 좁혔는가」뿐이다.
-    why: '조건을 채우면 곁의 미리보기에 뜹니다 — 어느 입력이 결과를 좁혔는지 알려 주는 기능은 아직 없습니다',
+    why: '조건을 채우면 미리보기에 뜹니다 — 어느 입력이 결과를 좁혔는지 알려 주는 기능은 아직 없습니다',
   },
 ] as const satisfies readonly OnboardingSection[];
 

@@ -45,8 +45,13 @@ function StrategyFields({ strategy }: { readonly strategy: StrategyReadResponse 
   return (
     <section data-testid="settings-strategy" className="flex flex-col gap-3">
       <h3 className="text-base font-semibold">감시 조건과 임계치</h3>
+      {/*
+        **개발 어휘를 쓰지 않는다**(v L-6). 「편집 세션」은 계약의 낱말이고 「개정 2」는 무엇의
+        2 인지 말하지 않았다. 운영자가 알아야 하는 것은 **걸음 세 개**와 **지금 적용된 판이
+        몇 번째인가**이고, 그 둘은 개발 낱말 없이 말할 수 있다.
+      */}
       <p className="text-xs text-ink-soft">
-        값은 편집 세션을 지나 바뀝니다 — 고치기 → 값 → 확인. 개정 {strategy.revision}
+        값은 고치기 → 값 → 확인 세 걸음으로 바뀝니다. 지금 적용된 판 {strategy.revision}
       </p>
 
       <StrategyWriteFailure session={session} />

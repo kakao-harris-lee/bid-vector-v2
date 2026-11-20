@@ -99,6 +99,118 @@ const PRIMARY_SLOT = {
   RESUME: 'head',
 } as const satisfies Record<NextActionKind, 'head' | 'price' | 'record'>;
 
+/**
+ * **받은 투찰가 응답이 그 화면에서만 사는 사실**(v H-1 high · cr D14 low).
+ *
+ * 계약에 응답을 **다시 읽는 operation 이 없고**(`requestBidPrice` 하나다), 상태를 민 뒤에는
+ * 요청 경로도 없다. 그래서 초안을 만든 날과 나라장터에 내는 날이 다르면 — 그것이 보통
+ * 흐름이다 — 다시 연 화면에는 자격도 하한 여유도 없다. 앞 판은 그 자리를 **빈칸으로 접었고**,
+ * 운영자는 「여유 표시가 없다」를 「문제없다」로 읽는다(해를 입는 자리가 투찰 금액이다).
+ *
+ * 그래서 빈 자리마다 **사유**를 세운다. 사유는 **다음 전이의 표에서 유도한다** — 상태 집합을
+ * 이 화면이 한 벌 더 적지 않고, 상태가 늘면 `satisfies` 가 여기서 멈춘다.
+ *
+ * **전제 한 문장을 세 자리가 나눠 쓴다.** 자격 · 3안 · 하한 여유는 **서로 다른 빈 자리**이고
+ * 각자 자기 축을 말해야 한다(「곁의 카드를 보라」는 폭이 바뀌면 거짓이 되는 꼴이다 — 같은
+ * 리뷰가 그 꼴을 둘 지적했다). 전제가 겹치는 것은 그 셋이 한 원인을 갖기 때문이다.
+ */
+/**
+ * **주어가 「받은 응답」이 아니다**(cr r1 LOW · v F5). 앞 판은 「**받은** 투찰가 응답은 …」이라
+ * 적어, 응답을 한 번도 받은 적 없는 건(담아 두고 바로 「나중에」로 내려놓은 건)에서도 받았다고
+ * 전제했다. 이것은 **그 표면의 성질**을 말하는 문장이라 어느 건에서나 참이다.
+ */
+const PRICE_ONLY_IN_SESSION = '투찰가 응답은 받은 화면에서만 보입니다';
+
+/**
+ * 투찰가를 물을 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc).
+ *
+ * **「다시」를 쓰지 않는다**(r2 v L1): 그 낱말은 **전에 한 번 쟀다**를 전제한다. 관심에서 바로
+ * 건너뛴 건이나 마감이 지난 건은 응답을 받은 적이 없고, 화면은 **그 사실을 알 수 없다**
+ * (`BidCase` 에 「응답을 받았다」는 칸이 없고, 초안이 있다는 것도 응답을 받았다는 뜻은 아니다).
+ * 그래서 **받았든 아니든 참인 말**로 적는다.
+ *
+ * **수출한다**(r2 cr LOW): 렌더 층 문면 게이트가 이 사유를 모집단에 넣으려면 글자를 먹여야
+ * 하는데, 그 글자를 손으로 적으면 **사본**이 된다(이 자리가 바뀌어도 게이트는 옛 글자를 본다).
+ * 조립자를 공유하면 그 갈림이 생기지 않는다.
+ */
+export const cannotAskHere = (axis: string): string =>
+  `${PRICE_ONLY_IN_SESSION} — 이 화면에서는 투찰가를 요청할 수 없어 ${axis}.`;
+
+/** 다음 걸음이 아예 없는 상태 — 요청을 **하지 않는** 것이지 못 하는 것이 아니다. */
+const settled = (axis: string): string =>
+  `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 투찰가를 요청하지 않으므로 ${axis}.`;
+
+/**
+ * 응답이 손에 없을 때 **빈 자리 셋이 각자 드는 사유**(v H-1 · cr D14 · cr r1 HIGH).
+ *
+ * **세 자리가 한 표에서 나온다.** 앞 판은 자격 축만 다음 행동별 표를 쓰고 나머지 둘은 한 문장을
+ * 공유했다 — 그래서 「나중에」 건의 한 화면에서 윗줄이 「되돌린 뒤 요청하면 온다」고 하고 아랫줄
+ * 둘이 「다시 요청할 수 없다」고 **서로를 부정했다**(cr r1 HIGH 의 실측). 세 자리가 한 원인을
+ * 가지므로 **한 표**가 맞다.
+ *
+ * **주어를 화면으로 낮췄다.** 「이 **상태에서는** 요청할 수 없어」는 거짓일 수 있다 —
+ * 「나중에 → 다시 보기」 두 걸음이 요청 경로로 데려가는 상태가 있다. 「이 **화면에서는**」은 네
+ * 갈래 전부에서 참이다: 그 상태의 화면에 투찰가 요청이 없다는 말이고, 그것이 운영자가 지금
+ * 보는 사실이다.
+ *
+ * **`null` 은 「이 자리에 사유를 두지 않는다」**이고 그 뜻은 둘 가운데 하나다 — 아직 묻지
+ * 않았거나(요청 버튼이 이 화면에 있다), 한 걸음 뒤에 물을 수 있다(「다시 보기」가 이 화면에
+ * 있다). 두 경우 모두 **자격 자리만** 다음 걸음을 말하고 나머지 둘은 자리 자체를 만들지 않는다 —
+ * 묻지 않은 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다(13C 의 판단).
+ */
+interface PriceAbsenceCopy {
+  readonly qualification: string;
+  readonly price: string | null;
+  readonly floorMargin: string | null;
+}
+
+const PRICE_ABSENCE = {
+  REQUEST_PRICE: {
+    qualification: '투찰가를 요청하면 자격 판정이 함께 옵니다.',
+    price: null,
+    floorMargin: null,
+  },
+  // 「다시 보기」가 **이 화면의 다음 행동**이다 — 한 번 누르면 요청 경로가 열린다.
+  RESUME: {
+    qualification: '다시 보기로 되돌린 뒤 투찰가를 요청하면 자격 판정이 함께 옵니다.',
+    price: null,
+    floorMargin: null,
+  },
+  DRAFT_BID: {
+    qualification: cannotAskHere('자격 판정을 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 잴 수 없습니다'),
+  },
+  RECORD_BID: {
+    qualification: cannotAskHere('자격 판정을 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 잴 수 없습니다'),
+  },
+} as const satisfies Record<NextActionKind, PriceAbsenceCopy>;
+
+/**
+ * 다음 전이가 **없는** 상태의 같은 셋. 표 밖이라 따로 적는다 — 그 상태에서는 요청 경로가 아예
+ * 없고 「요청하면 온다」가 거짓 안내가 된다. **세 자리가 같은 주장을 한다**(cr r1 LOW: 앞 판은
+ * 자격 축만 이 갈래를 쓰고 투찰가 카드는 「요청할 수 없어」를 재사용해, 결과는 같은데
+ * 주장이 갈렸다).
+ */
+const PRICE_ABSENCE_SETTLED: PriceAbsenceCopy = {
+  qualification: settled('자격 판정을 잴 수 없습니다'),
+  price: settled('투찰가 3안과 그 근거를 볼 수 없습니다'),
+  floorMargin: settled('하한 대비 여유를 잴 수 없습니다'),
+};
+
+/**
+ * 기록할 금액을 **다시 적어야 하는** 사실. `BidCase` 에 초안 금액 칸이 없어 화면이 그 값을
+ * 되읽을 수 없다(그 알려진 제한이 지금까지 **코드 주석에만** 있었고 화면은 빈 입력 위에
+ * 「초안과 기록이 같은 입력을 씁니다」를 세웠다).
+ *
+ * **초안이 있는 자리에서만 선다**(v F5): 다음 행동이 「제출함」이라는 것이 곧 초안이 있다는
+ * 뜻이다(상태 표의 `why` — 「초안이 있고 아직 제출 기록이 없다」). 앞 판은 「다시 요청할 수 없는」
+ * 자리 전부에 세워, 초안을 만든 적 없는 「나중에」 건에도 「**다시** 적으십시오」라고 말했다.
+ */
+const DRAFT_AMOUNT_NOT_READABLE = '기록할 금액은 다시 적으십시오 — 초안 금액을 되읽는 표면이 계약에 없습니다.';
+
 /** 내려놓기의 자리 표지 — 화면 D 의 카드와 **다른 이름**이다(한 여정이 두 화면을 지난다). */
 const EXIT_TEST_ID = {
   DEFER: 'worksheet-exit-DEFER',
@@ -671,6 +783,22 @@ export function WorksheetScreen() {
   const exits = bidCase === undefined ? [] : exitsOf(bidCase.state);
   const amountWon = parseWon(form.amount);
   /**
+   * **응답이 손에 없는 자리 셋이 드는 사유** — 한 표에서 온다(cr r1 HIGH). 응답이 손에 있으면
+   * 셋 다 사유가 없다(그 자리에 **값**이 선다).
+   */
+  const priceView: { readonly kind: 'present'; readonly price: BidPriceRequestResponse } | { readonly kind: 'absent'; readonly copy: PriceAbsenceCopy } =
+    price === null
+      ? { kind: 'absent', copy: action === null ? PRICE_ABSENCE_SETTLED : PRICE_ABSENCE[action.kind] }
+      : { kind: 'present', price };
+  const absence = priceView.kind === 'absent' ? priceView.copy : null;
+  const priceCardAbsence = absence === null ? null : absence.price;
+  const marginAbsence = absence === null ? null : absence.floorMargin;
+  /**
+   * 초안 금액을 되읽지 못한다는 사실은 **초안이 있는 자리에서만** 선다(v F5) — 다음 행동이
+   * 「제출함」이라는 것이 곧 초안이 있다는 뜻이다.
+   */
+  const draftAmountUnreadable = price === null && action !== null && action.kind === 'RECORD_BID';
+  /**
    * 하한 대비 여유 — **투찰가 응답이 있어야** 하한율이 있다. 요청 전에는 자리 자체를 만들지
    * 않는다(없는 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다).
    */
@@ -806,7 +934,10 @@ export function WorksheetScreen() {
           </div>
         </div>
       ) : action === null ? (
-        <p className="text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
+        /* **개발 어휘를 쓰지 않는다**(v L-3). 그리고 「끝났다」로도 적지 않는다 — 이 자리의
+           상태 집합에는 개찰 대기처럼 **끝나지 않은** 건이 들어 있고, 그 건에 「끝났다」는
+           거짓이다. 참인 것은 「이 화면에서 지금 할 걸음이 없다」까지다. */
+        <p className="text-xs text-ink-soft">이 화면에서 지금 할 걸음이 없습니다.</p>
       ) : primarySlot === 'head' ? (
         <div>{primaryNode}</div>
       ) : null}
@@ -824,7 +955,23 @@ export function WorksheetScreen() {
       )}
       {bidCase === undefined ? null : (
         <>
-          {price === null ? null : <WorksheetQualification price={price} />}
+          {/* **빈 자리는 사유를 든다**(v H-1 · cr D14) — 앞 판은 응답이 없으면 이 카드를
+              통째로 걷어, 자격에 대해 **아무 말도 하지 않았다**. 그 침묵이 「판정했고 통과」로
+              읽힌다(화면 자신의 「빈 자리 + 사유」 규율과도 어긋난다). */}
+          {/* **사유를 표에서 받는다** — 「응답이 없다」와 「사유가 있다」가 한 값이라, 사유 없이
+              이 자리를 그리는 길이 타입에 남아 있지 않다(앞 판은 둘이 따로였다). */}
+          {priceView.kind === 'present' ? (
+            <WorksheetQualification price={priceView.price} />
+          ) : (
+            <section data-testid="qualification-absent" className={cardClass()}>
+              <h3 className="text-sm font-semibold">자격</h3>
+              {/* 사유를 **자기 표지**로 집는다 — 카드 전체를 읽으면 제목 글자가 섞여, 문면을
+                  축어로 못박는 단언이 제목까지 함께 잠근다. */}
+              <p data-testid="qualification-absent-why" className="mt-1 text-xs text-absent-ink">
+                {priceView.copy.qualification}
+              </p>
+            </section>
+          )}
           <section data-testid="worksheet-price-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰가</h3>
             {/* 요청의 전제다 — 선언이 없으면 요청이 가지 않는다(CR H-1). */}
@@ -840,17 +987,43 @@ export function WorksheetScreen() {
                 <WorksheetGrounds price={price} />
               </div>
             )}
-            {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
-                「아직 산출 안 함」을 화면이 추론해 말하는 꼴이었다(D-7E-4). */}
-            {price !== null && price.bidPriceMenuState === 'NOT_COMPUTED' ? (
-              <p data-testid="amount-self-entry-note" className="mt-3 text-xs text-ink-soft">
-                투찰가 3안이 아직 산출되지 않아 금액은 직접 적습니다(위 근거의 상태 그대로).
+            {/* 응답을 **다시 받을 수 없는** 자리의 사유(v H-1). 종단에서는 근거 절도 입력도
+                없으므로, 이것이 없으면 이 카드에 제목만 남는다. */}
+            {priceCardAbsence === null ? null : (
+              <p data-testid="price-card-absent" className="mt-1 text-xs text-absent-ink">
+                {priceCardAbsence}
               </p>
-            ) : null}
-            <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
-            <div className="mt-3">
-              <BidAmountFields form={form} onChange={changeForm} blocked={blocked} />
-            </div>
+            )}
+            {/*
+              **입력 묶음과 그 한 문장은 다음 전이가 있을 때만 선다**(cr D6 · §12.3 (aa) ⓖ).
+              머리가 「할 걸음이 없다」고 말하는 바로 아래에서 「초안과 기록이 같은 입력을
+              씁니다」와 입력 넷이 서면 — 누를 자리가 하나도 없는데 — 운영자가 금액을 적고 보낼
+              자리를 찾는다. **거짓 약속은 그 입력보다 거기 남은 문장이다**(cr N-4).
+
+              조건은 **다음 전이의 표**에서 온다(넘김·기록 카드와 같은 가드다). 근거 절
+              (3안 · 판정 · 고지)은 **읽는 표면**이라 이 가드 밖에 남는다.
+            */}
+            {action === null ? null : (
+              <>
+                {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
+                    「아직 산출 안 함」을 화면이 추론해 말하는 꼴이었다(D-7E-4). */}
+                {price !== null && price.bidPriceMenuState === 'NOT_COMPUTED' ? (
+                  <p data-testid="amount-self-entry-note" className="mt-3 text-xs text-ink-soft">
+                    투찰가 3안이 아직 산출되지 않아 금액은 직접 적습니다(위 근거의 상태 그대로).
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
+                {/* 초안 금액을 되읽는 표면이 없다 — 그 사실이 **빈 입력 곁**에서 말한다. */}
+                {draftAmountUnreadable ? (
+                  <p data-testid="draft-amount-not-readable" className="mt-1 text-xs text-absent-ink">
+                    {DRAFT_AMOUNT_NOT_READABLE}
+                  </p>
+                ) : null}
+                <div className="mt-3">
+                  <BidAmountFields form={form} onChange={changeForm} blocked={blocked} />
+                </div>
+              </>
+            )}
             {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보인다. 확인에 담긴
                 값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
             {/* **그 상태에서만 선다**(cr L-7). 확인을 열어 둔 사이 건이 움직이면 그 확인은 이미
@@ -906,7 +1079,12 @@ export function WorksheetScreen() {
               않고, 상태가 늘어도 이 자리가 따라온다. */}
           {action === null ? null : (
             <>
-          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
+          <KonepsHandoff
+            noticeNumber={notice.noticeNumber}
+            amountWon={amountWon}
+            margin={margin}
+            marginAbsence={marginAbsence}
+          />
           <section data-testid="worksheet-record-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰했나요? 기록을 확인해 주세요</h3>
             <p className="mt-1 text-xs text-ink-soft">
