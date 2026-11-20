@@ -20,7 +20,8 @@ import { bidCasesQueryKey } from '../api/queryKeys';
 import { Button, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import { ToastHost, useToast } from '../components/Toast';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { exitsOf, type BidBoxAction, type ExitActionKind } from '../display/bidBoxDisplay';
@@ -651,14 +652,14 @@ export function WorksheetScreen() {
           </span>
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field
+          <KeyValueRow
             label="발주기관"
             testId="worksheet-agency"
             value={notice.demandAgencyName ?? notice.noticeAgencyName ?? null}
           />
-          <Field label="공고번호 · 차수" testId="worksheet-number" value={`${notice.noticeNumber} · ${notice.noticeRound}`} />
-          <Field label="기초금액" testId="worksheet-amount" hint="투찰 기준 금액. 추정가격과 다르다." value={amount.present ? `${amount.amount} (${amount.provenance ?? ''})` : null} />
-          <Field
+          <KeyValueRow label="공고번호 · 차수" testId="worksheet-number" value={`${notice.noticeNumber} · ${notice.noticeRound}`} />
+          <KeyValueRow label="기초금액" testId="worksheet-amount" hint="투찰 기준 금액. 추정가격과 다르다." value={amount.present ? `${amount.amount} (${amount.provenance ?? ''})` : null} />
+          <KeyValueRow
             label="투찰 마감"
             testId="worksheet-deadline"
             value={deadline.kind === 'absent' ? null : `${deadline.text}${deadlineDays === null ? '' : ` (${deadlineDays})`}`}

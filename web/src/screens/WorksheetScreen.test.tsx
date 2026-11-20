@@ -709,11 +709,11 @@ describe('화면 C — 나라장터 이동과 투찰 기록(여정 ③)', () => 
   });
 
   /**
-   * CR r4 L-1 — r3 L-5 의 넷 가운데 **`Field` 자리**가 아직 잠기지 않았다(실측: `aria-describedby`·
+   * CR r4 L-1 — r3 L-5 의 넷 가운데 **`KeyValueRow` 자리**가 아직 잠기지 않았다(실측: `aria-describedby`·
    * `hintNode` 를 걷어도 200 전부 초록). 화면 C 의 기초금액이 화면 B 와 **같은 문면**을 같은
-   * `Field` 로 낸다 — r2 M-4 가 고친 원래 자리이고 r3 L-10 이 내용 모형을 고친 자리다.
+   * `KeyValueRow` 로 낸다 — r2 M-4 가 고친 원래 자리이고 r3 L-10 이 내용 모형을 고친 자리다.
    */
-  it('기초금액의 아래층 문면이 보조기기에 닿는다 — Field 자리도 잠근다', async () => {
+  it('기초금액의 아래층 문면이 보조기기에 닿는다 — KeyValueRow 자리도 잠근다', async () => {
     renderScreen();
 
     const value = await screen.findByTestId('worksheet-amount');

@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { replaceBusinessDetails, type Profile } from '../api/queries';
 import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import {
   businessDetailsBodyOf,
   NARA_FIELD_DISPLAY,
@@ -64,8 +65,8 @@ export function ProfileDetailsCard({
           />
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-          <Field label="상호" value={profile.tradeName ?? null} testId="profile-trade-name" />
-          <Field
+          <KeyValueRow label="상호" value={profile.tradeName ?? null} testId="profile-trade-name" />
+          <KeyValueRow
             label="본사 소재지"
             value={
               profile.headquartersRegion === null || profile.headquartersRegion === undefined
@@ -74,7 +75,7 @@ export function ProfileDetailsCard({
             }
             testId="profile-region"
           />
-          <Field
+          <KeyValueRow
             label="등록 분야"
             value={
               profile.naraRegisteredFields.length === 0

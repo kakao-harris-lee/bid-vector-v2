@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { replaceQualificationFacts, type Profile } from '../api/queries';
 import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import { termsOf } from '../display/editSessionDisplay';
 import { QUALIFICATION_STATE_DISPLAY, qualificationStateOf } from '../display/profileDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
@@ -63,17 +64,17 @@ export function ProfileFactsCard({
           />
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-          <Field
+          <KeyValueRow
             label="업종"
             value={profile.businessTypes.length === 0 ? null : profile.businessTypes.join(', ')}
             testId="profile-business-types"
           />
-          <Field
+          <KeyValueRow
             label="면허"
             value={profile.licenseNames.length === 0 ? null : profile.licenseNames.join(', ')}
             testId="profile-licenses"
           />
-          <Field
+          <KeyValueRow
             label="지역어"
             value={profile.regionTerms.length === 0 ? null : profile.regionTerms.join(', ')}
             testId="profile-region-terms"

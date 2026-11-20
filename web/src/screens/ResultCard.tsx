@@ -90,9 +90,9 @@ function MoneyAxis<T extends { readonly amountWon: number }>({
 }
 
 /**
- * 결과 카드의 칸 하나. **이름이 `ResultField` 인 이유**(r1 CR L-4): `components/StateBadge.tsx`
- * 에 같은 이름의 공용 `Field` 가 있고 계약이 다르다(`value: string | null` — 배지를 담지 못해
- * 이 지역 판이 생겼다). 이름이 겹치면 읽는 사람이 `aria-describedby` 배선까지 같다고 믿는다.
+ * 결과 카드의 칸 하나. **지역 판이 따로 있는 이유**(r1 CR L-4): 공용 `KeyValueRow` 와 계약이
+ * 다르다(`value: string | null` — 배지를 담지 못해 이 지역 판이 생겼다). 이름을 가르는 것은
+ * 읽는 사람이 `aria-describedby` 배선까지 같다고 믿지 않게 하려는 것이다.
  */
 function ResultField({ label, children }: { readonly label: string; readonly children: React.ReactNode }) {
   return (
