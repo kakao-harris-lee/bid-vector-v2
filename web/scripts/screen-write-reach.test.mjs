@@ -255,6 +255,25 @@ describe('양성 대조 — 심으면 붉는다', () => {
     expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
   });
 
+  /**
+   * **부작용 수입** — `import './x'` 는 이름을 가져오지 않지만 그 모듈의 최상위가 통째로
+   * 실행된다. 식별자 축만으로는 닿지 않으므로 전수를 민다.
+   */
+  it('이름 없이 수입한 모듈의 최상위 호출도 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          resolve(SRC, 'api', '__planted_effect__.ts'),
+          "import { apiClient } from './client';\nvoid apiClient.POST('/api/bid-price-requests', { body: {} });\n",
+        ],
+        [RESULTS_SCREEN, `import '../api/__planted_effect__';\n${read(RESULTS_SCREEN)}`],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
+  });
+
   /** **Outlet context** — 셸이 아래로 내려 주는 값(v M-1r 가 초록으로 재던 자리). */
   it('Outlet 이 리터럴 아닌 값을 내리면 붉다', () => {
     const shell = resolve(SRC, 'AppShell.tsx');
