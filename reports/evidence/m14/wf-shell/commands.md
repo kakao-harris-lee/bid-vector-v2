@@ -242,6 +242,17 @@ Kotlin `check` 는 evidence 가 누출 패턴 게이트의 훑기 뿌리에 드�
 HEAD** 에서 따로 돈다. 그 결과의 정본은 verifier 와 PR 조치 코멘트다(여기 적으면 그 기록이 또
 커밋을 낳는다).
 
+### 4.1 Kotlin `check`
+
+evidence 커밋 HEAD 에서 **두 벌**로 돌았다.
+- `check -x test`(빠른 쓸기) — **BUILD SUCCESSFUL** · `leakPatternGate` **실행됨**. 그 task 의
+  스캔 뿌리가 `reports/evidence` 라, evidence 를 실제로 훑은 것은 이 실행이다.
+- `check`(전건) — **BUILD SUCCESSFUL** · `FAILED` 0건. 14초인 것은 앞 쓸기와 앞 라운드의 전건이
+  이미 돌아 Kotlin 입력이 하나도 바뀌지 않았기 때문이고(이 slice 의 Kotlin 편집은 **0**),
+  `leakPatternGate` 는 그래서 UP-TO-DATE 다 — **앞 쓸기가 같은 HEAD 에서 실행한 결과**다.
+
+참조값: 수정 라운드 1 **이전**의 전건은 `1da17c04` 에서 BUILD SUCCESSFUL(35m 33s)이었다.
+
 ## 5. 부재값 재실측 (종결)
 
 좁힌 전수 **0** · 전수 **1**(생성 타입의 부분 일치 그 하나 — 승인 경계라 분모 밖).
