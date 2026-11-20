@@ -40,7 +40,7 @@ import { screenProgram } from './screen-card-coverage.mjs';
  * **머지 차례의 한 줄**: 14C·14D 가 레일을 붙이면 유도 집합이 늘어 등식이 깨진다 — 먼저 머지하는
  * 쪽이 자기 자리 이름을 여기 더한다. 이름순으로 둔다(사람이 읽는 목록이고 차례가 뜻을 갖지 않는다).
  */
-export const RAIL_SCREEN_FLOOR = Object.freeze(['onboarding']);
+export const RAIL_SCREEN_FLOOR = Object.freeze(['onboarding', 'worksheet']);
 
 /** `as const`·`satisfies` 를 벗겨 알맹이 식을 낸다. */
 function unwrap(node) {
@@ -215,11 +215,16 @@ export function railScreenSlots(webRoot) {
     if (slot.tag === undefined) {
       continue;
     }
-    const screen = symbolAt(checker, slot.tag)?.declarations?.[0]?.getSourceFile();
-    if (screen === undefined) {
+    /**
+     * 선언이 **여럿일 수 있다**(cr LOW): 같은 이름이 여러 파일에 선언되는 꼴(선언 병합·오버로드)
+     * 에서 첫 선언만 보면 레일을 그리는 쪽을 놓친다. 전수를 돌고, **하나라도** 그리면 의무다.
+     */
+    const declarations = symbolAt(checker, slot.tag)?.declarations ?? [];
+    if (declarations.length === 0) {
       throw new Error(`routes.tsx: 자리 ${slot.id} 의 element 태그가 가리키는 화면 모듈을 찾지 못했다`);
     }
-    if (drawsRail(screen, checker, railSymbol)) {
+    const screens = new Set(declarations.map((one) => one.getSourceFile()));
+    if ([...screens].some((one) => drawsRail(one, checker, railSymbol))) {
       withRail.push({ id: slot.id, path: slot.path });
     }
   }

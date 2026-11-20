@@ -188,6 +188,26 @@ export const notFoundSlot = { id: 'not-found', path: '*' };
     expect(idsOf(root)).toStrictEqual([]);
   });
 
+  /**
+   * **타입 전용 import 는 이제 든다** — 앞 판의 주장이 뒤집힌 자리라 지우지 않고 **고쳐** 남긴다.
+   *
+   * 이름 글자로 맞대던 판에서는 「타입만 들여왔으니 그릴 수 없다」가 참이었다. 신원이 심볼이 된
+   * 지금은 같은 심볼로 풀리므로 이 술어가 그 자리를 **센다**. 그래도 해가 없다: 그런 프로그램은
+   * **컴파일되지 않는다**(TS1361 — 값으로 쓸 수 없다). 즉 출하될 수 없는 꼴이고, 그 자리는 이
+   * 게이트가 아니라 typecheck(W-3)가 먼저 막는다. 층이 다르다는 사실을 거동으로 적어 둔다.
+   */
+  it('타입 전용 import 도 센다 — 그 꼴은 typecheck 가 먼저 막는다', () => {
+    const root = tree({
+      'src/components/TwoColumn.tsx': TWO_COLUMN,
+      'src/screens/Alpha.tsx':
+        "import type { TwoColumn } from '../components/TwoColumn';\nexport const Alpha = () => <TwoColumn />;\n",
+      'src/screens/Beta.tsx': PLAIN_BETA,
+      'src/routes.tsx': ROUTES,
+    });
+
+    expect(idsOf(root)).toStrictEqual(['alpha']);
+  });
+
   /** **같은 이름의 다른 심볼**은 들지 않는다 — 신원이 글자가 아니라 심볼이라는 뜻이다. */
   it('이름만 같은 남의 컴포넌트는 들지 않는다', () => {
     const root = tree({
