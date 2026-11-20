@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { expect, test, type Page } from '@playwright/test';
+
+import { appScreenSlots } from '../scripts/journey-screen-table.mjs';
 
 import {
   LAYOUT_SLOT_ATTRIBUTE,
@@ -295,5 +301,96 @@ test.describe('두 단 — 레일의 자리', () => {
     await mountTwoColumn(page, { plantWide: true });
 
     expect(await overflowOf(page, NARROW.width)).not.toStrictEqual([]);
+  });
+});
+
+/**
+ * **출하 화면의 레일**(M14/14B · 팀장 판정 — 14B 소유).
+ *
+ * 위 묶음은 합성 두 단을 꽂아 **술어**를 재고, 이 묶음은 **출하 화면이 실제로 그린 레일**을
+ * 잰다. 14A 가 「레일을 붙이면 같은 단언이 함께 든다」고 적었지만 그 문장은 **게이트가 그
+ * 화면을 도는 경우에만** 참이었다 — 레일 축이 `/` 한 자리만 돌고 있었다.
+ *
+ * **열거가 아니라 구성이다.** 도는 주소는 `src/routes.tsx` 의 자리 표에서 오고(AST 로 읽는
+ * 공용 술어), 잴 묶음은 표지 전수다. 그래서 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는
+ * 순간 이 spec 을 고치지 않아도 든다.
+ *
+ * **알려진 제한**: 이 레인에는 백엔드가 없다. 데이터가 와야만 그려지는 레일은 여기서 보이지
+ * 않으므로, 레일은 본문의 얼굴과 무관하게 서야 한다(시작하기가 그 꼴이다). 아래 비공허 하한이
+ * 그 자리를 지킨다 — 출하 레일이 하나도 안 보이면 붉는다.
+ *
+ * **재는 것은 레일의 자리뿐이다.** 가로 넘침은 **다른 축**이고 정책도 다르다 — 일부러 가로로
+ * 스크롤되는 줄(입찰함의 상태 탭)이 출하에 있고 그것은 위반이 아니다. 그 축을 여기서 함께 재면
+ * 그 줄이 거짓으로 붉는다(실측: `/bids` 에서 탭 버튼 둘이 뷰포트 밖 좌표를 냈다 — 그 줄은
+ * `overflow-x-auto` 라 스크롤된다). 넘침은 `/` 에서 위 묶음이, 모바일 전수는 터치 타깃 게이트가
+ * 자기 술어로 든다.
+ */
+const SHIPPED_RAIL_FLOOR = 1;
+
+/** 경로 인자를 채우는 토큰 — **주소를 만드는 값**이고 판정하는 값이 아니다. */
+const PATH_PARAM_TOKEN = 'SYN-LAYOUT-PROBE';
+
+/** catch-all 자리가 도는 주소 — 어느 자리도 받지 않는 것이 그 자리의 뜻이다. */
+const CATCH_ALL_ADDRESS = '/no-such-place';
+
+function shippedAddresses(): readonly string[] {
+  const routesText = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'routes.tsx'), 'utf8');
+  // 자리 표를 못 읽으면 **던진다**(공용 술어가 그렇게 적혀 있다) — 조용한 빈 집합을 두지 않는다.
+  const slots = appScreenSlots(routesText);
+  return slots.map((slot) =>
+    slot.path === '*'
+      ? CATCH_ALL_ADDRESS
+      : slot.path
+          .split('/')
+          .map((one) => (one.startsWith(':') ? PATH_PARAM_TOKEN : one))
+          .join('/'),
+  );
+}
+
+const SHIPPED_ADDRESSES = shippedAddresses();
+
+test.describe('출하 화면의 레일', () => {
+  test('자리 표를 실제로 읽었다 — 빈 목록은 아래 단언을 공허하게 만든다', () => {
+    expect(SHIPPED_ADDRESSES.length).toBeGreaterThan(5);
+    expect(SHIPPED_ADDRESSES.every((one) => one.startsWith('/'))).toBe(true);
+    expect(SHIPPED_ADDRESSES).toContain(CATCH_ALL_ADDRESS);
+  });
+
+  test('1280px 에서 출하 레일이 본문 오른쪽이다', async ({ page }) => {
+    await page.setViewportSize({ ...WIDE });
+    let seen = 0;
+    for (const address of SHIPPED_ADDRESSES) {
+      await page.goto(address);
+      await expect(page.getByTestId('app-shell')).toBeVisible();
+
+      for (const group of await twoColumnBoxes(page)) {
+        seen += 1;
+        expect(group.body.width, `${address}: 본문 칸의 폭이 0 이다`).toBeGreaterThan(0);
+        expect(group.rail.width, `${address}: 레일 칸의 폭이 0 이다`).toBeGreaterThan(0);
+        expect(group.rail.left, `${address}: 레일이 본문 왼쪽이다`).toBeGreaterThanOrEqual(group.body.right - 1);
+      }
+    }
+
+    // **비공허** — 출하 레일을 하나도 보지 못했으면 위 루프는 아무것도 재지 않았다.
+    expect(seen, '출하 화면에서 레일을 하나도 찾지 못했다').toBeGreaterThanOrEqual(SHIPPED_RAIL_FLOOR);
+  });
+
+  test('390px 에서 출하 레일이 한 단으로 본문 아래에 선다', async ({ page }) => {
+    await page.setViewportSize({ ...NARROW });
+    let seen = 0;
+    for (const address of SHIPPED_ADDRESSES) {
+      await page.goto(address);
+      await expect(page.getByTestId('app-shell')).toBeVisible();
+
+      for (const group of await twoColumnBoxes(page)) {
+        seen += 1;
+        expect(group.rail.width, `${address}: 레일 칸의 폭이 0 이다`).toBeGreaterThan(0);
+        expect(group.rail.top, `${address}: 레일이 본문 위에 섰다`).toBeGreaterThan(group.body.top);
+        // 한 단 = 두 칸이 같은 왼쪽 끝에서 시작한다.
+        expect(Math.abs(group.rail.left - group.body.left), `${address}: 한 단이 아니다`).toBeLessThan(2);
+      }
+    }
+
+    expect(seen, '출하 화면에서 레일을 하나도 찾지 못했다').toBeGreaterThanOrEqual(SHIPPED_RAIL_FLOOR);
   });
 });
