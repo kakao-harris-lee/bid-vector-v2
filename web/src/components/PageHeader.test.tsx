@@ -138,6 +138,34 @@ describe('행동', () => {
   });
 });
 
+/**
+ * **제목 노드의 표지**(M14/14C · 팀장 판정 ⑤ — additive 확장). 바깥 상자의 표지로는 제목을
+ * 집을 수 없다: 그 글자에는 요약과 행동이 섞여, 제목을 **정확 일치**로 재는 자리(워크시트
+ * 여정의 머리 다섯 축)가 그것을 쓸 수 없다. 자리마다 표지를 두는 이 파일의 규율 그대로다.
+ */
+describe('제목의 표지 (M14/14C)', () => {
+  it('제목 노드가 자기 표지를 든다', () => {
+    render(
+      <PageHeader
+        title="공고 제목"
+        summary="한 줄"
+        actions={<button type="button">행동</button>}
+        testId="probe"
+      />,
+    );
+
+    expect(screen.getByTestId('probe-title').textContent).toBe('공고 제목');
+    // 비공허: 바깥 상자로는 이 단언이 설 수 없다(요약·행동이 섞인다).
+    expect(screen.getByTestId('probe').textContent).not.toBe('공고 제목');
+  });
+
+  it('제목 표지는 머리글 그 자체에 붙는다 — 감싸는 상자가 아니다', () => {
+    render(<PageHeader title="공고 제목" testId="probe" />);
+
+    expect(screen.getByTestId('probe-title')).toBe(screen.getByRole('heading', { name: '공고 제목' }));
+  });
+});
+
 describe('표지', () => {
   it('testId 가 없으면 바깥 상자도 안쪽 자리도 속성을 내지 않는다', () => {
     const { container } = render(

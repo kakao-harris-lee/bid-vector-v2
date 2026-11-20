@@ -9,6 +9,11 @@ import * as queries from '../api/queries';
 import { stateDisplayOf } from '../display/caseDisplay';
 
 import { controlClass } from '../components/Button';
+import {
+  LAYOUT_SLOT_ATTRIBUTE,
+  TWO_COLUMN_BODY_SLOT,
+  TWO_COLUMN_RAIL_SLOT,
+} from '../components/twoColumnShape';
 
 import { SECTION_SUMMARY_CLASS } from './WorksheetGrounds';
 import { BID_CASE_STATE_DISPLAY } from '../display/caseDisplay';
@@ -1487,5 +1492,179 @@ describe('화면 C — 내려놓기의 입구는 하나다', () => {
     await screen.findByTestId('write-failure');
 
     expect(screen.queryByTestId('toast')?.textContent, '실패가 되돌릴 길을 걷었다').toContain('실행 취소');
+  });
+});
+
+/**
+ * **와이어프레임 배치**(M14/14C · 팀장 판정 ①). 계약 문장은 레일에 넷을 넣으라고 적었지만
+ * 원천(`design/Main.raw.html`)은 카운트다운을 **머리 행 오른쪽**에, 참가 자격을 **본문 첫
+ * 카드**에 둔다. 판정은 원천을 따른다.
+ *
+ * **자리를 표지로 재지 않고 두 단의 칸으로 잰다** — 칸 표지는 출하 모듈(`twoColumnShape`)의
+ * 것이고 배치 게이트가 읽는 바로 그 글자다(사본이 생기지 않는다). 상자 좌표 축은 14B 가
+ * 레일 모집단을 넓힐 때 서고, 그때까지는 **문서 순서**가 이 화면의 잠금이다.
+ */
+describe('화면 C — 와이어프레임 배치(M14/14C)', () => {
+  const slotOf = (slot: string): HTMLElement | null =>
+    document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${slot}"]`);
+
+  const body = (): HTMLElement => {
+    const found = slotOf(TWO_COLUMN_BODY_SLOT);
+    if (found === null) {
+      throw new Error('본문 칸을 찾지 못했다 — 두 단 배치가 서지 않았다');
+    }
+    return found;
+  };
+
+  const rail = (): HTMLElement => {
+    const found = slotOf(TWO_COLUMN_RAIL_SLOT);
+    if (found === null) {
+      throw new Error('레일 칸을 찾지 못했다 — 두 단 배치가 서지 않았다');
+    }
+    return found;
+  };
+
+  /** 문서 순서 — `second` 가 `first` 뒤에 오는가. */
+  const precedes = (first: Element, second: Element): boolean =>
+    (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+  it('마감 카운트다운은 두 단 밖 — 머리 행에 선다', async () => {
+    renderScreen();
+
+    const deadline = await screen.findByTestId('worksheet-deadline');
+    // 비공허: 두 단이 실제로 서 있다(안 서 있으면 「밖이다」가 늘 참이다).
+    expect(rail()).not.toBeNull();
+    expect(deadline.closest(`[${LAYOUT_SLOT_ATTRIBUTE}]`), '카운트다운이 두 단 안으로 들어갔다').toBeNull();
+  });
+
+  it('본문의 첫 카드가 참가 자격이다', async () => {
+    renderScreen();
+    await askPrice();
+
+    const qualification = await screen.findByTestId('qualification');
+    expect(body().contains(qualification), '자격 카드가 본문에 없다').toBe(true);
+    // 자격이 **근거 묶음의 앞**이다 — 와이어프레임의 첫 카드가 그것이다.
+    expect(precedes(qualification, screen.getByTestId('verdict')), '자격이 판정 뒤로 밀렸다').toBe(true);
+  });
+
+  it('본문 차례가 여정 차례다 — 자격 → 투찰가 → 나라장터 넘김 → 기록', async () => {
+    renderScreen();
+    await askPrice();
+
+    const order = [
+      await screen.findByTestId('qualification'),
+      screen.getByTestId('record-amount'),
+      screen.getByTestId('koneps-deeplink'),
+      screen.getByTestId('worksheet-record-card'),
+    ];
+    for (const one of order) {
+      expect(body().contains(one), '본문 밖으로 나간 자리가 있다').toBe(true);
+    }
+    for (let at = 0; at + 1 < order.length; at += 1) {
+      expect(precedes(order[at]!, order[at + 1]!), `${at} 번째와 그다음의 차례가 뒤집혔다`).toBe(true);
+    }
+  });
+
+  it('레일이 다음 확인 시점 · 타임라인 · 내려놓기를 이 차례로 든다', async () => {
+    renderScreen();
+
+    const checkpoint = await screen.findByTestId('worksheet-checkpoint');
+    const timeline = await screen.findByTestId('timeline');
+    const exit = await screen.findByTestId('worksheet-exit-DEFER');
+    for (const one of [checkpoint, timeline, exit]) {
+      expect(rail().contains(one), '레일 밖에 선 자리가 있다').toBe(true);
+    }
+    expect(precedes(checkpoint, timeline)).toBe(true);
+    expect(precedes(timeline, exit)).toBe(true);
+  });
+
+  it('레일은 문서 순서에서 본문 뒤다 — 좁은 화면에서 읽는 차례가 그것이다', async () => {
+    renderScreen();
+    await screen.findByTestId('worksheet-checkpoint');
+
+    expect(precedes(body(), rail())).toBe(true);
+  });
+
+  /**
+   * **옛 「필드명 / 빈 칸」 격자를 걷는다**(계약 C 행). 남는 용어 줄은 **기초금액 하나**다 —
+   * 그 줄의 아래층 문면이 보조기기와 손가락에 닿는 경로(13C r4 L-1 · 14A M13 잔여 ⓖ)가
+   * 거기 걸려 있다.
+   */
+  it('머리의 용어 줄은 기초금액 하나다 — 격자가 걷혔다', async () => {
+    renderScreen();
+    const amount = await screen.findByTestId('worksheet-amount');
+
+    const head = amount.closest('header');
+    expect(head, '기초금액이 머리 블록 밖으로 나갔다').not.toBeNull();
+    expect(head!.querySelectorAll('dt')).toHaveLength(1);
+  });
+
+  it('건이 입찰함에 없으면 두 단을 쓰지 않는다 — 빈 레일을 만들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-add-case');
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT), '레일에 담을 것이 없는데 두 단이 섰다').toBeNull();
+  });
+});
+
+/** 14A cr L-5 — 출처가 없는 기초금액이 `1,234,000 ()` 로 섰다. */
+describe('화면 C — 출처 없는 기초금액 (14A cr L-5)', () => {
+  it('출처가 없으면 빈 괄호를 그리지 않는다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, baseAmountBasis: null, baseAmountVatTreatment: null, baseAmountProvenance: null }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const amount = await screen.findByTestId('worksheet-amount');
+    expect(amount.textContent, '빈 괄호가 남았다').not.toContain('(');
+    expect(amount.textContent).toContain('1,200,000,000');
+  });
+});
+
+/**
+ * **§12.3 (x) ⓒ — 「되돌릴 길 기억」이 다른 토스트 자리에서 지워지지 않는다**(v N-1).
+ *
+ * 그 기억은 「지금 떠 있는 토스트가 실행 취소를 들었는가」를 뜻한다. 실행 취소가 **없는**
+ * 토스트로 바뀌었는데 기억이 참으로 남으면, 뒤이은 실패가 그 토스트를 걷지 않고 실패 얼굴
+ * 옆에 **무엇이 성공인지 흐리는 성공 문면**을 남긴다.
+ */
+describe('화면 C — 되돌릴 길 기억은 지금 토스트의 함수다 (§12.3 (x) ⓒ)', () => {
+  it('실행 취소 없는 토스트로 바뀌면 그 기억이 비워진다', async () => {
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'WATCHING' }]);
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED', caseVersion: 1 }]);
+    mocked.deferCase.mockResolvedValue({ ...CASE, state: 'DEFERRED', caseVersion: 1 });
+    mocked.resumeCase.mockResolvedValue({ ...CASE, state: 'WATCHING', caseVersion: 2 });
+    mocked.skipCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    // ① 나중에 — 실행 취소가 붙은 토스트(기억이 참이 된다).
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    expect((await screen.findByTestId('toast')).textContent).toContain('실행 취소');
+
+    // ② 다시 보기로 되돌림 — **실행 취소가 없는** 토스트가 그 자리를 덮는다.
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await waitFor(() => expect(mocked.resumeCase).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId('toast').textContent).toContain('다시 보기로 돌렸습니다'),
+    );
+    expect(screen.getByTestId('toast').textContent, '덮은 토스트에 실행 취소가 있다').not.toContain('실행 취소');
+
+    // ③ 뒤이은 내려놓기 실패 — 걷을 토스트이므로 걷혀야 한다.
+    fireEvent.click(await screen.findByTestId('worksheet-exit-SKIP'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.SKIP.label ?? ''), {
+      target: { value: '예산 초과' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+    await screen.findByTestId('write-failure');
+
+    expect(screen.queryByTestId('toast'), '묵은 기억이 성공 문면을 실패 얼굴 옆에 남겼다').toBeNull();
   });
 });

@@ -250,8 +250,14 @@ function policyVersionTextOf(effectiveFrom: string | null | undefined): string {
   return effectiveFrom === null ? '최초 판(시행일 없음)' : `${effectiveFrom} 시행 판`;
 }
 
-/** 자격 — **면허 축만** 판정한다. 판정하지 않는 축을 함께 싣는 것이 이 카드의 요점이다. */
-function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
+/**
+ * 자격 — **면허 축만** 판정한다. 판정하지 않는 축을 함께 싣는 것이 이 카드의 요점이다.
+ *
+ * **본문의 첫 카드다**(M14/14C · 와이어프레임 원천). 나머지 네 절과 떨어져 서지만 **같은 꼴**
+ * 이다 — 접기 · 요약 · 펼침 표지가 `DisclosureSection` 한 자리에서 오므로 사본이 생기지 않는다.
+ * 분모(「n/n」)를 쓰지 않는 사유는 계약이 적은 그대로다: 「축 전부」의 수를 선언한 표면이 없다.
+ */
+export function WorksheetQualification({ price }: { readonly price: BidPriceRequestResponse }) {
   const reason = price.licenseUncertainReason;
   return (
     <DisclosureSection
@@ -339,13 +345,18 @@ function Disclosures({ price }: { readonly price: BidPriceRequestResponse }) {
   );
 }
 
-/** 투찰가 요청의 결과 전부 — 판정 · 3안 자리 · 자격 · 근거 · 고지. 다섯 절이 접혀서 선다. */
+/**
+ * 투찰가 요청의 결과 — 판정 · 3안 자리 · 근거 · 고지. 네 절이 접혀서 선다.
+ *
+ * **자격은 이 묶음 밖이다**(M14/14C): 와이어프레임이 그것을 본문의 첫 카드로 두고, 투찰가
+ * 카드는 그 아래다. 다섯째 절을 여기서 뺀 것이 아니라 **자리를 옮긴 것**이라 접기의 짝 test
+ * 다섯은 그대로 돈다(절을 전역 표지로 집는다).
+ */
 export function WorksheetGrounds({ price }: { readonly price: BidPriceRequestResponse }) {
   return (
     <div className="flex flex-col gap-4">
       <Verdict price={price} />
       <BidPriceMenu price={price} />
-      <Qualification price={price} />
       <Grounds price={price} />
       <Disclosures price={price} />
     </div>

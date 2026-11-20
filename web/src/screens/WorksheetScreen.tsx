@@ -1,5 +1,5 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 
 import {
@@ -17,12 +17,15 @@ import {
   type BidPriceRequestResponse,
 } from '../api/queries';
 import { bidCasesQueryKey } from '../api/queryKeys';
+import { AbsentValue } from '../components/AbsentValue';
 import { Button, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { StateBadge } from '../components/StateBadge';
 import { KeyValueRow } from '../components/KeyValueRow';
 import { ToastHost, useToast } from '../components/Toast';
+import { TwoColumn } from '../components/TwoColumn';
 import { isUnauthorized, SignedOutFace, WriteFailureFace } from '../components/WriteFailure';
 import { exitsOf, type BidBoxAction, type ExitActionKind } from '../display/bidBoxDisplay';
 import { NEXT_CHECKPOINT_DISPLAY, nextActionOf, type NextActionKind } from '../display/caseDisplay';
@@ -35,7 +38,7 @@ import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { ActionForm, type ActionPayload } from './BidBoxCard';
 import { InstantText } from './InstantText';
-import { WorksheetGrounds } from './WorksheetGrounds';
+import { WorksheetGrounds, WorksheetQualification } from './WorksheetGrounds';
 import {
   ActiveBidsDeclaration,
   BidAmountFields,
@@ -79,6 +82,23 @@ function sendExit(caseId: number, payload: { readonly kind: ExitActionKind; read
   }
 }
 
+/**
+ * 다음 행동 하나가 **어느 카드에 서는가**(M14/14C · 와이어프레임의 자리).
+ *
+ * 앞 판은 전부 머리에 섰다. 와이어프레임은 그 버튼을 **그 행동이 사는 카드**에 둔다 —
+ * 「투찰가 요청」·「이 금액으로 진행」은 투찰가 카드, 「제출함」은 기록 카드다. 버튼은 그대로
+ * 하나이고(§6.5) 자리만 상태를 따른다.
+ *
+ * **전수 표**다: 다음 행동 종류가 늘면 `satisfies` 가 여기서 컴파일을 멈춘다 — 새 종류가
+ * 조용히 머리로 떨어지지 않는다.
+ */
+const PRIMARY_SLOT = {
+  REQUEST_PRICE: 'price',
+  DRAFT_BID: 'price',
+  RECORD_BID: 'record',
+  RESUME: 'head',
+} as const satisfies Record<NextActionKind, 'head' | 'price' | 'record'>;
+
 /** 내려놓기의 자리 표지 — 화면 D 의 카드와 **다른 이름**이다(한 여정이 두 화면을 지난다). */
 const EXIT_TEST_ID = {
   DEFER: 'worksheet-exit-DEFER',
@@ -112,6 +132,25 @@ export function WorksheetScreen() {
   // 쓰기를 하는 화면이다 — 새로고침 뒤에도 CSRF 값을 쥐게 한다(7A 알려진 제한 L-1).
   const { signedIn } = useSessionCsrf();
   const { toast, show, dismiss } = useToast();
+  /**
+   * 지금 떠 있는 토스트가 **실행 취소를 들었는가**(cr L-1 · 13D 가 같은 자리에 둔 예외).
+   * 뒤이은 쓰기가 실패해도 **성공한 내려놓기의 되돌릴 길**은 걷지 않는다 — 되돌릴 수 있는데
+   * 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다.
+   *
+   * **이 기억은 그려진 토스트에서 유도된다**(M13 잔여 §12.3 (x) ⓒ · v N-1). 앞 판은 값을
+   * 올리는 자리가 하나, 내리는 자리가 하나였고 그 사이에 토스트를 내는 자리가 **여섯 더**
+   * 있었다 — 실행 취소가 없는 토스트가 덮은 뒤에도 기억이 참으로 남아, 뒤이은 실패가 그 성공
+   * 문면을 실패 얼굴 옆에 남겼다. 이제 **맞출 자리가 없다**: 토스트가 바뀌면 그다음 commit 에서
+   * 기억이 따라오므로, 토스트를 내는 자리가 몇이든 둘이 갈리지 않는다.
+   *
+   * **ref 인 이유는 비동기 `onError` 가 읽기 때문**이다 — 그 자리가 보아야 하는 것은 요청을
+   * 보내던 렌더의 closure 가 아니라 **지금 그려져 있는 것**이다. 쓰는 자리를 effect 하나로 둔
+   * 이유도 같다: 렌더 중에 ref 를 만지면 그 값을 쥔 객체가 전부 「렌더 중 ref 접근」이 된다.
+   */
+  const exitUndoable = useRef(false);
+  useEffect(() => {
+    exitUndoable.current = toast?.undo !== undefined;
+  }, [toast]);
   const [form, setForm] = useState<BidAmountForm>(EMPTY_BID_FORM);
   // 진행 중 투찰 건수의 **선언** — 기본값이 없다(CR H-1). 빈 칸이면 요청 경로가 막힌다.
   const [activeBids, setActiveBids] = useState('');
@@ -306,13 +345,6 @@ export function WorksheetScreen() {
    * 되돌릴 수 없거나(건너뜀) 되돌리는 데 전이가 하나 더 드는 자리라(나중에) 중복이 비싸다.
    */
   const exitSending = useRef(false);
-  /**
-   * 지금 떠 있는 토스트가 **실행 취소를 들었는가**(cr L-1 · 13D 가 같은 자리에 둔 예외).
-   * 뒤이은 쓰기가 실패해도 **성공한 내려놓기의 되돌릴 길**은 걷지 않는다 — 되돌릴 수 있는데
-   * 되돌릴 길이 화면에서 사라지는 것이 가장 비싼 손해다. 토스트가 떠나면 함께 비운다(묵은 참이
-   * 다음 실패의 판단을 흐린다).
-   */
-  const exitUndoable = useRef(false);
 
   const resume = useMutation({
     mutationFn: (payload: { readonly caseId: number; readonly fromVersion: number }) =>
@@ -348,13 +380,10 @@ export function WorksheetScreen() {
       // **가드를 여기서 푼다** — 실행 취소가 살아나는 시점과 같아야 한다(13D 의 그 자리와 같은 사유).
       exitSending.current = false;
       /*
-       * **실행 취소가 붙은 토스트인가.** 오늘 이 값은 도달 가능한 자리에서 늘 참이다 — 성공 뒤
-       * 내려놓기가 또 열리는 상태는 「나중에」가 만든 그 상태 하나뿐이고(「건너뜀」은 종단이라
-       * 그 뒤로 열린 내려놓기가 없다), 그래서 이 줄을 `true` 로 바꾸는 변이가 **초록이다**(실측).
-       * 그래도 종류에서 유도한다: 종류가 늘면(예: 되돌릴 수 없는 셋째 내려놓기) 그 순간부터
-       * 두 값이 갈리고, 그때 이 줄이 이미 맞는 쪽에 서 있다.
+       * 되돌릴 길의 **기억은 여기서 손대지 않는다**(§12.3 (x) ⓒ). 그 값은 그려진 토스트에서
+       * 유도되므로 「실행 취소를 붙였는데 기억은 안 바꿨다」가 설 자리가 없다 — 앞 판은 그
+       * 둘을 손으로 맞췄고, 그래서 **뒤에 오는 다른 토스트**가 기억을 묵은 참으로 남겼다.
        */
-      exitUndoable.current = sent.kind === 'DEFER';
       show(
         sent.kind === 'DEFER'
           ? {
@@ -639,119 +668,117 @@ export function WorksheetScreen() {
           bidVatTreatment: form.vat,
         });
 
-  return (
-    <section data-testid="screen-worksheet" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <header className={cardClass()}>
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h2 data-testid="worksheet-title" className="text-base font-semibold break-words">
-            {notice.title ?? notice.noticeNumber}
-          </h2>
-          <span className="flex flex-wrap items-center gap-2">
+
+  /**
+   * 기초금액의 **출처 꼴**(14A cr L-5). 앞 판은 `?? ''` 라 출처가 없을 때 `1,234,000 ()` 를
+   * 그렸다 — 빈 괄호는 「괄호 안의 무언가를 못 읽었다」로 보이지만, 사실은 **적을 것이 없다**.
+   */
+  const amountText = !amount.present
+    ? null
+    : amount.provenance === null
+      ? amount.amount
+      : `${amount.amount} (${amount.provenance})`;
+  /** 마감 한 칸 — 절대 시각과 남은 날이 **같은 노드**다(M9 D-1·D-2). */
+  const deadlineText =
+    deadline.kind === 'absent' ? null : `${deadline.text}${deadlineDays === null ? '' : ` (${deadlineDays})`}`;
+  const agency = notice.demandAgencyName ?? notice.noticeAgencyName ?? null;
+  /** 다음 행동 하나 — 자리는 아래 표가 정한다. */
+  const primarySlot = action === null ? null : PRIMARY_SLOT[action.kind];
+  const primaryNode =
+    action === null || bidCase === undefined ? null : (
+      <Button
+        tone="primary"
+        size="lg"
+        testId="worksheet-primary"
+        onClick={() => runPrimary(action.kind, bidCase.caseId, bidCase.caseVersion)}
+        disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
+      >
+        {action.label}
+      </Button>
+    );
+
+  /**
+   * 머리 블록(와이어프레임 원천) — 상태 알약 · 공고번호 · 제목 · 발주기관, 그리고 오른쪽에
+   * **마감 카운트다운**.
+   *
+   * 옛 「필드명 / 빈 칸」 격자를 걷었다. 남는 용어 줄은 **기초금액 하나**다 — 그 줄의 아래층
+   * 문면이 보조기기와 손가락에 닿는 경로(13C r4 L-1 · 14A M13 잔여 ⓖ)가 거기 걸려 있고, 다른
+   * 네 줄의 사실은 알약 · 제목 곁 · 카운트다운 카드 · 레일이 각자 더 가까운 자리에서 말한다.
+   *
+   * **「방식」 칸은 만들지 않는다**(팀장 판정 ②): `NoticeSummary` 에 낙찰 방식을 내는 칸이 없다.
+   * 서버가 가진 적 없는 칸을 부재 값으로 그리면 「이번 답에 빠졌다」로 읽힌다 — 그 사실은
+   * §12.3 의 **데이터로 막힘** 행이 말한다.
+   */
+  const head = (
+    <header className={`${cardClass()} flex flex-col gap-3`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StateBadge display={noticeStatusDisplayOf(notice.status)} testId="worksheet-notice-status" />
             {bidCase === undefined ? null : <CaseStateBadge state={bidCase.state} testId="worksheet-case-state" />}
+            <span data-testid="worksheet-number" className="text-xs text-ink-soft">
+              공고번호 {notice.noticeNumber} · 차수 {notice.noticeRound}
+            </span>
+          </div>
+          <PageHeader
+            testId="worksheet"
+            title={notice.title ?? notice.noticeNumber}
+            summary={
+              <span data-testid="worksheet-agency">
+                {agency === null ? <AbsentValue reason="notSent" /> : agency}
+              </span>
+            }
+          />
+          <dl className="flex flex-wrap items-start gap-x-8 gap-y-2">
+            <KeyValueRow
+              label="기초금액"
+              testId="worksheet-amount"
+              hint="투찰 기준 금액. 추정가격과 다르다."
+              value={amountText}
+            />
+          </dl>
+        </div>
+        {/* **마감 카운트다운은 두 단 밖이다** — 와이어프레임이 그것을 머리 행의 오른쪽에 둔다.
+            좁은 화면에서는 머리 아래로 내려온다(줄바꿈 하나, 뒤집지 않는다). */}
+        <div className={`${cardClass('sm')} flex shrink-0 flex-col gap-1`}>
+          <span className="text-xs text-ink-soft">투찰 마감까지</span>
+          <span data-testid="worksheet-deadline" className="font-numeric text-base font-semibold">
+            {deadlineText === null ? <AbsentValue reason="notSent" /> : deadlineText}
           </span>
         </div>
-        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-          <KeyValueRow
-            label="발주기관"
-            testId="worksheet-agency"
-            value={notice.demandAgencyName ?? notice.noticeAgencyName ?? null}
-          />
-          <KeyValueRow label="공고번호 · 차수" testId="worksheet-number" value={`${notice.noticeNumber} · ${notice.noticeRound}`} />
-          <KeyValueRow label="기초금액" testId="worksheet-amount" hint="투찰 기준 금액. 추정가격과 다르다." value={amount.present ? `${amount.amount} (${amount.provenance ?? ''})` : null} />
-          <KeyValueRow
-            label="투찰 마감"
-            testId="worksheet-deadline"
-            value={deadline.kind === 'absent' ? null : `${deadline.text}${deadlineDays === null ? '' : ` (${deadlineDays})`}`}
-          />
-          {bidCase === undefined ? null : (
-            <div className="flex flex-col gap-1">
-              <dt className="text-xs text-ink-soft">다음 확인 시점</dt>
-              <dd data-testid="worksheet-checkpoint" className="flex flex-wrap items-center gap-2 text-sm">
-                <StateBadge display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
-                {/* 시점이 없으면 **자리도 없다** — 옆 배지가 「없음」을 말하므로 같은 사실을
-                    두 번 적지 않는다(M9 D-1 의 없음 표지는 배지가 없는 자리의 일이다). */}
-                {checkpoint === null || checkpoint.kind === 'absent' ? null : (
-                  <InstantText display={checkpoint} className="text-xs" />
-                )}
-                {bidCase.overdue ? <span className="text-xs text-bad-ink">지난 일정</span> : null}
-              </dd>
-            </div>
-          )}
-        </dl>
-        {bidCase === undefined ? (
-          /* **다음 걸음을 그 자리에 둔다**(계약 받는 항목 7) — 앞 판은 다른 화면으로 돌려보냈다. */
-          <div className="mt-3 flex flex-col gap-2">
-            <p className="text-xs text-ink-soft">
-              이 공고는 아직 입찰함에 없습니다 — 담으면 투찰가를 요청하고 투찰을 기록할 수 있습니다.
-            </p>
-            <div>
-              <Button
-                tone="primary"
-                size="lg"
-                testId="worksheet-add-case"
-                onClick={() => addCase.mutate()}
-                disabled={addCase.isPending}
-              >
-                입찰함에 담기
-              </Button>
-            </div>
+      </div>
+      {bidCase === undefined ? (
+        /* **다음 걸음을 그 자리에 둔다**(계약 받는 항목 7) — 앞 판은 다른 화면으로 돌려보냈다. */
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-ink-soft">
+            이 공고는 아직 입찰함에 없습니다 — 담으면 투찰가를 요청하고 투찰을 기록할 수 있습니다.
+          </p>
+          <div>
+            <Button
+              tone="primary"
+              size="lg"
+              testId="worksheet-add-case"
+              onClick={() => addCase.mutate()}
+              disabled={addCase.isPending}
+            >
+              입찰함에 담기
+            </Button>
           </div>
-        ) : action === null ? (
-          <p className="mt-3 text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
-        ) : (
-          <>
-            {/* 요청의 전제이므로 버튼 옆에 둔다 — 선언이 없으면 요청이 가지 않는다(CR H-1). */}
-            {action.kind === 'REQUEST_PRICE' ? (
-              <ActiveBidsDeclaration value={activeBids} onChange={setActiveBids} blocked={activeBidsBlocked} />
-            ) : null}
-            {/* 그 상태의 **다음 행동 하나** — 화면에서 가장 큰 타깃이다(§6.5). */}
-            <div className="mt-3">
-              <Button
-                tone="primary"
-                size="lg"
-                testId="worksheet-primary"
-                onClick={() => runPrimary(action.kind, bidCase.caseId, bidCase.caseVersion)}
-                disabled={askPrice.isPending || makeDraft.isPending || makeRecord.isPending || resume.isPending}
-              >
-                {action.label}
-              </Button>
-            </div>
-          </>
-        )}
+        </div>
+      ) : action === null ? (
+        <p className="text-xs text-ink-soft">이 상태에서 할 다음 전이가 없습니다.</p>
+      ) : primarySlot === 'head' ? (
+        <div>{primaryNode}</div>
+      ) : null}
+    </header>
+  );
 
-        {/* **내려놓기는 다른 줄이다**(13D 의 선례). 위 줄의 「다음 행동 하나」와 섞으면 이 상태에서
-            행동이 셋이 되고 무엇이 다음 걸음인지 화면이 말하지 못한다(§6.5). 열린 집합은 표가
-            정하고, 폼은 13D 의 것 하나다 — 입력 꼴·빈 값 가드·확인 한 단이 두 화면에서 같다. */}
-        {bidCase === undefined || exits.length === 0 ? null : (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {exits.map((one) => (
-              <Button
-                key={one.kind}
-                testId={EXIT_TEST_ID[one.kind as ExitActionKind]}
-                onClick={() => setExiting(one)}
-                disabled={exit.isPending || resume.isPending}
-              >
-                {one.label}
-              </Button>
-            ))}
-          </div>
-        )}
-        {bidCase === undefined || exiting === null ? null : (
-          /* **폼의 정체를 행동에 묶는다**(13D cr HIGH): `key` 가 없으면 「닫지 않고 다른 것을
-             연다」가 앞 폼의 값과 확인 상태를 그대로 물려받고, 그 입력이 되돌릴 수 없는 전이에
-             실려 나간다. */
-          <ActionForm
-            key={exiting.kind}
-            action={exiting}
-            formId={exitFormId}
-            pending={exit.isPending}
-            onCancel={() => setExiting(null)}
-            onSend={(payload) => submitExit(bidCase.caseId, bidCase.caseVersion, payload)}
-          />
-        )}
-      </header>
-
+  /**
+   * 본문 — **여정의 차례**다(계약 C 행): 참가 자격 → 투찰가 → 나라장터 넘김 → 투찰 기록.
+   * 앞 판은 근거 다섯 절이 통째로 앞에 서고 금액 입력이 맨 아래였다.
+   */
+  const body = (
+    <>
       {writeFailure === null ? null : (
         <WriteFailureFace
           what={writeFailure.what}
@@ -759,22 +786,28 @@ export function WorksheetScreen() {
           onRetry={writeFailure.retry ?? retryExit}
         />
       )}
-
-      {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
-      {priceFailure === null ? null : (
-        <WriteFailureFace what={priceFailure.what} error={priceFailure.error} onRetry={priceFailure.retry} />
-      )}
-      {price === null ? null : <WorksheetGrounds price={price} />}
-
       {bidCase === undefined ? null : (
         <>
-          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
+          {price === null ? null : <WorksheetQualification price={price} />}
           <section className={cardClass()}>
-            <h3 className="text-sm font-semibold">투찰 금액과 기록</h3>
+            <h3 className="text-sm font-semibold">투찰가</h3>
+            {/* 요청의 전제다 — 선언이 없으면 요청이 가지 않는다(CR H-1). */}
+            {action !== null && action.kind === 'REQUEST_PRICE' ? (
+              <ActiveBidsDeclaration value={activeBids} onChange={setActiveBids} blocked={activeBidsBlocked} />
+            ) : null}
+            {askPrice.isPending ? <Skeleton testId="price-loading" rows={2} /> : null}
+            {priceFailure === null ? null : (
+              <WriteFailureFace what={priceFailure.what} error={priceFailure.error} onRetry={priceFailure.retry} />
+            )}
+            {price === null ? null : (
+              <div className="mt-3">
+                <WorksheetGrounds price={price} />
+              </div>
+            )}
             {/* v L-1 — 이 문장은 **API 상태에서만** 나온다. 앞 판은 요청 전에도 늘 떠 있어
                 「아직 산출 안 함」을 화면이 추론해 말하는 꼴이었다(D-7E-4). */}
             {price !== null && price.bidPriceMenuState === 'NOT_COMPUTED' ? (
-              <p data-testid="amount-self-entry-note" className="mt-1 text-xs text-ink-soft">
+              <p data-testid="amount-self-entry-note" className="mt-3 text-xs text-ink-soft">
                 투찰가 3안이 아직 산출되지 않아 금액은 직접 적습니다(위 근거의 상태 그대로).
               </p>
             ) : null}
@@ -782,8 +815,8 @@ export function WorksheetScreen() {
             <div className="mt-3">
               <BidAmountFields form={form} onChange={changeForm} blocked={blocked} />
             </div>
-            {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보이고, 하한 대비
-                자리도 같은 자리에 둔다. 확인에 담긴 값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
+            {/* **보내기 전 확인**(§6.2 C 3) — 보낼 금액을 숫자와 한글로 함께 보인다. 확인에 담긴
+                값이 그대로 가고, 입력이 바뀌면 닫힌다. */}
             {/* **그 상태에서만 선다**(cr L-7). 확인을 열어 둔 사이 건이 움직이면 그 확인은 이미
                 다른 상태의 것이고, 그대로 보내면 서버가 409 로 막는다 — 운영자에게는 「확인했는데
                 실패했다」로 보인다. 다음 행동이 초안이 아니면 패널 자체를 그리지 않는다. */}
@@ -819,20 +852,90 @@ export function WorksheetScreen() {
                 </div>
               </div>
             )}
+            {/*
+              「투찰가 요청」·「이 금액으로 진행」 — 와이어프레임이 그 버튼을 투찰가 카드의
+              **마지막 줄**에 둔다.
+
+              **두 종류가 같은 자리를 쓴다.** 종류마다 자리를 나누면 상태가 바뀔 때 React 가
+              버튼을 떼었다 다시 붙이고, 그 사이에 잡아 둔 노드를 누르면 **아무 일도 일어나지
+              않는다**(이 라운드의 실측 — 13C 의 확인 단계 test 여섯이 그렇게 붉었다). 자리를
+              하나로 두면 노드가 살아 있으므로 그 함정이 없다.
+            */}
+            {primarySlot === 'price' ? <div className="mt-3">{primaryNode}</div> : null}
+          </section>
+          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
+          <section data-testid="worksheet-record-card" className={cardClass()}>
+            <h3 className="text-sm font-semibold">투찰했나요? 기록을 확인해 주세요</h3>
+            <p className="mt-1 text-xs text-ink-soft">
+              나라장터에서 제출한 뒤 이 자리에서 기록합니다 — 금액 · 과세 구분 · 추첨번호는 위에 적은 값을 그대로
+              보냅니다.
+            </p>
+            {primarySlot === 'record' ? <div className="mt-3">{primaryNode}</div> : null}
           </section>
         </>
       )}
+    </>
+  );
 
-      {timeline.data === undefined ? null : <WorksheetTimeline entries={timeline.data} />}
+  /**
+   * 레일(와이어프레임의 300px 칸) — 다음 확인 시점 · 타임라인 · 내려놓기.
+   *
+   * **내려놓기가 레일의 맨 아래다**: 본문의 「다음 행동 하나」와 섞으면 이 상태에서 행동이
+   * 셋이 되고 무엇이 다음 걸음인지 화면이 말하지 못한다(§6.5). 열린 집합은 표가 정하고, 폼은
+   * 13D 의 것 하나다 — 입력 꼴 · 빈 값 가드 · 확인 한 단이 두 화면에서 같다.
+   */
+  const rail =
+    bidCase === undefined || checkpoint === null ? null : (
+      <>
+        <section className={cardClass()}>
+          <h3 className="text-sm font-semibold">다음 확인 시점</h3>
+          <p data-testid="worksheet-checkpoint" className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <StateBadge display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
+            {/* 시점이 없으면 **자리도 없다** — 옆 배지가 「없음」을 말하므로 같은 사실을
+                두 번 적지 않는다(M9 D-1 의 없음 표지는 배지가 없는 자리의 일이다). */}
+            {checkpoint.kind === 'absent' ? null : <InstantText display={checkpoint} className="text-xs" />}
+            {bidCase.overdue ? <span className="text-xs text-bad-ink">지난 일정</span> : null}
+          </p>
+        </section>
+        {timeline.data === undefined ? null : <WorksheetTimeline entries={timeline.data} />}
+        {exits.length === 0 ? null : (
+          <div className="flex flex-wrap gap-2">
+            {exits.map((one) => (
+              <Button
+                key={one.kind}
+                testId={EXIT_TEST_ID[one.kind as ExitActionKind]}
+                onClick={() => setExiting(one)}
+                disabled={exit.isPending || resume.isPending}
+              >
+                {one.label}
+              </Button>
+            ))}
+          </div>
+        )}
+        {exiting === null ? null : (
+          /* **폼의 정체를 행동에 묶는다**(13D cr HIGH): `key` 가 없으면 「닫지 않고 다른 것을
+             연다」가 앞 폼의 값과 확인 상태를 그대로 물려받고, 그 입력이 되돌릴 수 없는 전이에
+             실려 나간다. */
+          <ActionForm
+            key={exiting.kind}
+            action={exiting}
+            formId={exitFormId}
+            pending={exit.isPending}
+            onCancel={() => setExiting(null)}
+            onSend={(payload) => submitExit(bidCase.caseId, bidCase.caseVersion, payload)}
+          />
+        )}
+      </>
+    );
 
-      <ToastHost
-        toast={toast}
-        onDismiss={() => {
-          // 토스트가 떠나면 그 기억도 함께 비운다 — 묵은 참이 다음 실패의 판단을 흐린다.
-          exitUndoable.current = false;
-          dismiss();
-        }}
-      />
+  return (
+    <section data-testid="screen-worksheet" className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
+      {head}
+      {/* **레일에 담을 것이 없으면 두 단을 쓰지 않는다**(`TwoColumn` 의 규율): 빈 레일은 배치
+          게이트가 「표지는 있는데 잴 것이 없는」 자리로 보게 되는 입구다. */}
+      {rail === null ? <div className="flex flex-col gap-4">{body}</div> : <TwoColumn body={body} rail={rail} />}
+
+      <ToastHost toast={toast} onDismiss={dismiss} />
     </section>
   );
 }
