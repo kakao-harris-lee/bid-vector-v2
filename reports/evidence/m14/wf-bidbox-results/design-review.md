@@ -51,12 +51,17 @@
 | `Outlet`·`useOutlet` 의 context — **그대로 · 별칭 · 네임스페이스 접근 · 낱말을 숨긴 재수출** | 꼴 넷 |
 | `useOutletContext` 로 **받는** 쪽 | 그 꼴 |
 
+**주는 쪽을 다 세지 못해도 받는 쪽이 받는다**(v). `const Slot = Outlet` · `createElement(Outlet, …)` ·
+`kit.Outlet` 처럼 주는 자리를 바꿔 쓰는 꼴은 주는 쪽 술어가 다 열거할 수 없다 — 그 자리를 닫는
+층은 **받는 쪽 검사**다. 읽기 화면이 `useOutletContext` 에 닿으면 그 값이 어디서 왔든 붉는다.
+
 ### 닿지 않는다 — 일부러 둔 밖
 
 | 꼴 | 왜 밖인가 | 누가 드는가 |
 | --- | --- | --- |
 | `eval` · `new Function` · 문자열로 지은 코드 | 정적 축이 원리적으로 볼 수 없다. **무심코 쓰는 꼴이 아니다** — 이 저장소에 0 이고 lint 가 `no-eval` 로 막는다 | lint · code review |
 | 셈한 전역 접근(`globalThis[name]`) · `Reflect` · 프로토타입 사슬로 바꿔치기 | 같은 사유. 이름이 런타임에만 정해진다 | code review |
+| **질의 라이브러리의 기본값 등록** — `setMutationDefaults(key, { mutationFn })` + `useMutation({ mutationKey })` | TanStack 에서 **관용적인** 꼴이라 「무심코 쓸 수 있는」 쪽에 가깝다. 그런데 쓰기 함수가 **키로** 묶이므로 import 그래프에 그 간선이 서지 않는다 — 공유 가변 모듈의 한 갈래다. **이 slice 에서 구현하지 않는다**(팀장 판정) | code review · §12.3 (ac) 의 OPEN(후보 처방: 읽기 전용 화면이 `useMutation` 에 닿으면 붉힌다) |
 | **공유 가변 모듈 · React context** 로 값 건네기(적재 때가 **아닌** 자리에서) | import 그래프는 **누가 무엇을 수입하는가**를 보는 축이라 런타임에 옮겨 가는 값을 못 본다. 적재 때 꽂는 꼴은 **닿는다**(위 표) | code review |
 | `apiClient` 를 지나지 않는 HTTP(전역 `fetch` · 다른 의존 · `index.html`) | 이 축의 경계 밖이다 | 번들 모듈 그래프(W-9) · `gate:src-tree`(W-4) |
 | 서버가 GET 응답에 그 값을 실어 주는 것 | 화면의 문제가 아니다 | 승인 경계(서버 변경) |
