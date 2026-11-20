@@ -56,7 +56,8 @@ function navLinkClass({ isActive }: { readonly isActive: boolean }): string {
 
 /** 사이드바의 한 줄 — 한 단이라 가로를 다 쓰고, 배지는 오른쪽 끝으로 밀린다. */
 function sidebarLinkClass({ isActive }: { readonly isActive: boolean }): string {
-  const tone = isActive ? 'bg-neutral-skin font-medium text-neutral-ink' : 'text-ink-soft hover:bg-neutral-skin';
+  // 선택 어조는 상태 어조 다섯과 **다른 축**이다 — 무엇인지가 아니라 어디에 서 있는지를 말한다.
+  const tone = isActive ? 'bg-selected-skin font-medium text-selected-ink' : 'text-ink-soft hover:bg-neutral-skin';
   return `flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-sm ${tone}`;
 }
 
