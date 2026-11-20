@@ -3,7 +3,15 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { Button, BUTTON_SIZES, BUTTON_TONES, controlClass, LinkButton } from './Button';
+import {
+  Button,
+  BUTTON_SIZES,
+  BUTTON_TONES,
+  controlClass,
+  LinkButton,
+  type ButtonSize,
+  type ButtonTone,
+} from './Button';
 
 /**
  * 공유 버튼의 짝 test(M13/13B). 이 파일이 잠그는 것은 **표의 전수**와 **요소의 신원**이다 —
@@ -127,5 +135,56 @@ describe('요소의 신원', () => {
     const narrow = screen.getByTestId('narrow').className;
 
     expect(wide).toBe(`${narrow} w-full`);
+  });
+});
+
+/**
+ * **공유 컨트롤의 경계 토큰**(M14/14A · 팀장 판정 2026-11-20).
+ *
+ * 대비 게이트가 `control-line` 을 3:1 로 재는데, 컨트롤이 **다른 토큰**을 쓰면 그 측정은
+ * 아무것도 지키지 못한다. 손으로 적은 입력칸은 AST 축(`scripts/control-line.test.mjs`)이 받지만
+ * **이 컴포넌트의 어조 표는 그 축 밖**이다 — JSX 의 className 이 식(`controlClass(…)`)이라
+ * 리터럴이 요소에 붙어 있지 않기 때문이다(변이 실측: 표를 되돌려도 그 축은 초록이었다).
+ *
+ * 그래서 표를 **값으로** 잰다. 어조 전수를 돌므로 새 어조가 들어와도 함께 든다.
+ */
+describe('경계 토큰 (M14/14A)', () => {
+  const CARD_LINE = 'border-line';
+  const CONTROL_LINE = 'border-control-line';
+
+  const classTokens = (tone: ButtonTone, size: ButtonSize): readonly string[] => controlClass(tone, size).split(/\s+/u);
+
+  it('어조 전수에서 카드 토큰을 쓰지 않는다', () => {
+    for (const tone of BUTTON_TONES) {
+      for (const size of BUTTON_SIZES) {
+        expect(classTokens(tone, size), `${tone}/${size}`).not.toContain(CARD_LINE);
+      }
+    }
+  });
+
+  /**
+   * **비공허** — 테두리를 가진 어조가 **실제로** 컨트롤 토큰을 쓴다. 위 단언만으로는 테두리를
+   * 전부 없앤 변이도 지나간다(그때 카드 토큰은 당연히 없다).
+   *
+   * 색을 **어조 자신에서** 끌어오는 테두리(`danger` 의 경고 색)는 그 축이 다르다 — 중립 경계가
+   * 아니라 **그 버튼이 무엇인지**를 말하는 색이고, 중립 토큰으로 바꾸면 그 신호가 사라진다.
+   * 그래서 테두리 색 클래스는 **둘 중 하나**여야 한다: 컨트롤 토큰이거나 어조 자신의 색.
+   */
+  it('테두리 색이 컨트롤 토큰이거나 어조 자신의 색이다', () => {
+    const borderColors = BUTTON_TONES.filter((tone) => classTokens(tone, 'md').includes('border')).map((tone) => ({
+      tone,
+      colors: classTokens(tone, 'md').filter((one) => one.startsWith('border-')),
+    }));
+
+    expect(borderColors.length, '테두리를 가진 어조가 하나도 없다').toBeGreaterThan(0);
+    for (const { tone, colors } of borderColors) {
+      expect(colors.length, tone).toBe(1);
+      // 어조 이름과 토큰 이름이 1:1 이 아니다(`danger` 의 색은 `bad` 다) — 그래서 이름을 맞대지
+      // 않고 **어조 글자색 토큰을 가리키는가**로 본다.
+      const ownTone = /^border-[a-z]+-ink(\/\d+)?$/u.test(colors[0] ?? '');
+      expect(colors[0] === CONTROL_LINE || ownTone, `${tone}: ${colors[0]}`).toBe(true);
+    }
+    // 적어도 하나는 **중립 컨트롤 토큰**이다 — 전부 어조 색이면 그 토큰이 어디에도 닿지 않는다.
+    expect(borderColors.some(({ colors }) => colors[0] === CONTROL_LINE)).toBe(true);
   });
 });
