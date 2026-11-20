@@ -245,3 +245,10 @@ src/screens/screenCopy.test.tsx
 # 집합으로 재서 이것을 잡지 못한다(계획 리뷰 r2 실측). 양성 대조 아홉과 음성 대조 하나가
 # 붉음이 **쓰기 축에서** 왔음을 가른다.
 scripts/screen-write-reach.test.mjs
+# M14/14D 수정 라운드 4 — 위 게이트의 **양성 대조**를 담은 짝 파일. 대조마다 TS 프로그램을
+# 새로 세워야 해서 한 파일에 전부 두면 그 파일이 시간 예산의 절반을 넘는다. 주장과 대조를
+# 갈라 각 파일이 예산 안에 서고, 어느 쪽이 수집에서 빠져도 이 게이트가 붉는다.
+scripts/screen-write-reach-bypass.test.mjs
+# 같은 사유로 **주입·정책 축**의 대조를 셋째 파일로 가른다(라우터 context · route prop ·
+# 정책 표 · 클라이언트 바인딩).
+scripts/screen-write-reach-inject.test.mjs

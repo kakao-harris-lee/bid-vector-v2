@@ -274,7 +274,13 @@ function topLevelStatementOf(declaration, source) {
  * 없었다). 그 심볼이 없는 채로 도는 것은 **호출 축 전체가 조용해지는** 것이고, 조용한 초록은
  * 이 게이트가 가장 피하려는 꼴이다.
  */
+const clientSymbolCache = new WeakMap();
+
 export function clientExportSymbol(program, checker) {
+  const cached = clientSymbolCache.get(program);
+  if (cached !== undefined) {
+    return cached;
+  }
   const clientSource = program
     .getSourceFiles()
     .find((one) => one.fileName.endsWith(`/src/${CLIENT_MODULE}`));
@@ -287,6 +293,7 @@ export function clientExportSymbol(program, checker) {
   if (symbol === undefined) {
     throw new Error(`${CLIENT_MODULE} 의 ${CLIENT_EXPORT} 심볼을 얻지 못했다 — 호출 축이 조용해진다`);
   }
+  clientSymbolCache.set(program, symbol);
   return symbol;
 }
 
@@ -530,15 +537,44 @@ export function reachFrom(entry, { program, srcRoot }) {
       return;
     }
     if (ts.isSourceFile(declaration)) {
-      // **모듈 통째로**(`import * as q` · `await import(리터럴)`) — 어느 이름을 쓸지 이 축에서
-      // 알 수 없으므로 적재하고 전수를 민다(fail-closed).
-      load(declaration);
-      queue.push(...declaration.statements);
+      followNamespace(declaration);
       return;
     }
     const top = topLevelStatementOf(declaration, file);
     if (top !== undefined) {
       queue.push(top);
+    }
+  };
+
+  /**
+   * **네임스페이스 = 그 모듈이 내보내는 것 전부.**
+   *
+   * `import * as q` 와 `await import(리터럴)` 이 손에 쥐어 주는 것은 **그 모듈의 내보내기
+   * 집합**이고, 어느 이름을 꺼낼지는 이 축에서 알 수 없다(셈한 키·`Object.values`). 그래서
+   * **검사기가 세는 그 집합**(`getExportsOfModule`)을 전부 따라간다.
+   *
+   * 그 집합을 쓰는 것이 요점이다(v H-3r). 앞 판은 「그 모듈의 **문장** 전수」를 밀었는데,
+   * `export * from …` 한 줄짜리 barrel 에서는 그 문장이 재수출 하나뿐이라 **적재 때 도는 것만**
+   * 씨앗이 됐다 — 함수 선언은 적재 씨앗이 아니므로 쓰기가 그대로 빠져나갔다. 내보내기 집합은
+   * 재수출을 **이미 평탄화해** 준다.
+   *
+   * 모듈의 최상위는 따로 **적재**한다 — 내보내지 않는 부작용도 실행되기 때문이다.
+   */
+  const followNamespace = (file) => {
+    if (!ours(file)) {
+      return;
+    }
+    load(file);
+    const moduleSymbol = checker.getSymbolAtLocation(file);
+    if (moduleSymbol === undefined) {
+      unresolved.push(`${file.fileName}: 모듈 심볼을 얻지 못했다 — 네임스페이스가 조용해진다`);
+      return;
+    }
+    for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+      const target = resolvedSymbol(checker, exported);
+      for (const declaration of target?.declarations ?? []) {
+        follow(declaration);
+      }
     }
   };
 
@@ -589,11 +625,11 @@ export function reachFrom(entry, { program, srcRoot }) {
           unresolved.push(`${statement.getSourceFile().fileName}: 동적 import 의 지정자가 리터럴이 아니다`);
         } else {
           // **리터럴 동적 수입은 네임스페이스다**(v H-2r): 어느 이름을 꺼낼지 이 축에서 알 수
-          // 없으므로 정적 `import * as` 와 같은 대접을 한다.
+          // 없으므로 정적 `import * as` 와 **같은 정의**를 쓴다.
           const target = resolvedSymbol(checker, checker.getSymbolAtLocation(first));
           for (const declaration of target?.declarations ?? []) {
             if (ts.isSourceFile(declaration)) {
-              follow(declaration);
+              followNamespace(declaration);
             }
           }
         }
@@ -707,6 +743,8 @@ export function elementPropsOf(routesText, routesPath) {
 /** router 가 값을 아래로 내리는 자리의 이름들 — 심볼로 고르므로 **철자에 기대지 않는다**. */
 const ROUTER_OUTLET_EXPORTS = ['Outlet', 'useOutlet'];
 const ROUTER_CONTEXT_HOOK = 'useOutletContext';
+/** 위 이름들을 내보내는 **모듈 심볼 집합**을 담는 자리(이름과 섞이지 않는 키). */
+const ROUTER_MODULES = Symbol('router-modules');
 
 /**
  * 프로그램마다 한 번만 세는 router 심볼 — `getExportsOfModule` 을 호출마다 돌면 그 자체가
@@ -714,11 +752,49 @@ const ROUTER_CONTEXT_HOOK = 'useOutletContext';
  */
 const routerSymbolCache = new WeakMap();
 
-/** 위 축의 답 — 키는 **그 축에 닿을 수 있는 오버레이 내용**이다(아래 주석 참조). */
+/** 위 축의 답 — 키는 [outletCacheKey] 가 짓는다. */
 const outletCache = new Map();
 
-/** 그 이름들의 **심볼** — `react-router` 가 내보낸 것으로 고정한다. */
-function routerSymbols(program, checker, names) {
+/**
+ * 그 축의 답을 바꿀 수 **있는** 오버레이 항목만 추린 키.
+ *
+ * **건전성 조건**: 어떤 파일이 router 의 그 심볼들에 닿으려면 ⓐ `react-router` 를 **이름으로**
+ * 수입하거나(패키지 이름이 그 모듈의 정체다 — 경로 별칭 설정이 0 이다) ⓑ 그것을 재수출하는
+ * 우리 모듈을 수입해야 한다. 그래서 키는 **그 패키지 이름을 담은 항목**과 **우리 트리에서 그
+ * 심볼을 노출하거나 닿는 파일의 경로**를 담은 항목으로 충분하다.
+ *
+ * ⓑ 의 재수출 모듈이 **오버레이 밖에 이미 있고** 오버레이가 그것을 새로 수입하는 경우만
+ * 이 키가 놓친다. 오늘 그런 모듈은 0 이고(출하 트리의 노출 모듈은 패키지 자신뿐이다), 생기면
+ * 그 파일이 곧 ⓐ 를 담으므로 같은 커밋에서 키에 든다.
+ */
+function outletCacheKey(overlay, srcRoot) {
+  return [...overlay]
+    .filter(([path, text]) => {
+      const body = typeof text === 'string' ? text : '';
+      return body.includes(ROUTER_PACKAGE) || outletSensitivePaths.has(path) || !path.startsWith(`${srcRoot}/`);
+    })
+    .map(([path, text]) => `${path}\u0000${typeof text === 'string' ? text : ''}`)
+    .sort()
+    .join('\u0001');
+}
+
+/** 그 축에 닿는 **출하 파일**의 경로 — 축을 한 번 셀 때 함께 적어 둔다. */
+const outletSensitivePaths = new Set();
+
+/** 그 패키지를 가리키는 지정자인가 — 패키지 이름은 그 모듈의 **정체**다(별칭 경로 설정 0). */
+const ROUTER_PACKAGE = 'react-router';
+const routerSpecifier = (text) => text === ROUTER_PACKAGE || text.startsWith(`${ROUTER_PACKAGE}/`);
+
+/**
+ * 그 이름들의 **심볼**과, 그것을 내보내는 **모듈 심볼**.
+ *
+ * 패키지를 **우리 트리의 수입 자리에서** 해소한다 — `node_modules` 전수를 훑으면 프로그램마다
+ * 0.6초가 들고(실측) 이 게이트는 대조마다 프로그램을 새로 세운다. 공개 진입점의 심볼은 그
+ * 수입 지정자가 그대로 준다.
+ *
+ * 우리 트리에 그 수입이 하나도 없으면 **던진다** — 이 축이 조용히 비는 길을 두지 않는다.
+ */
+function routerSymbols(program, checker, names, srcRoot) {
   const key = names.join('·');
   const perProgram = routerSymbolCache.get(program) ?? new Map();
   const cached = perProgram.get(key);
@@ -726,20 +802,37 @@ function routerSymbols(program, checker, names) {
     return cached;
   }
   const found = new Map();
+  const modules = new Set();
   for (const source of program.getSourceFiles()) {
-    if (!/[\\/]node_modules[\\/]react-router[\\/]/u.test(source.fileName)) {
+    if (!source.fileName.startsWith(`${srcRoot}/`)) {
       continue;
     }
-    const moduleSymbol = checker.getSymbolAtLocation(source);
-    if (moduleSymbol === undefined) {
-      continue;
-    }
-    for (const exported of checker.getExportsOfModule(moduleSymbol)) {
-      if (names.includes(exported.getName())) {
-        found.set(exported.getName(), resolvedSymbol(checker, exported));
+    for (const statement of source.statements) {
+      const specifier =
+        (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+        statement.moduleSpecifier !== undefined &&
+        ts.isStringLiteralLike(statement.moduleSpecifier)
+          ? statement.moduleSpecifier
+          : undefined;
+      if (specifier === undefined || !routerSpecifier(specifier.text)) {
+        continue;
+      }
+      const moduleSymbol = resolvedSymbol(checker, checker.getSymbolAtLocation(specifier));
+      if (moduleSymbol === undefined) {
+        continue;
+      }
+      for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+        if (names.includes(exported.getName())) {
+          found.set(exported.getName(), resolvedSymbol(checker, exported));
+          modules.add(moduleSymbol);
+        }
       }
     }
   }
+  if (modules.size === 0) {
+    throw new Error(`${ROUTER_PACKAGE} 의 ${names.join('·')} 를 우리 트리의 수입 자리에서 찾지 못했다`);
+  }
+  found.set(ROUTER_MODULES, modules);
   perProgram.set(key, found);
   routerSymbolCache.set(program, perProgram);
   return found;
@@ -760,52 +853,88 @@ function routerSymbols(program, checker, names) {
  */
 export function outletContextSites(program, webRoot, overlay = new Map()) {
   /**
-   * **이 축의 답은 「Outlet 글자를 담은 파일들의 내용」에만 달려 있다.** 오버레이가 그런 파일을
-   * 하나도 건드리지 않으면 답이 바뀔 수 없으므로 앞서 센 것을 그대로 쓴다 — 대조마다 프로그램을
-   * 새로 세우는 이 게이트에서 그 재계산이 가장 비싼 자리였다(실측 0.8초/호출).
+   * 캐시 키는 [outletCacheKey] 가 짓는다 — 그 주석이 건전성 조건을 적는다.
+   *
+   * **디스크가 바뀌면 이 캐시는 무효가 되지 않는다**(cr LOW). 한 프로세스 안의 게이트 실행을
+   * 위한 것이고, 디스크를 고치는 쪽은 새 프로세스에서 다시 잰다.
    */
-  const key = [...overlay]
-    .filter(([, text]) => typeof text === 'string' && text.includes('Outlet'))
-    .map(([path, text]) => `${path}\u0000${text}`)
-    .sort()
-    .join('\u0001');
+  const key = outletCacheKey(overlay, resolve(webRoot, 'src'));
   const cached = outletCache.get(key);
   if (cached !== undefined) {
     return cached;
   }
   const checker = program.getTypeChecker();
   const srcRoot = resolve(webRoot, 'src');
-  const outlets = routerSymbols(program, checker, ROUTER_OUTLET_EXPORTS);
-  const receivers = routerSymbols(program, checker, [ROUTER_CONTEXT_HOOK]);
-  if (outlets.size === 0 || receivers.size === 0) {
+  const outlets = routerSymbols(program, checker, ROUTER_OUTLET_EXPORTS, srcRoot);
+  const receivers = routerSymbols(program, checker, [ROUTER_CONTEXT_HOOK], srcRoot);
+  if (outlets.size <= 1 || receivers.size <= 1) {
     // 심볼을 못 얻으면 이 축이 **조용히** 비어 버린다 — 조용한 초록을 두지 않는다.
     throw new Error('react-router 의 Outlet·useOutletContext 심볼을 얻지 못했다 — 주입 축이 조용해진다');
   }
-  const outletSymbols = new Set(outlets.values());
-  const receiverSymbols = new Set(receivers.values());
+  /** 식 하나의 심볼 — 별칭을 끝까지 풀고 `RR.Outlet` 같은 속성 접근도 같은 자리로 모은다. */
+  const symbolOf = (node) => resolvedSymbol(checker, checker.getSymbolAtLocation(node));
+  const outletSymbols = new Set([...outlets].filter(([key]) => key !== ROUTER_MODULES).map(([, one]) => one));
+  const receiverSymbols = new Set([...receivers].filter(([key]) => key !== ROUTER_MODULES).map(([, one]) => one));
   const sites = [];
+
+  /**
+   * **그 심볼을 노출하는 모듈 집합** — react-router 와, 그것을 (이름을 바꿔서라도) 재수출하는
+   * 우리 모듈들이다. 글자가 아니라 **내보내기 집합**으로 센다.
+   */
+  const exposing = new Set([...(outlets.get(ROUTER_MODULES) ?? []), ...(receivers.get(ROUTER_MODULES) ?? [])]);
+  // 그것을 (이름을 바꿔서라도) **재수출하는 우리 모듈**도 같은 자리다.
+  for (const source of program.getSourceFiles()) {
+    if (!source.fileName.startsWith(`${srcRoot}/`)) {
+      continue;
+    }
+    const moduleSymbol = checker.getSymbolAtLocation(source);
+    if (moduleSymbol === undefined || exposing.has(moduleSymbol)) {
+      continue;
+    }
+    for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+      const symbol = resolvedSymbol(checker, exported);
+      if (symbol !== undefined && (outletSymbols.has(symbol) || receiverSymbols.has(symbol))) {
+        exposing.add(moduleSymbol);
+        break;
+      }
+    }
+  }
+
+  /**
+   * **그 파일이 그 심볼에 닿을 수 있는가** — 닿으려면 노출 모듈 가운데 하나를 **수입**해야
+   * 한다(이름 그대로든, 별칭이든, 네임스페이스든). 수입 문장만 보므로 싸고, 판정은 여전히
+   * 심볼이 한다. 글자 훑기(`includes('Outlet')`)는 그 낱말이 남지 않는 꼴에 **건전하지
+   * 않아서** 걷었다(v M).
+   */
+  const canReach = (source) =>
+    source.statements.some((statement) => {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) {
+        return false;
+      }
+      const target = resolvedSymbol(checker, checker.getSymbolAtLocation(statement.moduleSpecifier));
+      return target !== undefined && exposing.has(target);
+    });
 
   for (const source of program.getSourceFiles()) {
     if (!source.fileName.startsWith(`${srcRoot}/`) || /\.test\.tsx?$/u.test(source.fileName)) {
       continue;
     }
-    // **글자로 건너뛰기만 한다**(판정은 아래 심볼이 한다). 이 축이 찾는 세 이름은 별칭으로
-    // 가려도 수입 자리에 **그 철자가 남으므로**(`Outlet as Slot`) 건너뛰기가 건전하다.
-    if (!source.text.includes('Outlet')) {
+    if (!canReach(source)) {
       continue;
     }
+    outletSensitivePaths.add(source.fileName);
     const where = relative(srcRoot, source.fileName);
     const visit = (node) => {
-      if (ts.isIdentifier(node)) {
-        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
+      if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+        const symbol = symbolOf(node);
         if (symbol !== undefined && receiverSymbols.has(symbol)) {
           sites.push(`${where}: ${ROUTER_CONTEXT_HOOK} 로 내려온 값을 받는다`);
         }
       }
-      // `<Outlet context={…} />` — 태그의 **심볼**이 그 내보내기인가.
+      // `<Outlet …>` · `<RR.Outlet …>` — **태그 식 전체**의 심볼이 그 내보내기인가(v M).
       const opening = ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node) ? node : undefined;
-      if (opening !== undefined && ts.isIdentifier(opening.tagName)) {
-        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(opening.tagName));
+      if (opening !== undefined) {
+        const symbol = symbolOf(opening.tagName);
         if (symbol !== undefined && outletSymbols.has(symbol)) {
           for (const attribute of opening.attributes.properties) {
             const risky = ts.isJsxSpreadAttribute(attribute)
@@ -819,9 +948,9 @@ export function outletContextSites(program, webRoot, overlay = new Map()) {
           }
         }
       }
-      // `useOutlet(…)` — 인자를 주면 그것이 곧 context 다.
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-        const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node.expression));
+      // `useOutlet(…)` · `RR.useOutlet(…)` — **호출 대상 식 전체**의 심볼로 본다.
+      if (ts.isCallExpression(node)) {
+        const symbol = symbolOf(node.expression);
         if (symbol !== undefined && outletSymbols.has(symbol) && node.arguments.length > 0) {
           sites.push(`${where}: useOutlet 이 값을 아래로 내린다`);
         }
