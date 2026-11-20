@@ -35,10 +35,23 @@ describe('오늘의 트리', () => {
     expect(sweepFiles(webRoot).length).toBeGreaterThan(100);
   });
 
-  /** **비공허 ②** — 뿌리 셋이 모두 섰다. 하나라도 비면 그 뿌리의 위반이 조용히 빠진다. */
+  /**
+   * **비공허 ②** — 뿌리 집합 자신을 단언한다.
+   *
+   * 앞 판은 `SWEEP_ROOTS` 를 **돌면서** 「뿌리마다 파일이 있다」를 쟀고, 그래서 뿌리를 하나로
+   * 좁히는 변이가 **초록이었다**(실측): 돌 목록이 함께 줄어 루프가 조용히 작아진다. 재는 쪽이
+   * 재어지는 쪽에서 모집단을 받으면 그 축은 사라진다.
+   */
+  it('뿌리가 셋 그대로다 — 좁히면 그 뿌리의 위반이 조용히 빠진다', () => {
+    expect(SWEEP_ROOTS).toStrictEqual(['src', 'e2e', 'scripts']);
+  });
+
+  /** 뿌리가 **이름만 있고 비어** 있지도 않다 — 위 등식과 다른 축이다. */
   it('뿌리마다 읽은 파일이 있다', () => {
-    for (const root of SWEEP_ROOTS) {
-      expect(sweepFiles(webRoot).filter((one) => one.startsWith(`${root}/`)).length).toBeGreaterThan(0);
+    const swept = sweepFiles(webRoot);
+
+    for (const root of ['src', 'e2e', 'scripts']) {
+      expect(swept.filter((one) => one.startsWith(`${root}/`)).length, root).toBeGreaterThan(0);
     }
   });
 });
