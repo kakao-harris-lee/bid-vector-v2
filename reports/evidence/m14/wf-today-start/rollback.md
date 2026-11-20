@@ -1,8 +1,9 @@
 # M14 / wf-today-start (14B) — 되돌리기
 
 ```
-실측 HEAD: 897baf386ec07f622c36130d37e1e8d6ff342317
-base:      056f405c9e5659b9a068288f1104f9e04a6de016
+실측 HEAD: 1a67bfcbd2c5c7df7ed4834c057bd477cc2d0ad5
+복원 원천: 9fc1877e0acccad184344a77d485c89a3cadee90   (머지한 main — 착수 base 가 아니다)
+착수 base: 056f405c9e5659b9a068288f1104f9e04a6de016
 ```
 
 ## 어떻게 되돌리나
@@ -11,13 +12,23 @@ range revert 가 아니라 **in_scope 경로 한정 복원**이다. 복원 목�
 `git diff --name-only <base>..HEAD` 의 **기계 산출**이고, 라운드마다 다시 뽑는다.
 
 ```
-git diff --name-only 056f405c..HEAD | sort > /tmp/rb.txt
-git restore --source=056f405c --staged --worktree -- $(cat /tmp/rb.txt | tr '\n' ' ')
+git diff --name-only 9fc1877e..HEAD | sort > /tmp/rb.txt
+git restore --source=9fc1877e --staged --worktree -- $(cat /tmp/rb.txt | tr '\n' ' ')
 ```
 
 **복원 목록 등식**: 기계 산출과 되돌린 집합이 같다(`comm -23` · `comm -13` 둘 다 빈 출력).
-목록은 **실측 HEAD 기준 25 경로**다 — 산출물 20 · evidence 5. 이 파일을 담은 커밋이 더해져도
-판정 SHA 에서 **같은 25** 다(`rollback.md` 가 이미 목록에 있다). 어느 SHA 에서 센 수인지 적는
+목록은 **실측 HEAD 기준 26 경로**다 — 산출물 20 · evidence 5 · capability map 1. 이 파일을 담은
+커밋이 더해져도 판정 SHA 에서 **같은 26** 이다(`rollback.md` 가 이미 목록에 있다).
+
+**원천이 착수 base 가 아니라 머지한 main 이다.** 이 branch 는 `9fc1877e` 를 `--no-ff` 로 병합했고,
+그 안에 14C(#181)와 chore(#180)가 들어 있다 — base 로 되돌리면 **남의 것까지 지운다**.
+
+**셋째 단언**(복원 대상 blob 이 착수 base 와 새 원천에서 같은가):
+`git diff --name-only 056f405c 9fc1877e -- <복원 목록>` 이 **한 줄**을 낸다 —
+`docs/discovery/capability-map.md`. 14C 가 그 사이에 §12.3 (aa) 를 더했기 때문이고, 그래서
+**원천을 새 SHA 로 바꾼 것이 옳다**: base 에서 복원하면 (aa) 가 함께 사라진다. 나머지 25 경로의
+blob 은 두 SHA 에서 같다. `web/vite.config.ts`(#180)는 이 목록에 **들지 않는다** — 이 slice 가
+건드리지 않았다. 어느 SHA 에서 센 수인지 적는
 것이 요점이다 — 앞 라운드 보고가 그 말을 빠뜨려 거짓 불일치로 읽혔다(cr L-10).
 
 **공유 파일 주의**: 복원 목록에 다른 레인과 겹치는 파일이 **넷** 있다 — `web/config/gate-tests.txt`
@@ -31,20 +42,17 @@ git restore --source=056f405c --staged --worktree -- $(cat /tmp/rb.txt | tr '\n'
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | `git restore …` 종료 코드 | **0** |
-| ② | 되돌린 뒤 `git status --porcelain` 의 상태 계수 | **D 9 · M 16**(= 신설 9 + 수정 16, 복원 목록 25 와 같다) |
-| ③ | 복원 목록 한정 `git diff <base>` 줄 수 | **0** — 그리고 **트리 전체** `git diff <base>` 도 빈 출력이다(**트리 동일성**) |
+| ② | 되돌린 뒤 `git status --porcelain` 의 상태 계수 | **D 9 · M 17**(= 신설 9 + 수정 17, 복원 목록 26 과 같다) |
+| ③ | 복원 목록 한정 `git diff <원천>` 줄 수 | **0** — 그리고 **트리 전체** `git diff <원천>` 도 빈 출력이다(**트리 동일성**) |
 | ④ | 컴파일 — `npm run typecheck` | exit **0** |
-| ⑤ | test — `npm run test` | exit **0** · 1669 통과(이 slice 가 더한 83 이 빠진 수다) |
+| ⑤ | test — `npm run test` | exit **0** · 1708 통과(이 slice 가 더한 84 가 빠진 수다 — 1792 → 1708) |
 | ⑥ | 게이트 — `lint` · `gate:src-tree` · `api:types:check` · `gate:tests` · `build` · `gate:boundary-canary` | 전부 exit **0** |
 
-**첫 실행에서 떨어지면 한 번 재시도했다**(사실로 적는다). 되돌린 트리에서 `npm run test` ·
-`gate:tests` 가 `scripts/kotlin-read-guard.test.mjs` · `scripts/screen-card-coverage.test.mjs` 의
-**5s 타임아웃**으로 떨어지는 일이 있고, 각 파일을 단독으로 돌리면 통과하며 재시도에서 전건이
-통과한다. **이 트리는 base 와 바이트까지 같으므로 base 에도 있는 flake 다** — verifier(W-6 1→1→0)와
-code-review 가 같은 서명을 따로 기록했다. 이 slice 가 만든 것이 아니다.
+**재시도가 필요 없었다.** 앞 라운드까지 ⑤⑥ 을 떨어뜨리던 5s 타임아웃 flake 는 **PR #180 으로
+닫혔다**(vitest 기본 `testTimeout` 30s) — 이번에는 한 번에 통과했다.
 
-**e2e 두 레인(W-11 · W-13)은 트리 동일성으로 갈음한다.** 되돌린 트리가 base 와 바이트까지 같고
-(③ 의 전체 diff 빈 출력), base 는 머지된 main 커밋이다. 「HEAD 가 초록이니까」가 아니라 **같은
+**e2e 두 레인(W-11 · W-13)은 트리 동일성으로 갈음한다.** 되돌린 트리가 원천과 바이트까지 같고
+(③ 의 전체 diff 빈 출력), 원천 `9fc1877e` 는 머지된 main 커밋이다. 「HEAD 가 초록이니까」가 아니라 **같은
 트리이기 때문**이다.
 
 ## 완료의 계수 — 내 표지 0 · 남의 표지 보존
@@ -53,8 +61,15 @@ code-review 가 같은 서명을 따로 기록했다. 이 slice 가 만든 것�
 
 | 축 | 항목 | 되돌린 뒤 |
 | --- | --- | --- |
-| 내 표지(21) | 앞의 열여덟에 `computedDisplaysOf` · `notice-facts` · `b2-notices-default` 를 더한 전수 | **전부 0 파일** |
-| 남의 표지(10) | `notice-amount` 3 · `notice-agency` 3 · `chip-agency` 2 · `onboarding-step-body` 2 · `TWO_COLUMN_ATTRIBUTE` 3 · `koreanAmountTextOf` 5 · `TOUCH_TARGET_SCREENS` 3 · `absenceTextOf` 18 · `touchMeasure` 5 · `onboarding-not-ready` 2 | **전부 보존** |
+| 내 표지(22) | 앞의 열여덟에 `computedDisplaysOf` · `notice-facts` · `b2-notices-default` · `seedWatchCondition` 을 더한 전수 | **전부 0 파일** |
+| **14C 의 표지**(7) | `amount-self-entry-note` 2 · `worksheet-agency` 3 · `worksheet-price-card` 2 · `worksheet-record-card` 2 · `worksheet-number` 1 · `worksheet-title` 3 · `worksheet-deadline` 2 | **전부 보존** |
+| 그 밖의 표지(9) | `notice-amount` 3 · `notice-agency` 3 · `chip-agency` 2 · `onboarding-step-body` 2 · `TWO_COLUMN_ATTRIBUTE` 3 · `koreanAmountTextOf` 5 · `TOUCH_TARGET_SCREENS` 3 · `absenceTextOf` 19 · `onboarding-not-ready` 2 | **전부 보존** |
+| capability map 절 | **(ab) 1 → 0** · (t)~(aa) 여덟은 **각각 1 로 보존** | 등재가 절 단위로 떨어진다 |
+| #180 · 14C 의 공유 파일 | `vite.config.ts` 의 `testTimeout` 1 · `PageHeader` 의 제목 표지 1 | **보존** |
+
+**14C 표지는 이름을 지어내지 않았다**: `git diff 056f405c 9fc1877e -- WorksheetScreen.tsx PageHeader.tsx`
+에서 `data-testid` 를 기계로 뽑아 썼다. 첫 시도에 손으로 적은 둘(`worksheet-countdown` ·
+`worksheet-layout`)은 **존재하지 않는 이름**이라 0 을 냈다 — 그대로 뒀으면 「보존됨」이 공허했다.
 
 `layout-rails` · `railScreenSlots` 가 0 인 것이 **등록부까지 되돌아갔다**는 뜻이다 — spec·술어
 파일과 `journey-specs.txt` · `gate-tests.txt` 의 줄이 함께 사라져야 두 레인의 집합 등식이 되돌린
