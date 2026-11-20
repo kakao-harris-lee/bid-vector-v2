@@ -4,8 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ariaLabelOverrides,
   MIN_HEIGHT_DISPLAY_TOKENS,
   MIN_TOUCH_CLASS,
+  NAME_OVERRIDE_ATTRIBUTES,
+  scanAriaLabelOverrides,
   scanControls,
   unwrappedControls,
   WRAPPED_CONTROL_TYPES,
@@ -196,6 +199,97 @@ describe('음성 대조 — 걸리면 안 되는 것', () => {
 
   it('종류 표가 비어 있지 않다 — 비면 이 축이 공허하다', () => {
     expect([...WRAPPED_CONTROL_TYPES].sort()).toStrictEqual(['checkbox', 'radio']);
+  });
+});
+
+/**
+ * **암묵 레이블 위의 `aria-label` 0**(M14/14F · cr D4).
+ *
+ * 보이는 레이블이 이미 이름을 주는 컨트롤에 `aria-label` 을 덧붙이면 그 보이는 글자의 **일부가
+ * 낭독에서 사라진다** — 지워지는 것이 형식 지시(「쉼표로 구분」)와 파괴적 결과 경고(「끄면 면허
+ * 목록을 비워 보냅니다」)라, 눈으로 보는 운영자와 듣는 운영자가 **다른 지시**를 받는다.
+ *
+ * 저장소는 그 규칙을 이미 적어 두었다(`components/Button.tsx` 의 KDoc — 「보이는 글자가 있으면
+ * 주지 않는다(낭독이 갈린다)」). **선언만 있고 재는 자리가 없었다.**
+ *
+ * 설계 검토는 `reports/evidence/m14/fullreview-fixes/design-review.md` 가 정본이다.
+ */
+describe('암묵 레이블 위의 이름 덮어쓰기 (M14/14F cr D4)', () => {
+  const { files, findings } = scanAriaLabelOverrides(srcDir);
+
+  it('훑기가 실제 소스를 읽었다 — 빈 훑기는 아래 등식을 공허하게 만든다', () => {
+    expect(files.length).toBeGreaterThan(5);
+    expect(files).toContain('screens/ProfileFactsCard.tsx');
+  });
+
+  it('출하 트리에 위반이 0 이다', () => {
+    expect(
+      findings.map((one) => `${one.file} ${one.why}`),
+      '보이는 레이블이 있는 컨트롤에 이름 덮어쓰기가 남았다',
+    ).toStrictEqual([]);
+  });
+
+  /** 재는 속성 집합이 비면 이 축이 통째로 공허하다. `aria-labelledby` 가 더 센 쪽이라 함께 든다. */
+  it('재는 속성이 둘이다', () => {
+    expect([...NAME_OVERRIDE_ATTRIBUTES].sort()).toStrictEqual(['aria-label', 'aria-labelledby']);
+  });
+
+  it('양성 — 암묵 레이블 안의 입력에 aria-label 이 있으면 걸린다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = () => (\n  <label>\n    <span>업종(쉼표)</span>\n    <input aria-label="업종" />\n  </label>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('aria-label');
+  });
+
+  it('양성 — 더 센 aria-labelledby 로 갈음해도 걸린다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label>\n    <span id="t">업종(쉼표)</span>\n    <input aria-labelledby="t" />\n  </label>\n);\n',
+      ),
+    ).toHaveLength(1);
+  });
+
+  /** **볼 수 없는 것을 통과시키지 않는다**(설계 검토 (2) ①) — 형제 술어와 같은 규율이다. */
+  it('양성 — 펼친 속성 뒤에 숨긴 자리도 걸린다', () => {
+    expect(
+      ariaLabelOverrides(
+        "export const X = () => (\n  <label>\n    <span>업종</span>\n    <input {...rest} />\n  </label>\n);\n",
+      ),
+    ).toHaveLength(1);
+  });
+
+  /** 체크박스·토글도 같은 자리다 — 거기서 사라지는 것이 파괴적 결과 경고다. */
+  it('양성 — 암묵 레이블 안의 체크박스도 같은 의무를 진다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label>\n    <input type="checkbox" aria-label="신고함" />\n    신고함 (끄면 목록을 비워 보냅니다)\n  </label>\n);\n',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('음성 — 레이블이 감싸지 않은 컨트롤의 aria-label 은 정당하다', () => {
+    expect(ariaLabelOverrides('export const X = () => <button aria-label="조건 지우기">×</button>;\n')).toStrictEqual(
+      [],
+    );
+  });
+
+  it('음성 — 레이블 안이지만 이름을 덮지 않으면 초록이다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label>\n    <span>업종(쉼표)</span>\n    <input name="types" />\n  </label>\n);\n',
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /** 레이블 **자신**의 `aria-label` 은 이 축이 아니다(그것은 컨트롤의 이름을 덮지 않는다). */
+  it('음성 — 레이블 요소 자신의 aria-label 은 걸리지 않는다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label aria-label="업종">\n    <input name="types" />\n  </label>\n);\n',
+      ),
+    ).toStrictEqual([]);
   });
 });
 

@@ -553,7 +553,7 @@ describe('시작하기 — 마법사의 걸음', () => {
     renderScreen();
 
     fireEvent.click(await screen.findByTestId('onboarding-step-QUALIFICATION_FACTS'));
-    await screen.findByLabelText('업종', { exact: true });
+    await screen.findByLabelText('업종(쉼표)', { exact: true });
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
     expect(await screen.findByTestId('strategy-row-MIN_BUDGET')).toBeTruthy();
@@ -573,7 +573,7 @@ describe('시작하기 — 마법사의 걸음', () => {
     renderScreen();
 
     fireEvent.click(await screen.findByTestId('onboarding-step-QUALIFICATION_FACTS'));
-    await screen.findByLabelText('업종', { exact: true });
+    await screen.findByLabelText('업종(쉼표)', { exact: true });
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
     expect(await screen.findByLabelText('상호')).toBeTruthy();

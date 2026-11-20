@@ -60,27 +60,42 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             </li>
           ))}
         </ul>
+        {/*
+          **보이는 라벨 셋**(cr D3 · v M-3). 앞 판은 이름이 `aria-label` 에만 있어서 눈으로 보는
+          운영자에게는 **똑같이 생긴 빈 상자 셋**이었다 — 어느 칸에 무엇을 적는지 알 길이 없고,
+          틀리면 돌아오는 것은 어느 칸이 틀렸는지 말하지 않는 한 줄뿐이다. 같은 화면의 형제 카드
+          전부가 이미 이 꼴을 쓴다(이 카드만 안 쓰고 있었다).
+
+          금액 칸은 **형식 요건을 라벨에 싣는다**: 앞 판은 그 요건을 틀린 **뒤에야** 경고로
+          말했다(WCAG 3.3.2 — 적기 전에 알 수 없었다).
+        */}
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          <input
-            aria-label="시평액 면허명"
-            value={capacity.licenseName}
-            onChange={(event) => setCapacity({ ...capacity, licenseName: event.target.value })}
-            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
-          />
-          <input
-            aria-label="시평액 금액"
-            inputMode="numeric"
-            value={capacity.amountWon}
-            onChange={(event) => setCapacity({ ...capacity, amountWon: event.target.value })}
-            className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
-          />
-          <input
-            aria-label="평가 연도"
-            inputMode="numeric"
-            value={capacity.assessmentYear}
-            onChange={(event) => setCapacity({ ...capacity, assessmentYear: event.target.value })}
-            className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
-          />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-soft">면허명</span>
+            <input
+              value={capacity.licenseName}
+              onChange={(event) => setCapacity({ ...capacity, licenseName: event.target.value })}
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-soft">금액(원 · 자리 구분 없이)</span>
+            <input
+              inputMode="numeric"
+              value={capacity.amountWon}
+              onChange={(event) => setCapacity({ ...capacity, amountWon: event.target.value })}
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-soft">평가 연도</span>
+            <input
+              inputMode="numeric"
+              value={capacity.assessmentYear}
+              onChange={(event) => setCapacity({ ...capacity, assessmentYear: event.target.value })}
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
+            />
+          </label>
         </div>
         {missing ? (
           <p data-testid="capacity-missing" role="alert" className="mt-2 text-xs text-bad-ink">

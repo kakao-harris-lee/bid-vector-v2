@@ -132,8 +132,8 @@ describe('프로필 — 쓰기는 계약의 모양을 지킨다', () => {
     mocked.replaceQualificationFacts.mockResolvedValue(profile({ qualificationDeclared: true }));
     renderSection();
 
-    fireEvent.change(await screen.findByLabelText('업종'), { target: { value: '건축, 토목' } });
-    fireEvent.change(screen.getByLabelText('지역어'), { target: { value: '제주' } });
+    fireEvent.change(await screen.findByLabelText('업종(쉼표)'), { target: { value: '건축, 토목' } });
+    fireEvent.change(screen.getByLabelText('지역어(쉼표)'), { target: { value: '제주' } });
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
     await waitFor(() => expect(mocked.replaceQualificationFacts).toHaveBeenCalled());
@@ -150,7 +150,7 @@ describe('프로필 — 쓰기는 계약의 모양을 지킨다', () => {
     mocked.replaceQualificationFacts.mockResolvedValue(profile({ qualificationDeclared: true }));
     renderSection();
 
-    fireEvent.change(await screen.findByLabelText('업종'), { target: { value: '건축, 건축, 토목' } });
+    fireEvent.change(await screen.findByLabelText('업종(쉼표)'), { target: { value: '건축, 건축, 토목' } });
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
     await waitFor(() => expect(mocked.replaceQualificationFacts).toHaveBeenCalled());
@@ -165,7 +165,7 @@ describe('프로필 — 쓰기는 계약의 모양을 지킨다', () => {
     mocked.replaceQualificationFacts.mockResolvedValue(profile());
     renderSection();
 
-    fireEvent.click(await screen.findByLabelText('면허를 신고함'));
+    fireEvent.click(await screen.findByLabelText(/면허를 신고함/u));
     fireEvent.click(screen.getByRole('button', { name: '자격 사실 저장' }));
 
     await waitFor(() => expect(mocked.replaceQualificationFacts).toHaveBeenCalled());
@@ -260,12 +260,34 @@ describe('프로필 — 시공능력평가액은 행 단위다', () => {
     expect(row.textContent).toContain('2026년 평가');
   });
 
+  /**
+   * **보이는 라벨 셋**(M14/14F · cr D3 · v M-3). 앞 판은 이름이 `aria-label` 에만 있어서, 눈으로
+   * 보는 운영자에게는 **똑같이 생긴 빈 상자 셋**이었다 — 어느 칸에 면허명·금액·연도를 적는지
+   * 알 길이 없고, 틀리면 돌아오는 것은 어느 칸이 틀렸는지 말하지 않는 한 줄뿐이다.
+   *
+   * 형식 요건도 **적기 전에** 보인다(WCAG 3.3.2) — 앞 판은 틀린 뒤에야 경고로 나왔다.
+   */
+  it('시평액 입력 셋이 보이는 라벨을 든다', async () => {
+    renderSection();
+
+    await screen.findByText('시공능력평가액');
+    for (const label of ['면허명', '평가 연도']) {
+      // 그 글자가 **보이고**, 동시에 그 입력의 **이름**이다(곁에 둔 장식이 아니다).
+      expect(screen.getByText(label).textContent, `${label} 이 보이는 글자가 아니다`).toBe(label);
+      const control = screen.getByLabelText(label);
+      expect(control.getAttribute('aria-label'), `${label} 에 이름 덮어쓰기가 남았다`).toBeNull();
+    }
+    // 금액 칸은 형식 요건을 라벨에 싣는다 — 「자리 구분」 없이 적으라는 말이 **적기 전에** 보인다.
+    expect(screen.getByLabelText(/^금액/u).getAttribute('aria-label')).toBeNull();
+    expect(screen.getByText(/^금액/u).textContent).toContain('자리 구분');
+  });
+
   /** **CR M-1 의 화면 쪽 회귀 test** — 목록이 보이는 꼴 그대로 되타이핑한 입력이다. */
   it('자리 구분 쉼표가 있는 금액은 보내지 않는다 — 잘린 값이 조용히 저장되지 않게', async () => {
     renderSection();
 
-    fireEvent.change(await screen.findByLabelText('시평액 면허명'), { target: { value: '토목공사업' } });
-    fireEvent.change(screen.getByLabelText('시평액 금액'), { target: { value: '1,500,000,000' } });
+    fireEvent.change(await screen.findByLabelText('면허명'), { target: { value: '토목공사업' } });
+    fireEvent.change(screen.getByLabelText(/^금액/u), { target: { value: '1,500,000,000' } });
     fireEvent.change(screen.getByLabelText('평가 연도'), { target: { value: '2026' } });
     fireEvent.click(screen.getByRole('button', { name: '시평액 저장' }));
 
@@ -277,7 +299,7 @@ describe('프로필 — 시공능력평가액은 행 단위다', () => {
   it('셋 가운데 하나라도 없으면 보내지 않는다', async () => {
     renderSection();
 
-    fireEvent.change(await screen.findByLabelText('시평액 면허명'), { target: { value: '토목공사업' } });
+    fireEvent.change(await screen.findByLabelText('면허명'), { target: { value: '토목공사업' } });
     fireEvent.click(screen.getByRole('button', { name: '시평액 저장' }));
 
     expect(await screen.findByTestId('capacity-missing')).toBeTruthy();
@@ -288,8 +310,8 @@ describe('프로필 — 시공능력평가액은 행 단위다', () => {
     mocked.upsertConstructionCapacity.mockResolvedValue([]);
     renderSection();
 
-    fireEvent.change(await screen.findByLabelText('시평액 면허명'), { target: { value: '토목공사업' } });
-    fireEvent.change(screen.getByLabelText('시평액 금액'), { target: { value: '1500000000' } });
+    fireEvent.change(await screen.findByLabelText('면허명'), { target: { value: '토목공사업' } });
+    fireEvent.change(screen.getByLabelText(/^금액/u), { target: { value: '1500000000' } });
     fireEvent.change(screen.getByLabelText('평가 연도'), { target: { value: '2026' } });
     fireEvent.click(screen.getByRole('button', { name: '시평액 저장' }));
 

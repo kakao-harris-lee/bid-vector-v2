@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { ApiError } from '../api/apiError';
 import type { components } from '../api/generated/operator-api';
@@ -380,6 +380,8 @@ export function StrategyEditPanel({
   readonly session: StrategyEditSession;
   readonly strategy: StrategyReadResponse;
 }) {
+  // 훅은 **이른 반환보다 앞에** 선다 — 건너뛰면 렌더마다 훅 수가 달라진다.
+  const valueHintId = useId();
   const { open } = session;
   if (open === null) {
     return null;
@@ -411,17 +413,28 @@ export function StrategyEditPanel({
 
       {phase === 'VALUE' ? (
         <div className="mt-3 flex flex-col gap-2">
+          {/*
+            **이름은 칸 이름이고 힌트는 설명이다**(M14/14F · cr D4 의 같은 계열). 앞 판은 보이는
+            글자가 힌트이고 `aria-label` 이 칸 이름이어서, 이름 계산에서 `aria-label` 이 이기며
+            **힌트가 낭독에서 사라졌다** — 그 힌트에 「비우면 그 조건을 지웁니다」가 들어 있다
+            (파괴적 결과 경고다). 둘 다 남기는 길은 저장소가 이미 쓰는 꼴이다:
+            이름은 보이는 라벨이 주고 힌트는 `aria-describedby` 가 준다
+            (`WorksheetRecord` 의 진행 중 건수 선언이 같은 꼴이다).
+          */}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-ink-soft">{input.hint}</span>
+            <span className="text-xs text-ink-soft">{display.label}</span>
             <input
               name="edit-value"
-              aria-label={display.label}
+              aria-describedby={valueHintId}
               inputMode={input.kind === 'TERMS' ? 'text' : 'numeric'}
               value={session.raw}
               onChange={(event) => session.onRaw(event.target.value)}
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
+          <p id={valueHintId} className="text-xs text-ink-soft">
+            {input.hint}
+          </p>
           {session.missing ? (
             <p data-testid="edit-value-missing" role="alert" className="text-xs text-bad-ink">
               {input.accepts} 을(를) 적으십시오 — 자리 구분 쉼표·단위·꼬리 문자가 있으면 보내지

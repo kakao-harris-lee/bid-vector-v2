@@ -270,6 +270,88 @@ export function unwrappedControls(text, modules = {}) {
   return unwrappedControlsIn(program.getTypeChecker(), source);
 }
 
+/* ── 축 ② 암묵 레이블 위의 이름 덮어쓰기 (M14/14F · cr D4) ──────────────────────── */
+
+/**
+ * **이름을 덮는 속성.** `aria-labelledby` 를 함께 드는 까닭은 그것이 이름 계산에서 `aria-label`
+ * 보다 **더 세기** 때문이다 — 한쪽만 재면 술어가 한 글자로 비켜 간다(설계 검토 (2) ③).
+ *
+ * `title` 은 들지 않는다: 레이블이 있으면 이름이 **이미** 섰고 `title` 은 쓰이지 않는다. 그
+ * 속성의 다른 문제(손가락이 볼 수 없다)는 **다른 축**이다(설계 검토 (2) ④).
+ */
+export const NAME_OVERRIDE_ATTRIBUTES = new Set(['aria-label', 'aria-labelledby']);
+
+/**
+ * 한 소스의 위반 — **보이는 레이블이 이미 이름을 주는 컨트롤의 이름을 덮는 자리**.
+ *
+ * 저장소가 적어 둔 규칙(`components/Button.tsx` 의 KDoc — 「보이는 글자가 있으면 주지 않는다 ·
+ * 낭독이 갈린다」)을 재는 자리다. 선언만 있고 재는 자리가 없었다. 지워지는 것이 형식 지시와
+ * **파괴적 결과 경고**라, 눈으로 보는 운영자와 듣는 운영자가 서로 다른 지시를 받는다.
+ *
+ * 암묵 레이블의 정의와 태그 판정은 ① 축과 **같은 함수**를 쓴다 — 사본을 두면 「암묵 레이블」이
+ * 두 벌이 되고, 갈린 날 어느 쪽이 맞는지 아무도 모른다.
+ */
+export function ariaLabelOverridesIn(checker, source) {
+  const found = [];
+  const visit = (node) => {
+    if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+      const tags = tagsOf(checker, node);
+      const custom = tags !== null && tags.length === 0;
+      /**
+       * 모집단은 **labelable 후보**다 — 태그를 증명할 수 없는 자리와 컴포넌트도 든다(① 축의
+       * 보수적 셈과 같은 규율: 모르는 것을 면제로 쓰지 않는다). 레이블 **자신**은 모집단이
+       * 아니다 — 레이블의 `aria-label` 은 컨트롤의 이름을 덮지 않는다.
+       */
+      const labelable = tags === null || custom || tags.some((one) => LABELABLE_TAGS.has(one));
+      const isLabel = tags !== null && tags.length > 0 && tags.every((one) => one === 'label');
+      if (labelable && !isLabel && enclosingLabelElement(checker, node) !== null) {
+        const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+        for (const name of NAME_OVERRIDE_ATTRIBUTES) {
+          const value = literalAttribute(node, name);
+          if (value === undefined) {
+            continue;
+          }
+          // `null` 은 **볼 수 없다**는 뜻이다(식 · 펼친 속성) — 통과시키지 않는다.
+          const why =
+            value === null
+              ? `감싼 label 이 이름을 주는데 ${name} 을 볼 수 없다(식 또는 펼친 속성)`
+              : `감싼 label 이 이름을 주는데 ${name} 이 그것을 덮는다`;
+          found.push({ file: source.fileName, line, why });
+          break;
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
+/** 합성 원문 하나를 재는 입구(대조용). */
+export function ariaLabelOverrides(text, modules = {}) {
+  const { program, source } = probeProgram(text, modules);
+  return ariaLabelOverridesIn(program.getTypeChecker(), source);
+}
+
+/** 출하 트리 전수 — `findings` 가 빈 배열이면 위반 0 이다. */
+export function scanAriaLabelOverrides(dir) {
+  const files = shippedSourceFiles(dir);
+  if (files.length === 0) {
+    throw new Error(`훑기가 비었다: ${dir}`);
+  }
+  const program = screenProgram(resolve(dir, '..'));
+  const checker = program.getTypeChecker();
+  const findings = [];
+  for (const one of files) {
+    const source = program.getSourceFile(resolve(dir, one));
+    if (source === undefined) {
+      throw new Error(`TS 프로그램에 소스 파일이 없다: ${one}`);
+    }
+    findings.push(...ariaLabelOverridesIn(checker, source).map((hit) => ({ ...hit, file: one })));
+  }
+  return { files, findings };
+}
+
 /** 출하 트리 전수 — 반환이 빈 배열이면 위반 0 이다. */
 export function scanControls(dir) {
   const files = shippedSourceFiles(dir);
