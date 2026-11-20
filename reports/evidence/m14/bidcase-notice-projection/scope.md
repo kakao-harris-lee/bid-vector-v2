@@ -14,6 +14,8 @@ in_scope:
   # ── 어댑터 (adapters) ───────────────────────────────────────────────────
   - adapters/src/main/kotlin/bidvector/adapters/bidding/BiddingSql.kt        # 묶음 질의 한 문장
   - adapters/src/main/kotlin/bidvector/adapters/bidding/JdbcNoticeProjectionQuery.kt  # 신설
+  - adapters/src/main/kotlin/bidvector/adapters/bidding/NoticeKeyLookup.kt       # 신설 — 계약 갱신 (5)
+  - adapters/src/main/kotlin/bidvector/adapters/bidding/JdbcNoticeDeadlineQuery.kt  # 계약 갱신 (5) — 중복 제거
   - adapters/src/test/kotlin/bidvector/adapters/bidding/NoticeProjectionQueryTest.kt  # 신설 — 실 DB 축
   - adapters/src/test/kotlin/bidvector/adapters/bidding/BidCaseDbFixture.kt      # 출하 질의 조립
   - adapters/src/test/kotlin/bidvector/adapters/bidding/BidCaseOwnershipTest.kt  # 계약 갱신 (1) — 조립 인자
@@ -212,6 +214,15 @@ capability map §12.3 의 이 slice 몫은 **머지 차례에 정한다**(계약
 않는다) 문서가 선언하지 않아 생성 타입에서만 선택 칸이다. **고치지 않는다** — 기존 칸의 선언을
 바꾸면 생성 타입이 움직여 이 slice 밖의 자리가 함께 흔들린다. (3) 의 등식이 오늘의 사실을
 그대로 못박아(`CASE_KEYS - "nextCheckpointAt"`) 그 예외가 **늘지 않음**을 잰다.
+
+**(5) in_scope 에 공고 키 묶음 조회의 공용 자리와 마감 질의가 든다** — `cpdCheck` 가 요구했다.
+새 투영 질의가 마감 질의의 조립(배열 바인딩 · 키 복원 · `buildMap`)을 **복사했고** 전건 check 의
+`:adapters:cpdCheck` 가 18줄 120토큰 중복으로 떨어졌다(실측). 프로젝트 규율 「중복 금지 — 복사
+전 기존 구현 조사」를 어긴 것이고 게이트가 맞게 잡았다.
+
+복사본을 지우고 `readByNoticeKeys` 한 자리로 모았다. **중복 제거가 목적의 전부는 아니다**:
+복사본이 있으면 「키가 있으면 공고 행이 있다」는 약속이 두 벌이 되고 한쪽만 고쳐도 아무것도
+붉지 않는다. 그 약속이 이제 한 번 적힌다. 거동 0 — 두 질의의 문장 · 바인딩 · 읽는 열이 그대로다.
 
 ## 갱신 이력
 
