@@ -1861,3 +1861,41 @@ describe('화면 C — 수정 라운드의 LOW 셋', () => {
     expect(await screen.findByTestId('timeline')).not.toBeNull();
   });
 });
+
+/**
+ * **「첫 카드」는 「본문 안 어딘가」가 아니다**(v L-2). 앞 판의 단언은 「본문 안 + 판정 절
+ * 앞」까지였고, 자격을 **투찰가 카드 안** 맨 위로 넣은 변이가 초록이었다 — 이름의 주장보다
+ * 단언이 좁았다. 본문 칸의 **첫 요소 자식**인지로 좁힌다.
+ */
+describe('화면 C — 참가 자격은 본문의 첫 카드다 (v L-2)', () => {
+  it('본문 칸의 첫 요소 자식이 자격 카드다', async () => {
+    renderScreen();
+    await askPrice();
+
+    // 응답이 닿아 카드가 선 **뒤에** 자리를 읽는다(요청 직후에는 투찰가 카드뿐이다).
+    const qualification = await screen.findByTestId('qualification');
+    const body = document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_BODY_SLOT}"]`);
+    expect(body, '본문 칸을 찾지 못했다').not.toBeNull();
+    const first = body!.firstElementChild;
+    expect(first, '본문이 비었다').not.toBeNull();
+    expect(first, '첫 자식이 자격 카드가 아니다').toBe(qualification);
+    // 비공허: 투찰가 카드는 그 **뒤**에 있고, 자격을 품고 있지 않다.
+    const price = screen.getByTestId('worksheet-price-card');
+    expect(price.contains(first), '자격이 투찰가 카드 안으로 들어갔다').toBe(false);
+  });
+
+  /** 쓰기 실패 얼굴이 본문 맨 위에 설 때도 자격은 **그다음 카드**다(얼굴은 카드가 아니다). */
+  it('본문에 실패 얼굴이 서면 자격은 그 바로 다음이다', async () => {
+    mocked.draftBid.mockRejectedValue(new Error('500'));
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
+    await screen.findByTestId('write-failure');
+
+    const body = document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_BODY_SLOT}"]`);
+    const cards = [...body!.children].filter((one) => one.getAttribute('data-testid') !== 'write-failure');
+    expect(cards[0]).toBe(screen.getByTestId('qualification'));
+  });
+});
