@@ -36,6 +36,33 @@ interface Box {
   readonly width: number;
 }
 
+/**
+ * **어느 탐색이 어느 폭에서 서는가**(cr M-1). 이 slice 의 머리 주장은 「같은 자리 집합이 폭에
+ * 따라 두 모양으로 갈린다」인데, 앞 판의 단언은 본문 상자와 넘침뿐이라 그 주장이 걸리지 않았다.
+ *
+ * 실측으로 확인된 두 구멍: 사이드바를 390px 에서도 서게 해도 초록이었고, 하단 탭의 `md:hidden`
+ * 을 걷어 1280px 에 고정 바가 서도 초록이었다. 뒤엣것이 더 아프다 — 본문은 `md` 이상에서
+ * 바닥 여백이 **없어서**, 그 한 줄이 빠지면 모든 화면의 바닥이 고정 바에 덮인다.
+ */
+async function displayOf(page: Page, selector: string, index: number): Promise<string | null> {
+  return page.evaluate(
+    ({ one, at }) => {
+      const nodes = [...document.querySelectorAll(one)];
+      const node = nodes[at];
+      return node === undefined ? null : getComputedStyle(node).display;
+    },
+    { one: selector, at: index },
+  );
+}
+
+/** 탐색 landmark 두 개 — 문서 순서로 사이드바가 앞, 하단 탭이 뒤다(셸의 DOM 이 그렇다). */
+const SIDEBAR_NAV = 0;
+const BOTTOM_NAV = 1;
+
+async function navCount(page: Page, selector: string): Promise<number> {
+  return page.evaluate((one) => document.querySelectorAll(one).length, selector);
+}
+
 /** 보이는 요소 하나의 상자 — 없으면 `null` 이라 **찾지 못한 것**과 폭 0 을 가를 수 있다. */
 async function boxOf(page: Page, selector: string): Promise<Box | null> {
   return page.evaluate((one) => {
@@ -111,6 +138,36 @@ test.describe('셸 — 사이드바와 본문', () => {
     await expect(page.getByTestId('app-shell')).toBeVisible();
 
     expect(await overflowOf(page, WIDE.width)).toStrictEqual([]);
+  });
+
+  /**
+   * **두 탐색이 함께 그려지고 가리는 것은 CSS 다**(셸의 설계). 그러니 「어느 쪽이 서는가」는
+   * computed `display` 로만 설 수 있다 — 상자 좌표는 숨은 쪽도 0 으로 읽혀 두 사실을 가르지
+   * 못한다.
+   */
+  test('1280px 에서는 사이드바가 서고 하단 탭이 숨는다', async ({ page }) => {
+    await page.setViewportSize({ ...WIDE });
+    await page.goto('/');
+    await expect(page.getByTestId('app-shell')).toBeVisible();
+
+    // 비공허: 탐색 landmark 가 **둘 다 DOM 에 있다**(하나뿐이면 아래 단언이 엉뚱한 것을 잰다).
+    expect(await navCount(page, SIDEBAR_SELECTOR), '탐색 landmark 가 둘이 아니다').toBe(2);
+    expect(await displayOf(page, SIDEBAR_SELECTOR, SIDEBAR_NAV), '사이드바가 숨었다').not.toBe('none');
+    expect(await displayOf(page, SIDEBAR_SELECTOR, BOTTOM_NAV), '하단 탭이 넓은 화면에서 섰다').toBe('none');
+  });
+
+  /**
+   * 390px 에서 거꾸로다. 하단 탭이 **고정 바**라 본문 바닥을 덮는데, 그 여백(`pb-28`)은 `md`
+   * 이상에서 없어진다 — 그래서 어느 쪽이 서는지가 배치의 사실이다.
+   */
+  test('390px 에서는 하단 탭이 서고 사이드바가 숨는다', async ({ page }) => {
+    await page.setViewportSize({ ...NARROW });
+    await page.goto('/');
+    await expect(page.getByTestId('app-shell')).toBeVisible();
+
+    expect(await navCount(page, SIDEBAR_SELECTOR), '탐색 landmark 가 둘이 아니다').toBe(2);
+    expect(await displayOf(page, SIDEBAR_SELECTOR, SIDEBAR_NAV), '사이드바가 좁은 화면에서 섰다').toBe('none');
+    expect(await displayOf(page, SIDEBAR_SELECTOR, BOTTOM_NAV), '하단 탭이 숨었다').not.toBe('none');
   });
 
   test('390px 에서는 한 단이고 사이드바가 서지 않는다', async ({ page }) => {
