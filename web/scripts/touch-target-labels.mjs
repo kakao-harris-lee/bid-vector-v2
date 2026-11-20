@@ -291,33 +291,149 @@ export const NAME_OVERRIDE_ATTRIBUTES = new Set(['aria-label', 'aria-labelledby'
  * 암묵 레이블의 정의와 태그 판정은 ① 축과 **같은 함수**를 쓴다 — 사본을 두면 「암묵 레이블」이
  * 두 벌이 되고, 갈린 날 어느 쪽이 맞는지 아무도 모른다.
  */
+/** 그 여는 태그가 **레이블인가** — 태그 판정은 ① 축과 같은 층이다. */
+function isLabelTag(checker, node) {
+  const tags = tagsOf(checker, node);
+  return tags !== null && tags.length > 0 && tags.every((one) => one === 'label');
+}
+
+/** 그 여는 태그가 **labelable 후보인가** — 모르는 것(식·컴포넌트)은 후보로 센다(① 축의 규율). */
+function isLabelableCandidate(checker, node) {
+  const tags = tagsOf(checker, node);
+  const custom = tags !== null && tags.length === 0;
+  return tags === null || custom || tags.some((one) => LABELABLE_TAGS.has(one));
+}
+
+/** 그 레이블 요소 안에 **보이는 글자**가 있는가 — 없으면 그 레이블은 이름을 주지 않는다. */
+function labelHasText(labelElement) {
+  let text = false;
+  const visit = (node) => {
+    if (ts.isJsxText(node) && node.getText().trim() !== '') {
+      text = true;
+    }
+    // 보간(`{…}`)도 글자일 수 있다 — **모르는 것을 「글자 없음」으로 접지 않는다**(그 접음은
+    // 아래 사유를 「감싸지 말라」로 틀리게 돌린다).
+    if (ts.isJsxExpression(node) && node.expression !== undefined) {
+      text = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  for (const child of labelElement.children) {
+    visit(child);
+  }
+  return text;
+}
+
+/**
+ * **그 레이블이 이 컨트롤에게 이름을 주는가.** ① 축이 쓰는 `htmlFor` 판정을 그대로 쓴다 — 두
+ * 축이 「연결」을 다르게 보면 같은 모듈 안에서 정의가 두 벌이 된다(r1 cr M①).
+ *
+ * 돌려주는 값 셋: `'names'`(이름을 준다) · `'other'`(그 레이블의 이름은 **남에게** 간다) ·
+ * `'unprovable'`(연결을 볼 수 없다 — 모르는 것을 면제로 쓰지 않는다).
+ */
+function namingBy(checker, labelElement, node) {
+  const labelOpening = labelElement.openingElement;
+  const htmlFor = literalAttribute(labelOpening, 'htmlFor');
+  if (htmlFor !== undefined) {
+    if (htmlFor === null) {
+      return 'unprovable';
+    }
+    const id = literalAttribute(node, 'id');
+    if (id === null) {
+      return 'unprovable';
+    }
+    return htmlFor === id ? 'names' : 'other';
+  }
+  /**
+   * 암묵 연결이 켜는 것은 **첫 labelable 자손 하나**다 — 뒤의 컨트롤은 이름을 받지 못하므로
+   * 자기 `aria-label` 이 필요하다(과잉 차단을 막는 자리다).
+   */
+  const first = labelableDescendants(checker, labelElement)[0];
+  if (first === undefined) {
+    return 'other';
+  }
+  return first === node ? 'names' : 'other';
+}
+
+/**
+ * 한 소스의 위반 — **보이는 레이블이 이미 이름을 주는 컨트롤의 이름을 덮는 자리**.
+ *
+ * 저장소가 적어 둔 규칙(`components/Button.tsx` 의 KDoc — 「보이는 글자가 있으면 주지 않는다 ·
+ * 낭독이 갈린다」)을 재는 자리다. 선언만 있고 재는 자리가 없었다. 지워지는 것이 형식 지시와
+ * **파괴적 결과 경고**라, 눈으로 보는 운영자와 듣는 운영자가 서로 다른 지시를 받는다.
+ *
+ * 모집단은 **둘**이다(r1 v F1 · cr M①).
+ *  · **이름을 받는 컨트롤** — 감싼 레이블이든 `htmlFor` 로 이은 레이블이든, 그 레이블이 이
+ *    컨트롤에게 이름을 주는 자리.
+ *  · **그 레이블 자신** — Chromium 실측에서 레이블의 `aria-label` 이 **컨트롤의 이름을 덮는다**.
+ *    앞 판은 그 반대를 전제로 두고 음성 대조까지 굳혔는데, 그 전제가 거짓이었다. 더 나쁜 것은
+ *    그 틈이 **술어가 만드는 회피로**라는 점이다 — 입력의 `aria-label` 이 붉으면 그것을 레이블로
+ *    옮기는 손질이 가장 자연스럽고, 그 손질이 같은 낭독 결함을 낸다.
+ *
+ * 암묵 레이블의 정의와 태그 판정은 ① 축과 **같은 함수**를 쓴다 — 사본을 두면 「암묵 레이블」이
+ * 두 벌이 되고, 갈린 날 어느 쪽이 맞는지 아무도 모른다.
+ */
 export function ariaLabelOverridesIn(checker, source) {
   const found = [];
+  /** `htmlFor` 가 **밖에서** 가리키는 컨트롤을 찾으려면 그 파일의 레이블 전수를 먼저 모은다. */
+  const labels = [];
+  const collect = (node) => {
+    if (ts.isJsxElement(node) && isLabelTag(checker, node.openingElement)) {
+      labels.push(node);
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
+
+  const report = (node, why) => {
+    found.push({
+      file: source.fileName,
+      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      why,
+    });
+  };
+
+  /** 그 노드가 든 **이름 덮어쓰기 속성** — 없으면 `null`, 볼 수 없으면 `'unprovable'`. */
+  const overrideOn = (node) => {
+    for (const name of NAME_OVERRIDE_ATTRIBUTES) {
+      const value = literalAttribute(node, name);
+      if (value === undefined) {
+        continue;
+      }
+      // `null` 은 **볼 수 없다**는 뜻이다(식 · 펼친 속성) — 통과시키지 않는다.
+      return { name, unprovable: value === null };
+    }
+    return null;
+  };
+
   const visit = (node) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
-      const tags = tagsOf(checker, node);
-      const custom = tags !== null && tags.length === 0;
-      /**
-       * 모집단은 **labelable 후보**다 — 태그를 증명할 수 없는 자리와 컴포넌트도 든다(① 축의
-       * 보수적 셈과 같은 규율: 모르는 것을 면제로 쓰지 않는다). 레이블 **자신**은 모집단이
-       * 아니다 — 레이블의 `aria-label` 은 컨트롤의 이름을 덮지 않는다.
-       */
-      const labelable = tags === null || custom || tags.some((one) => LABELABLE_TAGS.has(one));
-      const isLabel = tags !== null && tags.length > 0 && tags.every((one) => one === 'label');
-      if (labelable && !isLabel && enclosingLabelElement(checker, node) !== null) {
-        const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-        for (const name of NAME_OVERRIDE_ATTRIBUTES) {
-          const value = literalAttribute(node, name);
-          if (value === undefined) {
-            continue;
+      const override = overrideOn(node);
+      if (override !== null) {
+        const seen = override.unprovable ? `${override.name} 을 볼 수 없다(식 또는 펼친 속성)` : override.name;
+        if (isLabelTag(checker, node)) {
+          // **레이블 자신** — 켤 컨트롤이 있을 때만 덮을 이름이 있다.
+          const element = node.parent;
+          const labelable =
+            ts.isJsxElement(element) && element.openingElement === node
+              ? labelableDescendants(checker, element)
+              : [];
+          if (labelable.length > 0) {
+            report(node, `label 자신의 ${seen} 이 감싼 컨트롤의 이름을 덮는다`);
           }
-          // `null` 은 **볼 수 없다**는 뜻이다(식 · 펼친 속성) — 통과시키지 않는다.
-          const why =
-            value === null
-              ? `감싼 label 이 이름을 주는데 ${name} 을 볼 수 없다(식 또는 펼친 속성)`
-              : `감싼 label 이 이름을 주는데 ${name} 이 그것을 덮는다`;
-          found.push({ file: source.fileName, line, why });
-          break;
+        } else if (isLabelableCandidate(checker, node)) {
+          const enclosing = enclosingLabelElement(checker, node);
+          const linked =
+            enclosing !== null
+              ? { label: enclosing, how: namingBy(checker, enclosing, node) }
+              : explicitLabelFor(checker, labels, node);
+          if (linked !== null && linked.how !== 'other') {
+            const unsure = linked.how === 'unprovable' ? '(연결을 증명할 수 없다)' : '';
+            const why = labelHasText(linked.label)
+              ? `이름을 주는 label 이 있는데 ${seen} 이 그것을 덮는다${unsure}`
+              : `이 label 은 보이는 글자가 없어 이름을 주지 않는다 — 감싸지 말고 ${override.name} 을 그대로 두라${unsure}`;
+            report(node, why);
+          }
         }
       }
     }
@@ -325,6 +441,20 @@ export function ariaLabelOverridesIn(checker, source) {
   };
   visit(source);
   return found;
+}
+
+/** 이 파일의 레이블 가운데 **`htmlFor` 로 이 노드를 가리키는** 것 — 없으면 `null`. */
+function explicitLabelFor(checker, labels, node) {
+  const id = literalAttribute(node, 'id');
+  if (id === null || id === undefined) {
+    return null;
+  }
+  for (const label of labels) {
+    if (literalAttribute(label.openingElement, 'htmlFor') === id) {
+      return { label, how: 'names' };
+    }
+  }
+  return null;
 }
 
 /** 합성 원문 하나를 재는 입구(대조용). */

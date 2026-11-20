@@ -137,11 +137,15 @@ const FILTER_CHIPS = [
 
 /** 적는 방법 → 입력 속성. 표가 한 자리라 칸마다 속성이 갈리지 않는다. */
 /**
+ * **수출한다**(M14/14F r1 · cr r1 LOW): 호출부가 펼치지 않고 손으로 적게 된 뒤로, 이 표가
+ * 자랄 때 호출부가 뒤처져도 아무도 붉지 않는 틈이 생겼다 — 짝 test 가 **표의 칸 전수**가
+ * 그려진 입력에 실리는지 재고, 그러려면 그 test 가 이 표를 읽어야 한다.
+ *
  * **칸마다 `inputMode` 를 적는다**(M14/14F): 없는 칸을 `undefined` 로 적어 두면 부르는 자리가
  * 펼치지 않고 **속성을 적을 수 있다**(「암묵 레이블 위의 이름 덮어쓰기 0」 술어가 펼친 속성을
  * 증명 불가로 센다). 적지 않으면 합집합 가운데 그 칸이 없는 갈래가 생겨 접근이 서지 않는다.
  */
-const FIELD_INPUT = {
+export const FIELD_INPUT = {
   text: { type: 'text', inputMode: undefined },
   numeric: { type: 'text', inputMode: 'numeric' },
   instant: { type: 'datetime-local', inputMode: undefined },

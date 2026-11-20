@@ -283,13 +283,93 @@ describe('암묵 레이블 위의 이름 덮어쓰기 (M14/14F cr D4)', () => {
     ).toStrictEqual([]);
   });
 
-  /** 레이블 **자신**의 `aria-label` 은 이 축이 아니다(그것은 컨트롤의 이름을 덮지 않는다). */
-  it('음성 — 레이블 요소 자신의 aria-label 은 걸리지 않는다', () => {
+  /**
+   * **레이블 자신의 이름 덮어쓰기도 같은 결함이다**(r1 v F1).
+   *
+   * 앞 판은 이 자리를 **음성 대조로 굳혔다** — 「레이블의 `aria-label` 은 컨트롤의 이름을 덮지
+   * 않는다」는 전제 위에서였다. 그 전제는 **Chromium 에서 거짓이다**(verifier 실측:
+   * `<label aria-label="업종"><span>업종(쉼표)</span><input/></label>` 에서 입력의 이름은 「업종」
+   * 이다 — 막으려는 결함과 **같은 결과**다).
+   *
+   * 더 나쁜 것은 그 틈이 **술어가 만드는 회피로**라는 점이다: 입력의 `aria-label` 이 붉으면
+   * 그것을 레이블로 옮기는 것이 가장 자연스러운 손질이고, 그 손질이 같은 낭독 결함을 낸다.
+   */
+  it('양성 — 레이블 요소 자신의 aria-label 도 걸린다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = () => (\n  <label aria-label="업종">\n    <span>업종(쉼표)</span>\n    <input name="types" />\n  </label>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('aria-label');
+  });
+
+  it('양성 — 레이블 자신의 aria-labelledby 도 걸린다', () => {
     expect(
       ariaLabelOverrides(
-        'export const X = () => (\n  <label aria-label="업종">\n    <input name="types" />\n  </label>\n);\n',
+        'export const X = () => (\n  <label aria-labelledby="t">\n    <span id="t">업종</span>\n    <input name="types" />\n  </label>\n);\n',
+      ),
+    ).toHaveLength(1);
+  });
+
+  /** 켤 컨트롤이 없는 레이블은 이 축 밖이다 — 덮을 이름이 없다. */
+  it('음성 — labelable 자손이 없는 레이블의 aria-label 은 걸리지 않는다', () => {
+    expect(
+      ariaLabelOverrides('export const X = () => <label aria-label="업종">업종</label>;\n'),
+    ).toStrictEqual([]);
+  });
+
+  /**
+   * **명시 연결(`htmlFor`)이 같은 결함을 낸다**(r1 cr M①). 위협 모델이 적은 꼴 그대로인데 앞
+   * 판의 술어는 **감싼 레이블만** 보아 통째로 놓쳤다. 오늘 출하 소스의 `htmlFor` 는 0 이라 live
+   * 위반은 없지만, 그 0 은 이 꼴에 대해 **공허했다**.
+   */
+  it('양성 — htmlFor 로 이은 레이블 밖의 컨트롤도 걸린다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = () => (\n  <div>\n    <label htmlFor="t">업종(쉼표)</label>\n    <input id="t" aria-label="업종" />\n  </div>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('aria-label');
+  });
+
+  /**
+   * **반대쪽도 막는다**(r1 cr M① 의 과잉 축): 레이블의 `htmlFor` 가 **다른 컨트롤**을 가리키면
+   * 그 레이블은 이 버튼에게 이름을 주지 않는다 — 버튼의 `aria-label` 은 정당하다. 과잉으로
+   * 붉히면 유지보수자가 그것을 떼고 **이름 없는 컨트롤**이 남는다.
+   */
+  it('음성 — htmlFor 가 남을 가리키면 그 안의 다른 컨트롤은 자기 이름을 가질 수 있다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label htmlFor="other">\n    <span>금액</span>\n    <input id="other" />\n    <button aria-label="조건 지우기">x</button>\n  </label>\n);\n',
       ),
     ).toStrictEqual([]);
+  });
+
+  /**
+   * 암묵 연결에서 레이블이 켜는 것은 **첫 labelable 하나**다 — 뒤의 컨트롤은 이름을 받지 못하므로
+   * 자기 `aria-label` 이 필요하다(같은 과잉 축).
+   */
+  it('음성 — 암묵 레이블의 둘째 컨트롤은 자기 이름을 가질 수 있다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <label>\n    <span>금액</span>\n    <input name="amount" />\n    <button aria-label="조건 지우기">x</button>\n  </label>\n);\n',
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /**
+   * **글자 없는 레이블의 사유가 달라야 한다**(r1 cr M②). 그 레이블은 이름을 주지 않으므로
+   * 「덮는다」는 거짓이고, 그 말을 읽은 유지보수자의 자연스러운 손질(`aria-label` 떼기)은
+   * **이름 없는 컨트롤**을 남긴다. 그래서 사유가 **다른 손질**을 가리켜야 한다.
+   */
+  it('글자 없는 레이블이 감싼 자리는 다른 사유를 낸다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = () => (\n  <label className="x">\n    <input aria-label="검색어" />\n  </label>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why, '덮는다고 말한다 — 그 레이블은 이름을 주지 않는다').not.toContain('덮는다');
+    expect(found[0].why).toContain('감싸지 말고');
   });
 });
 

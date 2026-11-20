@@ -8,6 +8,20 @@
 export interface MeasuredTarget {
   readonly tag: string;
   readonly name: string;
+  /**
+   * **접근 가능한 이름이 서는가**(M14/14F r1 · cr M②). 위 `name` 은 실패 **메시지**용 근사라
+   * `aria-label` 과 자기 글자만 본다 — 그것으로 「이름이 있다」를 판정하면 감싼 레이블로 이름을
+   * 받는 컨트롤이 전부 이름 없음으로 읽힌다.
+   *
+   * 이 칸은 **이름이 서는 길 전부**를 순서대로 본다: `aria-label` → `aria-labelledby` →
+   * `label[for]` → 감싼 `label` → 자기 글자 → `title`·`placeholder`·`value`·`alt`.
+   *
+   * 왜 필요한가: 새 AST 술어가 **과잉으로** 붉히는 자리가 있다고 설계 검토가 선언했고(글자 없는
+   * 레이블이 감싼 컨트롤), 그 과잉을 받는 층으로 「이름 없는 컨트롤 0」을 들었다 — **그 층이
+   * 저장소에 없었다**. 술어의 말을 따라 `aria-label` 을 떼면 이름 없는 컨트롤이 남는데 CI 는
+   * 초록이었다.
+   */
+  readonly named: boolean;
   readonly width: number;
   readonly height: number;
   /**
@@ -183,6 +197,45 @@ export function measureInPage(): Measurement {
       }
       const name = (node.getAttribute('aria-label') ?? measured.textContent ?? '').trim().slice(0, 40);
       /**
+       * **이름이 서는 길 전부**를 순서대로 본다(cr M②). 상자는 레이블일 수 있지만 이름이 서는
+       * 주체는 **컨트롤**이므로 `node` 를 본다.
+       */
+      const named = ((): boolean => {
+        const own = (node.getAttribute('aria-label') ?? '').trim();
+        if (own !== '') {
+          return true;
+        }
+        const labelledBy = node.getAttribute('aria-labelledby') ?? '';
+        if (labelledBy.trim() !== '') {
+          const joined = labelledBy
+            .split(/\s+/u)
+            .map((id) => document.getElementById(id)?.textContent ?? '')
+            .join(' ')
+            .trim();
+          if (joined !== '') {
+            return true;
+          }
+        }
+        const id = node.getAttribute('id') ?? '';
+        if (id !== '') {
+          for (const label of document.querySelectorAll('label[for]')) {
+            if (label.getAttribute('for') === id && (label.textContent ?? '').trim() !== '') {
+              return true;
+            }
+          }
+        }
+        const wrapping = node.closest('label');
+        if (wrapping !== null && (wrapping.textContent ?? '').trim() !== '') {
+          return true;
+        }
+        if ((node.textContent ?? '').trim() !== '') {
+          return true;
+        }
+        return ['title', 'placeholder', 'value', 'alt'].some(
+          (one) => (node.getAttribute(one) ?? '').trim() !== '',
+        );
+      })();
+      /**
        * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
        * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
        * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
@@ -198,6 +251,7 @@ export function measureInPage(): Measurement {
       targets.push({
         tag: measured.tagName.toLowerCase(),
         name,
+        named,
         testId: measured.getAttribute('data-testid') ?? '',
         width: Math.round(box.width * 10) / 10,
         // **보이는 띠**의 높이다(v M-8 · H-4) — 조상이 자르면 그만큼만, 스크롤러 안이면 그 상자

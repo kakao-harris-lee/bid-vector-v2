@@ -415,13 +415,27 @@ function renderAll() {
         최소이고(이 층은 문면만 본다) 하한 여유는 **근거가 선 쪽**을 준다 — 빈 자리만 그리면
         그 카드의 문면 절반이 미측정으로 남는다.
       */}
-      {/* M14/14F — 「다시 잴 수 없다」 쪽 사유는 **부르는 자리가 적는 글자**라(prop) 이 층의
-          모집단이 아니다. 그 문면은 소스 층(`screen-copy-vocabulary`)이 전수에서 본다. */}
+      {/*
+        M14/14F — 「다시 잴 수 없다」 쪽 사유도 **이 층이 보는 문면**이다(r1 cr LOW).
+        앞 판은 `marginAbsence={null}` 하나만 두고 「소스 층이 전수에서 본다」로 사유를 적었는데,
+        그 층이 보는 것은 **금지 꼴**(개발 코드 · ID 토막)이고 개발 **어휘** 계열은 그 집합에
+        없다 — 이 slice 가 세운 문면이 자기 검사 밖이었다. 재어진 여유와 함께 그릴 수 없으므로
+        (한 자리다) 같은 카드를 **사유 쪽으로 한 번 더** 마운트한다.
+
+        testId 가 겹치는 것은 이 층에 문제가 되지 않는다 — 이 층은 testId 로 고르지 않고
+        **그려진 조각 전수**를 훑는다.
+      */}
       <KonepsHandoff
         noticeNumber={TITLELESS_NUMBER}
         amountWon={1_100_000_000}
         margin={HANDOFF_MARGIN}
         marginAbsence={null}
+      />
+      <KonepsHandoff
+        noticeNumber={TITLELESS_NUMBER}
+        amountWon={null}
+        margin={null}
+        marginAbsence="투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 하한 대비 여유를 다시 잴 수 없습니다."
       />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />

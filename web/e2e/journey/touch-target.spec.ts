@@ -462,6 +462,22 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
       expect(offscreen, `${where}: 타깃이 뷰포트 밖으로 나간다`).toStrictEqual([]);
       expect(partiallyClipped, `${where}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
       expect(overflow, `${where}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
+      /**
+       * ④ **이름 없는 컨트롤 0**(M14/14F r1 · cr M②).
+       *
+       * 이 축은 **선언만 있고 재는 자리가 없었다**: 14F 의 AST 술어가 자기 설계 검토에서 과잉
+       * (글자 없는 레이블이 감싼 컨트롤)을 **의도로** 선언하고 그 과잉을 받는 층으로 「여정
+       * 레인의 이름 없는 컨트롤 0」을 들었는데, 저장소에 그런 단언이 없었다. 그래서 술어의 말을
+       * 따라 `aria-label` 을 떼면 **이름 없는 컨트롤이 출하되고 CI 는 초록**이었다.
+       *
+       * 모집단은 이 축이 이미 걷는 **보이는 타깃 전수**이고, 비공허는 위 ① 이 든다 — 집합이
+       * 비면 그 하한에서 먼저 붉는다.
+       */
+      const nameless = targets.filter((one) => !one.named);
+      expect(
+        nameless.map((one) => `${one.tag}[${one.testId}]`),
+        `${where}: 접근 가능한 이름이 서지 않는 컨트롤이 있다(보이는 전수 ${targets.length})`,
+      ).toStrictEqual([]);
     }
   }
 

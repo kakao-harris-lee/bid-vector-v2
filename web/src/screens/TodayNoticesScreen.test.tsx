@@ -10,7 +10,7 @@ import { absenceTextOf } from '../display/absence';
 import { SUGGESTIONS_ORDER_TEXT } from '../display/noticeDisplay';
 import { localInputToIso } from '../display/timeDisplay';
 
-import { TodayNoticesScreen } from './TodayNoticesScreen';
+import { FIELD_INPUT, TodayNoticesScreen } from './TodayNoticesScreen';
 
 vi.mock('../api/queries');
 
@@ -207,6 +207,41 @@ describe('화면 B — 조건 칩', () => {
       expect(panel, `${chip} 칩의 aria-controls 가 없는 자리를 가리킨다`).not.toBeNull();
       expect(panel?.hidden, `${chip} 칩의 칸이 접히지 않았다`).toBe(true);
     }
+  });
+
+  /**
+   * **표의 칸 전수가 그려진 입력에 실린다**(M14/14F r1 · cr r1 LOW).
+   *
+   * 14F 가 새 술어의 fail-closed 규율 때문에 `{...FIELD_INPUT[kind]}` 펼침을 걷고 속성을 **손으로**
+   * 적었다. 거동은 같지만 틈이 생겼다: 그 표가 셋째 속성을 받도록 자라는 날 호출부가 그것을 **안
+   * 적어도 아무도 붉지 않는다**(앞 판의 펼침은 저절로 실렸다). `satisfies` 는 표만 보고 호출부를
+   * 보지 않으므로, 표가 자랄 때 호출부를 붉히는 자리는 여기다.
+   */
+  it('칩 입력이 표의 칸을 하나도 빠뜨리지 않는다', async () => {
+    renderScreen();
+    await screen.findByTestId('suggestions-empty');
+
+    fireEvent.click(screen.getByTestId('chip-amount'));
+    const panel = screen.getByTestId('chip-panel-amount');
+    const inputs = [...panel.querySelectorAll('input')];
+    expect(inputs.length, '칸을 하나도 찾지 못했다').toBeGreaterThan(0);
+
+    /** 표의 칸 이름 → DOM 속성 이름. 표가 자라면 **이 표도 자라야** 한다(그 사실이 단언이다). */
+    const ATTRIBUTE_OF: Record<string, string> = { type: 'type', inputMode: 'inputmode' };
+    for (const input of inputs) {
+      for (const [key, attribute] of Object.entries(ATTRIBUTE_OF)) {
+        const expected = FIELD_INPUT.numeric[key as keyof typeof FIELD_INPUT.numeric];
+        if (expected === undefined) {
+          continue;
+        }
+        expect(input.getAttribute(attribute), `${key} 가 그려진 입력에 실리지 않았다`).toBe(expected);
+      }
+    }
+    // 표의 칸 전수가 **위 사상에 들어 있는가** — 새 칸이 생기면 여기서 멈춘다.
+    expect(
+      Object.keys(FIELD_INPUT.numeric).filter((one) => !(one in ATTRIBUTE_OF)),
+      '표에 새 칸이 생겼다 — 그려진 입력에 실리는지 재는 자리를 함께 넓혀라',
+    ).toStrictEqual([]);
   });
 
   it('칩을 누르면 그 칸이 드러나고 다시 누르면 숨는다', async () => {
