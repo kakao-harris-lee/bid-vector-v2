@@ -1,11 +1,13 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
-  CLIENT_MODULE,
+
   QUERIES_MODULE,
+  clientBindingImporters,
+  elementPropsOf,
   SCREEN_WRITE_POLICY,
   collectScreenWriteReach,
   moduleEdgesOf,
@@ -13,13 +15,23 @@ import {
   policyGaps,
   violationsOf,
   writeOperationsOf,
+  writeReachProgram,
 } from './screen-write-reach.mjs';
+
+
+/**
+ * **이 파일만의 시간 예산**(v M-4). 이 게이트는 별칭을 선언까지 풀어야 해서 호출마다 TS
+ * 프로그램을 세운다 — 원문 캐시와 앞 프로그램 재사용을 넣어 한 파일 47초를 13초로 줄였고,
+ * 가장 느린 **개별 test 는 0.7초**라 기본 5초 예산 안이다(실측). 그래도 병렬 수집에서 호스트가
+ * 붐비면 이 파일이 먼저 밀리므로, **다른 test 를 건드리지 않고** 이 자리만 넉넉히 둔다.
+ */
+vi.setConfig({ testTimeout: 20_000 });
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
 const SRC = resolve(WEB_ROOT, 'src');
 const RESULTS_SCREEN = resolve(SRC, 'screens', 'ResultsScreen.tsx');
+const ROUTES = resolve(SRC, 'routes.tsx');
 const QUERIES_PATH = resolve(SRC, QUERIES_MODULE);
-const CLIENT_PATH = resolve(SRC, CLIENT_MODULE);
 
 const read = (path) => readFileSync(path, 'utf8');
 
@@ -134,14 +146,21 @@ describe('양성 대조 — 심으면 붉는다', () => {
     expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
   });
 
-  /** 같은 길이라도 **메서드가 GET 이면** 쓰기가 아니다 — 판정이 메서드에서 나온다. */
-  it('apiClient 직접 수입이라도 GET 이면 초록이다 — 판정은 메서드가 한다', () => {
-    const planted = plantInResults(
-      "import { apiClient } from '../api/client';",
-      "export const planted = () => apiClient.GET('/api/bid-results');",
+  /**
+   * **같은 길이라도 메서드가 `GET` 이면 쓰기 축은 조용하다** — 붉는 것은 다른 축, 곧 「이
+   * 바인딩을 수입하는 자리는 질의 모듈 하나」라는 등식이다(cr HIGH ② 가 세우라 한 그 등식).
+   * 두 축이 **따로 선다**는 것을 이 대조가 가른다: 쓰기 문면은 없고 수입 자리 문면만 있다.
+   */
+  it('apiClient 직접 수입은 GET 이어도 붉다 — 다만 쓰기 축이 아니라 수입 자리 축에서', () => {
+    const lines = violationsOf(
+      plantInResults(
+        "import { apiClient } from '../api/client';",
+        "export const planted = () => apiClient.GET('/api/bid-results');",
+      ),
     );
 
-    expect(violationsOf(planted)).toStrictEqual([]);
+    expect(lines.join('\n')).toContain('바인딩을 수입하는 자리가');
+    expect(lines.join('\n'), 'GET 인데 쓰기로 셌다').not.toContain('쓰기 operation 에 닿는다');
   });
 
   /** 메서드·경로가 리터럴이 아니면 **모르는 것**이고, 모르는 것은 통과가 아니다. */
@@ -167,6 +186,108 @@ describe('양성 대조 — 심으면 붉는다', () => {
     const planted = plantInResults("import { nothing } from './__no_such_module__';", 'export const used = nothing;');
 
     expect(violationsOf(planted).join('\n')).toContain('해소되지 않는다');
+  });
+
+  /**
+   * **별칭 재수출 — verifier 와 code review 가 따로 찾은 살아 있는 우회였다(HIGH ①).**
+   * `queries.ts` 에 한 줄을 더하고 그 이름을 수입하면 네 게이트가 전부 초록이었다. 꼴 셋을
+   * 전부 심어 **열거가 아니라 해소**로 닫혔는지 잰다.
+   */
+  it.each([
+    ['지역 별칭', 'export { requestBidPrice as readFloorHint };', 'readFloorHint'],
+    ['재수출 별칭', "export { requestBidPrice as readFloorHint } from './queries';", 'readFloorHint'],
+    ['기본 내보내기', 'export default requestBidPrice;', 'default'],
+  ])('%s 로 숨긴 쓰기가 붉는다', (_label, line, name) => {
+    const importLine =
+      name === 'default'
+        ? "import readFloorHint from '../api/queries';"
+        : `import { ${name} } from '../api/queries';`;
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [QUERIES_PATH, `${read(QUERIES_PATH)}\n${line}\n`],
+        [RESULTS_SCREEN, `${importLine}\n${read(RESULTS_SCREEN)}\nexport const planted = readFloorHint;\n`],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
+  });
+
+  /** 내보내기 전수에 **없는 이름**을 수입하면 모르는 것이라 붉는다(fail-closed). */
+  it('질의 모듈이 내보내지 않는 이름을 수입하면 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          RESULTS_SCREEN,
+          `import { noSuchExport } from '../api/queries';\n${read(RESULTS_SCREEN)}\nexport const planted = noSuchExport;\n`,
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('내보내기 전수에 없다');
+  });
+
+  /** 네임스페이스로 클라이언트를 가져오면 어느 이름이 왔는지 이 축에서 알 수 없다(v L-1). */
+  it('클라이언트 모듈을 통째로 가져오면 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          RESULTS_SCREEN,
+          `import * as client from '../api/client';\n${read(RESULTS_SCREEN)}\nexport const planted = () => client['apiClient'].POST('/api/bid-price-requests', { body: {} });\n`,
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('통째로');
+  });
+
+  /** 별칭으로 가져온 클라이언트도 **심볼**이 같아 같은 자리에 선다(v L-1). */
+  it('apiClient 를 별칭으로 가져와 POST 해도 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          RESULTS_SCREEN,
+          `import { apiClient as sender } from '../api/client';\n${read(RESULTS_SCREEN)}\nexport const planted = () => sender.POST('/api/bid-price-requests', { body: {} });\n`,
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('/api/bid-price-requests');
+  });
+
+  /**
+   * **쓰기를 바깥에서 꽂는 길** — 자리 표가 함수를 prop 으로 내려 주면 화면의 폐포에 그 질의가
+   * 없다(v M-1). 싼 값에 닫는 축: 읽기 전용 화면의 element 는 리터럴 아닌 prop 을 받지 않는다.
+   */
+  it('읽기 화면의 route element 가 리터럴 아닌 prop 을 받으면 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          ROUTES,
+          read(ROUTES).replace('element: <ResultsScreen />', 'element: <ResultsScreen requestFloor={undefined} />'),
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('리터럴이 아닌 prop');
+  });
+
+  it('클라이언트 바인딩을 다른 자리에서 수입하면 붉다', () => {
+    const planted = collectScreenWriteReach({
+      webRoot: WEB_ROOT,
+      overlay: new Map([
+        [
+          resolve(SRC, 'display', '__planted_client__.ts'),
+          "import { apiClient } from '../api/client';\nexport const planted = apiClient;\n",
+        ],
+      ]),
+    });
+
+    expect(violationsOf(planted).join('\n')).toContain('바인딩을 수입하는 자리가');
   });
 
   /** 정책을 돌려 입막음하는 길 — 표를 고치면 **이 파일의 단언**이 함께 붉는다. */
@@ -232,29 +353,97 @@ describe('술어 조각 — 간선과 operation 사상', () => {
 
   /** 얇은 포장이 쓰기를 감추지 못한다 — 선언 사이 폐포가 그 자리를 닫는다. */
   it('읽기 이름이 속으로 쓰기를 부르면 그 operation 이 함께 실린다', () => {
-    const text = [
-      "import { apiClient } from './client';",
-      "export async function hidden() { return apiClient.POST('/api/x', { body: {} }); }",
-      'export async function looksLikeRead() { return hidden(); }',
-    ].join('\n');
+    const program = writeReachProgram(
+      WEB_ROOT,
+      new Map([
+        [
+          QUERIES_PATH,
+          [
+            "import { apiClient } from './client';",
+            "export async function hidden() { return apiClient.POST('/api/x', { body: {} }); }",
+            'export async function looksLikeRead() { return hidden(); }',
+          ].join('\n'),
+        ],
+      ]),
+    );
+    const { operations } = operationsByExport(program, QUERIES_PATH);
 
-    const { operations } = operationsByExport(text, QUERIES_PATH);
-
-    expect([...(operations.get('looksLikeRead') ?? [])]).toStrictEqual(['POST /api/x']);
+    expect([...(operations.get('looksLikeRead')?.operations ?? [])]).toStrictEqual(['POST /api/x']);
   });
 
-  it('출하 질의 모듈의 선언마다 호출이 정확히 하나다', () => {
-    const { operations, unresolved } = operationsByExport(read(QUERIES_PATH), QUERIES_PATH);
-    const bearing = [...operations].filter(([, ops]) => ops.size > 0);
+  /**
+   * **별칭은 선언까지 풀린다** — 꼴을 열거하지 않는다. 이것이 HIGH ① 의 뿌리였다: 앞 판은
+   * 최상위 **선언 이름**만 키로 삼아 별칭 이름이 키 집합 밖이었고, 부르는 자리가 그것을
+   * operation 0 으로 조용히 통과시켰다.
+   */
+  it.each([
+    ['지역 별칭', 'export { requestBidPrice as readFloorHint };', 'readFloorHint'],
+    ['재수출 별칭', "export { requestBidPrice as readFloorHint } from './queries';", 'readFloorHint'],
+    ['기본 내보내기', 'export default requestBidPrice;', 'default'],
+  ])('%s 도 같은 operation 으로 풀린다', (_label, line, name) => {
+    const program = writeReachProgram(WEB_ROOT, new Map([[QUERIES_PATH, `${read(QUERIES_PATH)}\n${line}\n`]]));
+    const { operations } = operationsByExport(program, QUERIES_PATH);
+
+    expect([...(operations.get(name)?.operations ?? [])]).toStrictEqual(['POST /api/bid-price-requests']);
+  });
+
+  it('출하 질의 모듈의 값 내보내기마다 호출이 많아야 하나다', () => {
+    const program = writeReachProgram(WEB_ROOT);
+    const { operations, unresolved } = operationsByExport(program, QUERIES_PATH);
+    const bearing = [...operations].filter(([, one]) => one.operations.size > 0);
 
     expect(unresolved).toStrictEqual([]);
     expect(bearing.length, '질의가 하나도 없으면 이 게이트가 공허하다').toBeGreaterThan(0);
-    expect(bearing.filter(([, ops]) => ops.size !== 1).map(([name]) => name)).toStrictEqual([]);
+    expect(bearing.filter(([, one]) => one.operations.size !== 1).map(([name]) => name)).toStrictEqual([]);
   });
 
-  it('클라이언트 모듈을 수입하는 자리가 질의 모듈 하나다 — 그 전제가 이 게이트의 경계다', () => {
-    expect(read(CLIENT_PATH).length, '클라이언트 모듈이 비었다').toBeGreaterThan(0);
-    expect(shipped.screens.every((one) => one.unresolved.length === 0)).toBe(true);
+  /** 타입 내보내기는 **키에 남되** operation 이 0 이다 — 「아는 이름」과 「모르는 이름」을 가른다. */
+  it('타입 내보내기는 키에 있고 값이 아니다', () => {
+    const program = writeReachProgram(WEB_ROOT);
+    const { operations } = operationsByExport(program, QUERIES_PATH);
+
+    expect(operations.get('BidCase')?.isValue).toBe(false);
+    expect(operations.get('listBidCases')?.isValue).toBe(true);
+  });
+
+  /**
+   * **`apiClient` 바인딩을 수입하는 자리가 질의 모듈 하나다** — 설계 검토 우회 5 행이 「등식으로
+   * 고정한다」고 적은 그 등식이다. 앞 판의 이 자리는 제목이 주장하는 것을 **재지 않았고**(본문이
+   * 센 것은 파일이 비지 않았다는 것과 `unresolved` 가 없다는 것뿐이었다), 제목 자체도 글자
+   * 그대로는 거짓이었다 — `api/client` **모듈**을 수입하는 자리는 셋 더 있다(`rememberCsrf`).
+   * 하나인 것은 모듈이 아니라 **이 바인딩**이다.
+   */
+  it('apiClient 바인딩을 수입하는 자리 == 질의 모듈 하나', () => {
+    expect(shipped.clientBindingImporters).toStrictEqual([QUERIES_MODULE]);
+  });
+
+  it('그 모듈 자체를 수입하는 자리는 더 많다 — 등식이 재는 것은 바인딩이다', () => {
+    const importers = readdirSync(resolve(SRC), { recursive: true })
+      .filter((one) => typeof one === 'string' && /\.tsx?$/u.test(one) && !/\.test\./u.test(one))
+      .filter((one) => /from '(\.\.?\/)+api\/client'/u.test(read(resolve(SRC, one))));
+
+    expect(importers.length, '모듈 수입이 하나뿐이면 이 대조가 공허하다').toBeGreaterThan(1);
+  });
+
+  it('자리 표의 리터럴 아닌 prop 만 고른다 — 글자 리터럴은 조용하다', () => {
+    const text = [
+      "import { A } from './A';",
+      "export const screenSlots = [",
+      "  { id: 'plain', path: '/p', element: <A /> },",
+      "  { id: 'literal', path: '/l', element: <A title=\"ok\" /> },",
+      "  { id: 'injected', path: '/i', element: <A run={x} /> },",
+      '];',
+    ].join('\n');
+
+    const found = elementPropsOf(text, 'routes.tsx');
+
+    expect(found.get('injected')).toStrictEqual(['run']);
+    expect(found.has('plain'), '빈 element 가 걸렸다').toBe(false);
+    expect(found.has('literal'), '글자 리터럴이 걸렸다').toBe(false);
+  });
+
+  it('바인딩 수입 집계가 출하 트리에서 질의 모듈 하나다 — 직접 부른 값으로도 같다', () => {
+    expect(clientBindingImporters(writeReachProgram(WEB_ROOT), WEB_ROOT)).toStrictEqual([QUERIES_MODULE]);
   });
 
   it('정책 등식이 양쪽 방향을 다 낸다', () => {
