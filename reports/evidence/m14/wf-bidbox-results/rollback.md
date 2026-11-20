@@ -1,6 +1,6 @@
 # M14 / wf-bidbox-results (14D) — rollback
 
-**실측 HEAD: `be02c94e3c708cbe835f81478329e8646b6de71d`** (이 slice 의 마지막 산출물 커밋).
+**실측 HEAD: `d8c7bd7153317c5bd4e8d5a1b7e1e18be1676e65`** (수정 라운드 1 의 마지막 산출물 커밋).
 이 파일을 담은 커밋은 그 뒤에 오므로 두 SHA 는 영원히 다르다 — 재는 것은 **그 사이에 되돌림
 대상이 움직였는가**다(아래 「유효성」).
 
@@ -12,7 +12,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-status 056f405c..be02c94e` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
+`git diff --name-status 056f405c..d8c7bd71` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
 재산출한다.
 
 | 상태 | 경로 |
@@ -20,12 +20,15 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | A | `reports/evidence/m14/wf-bidbox-results/checklist.md` |
 | A | `reports/evidence/m14/wf-bidbox-results/commands.md` |
 | A | `reports/evidence/m14/wf-bidbox-results/design-review.md` |
+| A | `reports/evidence/m14/wf-bidbox-results/rollback.md` |
 | A | `reports/evidence/m14/wf-bidbox-results/scope.md` |
 | A | `web/scripts/screen-write-reach.mjs` |
 | A | `web/scripts/screen-write-reach.test.mjs` |
 | M | `docs/discovery/capability-map.md` |
 | M | `web/config/gate-tests.txt` |
+| M | `web/e2e/journey/touch-target.spec.ts` |
 | M | `web/scripts/screen-vocabulary-registry.mjs` |
+| M | `web/src/AppShell.tsx` |
 | M | `web/src/display/bidBoxDisplay.test.ts` |
 | M | `web/src/display/bidBoxDisplay.ts` |
 | M | `web/src/display/caseDisplay.ts` |
@@ -40,7 +43,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | M | `web/src/screens/ResultsScreen.test.tsx` |
 | M | `web/src/screens/ResultsScreen.tsx` |
 
-전수 22(신설 6 · 수정 16).
+전수 25(신설 7 · 수정 18).
 
 ## 공유 파일
 
@@ -53,38 +56,43 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 실측 ①~⑥ — 버릴 clone 에서
 
-`git clone` 한 뒤 `be02c94e` 로 체크아웃하고 위 복원을 돌렸다.
+`git clone` 한 뒤 `d8c7bd71` 로 체크아웃하고 위 복원을 돌렸다.
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 종료 코드 | **0** |
-| ② | `git status --porcelain` 의 D/M 수 | **D 6 · M 16**(복원 목록의 신설 6 · 수정 16 과 같다) |
+| ② | `git status --porcelain` 의 D/M 수 | **D 7 · M 18**(복원 목록의 신설 7 · 수정 18 과 같다) |
 | ③ | 복원 뒤 그 경로들의 base 대비 diff | **빈 출력** — 트리가 base 와 동일하다 |
 | ④ | `npm run typecheck` | **0** |
 | ⑤ | `npm run test` | **0**(70 파일 · 1669 통과 — 이 slice 의 증분이 사라진 수) |
 | ⑥ | `gate:tests` · `gate:src-tree` · `lint` · `build` | 전부 **0** |
 
-**⑤ 의 첫 판이 한 번 붉었다.** `scripts/kotlin-read-guard.test.mjs` 1건이고 재실행에서 통과했다
-(단독 25/25 · 전건 재실행 exit 0 · 70 파일 1669 통과). **복원된 트리는 그 경로들에 대해 base 와
-바이트 동일**이므로 이 실패는 base 에도 있는 것이고 이 slice 가 만든 것이 아니다 — 같은 서명이
-판정 트리의 W-7 첫 판에서도 한 번 나왔다(`commands.md`).
+**수정 라운드 1 에서는 ⑤ 가 첫 판에 바로 초록이다.** 앞 판의 한 번 붉음은 `kotlin-read-guard`
+의 5초 timeout 이었고, 그 원인은 이번 라운드에 **통제 실측으로 갈랐다**(`commands.md`) — base
+의 결함이 아니라 게이트 test 가 더한 CPU 압력이다. 복원된 트리에는 그 test 가 없으므로 압력도
+없다.
 
 **완료는 종료 코드가 아니라 계수로 잰다.**
 
 | 계수 | 결과 |
 | --- | --- |
-| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일** (항목 집합으로 센다: 「전체」 축 · 새 게이트 · 새 탭 id · 배지 조회 · 공고 행 부재 문면) |
+| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일**. 항목 아홉으로 센다: `ALL_SELECTION` · `screen-write-reach` · `bid-planned` · `pendingBadgeOf` · `NOTICE_ROW_ABSENT_TEXT` · `shownText` · `writeReachProgram` · `TERMINAL_TAB` · `submittedAmountTextById`. **아홉 전부 base 계수 0 임을 먼저 확인했다** |
 | **남의 표지 보존** — 14A·14E 의 것이 살아 있는가 | **17 파일** (두 단 원시 요소 · 두 축 타일 · 공고 투영) |
+
+**표지 목록을 한 번 고쳤다**(이 라운드의 실측). 처음 센 목록에 `openCaseCountOf` 가 들어 있어
+복원 뒤 계수가 1 이었다 — 그런데 그 이름은 **14A 가 지은 상류 어휘**이고(base 계수 2) 이 slice 는
+그것을 **옮겼을 뿐**이다. 상류가 이미 쓰는 낱말을 내 표지로 삼으면 그 계수는 내 산출물을 세지
+않는다. 그래서 목록에서 빼고, 남은 아홉이 **원천에 없다는 것을 먼저 재고** 다시 셌다.
 | 트리 동일성 | 복원 경로 전수에서 base 와 **동일** |
 
 ## 유효성 (verifier 가 대조하는 것)
 
-`git diff --name-only be02c94e..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
+`git diff --name-only d8c7bd71..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
 한 줄이라도 나오면 **그 경로가 전부 원천(base `056f405c`)에 없는 신설 파일일 때만** 유효하다 —
 이 slice 에서 그에 해당하는 것은 `reports/evidence/m14/wf-bidbox-results/**` 뿐이고, 열거와
 원천 부재 확인은 verifier 가 한다.
 
-`git rev-list --merges be02c94e..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
+`git rev-list --merges d8c7bd71..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
 실측 자리가 그 병합 커밋이다).
 
 복원 원천을 `056f405c` 에서 바꾸면 **셋째 단언**을 다시 잰다 — 복원 대상 blob 이 착수 base 와 새
