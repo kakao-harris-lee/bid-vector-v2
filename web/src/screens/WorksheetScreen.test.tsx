@@ -1705,3 +1705,44 @@ describe('화면 C — 빈 글자 기관명 (cr M-1)', () => {
     expect((await screen.findByTestId('worksheet-agency')).textContent).toBe('합성 공고기관');
   });
 });
+
+/**
+ * **얼굴은 그 행동이 사는 칸에 선다**(cr M-2). 내려놓기는 레일에서 보내므로 그 실패와
+ * 「다시 시도」도 레일에 서야 한다 — 본문에 두면 1280px 에서 반대쪽 칸, 390px 에서는 몇 화면
+ * 위다. 그 버튼이 내려놓기 가드를 지나는 **유일한 입구**라 거리가 값을 낳는다.
+ */
+describe('화면 C — 실패 얼굴은 보낸 칸에서 말한다 (cr M-2)', () => {
+  const slotOf = (slot: string): HTMLElement | null =>
+    document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${slot}"]`);
+
+  it('레일에서 보낸 내려놓기의 실패는 레일에 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT)?.contains(face), '내려놓기 실패가 레일 밖에 섰다').toBe(true);
+    expect(slotOf(TWO_COLUMN_BODY_SLOT)?.contains(face)).toBe(false);
+    // 다시 시도도 같은 칸이다 — 그 버튼이 가드를 지나는 유일한 입구다.
+    expect(face.contains(within(face).getByRole('button', { name: '다시 시도' }))).toBe(true);
+  });
+
+  it('본문에서 보낸 쓰기의 실패는 본문에 선다 — 음성 대조', async () => {
+    mocked.draftBid.mockRejectedValue(new Error('500'));
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(slotOf(TWO_COLUMN_BODY_SLOT)?.contains(face), '본문 쓰기의 실패가 본문 밖에 섰다').toBe(true);
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT)?.contains(face)).toBe(false);
+  });
+});

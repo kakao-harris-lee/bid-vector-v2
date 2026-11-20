@@ -599,9 +599,15 @@ export function WorksheetScreen() {
   /**
    * 쓰기 실패 얼굴 하나 — primary 버튼이 하나이므로 한 번에 하나의 쓰기만 돈다. 어느 전이가
    * 실패했는지는 **그 전이의 이름**으로 말한다(CR H-2).
+   *
+   * **얼굴은 그 행동이 사는 칸에 선다**(cr M-2). 배치를 두 칸으로 가르기 전에는 내려놓기와 그
+   * 실패가 같은 카드 둘레에 붙어 있었다. 이제 내려놓기는 레일에 살고, 얼굴을 본문에 두면
+   * 1280px 에서는 **반대쪽 칸**, 390px 에서는 몇 화면 위에 선다 — 그 얼굴 안의 「다시 시도」가
+   * 내려놓기 가드를 지나는 **유일한 입구**라 값이 큰 자리다. 그래서 자리를 값으로 들고 다닌다.
    */
   const writeFailure = makeDraft.isError
     ? {
+        where: 'body' as const,
         what: '투찰 예정 초안을 만들지',
         error: makeDraft.error,
         // **실제로 다시 보낸다**(CR r2 M-3) — 앞 판은 `reset()` 이라 얼굴만 사라졌고, 운영자는
@@ -610,18 +616,21 @@ export function WorksheetScreen() {
       }
     : makeRecord.isError
       ? {
+          where: 'body' as const,
           what: '투찰 기록을 기록하지',
           error: makeRecord.error,
           retry: writeRetry(makeRecord),
         }
       : resume.isError
         ? {
+            where: 'body' as const,
             what: '다시 보기로 되돌리지',
             error: resume.error,
             retry: writeRetry(resume),
           }
         : addCase.isError
           ? {
+              where: 'body' as const,
               what: '입찰함에 담지',
               error: addCase.error,
               // 담기는 **멱등**이라(서버가 이미 담긴 건을 돌려준다) 보낸 진술을 그대로 다시 보낸다.
@@ -634,6 +643,8 @@ export function WorksheetScreen() {
                    「나중에를 하지 못했습니다」가 되어 한국어가 아니다. 다시 보내기는 다른 쓰기와
                    같은 버전 가드를 지난다: 그 사이 건이 움직였으면 보내지 않는다(내려놓기는
                    멱등이 아니다). */
+                /* 내려놓기는 **레일에서 보낸다** — 그 결과도 레일에서 말한다(cr M-2). */
+                where: 'rail' as const,
                 what: `${exit.variables?.kind === 'SKIP' ? '건너뛰지' : '나중에 보기로 돌리지'}`,
                 error: exit.error,
                 /* 이 갈래의 다시 시도는 **가드를 지나는 입구**이고 그 입구가 가드 ref 를 읽는다.
@@ -790,12 +801,8 @@ export function WorksheetScreen() {
    */
   const body = (
     <>
-      {writeFailure === null ? null : (
-        <WriteFailureFace
-          what={writeFailure.what}
-          error={writeFailure.error}
-          onRetry={writeFailure.retry ?? retryExit}
-        />
+      {writeFailure === null || writeFailure.where !== 'body' ? null : (
+        <WriteFailureFace what={writeFailure.what} error={writeFailure.error} onRetry={writeFailure.retry} />
       )}
       {bidCase === undefined ? null : (
         <>
@@ -909,6 +916,11 @@ export function WorksheetScreen() {
           </p>
         </section>
         {timeline.data === undefined ? null : <WorksheetTimeline entries={timeline.data} />}
+        {/* **레일에서 보낸 것의 결과는 레일에서 말한다**(cr M-2) — 그 얼굴 안의 「다시 시도」가
+            내려놓기 가드를 지나는 유일한 입구라, 버튼 바로 위가 그 자리다. */}
+        {writeFailure === null || writeFailure.where !== 'rail' ? null : (
+          <WriteFailureFace what={writeFailure.what} error={writeFailure.error} onRetry={retryExit} />
+        )}
         {exits.length === 0 ? null : (
           <div className="flex flex-wrap gap-2">
             {exits.map((one) => (
