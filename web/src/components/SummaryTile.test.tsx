@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { absenceTextOf } from '../display/absence';
 import { SummaryTile, tileTwoAxis, tileUnavailable, tileValue } from './SummaryTile';
 
 /**
@@ -83,6 +84,13 @@ describe('빈 값 (cr L-1)', () => {
     expect(screen.getByTestId('probe-unavailable')).not.toBeNull();
   });
 
+  /** **사유를 주지 않으면 부재 어휘다**(v L-r2-4) — 같은 사실이 자리마다 다른 말로 읽히지 않는다. */
+  it('사유를 주지 않은 빈 값은 부재 어휘로 읽힌다', () => {
+    render(<SummaryTile label="적격" face={tileValue('')} testId="probe" />);
+
+    expect(screen.getByTestId('probe-unavailable').textContent).toBe(absenceTextOf('notSent'));
+  });
+
   it('그 사유를 부르는 자리가 정할 수 있다', () => {
     render(<SummaryTile label="적격" face={tileValue('', { whenEmpty: '서버가 계수를 내지 않는다' })} testId="probe" />);
 
@@ -153,6 +161,23 @@ describe('두 축 얼굴 (cr L-4)', () => {
 
     expect(screen.getByTestId('probe-axis-0').textContent).toBe('12.5%');
     expect(screen.getByTestId('probe-axis-1').textContent).toBe('분모에 드는 건이 없음');
+  });
+
+  /** 공백뿐인 값도 **비었다** — `trim` 을 거치므로 눈에 보이지 않는 글자가 값으로 서지 않는다. */
+  it('공백뿐인 축도 사유를 말한다', () => {
+    render(
+      <SummaryTile
+        label="낙찰"
+        face={tileTwoAxis([
+          { label: '운영자 기록', text: '   ' },
+          { label: '서버 대사', text: '11.8%' },
+        ])}
+        testId="probe"
+      />,
+    );
+
+    expect(screen.getByTestId('probe-axis-0').textContent).toBe(absenceTextOf('notSent'));
+    expect(screen.getByTestId('probe-axis-1').textContent).toBe('11.8%');
   });
 
   it('각주를 함께 실을 수 있다', () => {

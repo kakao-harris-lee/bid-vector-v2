@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { absenceTextOf } from '../display/absence';
+
 import { cardClass } from './Card';
 
 /**
@@ -11,6 +13,10 @@ import { cardClass } from './Card';
  *
  * 그래서 타일은 숫자를 **글자로** 받는다: 서식(자릿점·단위·부호)은 표시층의 일이고, 타일이
  * 숫자를 받으면 그 서식이 여기로 흘러들어 자리마다 갈린다.
+ *
+ * **사유를 주지 않은 빈 값의 기본은 부재 어휘다**(v L-r2-4). 같은 사실이 자리마다 다른 말로
+ * 읽히면 운영자가 그 둘을 다른 사실로 센다 — 「값이 비어 있다」와 「주어지지 않음」이 같은
+ * 사실의 두 얼굴이 되는 자리였다.
  */
 export type TileFace =
   | {
@@ -56,7 +62,7 @@ export function tileValue(
   options?: { readonly beside?: string; readonly note?: string; readonly whenEmpty?: string },
 ): TileFace {
   if (text.trim() === '') {
-    return tileUnavailable(options?.whenEmpty ?? '값이 비어 있다');
+    return tileUnavailable(options?.whenEmpty ?? absenceTextOf('notSent'));
   }
   return { kind: 'value', text, beside: options?.beside, note: options?.note };
 }
@@ -76,7 +82,7 @@ export function tileTwoAxis(axes: readonly [TileAxis, TileAxis], options?: { rea
 /** 축 하나가 보이는 글자 — 비면 사유다(빈 칸이 값처럼 읽히지 않게). */
 function axisTextOf(axis: TileAxis): { readonly text: string; readonly present: boolean } {
   return axis.text.trim() === ''
-    ? { text: axis.whenEmpty ?? '값이 비어 있다', present: false }
+    ? { text: axis.whenEmpty ?? absenceTextOf('notSent'), present: false }
     : { text: axis.text, present: true };
 }
 
