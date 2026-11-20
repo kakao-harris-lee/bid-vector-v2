@@ -156,6 +156,11 @@ src/components/StateBadge.test.tsx
 # 새 문면이 걷어낸 옛 문면을 **부분 문자열로도 담지 않는 것**이 이 slice 의 게이트 술어다
 # (부분 일치가 측정 acceptance 를 0 에 닿지 못하게 만드는 자리는 실제로 있다).
 src/display/absence.test.ts
+# M14/14A ④ — 그 어휘가 **다시 들어오지 않는가**(좁힌 전수 0). 열거는 낡지만 훑기는 낡지 않는다.
+# 0 이 「막았다」는 뜻이려면 비공허(읽은 파일 수·뿌리마다 하나 이상)와 차감의 크기·뜻, 그리고
+# 심은 자리를 찾는 양성 대조가 함께 서야 한다 — 그러지 않으면 0 은 **방어 부재와 미측정이 같은
+# 값**이다.
+scripts/absence-vocabulary.test.mjs
 src/components/TwoColumn.test.tsx
 src/components/PageHeader.test.tsx
 src/components/SummaryTile.test.tsx
