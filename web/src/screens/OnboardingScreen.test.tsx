@@ -957,6 +957,40 @@ describe('시작하기 — 레일 미리보기 (M14/14B)', () => {
     expect(error).toBeTruthy();
   });
 
+  /**
+   * **표시 상한이 곁다리보다 작아도 공시가 선다**(cr M-1 회귀 test). 앞 판의 술어는 받은 행
+   * 수를 화면 상수와 견주어 분모가 비교에 없었다 — 전략의 표시 상한이 3 이하이면 받은 행이
+   * 3 장뿐이라 공시가 서지 않았고, 통과 50 건이 조용히 사라졌다.
+   */
+  it('받은 행이 곁다리 크기와 같아도 통과가 더 많으면 그 사실을 말한다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [1, 2, 3].map((at) => suggestion(`SYN-PREVIEW-${at}`, 420_000_000)),
+      total: 50,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const more = await screen.findByTestId('onboarding-preview-more');
+
+    expect(more.textContent).toContain('50');
+    expect(more.textContent).toContain('3');
+    expect(within(more).getByRole('link', { name: /오늘의 공고/u }).getAttribute('href')).toBe('/');
+  });
+
+  /** 받은 것이 통과 전부면 공시가 **없다** — 더 볼 것이 없는 자리에 길을 지어내지 않는다. */
+  it('받은 행이 통과 전부면 공시가 없다 — 음성 대조', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [1, 2].map((at) => suggestion(`SYN-PREVIEW-${at}`, 420_000_000)),
+      total: 2,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    await screen.findByTestId('onboarding-preview-SYN-PREVIEW-1');
+
+    expect(screen.queryByTestId('onboarding-preview-more')).toBeNull();
+  });
+
   it('비면 서버가 준 사유를 그대로 말한다 — 화면이 짐작하지 않는다', async () => {
     mocked.listSuggestions.mockResolvedValue({ rows: [], total: 0, resultState: 'NO_OPEN_NOTICES' });
     renderScreen();

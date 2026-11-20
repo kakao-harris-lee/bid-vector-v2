@@ -926,6 +926,51 @@ describe('화면 B — 머리 요약 (M14/14B)', () => {
   });
 
   /**
+   * **경계를 양쪽에서 밟는다**(v M-1 · cr M-2). 앞 판은 +2·+3 과 2099 만 보아, 그 사이의 어떤
+   * 값도 같은 답을 냈다 — 상수를 27 년으로 올리거나 `>= 0` 을 지워도 조용했다(실측).
+   *
+   * 한 칸에 공고 **하나**만 둔다. 그래야 분자가 0 이냐 1 이냐로 갈리고, 그 수가 곧 「이 날이
+   * 곧인가」의 답이다.
+   */
+  it.each([
+    ['경계 당일은 든다', 7, true],
+    ['경계 다음 날은 빠진다', 8, false],
+    ['어제 마감(거울상)은 빠진다', -1, false],
+  ])('%s', async (_label, days, counted) => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [soonNotice(days)],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('감시 조건 통과 1건');
+    expect(summary.textContent?.includes('곧 마감'), `${days}일: 곧 마감 ${counted ? '이어야' : '이 아니어야'} 한다`).toBe(
+      counted,
+    );
+  });
+
+  /**
+   * **상한 가드의 경계**(v M-1 의 V11). 앞 판은 9 대 1 만 보아 「`rows + 5` 보다 클 때만」으로
+   * 느슨해지는 변이가 초록이었다. 한 건만 더 통과해도 분자를 말하지 않는다.
+   */
+  it('통과가 받은 행보다 한 건만 많아도 분자를 말하지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [soonNotice(2)],
+      total: 2,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const summary = await screen.findByTestId('home-header-summary');
+
+    expect(summary.textContent).toContain('감시 조건 통과 2건');
+    expect(summary.textContent, '보이지 않는 건까지 센 척했다').not.toContain('곧 마감');
+  });
+
+  /**
    * **상한을 넘으면 분자를 붙이지 않는다.** 분자는 받은 m 장에서만 셀 수 있는데 분모는 통과한
    * 전체다 — 둘을 한 문장에 걸면 화면이 세지 않은 것을 센 척한다.
    */
