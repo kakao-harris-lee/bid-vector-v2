@@ -122,14 +122,19 @@ const PRIMARY_SLOT = {
 const PRICE_ONLY_IN_SESSION = '투찰가 응답은 받은 화면에서만 보입니다';
 
 /**
- * 다시 요청할 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc).
+ * 투찰가를 물을 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc).
+ *
+ * **「다시」를 쓰지 않는다**(r2 v L1): 그 낱말은 **전에 한 번 쟀다**를 전제한다. 관심에서 바로
+ * 건너뛴 건이나 마감이 지난 건은 응답을 받은 적이 없고, 화면은 **그 사실을 알 수 없다**
+ * (`BidCase` 에 「응답을 받았다」는 칸이 없고, 초안이 있다는 것도 응답을 받았다는 뜻은 아니다).
+ * 그래서 **받았든 아니든 참인 말**로 적는다.
  *
  * **수출한다**(r2 cr LOW): 렌더 층 문면 게이트가 이 사유를 모집단에 넣으려면 글자를 먹여야
  * 하는데, 그 글자를 손으로 적으면 **사본**이 된다(이 자리가 바뀌어도 게이트는 옛 글자를 본다).
  * 조립자를 공유하면 그 갈림이 생기지 않는다.
  */
 export const cannotAskHere = (axis: string): string =>
-  `${PRICE_ONLY_IN_SESSION} — 이 화면에서는 다시 요청할 수 없어 ${axis}.`;
+  `${PRICE_ONLY_IN_SESSION} — 이 화면에서는 투찰가를 요청할 수 없어 ${axis}.`;
 
 /** 다음 걸음이 아예 없는 상태 — 요청을 **하지 않는** 것이지 못 하는 것이 아니다. */
 const settled = (axis: string): string =>
@@ -143,7 +148,7 @@ const settled = (axis: string): string =>
  * 둘이 「다시 요청할 수 없다」고 **서로를 부정했다**(cr r1 HIGH 의 실측). 세 자리가 한 원인을
  * 가지므로 **한 표**가 맞다.
  *
- * **주어를 화면으로 낮췄다.** 「이 **상태에서는** 다시 요청할 수 없어」는 거짓일 수 있다 —
+ * **주어를 화면으로 낮췄다.** 「이 **상태에서는** 요청할 수 없어」는 거짓일 수 있다 —
  * 「나중에 → 다시 보기」 두 걸음이 요청 경로로 데려가는 상태가 있다. 「이 **화면에서는**」은 네
  * 갈래 전부에서 참이다: 그 상태의 화면에 투찰가 요청이 없다는 말이고, 그것이 운영자가 지금
  * 보는 사실이다.
@@ -172,27 +177,27 @@ const PRICE_ABSENCE = {
     floorMargin: null,
   },
   DRAFT_BID: {
-    qualification: cannotAskHere('자격 판정을 다시 잴 수 없습니다'),
-    price: cannotAskHere('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
-    floorMargin: cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다'),
+    qualification: cannotAskHere('자격 판정을 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 잴 수 없습니다'),
   },
   RECORD_BID: {
-    qualification: cannotAskHere('자격 판정을 다시 잴 수 없습니다'),
-    price: cannotAskHere('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
-    floorMargin: cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다'),
+    qualification: cannotAskHere('자격 판정을 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 잴 수 없습니다'),
   },
 } as const satisfies Record<NextActionKind, PriceAbsenceCopy>;
 
 /**
  * 다음 전이가 **없는** 상태의 같은 셋. 표 밖이라 따로 적는다 — 그 상태에서는 요청 경로가 아예
  * 없고 「요청하면 온다」가 거짓 안내가 된다. **세 자리가 같은 주장을 한다**(cr r1 LOW: 앞 판은
- * 자격 축만 이 갈래를 쓰고 투찰가 카드는 「다시 요청할 수 없어」를 재사용해, 결과는 같은데
+ * 자격 축만 이 갈래를 쓰고 투찰가 카드는 「요청할 수 없어」를 재사용해, 결과는 같은데
  * 주장이 갈렸다).
  */
 const PRICE_ABSENCE_SETTLED: PriceAbsenceCopy = {
-  qualification: settled('자격 판정을 다시 잴 수 없습니다'),
-  price: settled('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
-  floorMargin: settled('하한 대비 여유를 다시 잴 수 없습니다'),
+  qualification: settled('자격 판정을 잴 수 없습니다'),
+  price: settled('투찰가 3안과 그 근거를 볼 수 없습니다'),
+  floorMargin: settled('하한 대비 여유를 잴 수 없습니다'),
 };
 
 /**

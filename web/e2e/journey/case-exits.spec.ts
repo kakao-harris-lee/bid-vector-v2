@@ -183,7 +183,7 @@ test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 �
    * 맞물린다.
    */
   await expect(why).toContainText('다시 보기로 되돌린 뒤');
-  await expect(why, '물을 길이 있는데 못 묻는다고 말한다').not.toContainText('다시 요청할 수 없어');
+  await expect(why, '물을 길이 있는데 못 묻는다고 말한다').not.toContainText('요청할 수 없어');
 
   /*
    * 아직 물을 길이 있는 축은 **자리 자체가 없다**(13C 의 판단). 하한 여유도 투찰가 카드의 사유도

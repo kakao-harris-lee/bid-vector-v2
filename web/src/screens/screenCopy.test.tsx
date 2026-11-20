@@ -439,7 +439,7 @@ function renderAll() {
         noticeNumber={TITLELESS_NUMBER}
         amountWon={null}
         margin={null}
-        marginAbsence={cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다')}
+        marginAbsence={cannotAskHere('하한 대비 여유를 잴 수 없습니다')}
       />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />
