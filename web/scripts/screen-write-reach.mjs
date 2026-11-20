@@ -103,6 +103,10 @@ export function writeReachProgram(webRoot, overlay = new Map()) {
     throw new Error(`tsconfig 을 읽지 못했다: ${configPath}`);
   }
   const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, webRoot);
+  // **test 파일은 뿌리에서 뺀다.** 이 게이트가 보는 것은 **출하 모듈의 그래프**이고
+  // `clientBindingImporters` 도 test 를 세지 않는다 — 모집단을 술어가 쓰는 범위에 맞춘다.
+  // (속도를 노린 것이 아니다: 재어 보니 프로그램 비용은 거의 그대로였다.)
+  parsed.fileNames = parsed.fileNames.filter((one) => !/\.test\.tsx?$/u.test(one));
   if (parsed.fileNames.length === 0) {
     // 빈 프로그램은 **모든 등식을 공허하게** 만든다 — 조용히 초록이 되는 길을 두지 않는다.
     throw new Error(`TS 프로그램이 비었다: ${configPath}`);

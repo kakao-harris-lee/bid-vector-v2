@@ -213,6 +213,13 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
   },
   { key: 'display/profileDisplay.ts#capacityBodyOf', kind: OTHER_AXIS, why: '입력 → 요청 본문. 서버로 간다' },
 
+  {
+    // M14/14D 수정 라운드 1 — 보이는 글자가 있는가(집 안 원시 요소와 같은 `.trim()` 술어).
+    key: 'display/caseDisplay.ts#shownText',
+    kind: OTHER_AXIS,
+    why: '받은 글자를 그대로 내거나 없다고 답하는 술어. 자기 문면을 만들지 않는다',
+  },
+
   // ── 결과 단계 축 ───────────────────────────────────────────────────────────
   { key: 'display/resultDisplay.ts#isResultStage', kind: OTHER_AXIS, why: '결과 단계인가를 참·거짓으로 낸다' },
   {
@@ -224,6 +231,12 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
   },
 
   // ── 입찰함의 고르기·레일 축(M14/14D) ──────────────────────────────────────
+  {
+    // M14/14D 수정 라운드 1 — 사이드바 배지가 세는 축. 셸·레일·짝 test 가 같은 자리를 읽는다.
+    key: 'display/bidBoxDisplay.ts#openCaseCountOf',
+    kind: OTHER_AXIS,
+    why: '지금 들여다볼 건의 **수**를 낸다. 글자를 만들지 않는다',
+  },
   {
     key: 'display/bidBoxDisplay.ts#isBidBoxSelection',
     kind: OTHER_AXIS,
