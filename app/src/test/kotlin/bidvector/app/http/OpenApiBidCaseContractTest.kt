@@ -34,13 +34,6 @@ class OpenApiBidCaseContractTest {
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
     /**
-     * 전수는 **전이표의 열 키 열넷 + 건을 여는 명령 하나**다. 여는 명령은 출발 상태가 없어 전이표의
-     * 행이 될 수 없고 타임라인에는 생성 전이로 남으므로, `BidCommandTag` 만으로는 전수가 아니다.
-     *
-     * 기댓값을 어댑터 쪽 CHECK 등식과 **같은 꼴로** 만든다 — 두 층이 같은 식을 쓰면 한쪽만 늘어난
-     * 상태가 생기지 않는다.
-     */
-    /**
      * **키 집합 등식의 두 방향**(M14/14E 가 세운다 — 그전까지 이 계열에 이 축이 **없었다**).
      * 어휘 축(위·아래 test)은 enum 의 값을 재지 칸의 **집합**을 재지 않는다. 그래서 응답 DTO 에
      * 칸을 더하고 문서를 놔두면(또는 그 반대) 이 계열에서 아무것도 붉지 않았다 — 같은 저장소의
@@ -74,6 +67,13 @@ class OpenApiBidCaseContractTest {
         spec.requiredKeys("BidCase") shouldBe CASE_KEYS - "nextCheckpointAt"
     }
 
+    /**
+     * 전수는 **전이표의 열 키 열넷 + 건을 여는 명령 하나**다. 여는 명령은 출발 상태가 없어 전이표의
+     * 행이 될 수 없고 타임라인에는 생성 전이로 남으므로, `BidCommandTag` 만으로는 전수가 아니다.
+     *
+     * 기댓값을 어댑터 쪽 CHECK 등식과 **같은 꼴로** 만든다 — 두 층이 같은 식을 쓰면 한쪽만 늘어난
+     * 상태가 생기지 않는다.
+     */
     @Test
     fun `타임라인 명령 어휘가 Kotlin 전수와 같다 — 전이 명령 열넷과 여는 명령 하나`() {
         spec.propertyEnum("BidTimelineEntry", "command") shouldContainExactlyInAnyOrder
