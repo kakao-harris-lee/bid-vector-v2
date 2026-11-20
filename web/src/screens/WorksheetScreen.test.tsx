@@ -1059,6 +1059,19 @@ describe('화면 C — 하한 대비 여유', () => {
 describe('화면 C — 투찰가 응답 없이 다시 연 화면 (v H-1 · cr D14)', () => {
   const STATES = Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][];
 
+  /** 자리마다 다른 **축 이름** — 주장을 맞대려면 이 꼬리를 떼야 한다. */
+  const AXIS_TAILS = [
+    '자격 판정을 다시 잴 수 없습니다.',
+    '투찰가 3안과 그 근거를 다시 볼 수 없습니다.',
+    '하한 대비 여유를 다시 잴 수 없습니다.',
+  ] as const;
+
+  /** 축 이름을 뗀 나머지와, **실제로 뗐는가**. 못 뗀 것을 조용히 통과시키지 않는다. */
+  const claimOf = (text: string): { readonly claim: string; readonly ends: boolean } => {
+    const tail = AXIS_TAILS.find((one) => text.endsWith(one));
+    return { claim: tail === undefined ? text : text.slice(0, -tail.length), ends: tail !== undefined };
+  };
+
   /** 받은 응답이 손에 없는 자리 전수 — 그 가운데 **빈칸으로 접히는 자리가 없다**. */
   it.each(STATES)('%s — 응답이 없으면 자격 자리가 사유를 든다(빈칸으로 접지 않는다)', async (state) => {
     mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
@@ -1069,6 +1082,111 @@ describe('화면 C — 투찰가 응답 없이 다시 연 화면 (v H-1 · cr D1
     expect(screen.queryByTestId('qualification'), '응답 없이 자격 카드가 섰다').toBeNull();
     const absent = await screen.findByTestId('qualification-absent');
     expect((absent.textContent ?? '').trim().length, '사유가 비었다').toBeGreaterThan(0);
+  });
+
+  /**
+   * **세 자리가 서로를 부정하지 않는다**(cr r1 HIGH).
+   *
+   * 앞 판은 자격 축만 다음 행동별 표를 쓰고 나머지 둘이 한 문장을 공유했다 — 그래서 「나중에」
+   * 건의 한 화면에서 윗줄이 「되돌린 뒤 요청하면 온다」고 하고 아랫줄 둘이 「다시 요청할 수
+   * 없다」고 말했다. **그 틈이 test 를 지나간 까닭**은 전수 단언이 「비지 않음」만 보고, 세 얼굴
+   * 비교가 세 상태에서만 돌았기 때문이다. 그래서 **상태 전수 × 자리 셋**을 본다.
+   *
+   * 어느 자리가 서는가는 **다음 전이의 표에서 유도한다** — 기대값을 손으로 적으면 그 표가 바뀔
+   * 때 둘이 갈린다.
+   */
+  it.each(STATES)('%s — 사유 자리 셋이 한 표에서 나온다', async (state) => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    const next = nextActionOf(state);
+    /**
+     * 투찰가를 **이 화면에서 곧 물을 수 있는가** — 요청 버튼이 여기 있거나(`REQUEST_PRICE`),
+     * 「다시 보기」 한 번이면 그 길이 열린다(`RESUME`). 그 둘에서는 자격 자리만 다음 걸음을
+     * 말하고 나머지 둘은 **자리 자체를 만들지 않는다**(13C 의 판단).
+     */
+    const hasPathToAsk = next !== null && (next.kind === 'REQUEST_PRICE' || next.kind === 'RESUME');
+    /** 넘김 카드는 다음 전이가 있을 때만 선다 — 하한 여유 자리는 그 카드 **안**이다. */
+    const handoffStands = next !== null;
+
+    const qualification = (await screen.findByTestId('qualification-absent-why')).textContent ?? '';
+    const priceCard = screen.queryByTestId('price-card-absent');
+    const margin = screen.queryByTestId('floor-margin');
+
+    expect(priceCard !== null, '투찰가 카드의 사유').toBe(!hasPathToAsk);
+    expect(margin !== null, '하한 여유 자리').toBe(handoffStands && !hasPathToAsk);
+
+    /**
+     * 서는 자리끼리 **같은 주장**을 한다. 주장은 「축 이름을 뗀 나머지」다 — 한 화면의 두 문장이
+     * 서로를 부정하지 않는 것이 이 단언의 일이다(앞 판은 윗줄이 「되돌린 뒤 요청하면 온다」,
+     * 아랫줄이 「다시 요청할 수 없다」였다).
+     */
+    for (const other of [priceCard, margin]) {
+      if (other === null) {
+        continue;
+      }
+      const mine = claimOf(other.textContent ?? '');
+      const theirs = claimOf(qualification);
+      // **비공허** — 축 이름을 실제로 뗐는가. 못 떼면 아래 비교가 글자 전체를 맞대게 된다.
+      expect(mine.ends, `${other.textContent ?? ''}: 축 이름을 떼지 못했다`).toBe(true);
+      expect(theirs.ends, `${qualification}: 축 이름을 떼지 못했다`).toBe(true);
+      expect(mine.claim, '자격 자리와 다른 주장을 한다').toBe(theirs.claim);
+    }
+  });
+
+  /**
+   * **문면을 축어로 못박는 세 상태**(팀장 지시). 구조 단언은 「어느 자리가 서는가」를 들고 이
+   * 단언이 **무슨 말을 하는가**를 든다 — 둘이 함께 있어야 사유가 조용히 뒤집히지 않는다.
+   */
+  it.each([
+    ['DEFERRED' as const, '다시 보기로 되돌린 뒤 투찰가를 요청하면 자격 판정이 함께 옵니다.', null, null],
+    [
+      'PRICE_RECEIVED' as const,
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 자격 판정을 다시 잴 수 없습니다.',
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 투찰가 3안과 그 근거를 다시 볼 수 없습니다.',
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 하한 대비 여유를 다시 잴 수 없습니다.',
+    ],
+    [
+      'BID_PLANNED' as const,
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 자격 판정을 다시 잴 수 없습니다.',
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 투찰가 3안과 그 근거를 다시 볼 수 없습니다.',
+      '투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 하한 대비 여유를 다시 잴 수 없습니다.',
+    ],
+  ])('%s 의 세 문면이 이것이다', async (state, qualification, priceCard, margin) => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    expect((await screen.findByTestId('qualification-absent-why')).textContent).toBe(qualification);
+    expect(screen.queryByTestId('price-card-absent')?.textContent ?? null).toBe(priceCard);
+    expect(screen.queryByTestId('floor-margin')?.textContent ?? null).toBe(margin);
+  });
+
+  /**
+   * **「다시 적으십시오」는 초안이 있는 자리에서만**(v F5). 담아 두고 바로 「나중에」로 내려놓은
+   * 건에는 초안도 응답도 없었는데 앞 판이 「**다시** 적으십시오」라고 말했다. 다음 걸음이
+   * 「제출함」이라는 것이 곧 초안이 있다는 뜻이다(상태 표의 `why`).
+   */
+  it.each(STATES)('%s — 초안 금액 안내가 서는지는 다음 걸음이 「제출함」인지와 같다', async (state) => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    expect(
+      screen.queryByTestId('draft-amount-not-readable') !== null,
+      '초안 금액 안내',
+    ).toBe(nextActionOf(state)?.kind === 'RECORD_BID');
+  });
+
+  /** 전제가 **받았다고 단정하지 않는다**(v F5) — 응답을 받은 적 없는 건에도 서는 글자다. */
+  it('사유의 전제가 응답 수신을 단정하지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    const text = (await screen.findByTestId('qualification-absent-why')).textContent ?? '';
+    expect(text, '받았다고 단정한다').not.toContain('받은 투찰가 응답');
+    expect(text).toContain('투찰가 응답은 받은 화면에서만');
   });
 
   /**

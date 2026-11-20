@@ -114,36 +114,89 @@ const PRIMARY_SLOT = {
  * 각자 자기 축을 말해야 한다(「곁의 카드를 보라」는 폭이 바뀌면 거짓이 되는 꼴이다 — 같은
  * 리뷰가 그 꼴을 둘 지적했다). 전제가 겹치는 것은 그 셋이 한 원인을 갖기 때문이다.
  */
-const PRICE_ONLY_IN_SESSION = '받은 투찰가 응답은 받은 화면에서만 보입니다';
+/**
+ * **주어가 「받은 응답」이 아니다**(cr r1 LOW · v F5). 앞 판은 「**받은** 투찰가 응답은 …」이라
+ * 적어, 응답을 한 번도 받은 적 없는 건(담아 두고 바로 「나중에」로 내려놓은 건)에서도 받았다고
+ * 전제했다. 이것은 **그 표면의 성질**을 말하는 문장이라 어느 건에서나 참이다.
+ */
+const PRICE_ONLY_IN_SESSION = '투찰가 응답은 받은 화면에서만 보입니다';
 
-/** 다시 요청할 수 **없는** 자리의 축별 사유 — 위 전제에 자기 축을 잇는다. */
-const CANNOT_ASK_AGAIN = {
-  qualification: `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 다시 요청할 수 없어 자격 판정을 다시 잴 수 없습니다.`,
-  price: `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 다시 요청할 수 없어 투찰가 3안과 그 근거를 다시 볼 수 없습니다.`,
-  floorMargin: `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 다시 요청할 수 없어 하한 대비 여유를 다시 잴 수 없습니다.`,
-} as const;
+/** 다시 요청할 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc). */
+const cannotAskHere = (axis: string): string =>
+  `${PRICE_ONLY_IN_SESSION} — 이 화면에서는 다시 요청할 수 없어 ${axis}.`;
+
+/** 다음 걸음이 아예 없는 상태 — 요청을 **하지 않는** 것이지 못 하는 것이 아니다. */
+const settled = (axis: string): string =>
+  `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 투찰가를 요청하지 않으므로 ${axis}.`;
 
 /**
- * 자격 자리의 사유 — **다음 행동의 종류**가 고른다. 축은 하나다: **지금 요청할 수 있는가.**
- * 그럴 수 있으면 다음 걸음을 말하고(그것이 참인 안내다), 없으면 위의 사실을 말한다.
+ * 응답이 손에 없을 때 **빈 자리 셋이 각자 드는 사유**(v H-1 · cr D14 · cr r1 HIGH).
+ *
+ * **세 자리가 한 표에서 나온다.** 앞 판은 자격 축만 다음 행동별 표를 쓰고 나머지 둘은 한 문장을
+ * 공유했다 — 그래서 「나중에」 건의 한 화면에서 윗줄이 「되돌린 뒤 요청하면 온다」고 하고 아랫줄
+ * 둘이 「다시 요청할 수 없다」고 **서로를 부정했다**(cr r1 HIGH 의 실측). 세 자리가 한 원인을
+ * 가지므로 **한 표**가 맞다.
+ *
+ * **주어를 화면으로 낮췄다.** 「이 **상태에서는** 다시 요청할 수 없어」는 거짓일 수 있다 —
+ * 「나중에 → 다시 보기」 두 걸음이 요청 경로로 데려가는 상태가 있다. 「이 **화면에서는**」은 네
+ * 갈래 전부에서 참이다: 그 상태의 화면에 투찰가 요청이 없다는 말이고, 그것이 운영자가 지금
+ * 보는 사실이다.
+ *
+ * **`null` 은 「이 자리에 사유를 두지 않는다」**이고 그 뜻은 둘 가운데 하나다 — 아직 묻지
+ * 않았거나(요청 버튼이 이 화면에 있다), 한 걸음 뒤에 물을 수 있다(「다시 보기」가 이 화면에
+ * 있다). 두 경우 모두 **자격 자리만** 다음 걸음을 말하고 나머지 둘은 자리 자체를 만들지 않는다 —
+ * 묻지 않은 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다(13C 의 판단).
  */
-const QUALIFICATION_ABSENCE = {
-  REQUEST_PRICE: '투찰가를 요청하면 자격 판정이 함께 옵니다.',
-  DRAFT_BID: CANNOT_ASK_AGAIN.qualification,
-  RECORD_BID: CANNOT_ASK_AGAIN.qualification,
-  RESUME: `${PRICE_ONLY_IN_SESSION} — 나중에로 미룬 건이라, 다시 보기로 되돌린 뒤 투찰가를 요청하면 자격 판정이 함께 옵니다.`,
-} as const satisfies Record<NextActionKind, string>;
+interface PriceAbsenceCopy {
+  readonly qualification: string;
+  readonly price: string | null;
+  readonly floorMargin: string | null;
+}
+
+const PRICE_ABSENCE = {
+  REQUEST_PRICE: {
+    qualification: '투찰가를 요청하면 자격 판정이 함께 옵니다.',
+    price: null,
+    floorMargin: null,
+  },
+  // 「다시 보기」가 **이 화면의 다음 행동**이다 — 한 번 누르면 요청 경로가 열린다.
+  RESUME: {
+    qualification: '다시 보기로 되돌린 뒤 투찰가를 요청하면 자격 판정이 함께 옵니다.',
+    price: null,
+    floorMargin: null,
+  },
+  DRAFT_BID: {
+    qualification: cannotAskHere('자격 판정을 다시 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다'),
+  },
+  RECORD_BID: {
+    qualification: cannotAskHere('자격 판정을 다시 잴 수 없습니다'),
+    price: cannotAskHere('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
+    floorMargin: cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다'),
+  },
+} as const satisfies Record<NextActionKind, PriceAbsenceCopy>;
 
 /**
- * 다음 전이가 **없는** 상태의 같은 자리. 표의 밖에 있는 자리라 따로 적는다 — 그 상태에서는
- * 요청 경로가 아예 없고, 「요청하면 온다」는 거짓 안내가 된다.
+ * 다음 전이가 **없는** 상태의 같은 셋. 표 밖이라 따로 적는다 — 그 상태에서는 요청 경로가 아예
+ * 없고 「요청하면 온다」가 거짓 안내가 된다. **세 자리가 같은 주장을 한다**(cr r1 LOW: 앞 판은
+ * 자격 축만 이 갈래를 쓰고 투찰가 카드는 「다시 요청할 수 없어」를 재사용해, 결과는 같은데
+ * 주장이 갈렸다).
  */
-const QUALIFICATION_ABSENCE_SETTLED = `${PRICE_ONLY_IN_SESSION} — 이 상태에서는 투찰가를 요청하지 않으므로 자격 판정을 다시 잴 수 없습니다.`;
+const PRICE_ABSENCE_SETTLED: PriceAbsenceCopy = {
+  qualification: settled('자격 판정을 다시 잴 수 없습니다'),
+  price: settled('투찰가 3안과 그 근거를 다시 볼 수 없습니다'),
+  floorMargin: settled('하한 대비 여유를 다시 잴 수 없습니다'),
+};
 
 /**
  * 기록할 금액을 **다시 적어야 하는** 사실. `BidCase` 에 초안 금액 칸이 없어 화면이 그 값을
  * 되읽을 수 없다(그 알려진 제한이 지금까지 **코드 주석에만** 있었고 화면은 빈 입력 위에
  * 「초안과 기록이 같은 입력을 씁니다」를 세웠다).
+ *
+ * **초안이 있는 자리에서만 선다**(v F5): 다음 행동이 「제출함」이라는 것이 곧 초안이 있다는
+ * 뜻이다(상태 표의 `why` — 「초안이 있고 아직 제출 기록이 없다」). 앞 판은 「다시 요청할 수 없는」
+ * 자리 전부에 세워, 초안을 만든 적 없는 「나중에」 건에도 「**다시** 적으십시오」라고 말했다.
  */
 const DRAFT_AMOUNT_NOT_READABLE = '기록할 금액은 다시 적으십시오 — 초안 금액을 되읽는 표면이 계약에 없습니다.';
 
@@ -719,23 +772,21 @@ export function WorksheetScreen() {
   const exits = bidCase === undefined ? [] : exitsOf(bidCase.state);
   const amountWon = parseWon(form.amount);
   /**
-   * **응답이 손에 없는 자리들이 드는 사유**(v H-1 · cr D14) — 축은 「지금 요청할 수 있는가」
-   * 하나이고 그 답은 **다음 전이의 표**가 준다.
+   * **응답이 손에 없는 자리 셋이 드는 사유** — 한 표에서 온다(cr r1 HIGH). 응답이 손에 있으면
+   * 셋 다 사유가 없다(그 자리에 **값**이 선다).
    */
-  const canAskPrice = action !== null && action.kind === 'REQUEST_PRICE';
-  const qualificationAbsence =
-    action === null ? QUALIFICATION_ABSENCE_SETTLED : QUALIFICATION_ABSENCE[action.kind];
+  const priceView: { readonly kind: 'present'; readonly price: BidPriceRequestResponse } | { readonly kind: 'absent'; readonly copy: PriceAbsenceCopy } =
+    price === null
+      ? { kind: 'absent', copy: action === null ? PRICE_ABSENCE_SETTLED : PRICE_ABSENCE[action.kind] }
+      : { kind: 'present', price };
+  const absence = priceView.kind === 'absent' ? priceView.copy : null;
+  const priceCardAbsence = absence === null ? null : absence.price;
+  const marginAbsence = absence === null ? null : absence.floorMargin;
   /**
-   * 투찰가 카드 자신의 사유 — **다시 요청할 수 없을 때만** 선다. 요청할 수 있는 자리에서는
-   * 선언 칸과 primary 버튼이 그 사실을 이미 말한다(같은 말을 두 번 적지 않는다).
+   * 초안 금액을 되읽지 못한다는 사실은 **초안이 있는 자리에서만** 선다(v F5) — 다음 행동이
+   * 「제출함」이라는 것이 곧 초안이 있다는 뜻이다.
    */
-  const priceCardAbsence = price !== null || canAskPrice ? null : CANNOT_ASK_AGAIN.price;
-  /**
-   * 하한 여유 자리의 사유 — 같은 축이다. **요청할 수 있는 자리에서는 `null`**: 아직 묻지 않은
-   * 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다(13C 의 판단은 그 자리의 것이고,
-   * H-1 이 말하는 것은 **다시 물을 수 없는** 자리다 — 둘은 다른 사실이다).
-   */
-  const marginAbsence = price !== null || canAskPrice ? null : CANNOT_ASK_AGAIN.floorMargin;
+  const draftAmountUnreadable = price === null && action !== null && action.kind === 'RECORD_BID';
   /**
    * 하한 대비 여유 — **투찰가 응답이 있어야** 하한율이 있다. 요청 전에는 자리 자체를 만들지
    * 않는다(없는 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다).
@@ -896,13 +947,19 @@ export function WorksheetScreen() {
           {/* **빈 자리는 사유를 든다**(v H-1 · cr D14) — 앞 판은 응답이 없으면 이 카드를
               통째로 걷어, 자격에 대해 **아무 말도 하지 않았다**. 그 침묵이 「판정했고 통과」로
               읽힌다(화면 자신의 「빈 자리 + 사유」 규율과도 어긋난다). */}
-          {price === null ? (
+          {/* **사유를 표에서 받는다** — 「응답이 없다」와 「사유가 있다」가 한 값이라, 사유 없이
+              이 자리를 그리는 길이 타입에 남아 있지 않다(앞 판은 둘이 따로였다). */}
+          {priceView.kind === 'present' ? (
+            <WorksheetQualification price={priceView.price} />
+          ) : (
             <section data-testid="qualification-absent" className={cardClass()}>
               <h3 className="text-sm font-semibold">자격</h3>
-              <p className="mt-1 text-xs text-absent-ink">{qualificationAbsence}</p>
+              {/* 사유를 **자기 표지**로 집는다 — 카드 전체를 읽으면 제목 글자가 섞여, 문면을
+                  축어로 못박는 단언이 제목까지 함께 잠근다. */}
+              <p data-testid="qualification-absent-why" className="mt-1 text-xs text-absent-ink">
+                {priceView.copy.qualification}
+              </p>
             </section>
-          ) : (
-            <WorksheetQualification price={price} />
           )}
           <section data-testid="worksheet-price-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰가</h3>
@@ -946,7 +1003,7 @@ export function WorksheetScreen() {
                 ) : null}
                 <p className="mt-1 text-xs text-ink-soft">초안과 기록이 같은 입력을 씁니다.</p>
                 {/* 초안 금액을 되읽는 표면이 없다 — 그 사실이 **빈 입력 곁**에서 말한다. */}
-                {price === null && !canAskPrice ? (
+                {draftAmountUnreadable ? (
                   <p data-testid="draft-amount-not-readable" className="mt-1 text-xs text-absent-ink">
                     {DRAFT_AMOUNT_NOT_READABLE}
                   </p>

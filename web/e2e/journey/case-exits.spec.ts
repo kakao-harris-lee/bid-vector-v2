@@ -135,14 +135,18 @@ test('여정 — 나중에 → 실행 취소 → 원상태', async ({ page }) =>
  * 민 뒤에는 요청 경로도 없다. 앞 판은 그 자리를 **빈칸으로 접었고**, 운영자는 「하한 대비 여유
  * 표시가 없다」를 「문제없다」로 읽는다(해를 입는 자리가 투찰 금액이다).
  *
- * **왜 「나중에」로 재는가**: 그 상태의 다음 행동은 「다시 보기」이고 **투찰가 요청이 아니다** —
- * 곧 「다시 요청할 수 없는」 갈래에 들면서 넘김 카드가 서는 상태다(종단에서는 그 카드 자체가
- * 없어 하한 여유 자리를 잴 수 없다). 그리고 이 여정이 **이미 만들고 되돌리는** 상태라 새
- * fixture 도 남는 상태 변화도 없다.
+ * **왜 「나중에」로 재는가**: 이 여정이 **이미 만들고 되돌리는** 상태라 새 fixture 도 남는 상태
+ * 변화도 없다. 그 상태에서 재는 것은 **자격 자리가 사유를 들고 그 사유가 다음 걸음을 말한다**는
+ * 것이다 — 「다시 보기」가 이 화면의 다음 행동이므로 한 번 누르면 요청 경로가 열리고, 그래서
+ * 그 자리는 「다시 못 받는다」가 아니라 **그 걸음**을 말해야 한다(r1 cr HIGH 가 바로잡은 자리다).
  *
- * **음성 대조가 같은 test 안에 있다**: 되돌린 뒤(관심) 같은 화면에서 하한 여유 자리는 **없어야**
- * 한다 — 아직 묻지 않은 축을 「재지 못함」으로 그리면 화면이 묻지 않은 것에 답한다. 더하기만 한
- * 변경이면 그 단언이 붉는다.
+ * **하한 여유 자리는 이 상태에서 서지 않는다**: 아직 물을 길이 있는 축을 「재지 못함」으로
+ * 그리면 화면이 묻지 않은 것에 답한다(13C 의 판단). 그 자리가 **사유를 드는** 갈래(투찰 예정 ·
+ * 투찰가 받음)는 상태 전수 × 자리 셋을 단위 레인이 든다 — 그 상태를 여정으로 만들려면 되돌릴
+ * 길이 없는 전이를 공유 하네스에 남겨야 해서, 전용 fixture 공고가 필요하다(알려진 제한).
+ *
+ * **음성 대조가 같은 test 안에 있다**: 되돌린 뒤(관심) 자격 사유의 글자가 **바뀐다** — 되돌림
+ * 한 걸음이 사라졌으므로 「다시 보기로 되돌린 뒤」가 빠진다. 더하기만 한 변경이면 그 단언이 붉는다.
  */
 test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 든다', async ({ page }) => {
   const watched = watchRequests(page);
@@ -168,16 +172,25 @@ test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 �
   await expect(page.getByTestId('screen-worksheet')).toBeVisible();
   await page.waitForLoadState('networkidle');
 
-  // 자격 자리: 카드가 걷히는 대신 **사유**가 선다.
+  // 자격 자리: 카드가 걷히는 대신 **사유**가 선다 — H-1 이 가리킨 빈칸이 여기다.
+  const why = page.getByTestId('qualification-absent-why');
   await expect(page.getByTestId('qualification-absent'), '자격 자리가 사유 없이 사라졌다').toHaveCount(1);
   await expect(page.getByTestId('qualification'), '응답 없이 자격 카드가 섰다').toHaveCount(0);
 
-  // 하한 여유 자리: **그 줄이 통째로 없어지지 않는다**. H-1 의 핵심 자리다.
-  const margin = page.getByTestId('floor-margin');
-  await expect(margin, '하한 대비 여유가 빈칸으로 접혔다').toHaveCount(1);
-  await expect(margin).toContainText('받은 화면에서만');
-  // 숫자를 지어내지 않는다 — 재지 못한 자리에 비율을 그리지 않는다.
-  await expect(margin).not.toContainText('%');
+  /*
+   * 사유가 **이 화면의 다음 걸음**을 말한다. 그 걸음(「다시 보기」)이 같은 화면의 primary 자리에
+   * 서 있고, 아래에서 실제로 그것을 눌러 길이 열리는 것을 잰다 — 문면과 거동이 같은 test 에서
+   * 맞물린다.
+   */
+  await expect(why).toContainText('다시 보기로 되돌린 뒤');
+  await expect(why, '물을 길이 있는데 못 묻는다고 말한다').not.toContainText('다시 요청할 수 없어');
+
+  /*
+   * 아직 물을 길이 있는 축은 **자리 자체가 없다**(13C 의 판단). 하한 여유도 투찰가 카드의 사유도
+   * 이 상태에서는 서지 않는다.
+   */
+  await expect(page.getByTestId('floor-margin'), '묻지 않은 축을 재지 못함으로 그렸다').toHaveCount(0);
+  await expect(page.getByTestId('price-card-absent'), '같은 자리에서 다른 주장을 한다').toHaveCount(0);
 
   // 되돌린다 — 그 상태의 다음 행동 하나가 「다시 보기」다(머리 자리).
   const resumed = page.waitForResponse(
@@ -188,12 +201,12 @@ test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 �
   expect(back.state, '되돌림이 관심으로 돌린다').toBe('WATCHING');
 
   /**
-   * **음성 대조** — 요청할 수 있는 상태에서는 하한 여유 자리가 **없다**. 그리고 자격 자리의
-   * 사유가 **다른 글자**로 바뀐다(「요청하면 온다」는 참인 안내이고 「다시 못 받는다」는 그
-   * 상태에서 거짓이다).
+   * **음성 대조** — 되돌림 한 걸음이 사라졌으므로 사유의 글자가 **바뀐다**. 같은 글자가 두
+   * 상태에 서 있으면(더하기만 한 변경) 이 단언이 붉는다.
    */
-  await expect(page.getByTestId('floor-margin'), '묻지 않은 축을 재지 못함으로 그렸다').toHaveCount(0);
-  await expect(page.getByTestId('qualification-absent')).toContainText('투찰가를 요청하면');
+  await expect(why).toContainText('투찰가를 요청하면');
+  await expect(why, '되돌림이 끝났는데 그 걸음을 아직 말한다').not.toContainText('다시 보기로 되돌린 뒤');
+  await expect(page.getByTestId('floor-margin'), '관심 상태에 여유 자리가 생겼다').toHaveCount(0);
 
   await expect(page.getByTestId('write-failure')).toHaveCount(0);
   expect(watched.outside).toStrictEqual([]);
