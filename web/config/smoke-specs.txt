@@ -9,5 +9,10 @@
 # 경로는 `playwright.config.ts` 의 `testDir` 기준 상대 경로다. spec 을 더하거나 지우면 **같은
 # 커밋에서** 이 파일을 고친다.
 kotlin-read-guard.spec.ts
+# M14/14A — **배치 게이트**. 1280px 에서 사이드바와 본문이 나란하고 레일이 본문 오른쪽인지,
+# 390px 에서 한 단이고 가로 넘침이 0 인지를 **상자 좌표로** 잰다(class 이름으로 고르지 않는다).
+# 이 레인에 두는 까닭은 백엔드가 필요 없기 때문이다 — 출하 번들을 preview 로 띄우면 세션 없이도
+# 셸과 화면이 선다(기존 셸 스모크가 그 사실을 든다).
+layout.spec.ts
 shell.spec.ts
 touch-measure.spec.ts

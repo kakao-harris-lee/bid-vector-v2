@@ -2,7 +2,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { LAYOUT_SLOT_ATTRIBUTE, TWO_COLUMN_ATTRIBUTE, TwoColumn } from './TwoColumn';
+import { TwoColumn } from './TwoColumn';
+import { LAYOUT_SLOT_ATTRIBUTE, TWO_COLUMN_ATTRIBUTE } from './twoColumnShape';
 
 /**
  * 두 단 배치의 짝 test(M14/14A). **상자 좌표는 여기서 설 수 없다** — jsdom 은 레이아웃을 풀지
