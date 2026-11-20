@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { NoticeSummary, SuggestedNotice } from '../api/queries';
 import { AbsentValue } from '../components/AbsentValue';
 import { Card } from '../components/Card';
-import { StateBadge, useHint } from '../components/StateBadge';
+import { StateBadge, useTermHint } from '../components/StateBadge';
 import { amountDisplayOf, noticeStatusDisplayOf, SUGGESTION_LICENSE_VERDICT_DISPLAY } from '../display/noticeDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 import { dayCountText, daysUntil } from '../display/timeDisplay';
@@ -56,7 +56,7 @@ export function NoticeCard({
   readonly action: React.ReactNode;
 }) {
   const amount = amountDisplayOf(notice);
-  const amountHint = useHint(AMOUNT_HINT);
+  const amountHint = useTermHint(AMOUNT_HINT);
   return (
     <Card as="li" testId={`notice-card-${notice.noticeNumber}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -80,11 +80,10 @@ export function NoticeCard({
           </dd>
         </div>
         <div className="flex flex-col gap-0.5">
-          <dt className="text-xs text-ink-soft" title={AMOUNT_HINT}>
-            기초금액
-          </dt>
-          {/* CR r3 M-5 — 같은 문면의 **세 번째 자리**였다. `title` 하나로 두면 터치·보조기기에서
-              볼 수 없다(배선은 `useHint` 한 자리). */}
+          {/* CR r3 M-5 · M14/14A(M13 잔여 ⓖ) — 같은 문면의 **세 번째 자리**였다. `title` 하나로
+              두면 터치·보조기기에서 볼 수 없다. 이제 라벨이 누를 수 있는 자리이고 배선은
+              `useTermHint` 한 자리다. */}
+          <dt className="text-xs text-ink-soft">{amountHint.termNode('기초금액')}</dt>
           <dd aria-describedby={amountHint.describedBy} className="font-numeric text-sm">
             {/* 값은 **자기 요소**가 들고 아래층 문면은 그 옆에 둔다 — 값 단언이 설명까지 읽지
                 않게 하면서 `dl` 내용 모형도 지킨다(한 용어에 `<dd>` 하나). */}
