@@ -83,4 +83,13 @@
 | 와이어프레임 B(모바일) | `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-14b/wf-MobileToday.png` |
 | 와이어프레임 A | `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-14b/wf-Start.png` |
 | 앞(base `056f405c`) | `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-14b/before/` — `a-start-{desktop,mobile}.png` · `b-notices-{desktop,mobile}.png` |
-| 뒤(산출물) | `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-14b/after/` — 같은 네 이름 |
+| 뒤(산출물 · 수정 라운드 1 뒤 다시 떴다) | `/tmp/claude-1000/-home-deploy-project-bid-vector-v2/ee4ff2c1-ad7b-487d-8e6e-ee9ee2fed55e/scratchpad/lane-14b/after/` — 같은 네 이름 |
+
+**캡처의 알려진 제한**(v L5). B 두 장은 **검색 결과 상태**다 — 캡처 도구의 양성 표지가 검색
+결과 카드이기 때문이다. 그래서 이 slice 가 바꾼 것 가운데 **기본 상태에서만 보이는 것**
+(머리 요약 · 눌린 「전체」 칩 · 정렬 표시 · 제안 카드)이 캡처에 없다. 기본 상태를 찍으려면
+캡처 하네스 계정에 **감시 조건을 심어야** 하고(지금은 「감시 조건이 설정되지 않았습니다」라
+제안이 0 이다), 그 씨앗은 캡처 도구의 몫이라 이 slice 의 in_scope 밖이다. 레일 미리보기가
+빈 얼굴로만 찍히는 것도 같은 까닭이다.
+
+모바일 카드는 다시 떠서 **「기초 / 15억원」**(축 이름 + 압축)으로 선다 — v M-2 의 그 자리다.
