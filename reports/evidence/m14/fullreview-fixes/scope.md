@@ -176,6 +176,33 @@ L-3 의 둘째 몫(넘김 카드의 금액이 운영자가 아직 안 적은 입
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신 (수정 라운드 1 — 기계 재산출로 드러난 것)
+
+**(1) in_scope 밖이었던 경로 여섯**(v F6 — 반복 사각). 아래는 `git diff --name-only <base>..HEAD`
+와 착수 목록을 대조해 **기계로** 낸 것이다.
+
+| 경로 | 왜 열렸나 |
+| --- | --- |
+| `web/src/screens/TodayNoticesScreen.tsx` | **출하 코드다.** 새 술어의 fail-closed 규율이 펼친 속성을 증명 불가로 세어, 그 자리를 펼치지 않고 적었다(거동 보존) |
+| `web/e2e/journey/onboarding.spec.ts` | 보이는 라벨이 이름이 되면서 **여정 레인의 locator** 가 함께 움직였다(그 모집단을 착수 때 세지 않았다 — 등재한 교훈) |
+| `web/src/display/myBidResultDisplay.test.ts` | D8 의 짝 test(방향 말 금지 단언) |
+| `web/src/screens/absenceRender.test.tsx` | 부재 어휘 렌더 표본 — 사유가 늘자 전수 단언이 그 자리에서 멈췄다 |
+| `web/src/screens/screenCopy.test.tsx` · `screenVocabulary.test.tsx` | `KonepsHandoff` 의 새 필수 인자, 그리고 r1 에서 사유 문면을 모집단에 넣은 마운트 |
+
+**(2) 수정 라운드 1 이 더 연 자리 셋**.
+
+| 경로 | 왜 열렸나 |
+| --- | --- |
+| `web/e2e/journey/touchMeasure.ts` · `touch-target.spec.ts` | 설계 검토가 과잉을 선언하며 기댄 층(「이름 없는 컨트롤 0」)을 **실제 게이트로** 세웠다(cr r1 M②) |
+| `web/src/screens/SettingsScreen.test.tsx` | strategyEdit 의 `aria-describedby` 를 지키는 단언(v F2) |
+
+**(3) 터치 타깃 계수**(v F7 — 문자 그대로 거짓이던 문장의 정정). 착수 때 적은 「계수가 줄어드는
+변경은 하나도 없다」는 **worksheet 에서 거짓**이다: 10 → **9** 로 하나 줄었다. 줄어든 것은
+`record-vat` 이고, 그 화면이 종단 건이라 **D6 이 의도대로** 쓸 수 없는 입력 묶음을 걷은 결과다.
+**하한은 8 이고 지킨다**(계약의 「올리기만」은 하한 값의 규율이고, 그 값은 diff 0 이다).
+
 ## 갱신 이력
 
 - 2026-11-20 초판(착수 보고와 함께).
+- 2026-11-21 수정 라운드 1 — in_scope 표류 여섯과 새로 연 자리 셋을 (1)·(2) 로, 터치 계수
+  정정을 (3) 으로 등재.
