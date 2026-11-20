@@ -161,6 +161,8 @@ export function WorksheetScreen() {
   const confirmTitleId = `bid-confirm-title-${useId()}`;
   /** 내려놓기 폼의 자리 — 13D 의 폼이 `aria-controls` 로 쓰는 그 id 와 같은 몫이다. */
   const exitFormId = `worksheet-exit-form-${useId()}`;
+  /** 카운트다운의 라벨 id — 값 노드가 `aria-labelledby` 로 그것을 든다(cr L-2). */
+  const deadlineLabelId = `worksheet-deadline-label-${useId()}`;
   // **한 번 읽고 내린다**(M9 D-1) — 렌더마다 다시 읽으면 같은 화면의 두 칸이 서로 다른
   // 「지금」으로 날을 센다. 벽시계를 읽는 자리는 `timeDisplay` 하나다.
   const [now] = useState(readClock);
@@ -658,7 +660,12 @@ export function WorksheetScreen() {
   // 마감은 **절대 시각과 남은 날이 한 칸**이다 — 둘 다 `timeDisplay` 를 지난다(M9 D-1·D-2).
   const deadline = instantDisplayOf(notice.deadlineAt);
   const deadlineDays = dayCountText(daysUntil(notice.deadlineAt, now));
-  const checkpoint = bidCase === undefined ? null : instantDisplayOf(bidCase.nextCheckpointAt);
+  /**
+   * 다음 확인 시점의 표기. **레일이 서는 전제는 「건이 있는가」다**(cr L-3) — 앞 판은 이 값의
+   * null 여부로 레일을 가렸는데, 오늘 그 둘은 동치지만 뒤 라운드가 이 값을 「없으면 null」로
+   * 바꾸는 순간 레일 **전체**(다음 확인 시점 · 타임라인 · 내려놓기 · 열린 폼)가 조용히 사라진다.
+   */
+  const checkpointDisplay = instantDisplayOf(bidCase?.nextCheckpointAt);
   const action = bidCase === undefined ? null : nextActionOf(bidCase.state, price !== null);
   /** 이 상태에서 열린 내려놓기 — **표에서 유도된다**(화면이 상태를 보고 고르지 않는다). */
   const exits = bidCase === undefined ? [] : exitsOf(bidCase.state);
@@ -763,8 +770,17 @@ export function WorksheetScreen() {
         {/* **마감 카운트다운은 두 단 밖이다** — 와이어프레임이 그것을 머리 행의 오른쪽에 둔다.
             좁은 화면에서는 머리 아래로 내려온다(줄바꿈 하나, 뒤집지 않는다). */}
         <div className={`${cardClass('sm')} flex w-full flex-col gap-1 md:w-auto md:shrink-0`}>
-          <span className="text-xs text-ink-soft">투찰 마감까지</span>
-          <span data-testid="worksheet-deadline" className="font-numeric text-base font-semibold">
+          {/* 라벨과 값을 **프로그램적으로** 묶는다(cr L-2). 앞 판은 `dt`/`dd` 였고 지금은 형제
+              둘이라, 그대로 두면 보조기기가 둘을 「인접한 두 글자」로만 받는다. `dl` 로 되돌리면
+              머리의 용어 줄이 둘이 되어 격자 하나 규율과 부딪히므로 `aria-labelledby` 로 묶는다. */}
+          <span id={deadlineLabelId} className="text-xs text-ink-soft">
+            투찰 마감까지
+          </span>
+          <span
+            data-testid="worksheet-deadline"
+            aria-labelledby={deadlineLabelId}
+            className="font-numeric text-base font-semibold"
+          >
             {deadlineText === null ? <AbsentValue reason="notSent" /> : deadlineText}
           </span>
         </div>
@@ -882,6 +898,10 @@ export function WorksheetScreen() {
             {primarySlot === 'price' ? <div className="mt-3">{primaryNode}</div> : null}
           </section>
           <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
+          {/* **종단 상태에서는 묻지 않는다**(cr L-1). 이미 낙찰·유찰·건너뜀인 건에
+              「투찰했나요?」는 거짓 질문이다. 조건은 **다음 전이의 표에서 유도한다** —
+              그 표가 종단에서 `null` 을 내므로 종단 집합을 화면이 한 벌 더 적지 않는다. */}
+          {action === null ? null : (
           <section data-testid="worksheet-record-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰했나요? 기록을 확인해 주세요</h3>
             <p className="mt-1 text-xs text-ink-soft">
@@ -890,6 +910,7 @@ export function WorksheetScreen() {
             </p>
             {primarySlot === 'record' ? <div className="mt-3">{primaryNode}</div> : null}
           </section>
+          )}
         </>
       )}
     </>
@@ -903,7 +924,7 @@ export function WorksheetScreen() {
    * 13D 의 것 하나다 — 입력 꼴 · 빈 값 가드 · 확인 한 단이 두 화면에서 같다.
    */
   const rail =
-    bidCase === undefined || checkpoint === null ? null : (
+    bidCase === undefined ? null : (
       <>
         <section className={cardClass()}>
           <h3 className="text-sm font-semibold">다음 확인 시점</h3>
@@ -911,7 +932,9 @@ export function WorksheetScreen() {
             <StateBadge display={displayOrUnknown(NEXT_CHECKPOINT_DISPLAY, bidCase.nextCheckpointKind)} />
             {/* 시점이 없으면 **자리도 없다** — 옆 배지가 「없음」을 말하므로 같은 사실을
                 두 번 적지 않는다(M9 D-1 의 없음 표지는 배지가 없는 자리의 일이다). */}
-            {checkpoint.kind === 'absent' ? null : <InstantText display={checkpoint} className="text-xs" />}
+            {checkpointDisplay.kind === 'absent' ? null : (
+              <InstantText display={checkpointDisplay} className="text-xs" />
+            )}
             {bidCase.overdue ? <span className="text-xs text-bad-ink">지난 일정</span> : null}
           </p>
         </section>

@@ -19,6 +19,7 @@ import {
 import { SECTION_SUMMARY_CLASS } from './WorksheetGrounds';
 import { BID_CASE_STATE_DISPLAY } from '../display/caseDisplay';
 import { ACTION_INPUT, exitsOf } from '../display/bidBoxDisplay';
+import { nextActionOf } from '../display/caseDisplay';
 import { WorksheetScreen } from './WorksheetScreen';
 
 vi.mock('../api/queries');
@@ -1800,5 +1801,63 @@ describe('화면 C — 다음 행동의 자리 표 (cr M-3 · v M-1)', () => {
 
     await screen.findByTestId('worksheet-primary');
     await primaryIn('head');
+  });
+});
+
+/** cr LOW 셋 — 종단의 질문 문면 · 카운트다운 라벨의 묶임 · 레일이 서는 전제. */
+describe('화면 C — 수정 라운드의 LOW 셋', () => {
+  /**
+   * **종단 상태에 「투찰했나요?」는 거짓 질문이다**(cr L-1). 뒤 캡처의 낙찰 건에 그 카드가
+   * 행동 없이 서 있었다. 조건은 다음 전이의 표에서 유도하므로 종단 집합을 화면이 한 벌 더
+   * 적지 않는다 — 상태 전수로 그 등식을 센다.
+   */
+  it.each(Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][])(
+    '%s 에서 기록 카드가 서는지는 다음 전이가 있는지와 같다',
+    async (state) => {
+      mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+      renderScreen();
+      await screen.findByTestId('worksheet-case-state');
+
+      const hasNext = nextActionOf(state) !== null;
+      expect(screen.queryByTestId('worksheet-record-card') !== null).toBe(hasNext);
+    },
+  );
+
+  it('종단 상태에서는 그 질문 문면이 화면에 없다 — 비공허 대조', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WON' }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    expect(screen.queryByText(/투찰했나요/u)).toBeNull();
+    // 같은 fixture 의 다른 상태에서는 선다(이 단언이 늘 참이 아니다).
+    cleanup();
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+    expect(await screen.findByText(/투찰했나요/u)).not.toBeNull();
+  });
+
+  /** cr L-2 — 라벨과 값이 **프로그램적으로** 묶인다(형제 두 글자가 아니다). */
+  it('카운트다운의 값이 자기 라벨을 든다', async () => {
+    renderScreen();
+
+    const value = await screen.findByTestId('worksheet-deadline');
+    const labelId = value.getAttribute('aria-labelledby');
+    expect(labelId, 'aria-labelledby 가 없으면 형제 두 글자로 돌아간 것이다').not.toBeNull();
+    expect(document.getElementById(labelId ?? '')?.textContent).toContain('투찰 마감까지');
+    // 머리의 용어 줄은 여전히 하나다 — 격자 하나 규율을 지킨 채 묶었다.
+    expect(value.closest('header')!.querySelectorAll('dt')).toHaveLength(1);
+  });
+
+  /**
+   * cr L-3 — 레일이 서는 전제는 **건이 있는가**다. 다음 확인 시점의 표기가 「없음」이어도
+   * 레일은 선다(그 값으로 레일 전체를 가리면 뒤 라운드가 조용히 레일을 지운다).
+   */
+  it('다음 확인 시점이 없는 건에서도 레일이 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, nextCheckpointKind: 'NONE', nextCheckpointAt: null }]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-checkpoint');
+    expect(document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_RAIL_SLOT}"]`)).not.toBeNull();
+    expect(await screen.findByTestId('timeline')).not.toBeNull();
   });
 });
