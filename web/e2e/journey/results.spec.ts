@@ -183,7 +183,10 @@ async function transitionInBidBox(
   }
 
   async function transition(): Promise<BidCaseRow> {
-    await page.getByRole('link', { name: '내 입찰함', exact: true }).click();
+    // **탐색 landmark 안에서 고른다**(M14/14A). 사이드바의 입찰함 자리가 **개수 배지**를 달면서
+    // 그 링크의 접근 이름이 「내 입찰함 <수>」가 됐다 — 축어 이름으로 고르던 앞 판은 배지가 서는
+    // 순간 아무것도 집지 못한다(실측: 이 자리에서 timeout). 알림함 자리가 이미 쓰던 꼴을 따른다.
+    await page.getByRole('navigation', { name: '화면' }).getByRole('link', { name: '내 입찰함' }).click();
     await expect(page.getByTestId('screen-bid-box')).toBeVisible();
 
     const tab = CASE_TAB_LABEL[fromState];
