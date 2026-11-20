@@ -7,16 +7,18 @@ base_sha: 056f405c9e5659b9a068288f1104f9e04a6de016   # 착수 커밋에서 기�
 head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다
 in_scope:
   - web/src/screens/WorksheetScreen.tsx    # 머리 블록 · TwoColumn · 본문 순서 · 「되돌릴 길 기억」 · 빈 괄호
-  - web/src/screens/WorksheetGrounds.tsx   # 자격 절을 레일이 함께 쓰도록 — 절 자체의 거동 0
-  - web/src/screens/WorksheetRecord.tsx    # 넘김 카드 · 기록 폼의 자리 이동(거동 0)
-  - web/src/screens/WorksheetTimeline.tsx  # 타임라인이 레일에 선다(거동 0)
+  - web/src/screens/WorksheetGrounds.tsx   # 자격 절을 본문 첫 카드로 — 절 자체의 거동 0
   - web/src/screens/WorksheetScreen.test.tsx  # **새 배치의 새 단언만** 더한다 — 13C 의 기존 주장은 그대로
+  - web/src/components/PageHeader.tsx      # 판정 ⑤ — 제목 자리 표지 하나(additive)
+  - web/src/components/PageHeader.test.tsx # 판정 ⑤ — 짝 test 를 **같은 커밋에서** 넓힌다
   - docs/discovery/capability-map.md       # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다((aa) 이후)
   - reports/evidence/m14/wf-worksheet/
-in_scope_pending_verdict:   # 팀장 판정 뒤에만 연다(착수 보고 OPEN ④)
-  - web/e2e/journey/journey.spec.ts        # 출하 레일을 **상자 좌표로** 재는 단언 한 자리
+not_touched:   # in_scope 로 열어 두었으나 **편집 0** 으로 끝났다(기계 diff 가 정본이다)
+  - web/src/screens/WorksheetRecord.tsx    # 넘김 카드·기록 폼은 자리만 옮겼고 그 자리는 화면 모듈이 정한다
+  - web/src/screens/WorksheetTimeline.tsx  # 타임라인도 같다 — 레일에 꽂는 것은 화면 모듈이다
 out_of_scope:
-  - web/src/components/**                  # 14A 원시 요소 — 쓰기만 한다(넓히려면 팀장 판정)
+  - web/e2e/journey/journey.spec.ts        # 판정 ④ — 레일 상자 축은 14B 소유. 이 레인은 문서 순서만 잠근다
+  - web/src/components/ 의 나머지          # 14A 원시 요소 — 쓰기만 한다
   - web/src/display/timeDisplay.ts         # 14A 소유. 분·시 단위 카운트다운은 새 축이다(OPEN ①)
   - web/src/display/noticeDisplay.ts · moneyDisplay.ts · caseDisplay.ts · bidBoxDisplay.ts  # 표시 계약의 표
   - web/src/screens/TodayNoticesScreen.tsx · NoticeCard.tsx · OnboardingScreen.tsx   # 14B
@@ -65,7 +67,19 @@ rollback: rollback.md
 | 「되돌릴 길 기억」의 자리 | `exitUndoable` 을 참으로 만드는 자리는 하나, **거짓으로 되돌리는 자리는 토스트 닫힘 하나**다. 그 사이에 토스트를 내는 자리가 여섯 더 있다(초안 · 기록 · 되돌림 · 담기 · 재전송 가드 둘) | 토스트 입구를 하나로 모아 닫는다 |
 | 자격·타임라인·다음 확인 시점의 전제 | 자격은 `requestBidPrice` 응답에서만 오고, 타임라인·다음 확인 시점은 **건이 입찰함에 있을 때만** 온다 | 레일의 각 카드가 자기 전제를 사유로 말한다(14A 부재 어휘) |
 
-## 착수 OPEN (팀장 판정 요청)
+## 착수 OPEN의 판정 (팀장 2026-11-20)
+
+| OPEN | 판정 | 이 slice 가 한 것 |
+| --- | --- | --- |
+| ① 카운트다운 단위 | **추천대로** — 지금 있는 두 값을 카드로 옮긴다(거동 0) | 분·시 축은 **새 OPEN** 으로 등재 |
+| ② 레일 모집합 | **와이어프레임 원천을 따른다** | 카운트다운 = 머리 행 오른쪽 · 자격 = 본문 첫 카드 · 레일 = 다음 확인 시점 · 타임라인 · 내려놓기 |
+| ③ 머리의 「방식」 | **자리를 만들지 않는다** | §12.3 에 **데이터로 막힘**, 대조표 C 행에 사유 |
+| ④ 레일 상자 축 | **14C 는 여정 spec 을 건드리지 않는다** | 문서 순서를 vitest 로 잠그고, 상자 축은 **「14B 머지 전 레일 상자 미측정」** 으로 알려진 제한 |
+| ⑤ `PageHeader` | **additive 확장 승인** | `h2` 에 제목 자리 표지 · 짝 test 를 같은 커밋에서 · 변이로 RED 실측 |
+
+「되돌릴 길 기억」(§12.3 (x) ⓒ)과 빈 괄호(14A cr L-5)도 같은 자리에서 승인됐다.
+
+## 착수 OPEN (팀장 판정 요청 — 위 표가 그 판정이다)
 
 **① 마감 카운트다운의 단위.** 와이어프레임은 「1일 22시간 10분」이다. `timeDisplay` 가 내는 것은
 **날 단위**(`daysUntil` → `dayCountText`)뿐이고, 그 모듈은 **14A 소유**다. 더 나아가 이 화면은
@@ -113,6 +127,26 @@ rollback: rollback.md
 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에 있다.
 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신 (구현 중 실측으로 드러난 것 — 팀장 보고 대상)
+
+**(1) `WorksheetRecord.tsx` · `WorksheetTimeline.tsx` 는 편집 0 으로 끝났다.** 두 카드의 **자리**는
+화면 모듈이 정하므로 카드 자신은 손대지 않았다. in_scope 에 열어 둔 것은 사실이고, 기계 diff 가
+정본이라 위 yaml 에 `not_touched` 로 옮겨 적는다(복원 목록에도 들지 않는다).
+
+**(2) 다음 행동 하나의 두 종류가 투찰가 카드의 「같은 자리」를 쓴다.** 종류마다 자리를 나누면
+상태가 바뀔 때 React 가 버튼을 떼었다 다시 붙이고, 그 사이에 잡아 둔 노드를 누르면 **아무 일도
+일어나지 않는다** — 13C 의 확인 단계 test 여섯이 이 라운드에서 실제로 그렇게 붉었다(실측). 자리를
+하나로 두면 노드가 살아 있다. 와이어프레임도 그 버튼을 카드의 마지막 줄에 둔다.
+
+**(3) 되돌릴 길의 기억을 effect 하나로 유도한다.** 처음에는 토스트를 내는 입구 하나에서 기억을
+썼는데, 그러면 그 입구를 닫아 쥔 객체가 전부 「렌더 중 ref 접근」이 되어 **lint 가 여섯 자리를
+들었다**(실측). 그래서 쓰는 자리를 effect 로 옮겼다 — 기억은 **그려진 토스트의 함수**이고 비동기
+`onError` 가 「지금 그려져 있는 것」을 읽는다.
+
+**(4) 390px 에서 카운트다운 카드가 제목을 꺾었다**(캡처 실측). 좁은 폭에서 카드를 한 줄 통째로
+두어 제목이 먼저 한 줄을 쓰게 했다(차례는 그대로 · 별도 커밋).
+
 ## 갱신 이력
 
 - 2026-11-20 초판(착수 보고와 함께).
+- 2026-11-20 팀장 판정 ①~⑤ 등재 · 계약 갱신 (1)~(4).
