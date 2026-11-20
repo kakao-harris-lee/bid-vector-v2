@@ -15,7 +15,7 @@
 | W-3 | `npm run typecheck` | 0 | 진단 0 |
 | W-4 | `npm run gate:src-tree` | 0 | 호출 능력 간선 집합 == `{src/api/queries.ts}` 그대로 |
 | W-5 | `npm run api:types:check` | 0 | 생성 타입 바이트 등식 성립(이 slice 는 계약을 건드리지 않는다) |
-| W-6 | `npm run test` | 0 | **파일 74 · test 1951** 통과. 두 번 돌렸고 두 번 다 같은 수 · 같은 exit |
+| W-6 | `npm run test` | 0 | **파일 74 · test 1951** 통과. **판정 SHA 의 트리에서** 두 번 돌렸고 두 번 다 같은 수 · 같은 exit |
 | W-7 | `npm run gate:tests` | 0 | 등록부 전수가 수집에 있고 skipped/todo/failed 0 |
 | W-8 | `npm run build` | 0 | 번들 생성 |
 | W-9 | `npm run gate:boundary-canary` | 0 | 두 그래프에서 경계 플러그인이 fixture 실경로를 거부 |
@@ -35,6 +35,8 @@ evidence 를 스캔 뿌리에 들므로 **evidence 편집 커밋의 HEAD 에서*
 | 명령 | exit | 비고 |
 | --- | --- | --- |
 | `./gradlew --no-daemon ktlintCheck detekt cpdCheck leakPatternGate` | 0 | `leakPatternGate` 가 **실행**됐다(UP-TO-DATE·FROM-CACHE 접미 없음) |
+
+산출물 커밋 뒤 **evidence 커밋이 세 번** 왔으므로 그때마다가 아니라 **판정 SHA 에서** 다시 쟀다(그 HEAD 에서 exit 0 · `leakPatternGate` 실행). W-6·W-7 도 같은 SHA 에서 다시 쟀다 — 여정 spec 을 고친 커밋이 W-6 의 수집 밖(`e2e/**/*.spec.ts` 는 제외된다)이라 수는 같지만, **판정 SHA 의 트리에서 잰 수**를 적는다.
 
 비밀값 스캔은 참조형으로 돌린다 — `grep -rniE -f config/quality/leak-patterns.txt` 가 그 어휘의
 한 자리이고 evidence 는 그것을 축어로 적지 않는다.
