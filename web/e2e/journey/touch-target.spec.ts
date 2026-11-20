@@ -5,6 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // @ts-expect-error — 게이트 술어는 `scripts/` 의 평범한 ESM 이고 이 레인은 타입 선언을 두지 않는다.
 import { readPalette } from '../../scripts/contrast.mjs';
+import { BUTTON_TONES, controlClass } from '../../src/components/Button';
 
 import { journeyContext, search, signIn } from './shared';
 import { measureControlBordersInPage } from './controlBorderMeasure';
@@ -26,9 +27,13 @@ import { measureInPage, type Measurement } from './touchMeasure';
  * 값을 여기 적지 않는 이유는 대비 게이트와 같다: 적으면 파일을 고쳐도 이 집합이 옛 값을 들고,
  * 그 둘이 갈린 날 아무도 붉지 않는다.
  *
- * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **어조 자신의 글자색**(`danger` 의 경고 테두리가
- * 그 꼴이다. 그 색은 경계가 아니라 그 버튼이 무엇인지를 말한다). **카드 선은 들어 있지 않다** —
- * 그것이 이 축이 잡으려는 바로 그 값이다.
+ * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **공유 버튼의 어조 표가 실제로 쓰는 경계 색**
+ * (`danger` 의 경고 테두리가 그 꼴이다. 그 색은 경계가 아니라 그 버튼이 무엇인지를 말한다).
+ * **카드 선은 들어 있지 않다** — 그것이 이 축이 잡으려는 바로 그 값이다.
+ *
+ * **어조 글자색 전수를 허용하지 않는다**(v r2-low). 앞 판은 `*-ink` 를 모두 받았고 거기에
+ * `accent-ink`(**흰색**)가 들어 있었다 — 흰 카드 위의 흰 테두리는 **보이지 않는 경계**인데 그
+ * 축이 그것을 받고 있었다. 허용 집합을 **표가 실제로 쓰는 것**에서 유도해 좁힌다.
  *
  * 투명·없음도 받는다: 테두리를 그리지 않는 컨트롤(`primary` 버튼)은 위에서 두께로 이미 빠지지만,
  * 브라우저가 색만 투명으로 주는 꼴도 있어 함께 둔다.
@@ -48,14 +53,25 @@ function allowedBorderColorSet(): ReadonlySet<string> {
     allowed.add(alpha === undefined ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`);
   };
   add(light.get('control-line'));
-  for (const [name, value] of light) {
-    if (name.endsWith('-ink')) {
-      add(value);
-      // 어조 테두리는 투명도를 함께 쓸 수 있다(`border-bad-ink/40`).
-      for (const alpha of [0.4]) {
-        add(value, alpha);
+
+  /**
+   * 어조 표가 쓰는 경계 색만 더한다 — 표를 **읽어서** 낸다(사본을 만들지 않는다).
+   * `border-bad-ink/40` 처럼 투명도가 붙은 꼴도 그대로 받는다.
+   */
+  let fromTable = 0;
+  for (const tone of BUTTON_TONES) {
+    for (const token of controlClass(tone, 'md').split(/\s+/u)) {
+      const match = /^border-([a-z-]+?)(?:\/(\d+))?$/u.exec(token);
+      if (match === null || match[1] === 'control-line') {
+        continue;
       }
+      const alpha = match[2] === undefined ? undefined : Number.parseInt(match[2], 10) / 100;
+      add(light.get(match[1]), alpha);
+      fromTable += 1;
     }
+  }
+  if (fromTable === 0) {
+    throw new Error('어조 표에서 경계 색을 하나도 읽지 못했다 — 허용 집합이 공허하다');
   }
   return allowed;
 }
