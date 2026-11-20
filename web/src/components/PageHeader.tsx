@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 
 /**
+ * 안쪽 자리의 표지 — 바깥 표지가 없으면 안쪽도 없다(장식 자리에 쓸 수 있어야 한다).
+ *
+ * **왜 자리마다 표지인가**: 「없으면 그리지 않는다」를 글자로만 재면 **빈 노드를 늘 그리는
+ * 변이가 지나간다**(이 컴포넌트의 변이 실측 — 빈 `<p>` 의 `textContent` 는 빈 글자라 제목만
+ * 남은 글자와 같다). 자리의 **존재**를 재야 그 변이가 붉는다.
+ */
+const slotTestId = (testId: string | undefined, slot: string): string | undefined =>
+  testId === undefined ? undefined : `${testId}-${slot}`;
+
+/**
  * 화면 머리의 **한 자리**(M14/14A · 와이어프레임의 머리). 제목 · 요약 한 줄 · 행동 셋이
  * 화면마다 다른 글자 크기와 다른 배치로 복제되던 자리를 모은다.
  *
@@ -28,9 +38,17 @@ export function PageHeader({
     <div data-testid={testId} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-        {summary === undefined ? null : <p className="text-sm text-ink-soft">{summary}</p>}
+        {summary === undefined ? null : (
+          <p data-testid={slotTestId(testId, 'summary')} className="text-sm text-ink-soft">
+            {summary}
+          </p>
+        )}
       </div>
-      {actions === undefined ? null : <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions === undefined ? null : (
+        <div data-testid={slotTestId(testId, 'actions')} className="flex flex-wrap items-center gap-2">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
