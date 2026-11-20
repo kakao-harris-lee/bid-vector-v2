@@ -681,7 +681,18 @@ export function WorksheetScreen() {
   /** 마감 한 칸 — 절대 시각과 남은 날이 **같은 노드**다(M9 D-1·D-2). */
   const deadlineText =
     deadline.kind === 'absent' ? null : `${deadline.text}${deadlineDays === null ? '' : ` (${deadlineDays})`}`;
-  const agency = notice.demandAgencyName ?? notice.noticeAgencyName ?? null;
+  /**
+   * 발주기관 — **부재 판정을 글자 기준으로** 한다(cr M-1).
+   *
+   * `??` 만 두면 `''` 와 공백뿐인 값이 비켜 가 **조용한 빈칸**이 선다. 앞 판에서 이 값을 받던
+   * `KeyValueRow` 는 그 꼴을 부재로 접었고(14A cr L-1 이 정확히 이 때문에 넣은 분기다), 머리를
+   * 직접 그리면서 그 가드가 사라졌다 — 이 자리가 그것을 다시 세운다.
+   *
+   * **`PageHeader` 의 빈 자리 술어는 여기까지 보지 못한다**: 요약이 **요소**면 그 술어가 거짓을
+   * 내고 빈 문단이 선다(그 컴포넌트가 자기 알려진 제한으로 적어 둔 구멍이고, 호출부가 닫는다).
+   */
+  const agency =
+    [notice.demandAgencyName, notice.noticeAgencyName].find((one) => (one ?? '').trim() !== '') ?? null;
   /** 다음 행동 하나 — 자리는 아래 표가 정한다. */
   const primarySlot = action === null ? null : PRIMARY_SLOT[action.kind];
   const primaryNode =

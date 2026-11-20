@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
+import { absenceTextOf } from '../display/absence';
 import * as queries from '../api/queries';
 import { stateDisplayOf } from '../display/caseDisplay';
 
@@ -1666,5 +1667,41 @@ describe('화면 C — 되돌릴 길 기억은 지금 토스트의 함수다 (§
     await screen.findByTestId('write-failure');
 
     expect(screen.queryByTestId('toast'), '묵은 기억이 성공 문면을 실패 얼굴 옆에 남겼다').toBeNull();
+  });
+});
+
+/**
+ * **빈 글자 기관명은 부재다**(cr M-1). 계약 타입이 `string | null` 이라 wire 는 `''` 를 막지
+ * 않는다. 앞 판에서 이 값을 받던 `KeyValueRow` 는 그 꼴을 부재로 접었고, 머리를 직접 그리면서
+ * 그 가드가 사라졌다 — 여정의 머리 단언도 `?? ABSENT` 꼴이라 `''` 를 그대로 기대해 통과한다.
+ */
+describe('화면 C — 빈 글자 기관명 (cr M-1)', () => {
+  it.each([
+    ['빈 글자', ''],
+    ['공백뿐', '   '],
+  ])('%s 이면 부재 문면이 선다 — 조용한 빈칸이 아니다', async (_label, blank) => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: blank, noticeAgencyName: blank }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const agency = await screen.findByTestId('worksheet-agency');
+    expect(agency.textContent?.trim(), '빈칸이 그대로 섰다').not.toBe('');
+    expect(agency.textContent).toContain(absenceTextOf('notSent'));
+    // 요약 자리도 빈 문단이 아니다 — `PageHeader` 의 빈 자리 술어는 요소를 가리지 못한다.
+    expect(screen.getByTestId('worksheet-summary').textContent?.trim()).not.toBe('');
+  });
+
+  it('둘째 기관명이 성하면 그것이 선다 — 첫 칸이 비었다고 부재로 접지 않는다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: '  ', noticeAgencyName: '합성 공고기관' }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-agency')).textContent).toBe('합성 공고기관');
   });
 });
