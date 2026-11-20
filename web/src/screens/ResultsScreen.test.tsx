@@ -1025,3 +1025,38 @@ describe('화면 E — 아직 없는 자리의 배지가 사유와 같은 말을
     }
   });
 });
+
+describe('화면 E — 결과 카드의 머리도 공고명이다 (14E 투영)', () => {
+  it('제목이 머리에 서고 기관이 식별 줄에 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({
+        caseId: 51,
+        state: 'AWAITING_OPENING',
+        noticeKnown: true,
+        noticeTitle: '합성 결과 공고명',
+        demandAgencyName: '합성 수요기관',
+      }),
+    ]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    expect((await screen.findByTestId('result-notice-title-51')).textContent).toContain('합성 결과 공고명');
+    expect(screen.getByTestId('result-demand-agency-51').textContent).toContain('합성 수요기관');
+  });
+
+  it('공고 행이 없을 때와 제목만 빈 때가 다른 문면이다', async () => {
+    mocked.listBidCases.mockResolvedValue([
+      bidCase({ caseId: 51, state: 'AWAITING_OPENING', noticeKnown: false, noticeTitle: null }),
+      bidCase({ caseId: 52, state: 'AWAITING_OPENING', noticeKnown: true, noticeTitle: null }),
+    ]);
+    mocked.readMyBidResults.mockResolvedValue(myBidResults());
+    renderScreen();
+
+    const rowAbsent = (await screen.findByTestId('result-notice-title-51')).textContent ?? '';
+    const titleAbsent = screen.getByTestId('result-notice-title-52').textContent ?? '';
+
+    expect(rowAbsent.length).toBeGreaterThan(0);
+    expect(titleAbsent.length).toBeGreaterThan(0);
+    expect(rowAbsent, '두 사실이 한 문면으로 접혔다').not.toBe(titleAbsent);
+  });
+});

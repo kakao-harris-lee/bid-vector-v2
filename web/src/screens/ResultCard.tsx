@@ -8,7 +8,11 @@ import { Card } from '../components/Card';
 import { AbsentValue } from '../components/AbsentValue';
 import { StateBadge } from '../components/StateBadge';
 import { tabOf } from '../display/bidBoxDisplay';
-import { BID_CASE_STATE_DISPLAY, NEXT_CHECKPOINT_DISPLAY } from '../display/caseDisplay';
+import {
+  BID_CASE_STATE_DISPLAY,
+  NEXT_CHECKPOINT_DISPLAY,
+  NOTICE_ROW_ABSENT_TEXT,
+} from '../display/caseDisplay';
 import {
   GAP_STATE_DISPLAY,
   OUTCOME_AGREEMENT_DISPLAY,
@@ -375,13 +379,28 @@ export function ResultCard({
 }) {
   return (
     <Card as="li" testId={`result-case-${bidCase.caseId}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-numeric text-sm font-medium">{bidCase.noticeNumber}</span>
-        <span className="text-xs text-ink-soft">차수 {bidCase.noticeRound}</span>
+      {/* 머리는 **제목 + 상태 알약**이다(M14/14D · 와이어프레임 E · D 카드와 같은 문법).
+          앞 판은 공고번호가 가장 큰 글자였고 공고명이 없었다. 번호·차수는 아래 식별 줄이다. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <h3 className="min-w-0 text-sm font-semibold" data-testid={`result-notice-title-${bidCase.caseId}`}>
+          {/* 「공고 행이 없다」와 「행은 있고 제목이 비었다」는 **다른 사실**이다(14E 계약). */}
+          {bidCase.noticeKnown ? (
+            (bidCase.noticeTitle ?? <AbsentValue reason="notSent" />)
+          ) : (
+            <span className="text-xs font-normal text-absent-ink">{NOTICE_ROW_ABSENT_TEXT}</span>
+          )}
+        </h3>
         <StateBadge
           display={displayOrUnknown(BID_CASE_STATE_DISPLAY, bidCase.state)}
           testId={`result-state-${bidCase.caseId}`}
         />
+      </div>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-ink-soft">
+        {bidCase.demandAgencyName === null ? null : (
+          <span data-testid={`result-demand-agency-${bidCase.caseId}`}>{bidCase.demandAgencyName}</span>
+        )}
+        <span className="font-numeric">{bidCase.noticeNumber}</span>
+        <span>차수 {bidCase.noticeRound}</span>
       </div>
 
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
