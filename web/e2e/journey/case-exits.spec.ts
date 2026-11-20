@@ -154,8 +154,17 @@ test('여정 — 다시 요청할 수 없는 건의 워크시트가 사유를 �
   const deferred = await defer(page, card, row.caseId);
   expect(deferred.state).toBe('DEFERRED');
 
-  // 그 건의 워크시트로 간다 — 주소는 **카드의 링크**에서 온다(경로를 손으로 적지 않는다).
-  await card.getByRole('link').first().click();
+  /*
+   * 그 건의 워크시트로 간다 — 주소는 **카드의 링크에서 읽고**(경로를 손으로 적지 않는다) 이동은
+   * `goto` 로 한다.
+   *
+   * **그 링크를 누르지 않는 까닭**(실측): 쓰기 응답이 돌아오면 목록이 다시 그려지고 카드의 노드가
+   * 바뀐다 — 그 사이에 잡아 둔 노드를 누르면 「element was detached from the DOM」으로 죽는다
+   * (13C 가 확인 단계에서 밟은 것과 같은 자리다). 주소를 읽어 두면 그 경합이 없다.
+   */
+  const href = await card.getByRole('link').first().getAttribute('href');
+  expect(href, '카드에 워크시트 링크가 없다').not.toBeNull();
+  await page.goto(href!);
   await expect(page.getByTestId('screen-worksheet')).toBeVisible();
   await page.waitForLoadState('networkidle');
 

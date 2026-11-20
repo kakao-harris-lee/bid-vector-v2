@@ -425,10 +425,10 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
   await page.getByTestId('onboarding-step-QUALIFICATION_FACTS').click();
   // **`exact`** — 부분 일치면 전략 패널의 `관심 업종` 입력도 같은 패턴에 걸린다(CR r1 LOW).
   // 오늘은 단계마다 카드 하나뿐이라 지나가지만, 화면 전체 locator 가 남의 건을 집는 자리다.
-  await page.getByLabel('업종', { exact: true }).fill('토목공사업');
+  await page.getByLabel('업종(쉼표)', { exact: true }).fill('토목공사업');
   await page.getByLabel('면허를 신고함').check();
-  await page.getByLabel('면허', { exact: true }).fill('토목건축공사업');
-  await page.getByLabel('지역어').fill('서울');
+  await page.getByLabel('면허(쉼표)', { exact: true }).fill('토목건축공사업');
+  await page.getByLabel('지역어(쉼표)', { exact: true }).fill('서울');
   const afterFacts = await saveAndReread(page, reads, '자격 사실 저장');
 
   expect(afterFacts.completed).toContain('BUSINESS_TYPES');
@@ -437,8 +437,8 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   // ④ 시공능력평가액 — 행 단위다.
   await page.getByTestId('onboarding-step-CONSTRUCTION_CAPACITY').click();
-  await page.getByLabel('시평액 면허명').fill('토목건축공사업');
-  await page.getByLabel('시평액 금액').fill('1200000000');
+  await page.getByLabel('면허명', { exact: true }).fill('토목건축공사업');
+  await page.getByLabel(/^금액/u).fill('1200000000');
   await page.getByLabel('평가 연도').fill('2026');
   const afterCapacity = await saveAndReread(page, reads, '시평액 저장');
 
@@ -513,8 +513,8 @@ test('여정 ① — 빈 계정 → 시작하기 마법사로 항목을 채우�
 
   await page.getByTestId('onboarding-step-QUALIFICATION_FACTS').click();
   // ③ 과 같은 사유로 `exact` 다(CR r1 지적이 ③ 만 닫혔던 자리 — CR r2 LOW).
-  await page.getByLabel('업종', { exact: true }).fill('');
-  await page.getByLabel('지역어').fill('');
+  await page.getByLabel('업종(쉼표)', { exact: true }).fill('');
+  await page.getByLabel('지역어(쉼표)', { exact: true }).fill('');
   await page.getByLabel('면허를 신고함').uncheck();
   const afterFactsCleared = await saveAndReread(page, reads, '자격 사실 저장');
 
