@@ -15,7 +15,7 @@
 | W-3 | `npm run typecheck` | 0 | 진단 0 |
 | W-4 | `npm run gate:src-tree` | 0 | 호출 능력 간선 집합 == `{src/api/queries.ts}` 그대로 |
 | W-5 | `npm run api:types:check` | 0 | 생성 타입 바이트 등식 성립(이 slice 는 계약을 건드리지 않는다) |
-| W-6 | `npm run test` | 0 | **파일 74 · test 1991** 통과(수정 라운드 1). **판정 SHA 의 트리에서** 두 번 돌렸고 두 번 다 같은 수 · 같은 exit |
+| W-6 | `npm run test` | 0 | **파일 74 · test 1997** 통과(수정 라운드 2). **판정 SHA 의 트리에서** 두 번 돌렸고 두 번 다 같은 수 · 같은 exit |
 | W-7 | `npm run gate:tests` | 0 | 등록부 전수가 수집에 있고 skipped/todo/failed 0 |
 | W-8 | `npm run build` | 0 | 번들 생성 |
 | W-9 | `npm run gate:boundary-canary` | 0 | 두 그래프에서 경계 플러그인이 fixture 실경로를 거부 |
