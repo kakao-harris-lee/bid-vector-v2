@@ -51,8 +51,8 @@ export const ONBOARDING_STEPS = [
   { id: 'BUSINESS_DETAILS', label: '사업 정보', why: '상호 · 본사 소재지 · 나라장터 준비를 한 번에 저장합니다' },
   { id: 'QUALIFICATION_FACTS', label: '자격 사실', why: '업종 · 면허 · 지역어를 한 번에 저장합니다' },
   { id: 'CONSTRUCTION_CAPACITY', label: '시공능력평가액', why: '공사로 입찰하는 계정에만 걸립니다' },
-  { id: 'BUDGET', label: '감시 금액대', why: '편집 세션을 지나 바뀝니다' },
-  { id: 'WATCH', label: '감시 관심 업종', why: '편집 세션을 지나 바뀝니다' },
+  { id: 'BUDGET', label: '감시 금액대', why: '고치기 → 값 → 확인 세 걸음으로 바뀝니다' },
+  { id: 'WATCH', label: '감시 관심 업종', why: '고치기 → 값 → 확인 세 걸음으로 바뀝니다' },
 ] as const satisfies readonly OnboardingStep[];
 
 /**

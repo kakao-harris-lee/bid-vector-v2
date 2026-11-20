@@ -298,6 +298,27 @@ describe('탐색의 안 읽음 배지', () => {
     expect(screen.queryByTestId('nav-tab-unread')).toBeNull();
   });
 
+  /**
+   * **하단 탭에서 배지는 라벨 아래에 쌓인다**(M14/14F · v L-1 · cr D9). 390px / 다섯 칸이면
+   * 칸당 ≈78px 인데 앞 판은 라벨과 배지를 한 줄 묶음에 넣어 「내 입찰 / 함」으로 꺾였다. 배지가
+   * 그려지지 않는 화면에서는 꺾이지 않는 것이 그 **음성 대조**였다.
+   *
+   * jsdom 은 상자를 풀지 않으므로 이 층이 잠그는 것은 **구조**다: 배지가 탭 링크의 직계 자식이고
+   * 라벨과 한 줄 묶음에 갇혀 있지 않다. 화소의 증거는 390px 캡처다.
+   */
+  it('하단 탭의 배지가 라벨과 한 줄 묶음에 갇히지 않는다', async () => {
+    stub({ realCases: 6 });
+    await renderAt('/');
+
+    const badge = await screen.findByTestId('nav-tab-bid-box');
+    const link = badge.closest('a');
+    expect(link, '배지가 탭 링크 안이 아니다').not.toBeNull();
+    // 배지의 부모가 **링크 자신**이다 — 라벨을 함께 품은 안쪽 묶음이면 그 묶음이 부모가 된다.
+    expect(badge.parentElement, '배지가 안쪽 한 줄 묶음에 갇혔다').toBe(link);
+    // 비공허 — 그 링크가 라벨 글자도 들고 있다(배지만 있는 자리를 재고 있지 않다).
+    expect((link!.textContent ?? '').replace(badge.textContent ?? '', '').trim().length).toBeGreaterThan(0);
+  });
+
   /** 배지는 **한 행만** 받아 온다 — 화면이 그 본문을 쓰지 않으므로 목록을 통째로 끌 이유가 없다. */
   it('배지 질의는 한 행만 요청한다', async () => {
     stub({ unread: 1 });

@@ -93,6 +93,23 @@ describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
     expect(row.textContent).toBe(absenceTextOf('notSent'));
   });
 
+  /**
+   * **머리 문장에 개발 어휘가 없다**(M14/14F · v L-6). 「편집 세션」은 계약의 낱말이고 「개정 2」는
+   * 무엇의 2 인지 말하지 않았다. 운영자가 알아야 하는 것은 걸음 세 개와 지금 적용된 판이고,
+   * 그 둘은 개발 낱말 없이 말할 수 있다.
+   */
+  it('전략 절의 머리 문장에 개발 어휘가 없다', async () => {
+    renderScreen();
+
+    const head = (await screen.findByTestId('settings-strategy')).textContent ?? '';
+    for (const term of ['편집 세션', '개정']) {
+      expect(head, `${term} 이 남았다`).not.toContain(term);
+    }
+    // 비공허 — 그 문장이 여전히 **걸음 셋과 판 번호**를 말한다(지워서 통과하지 않게).
+    expect(head).toContain('고치기 → 값 → 확인');
+    expect(head).toContain('지금 적용된 판');
+  });
+
   it('어휘·금액·수를 API 가 준 그대로 보인다', async () => {
     mocked.readStrategy.mockResolvedValue(
       strategy({
