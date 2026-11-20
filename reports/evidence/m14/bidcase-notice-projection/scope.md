@@ -10,25 +10,35 @@ in_scope:
   - workflow/src/main/kotlin/bidvector/workflow/bidding/BiddingPorts.kt   # 읽기 투영 포트 + 값
   - workflow/src/main/kotlin/bidvector/workflow/bidding/BidCaseWorkflow.kt # view() 가 투영을 싣는다
   - workflow/src/test/kotlin/bidvector/workflow/bidding/BidCaseWorkflowTest.kt
-  - workflow/src/test/kotlin/bidvector/workflow/bidding/FakeBidCaseStore.kt  # fake 포트(값 없음 ↔ 행 없음)
+  - workflow/src/test/kotlin/bidvector/workflow/bidding/BidCaseNotificationTest.kt  # 계약 갱신 (1) — 조립 인자
   # ── 어댑터 (adapters) ───────────────────────────────────────────────────
   - adapters/src/main/kotlin/bidvector/adapters/bidding/BiddingSql.kt        # 묶음 질의 한 문장
   - adapters/src/main/kotlin/bidvector/adapters/bidding/JdbcNoticeProjectionQuery.kt  # 신설
-  - adapters/src/test/kotlin/bidvector/adapters/bidding/                     # 실 DB 통합 test(신설)
+  - adapters/src/test/kotlin/bidvector/adapters/bidding/NoticeProjectionQueryTest.kt  # 신설 — 실 DB 축
+  - adapters/src/test/kotlin/bidvector/adapters/bidding/BidCaseDbFixture.kt      # 출하 질의 조립
+  - adapters/src/test/kotlin/bidvector/adapters/bidding/BidCaseOwnershipTest.kt  # 계약 갱신 (1) — 조립 인자
   # ── HTTP 응답과 배선 (app) ──────────────────────────────────────────────
   - app/src/main/kotlin/bidvector/app/http/BidCaseResponses.kt   # 평탄한 칸 넷
   - app/src/main/kotlin/bidvector/app/wiring/BidCaseWiring.kt    # 새 포트 배선
   - app/src/test/kotlin/bidvector/app/http/BidCaseEndpointTest.kt
   - app/src/test/kotlin/bidvector/app/http/InMemoryBidCaseStore.kt
   - app/src/test/kotlin/bidvector/app/http/OpenApiBidCaseContractTest.kt
+  - app/src/test/kotlin/bidvector/app/http/HttpTestApplication.kt   # 계약 갱신 (1) — 이중체 빈 하나
   - config/quality/gate-tests.properties   # 새 Kotlin test class 를 **만드는 커밋에서** 등재
   # ── 계약과 생성 타입 ────────────────────────────────────────────────────
   - openapi/bidvector-operator-api.yaml    # `BidCase` 스키마 + 두 operation 의 설명
   - web/src/api/generated/operator-api.ts  # 재생성(바이트 등식 W-5)
   - docs/discovery/capability-map.md       # §12.3 하위 절 하나 — 글자는 머지 차례에 정한다
   - reports/evidence/m14/bidcase-notice-projection/
-  # ── 착수 OPEN-1 이 승인되면 더해지는 자리(web fixture, 값만) ─────────────
-  #   아래 「착수 보고의 OPEN」 OPEN-1. 승인 전에는 열지 않는다.
+  # ── web test 고정물 일곱 — 생성 타입의 새 필수 칸이 tsc 에서 멈춘 자리(계약 갱신 (2)) ──
+  #   **값 칸만** 더한다(배치·문면 0). 각 고정물에 칸 넷을 「공고 행 없음」으로 둔다.
+  - web/src/screens/BidBoxCard.test.tsx
+  - web/src/screens/BidBoxScreen.test.tsx
+  - web/src/screens/ResultsScreen.test.tsx
+  - web/src/screens/TodayNoticesScreen.test.tsx
+  - web/src/screens/WorksheetScreen.test.tsx
+  - web/src/screens/screenCopy.test.tsx
+  - web/src/screens/screenVocabulary.test.tsx
 out_of_scope:
   - adapters/src/main/resources/db/migration/**   # **마이그레이션 0** — 읽는 열 셋이 V7·V14 에 이미 있다
   - 모든 쓰기 경로(POST/PUT/DELETE 컨트롤러 · `applyTransition` · outbox)  # 쓰기 0
@@ -112,6 +122,10 @@ base `af6d9c0f` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
 
 ## 착수 보고의 OPEN (팀장 판정 대기 — 답을 받은 뒤 구현에 들어간다)
 
+> **2026-11-20 처분 — 셋 다 추천안으로 진행했다**(팀장 판정이 오지 않아 운영자 상시 지시
+> 「추천 선택 = 진행」을 따랐고, 고른 것과 사유를 팀장에게 보고했다). 아래는 그때의 제안과
+> 근거를 **그대로 남긴 것**이다. 실제 처분은 §계약 갱신 과 §갱신 이력 이 정본이다.
+
 **OPEN-1 — 새 칸을 필수로 두면 다른 레인 소유의 web 고정물 일곱이 컴파일에서 멈춘다.**
 
 알림함 선례는 `noticeKnown`·`noticeTitle` 을 **required + nullable** 로 둔다. 같은 꼴을 쓰면
@@ -170,6 +184,37 @@ web 은 그 operation 을 부르지 않는다(승인 쌍에 없다) — 소비�
 capability map §12.3 의 이 slice 몫은 **머지 차례에 정한다**(계약 「capability map letter」).
 상호 참조에는 글자를 쓰지 않는다 — 이 줄이 그 글자를 적는 유일한 자리가 된다.
 
+## 계약 갱신
+
+**(1) in_scope 에 조립 자리 셋이 든다.** `BidCaseWorkflow` 의 생성자 인자가 하나 늘어, 그것을
+조립하는 **일곱 자리**가 컴파일에서 멈춘다(출하 1 + test 6 — 착수 실측). 그 가운데 초판이
+빠뜨린 셋을 등재한다: `BidCaseNotificationTest` · `BidCaseOwnershipTest` · `HttpTestApplication`.
+**선택 인자로 두지 않은 이유**: 기본값을 주면 배선을 잊은 조립이 조용히 「공고를 모른다」가
+되고, 그 부재를 아무것도 붉히지 않는다.
+
+**(2) in_scope 에 web test 고정물 일곱이 든다**(착수 OPEN-1 의 추천안대로 진행 — 팀장 보고).
+생성 타입의 새 칸이 **필수**라 `BidCase` 를 짓는 자리 **아홉**이 `tsc`(W-3)에서 멈췄다(실측:
+7 파일 · 9 리터럴). **값만** 더했다 — 배치·문면·단언을 건드리지 않았다.
+
+고정물의 값은 「**공고 행이 없다**」로 두었다. 이 slice 는 화면을 바꾸지 않아 어느 화면도 아직
+그 칸을 그리지 않으므로, 새 문면을 하나도 들이지 않는 선택이 문면·어휘 게이트의 모집단을
+움직이지 않는다. 카드가 그 칸을 쓰기 시작하면 그 slice 가 값을 세운다.
+
+**(3) `BidCase` 계열에 키 집합 등식을 세운다**(없던 축 — 술어 변경이 아니다). 착수 실측에서
+이 계열의 계약 test 는 **어휘(enum)만** 재고 칸의 **집합**을 재지 않았다. 그래서 응답 DTO 에
+칸을 더하고 문서를 놔두면(또는 그 반대) 아무것도 붉지 않는다 — 이 slice 가 바로 그 편집을
+손으로 하므로 그 자리를 닫는다. 같은 저장소의 `NotificationItem` · `SuggestedNotice` ·
+`NoticeSummary` 가 이미 같은 등식을 들고 있어 **발명이 아니다**. 두 방향으로 묶는다: 문서 ↔
+축어 집합(문서가 조용히 줄어드는 쪽) · 문서 ↔ DTO 필드 전수(문서에 없는 칸이 wire 에 닿는 쪽).
+
+**(4) 새 OPEN 후보 — `nextCheckpointAt` 이 `required` 에 없다.** 이 slice 가 만든 것이 아니라
+착수 전부터다. 서버는 그 칸을 **언제나** 싣는데(DTO 의 필드이고 직렬화가 null 을 생략하지
+않는다) 문서가 선언하지 않아 생성 타입에서만 선택 칸이다. **고치지 않는다** — 기존 칸의 선언을
+바꾸면 생성 타입이 움직여 이 slice 밖의 자리가 함께 흔들린다. (3) 의 등식이 오늘의 사실을
+그대로 못박아(`CASE_KEYS - "nextCheckpointAt"`) 그 예외가 **늘지 않음**을 잰다.
+
 ## 갱신 이력
 
 - 2026-11-20 초판(착수 보고와 함께). OPEN 셋은 팀장 판정을 기다린다.
+- 2026-11-20 OPEN 셋을 추천안으로 진행(팀장 판정이 오지 않아 운영자 상시 지시 「추천 선택 =
+  진행」을 따랐고, 고른 것과 사유를 팀장에게 보고했다). §계약 갱신 (1)~(4) 를 더했다.
