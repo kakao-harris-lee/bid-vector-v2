@@ -6,7 +6,6 @@ import { WriteFailureFace } from '../components/WriteFailure';
  * 프로필 절의 질의 키와 쓰기 배선(M7/7E-2b, D-7E2b-8) — **화면 둘이 같은 자리를 쓴다**: 설정
  * 화면과 시작하기 마법사가 같은 필드를 저장하므로, 배선이 두 벌이면 한쪽만 고쳐져 갈린다.
  */
-export const PROFILE_QUERY_KEY = ['profile'] as const;
 export const CAPACITY_QUERY_KEY = ['construction-capacities'] as const;
 
 /**

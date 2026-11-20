@@ -1,13 +1,15 @@
 import { useState } from 'react';
 
 import { replaceQualificationFacts, type Profile } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import { termsOf } from '../display/editSessionDisplay';
 import { QUALIFICATION_STATE_DISPLAY, qualificationStateOf } from '../display/profileDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
-import { attemptOf, PROFILE_QUERY_KEY, ProfileWriteFailure, useProfileWrite } from './profileWrites';
+import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
 
 /** 자격 사실 폼 — 세 어휘 배열과 신고 여부. 기본값을 지어내지 않는다. */
 interface FactsForm {
@@ -62,17 +64,17 @@ export function ProfileFactsCard({
           />
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-          <Field
+          <KeyValueRow
             label="업종"
             value={profile.businessTypes.length === 0 ? null : profile.businessTypes.join(', ')}
             testId="profile-business-types"
           />
-          <Field
+          <KeyValueRow
             label="면허"
             value={profile.licenseNames.length === 0 ? null : profile.licenseNames.join(', ')}
             testId="profile-licenses"
           />
-          <Field
+          <KeyValueRow
             label="지역어"
             value={profile.regionTerms.length === 0 ? null : profile.regionTerms.join(', ')}
             testId="profile-region-terms"
@@ -85,7 +87,7 @@ export function ProfileFactsCard({
               aria-label="업종"
               value={form.businessTypes}
               onChange={(event) => setFacts({ ...form, businessTypes: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -95,7 +97,7 @@ export function ProfileFactsCard({
               disabled={!form.licensesDeclared}
               value={form.licenseNames}
               onChange={(event) => setFacts({ ...form, licenseNames: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm disabled:opacity-50"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm disabled:opacity-50"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -104,7 +106,7 @@ export function ProfileFactsCard({
               aria-label="지역어"
               value={form.regionTerms}
               onChange={(event) => setFacts({ ...form, regionTerms: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
         </div>

@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { BUTTON_TONES, controlClass } from '../../src/components/Button';
+
 import { journeyContext, search, signIn } from './shared';
+import { computeBorderColorsInPage, measureControlBordersInPage } from './controlBorderMeasure';
 import { measureInPage, type Measurement } from './touchMeasure';
 
 /**
@@ -13,6 +16,38 @@ import { measureInPage, type Measurement } from './touchMeasure';
  * 착수 실측(2026-11-16, base a338b55b): 보이는 요소 101개 가운데 44px 이상이 **0** 이었다.
  * 그래서 이 spec 은 이관 전 트리에서 **붉고**, 이관이 끝나야 초록이다.
  */
+/**
+ * 컨트롤 경계로 **허용되는 클래스**(v M-1 · cr L-2 · cr M-1) — 색이 아니라 **클래스**를 모은다.
+ *
+ * 색을 Node 에서 글자로 조립하던 앞 판은 틀렸다(cr M-1 실측): 출하 CSS 의 어조 테두리는
+ * `color-mix(in oklab, …)` 이고 브라우저는 그것을 `oklab(… / 0.4)` 로 돌려준다 — 조립한
+ * `rgba(…)` 와 **영영 맞지 않는다**. 그래서 허용 색은 **브라우저가 계산하게** 한다(아래
+ * `computeBorderColorsInPage`). 재는 쪽과 재어지는 쪽이 같은 파서를 지난다.
+ *
+ * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **공유 버튼의 어조 표가 실제로 쓰는 경계 클래스**
+ * (`danger` 의 경고 테두리). **카드 선은 들어 있지 않다** — 그것이 이 축이 잡으려는 값이다.
+ * 어조 글자색 **전수**를 받지도 않는다(v r2-low — `accent-ink` 는 흰색이라 보이지 않는 경계다).
+ */
+function allowedBorderClasses(): readonly string[] {
+  const classes = ['border-control-line'];
+  let fromTable = 0;
+  for (const tone of BUTTON_TONES) {
+    for (const token of controlClass(tone, 'md').split(/\s+/u)) {
+      if (!token.startsWith('border-') || token === 'border-control-line') {
+        continue;
+      }
+      classes.push(token);
+      fromTable += 1;
+    }
+  }
+  if (fromTable === 0) {
+    throw new Error('어조 표에서 경계 클래스를 하나도 읽지 못했다 — 허용 집합이 공허하다');
+  }
+  return classes;
+}
+
+const ALLOWED_BORDER_CLASSES = allowedBorderClasses();
+
 /** 측정은 **공용 자리**를 지난다(`touchMeasure.ts`) — 합성 대조가 같은 함수를 본다. */
 const measure = async (page: Page): Promise<Measurement> => page.evaluate(measureInPage);
 
@@ -293,6 +328,16 @@ test('이 레인은 모바일 폭으로 돌고, 워크시트 자리가 이 spec 
 
 test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 넘침이 0 이다', async ({ page }) => {
   await prepare(page);
+  /**
+   * 경계를 **그리는** 컨트롤의 전수(v M-1 의 비공허). 화면마다 세지 않는다 — 입찰함처럼
+   * 테두리 없는 버튼만 선 화면이 있어서 화면별 하한은 거짓으로 붉는다. 모집단 전체로 센다.
+   */
+  let borderedControls = 0;
+  /**
+   * **그려진 경계에 실제로 맞은 허용 색**(cr M-1). 앞 판은 「표에서 읽은 색 수」를 셌는데, 그
+   * 수는 화면을 한 번도 보지 않고도 선다 — 허용이 틀려도(색 꼴이 어긋나도) 알 수 없었다.
+   */
+  let matchedAllowed = new Set<string>();
   for (const screen of TOUCH_TARGET_SCREENS) {
     await page.goto(screen.path);
     await expect(page.getByTestId(screen.ready)).toBeVisible();
@@ -305,15 +350,44 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
 
     const { targets, overflow, offscreen, partiallyClipped } = await measure(page);
 
+    /**
+     * **컨트롤의 경계가 그려진 색**(v M-1 · cr L-2). AST 축은 className **리터럴**만 보므로
+     * 클래스 글자가 상수나 헬퍼에 들어가면 아무 말도 하지 않는다 — 이 층은 브라우저가 실제로
+     * 그린 색을 본다. 허용 집합은 `index.css` 에서 **유도한다**(값을 여기 복사하지 않는다):
+     * 컨트롤 선이거나 어조 자신의 글자색이다. 카드 선은 그 집합에 없다.
+     */
+    // 허용 색은 **그 페이지에서** 계산한다 — 출하 CSS 와 같은 파서를 지난다(cr M-1).
+    const allowed = new Set([
+      ...(await page.evaluate(computeBorderColorsInPage, ALLOWED_BORDER_CLASSES)),
+      'rgba(0, 0, 0, 0)',
+      'transparent',
+    ]);
+    const borders = await page.evaluate(measureControlBordersInPage);
+    const drawn = borders.filter((one) => one.width > 0);
+    borderedControls += drawn.length;
+    matchedAllowed = new Set([...matchedAllowed, ...drawn.map((one) => one.color).filter((one) => allowed.has(one))]);
+    const wrong = drawn.filter((one) => !allowed.has(one.color));
+    expect(
+      wrong.map((one) => `${one.tag}[${one.testId}] ${one.color} "${one.name}"`),
+      `${screen.slotId}: 컨트롤 경계가 허용 토큰 밖의 색이다(카드 선을 쓴 자리일 수 있다)`,
+    ).toStrictEqual([]);
+
     // ① **비공허** — 보이는 것 필터가 집합을 비우면 아래 전수 단언이 조용히 초록이 된다.
     expect(targets.length, `${screen.slotId}: 보이는 타깃 ${targets.length} 이 하한 ${screen.minCount} 에 못 미친다`).toBeGreaterThanOrEqual(
       screen.minCount,
     );
-    // ② 전수 — 이름으로 고르지 않는다.
-    const small = targets.filter((one) => one.height < MIN_TOUCH_PX);
+    /**
+     * ② 전수 — 이름으로 고르지 않는다.
+     *
+     * **두 변을 함께 잰다**(M14/14A — M13 잔여 §12.3 (w) ⓑ). 앞 판은 **세로만** 보았고, 측정
+     * 함수는 가로도 내는데 아무도 단언하지 않았다. 짧은 라벨의 알약 버튼은 세로만 키우면
+     * 44×40 꼴이 되어 손가락이 옆으로 빗나간다 — 하한은 「최소 **변**」이므로 두 변 모두다.
+     * 이 축을 더하는 것은 하한을 **올리는** 변경이다(계약 「올리기만」).
+     */
+    const small = targets.filter((one) => one.height < MIN_TOUCH_PX || one.width < MIN_TOUCH_PX);
     expect(
-      small.map((one) => `${one.tag} ${one.height}px "${one.name}"`),
-      `${screen.slotId}: 터치 타깃이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
+      small.map((one) => `${one.tag} ${one.width}x${one.height}px "${one.name}"`),
+      `${screen.slotId}: 터치 타깃의 변이 ${MIN_TOUCH_PX}px 에 못 미친다(보이는 전수 ${targets.length})`,
     ).toStrictEqual([]);
     /**
      * ③ 가로 넘침 0 — 모바일에서 옆으로 밀리는 화면을 만들지 않는다.
@@ -327,6 +401,18 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
     expect(partiallyClipped, `${screen.slotId}: 타깃에 부분 잘라내기가 걸려 상자로 잴 수 없다`).toStrictEqual([]);
     expect(overflow, `${screen.slotId}: 가로로 ${overflow}px 넘친다`).toBeLessThanOrEqual(0);
   }
+
+  /**
+   * **비공허(v M-1)** — 경계 색 단언이 **무엇인가를 실제로 봤는가**. 모집단 전체로 센다:
+   * 화면마다 세면 테두리 없는 버튼만 선 화면(입찰함)에서 거짓으로 붉는다(실측).
+   * 하한은 오늘의 수보다 넉넉히 낮게 두어 화면이 바뀔 때 잡음으로 흔들리지 않는다.
+   */
+  expect(borderedControls, '경계를 그리는 컨트롤을 하나도 보지 못했다 — 색 단언이 공허하다').toBeGreaterThan(10);
+  /**
+   * **허용 색이 실제로 쓰였는가**(cr M-1). 이 수가 0 이면 허용 집합이 그려진 경계와 한 번도
+   * 맞지 않았다는 뜻이고, 그때 위 전수 단언은 「전부 위반」이거나 「허용이 공허」 둘 중 하나다.
+   */
+  expect(matchedAllowed.size, '허용 색이 그려진 경계와 한 번도 맞지 않았다').toBeGreaterThan(0);
 });
 
 /**

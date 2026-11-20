@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  ABSENT,
   assertOnlyAllowedOperations,
   journeyContext,
   signIn,
@@ -235,7 +236,7 @@ test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 
   const cleared = await setRequiredKeyword(page, '');
   expect(cleared.state).toBe('APPLIED');
   expect(cleared.revision, '지우는 것도 쓰기다 — 개정이 또 오른다').toBeGreaterThan(revisionAfterSet);
-  await expect(page.getByTestId(`strategy-value-${KEYWORD_FIELD}`)).toHaveText('값 없음');
+  await expect(page.getByTestId(`strategy-value-${KEYWORD_FIELD}`)).toHaveText(ABSENT);
 
   const after = await readSuggestions(page);
   expect(after.resultState, '조건을 지우면 그 빈 얼굴로 돌아온다').toBe('WATCH_NOT_CONFIGURED');

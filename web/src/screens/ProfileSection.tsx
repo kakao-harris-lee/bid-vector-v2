@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { readProfile, type Profile } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { StateBadge } from '../components/StateBadge';
 import { isUnauthorized } from '../components/WriteFailure';
@@ -10,7 +11,6 @@ import { displayOrUnknown } from '../display/stateDisplay';
 import { ProfileCapacityCard } from './ProfileCapacityCard';
 import { ProfileDetailsCard } from './ProfileDetailsCard';
 import { ProfileFactsCard } from './ProfileFactsCard';
-import { PROFILE_QUERY_KEY } from './profileWrites';
 
 /**
  * 프로필 설정(D-7E2-3) — 블록 셋을 조립한다. 각 블록은 **마법사의 한 단계이기도 하다**

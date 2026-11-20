@@ -12,34 +12,65 @@
 
 /* M7/7E-1 — 디자인 토큰은 **이 한 자리**다(D-7E-5). Tailwind v4 CSS-first 이므로 설정
    파일(`tailwind.config.*`·`postcss.config.*`)을 두지 않는다. 색을 컴포넌트에 리터럴로
-   적지 않는다 — 어조(tone)마다 토큰 쌍을 두고 컴포넌트는 그 이름만 쓴다. */
+   적지 않는다 — 어조(tone)마다 토큰 쌍을 두고 컴포넌트는 그 이름만 쓴다.
+
+   **M14/14A — 값을 와이어프레임의 캔버스 팔레트로 갈았다**(따뜻한 회백 바탕 · 흰 카드 ·
+   청록 강조). 토큰의 **이름과 역할은 그대로**이므로 컴포넌트는 이 교체를 모른다.
+
+   대비는 짝 게이트가 **이 파일을 파싱해서** 잰다 — 값을 test 에 복사하지 않는다. 라이트·다크
+   두 블록 모두 WCAG AA(본문 4.5:1)와 비텍스트 3:1 을 넘는다. */
 @theme {
-  --color-page: #ffffff;
+  --color-page: #f6f5f2;
   --color-card: #ffffff;
-  --color-ink: #111827;
-  --color-ink-soft: #4b5563;
-  --color-line: #e5e7eb;
-  --color-accent: #1d4ed8;
+  --color-ink: #1c1b19;
+  --color-ink-soft: #6b6862;
+  /* **선이 둘이다**(팀장 판정 2026-11-20 — 계약의 게이트 축 변경).
+
+     WCAG 1.4.11 의 3:1 은 **UI 컴포넌트의 경계**(입력칸 · 버튼 · 선택 · 체크박스)에 걸리는
+     기준이지, 내용을 **묶는** 카드의 테두리에 걸리는 기준이 아니다. 카드 테두리를 전부 어둡게
+     하면 필요하지 않은 접근성을 와이어프레임 충실도와 맞바꾸게 된다.
+
+     그래서 역할로 가른다.
+      · `line` — **카드 테두리와 가름선**. 와이어프레임 값 그대로이고 **대비 측정 밖**이다.
+      · `control-line` — **컨트롤의 경계**. 캔버스가 이미 선언한 더 어두운 회색이고 3:1 로 잰다.
+
+     카드와 바탕을 가르는 것은 선이 아니라 **면의 차이**(1.09:1)다 — 그 차이가 유지되는지도
+     게이트가 함께 센다(없어지면 카드가 바탕에 녹는다). */
+  --color-line: #d9d6cf;
+  --color-control-line: #8a877f;
+  --color-accent: #0f7b74;
   --color-accent-ink: #ffffff;
 
-  /* 어조 다섯 — `DisplayTone` 과 **같은 다섯**이다(`StateBadge` 가 그 등식을 든다).
-     `absent`·`unjudged` 가 `bad` 와 다른 색을 갖는 것이 요점이다: 「없음」과 「아직
-     판정하지 않음」이 「미달」로 읽히면 정직 명세가 무너진다. */
-  --color-neutral-skin: #f3f4f6;
-  --color-neutral-ink: #374151;
-  --color-absent-skin: #f3f4f6;
-  /* CR L-1 — 배지는 12px(large text 아님)이라 WCAG AA 가 4.5:1 을 요구한다. `#6b7280` 은
-     4.39:1 이었고 「없음·아직」 전부가 이 어조라 가장 많이 쓰이는 배지다. 한 단 내려 넘긴다. */
-  --color-absent-ink: #5b6472;
-  --color-unjudged-skin: #fef3c7;
-  --color-unjudged-ink: #92400e;
-  --color-good-skin: #dcfce7;
-  --color-good-ink: #166534;
-  --color-bad-skin: #fee2e2;
-  --color-bad-ink: #991b1b;
+  /* 전역 탐색에서 **지금 서 있는 자리**. 어조 다섯과 다른 축이다(`DisplayTone` 이 아니다) —
+     상태를 말하는 것이 아니라 선택을 말한다. 와이어프레임의 사이드바가 그 자리를 청록 옅은
+     면으로 그린다. */
+  --color-selected-skin: #e8f2f1;
+  --color-selected-ink: #0b5e59;
 
+  /* 어조 다섯 — `DisplayTone` 과 **같은 다섯**이다(`StatusPill` 이 그 등식을 든다).
+     `absent`·`unjudged` 가 `bad` 와 다른 색을 갖는 것이 요점이다: 「없음」과 「아직
+     판정하지 않음」이 「미달」로 읽히면 정직 명세가 무너진다.
+
+     캔버스의 배지 색을 그대로 쓰되 **글자색 둘은 한 단 내렸다**(「좋음」 4.32 · 「미판정」 4.42 로
+     AA 에 못 미쳤다 — M13 CR L-1 이 `absent` 에 한 것과 같은 처분이다). 눈으로 가릴 수 있는
+     차이가 아니다. */
+  --color-neutral-skin: #f0eee9;
+  --color-neutral-ink: #4a4843;
+  --color-absent-skin: #f0eee9;
+  --color-absent-ink: #5b5852;
+  --color-unjudged-skin: #fbf0dc;
+  --color-unjudged-ink: #8a580f;
+  --color-good-skin: #e3f1e8;
+  --color-good-ink: #2c7349;
+  --color-bad-skin: #f9e3e3;
+  --color-bad-ink: #b23a3a;
+
+  /* 서체는 **대조 대상이 아니다**(팀장 착수 판정). 새 의존성 0 · 런타임 외부 요청 0 —
+     와이어프레임이 쓴 서체를 스택 **앞**에 두고, 설치돼 있지 않으면 기존 스택으로 떨어진다.
+     자체 호스팅은 새 자산이라 별도 결정이다. */
   --font-sans:
-    Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    'IBM Plex Sans KR', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
   /* 금액·공고번호는 자리 수를 눈으로 세는 값이라 **고정폭**으로 둔다. */
   --font-numeric: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
 }
@@ -50,26 +81,33 @@
     color-scheme: light dark;
   }
 
+  /* 다크는 **별도 디자인이 아니라 같은 역할의 다른 값**이다(계약 범위 밖 — 「새 팔레트의 다크
+     쌍은 대비만 맞춘다」). 캔버스에 다크가 없어 같은 따뜻한 색조로 유도했고, 쌍 전수가 기준을
+     넘는 것을 짝 게이트가 잰다. */
   @media (prefers-color-scheme: dark) {
     :root {
-      --color-page: #0b0f14;
-      --color-card: #131a22;
-      --color-ink: #e5e7eb;
-      --color-ink-soft: #9ca3af;
-      --color-line: #273341;
-      --color-accent: #60a5fa;
-      --color-accent-ink: #0b0f14;
+      --color-page: #1a1917;
+      --color-card: #232220;
+      --color-ink: #ece9e3;
+      --color-ink-soft: #a8a49b;
+      --color-line: #3f3c37;
+      --color-control-line: #78746b;
+      --color-accent: #4fb3a8;
+      --color-accent-ink: #10211f;
 
-      --color-neutral-skin: #1f2937;
-      --color-neutral-ink: #d1d5db;
-      --color-absent-skin: #1f2937;
-      --color-absent-ink: #9ca3af;
-      --color-unjudged-skin: #422006;
-      --color-unjudged-ink: #fcd34d;
-      --color-good-skin: #052e16;
-      --color-good-ink: #86efac;
-      --color-bad-skin: #450a0a;
-      --color-bad-ink: #fca5a5;
+      --color-selected-skin: #223330;
+      --color-selected-ink: #8fd8cf;
+
+      --color-neutral-skin: #2e2c28;
+      --color-neutral-ink: #d6d2ca;
+      --color-absent-skin: #2e2c28;
+      --color-absent-ink: #a8a49b;
+      --color-unjudged-skin: #3a2d12;
+      --color-unjudged-ink: #f2c879;
+      --color-good-skin: #16301f;
+      --color-good-ink: #86d8a3;
+      --color-bad-skin: #3a1d1d;
+      --color-bad-ink: #f2a3a3;
     }
   }
 

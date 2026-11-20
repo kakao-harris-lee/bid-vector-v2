@@ -44,6 +44,15 @@ export function notificationsUnreadQueryKey(): readonly [string, string] {
 }
 
 /**
+ * 프로필 한 벌(M7/7E-2b). 화면 둘(설정 · 시작하기 마법사)과 **셸의 사업자명**이 같은 자리를
+ * 쓴다 — 쓰기의 무효화가 셸까지 닿는 것이 그래서 구조다.
+ *
+ * M14/14A 에 `screens/profileWrites` 에서 이 파일로 옮겼다. 질의 키의 한 자리가 여기라고
+ * 적어 두고 한 축만 화면 쪽에 남겨 두면, 그 축을 쓰는 새 자리가 화면을 import 해야 한다.
+ */
+export const PROFILE_QUERY_KEY: readonly [string] = ['profile'];
+
+/**
  * 내 입찰 결과(M7/7E-3b) — 건별과 집계가 **한 응답**이라 키도 하나다.
  *
  * **인자가 없다**: 계약에 질의 인자가 없고 주체는 세션 계정이 정한다. 계정을 키에 섞으면

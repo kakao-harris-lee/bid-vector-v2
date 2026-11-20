@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
 import { replaceBusinessDetails, type Profile } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { Button } from '../components/Button';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import {
   businessDetailsBodyOf,
   NARA_FIELD_DISPLAY,
@@ -14,7 +16,7 @@ import {
 } from '../display/profileDisplay';
 import { displayOrUnknown } from '../display/stateDisplay';
 
-import { attemptOf, PROFILE_QUERY_KEY, ProfileWriteFailure, useProfileWrite } from './profileWrites';
+import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
 
 function detailsFormOf(profile: Profile): BusinessDetailsForm {
   return {
@@ -63,8 +65,8 @@ export function ProfileDetailsCard({
           />
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-          <Field label="상호" value={profile.tradeName ?? null} testId="profile-trade-name" />
-          <Field
+          <KeyValueRow label="상호" value={profile.tradeName ?? null} testId="profile-trade-name" />
+          <KeyValueRow
             label="본사 소재지"
             value={
               profile.headquartersRegion === null || profile.headquartersRegion === undefined
@@ -73,7 +75,7 @@ export function ProfileDetailsCard({
             }
             testId="profile-region"
           />
-          <Field
+          <KeyValueRow
             label="등록 분야"
             value={
               profile.naraRegisteredFields.length === 0
@@ -92,7 +94,7 @@ export function ProfileDetailsCard({
               aria-label="상호"
               value={form.tradeName}
               onChange={(event) => setDetails({ ...form, tradeName: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -101,7 +103,7 @@ export function ProfileDetailsCard({
               aria-label="본사 소재지"
               value={form.headquartersRegion}
               onChange={(event) => setDetails({ ...form, headquartersRegion: event.target.value })}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             >
               {/* 고르기 전에는 **빈 자리**다 — 첫 지역을 기본값으로 두지 않는다. */}
               <option value="">고르지 않음</option>
@@ -120,7 +122,7 @@ export function ProfileDetailsCard({
               onChange={(event) =>
                 setDetails({ ...form, naraRegistration: event.target.value as NaraRegistration })
               }
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             >
               {Object.entries(NARA_REGISTRATION_DISPLAY).map(([value, display]) => (
                 <option key={value} value={value}>
@@ -138,7 +140,7 @@ export function ProfileDetailsCard({
                 aria-label="인증서 만료일"
                 value={form.businessCertificateExpiresOn}
                 onChange={(event) => setDetails({ ...form, businessCertificateExpiresOn: event.target.value })}
-                className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+                className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
               />
             </label>
           ) : null}

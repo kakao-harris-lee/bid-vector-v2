@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
+import { absenceTextOf } from '../display/absence';
 import { EDIT_SESSION_STATE_DISPLAY, STRATEGY_FIELD_DISPLAY } from '../display/editSessionDisplay';
 
 import { SettingsScreen } from './SettingsScreen';
@@ -89,7 +90,7 @@ describe('설정 — 전략의 지금 값은 API 가 준 값이다', () => {
     renderScreen();
 
     const row = await screen.findByTestId('strategy-value-MAX_ACTIVE_BIDS');
-    expect(row.textContent).toBe('값 없음');
+    expect(row.textContent).toBe(absenceTextOf('notSent'));
   });
 
   it('어휘·금액·수를 API 가 준 그대로 보인다', async () => {
@@ -275,7 +276,7 @@ describe('설정 — 전략은 편집 세션으로만 바뀐다', () => {
     const sent = await screen.findByTestId('edit-sent-value');
     expect(sent.textContent).toContain('비움');
     expect(sent.textContent).not.toBe('');
-    expect(sent.textContent).not.toBe('값 없음');
+    expect(sent.textContent).not.toBe(absenceTextOf('notSent'));
   });
 
   /**

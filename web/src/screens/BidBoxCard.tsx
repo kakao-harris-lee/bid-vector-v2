@@ -153,7 +153,7 @@ export function ActionForm({
             type="datetime-local"
             value={value}
             onChange={(event) => change(event.target.value)}
-            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           />
         </label>
       ) : null}
@@ -193,7 +193,7 @@ export function ActionForm({
               rows={3}
               onChange={(event) => change(event.target.value)}
               aria-describedby={input.maxChars === undefined ? undefined : lengthId}
-              className="rounded-md border border-line bg-card px-3 py-2 text-sm"
+              className="rounded-md border border-control-line bg-card px-3 py-2 text-sm"
             />
           </label>
           {input.maxChars === undefined ? null : (

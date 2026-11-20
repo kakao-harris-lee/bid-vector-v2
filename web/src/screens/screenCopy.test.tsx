@@ -18,6 +18,7 @@ import { RouteError } from '../RouteError';
 import { notFoundSlot, screenSlots } from '../routes';
 import { ScreenPlaceholder } from '../ScreenPlaceholder';
 
+import * as absence from '../display/absence';
 import * as bidBoxDisplay from '../display/bidBoxDisplay';
 import * as caseDisplay from '../display/caseDisplay';
 import * as editSessionDisplay from '../display/editSessionDisplay';
@@ -160,6 +161,7 @@ const sweep = (root: ParentNode): readonly string[] =>
 /* ── 표시층 표 전수 — 모듈 집합을 디렉터리에서 유도하고 소스 층이 등식을 건다 ───────── */
 
 const DISPLAY_MODULES: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+  'absence.ts': absence,
   'bidBoxDisplay.ts': bidBoxDisplay,
   'caseDisplay.ts': caseDisplay,
   'editSessionDisplay.ts': editSessionDisplay,

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { NOTIFICATIONS_QUERY_KEY, notificationsUnreadQueryKey } from '../api/queryKeys';
+import { absenceTextOf } from '../display/absence';
 import {
   NOTIFICATION_BID_KIND_DISPLAY,
   NOTIFICATION_DETAIL_DISPLAY,
@@ -125,7 +126,7 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
     mocked.listNotifications.mockResolvedValue(page([item({ read: false })], 7, 1));
     renderScreen();
 
-    // **목록이 온 뒤에 읽는다**(7E-2b r1 교훈): 적재 중에는 배지가 「값 없음」이라 여기서 바로
+    // **목록이 온 뒤에 읽는다**(7E-2b r1 교훈): 적재 중에는 배지가 **응답 전 어휘**라 여기서 바로
     // 읽으면 「본문을 세지 않는다」가 아니라 「아직 모른다」를 재게 된다.
     await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const badge = screen.getByTestId('inbox-unread-badge');
@@ -152,7 +153,7 @@ describe('안읽음 배지는 헤더 값에서만 온다 (D-7E3a-6)', () => {
     await screen.findByTestId('notification-OPENING_COMPLETED-SYN-7E3-RESULT-000-REAL');
     const badge = screen.getByTestId('inbox-unread-badge');
     expect(badge.textContent ?? '').toContain('0');
-    expect(badge.textContent ?? '', '적재 중의 「값 없음」을 0 으로 읽지 않았다').not.toContain('값 없음');
+    expect(badge.textContent ?? '', '적재 중의 응답 전 어휘를 0 으로 읽지 않았다').not.toContain(absenceTextOf('notLoaded'));
   });
 });
 
@@ -598,14 +599,32 @@ describe('로딩·오류 얼굴과 적재 중 배지 (r1 v M-1 · CR M-2)', () =
    * **응답 전에 0 을 지어내지 않는다**(D-7E3a-6 · v M-1). 배지 test 둘이 모두 목록이 온 **뒤**
    * 를 읽어서, `?? 0` 으로 바꾸는 변이가 초록이었다 — 「모른다」와 「0 이다」는 다른 답이다.
    */
-  it('응답 전 배지는 0 이 아니라 「값 없음」이다', async () => {
+  it('응답 전 배지는 0 도 부재도 아닌 **응답 전** 어휘다 (M14/14A ④)', async () => {
     mocked.listNotifications.mockReturnValue(new Promise<queries.NotificationPage>(() => {}));
     renderScreen();
 
     expect(await screen.findByTestId('inbox-loading')).toBeTruthy();
     const badge = screen.getByTestId('inbox-unread-badge').textContent ?? '';
-    expect(badge, '응답 전에 안읽음 수를 지어냈다').toContain('값 없음');
+    expect(badge, '응답 전에 안읽음 수를 지어냈다').toContain(absenceTextOf('notLoaded'));
+    // **「없다」로 접지 않는다** — 두 사실이 다른 얼굴인 것이 이 slice 가 세운 차이다.
+    expect(badge, '응답 전을 「없다」와 같은 얼굴로 접었다').not.toContain(absenceTextOf('notSent'));
     expect(badge).not.toMatch(/\d/u);
+  });
+
+  /**
+   * **실패한 뒤의 「아직 받지 못함」은 거짓이다**(v L-2). 답이 **왔고** 그것이 실패였다 —
+   * 기다리는 중이라고 말하면 운영자가 조금 더 기다린다.
+   */
+  it('목록이 실패하면 배지가 「아직 받지 못함」이라고 말하지 않는다', async () => {
+    mocked.listNotifications.mockRejectedValue(new ApiError(500, 'INTERNAL'));
+    renderScreen();
+
+    await screen.findByTestId('inbox-error');
+    const badge = screen.getByTestId('inbox-unread-badge').textContent ?? '';
+
+    expect(badge, '실패한 뒤에도 기다리는 중이라고 말했다').not.toContain(absenceTextOf('notLoaded'));
+    expect(badge, '실패를 「없다」로 접었다').not.toContain(absenceTextOf('notSent'));
+    expect(badge, '실패인데 수를 지어냈다').not.toMatch(/\d/u);
   });
 
   it('목록이 실패하면 오류 얼굴이고 「다시 시도」가 다시 읽는다', async () => {

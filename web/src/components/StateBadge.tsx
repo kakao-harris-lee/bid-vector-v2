@@ -1,21 +1,14 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState } from 'react';
 
-import { unknownStateDisplay, type DisplayTone, type StateDisplay } from '../display/stateDisplay';
+import { unknownStateDisplay, type StateDisplay } from '../display/stateDisplay';
+
+import { StatusPill, pillClass } from './StatusPill';
 
 /**
- * 어조 → 토큰. **다섯 어조 전수**이고 `satisfies` 가 그 등식을 든다 — 어조가 늘면 이 자리가
- * 컴파일에서 멈춘다. 색 리터럴은 `index.css` 의 토큰에만 있다(D-7E-5 「토큰은 한 자리」).
+ * 알약의 **모양과 어조 표는 `StatusPill` 한 자리**다(M14/14A). 앞 판은 그 표가 이 파일에
+ * 있었고, 와이어프레임 정렬에서 같은 알약을 쓰는 자리가 늘면서 사본이 생길 참이었다.
+ * 여기 남는 것은 그 알약을 **2층 라벨로 감싸는 일**뿐이다.
  */
-const TONE_CLASS = {
-  neutral: 'bg-neutral-skin text-neutral-ink',
-  absent: 'bg-absent-skin text-absent-ink',
-  unjudged: 'bg-unjudged-skin text-unjudged-ink',
-  good: 'bg-good-skin text-good-ink',
-  bad: 'bg-bad-skin text-bad-ink',
-} as const satisfies Record<DisplayTone, string>;
-
-/** 알약 하나의 모양 — 어조 토큰만 갈린다. */
-const PILL_CLASS = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
 
 /**
  * 상태 하나의 표시. **2층 라벨**(§6.4)이다.
@@ -55,16 +48,11 @@ export function StateBadge({
   const generatedId = useId();
   const [expanded, setExpanded] = useState(false);
   const shown = display ?? unknownStateDisplay('표에 없음');
-  const pillClass = `${PILL_CLASS} ${TONE_CLASS[shown.tone]}`;
 
   // **아래층이 없으면 펼칠 것이 없다** — 빈 펼침 버튼을 두면 운영자가 눌러 보고 아무 일도
   // 일어나지 않는다(가짜 affordance). 그 배지는 앞 판 그대로 글자다.
   if (shown.why === undefined) {
-    return (
-      <span data-testid={testId} className={pillClass}>
-        {shown.label}
-      </span>
-    );
+    return <StatusPill tone={shown.tone} label={shown.label} testId={testId} />;
   }
 
   const whyId = `state-why-${generatedId}`;
@@ -87,9 +75,9 @@ export function StateBadge({
         */
         aria-pressed={expanded}
         onClick={() => setExpanded((open) => !open)}
-        className="inline-flex min-h-11 items-center rounded-md"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md"
       >
-        <span className={pillClass}>{shown.label}</span>
+        <span className={pillClass(shown.tone)}>{shown.label}</span>
       </button>
       {/*
         **한 노드다.** 접히면 시각 은폐, 펼치면 보이는 글자 — 바뀌는 것은 **보는 사람의 몫**이고
@@ -110,65 +98,5 @@ export function StateBadge({
         {shown.why}
       </span>
     </span>
-  );
-}
-
-/**
- * 라벨 + 값 한 줄. 값이 없으면 **빈 자리**를 그린다(§6.5 가짜 기본값 금지) — 「0」·「미정」을
- * 넣지 않는다.
- */
-/**
- * 용어의 **아래층 문면**을 보조기기에도 닿게 묶는 한 자리(CR r2 M-4 · r3 M-5 · L-10).
- *
- * `title` 하나는 터치에서 볼 수 없고 `<dt>` 는 포커스를 받지 않는다. 그 문면(「투찰 기준 금액.
- * 추정가격과 다르다」)은 혼동하면 투찰 금액이 틀리는 자리다. 배선을 여기 하나로 두는 이유는
- * 같은 꼴이 화면마다 **복제되던 자리**이기 때문이다 — 셋째 자리에서 빠진 것이 M-5 였다.
- *
- * sr-only 문면은 호출자가 **값 요소 안**에 둔다. 형제 `<dd>` 로 두면 `dl` 의 내용 모형에서 한
- * 용어에 값이 둘이 된다.
- */
-export function useHint(hint: string | undefined): {
-  readonly describedBy: string | undefined;
-  readonly hintNode: ReactNode;
-} {
-  const generatedId = useId();
-  if (hint === undefined) {
-    return { describedBy: undefined, hintNode: null };
-  }
-  const describedBy = `field-hint-${generatedId}`;
-  return {
-    describedBy,
-    hintNode: (
-      <span id={describedBy} className="sr-only">
-        {hint}
-      </span>
-    ),
-  };
-}
-
-export function Field({
-  label,
-  value,
-  hint,
-  testId,
-}: {
-  readonly label: string;
-  readonly value: string | null;
-  readonly hint?: string;
-  readonly testId?: string;
-}) {
-  const { describedBy, hintNode } = useHint(hint);
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-xs text-ink-soft" title={hint}>
-        {label}
-      </dt>
-      {/* sr-only 문면은 **그 `<dd>` 안**에 둔다(CR r3 L-10) — 둘째 `<dd>` 로 두면 `dl` 의 내용
-          모형에서 한 용어에 값이 둘이 되고, 보조기기가 설명을 값으로 읽는다. */}
-      <dd aria-describedby={describedBy} className="text-sm">
-        <span data-testid={testId}>{value ?? <span className="text-absent-ink">값 없음</span>}</span>
-        {hintNode}
-      </dd>
-    </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   type Profile,
   type StrategyReadResponse,
 } from '../api/queries';
+import { PROFILE_QUERY_KEY } from '../api/queryKeys';
 import { ErrorFace, Skeleton } from '../components/ScreenFaces';
 import { controlClass, LinkButton } from '../components/Button';
 import { cardClass } from '../components/Card';
@@ -30,7 +31,6 @@ import { useSessionCsrf } from '../session/useSessionCsrf';
 import { ProfileCapacityCard } from './ProfileCapacityCard';
 import { ProfileDetailsCard } from './ProfileDetailsCard';
 import { ProfileFactsCard } from './ProfileFactsCard';
-import { PROFILE_QUERY_KEY } from './profileWrites';
 import {
   STRATEGY_QUERY_KEY,
   StrategyEditPanel,

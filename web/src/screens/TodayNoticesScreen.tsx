@@ -334,7 +334,7 @@ function FilterChip({
               name={one.field}
               value={form[one.field]}
               onChange={(event) => onEdit(one.field, event.target.value)}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
         ))}
@@ -486,7 +486,7 @@ export function TodayNoticesScreen() {
             name="q"
             value={form.q}
             onChange={(event) => setForm({ ...form, q: event.target.value })}
-            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           />
         </label>
         <div className="flex flex-wrap items-start gap-2">

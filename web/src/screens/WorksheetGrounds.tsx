@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 
 import type { BidPriceRequestResponse } from '../api/queries';
+import { AbsentValue } from '../components/AbsentValue';
 import { cardClass } from '../components/Card';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import { displayOrUnknown } from '../display/stateDisplay';
 import {
   BASE_AMOUNT_RESOLUTION_DISPLAY,
@@ -127,14 +129,14 @@ function Verdict({ price }: { readonly price: BidPriceRequestResponse }) {
         </p>
       )}
       <dl className="grid gap-3 sm:grid-cols-2">
-        <Field label="멈춘 단계" testId="drop-stage" value={price.dropStage ?? null} />
-        <Field label="멈춘 사유" testId="drop-reason" value={price.dropReasonCode ?? null} />
-        <Field
+        <KeyValueRow label="멈춘 단계" testId="drop-stage" value={price.dropStage ?? null} />
+        <KeyValueRow label="멈춘 사유" testId="drop-reason" value={price.dropReasonCode ?? null} />
+        <KeyValueRow
           label="판정 사유 코드"
           testId="verdict-reasons"
           value={price.verdictReasonCodes.length === 0 ? null : price.verdictReasonCodes.join(', ')}
         />
-        <Field
+        <KeyValueRow
           label="걸린 감시 규칙"
           testId="failed-watch-rules"
           value={price.failedWatchRuleIds.length === 0 ? null : price.failedWatchRuleIds.join(', ')}
@@ -156,7 +158,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
       summary={<StateBadge display={displayOrUnknown(FLOOR_RATE_GROUNDS_DISPLAY, price.floorRateGroundsState)} />}
     >
       <dl className="grid gap-4 sm:grid-cols-2">
-        <Field
+        <KeyValueRow
           label="기초금액"
           hint="투찰 기준 금액. 추정가격과 다르다."
           testId="base-amount"
@@ -166,7 +168,7 @@ function Grounds({ price }: { readonly price: BidPriceRequestResponse }) {
           <dt className="text-xs text-ink-soft">기초금액이 정해진 방식</dt>
           <dd data-testid="base-amount-resolution">
             {price.baseAmountResolution === null || price.baseAmountResolution === undefined ? (
-              <span className="text-sm text-absent-ink">값 없음</span>
+              <AbsentValue reason="notSent" className="text-sm" />
             ) : (
               <StateBadge display={displayOrUnknown(BASE_AMOUNT_RESOLUTION_DISPLAY, price.baseAmountResolution)} />
             )}
@@ -268,12 +270,12 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
         <StateBadge display={displayOrUnknown(LICENSE_VALIDITY_DISPLAY, price.licenseValidity)} testId="license-validity" />
       </p>
       <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field
+        <KeyValueRow
           label="요건이 온 필드"
           testId="license-source-fields"
           value={price.licenseRequirementSourceFields.length === 0 ? null : price.licenseRequirementSourceFields.join(', ')}
         />
-        <Field
+        <KeyValueRow
           label="공고가 요구한 면허"
           testId="license-required"
           value={
@@ -282,12 +284,12 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
               : price.licenseRequiredLicenses.join(', ')
           }
         />
-        <Field
+        <KeyValueRow
           label="충족한 제한그룹"
           testId="license-groups-satisfied"
           value={price.licenseGroupsSatisfied.length === 0 ? null : price.licenseGroupsSatisfied.join(', ')}
         />
-        <Field
+        <KeyValueRow
           label="미충족 제한그룹"
           testId="license-groups-missing"
           value={price.licenseGroupsMissing.length === 0 ? null : price.licenseGroupsMissing.join(', ')}
@@ -296,13 +298,13 @@ function Qualification({ price }: { readonly price: BidPriceRequestResponse }) {
             **재현용 값**이라 개발 식별자를 담는다 — 그것은 사용자 문면이 아니다. 운영자가 알아야
             하는 것은 **어느 판으로 판정했는가**이고, 그 사실은 시행일이 말한다. 원문은 API 와
             서버에 그대로 남으므로 재현성은 잃지 않는다. */}
-        <Field
+        <KeyValueRow
           label="자격 판정에 쓴 규칙 판본"
           hint="면허 판정에 쓴 규칙표가 어느 판인지. 규칙이 바뀌어도 지난 판정을 그 판으로 되짚을 수 있다."
           testId="license-policy"
           value={policyVersionTextOf(price.licensePolicyEffectiveFrom)}
         />
-        <Field label="읽지 못한 요건 행" testId="license-unparsable" value={`${price.licenseUnparsableRowCount}`} />
+        <KeyValueRow label="읽지 못한 요건 행" testId="license-unparsable" value={`${price.licenseUnparsableRowCount}`} />
       </dl>
       <p className="mt-2">
         <StateBadge display={displayOrUnknown(LICENSE_MISSING_DETAIL_DISPLAY, price.licenseMissingDetailState)} />

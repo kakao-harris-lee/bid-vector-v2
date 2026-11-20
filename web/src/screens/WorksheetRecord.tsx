@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 
+import { AbsentValue } from '../components/AbsentValue';
 import { Button, controlClass } from '../components/Button';
 import { cardClass } from '../components/Card';
 import { StateBadge } from '../components/StateBadge';
@@ -114,7 +115,7 @@ export function ActiveBidsDeclaration({
           aria-describedby={noteId}
           aria-invalid={blocked === null ? undefined : true}
           onChange={(event) => onChange(event.target.value)}
-          className="min-h-11 w-32 rounded-md border border-line bg-card px-3 font-numeric text-sm"
+          className="min-h-11 w-32 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <p id={noteId} className="text-xs text-ink-soft">
@@ -205,7 +206,7 @@ export function KonepsHandoff({
         <dt className="text-xs text-ink-soft">투찰 입력값(원 단위 정수)</dt>
         <dd data-testid="handoff-amount" className="font-numeric">
           {amountWon === null ? (
-            <span className="text-absent-ink">값 없음</span>
+            <AbsentValue reason="notSent" />
           ) : usable ? (
             amountWon.toLocaleString('ko-KR')
           ) : (
@@ -251,7 +252,7 @@ export function KonepsHandoff({
           value={`${amountWon}`}
           aria-label="투찰 입력값 원문"
           onFocus={(event) => event.currentTarget.select()}
-          className="mt-2 min-h-11 w-full rounded-md border border-line bg-card px-3 font-numeric text-sm"
+          className="mt-2 min-h-11 w-full rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
         />
       )}
       {margin === null ? null : (
@@ -316,7 +317,7 @@ export function BidAmountFields({
           inputMode="numeric"
           value={form.amount}
           onChange={(event) => onChange({ ...form, amount: event.target.value })}
-          className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
+          className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -326,7 +327,7 @@ export function BidAmountFields({
           name="vatTreatment"
           value={form.vat}
           onChange={(event) => onChange({ ...form, vat: event.target.value as VatTreatment | '' })}
-          className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+          className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
         >
           <option value="">고르십시오</option>
           {VAT_CHOICES.map((choice) => (
@@ -343,7 +344,7 @@ export function BidAmountFields({
           name="drawNumbers"
           value={form.drawNumbers}
           onChange={(event) => onChange({ ...form, drawNumbers: event.target.value })}
-          className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
+          className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -353,7 +354,7 @@ export function BidAmountFields({
           name="memo"
           value={form.memo}
           onChange={(event) => onChange({ ...form, memo: event.target.value })}
-          className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+          className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           rows={2}
         />
       </label>

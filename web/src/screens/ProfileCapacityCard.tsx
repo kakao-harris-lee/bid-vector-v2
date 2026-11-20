@@ -65,21 +65,21 @@ export function ProfileCapacityCard({ onSaved }: { readonly onSaved?: () => void
             aria-label="시평액 면허명"
             value={capacity.licenseName}
             onChange={(event) => setCapacity({ ...capacity, licenseName: event.target.value })}
-            className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
           />
           <input
             aria-label="시평액 금액"
             inputMode="numeric"
             value={capacity.amountWon}
             onChange={(event) => setCapacity({ ...capacity, amountWon: event.target.value })}
-            className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
           />
           <input
             aria-label="평가 연도"
             inputMode="numeric"
             value={capacity.assessmentYear}
             onChange={(event) => setCapacity({ ...capacity, assessmentYear: event.target.value })}
-            className="min-h-11 rounded-md border border-line bg-card px-3 font-numeric text-sm"
+            className="min-h-11 rounded-md border border-control-line bg-card px-3 font-numeric text-sm"
           />
         </div>
         {missing ? (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { absenceTextOf } from './absence';
 import {
   NOTICES_RESULT_STATE_DISPLAY,
   NOTICE_STATUS_DISPLAY,
@@ -77,7 +78,7 @@ describe('기초금액 표시', () => {
     }
   });
 
-  it('금액이 없으면 0 이 아니라 「값 없음」이다', () => {
+  it('금액이 없으면 0 이 아니라 부재 어휘다', () => {
     const shown = amountDisplayOf({
       baseAmountWon: null,
       baseAmountCurrency: null,
@@ -87,7 +88,7 @@ describe('기초금액 표시', () => {
     });
 
     expect(shown.present).toBe(false);
-    expect(shown.amount).toBe('값 없음');
+    expect(shown.amount).toBe(absenceTextOf('notSent'));
     expect(shown.amount).not.toMatch(/0/);
   });
 });

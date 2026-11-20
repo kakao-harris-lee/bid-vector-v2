@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { apiClient, hasCsrf, rememberCsrf } from './api/client';
 import { NOTIFICATIONS_QUERY_KEY } from './api/queryKeys';
+import { absenceTextOf } from './display/absence';
+import { tabOf } from './display/bidBoxDisplay';
 import { appRoutes } from './AppRoot';
 import { queryClient } from './queryClient';
 import { screenSlots } from './routes';
@@ -33,11 +35,20 @@ function stub({
   unread = 0,
   signOutStatus = 204,
   unreadAfterRefetch,
+  realCases = 0,
+  tradeName = null,
+  bidCasesBody,
 }: {
   unread?: number;
   signOutStatus?: number;
   /** 두 번째 읽기부터 돌려줄 값 — 「다시 돌았다」를 **보이는 값**으로 재려는 자리다. */
   unreadAfterRefetch?: number;
+  /** 사이드바 입찰함 배지가 세는 것 — 응답 **배열의 길이**다(M14/14A). */
+  realCases?: number;
+  /** 사이드바 발치의 사업자명. `null` 은 계약의 「미설정」이다. */
+  tradeName?: string | null;
+  /** 목록 자리의 답을 통째로 갈아 끼운다 — 꼴이 계약과 다른 경우를 세우는 자리다. */
+  bidCasesBody?: unknown;
 } = {}): void {
   let notificationReads = 0;
   // 서버를 **상태 있게** 흉내 낸다. 로그아웃이 성공하면 그 뒤의 세션 조회는 404 다(계약) —
@@ -73,6 +84,22 @@ function stub({
             'X-Total-Count': '0',
             'X-Unread-Count': String(count),
           },
+        });
+      }
+      // 입찰함 배지(M14/14A) — 건의 **배열**이다. 화면 D 와 같은 질의라 꼴이 같아야 한다.
+      if (path === '/api/bid-cases') {
+        // **표본이 종단과 비종단을 함께 든다**(cr M-2). 한쪽만 담으면 「종단을 뺀다」가 공허하고,
+        // 모두 같은 꼴이면 「거르지 않는다」가 공허하다 — 두 축이 같은 표본을 쓴다.
+        return new Response(JSON.stringify(bidCasesBody ?? bidCaseSample(realCases)), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      // 사이드바 발치의 사업자명 — 프로필 한 벌이다(빈 배열이 아니다).
+      if (path === '/api/profile') {
+        return new Response(JSON.stringify({ tradeName }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
         });
       }
       // 체크리스트는 **목록 셋을 든 객체**다 — 빈 배열로 답하면 그것을 읽는 배너가 터진다
@@ -121,12 +148,12 @@ const navPaths = (): string[] =>
     .map((one) => one.getAttribute('href') ?? '')
     .filter((one) => one !== '#main');
 
-describe('탐색의 두 모양 (M13/13B)', () => {
-  it('상단 줄과 하단 탭을 함께 그린다 — 가리는 것은 CSS 다', async () => {
+describe('탐색의 두 모양 (M13/13B · M14/14A 사이드바)', () => {
+  it('사이드바와 하단 탭을 함께 그린다 — 가리는 것은 CSS 다', async () => {
     stub();
     await renderAt('/');
 
-    // 자리 표의 `primary` 는 **두 곳 모두**에 선다(상단 줄 · 하단 탭).
+    // 자리 표의 `primary` 는 **두 곳 모두**에 선다(사이드바 · 하단 탭).
     const primaries = screenSlots.filter((one) => one.nav === 'primary');
     for (const slot of primaries) {
       expect(navPaths().filter((one) => one === slot.path).length, `${slot.id} 가 두 탐색에 없다`).toBe(2);
@@ -306,6 +333,201 @@ describe('탐색의 안 읽음 배지', () => {
 
     expect(sent.some((one) => one.url.includes('/api/notifications'))).toBe(false);
     expect(screen.queryByTestId('nav-more-toggle')).toBeNull();
+  });
+});
+
+/**
+ * **머리글은 문서에 하나다**(v L-1). 오늘의 코드는 그렇지만 그 사실을 **아무도 잠그지
+ * 않았다** — 폭마다 다른 `h1` 을 그리는 꼴(`md:hidden` 로 하나를 가리는)이 jsdom 과 스모크
+ * 둘 다에서 초록이었다(스모크의 머리글 단언은 넓은 폭에서만 돈다).
+ *
+ * **숨은 것도 센다**: jsdom 은 CSS 를 풀지 않으므로 여기서 세는 수가 곧 **DOM 의 수**이고,
+ * 그것이 이 축에서 재고 싶은 것이다(폭에 따라 다른 머리글을 그리지 않는다).
+ */
+describe('머리글의 단일성 (v L-1)', () => {
+  it('어느 자리에서도 h1 이 하나다', async () => {
+    for (const path of ['/', '/start', '/bids', '/results', '/inbox', '/settings', '/login', '/no-such-place']) {
+      cleanup();
+      queryClient.clear();
+      stub();
+      await renderAt(path);
+
+      expect(document.querySelectorAll('h1'), path).toHaveLength(1);
+      eject?.();
+      eject = undefined;
+    }
+  });
+});
+
+describe('사이드바 (M14/14A)', () => {
+  /**
+   * 와이어프레임의 사이드바는 항목이 다섯이고 「시작하기」가 없다 — 그것이 **시작하기가 끝난
+   * 뒤**의 모습이기 때문이다. 이 앱은 체크리스트가 남은 계정에게 그 자리가 첫 걸음이라 **여섯**을
+   * 그린다(계약의 이탈 하나). 수를 박지 않고 **자리 표에서 유도한다**.
+   */
+  it('전역 탐색에 두는 자리 전수를 그린다 — 수를 박지 않는다', async () => {
+    stub();
+    await renderAt('/');
+
+    const sidebar = screen.getAllByRole('navigation', { name: '화면' })[0];
+    const expected = screenSlots.filter((one) => one.nav !== 'none');
+
+    expect(expected.length).toBeGreaterThan(1);
+    expect(within(sidebar!).getAllByRole('link').map((one) => one.getAttribute('href'))).toStrictEqual(
+      expected.map((one) => one.path),
+    );
+  });
+
+  it('차례가 자리 표의 배열 순서다 — 셸이 자기 차례를 따로 들지 않는다', async () => {
+    stub();
+    await renderAt('/');
+
+    const sidebar = screen.getAllByRole('navigation', { name: '화면' })[0];
+    const labels = within(sidebar!)
+      .getAllByRole('link')
+      .map((one) => one.textContent ?? '');
+
+    expect(labels.map((one) => one.replace(/[0-9]+$/, ''))).toStrictEqual(
+      screenSlots.filter((one) => one.nav !== 'none').map((one) => one.label),
+    );
+  });
+});
+
+/**
+ * 배지 표본 — **종단과 비종단을 번갈아** 담는다. 기대값은 수를 박지 않고 **표시 계약의 표**에서
+ * 유도한다(`tabOf`), 그래서 계약에 상태가 늘어도 단언이 따라간다.
+ */
+const SAMPLE_STATES = ['WATCHING', 'WON', 'BID_RECORDED', 'LOST', 'AWAITING_OPENING', 'SKIPPED'] as const;
+
+/** 표본이 비면 모든 단언이 공허해진다 — 인덱스가 빗나가면 **던진다**. */
+const stateAt = (index: number): (typeof SAMPLE_STATES)[number] => {
+  const found = SAMPLE_STATES[index % SAMPLE_STATES.length];
+  if (found === undefined) {
+    throw new Error('배지 표본이 비었다');
+  }
+  return found;
+};
+
+const bidCaseSample = (count: number) =>
+  Array.from({ length: count }, (_unused, index) => ({ caseId: `case-${index}`, state: stateAt(index) }));
+
+const openCountOf = (count: number): number =>
+  bidCaseSample(count).filter((one) => tabOf(one.state) !== 'closed').length;
+
+describe('입찰함 배지 (M14/14A)', () => {
+  /**
+   * **종단 건을 뺀 수다**(cr M-2). 와이어프레임의 「내 입찰함 9」는 「전체 9」이고 「종료 12」는
+   * 따로 선 탭이다 — 배지는 **지금 들여다볼 건**을 센다.
+   *
+   * 기대값을 박지 않고 **표시 계약의 표**에서 유도한다. 표본이 종단을 담으므로 거르지 않는
+   * 변이는 수가 커져 붉고, 더 걸러도 작아져 붉는다.
+   */
+  it('종단 건을 뺀 수가 배지 수다', async () => {
+    const realCases = 6;
+    stub({ realCases });
+    await renderAt('/');
+
+    const open = openCountOf(realCases);
+    expect(open, '표본에 비종단이 없다').toBeGreaterThan(0);
+    expect(open, '표본에 종단이 없다 — 「뺀다」가 공허하다').toBeLessThan(realCases);
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box').textContent).toBe(String(open)));
+  });
+
+  /** 어조가 알림함과 **다르다**(cr M-2) — 요구가 아닌 수를 경보로 그리지 않는다. */
+  it('알림함 배지와 다른 어조다', async () => {
+    stub({ realCases: 6, unread: 3 });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box')).not.toBeNull());
+    const bidBox = screen.getByTestId('nav-bid-box').className;
+    const inbox = screen.getByTestId('nav-unread').className;
+
+    expect(bidBox).not.toBe(inbox);
+    expect(bidBox, '입찰함 배지가 경보 어조다').not.toContain('bad');
+    expect(inbox, '알림함 배지가 경보 어조를 잃었다').toContain('bad');
+  });
+
+  /** 페이퍼를 섞지 않는다 — 그 operation 은 `kind` 를 필수로 받고 계약이 둘을 섞지 않는다. */
+  it('실투찰만 묻는다', async () => {
+    stub({ realCases: 1 });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box')).not.toBeNull());
+    const asked = sent.filter((one) => one.url.includes('/api/bid-cases'));
+    expect(asked.length).toBeGreaterThan(0);
+    for (const one of asked) {
+      expect(new URL(one.url).searchParams.get('kind')).toBe('REAL');
+    }
+  });
+
+  it('0 이면 그리지 않는다 — 0 은 「비었다」이지 표시할 값이 아니다', async () => {
+    stub({ realCases: 0 });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-trade-name')).not.toBeNull());
+    expect(screen.queryByTestId('nav-bid-box')).toBeNull();
+  });
+
+  it('좁은 화면의 탭에도 같은 수가 선다 — 폭에 따라 아는 것이 달라지지 않는다', async () => {
+    const realCases = 6;
+    stub({ realCases });
+    await renderAt('/');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('nav-tab-bid-box').textContent).toBe(String(openCountOf(realCases))),
+    );
+  });
+
+  /**
+   * **배지 하나가 셸을 무너뜨리지 않는다.** 목록 자리에 배열이 아닌 답이 오면(계약 위반이거나
+   * 200 에 실린 오류 본문) 앞 판은 셸 전체가 오류 경계로 갔다 — 모든 화면이 함께 사라진다.
+   * 「모르면 그리지 않는다」가 이 경우에도 선다.
+   */
+  it('배열이 아닌 답에서도 셸이 서고 배지만 빠진다', async () => {
+    stub({ realCases: 0, bidCasesBody: { message: '배열이 아니다' } });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-trade-name')).not.toBeNull());
+    expect(screen.getByTestId('app-shell')).not.toBeNull();
+    expect(screen.queryByTestId('nav-bid-box')).toBeNull();
+  });
+
+  it('로그인 자리에서는 묻지 않는다', async () => {
+    stub({ realCases: 2 });
+    await renderAt('/login');
+
+    expect(sent.some((one) => one.url.includes('/api/bid-cases'))).toBe(false);
+    expect(sent.some((one) => one.url.includes('/api/profile'))).toBe(false);
+  });
+});
+
+describe('사이드바의 사업자명 (M14/14A)', () => {
+  it('서버가 준 상호를 그대로 그린다', async () => {
+    stub({ tradeName: '제주바다건설(주)' });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-trade-name').textContent).toBe('제주바다건설(주)'));
+  });
+
+  /** 미설정은 **값**이다 — 빈 자리로 두면 운영자가 그 칸이 있는 줄도 모른다. */
+  it('상호가 비었으면 사유를 그린다', async () => {
+    stub({ tradeName: null });
+    await renderAt('/');
+
+    await waitFor(() => expect(screen.getByTestId('nav-trade-name').textContent).toBe(absenceTextOf('notSent')));
+  });
+
+  /**
+   * **받기 전에는 아무 말도 하지 않는다.** 받지 못한 것을 「비었다」로 말하면 운영자가 상호를
+   * 지운 줄 안다 — 배지가 0 을 그리지 않는 것과 같은 규율이다.
+   */
+  it('응답 전에는 자리를 그리지 않는다', async () => {
+    stub({ tradeName: '제주바다건설(주)' });
+    queryClient.clear();
+    const router = createMemoryRouter(appRoutes, { initialEntries: ['/'] });
+    render(<RouterProvider router={router} />);
+
+    expect(screen.queryByTestId('nav-trade-name')).toBeNull();
   });
 });
 

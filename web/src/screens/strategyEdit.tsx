@@ -14,7 +14,8 @@ import {
   type StrategyReadResponse,
 } from '../api/queries';
 import { Button } from '../components/Button';
-import { Field, StateBadge } from '../components/StateBadge';
+import { StateBadge } from '../components/StateBadge';
+import { KeyValueRow } from '../components/KeyValueRow';
 import { WriteFailureFace } from '../components/WriteFailure';
 import {
   EDIT_SESSION_CONFLICT_DISPLAY,
@@ -356,7 +357,7 @@ export function StrategyFieldRow({
   const view = STRATEGY_FIELD_VALUE[field](strategy);
   return (
     <div data-testid={`strategy-row-${field}`} className="rounded-md border border-line p-3">
-      <Field label={display.label} value={view.text} hint={display.why} testId={`strategy-value-${field}`} />
+      <KeyValueRow label={display.label} value={view.text} hint={display.why} testId={`strategy-value-${field}`} />
       {view.qualifier === undefined ? null : (
         <p data-testid={`strategy-qualifier-${field}`} className="mt-1 text-xs text-ink-soft">
           {view.qualifier}
@@ -388,7 +389,7 @@ export function StrategyEditPanel({
   const currentView = STRATEGY_FIELD_VALUE[open.field](strategy);
   /**
    * 보낸 값의 문면. 둘을 가른다.
-   *  · `open.sent === null` — **아직 값을 보내지 않았다** → `Field` 가 「값 없음」을 낸다.
+   *  · `open.sent === null` — **아직 값을 보내지 않았다** → `KeyValueRow` 가 **부재 어휘**를 낸다(사유: 응답이 그 칸을 싣지 않았다).
    *  · 보냈는데 그 본문의 값이 비었다(어휘 0개) — **조건을 지우려고 비워 보낸 것**이다. 빈 칸으로
    *    그리면 위와 같은 얼굴이 되어 무엇을 적용하려는지 말하지 못한다(여정이 잡은 자리).
    *
@@ -418,7 +419,7 @@ export function StrategyEditPanel({
               inputMode={input.kind === 'TERMS' ? 'text' : 'numeric'}
               value={session.raw}
               onChange={(event) => session.onRaw(event.target.value)}
-              className="min-h-11 rounded-md border border-line bg-card px-3 text-sm"
+              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
           {session.missing ? (
@@ -456,8 +457,8 @@ export function StrategyEditPanel({
         <div className="mt-3 flex flex-col gap-2">
           {/* 보이는 값 둘 — **지금 값**(서버)과 **보낸 값**(운영자 입력)뿐이다. */}
           <dl className="grid gap-2 sm:grid-cols-2">
-            <Field label="지금 값" value={currentView.text} testId="edit-current-value" />
-            <Field label="보낸 값" value={sentView} testId="edit-sent-value" />
+            <KeyValueRow label="지금 값" value={currentView.text} testId="edit-current-value" />
+            <KeyValueRow label="보낸 값" value={sentView} testId="edit-sent-value" />
           </dl>
           <div className="flex flex-wrap gap-2">
             <Button tone="primary" disabled={session.busy} onClick={session.onConfirm}>
