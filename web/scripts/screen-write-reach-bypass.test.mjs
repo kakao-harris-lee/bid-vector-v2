@@ -332,13 +332,16 @@ describe('양성 대조 — 심으면 붉는다', () => {
   ])('Outlet 이 %s 값을 내리면 붉다', (_label, from, to, expected) => {
     const shell = resolve(SRC, 'AppShell.tsx');
     const original = read(shell);
-    const patched =
-      _label === '별칭으로 가려도'
-        ? original.replace(from, to).replace('<Outlet />', '<Slot context={{ load: 1 }} />')
-        : original.replace(from, to);
+    // **두 치환을 따로 단언한다**(cr LOW): 이어 붙이면 한쪽이 빗나가도 다른 쪽 때문에
+    // 「바뀌었다」가 참이 되어, 공허를 막으려던 단언이 스스로 공허해진다.
+    const renamed = original.replace(from, to);
+    expect(renamed, '수입 자리 치환이 빗나갔다').not.toBe(original);
 
-    // **바꿔치운 것이 실제로 바뀌었는가**(cr MEDIUM) — `.replace` 가 빗나가면 이 대조가 공허하다.
-    expect(patched, '심은 글이 원문과 같다').not.toBe(original);
+    const patched =
+      _label === '별칭으로 가려도' ? renamed.replace('<Outlet />', '<Slot context={{ load: 1 }} />') : renamed;
+    if (_label === '별칭으로 가려도') {
+      expect(patched, '태그 치환이 빗나갔다').not.toBe(renamed);
+    }
 
     const planted = collectScreenWriteReach({ webRoot: WEB_ROOT, overlay: new Map([[shell, patched]]) });
 
