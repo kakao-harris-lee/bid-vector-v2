@@ -153,9 +153,19 @@ describe('양성·음성 대조 — 술어 자신', () => {
     expect(() => failingPairs(paletteOf(synthetic({ ...BASE, ink: 'var(--something)' })).light)).toThrow(/hex/u);
   });
 
-  /** 주석 안의 가짜 선언이 쌍 수를 부풀리지 않는다(설계 검토 우회 C-5). */
-  it('주석 안의 선언은 읽지 않는다', () => {
+  /**
+   * 주석 **처리한 선언**이 쌍 수를 부풀리지 않는다(설계 검토 우회 C-5). 같은 줄 앞에 표지가
+   * 있으면 줄 머리 규칙이 그것을 받는다 — 주석 표지를 인자로 자르지 않고도 선다.
+   */
+  it('주석 처리한 선언은 읽지 않는다', () => {
     const css = synthetic(BASE).replace('@theme {', '@theme {\n  /* --color-fake-skin: #000000; */');
+
+    expect(paletteOf(css).light.has('fake-skin')).toBe(false);
+  });
+
+  /** 줄 머리가 아닌 선언도 읽지 않는다 — 값 뒤에 이어 붙인 꼴이 쌍을 만들지 않는다. */
+  it('줄 가운데의 선언 꼴은 읽지 않는다', () => {
+    const css = synthetic(BASE).replace('@theme {', '@theme {\n  color: red; --color-fake-skin: #000000;');
 
     expect(paletteOf(css).light.has('fake-skin')).toBe(false);
   });

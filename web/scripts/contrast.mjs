@@ -14,10 +14,18 @@ export const TEXT_RATIO = 4.5;
 /** 비텍스트 기준(WCAG 1.4.11). 카드와 바탕을 가르는 **선**이 이 축이다. */
 export const NON_TEXT_RATIO = 3;
 
-/** 토큰 선언 하나 — `--color-이름: 값;`. 주석을 걷은 뒤 읽는다. */
-const DECLARATION = /--color-([a-z0-9-]+)\s*:\s*([^;]+);/gu;
-
-const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//gu, '');
+/**
+ * 토큰 선언 하나 — `--color-이름: 값;`. **줄 머리에서만** 읽는다.
+ *
+ * 주석을 걷지 않는 이유: 주석 표지를 인자로 자르는 꼴은 이 저장소에서 「걷기 사본」으로 세고
+ * (Kotlin 원문 걷기의 소유 게이트), 그 층을 내 편의로 느슨하게 하지 않는다. 줄 머리 규칙이면
+ * 주석 **처리한 선언**(`/* --color-x: …; *\/` 꼴)은 같은 줄 앞에 표지가 있어 들어오지 않는다.
+ *
+ * **알려진 제한**: 여러 줄 주석 **안**에서 줄 머리에 선언 꼴을 적으면 그 줄은 읽힌다. 그때의
+ * 실패 모양은 **시끄러운 거짓 빨강**이다(살아 있지 않은 값을 재서 기준에 못 미치면 붉는다) —
+ * 조용한 통과가 아니므로 그 자리에서 드러난다.
+ */
+const DECLARATION = /^[ \t]*--color-([a-z0-9-]+)\s*:\s*([^;]+);/gmu;
 
 /**
  * 여는 중괄호 뒤부터 짝이 맞는 닫는 중괄호까지. 정규식으로 블록을 집으면 안쪽 블록에서 끊긴다
@@ -55,7 +63,7 @@ function tokensIn(body) {
  * 사라지는데, 빈 모집단은 모든 단언을 공허하게 만든다(설계 검토 우회 C-3).
  */
 export function paletteOf(cssText) {
-  const text = stripComments(cssText);
+  const text = cssText;
 
   const themeAt = text.indexOf('@theme');
   const lightBody = themeAt === -1 ? null : blockAfter(text, themeAt);
