@@ -121,8 +121,14 @@ const PRIMARY_SLOT = {
  */
 const PRICE_ONLY_IN_SESSION = '투찰가 응답은 받은 화면에서만 보입니다';
 
-/** 다시 요청할 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc). */
-const cannotAskHere = (axis: string): string =>
+/**
+ * 다시 요청할 길이 **이 화면에 없을 때** — 주어가 **화면**이다(아래 표의 KDoc).
+ *
+ * **수출한다**(r2 cr LOW): 렌더 층 문면 게이트가 이 사유를 모집단에 넣으려면 글자를 먹여야
+ * 하는데, 그 글자를 손으로 적으면 **사본**이 된다(이 자리가 바뀌어도 게이트는 옛 글자를 본다).
+ * 조립자를 공유하면 그 갈림이 생기지 않는다.
+ */
+export const cannotAskHere = (axis: string): string =>
   `${PRICE_ONLY_IN_SESSION} — 이 화면에서는 다시 요청할 수 없어 ${axis}.`;
 
 /** 다음 걸음이 아예 없는 상태 — 요청을 **하지 않는** 것이지 못 하는 것이 아니다. */

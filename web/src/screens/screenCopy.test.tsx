@@ -39,6 +39,7 @@ import { BidBoxCard } from './BidBoxCard';
 import { NoticeCard, SuggestionCard } from './NoticeCard';
 import { ResultCard } from './ResultCard';
 import { StrategyEditPanel, StrategyFieldRow, type StrategyEditSession } from './strategyEdit';
+import { cannotAskHere } from './WorksheetScreen';
 import { KonepsHandoff } from './WorksheetRecord';
 import { WorksheetTimeline } from './WorksheetTimeline';
 
@@ -424,6 +425,9 @@ function renderAll() {
 
         testId 가 겹치는 것은 이 층에 문제가 되지 않는다 — 이 층은 testId 로 고르지 않고
         **그려진 조각 전수**를 훑는다.
+
+        글자를 **손으로 적지 않는다**(r2 cr LOW): 사본을 두면 화면의 사유가 바뀌어도 이 층은 옛
+        글자를 본다. 조립자를 화면에서 받아 같은 글자를 먹인다.
       */}
       <KonepsHandoff
         noticeNumber={TITLELESS_NUMBER}
@@ -435,7 +439,7 @@ function renderAll() {
         noticeNumber={TITLELESS_NUMBER}
         amountWon={null}
         margin={null}
-        marginAbsence="투찰가 응답은 받은 화면에서만 보입니다 — 이 화면에서는 다시 요청할 수 없어 하한 대비 여유를 다시 잴 수 없습니다."
+        marginAbsence={cannotAskHere('하한 대비 여유를 다시 잴 수 없습니다')}
       />
       <StrategyFieldRow field="MIN_BUDGET" strategy={strategy} disabled={false} onBegin={noop} />
       <StrategyEditPanel session={editSession(strategy)} strategy={strategy} />
