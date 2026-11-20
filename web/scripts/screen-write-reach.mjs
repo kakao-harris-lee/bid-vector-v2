@@ -70,6 +70,7 @@ const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', '
  * 되고(실측), 그 비용이 병렬 수집의 다른 파일을 5초 timeout 으로 밀어낸다. 원문이 키라서
  * 오버레이가 바뀌면 그 파일만 다시 파싱된다 — 캐시가 대조를 무디게 하지 않는다.
  */
+const SOURCE_CACHE_LIMIT = 4096;
 const sourceCache = new Map();
 
 /**
@@ -86,6 +87,14 @@ function cachedSourceFile(fileName, text, languageVersion) {
     return found;
   }
   const made = ts.createSourceFile(fileName, text, languageVersion, true, ts.ScriptKind.TSX);
+  // **한도를 둔다**(cr LOW): 오버레이마다 키가 달라 캐시가 끝없이 자란다(실측 608MB). 가장
+  // 오래된 것부터 버린다 — 바로 앞 프로그램이 쓰는 원문은 최근 쪽에 있다.
+  if (sourceCache.size >= SOURCE_CACHE_LIMIT) {
+    const oldest = sourceCache.keys().next();
+    if (oldest.done !== true) {
+      sourceCache.delete(oldest.value);
+    }
+  }
   sourceCache.set(key, made);
   return made;
 }
@@ -160,64 +169,6 @@ function resolveSpecifier(fromFile, specifier, readText) {
 }
 
 /**
- * 한 파일이 내는 간선 전수 — `import`·`export … from`·동적 `import()`.
- *
- * 간선이 나르는 것은 **내보낸 이름**(`propertyName`)이다. 지역 이름으로 세면 별칭
- * (`import { requestBidPrice as r }`) 한 줄로 열린다.
- *
- * `names` 가 `'*'` 면 **그 모듈의 내보내기 전부에 닿는다**는 뜻이다 — 네임스페이스 수입,
- * `export * from`, 기본 수입, 동적 `import()` 가 그 꼴이다(fail-closed).
- */
-export function moduleEdgesOf(text, path) {
-  const source = parse(text, path);
-  const edges = [];
-  const visit = (node) => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      const specifier = node.moduleSpecifier;
-      if (specifier !== undefined && ts.isStringLiteralLike(specifier)) {
-        const clause = ts.isImportDeclaration(node) ? node.importClause : node.exportClause;
-        let names = '*';
-        // **타입 전용 지정자는 값 간선이 아니다**(cr HIGH ① 의 뿌리 절반). `import type { X }`
-        // 와 `import { type X }` 는 런타임에 아무것도 가져오지 않으므로 operation 에 닿을 수
-        // 없다. 값과 섞어 두면 「모르는 이름은 위반」을 켜는 순간 출하 트리가 붉는다 — 그래서
-        // **먼저** 걷어낸다(고치는 순서가 중요한 자리다).
-        if (clause !== undefined) {
-          if (ts.isImportClause(clause)) {
-            const bindings = clause.namedBindings;
-            if (clause.isTypeOnly) {
-              names = [];
-            } else if (bindings !== undefined && ts.isNamedImports(bindings) && clause.name === undefined) {
-              names = bindings.elements
-                .filter((one) => one.isTypeOnly !== true)
-                .map((one) => (one.propertyName ?? one.name).text);
-            }
-          } else if (ts.isNamedExports(clause)) {
-            names =
-              node.isTypeOnly === true
-                ? []
-                : clause.elements
-                    .filter((one) => one.isTypeOnly !== true)
-                    .map((one) => (one.propertyName ?? one.name).text);
-          }
-        }
-        edges.push({ specifier: specifier.text, names, dynamic: false });
-      }
-    }
-    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      const first = node.arguments[0];
-      edges.push({
-        specifier: first !== undefined && ts.isStringLiteralLike(first) ? first.text : null,
-        names: '*',
-        dynamic: true,
-      });
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return edges;
-}
-
-/**
  * 별칭을 끝까지 푼다 — `export { x as y }` · 재수출 · 기본 내보내기 전부 같은 자리로 모인다.
  */
 function resolvedSymbol(checker, symbol) {
@@ -243,7 +194,7 @@ export function clientCallsIn(source, checker, clientSymbol) {
   const visit = (node) => {
     if (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) {
       const symbol = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
-      if (symbol !== undefined && clientSymbol !== undefined && symbol === clientSymbol) {
+      if (symbol !== undefined && symbol === clientSymbol) {
         const parent = node.parent;
         const isBindingName =
           parent !== undefined &&
@@ -291,97 +242,12 @@ function topLevelStatementOf(declaration, source) {
 }
 
 /**
- * `queries.ts` 의 **내보내기 → operation 집합** — 키는 **그 모듈이 실제로 내보내는 이름 전수**다.
+ * `client.ts` 가 내보내는 `apiClient` 의 **심볼**.
  *
- * **앞 판은 최상위 선언 이름만 키로 삼았다**(cr·v HIGH ①). 그래서 `export { requestBidPrice as
- * readFloorHint }` 한 줄이 키 집합 밖의 이름을 만들었고, 부르는 자리의 `?? []` 가 그것을
- * **operation 0 으로 조용히** 통과시켰다 — 모듈 머리말의 「모르는 것은 통과시키지 않는다」와
- * 정면으로 어긋나는 자리였다. 이제 키는 **TypeChecker 가 센 내보내기 전수**이고 별칭은
- * `getAliasedSymbol` 로 선언까지 풀린다. 그래서 별칭의 **꼴을 열거하지 않는다**.
- *
- * 선언 **사이 참조**도 따라간다(얇은 포장이 쓰기를 감추지 못하게).
- *
- * 값이 아닌 내보내기(타입·인터페이스)는 `isValue: false` 로 **키에는 남는다** — 그래야 부르는
- * 자리가 「아는 이름인데 operation 이 없다」와 「모르는 이름이다」를 가를 수 있다.
+ * 없으면 **던진다**(cr LOW — 앞 판 주석은 「부르는 자리가 던진다」고 적었는데 던지는 자리가
+ * 없었다). 그 심볼이 없는 채로 도는 것은 **호출 축 전체가 조용해지는** 것이고, 조용한 초록은
+ * 이 게이트가 가장 피하려는 꼴이다.
  */
-export function operationsByExport(program, queriesPath) {
-  const checker = program.getTypeChecker();
-  const source = program.getSourceFile(queriesPath);
-  if (source === undefined) {
-    throw new Error(`질의 모듈이 프로그램에 없다: ${queriesPath}`);
-  }
-  const moduleSymbol = checker.getSymbolAtLocation(source);
-  if (moduleSymbol === undefined) {
-    throw new Error(`질의 모듈의 심볼을 얻지 못했다: ${queriesPath}`);
-  }
-  const clientSymbol = clientExportSymbol(program, checker);
-
-  // 최상위 문장마다: 자기 호출과, 자기가 참조하는 **다른 최상위 선언**.
-  const own = new Map();
-  const refs = new Map();
-  const unresolved = [];
-  for (const statement of source.statements) {
-    const calls = clientCallsIn(statement, checker, clientSymbol);
-    own.set(statement, new Set(calls.operations));
-    unresolved.push(...calls.unresolved);
-    const referenced = new Set();
-    const visit = (node) => {
-      if (ts.isIdentifier(node)) {
-        const target = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
-        for (const declaration of target?.declarations ?? []) {
-          if (declaration.getSourceFile() === source) {
-            const top = topLevelStatementOf(declaration, source);
-            if (top !== undefined && top !== statement) {
-              referenced.add(top);
-            }
-          }
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(statement);
-    refs.set(statement, referenced);
-  }
-
-  // 선언 사이 **고정점** — 포장이 몇 겹이든 속의 operation 이 바깥 이름에 실린다.
-  for (let round = 0; round < own.size + 1; round += 1) {
-    let grew = false;
-    for (const [statement, operations] of own) {
-      for (const referenced of refs.get(statement) ?? []) {
-        for (const one of own.get(referenced) ?? []) {
-          if (!operations.has(one)) {
-            operations.add(one);
-            grew = true;
-          }
-        }
-      }
-    }
-    if (!grew) {
-      break;
-    }
-  }
-
-  // 내보낸 **이름**마다: 그 심볼이 가리키는 선언의 최상위 문장이 든 operation.
-  const operations = new Map();
-  for (const exported of checker.getExportsOfModule(moduleSymbol)) {
-    const target = resolvedSymbol(checker, exported);
-    const isValue = ((target?.flags ?? 0) & ts.SymbolFlags.Value) !== 0;
-    const found = new Set();
-    for (const declaration of target?.declarations ?? []) {
-      if (declaration.getSourceFile() !== source) {
-        continue;
-      }
-      const top = topLevelStatementOf(declaration, source);
-      for (const one of (top === undefined ? undefined : own.get(top)) ?? []) {
-        found.add(one);
-      }
-    }
-    operations.set(exported.getName(), { operations: found, isValue });
-  }
-  return { operations, unresolved };
-}
-
-/** `client.ts` 가 내보내는 `apiClient` 의 **심볼**. 없으면 `undefined`(부르는 자리가 던진다). */
 export function clientExportSymbol(program, checker) {
   const clientSource = program
     .getSourceFiles()
@@ -391,7 +257,11 @@ export function clientExportSymbol(program, checker) {
     moduleSymbol === undefined
       ? undefined
       : checker.getExportsOfModule(moduleSymbol).find((one) => one.getName() === CLIENT_EXPORT);
-  return resolvedSymbol(checker, exported);
+  const symbol = resolvedSymbol(checker, exported);
+  if (symbol === undefined) {
+    throw new Error(`${CLIENT_MODULE} 의 ${CLIENT_EXPORT} 심볼을 얻지 못했다 — 호출 축이 조용해진다`);
+  }
+  return symbol;
 }
 
 /**
@@ -404,6 +274,12 @@ export function clientExportSymbol(program, checker) {
 export function clientBindingImporters(program, webRoot) {
   const checker = program.getTypeChecker();
   const clientSymbol = clientExportSymbol(program, checker);
+  const clientSource = program.getSourceFile(resolve(webRoot, 'src', CLIENT_MODULE));
+  const clientModuleSymbol =
+    clientSource === undefined ? undefined : checker.getSymbolAtLocation(clientSource);
+  if (clientModuleSymbol === undefined) {
+    throw new Error(`${CLIENT_MODULE} 의 모듈 심볼을 얻지 못했다 — 네임스페이스 갈래가 조용해진다`);
+  }
   const srcRoot = resolve(webRoot, 'src');
   const importers = new Set();
   for (const source of program.getSourceFiles()) {
@@ -415,12 +291,13 @@ export function clientBindingImporters(program, webRoot) {
         continue;
       }
       const bindings = statement.importClause.namedBindings;
+      // **글자가 아니라 심볼로 가른다**(v low · cr M). 앞 판은 지정자 원문에 `client` 가
+      // 들어가는지 보았다 — 관계없는 `__clientside_utils__` 에 거짓으로 걸리고, 다른 이름의
+      // 게이트웨이는 놓쳤다. 네임스페이스 수입은 **그 모듈의 심볼**이 클라이언트 모듈인지 본다.
       const brings =
         bindings !== undefined &&
         (ts.isNamespaceImport(bindings)
-          ? // 통째로 가져오면 그 바인딩도 함께 온다.
-            resolvedSymbol(checker, checker.getSymbolAtLocation(statement.moduleSpecifier)) !== undefined &&
-            statement.moduleSpecifier.getText().includes('client')
+          ? resolvedSymbol(checker, checker.getSymbolAtLocation(statement.moduleSpecifier)) === clientModuleSymbol
           : bindings.elements.some(
               (one) => resolvedSymbol(checker, checker.getSymbolAtLocation(one.name)) === clientSymbol,
             ));
@@ -531,104 +408,130 @@ export function screenModulesOf(routesText, routesPath, readText) {
 /**
  * 한 화면 모듈이 닿는 **operation 집합**과 **해소 불가 목록**.
  *
- * 모듈 폐포를 돌며 `queries.ts` 의 어느 내보내기에 닿는지 모으고, 그 이름들의 operation 을
- * 합친다. `apiClient` 에 **직접** 닿는 모듈이 있으면 그 파일의 호출도 함께 센다(팀장 조건 ①) —
- * 질의층을 건너뛰는 길이 그 자리다.
+ * **한 심볼 그래프다 — 특별한 경계가 없다**(v H-1r). 앞 판은 `queries.ts` 를 **닫힌 세계**로
+ * 두고 그 모듈의 내보내기만 operation 으로 접었다. 그래서 그 모듈 밖에 선언된 쓰기를 한 줄로
+ * 가져다 재수출하면 네 게이트가 모두 초록이었다(실측 세 꼴).
+ *
+ * 이제 진입 모듈의 최상위 문장에서 출발해 **식별자가 가리키는 선언**을 따라간다 — 파일 경계를
+ * 묻지 않으므로 `queries.ts` 는 그래프 위의 한 마디일 뿐이다. 쓰기인지는 **`apiClient` 호출
+ * 자리**에서 심볼 동일성과 메서드로 정한다.
+ *
+ * 선언 단위라 **모듈을 통째로 삼키지 않는다**: 결과 화면이 질의 모듈을 수입해도 부르지 않는
+ * 쓰기 선언은 그래프에 들지 않는다.
  */
-export function reachFrom(entry, { program, readText, srcRoot, queriesPath, clientPath }) {
+export function reachFrom(entry, { program, srcRoot }) {
   const checker = program.getTypeChecker();
   const clientSymbol = clientExportSymbol(program, checker);
+  const source = program.getSourceFile(entry);
+  if (source === undefined) {
+    throw new Error(`화면 모듈이 프로그램에 없다: ${entry}`);
+  }
+
   const seen = new Set();
-  const queue = [entry];
-  const queryExports = new Set();
-  const unresolved = [];
+  const modules = new Set();
   const operations = new Set();
-  let wholeQueries = false;
+  const unresolved = [];
+  // 씨앗은 **진입 모듈의 최상위 문장 전수**다 — 수입 문장도 든다(그 이름이 가리키는 선언으로
+  // 이어진다).
+  const queue = [...source.statements];
+
+  /** 그 선언이 **우리 트리 안**이면 그것을 담은 최상위 문장을 큐에 민다. */
+  const follow = (declaration) => {
+    const file = declaration.getSourceFile();
+    if (!file.fileName.startsWith(`${srcRoot}/`)) {
+      // 의존 패키지의 선언 — 이 축의 밖이다(번들 경계 게이트가 든다).
+      return;
+    }
+    if (ts.isSourceFile(declaration)) {
+      // **모듈 통째로**(`import * as q`) — 어느 이름을 쓸지 이 축에서 알 수 없으므로 전수를
+      // 민다(fail-closed). 속성 접근으로 실제로 부르는 자리는 아래 식별자 축이 따로 든다.
+      queue.push(...declaration.statements);
+      return;
+    }
+    const top = topLevelStatementOf(declaration, file);
+    if (top !== undefined) {
+      queue.push(top);
+    }
+  };
 
   while (queue.length > 0) {
-    const current = queue.pop();
-    if (seen.has(current)) {
+    const statement = queue.pop();
+    if (seen.has(statement)) {
       continue;
     }
-    seen.add(current);
-    const text = readText(current);
-    if (text === undefined) {
-      unresolved.push(`${current}: 파일을 읽지 못했다`);
-      continue;
-    }
-    if (current === queriesPath) {
-      // 질의 모듈 **안쪽**은 아래에서 내보내기 단위로 센다(모듈 통째로 삼키지 않는다).
-      continue;
-    }
+    seen.add(statement);
+    modules.add(statement.getSourceFile().fileName);
 
-    // `apiClient` 를 **직접** 수입해 쓰는 모듈 — 질의층 밖의 호출이다(팀장 조건 ①).
-    // 판정은 **부르는 자리**에서 심볼로 한다. 클라이언트 모듈 자신은 정의 자리라 걷지 않는다 —
-    // 거기 `apiClient.use(…)` 같은 자기 배선이 있고, 그것은 화면의 호출이 아니다.
-    const source = program.getSourceFile(current);
-    if (source === undefined) {
-      unresolved.push(`${current}: TS 프로그램에 없는 파일이다`);
-    } else {
-      const calls = clientCallsIn(source, checker, clientSymbol);
-      for (const one of calls.operations) {
-        operations.add(one);
-      }
-      unresolved.push(...calls.unresolved);
-    }
-
-    for (const edge of moduleEdgesOf(text, current)) {
-      if (edge.specifier === null) {
-        unresolved.push(`${current}: 동적 import 의 지정자가 리터럴이 아니다`);
-        continue;
-      }
-      const target = resolveSpecifier(current, edge.specifier, readText);
-      if (target === undefined) {
-        // 패키지 수입은 이 층의 관심 밖이다(번들 경계 게이트가 든다). 상대 지정자인데
-        // 해소되지 않는 것만 **모르는 것**으로 센다.
-        if (edge.specifier.startsWith('.')) {
-          unresolved.push(`${current}: ${edge.specifier} 가 어느 파일인지 해소되지 않는다`);
-        }
-        continue;
-      }
-      if (target === queriesPath) {
-        if (edge.names === '*') {
-          wholeQueries = true;
-        } else {
-          for (const one of edge.names) {
-            queryExports.add(one);
-          }
-        }
-      }
-      if (target === clientPath) {
-        // 정의 자리는 걷지 않는다. 그 모듈에서 **무엇을 가져왔는지**만 본다 — 통째로 가져오면
-        // 어느 이름이 왔는지 이 축에서 알 수 없으므로 **모르는 것**으로 센다(v L-1).
-        if (edge.names === '*') {
-          unresolved.push(`${current}: 클라이언트 모듈을 통째로 가져온다`);
-        }
-        continue;
-      }
-      if (target.startsWith(srcRoot)) {
-        queue.push(target);
-      }
-    }
-  }
-
-  const byExport = operationsByExport(program, queriesPath);
-  unresolved.push(...byExport.unresolved);
-  const names = wholeQueries ? [...byExport.operations.keys()] : [...queryExports];
-  for (const name of names) {
-    const known = byExport.operations.get(name);
-    if (known === undefined) {
-      // **모르는 이름은 통과가 아니다**(cr·v HIGH ①). 앞 판은 `?? []` 로 operation 0 을 주었고,
-      // 별칭 재수출 한 줄이 그 길로 쓰기를 숨겼다.
-      unresolved.push(`${queriesPath}: 수입한 이름 ${name} 이 내보내기 전수에 없다`);
-      continue;
-    }
-    for (const one of known.operations) {
+    // 이 문장이 **직접** 내는 호출.
+    const calls = clientCallsIn(statement, checker, clientSymbol);
+    for (const one of calls.operations) {
       operations.add(one);
     }
+    unresolved.push(...calls.unresolved);
+
+    // **부작용 수입**(`import './x'`)은 이름을 가져오지 않는다 — 그 모듈의 최상위가 통째로
+    // 실행되므로 전수를 민다.
+    if (
+      ts.isImportDeclaration(statement) &&
+      statement.importClause === undefined &&
+      ts.isStringLiteralLike(statement.moduleSpecifier)
+    ) {
+      const target = resolvedSymbol(checker, checker.getSymbolAtLocation(statement.moduleSpecifier));
+      for (const declaration of target?.declarations ?? []) {
+        if (ts.isSourceFile(declaration) && declaration.fileName.startsWith(`${srcRoot}/`)) {
+          queue.push(...declaration.statements);
+        }
+      }
+    }
+
+    const visit = (node) => {
+      // 동적 수입의 지정자가 리터럴이 아니면 **모르는 것**이다.
+      if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        const first = node.arguments[0];
+        if (first === undefined || !ts.isStringLiteralLike(first)) {
+          unresolved.push(`${statement.getSourceFile().fileName}: 동적 import 의 지정자가 리터럴이 아니다`);
+        }
+      }
+      // 상대 지정자가 해소되지 않으면 **모르는 것**이다.
+      if (
+        (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+        node.moduleSpecifier !== undefined &&
+        ts.isStringLiteralLike(node.moduleSpecifier) &&
+        node.moduleSpecifier.text.startsWith('.') &&
+        checker.getSymbolAtLocation(node.moduleSpecifier) === undefined
+      ) {
+        unresolved.push(
+          `${statement.getSourceFile().fileName}: ${node.moduleSpecifier.text} 가 어느 파일인지 해소되지 않는다`,
+        );
+      }
+      // **수입한 이름이 아무것도 가리키지 않으면 모르는 것이다**(fail-closed). 좁게 본다 —
+      // 수입 지정자 자리만이고, 전역·JSX 내장 이름은 이 술어에 들지 않는다.
+      if (ts.isImportSpecifier(node) || ts.isImportClause(node)) {
+        const name = ts.isImportSpecifier(node) ? node.name : node.name;
+        const bound = name === undefined ? undefined : resolvedSymbol(checker, checker.getSymbolAtLocation(name));
+        if (name !== undefined && (bound?.declarations ?? []).length === 0) {
+          unresolved.push(
+            `${statement.getSourceFile().fileName}: 수입한 이름 ${name.text} 이 어느 선언도 가리키지 않는다`,
+          );
+        }
+      }
+      if (ts.isIdentifier(node)) {
+        const target = resolvedSymbol(checker, checker.getSymbolAtLocation(node));
+        for (const declaration of target?.declarations ?? []) {
+          follow(declaration);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(statement);
   }
 
-  return { modules: seen, queryExports: names.sort(), operations: [...operations].sort(), unresolved };
+  return {
+    modules,
+    declarations: seen.size,
+    operations: [...operations].sort(),
+    unresolved,
+  };
 }
 
 /**
@@ -690,6 +593,53 @@ export function elementPropsOf(routesText, routesPath) {
   return bySlot;
 }
 
+/**
+ * `Outlet` 이 **리터럴이 아닌 값을 아래로 내려 주는** 자리 전수(`src` 기준 상대 경로).
+ *
+ * 왜 자리 표와 따로 서나(v M-1r): router context 는 route `element` 의 prop 이 아니라 **셸의
+ * `<Outlet context={…} />`** 로 내려가고, 받는 쪽은 `useOutletContext()` 다. 그래서 읽기 화면의
+ * import 폐포에도, element prop 축에도 걸리지 않는다 — 실측에서 네 게이트가 모두 초록이었다.
+ *
+ * 술어는 **그 요소 전수**다(읽기 화면만 보지 않는다): 셸은 화면 모두의 조상이라 한 번 꽂으면
+ * 어느 화면이든 받을 수 있고, 어느 화면이 받는지는 이 축에서 알 수 없다. 오늘 그 요소는
+ * **prop 을 하나도 들지 않는다**(실측) — 들기 시작하면 그 변경이 이 게이트를 지나야 한다.
+ */
+export function outletContextSites(program, webRoot) {
+  const srcRoot = resolve(webRoot, 'src');
+  const sites = [];
+  for (const source of program.getSourceFiles()) {
+    if (!source.fileName.startsWith(`${srcRoot}/`) || /\.test\.tsx?$/u.test(source.fileName)) {
+      continue;
+    }
+    const visit = (node) => {
+      const opening = ts.isJsxSelfClosingElement(node)
+        ? node
+        : ts.isJsxOpeningElement(node)
+          ? node
+          : undefined;
+      if (
+        opening !== undefined &&
+        ts.isIdentifier(opening.tagName) &&
+        opening.tagName.text === 'Outlet'
+      ) {
+        for (const attribute of opening.attributes.properties) {
+          const risky = ts.isJsxSpreadAttribute(attribute)
+            ? '…전개'
+            : attribute.initializer !== undefined && !ts.isStringLiteral(attribute.initializer)
+              ? attribute.name.getText(source)
+              : undefined;
+          if (risky !== undefined) {
+            sites.push(`${relative(srcRoot, source.fileName)}: Outlet 이 ${risky} 를 아래로 내린다`);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return sites.sort();
+}
+
 /** 정책 표와 자리 표의 **집합 등식** — 어느 쪽이 더 많아도 그 이름을 낸다. */
 export function policyGaps(slotIds, policy = SCREEN_WRITE_POLICY) {
   const declared = new Set(Object.keys(policy));
@@ -709,8 +659,6 @@ export function policyGaps(slotIds, policy = SCREEN_WRITE_POLICY) {
 export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy = SCREEN_WRITE_POLICY }) {
   const srcRoot = resolve(webRoot, 'src');
   const routesPath = resolve(srcRoot, 'routes.tsx');
-  const queriesPath = resolve(srcRoot, QUERIES_MODULE);
-  const clientPath = resolve(srcRoot, CLIENT_MODULE);
 
   const normalized = new Map([...overlay].map(([path, text]) => [resolve(path), text]));
   const readText = (path) => {
@@ -752,12 +700,12 @@ export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy =
     for (const one of injectedProps.get(slotId) ?? []) {
       injected.push(`${slotId}: route element 가 리터럴이 아닌 prop ${one} 을 받는다`);
     }
-    const reach = reachFrom(modulePath, { program, readText, srcRoot, queriesPath, clientPath });
+    const reach = reachFrom(modulePath, { program, readText, srcRoot });
     screens.push({
       slotId,
       module: relative(webRoot, modulePath),
       moduleCount: reach.modules.size,
-      queryExports: reach.queryExports,
+      declarationCount: reach.declarations,
       operations: reach.operations,
       writes: writeOperationsOf(reach.operations),
       unresolved: reach.unresolved,
@@ -771,6 +719,7 @@ export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy =
     injected,
     screens,
     clientBindingImporters: clientBindingImporters(program, webRoot),
+    outletContext: outletContextSites(program, webRoot),
   };
 }
 
@@ -778,6 +727,9 @@ export function collectScreenWriteReach({ webRoot, overlay = new Map(), policy =
 export function violationsOf(result) {
   const lines = [];
   for (const one of result.injected ?? []) {
+    lines.push(one);
+  }
+  for (const one of result.outletContext ?? []) {
     lines.push(one);
   }
   // 설계 검토 우회 5 행의 전제 — **이 바인딩을 수입하는 자리는 질의 모듈 하나**다(cr HIGH ②).
