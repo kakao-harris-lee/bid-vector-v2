@@ -1,18 +1,31 @@
 # M14 / wf-bidbox-results (14D) — rollback
 
-**실측 HEAD: `ac6e2a82678fab726694490ec0b4a37386c9a9e9`** (수정 라운드 4 의 마지막 산출물 커밋).
+**실측 HEAD: `35b265cb37d744d47920a88256858c6ecb172141`** (머지 차례의 마지막 산출물 커밋).
 이 파일을 담은 커밋은 그 뒤에 오므로 두 SHA 는 영원히 다르다 — 재는 것은 **그 사이에 되돌림
 대상이 움직였는가**다(아래 「유효성」).
 
 되돌리는 방식은 range revert 가 아니라 **in_scope 경로 한정 복원**이다.
 
+**복원 원천이 바뀌었다** — 착수 base 가 아니라 **머지한 main `335c976e`** 다. 셋째 단언을 다시
+재서 그렇게 정했다(아래 「원천을 바꾼 까닭」).
+
 ```
-git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktree -- <아래 경로들>
+git restore --source=335c976ecfbbd737d8689b782f5c31a731879f15 --staged --worktree -- <아래 경로들>
 ```
+
+## 원천을 바꾼 까닭 — 셋째 단언
+
+복원 대상 blob 이 **착수 base 와 새 원천에서 같은가**를 쟀다. **다섯이 다르다**:
+`docs/discovery/capability-map.md` · `web/config/gate-tests.txt` ·
+`web/e2e/journey/touch-target.spec.ts` · `web/scripts/screen-vocabulary-registry.mjs` ·
+`web/scripts/rail-screens.mjs`(**base 에 아예 없다** — 14B 가 만들었다).
+
+그래서 base 에서 복원하면 14B·14C 의 일이 함께 지워진다. 원천을 `335c976e` 로 바꾸고 ①~⑥ 을
+그 기준으로 **다시 셌다**.
 
 ## 복원 목록 — 기계 산출
 
-`git diff --name-status 056f405c..ac6e2a82` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
+`git diff --name-status 335c976e..35b265cb` 의 전수다(손으로 적은 열거가 아니다). 라운드마다
 재산출한다.
 
 | 상태 | 경로 |
@@ -29,6 +42,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | M | `docs/discovery/capability-map.md` |
 | M | `web/config/gate-tests.txt` |
 | M | `web/e2e/journey/touch-target.spec.ts` |
+| M | `web/scripts/rail-screens.mjs` |
 | M | `web/scripts/screen-vocabulary-registry.mjs` |
 | M | `web/src/AppShell.tsx` |
 | M | `web/src/display/bidBoxDisplay.test.ts` |
@@ -45,7 +59,7 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 | M | `web/src/screens/ResultsScreen.test.tsx` |
 | M | `web/src/screens/ResultsScreen.tsx` |
 
-전수 27(신설 9 · 수정 18).
+전수 28(신설 9 · 수정 19).
 
 ## 공유 파일
 
@@ -58,15 +72,15 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 실측 ①~⑥ — 버릴 clone 에서
 
-`git clone` 한 뒤 `ac6e2a82` 로 체크아웃하고 위 복원을 돌렸다.
+`git clone` 한 뒤 `35b265cb` 로 체크아웃하고 위 복원을 돌렸다.
 
 | # | 무엇 | 결과 |
 | --- | --- | --- |
 | ① | 복원 명령 종료 코드 | **0** |
-| ② | `git status --porcelain` 의 D/M 수 | **D 9 · M 18**(복원 목록의 신설 9 · 수정 18 과 같다) |
-| ③ | 복원 뒤 그 경로들의 base 대비 diff | **빈 출력** — 트리가 base 와 동일하다 |
+| ② | `git status --porcelain` 의 D/M 수 | **D 9 · M 19**(복원 목록의 신설 9 · 수정 19 와 같다) |
+| ③ | 복원 뒤 그 경로들의 **새 원천** 대비 diff | **빈 출력** — 트리가 `335c976e` 와 동일하다 |
 | ④ | `npm run typecheck` | **0** |
-| ⑤ | `npm run test` | **0**(70 파일 · 1669 통과 — 이 slice 의 증분이 사라진 수) |
+| ⑤ | `npm run test` | **0**(**71 파일 · 1792** — 이 slice 의 증분이 사라지고 14B·14C 의 것은 남은 수) |
 | ⑥ | `gate:tests` · `gate:src-tree` · `lint` · `build` | 전부 **0** |
 
 **⑤ 가 첫 판에 바로 초록이다.** 라운드 3 에서 게이트 test 의 비용을 절반 아래로 줄인 뒤로는
@@ -76,8 +90,10 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 | 계수 | 결과 |
 | --- | --- |
-| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일**. 항목 **열넷**으로 센다: 앞의 열하나 + `followNamespace` · `outletCacheKey` · `ROUTER_PACKAGE`(라운드 4 가 더했다). **열넷 전부 base 계수 0 임을 먼저 확인했다** |
-| **남의 표지 보존** — 14A·14E 의 것이 살아 있는가 | **17 파일** (두 단 원시 요소 · 두 축 타일 · 공고 투영) |
+| **내 표지 0** — 이 slice 가 들여온 이름이 남았는가 | **0 파일**. 항목 **열셋**으로 센다(`outletCacheKey` 는 머지 차례에 없앴다). **전부 원천 계수 0 임을 먼저 확인했다**. 더해서 **레일 래칫이 14B 의 두 이름으로 돌아왔다**(내 `bid-box` 한 줄만 빠진다) |
+| **남의 표지 보존** — 14A·14E 의 것이 살아 있는가 | **19 파일**(14B·14C 가 더한 자리를 포함해 늘었다) |
+| **14B·14C 의 산출물 보존** | main 의 diff 에서 **기계로** 뽑은 파일 **18 개가 `335c976e` 와 바이트 동일**, 다름 0 |
+| **§12.3 글자** | (ac) **1 → 0** · (t)~(ab) **아홉 전부 남는다** |
 
 **표지 목록을 한 번 고쳤다**(이 라운드의 실측). 처음 센 목록에 `openCaseCountOf` 가 들어 있어
 복원 뒤 계수가 1 이었다 — 그런데 그 이름은 **14A 가 지은 상류 어휘**이고(base 계수 2) 이 slice 는
@@ -87,13 +103,13 @@ git restore --source=056f405c9e5659b9a068288f1104f9e04a6de016 --staged --worktre
 
 ## 유효성 (verifier 가 대조하는 것)
 
-`git diff --name-only ac6e2a82..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
+`git diff --name-only 35b265cb..<판정 SHA> -- <위 복원 목록의 경로들>` 이 빈 출력이면 유효하다.
 한 줄이라도 나오면 **그 경로가 전부 원천(base `056f405c`)에 없는 신설 파일일 때만** 유효하다 —
 이 slice 에서 그에 해당하는 것은 `reports/evidence/m14/wf-bidbox-results/**` 뿐이고, 열거와
 원천 부재 확인은 verifier 가 한다.
 
-`git rev-list --merges ac6e2a82..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
+`git rev-list --merges 35b265cb..<판정 SHA>` 도 빈 출력이어야 한다(그 사이 main 병합이 오면
 실측 자리가 그 병합 커밋이다).
 
-복원 원천을 `056f405c` 에서 바꾸면 **셋째 단언**을 다시 잰다 — 복원 대상 blob 이 착수 base 와 새
+복원 원천을 또 바꾸면 **셋째 단언**을 다시 잰다 — 복원 대상 blob 이 착수 base 와 새
 원천에서 같은가이고, 다르면 새 원천 기준으로 ①~⑥ 을 다시 센다.
