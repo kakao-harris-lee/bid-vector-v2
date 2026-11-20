@@ -41,7 +41,7 @@ npx vitest run src/screens/WorksheetScreen.test.tsx src/components/PageHeader.te
 | W-3 | `npm run typecheck` | 0 |
 | W-4 | `npm run gate:src-tree` | 0 |
 | W-5 | `npm run api:types:check` | 0 (생성 타입 편집 0) |
-| W-6 | `npm run test` | 파일 **70** · test **1708** 통과 |
+| W-6 | `npm run test` | 파일 **70** · test **1708** 통과(부하가 내린 뒤 **두 번** 연속) |
 | W-7 | `npm run gate:tests` | 0 (등록부와 같다) |
 | W-8 | `npm run build` | 0 |
 | W-9 | `npm run gate:boundary-canary` | 0 |
@@ -59,10 +59,13 @@ slice 가 더한 것이고, 그것을 내는 `it` 선언은 **25** 다(기계 �
 `it.each` 가 표의 줄만큼 펼쳐져 둘의 수가 다르다). 기존 단언은 **주장을 고치지 않은 채** 그대로
 통과한다 — 13C 의 기능은 옮기기만 했다는 계약이 그 자리에서 측정된다.
 
-**W-6 는 부하를 탄다.** 같은 트리에서 한 번은 `screen-card-coverage` 가 `Test timed out in
-5000ms` 로 붉었다(그때 load average 28·옆 레인 둘이 전건 중). 부하가 내린 뒤 재실행은 1708
-전부 통과·종료 0 이다. 이 흔들림은 **main 에서도 재현되고**(검증 §4) 이 slice 의 성질이 아니라
-새 OPEN 후보로 등재했다 — `checklist.md` 의 ⓕ.
+**W-6 는 부하를 탄다**(이 레인에서 다시 쟀다). 옆 레인이 전건을 도는 동안(load average 13~28)
+여섯 번 가운데 **넷이 붉었고**, 서명은 둘 다 `Test timed out in 5000ms` 였다 —
+`screen-card-coverage` 와 `kotlin-read-guard` 다. **그 파일을 단독으로 돌리면 같은 부하에서도
+25 전부 통과**(3/3)이고, 부하가 내린 뒤 전건은 **두 번 연속 1708 통과·종료 0** 이다. 즉 느려진
+것은 이 slice 의 코드가 아니라 **동시 실행**이다. 검증이 base(= 되돌린 트리, 바이트 동일)에서
+같은 서명을 재현했다. 새 OPEN 후보로 등재했다 — `checklist.md` 의 ⓕ. **CI 의 `gate:tests` 도
+같은 자리에서 붉을 수 있다**(그 게이트가 수집 전건의 실패를 그대로 받는다).
 
 **여정 레인이 드는 것**(이 slice 의 축이라 따로 적는다): 머리 다섯 축의 정확 일치 · 터치 타깃
 화면별 전수(워크시트 하한 **8**) · 내려놓기 둘의 상자. 셋 다 초록이므로 **계수는 줄지 않았다.**
