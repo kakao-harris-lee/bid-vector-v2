@@ -84,10 +84,19 @@ function stub({
       }
       // 입찰함 배지(M14/14A) — 건의 **배열**이다. 화면 D 와 같은 질의라 꼴이 같아야 한다.
       if (path === '/api/bid-cases') {
-        return new Response(JSON.stringify(Array.from({ length: realCases }, () => ({}))), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
+        // **상태가 서로 다르다**(변이 실측). 모두 같은 꼴로 답하면 「길이」와 「상태로 거른
+        // 길이」를 가를 수 없어, 배지가 클라이언트에서 거르는 변이가 초록이었다. 종단 상태를
+        // 섞어 두면 어떤 거르기도 수를 바꾼다.
+        const states = ['WATCHING', 'BID_RECORDED', 'WON', 'LOST', 'SKIPPED'];
+        return new Response(
+          JSON.stringify(
+            Array.from({ length: realCases }, (_unused, index) => ({
+              caseId: `case-${index}`,
+              state: states[index % states.length],
+            })),
+          ),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
       // 사이드바 발치의 사업자명 — 프로필 한 벌이다(빈 배열이 아니다).
       if (path === '/api/profile') {
@@ -365,11 +374,17 @@ describe('사이드바 (M14/14A)', () => {
 });
 
 describe('입찰함 배지 (M14/14A)', () => {
+  /**
+   * **상태로 거르지 않는다.** fixture 의 건들이 서로 다른 상태를 들고 있으므로(종단 포함) 어떤
+   * 거르기도 이 수를 바꾼다 — 변이 실측이 그 전제를 세웠다. 수가 아니라 **받은 배열의 길이**와
+   * 맞댄다.
+   */
   it('받은 목록의 **길이**가 배지 수다 — 화면이 상태로 거르지 않는다', async () => {
-    stub({ realCases: 3 });
+    const realCases = 5;
+    stub({ realCases });
     await renderAt('/');
 
-    await waitFor(() => expect(screen.getByTestId('nav-bid-box').textContent).toBe('3'));
+    await waitFor(() => expect(screen.getByTestId('nav-bid-box').textContent).toBe(String(realCases)));
   });
 
   /** 페이퍼를 섞지 않는다 — 그 operation 은 `kind` 를 필수로 받고 계약이 둘을 섞지 않는다. */
