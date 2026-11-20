@@ -8,20 +8,6 @@
 export interface MeasuredTarget {
   readonly tag: string;
   readonly name: string;
-  /**
-   * **접근 가능한 이름이 서는가**(M14/14F r1 · cr M②). 위 `name` 은 실패 **메시지**용 근사라
-   * `aria-label` 과 자기 글자만 본다 — 그것으로 「이름이 있다」를 판정하면 감싼 레이블로 이름을
-   * 받는 컨트롤이 전부 이름 없음으로 읽힌다.
-   *
-   * 이 칸은 **이름이 서는 길 전부**를 순서대로 본다: `aria-label` → `aria-labelledby` →
-   * `label[for]` → 감싼 `label` → 자기 글자 → `title`·`placeholder`·`value`·`alt`.
-   *
-   * 왜 필요한가: 새 AST 술어가 **과잉으로** 붉히는 자리가 있다고 설계 검토가 선언했고(글자 없는
-   * 레이블이 감싼 컨트롤), 그 과잉을 받는 층으로 「이름 없는 컨트롤 0」을 들었다 — **그 층이
-   * 저장소에 없었다**. 술어의 말을 따라 `aria-label` 을 떼면 이름 없는 컨트롤이 남는데 CI 는
-   * 초록이었다.
-   */
-  readonly named: boolean;
   readonly width: number;
   readonly height: number;
   /**
@@ -197,45 +183,6 @@ export function measureInPage(): Measurement {
       }
       const name = (node.getAttribute('aria-label') ?? measured.textContent ?? '').trim().slice(0, 40);
       /**
-       * **이름이 서는 길 전부**를 순서대로 본다(cr M②). 상자는 레이블일 수 있지만 이름이 서는
-       * 주체는 **컨트롤**이므로 `node` 를 본다.
-       */
-      const named = ((): boolean => {
-        const own = (node.getAttribute('aria-label') ?? '').trim();
-        if (own !== '') {
-          return true;
-        }
-        const labelledBy = node.getAttribute('aria-labelledby') ?? '';
-        if (labelledBy.trim() !== '') {
-          const joined = labelledBy
-            .split(/\s+/u)
-            .map((id) => document.getElementById(id)?.textContent ?? '')
-            .join(' ')
-            .trim();
-          if (joined !== '') {
-            return true;
-          }
-        }
-        const id = node.getAttribute('id') ?? '';
-        if (id !== '') {
-          for (const label of document.querySelectorAll('label[for]')) {
-            if (label.getAttribute('for') === id && (label.textContent ?? '').trim() !== '') {
-              return true;
-            }
-          }
-        }
-        const wrapping = node.closest('label');
-        if (wrapping !== null && (wrapping.textContent ?? '').trim() !== '') {
-          return true;
-        }
-        if ((node.textContent ?? '').trim() !== '') {
-          return true;
-        }
-        return ['title', 'placeholder', 'value', 'alt'].some(
-          (one) => (node.getAttribute(one) ?? '').trim() !== '',
-        );
-      })();
-      /**
        * **부분 잘라내기는 잴 수 없으므로 위반이다**(v M-4). `clip-path: inset(0 0 70% 0)` 는 상자를
        * 줄이지 않아 높이 단언을 지나는데, 실제로 눌리는 띠는 그 일부뿐이다. 시각 은폐의 표준
        * 꼴(위 `clipped`)이 아닌 잘라내기가 걸려 있으면 **보수적으로** 센다.
@@ -251,7 +198,6 @@ export function measureInPage(): Measurement {
       targets.push({
         tag: measured.tagName.toLowerCase(),
         name,
-        named,
         testId: measured.getAttribute('data-testid') ?? '',
         width: Math.round(box.width * 10) / 10,
         // **보이는 띠**의 높이다(v M-8 · H-4) — 조상이 자르면 그만큼만, 스크롤러 안이면 그 상자
@@ -359,6 +305,12 @@ export interface NameSource {
   readonly height: number;
   /** 시각 은폐 기법이 걸려 있는가 — `sr-only` 는 상자를 1px 로 줄이고 잘라낸다. */
   readonly clipped: boolean;
+  /**
+   * **브라우저가 「보인다」고 보는가**(r2 v G3). 상자와 잘라내기만으로는 `invisible`
+   * (`visibility:hidden`)·`opacity-0` 이 지나간다 — 둘 다 상자를 그대로 두기 때문이다. 그 둘을
+   * **브라우저에게 묻는다**(열거를 늘리는 대신).
+   */
+  readonly shown: boolean;
 }
 
 /**
@@ -376,13 +328,26 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
   if (container === null) {
     throw new Error(`${containerTestId} 묶음을 찾지 못했다 — 아래 단언이 공허해진다`);
   }
-  const boxOf = (node: Element): { width: number; height: number; clipped: boolean } => {
+  const boxOf = (node: Element): { width: number; height: number; clipped: boolean; shown: boolean } => {
     const rect = node.getBoundingClientRect();
     const style = getComputedStyle(node);
+    /**
+     * **`overflow:hidden` 은 은폐가 아니다**(r1 cr LOW). `text-ellipsis`(Tailwind `truncate`)가
+     * **요구하는** 값이라, 뒤 레인이 라벨을 한 줄로 줄이면 **보이는 라벨인데** 이 축이 붉는다.
+     * `sr-only` 는 상자 쪽(1px)에서 이미 걸리므로 그 칸이 더해 주는 것이 없다.
+     */
     return {
       width: Math.round(rect.width * 10) / 10,
       height: Math.round(rect.height * 10) / 10,
-      clipped: style.clip !== 'auto' || style.clipPath !== 'none' || style.overflow === 'hidden',
+      clipped: style.clip !== 'auto' || style.clipPath !== 'none',
+      /**
+       * `checkVisibility` 는 `visibility`·`opacity`·`content-visibility` 를 **브라우저가** 본다 —
+       * 기법을 열거하지 않고 묻는 자리다. 쓸 수 없는 환경이면 **모른다를 보인다로 접지 않는다**.
+       */
+      shown:
+        typeof node.checkVisibility === 'function'
+          ? node.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+          : false,
     };
   };
   const found: NameSource[] = [];
@@ -405,11 +370,37 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
     /**
      * 글자를 **담은 자리**를 잰다. 레이블 전체는 입력까지 품어 상자가 크므로, 그 안에서 글자만
      * 든 자식이 있으면 그것을 본다 — `sr-only` 가 걸리는 자리가 바로 그 자식이다.
+     *
+     * **맨 텍스트 노드도 자식이다**(r1 cr LOW): `children` 은 요소만 내므로, 라벨의 주된 글자가
+     * 맨 텍스트면 그것을 지나치고 **뒤의 다른 요소**(괄호 힌트 등)를 재게 된다. 이 저장소에 그
+     * 꼴이 있다(자격 사실의 체크박스 라벨) — 그 자리에 이 helper 를 쓰면 주된 글자를 숨겨도
+     * 초록이었을 것이다. `childNodes` 로 보고 맨 텍스트는 `Range` 로 상자를 잡는다.
      */
-    const textChild = [...label.children].find(
-      (one) => (one.textContent ?? '').trim() !== '' && one.querySelector('input, select, textarea') === null,
+    const holdsControl = (one: Node): boolean =>
+      one.nodeType === Node.ELEMENT_NODE &&
+      (one as Element).querySelector('input, select, textarea') !== null;
+    const textNode = [...label.childNodes].find(
+      (one) => (one.textContent ?? '').trim() !== '' && !holdsControl(one),
     );
-    found.push({ control: name, from: 'label', ...boxOf(textChild ?? label) });
+    if (textNode !== undefined && textNode.nodeType === Node.TEXT_NODE) {
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      const rect = range.getBoundingClientRect();
+      const style = getComputedStyle(label);
+      found.push({
+        control: name,
+        from: 'label',
+        width: Math.round(rect.width * 10) / 10,
+        height: Math.round(rect.height * 10) / 10,
+        clipped: style.clip !== 'auto' || style.clipPath !== 'none',
+        shown:
+          typeof label.checkVisibility === 'function'
+            ? label.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+            : false,
+      });
+      continue;
+    }
+    found.push({ control: name, from: 'label', ...boxOf((textNode as Element | undefined) ?? label) });
   }
   return found;
 }

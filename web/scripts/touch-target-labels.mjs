@@ -412,14 +412,20 @@ export function ariaLabelOverridesIn(checker, source) {
       if (override !== null) {
         const seen = override.unprovable ? `${override.name} 을 볼 수 없다(식 또는 펼친 속성)` : override.name;
         if (isLabelTag(checker, node)) {
-          // **레이블 자신** — 켤 컨트롤이 있을 때만 덮을 이름이 있다.
+          /**
+           * **레이블 자신** — 이름을 줄 대상이 있을 때만 덮을 이름이 있다. 대상은 둘이다:
+           * 감싼 labelable 자손(암묵), 또는 `htmlFor` 가 가리키는 자리(명시). 앞 판은 **앞엣것만**
+           * 보아 명시 레이블의 덮어쓰기를 꼴과 무관하게 놓쳤다(r2 v G1 — R2·R3).
+           */
           const element = node.parent;
           const labelable =
             ts.isJsxElement(element) && element.openingElement === node
               ? labelableDescendants(checker, element)
               : [];
-          if (labelable.length > 0) {
-            report(node, `label 자신의 ${seen} 이 감싼 컨트롤의 이름을 덮는다`);
+          const explicit = literalAttribute(node, 'htmlFor') !== undefined;
+          if (labelable.length > 0 || explicit) {
+            const whose = explicit && labelable.length === 0 ? '가리키는' : '감싼';
+            report(node, `label 자신의 ${seen} 이 ${whose} 컨트롤의 이름을 덮는다`);
           }
         } else if (isLabelableCandidate(checker, node)) {
           const enclosing = enclosingLabelElement(checker, node);
@@ -443,18 +449,77 @@ export function ariaLabelOverridesIn(checker, source) {
   return found;
 }
 
-/** 이 파일의 레이블 가운데 **`htmlFor` 로 이 노드를 가리키는** 것 — 없으면 `null`. */
-function explicitLabelFor(checker, labels, node) {
-  const id = literalAttribute(node, 'id');
-  if (id === null || id === undefined) {
+/** 그 속성의 **식**(글자가 아닌 값) — 없거나 글자면 `null`. */
+function attributeExpression(element, name) {
+  for (const property of element.attributes.properties) {
+    if (!ts.isJsxAttribute(property) || property.name.getText() !== name) {
+      continue;
+    }
+    const value = property.initializer;
+    if (value !== undefined && ts.isJsxExpression(value) && value.expression !== undefined) {
+      return value.expression;
+    }
     return null;
   }
+  return null;
+}
+
+/**
+ * 두 식이 **같은 것을 가리키는가** — `useId` 의 표준 꼴(`htmlFor={id}` · `id={id}`)을 증명하는
+ * 자리다(r2 v G1 — R1).
+ *
+ * 신원은 **심볼**이다(이 저장소의 다른 게이트와 같은 축) — 글자로 맞대면 같은 이름의 다른
+ * 변수가 지나가고, 이름을 바꿔 부르면 같은 것이 갈린다. 식별자가 아니면 모른다(`null`).
+ */
+function sameBinding(checker, left, right) {
+  if (left === null || right === null || !ts.isIdentifier(left) || !ts.isIdentifier(right)) {
+    return null;
+  }
+  const one = checker.getSymbolAtLocation(left);
+  const other = checker.getSymbolAtLocation(right);
+  if (one === undefined || other === undefined) {
+    return null;
+  }
+  return one === other;
+}
+
+/**
+ * 이 파일의 레이블 가운데 **`htmlFor` 로 이 노드를 가리키는** 것.
+ *
+ * **증명할 수 없는 연결을 면제로 쓰지 않는다**(r2 v G1). 앞 판은 식 `id` 를 `null` 로 보고 그
+ * 자리를 통째로 빼, React 의 표준 꼴(`useId`)에서 같은 결함이 지나갔다 — 같은 모듈이 ① 축에서
+ * 세운 규율과 정반대였다. 이제 셋으로 가른다: 글자가 같거나 **같은 심볼**이면 `names`,
+ * 식이 달라 모르면 `unprovable`, 가리킬 `id` 자체가 없으면 연결 없음(`null`).
+ */
+function explicitLabelFor(checker, labels, node) {
+  const id = literalAttribute(node, 'id');
+  const idExpression = attributeExpression(node, 'id');
+  if ((id === null || id === undefined) && idExpression === null) {
+    // 그 컨트롤에 `id` 가 아예 없다 — 명시 레이블이 가리킬 수 없다.
+    return null;
+  }
+  let unsure = null;
   for (const label of labels) {
-    if (literalAttribute(label.openingElement, 'htmlFor') === id) {
+    const htmlFor = literalAttribute(label.openingElement, 'htmlFor');
+    if (htmlFor === undefined) {
+      continue;
+    }
+    if (typeof htmlFor === 'string' && typeof id === 'string') {
+      if (htmlFor === id) {
+        return { label, how: 'names' };
+      }
+      continue;
+    }
+    const bound = sameBinding(checker, attributeExpression(label.openingElement, 'htmlFor'), idExpression);
+    if (bound === true) {
       return { label, how: 'names' };
     }
+    if (bound === null) {
+      // 한쪽이 식이고 심볼로 풀리지 않는다 — **모르는 것을 면제로 쓰지 않는다**.
+      unsure = { label, how: 'unprovable' };
+    }
   }
-  return null;
+  return unsure;
 }
 
 /** 합성 원문 하나를 재는 입구(대조용). */

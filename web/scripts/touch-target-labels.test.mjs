@@ -358,6 +358,76 @@ describe('암묵 레이블 위의 이름 덮어쓰기 (M14/14F cr D4)', () => {
   });
 
   /**
+   * **React 의 표준 꼴**(`useId`)에서 같은 결함이 지나갔다(r2 v G1 — R1).
+   *
+   * `htmlFor={id}` · `id={id}` 는 **글자가 아니라 식**이라 앞 판의 `literalAttribute` 가 둘 다
+   * `null` 을 내고, 그 `null` 을 **면제**로 썼다 — 같은 모듈이 ① 축에서 「모르는 것을 면제로 쓰지
+   * 않는다」로 둔 규율과 정반대다. 식이 **같은 식별자 심볼**이면 연결은 증명된다.
+   */
+  it('양성 — useId 로 이은 명시 레이블의 덮어쓰기도 걸린다', () => {
+    const found = ariaLabelOverrides(
+      'import { useId } from "react";\nexport const X = () => {\n  const id = useId();\n  return (\n    <div>\n      <label htmlFor={id}>업종(쉼표)</label>\n      <input id={id} aria-label="업종" />\n    </div>\n  );\n};\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('aria-label');
+  });
+
+  /** 다른 심볼이면 그 레이블은 이 컨트롤을 가리키지 않는다 — 과잉 방향을 함께 잠근다. */
+  it('음성 — 다른 식별자를 가리키는 명시 레이블은 남의 이름을 덮지 않는다', () => {
+    expect(
+      ariaLabelOverrides(
+        'import { useId } from "react";\nexport const X = () => {\n  const one = useId();\n  const two = useId();\n  return (\n    <div>\n      <label htmlFor={one}>업종(쉼표)</label>\n      <input id={one} />\n      <button id={two} aria-label="조건 지우기">x</button>\n    </div>\n  );\n};\n',
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /**
+   * **명시 레이블 자신의 덮어쓰기**(r2 v G1 — R2·R3). 앞 판은 레이블 자신을 볼 때 **감싼
+   * labelable 자손**이 있어야 위반으로 셌는데, 명시 레이블은 자손이 없는 것이 보통이다 — 그래서
+   * 꼴과 무관하게 통째로 빠졌다. `htmlFor` 를 든 레이블은 **무언가의 이름을 준다**.
+   */
+  it('양성 — 명시 레이블 자신의 aria-label 도 걸린다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = () => (\n  <div>\n    <label htmlFor="t" aria-label="업종">업종(쉼표)</label>\n    <input id="t" />\n  </div>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('label');
+  });
+
+  it('양성 — useId 꼴의 명시 레이블 자신도 걸린다', () => {
+    expect(
+      ariaLabelOverrides(
+        'import { useId } from "react";\nexport const X = () => {\n  const id = useId();\n  return (\n    <div>\n      <label htmlFor={id} aria-label="업종">업종(쉼표)</label>\n      <input id={id} />\n    </div>\n  );\n};\n',
+      ),
+    ).toHaveLength(1);
+  });
+
+  /**
+   * **증명할 수 없는 연결은 면제가 아니다**(설계 검토 ⑧ 의 선택 — fail-closed). 식이 같은
+   * 심볼로 풀리지 않으면 그 레이블이 이 컨트롤을 가리키는지 **모른다**. ① 축과 같은 방향으로
+   * 센다.
+   */
+  it('양성 — 증명할 수 없는 연결은 위반으로 센다', () => {
+    const found = ariaLabelOverrides(
+      'export const X = ({ keys }) => (\n  <div>\n    <label htmlFor={keys.one}>업종(쉼표)</label>\n    <input id={keys.two} aria-label="업종" />\n  </div>\n);\n',
+    );
+
+    expect(found).toHaveLength(1);
+    expect(found[0].why).toContain('증명할 수 없다');
+  });
+
+  /** `id` 자체가 없으면 명시 레이블이 가리킬 수 없다 — 그 자리는 이 축 밖이다. */
+  it('음성 — id 가 없는 컨트롤은 명시 레이블의 대상이 아니다', () => {
+    expect(
+      ariaLabelOverrides(
+        'export const X = () => (\n  <div>\n    <label htmlFor="t">업종(쉼표)</label>\n    <button aria-label="조건 지우기">x</button>\n  </div>\n);\n',
+      ),
+    ).toStrictEqual([]);
+  });
+
+  /**
    * **글자 없는 레이블의 사유가 달라야 한다**(r1 cr M②). 그 레이블은 이름을 주지 않으므로
    * 「덮는다」는 거짓이고, 그 말을 읽은 유지보수자의 자연스러운 손질(`aria-label` 떼기)은
    * **이름 없는 컨트롤**을 남긴다. 그래서 사유가 **다른 손질**을 가리켜야 한다.

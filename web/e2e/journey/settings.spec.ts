@@ -320,7 +320,10 @@ test('설정에 사업자번호 입력칸이 없고 화면·콘솔에 그 꼴이
  * 그 변이가 이 slice 의 가장 비싼 거짓 초록이었다: D3 이 고친 것이 바로 「눈으로 보는 운영자가
  * 어느 칸에 무엇을 적는지 모른다」이므로, **보인다**를 재지 않으면 그 고침이 지켜지지 않는다.
  *
- * 그래서 **브라우저에서 상자**를 본다. 은폐 기법은 여럿이라 클래스 글자로 집지 않는다.
+ * 그래서 **브라우저에서** 본다. 은폐 기법은 여럿이라 클래스 글자로 집지 않는다 — 상자(`sr-only`
+ * 의 1px)와 잘라내기에 더해 **`checkVisibility`** 로 `invisible`·`opacity-0` 까지 브라우저에게
+ * 묻는다(열거를 늘리는 대신). 글자 색을 배경과 같게 하는 꼴(`text-transparent`)은 **대비 축**이고
+ * 이 축이 아니다 — OPEN 으로 등재했다.
  */
 test('설정 — 시평액 입력 셋의 라벨이 눈에 보인다', async ({ page }) => {
   await signIn(page);
@@ -340,9 +343,12 @@ test('설정 — 시평액 입력 셋의 라벨이 눈에 보인다', async ({ p
    * 그리고 그 라벨이 **그려진다**. `sr-only` 는 상자를 1px 로 줄이고 잘라내므로 둘 다 걸린다 —
    * 글자 크기(12px)보다 넉넉히 작은 문턱을 둔다.
    */
-  const hidden = sources.filter((one) => one.width < 8 || one.height < 8 || one.clipped);
+  const hidden = sources.filter((one) => one.width < 8 || one.height < 8 || one.clipped || !one.shown);
   expect(
-    hidden.map((one) => `${one.control}: ${one.width}x${one.height}${one.clipped ? ' clipped' : ''}`),
+    hidden.map(
+      (one) =>
+        `${one.control}: ${one.width}x${one.height}${one.clipped ? ' clipped' : ''}${one.shown ? '' : ' hidden'}`,
+    ),
     '라벨이 시각적으로 숨겨졌다 — 눈으로 보는 운영자에게는 빈 상자다',
   ).toStrictEqual([]);
 });
