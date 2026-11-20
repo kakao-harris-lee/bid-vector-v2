@@ -1097,8 +1097,12 @@ describe('화면 B — 카드의 배치와 자격 슬롯 (M14/14B)', () => {
     expect(exact?.getAttribute('data-expanded')).toBe('true');
   });
 
-  /** 금액이 없으면 압축할 것도 없다 — 「약 0원」을 지어내지 않는다. */
-  it('금액이 없는 공고에는 압축 자리가 없다', async () => {
+  /**
+   * 금액이 없으면 압축할 것도 없다 — 「약 0원」을 지어내지 않는다. 그러나 **자리째 사라지지도
+   * 않는다**(v M-2): 정확 금액의 부재 어휘는 `md` 이상에서만 서는 `dl` 안에 있어, 좁은 화면에서
+   * 압축 자리를 비우면 「금액이 없다」와 「배치가 숨겼다」가 같은 얼굴이 된다.
+   */
+  it('금액이 없는 공고는 압축 자리에서 사유를 말한다 — 수를 지어내지도 자리를 비우지도 않는다', async () => {
     mocked.searchNotices.mockResolvedValue({
       rows: [{ ...NOTICE, baseAmountWon: null, baseAmountProvenance: null, baseAmountBasis: null }],
       total: 1,
@@ -1109,7 +1113,38 @@ describe('화면 B — 카드의 배치와 자격 슬롯 (M14/14B)', () => {
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
 
-    expect(within(card).queryByTestId('notice-amount-compact')).toBeNull();
+    expect(within(card).queryByTestId('notice-amount-compact'), '없는 금액에 압축 글자를 지어냈다').toBeNull();
+    expect(within(card).getByTestId('notice-amount-compact-absent').textContent).toBe(absenceTextOf('notSent'));
     expect(within(card).getByTestId('notice-amount').textContent).toBe(absenceTextOf('notSent'));
+  });
+
+  /**
+   * **압축 금액은 좁은 화면의 것이다**(팀장 판정 ⑤ · v M-3). jsdom 은 CSS 를 풀지 않으므로
+   * 「보이는가」로는 설 수 없다 — 그 자리를 **클래스 선언**으로 잰다. 넓은 화면에서 압축과
+   * 정확 금액이 함께 서면 어느 쪽이 금액인지 흐려진다.
+   */
+  it('압축 금액 묶음이 넓은 화면에서 숨는다 — 정확 금액과 겹치지 않는다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const compact = within(card).getByTestId('notice-amount-compact');
+    const wrapper = compact.closest('span.md\\:hidden');
+
+    expect(wrapper, '압축 금액이 md 이상에서 숨는 묶음 안에 있지 않다').not.toBeNull();
+    expect(wrapper?.contains(compact)).toBe(true);
+    // 그 짝 — 정확 금액의 `dl` 은 반대로 **좁은 화면에서** 숨는다.
+    expect(within(card).getByTestId('notice-amount').closest('dl')?.className).toContain('md:flex');
+  });
+
+  /** 좁은 화면의 금액에도 **축 이름**이 붙는다(와이어프레임의 「기초 4.2억」 · v M-2). */
+  it('압축 금액에 기초 축 이름이 붙는다', async () => {
+    renderScreen();
+    await searchFor('SYN-7E1');
+
+    const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
+    const wrapper = within(card).getByTestId('notice-amount-compact').closest('span.md\\:hidden');
+
+    expect(wrapper?.textContent).toContain('기초');
   });
 });

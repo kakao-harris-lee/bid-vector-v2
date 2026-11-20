@@ -46,6 +46,12 @@ function DeadlineBadge({ days }: { readonly days: number | null }) {
 const AMOUNT_HINT = '투찰 기준 금액. 추정가격과 다르다.';
 
 /**
+ * 좁은 화면의 금액 **축 이름**(와이어프레임의 「기초 4.2억」). 넓은 화면의 `dt` 는 「기초금액」
+ * 전체를 쓰고, 좁은 쪽은 와이어프레임이 줄인 그 말을 쓴다 — 둘은 **같은 축**이고 길이만 다르다.
+ */
+const COMPACT_AMOUNT_LABEL = '기초';
+
+/**
  * 좁은 화면의 **압축 금액**(M14/14B · 와이어프레임 모바일 카드의 「기초 4.2억」).
  *
  * 자리를 버린 읽기라 **정확 금액에 닿는 길을 카드 안에 남긴다** — 2층 라벨의 아래층이 그
@@ -62,14 +68,28 @@ function CompactAmount({ notice }: { readonly notice: NoticeSummary }) {
   const exact = amount.provenance === null ? amount.amount : `${amount.amount} · ${amount.provenance}`;
   const hint = useTermHint(compact === null ? undefined : exact, { testId: 'notice-amount-compact' });
 
-  // 읽을 수 없는 금액에는 **압축 자리도 없다** — 「약 0원」을 지어내지 않는다.
-  if (compact === null) {
-    return null;
-  }
   return (
     <span className="inline-flex flex-col items-start text-xs md:hidden">
-      {hint.termNode(compact)}
-      {hint.hintNode}
+      {/*
+        **금액의 축을 좁은 화면에서도 말한다**(v M-2 · 와이어프레임의 「기초 4.2억」). 압축 글자만
+        두면 그 수가 무슨 금액인지 탭하기 전에는 알 수 없는데, 기초금액과 추정가격을 혼동하면
+        투찰 금액이 틀린다(`AMOUNT_HINT` 가 적은 그 자리다).
+      */}
+      <span className="text-ink-soft">{COMPACT_AMOUNT_LABEL}</span>
+      {/*
+        **읽을 수 없는 금액은 사라지지 않고 사유를 말한다**(v M-2). 압축 자리를 통째로 비우면
+        좁은 화면에서 「금액이 없다」와 「배치가 숨겼다」가 같은 얼굴이 된다 — 정확 금액의 부재
+        어휘는 `md` 이상에서만 서는 `dl` 안에 있기 때문이다. 「약 0원」을 지어내지 않는 규율은
+        그대로다: 지어내는 것이 아니라 **없다고 말하는** 것이다.
+      */}
+      {compact === null ? (
+        <AbsentValue reason="notSent" testId="notice-amount-compact-absent" />
+      ) : (
+        <>
+          {hint.termNode(compact)}
+          {hint.hintNode}
+        </>
+      )}
     </span>
   );
 }
