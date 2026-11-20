@@ -1,13 +1,25 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import { isUnauthorized as isSessionGone } from '../api/apiError';
-import { listBidCases, readMyBidResults, readOpeningResult, type BidCase } from '../api/queries';
+import {
+  listBidCases,
+  readMyBidResults,
+  readOpeningResult,
+  type BidCase,
+  type MyBidAggregate,
+} from '../api/queries';
 import { bidCasesQueryKey, MY_BID_RESULTS_QUERY_KEY, openingResultQueryKey } from '../api/queryKeys';
+import { AbsentValue } from '../components/AbsentValue';
 import { LinkButton } from '../components/Button';
+import { Card } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
 import { EmptyFace, ErrorFace, Skeleton } from '../components/ScreenFaces';
+import { StatusPill } from '../components/StatusPill';
+import { SummaryTile, tileTwoAxis, tileUnavailable, tileValue } from '../components/SummaryTile';
 import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
-import { caseResultsById, type CaseResult } from '../display/myBidResultDisplay';
-import { RESULT_PENDING_SLOTS, isResultStage } from '../display/resultDisplay';
+import { BID_CASE_STATE_DISPLAY, NOTICE_ROW_ABSENT_TEXT } from '../display/caseDisplay';
+import { caseResultsById, rateAxesOf, SAMPLE_NOTE, type CaseResult } from '../display/myBidResultDisplay';
+import { RESULT_PENDING_SLOTS, isResultStage, pendingBadgeOf } from '../display/resultDisplay';
 import { useSessionCsrf } from '../session/useSessionCsrf';
 
 import { ResultCard } from './ResultCard';
@@ -38,20 +50,104 @@ const EMPTY_DISPLAY = {
 function PendingSlots() {
   return (
     <section data-testid="results-pending" className="rounded-lg border border-dashed border-line p-4">
-      <h3 className="text-sm font-medium">다루지 않는 자리</h3>
+      <h3 className="text-sm font-medium">아직 없는 자리</h3>
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
         {RESULT_PENDING_SLOTS.map((slot) => (
           <div key={slot.id} data-testid={`pending-${slot.id}`} className="flex flex-col gap-0.5">
             <dt className="text-xs font-medium">
               {slot.label}
-              <span className="ml-1 text-absent-ink">{slot.kind === 'LATER' ? '준비 중' : '다루지 않음'}</span>
+              {/* 배지 문면은 **표 한 자리**에서 온다(M14/14D — 13A OPEN ⓖ). 화면이 분류를 보고
+                  글자를 고르던 앞 판은 배지가 「다루지 않음」이라 사유의 「지금은」과 어긋났다. */}
+              <span className="ml-1 text-absent-ink">{pendingBadgeOf(slot.kind)}</span>
             </dt>
-            {/* 사유를 **함께** 적는다 — 「준비 중」만 적으면 영영 안 오는 자리와 같아 보인다. */}
+            {/* 사유를 **함께** 적는다 — 배지만 적으면 무엇이 막고 있는지 말하지 않는다. */}
             <dd className="text-xs text-ink-soft">{slot.why}</dd>
           </div>
         ))}
       </dl>
     </section>
+  );
+}
+
+/**
+ * 요약 타일 넷(와이어프레임 E). **둘은 서버가 값을 내지 않는다** — 그 자리는 숫자 칸을 아예
+ * 갖지 않고 사유를 든다(계약 「데이터」 절 · `tileUnavailable`).
+ *
+ * 타일 ③ 은 **두 축 병기**다. `beside` 가 아니라 `twoAxis` 얼굴에 넣는다 — `beside` 의 뜻은
+ * 「분모처럼 같은 한 값의 일부」이고 거기에 둘째 **축**을 넣는 것은 그 뜻을 깬다(14A 인계).
+ * 축이 길이 둘의 튜플이라 한 축으로 부르는 것은 **타입에서 서지 않는다**.
+ */
+function SummaryTiles({ aggregate }: { readonly aggregate: MyBidAggregate }) {
+  const [recorded, reconciled] = rateAxesOf(aggregate);
+
+  return (
+    <div data-testid="results-tiles" className="flex flex-wrap gap-3">
+      <SummaryTile
+        label="투찰 (기록됨)"
+        face={tileValue(String(aggregate.sampleSize), { note: SAMPLE_NOTE })}
+        testId="tile-submitted"
+      />
+      {/* 와이어프레임의 「적격 n/m」 — `aggregate` 에 적격 계수가 없다. 0 으로 접지 않는다. */}
+      <SummaryTile
+        label="적격 (하한 이상)"
+        face={tileUnavailable('서버가 적격 계수를 내지 않습니다')}
+        testId="tile-eligible"
+      />
+      <SummaryTile
+        label="낙찰"
+        face={tileTwoAxis(
+          [
+            { label: recorded.label, text: String(recorded.wonCount) },
+            { label: reconciled.label, text: String(reconciled.wonCount) },
+          ],
+          { note: '두 축은 서로 다른 수를 낼 수 있습니다 — 아래 집계가 분모까지 보입니다.' },
+        )}
+        testId="tile-won"
+      />
+      {/* 와이어프레임의 「하한 대비 위치 중앙값」 — 하한 계열 칸이 응답에 없다. */}
+      <SummaryTile
+        label="하한 대비 위치 중앙값"
+        face={tileUnavailable('서버가 하한 대비 위치를 내지 않습니다')}
+        testId="tile-floor-position"
+      />
+    </div>
+  );
+}
+
+/**
+ * 잠정 1위 경고 카드(와이어프레임 E). **잠정 1위는 낙찰이 아니다** — 그 문장은 상태 표의
+ * `why` 에서 오고 이 카드가 자기 글을 따로 들지 않는다.
+ *
+ * 목록에 그 상태의 건이 없으면 **카드가 서지 않는다**(경고할 것이 없다).
+ */
+function ProvisionalFirstWarning({ cases }: { readonly cases: readonly BidCase[] }) {
+  const shown = cases.filter((one) => one.state === 'OPENED_PROVISIONAL_FIRST');
+  if (shown.length === 0) {
+    return null;
+  }
+  const display: { readonly label: string; readonly why?: string } =
+    BID_CASE_STATE_DISPLAY.OPENED_PROVISIONAL_FIRST;
+
+  return (
+    <Card as="section" testId="provisional-first-warning">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <StatusPill tone="good" label={display.label} />
+        <h3 className="text-sm font-semibold">낙찰로 확정되지 않았습니다</h3>
+      </div>
+      {display.why === undefined ? null : <p className="mt-1 text-xs text-ink-soft">{display.why}</p>}
+      <ul className="mt-2 flex flex-col gap-1">
+        {shown.map((one) => (
+          <li key={one.caseId} data-testid={`provisional-first-${one.caseId}`} className="text-xs">
+            {/* 제목은 14E 투영이다 — 공고 행이 없으면 그 사실을 말한다(빈 칸으로 접지 않는다). */}
+            {one.noticeKnown ? (
+              (one.noticeTitle ?? <AbsentValue reason="notSent" />)
+            ) : (
+              <span className="text-absent-ink">{NOTICE_ROW_ABSENT_TEXT}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -125,7 +221,17 @@ export function ResultsScreen() {
 
   return (
     <section data-testid="screen-results" className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <h2 className="text-lg font-semibold">결과 확인</h2>
+      <PageHeader
+        title="결과 확인"
+        summary="실측만 셉니다. 페이퍼(가상)는 섞지 않습니다."
+        testId="results-header"
+      />
+
+      {/* 타일은 **집계 응답이 선 뒤**에만 선다 — 받지 못한 수를 0 으로 그리지 않는다. */}
+      {results.isSuccess ? <SummaryTiles aggregate={results.data.aggregate} /> : null}
+
+      {/* 잠정 1위 경고는 **목록이 선 뒤**다. 그 상태의 건이 없으면 카드 자체가 없다. */}
+      {cases.isSuccess ? <ProvisionalFirstWarning cases={shown} /> : null}
 
       {cases.isPending ? <Skeleton testId="results-loading" /> : null}
       {cases.isError && !isUnauthorized(cases.error) ? (

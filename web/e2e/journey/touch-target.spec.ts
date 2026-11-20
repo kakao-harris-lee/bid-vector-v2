@@ -107,8 +107,12 @@ export const TOUCH_TARGET_SCREENS = [
   // 게이트가 값을 읽지 못한다. 씨앗과 어긋나지 않는 것은 아래 첫 단언이 든다.
   // M13/13C — 금액 복사 버튼이 늘어 **다시 조였다**(실측 8 · 여유 0). 하한은 올리기만 한다.
   { slotId: 'worksheet', path: '/notices/SYN-M9-OPEN-NOT-OPENED/000', ready: 'screen-worksheet', minCount: 8 },
-  { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 11 },
-  { slotId: 'results', path: '/results', ready: 'screen-results', minCount: 7 },
+  // M14/14D — 이 slice 가 입찰함에 고르기 둘(「전체」·「투찰 예정」)과 종류 전환 버튼을 더했고,
+  // 두 화면을 와이어프레임 배치로 다시 짰다. 계약 「겹치는 자리」가 이 하한을 **올리기만**으로
+  // 못박으므로 **실측한 계수로** 올린다(cr M-1 — 앞 판은 약속만 하고 올리지 않아, 더한 컨트롤을
+  // 되돌려도 게이트가 초록이었다). 수는 하네스 씨앗에 달려 있고 이 SHA 에서 쟀다.
+  { slotId: 'bid-box', path: '/bids?tab=closed', ready: 'screen-bid-box', minCount: 14 },
+  { slotId: 'results', path: '/results', ready: 'screen-results', minCount: 21 },
   { slotId: 'inbox', path: '/inbox', ready: 'screen-inbox', minCount: 12 },
   { slotId: 'settings', path: '/settings', ready: 'screen-settings', minCount: 27 },
   // 로그인 자리에는 **탐색을 그리지 않는다**(착수 판정) — 그래서 하한이 폼의 버튼 하나다.

@@ -16,7 +16,10 @@ export const BID_CASE_STATE_DISPLAY = {
   BID_PLANNED: { label: '투찰 예정', why: '초안이 있고 아직 제출 기록이 없다', tone: 'neutral' },
   BID_RECORDED: { label: '투찰 기록됨', tone: 'good' },
   AWAITING_OPENING: { label: '개찰 대기', tone: 'neutral' },
-  OPENED_PROVISIONAL_FIRST: { label: '잠정 1위', tone: 'good' },
+  // **잠정 1위는 낙찰이 아니다** — 와이어프레임의 「상태 뜻」이 말하는 가장 비싼 오해이고,
+  // 그 문장이 서는 자리는 레일이 아니라 **이 표**다(M14/14D). 레일은 이 `why` 를 읽을 뿐이라
+  // 같은 말이 두 곳에 살지 않는다.
+  OPENED_PROVISIONAL_FIRST: { label: '잠정 1위', why: '적격심사가 끝나야 낙찰로 확정된다', tone: 'good' },
   OPENED_OUT_OF_RANK: { label: '순위 밖', tone: 'neutral' },
   UNDER_QUALIFICATION_REVIEW: { label: '적격심사 중', tone: 'neutral' },
   WON: { label: '낙찰', tone: 'good' },
@@ -48,6 +51,27 @@ export const BID_CASE_STATE_DISPLAY = {
 export function stateDisplayOf(state: string): StateDisplay {
   return displayOrUnknown<string>(BID_CASE_STATE_DISPLAY, state);
 }
+
+/**
+ * 보이는 글자가 있는가 — 집 안 원시 요소(`KeyValueRow`·`SummaryTile`)와 **같은 술어**다
+ * (cr LOW). `=== null` 하나로는 `''`·공백뿐인 값이 지나가고, 그 값은 닿을 수 있다:
+ * 기관명 칸에는 공백류 CHECK 가 없다(제목 칸만 그것을 진다).
+ */
+export function shownText(value: string | null | undefined): string | undefined {
+  return value === null || value === undefined || value.trim() === '' ? undefined : value;
+}
+
+/**
+ * 공고 행이 **없을 때**의 문면 — `noticeKnown` 이 거짓인 자리의 한 자리다(M14/14D).
+ *
+ * 이것은 **부재 어휘가 아니다**: 「주어지지 않음」은 응답이 그 칸을 싣지 않았다는 말이고, 이쪽은
+ * 서버가 「그 공고 행이 저장소에 없다」고 **적극적으로** 답한 것이다. 보존 기한이 지나 파기됐는지
+ * 아직 수집되지 않았는지는 서버도 가르지 않는다(묘비를 남기지 않으므로) — 그래서 문면도 가르지
+ * 않는다. `noticeKnown` 이 참인데 제목이 `null` 인 것은 **다른 사실**이고 그 자리는 부재 어휘다.
+ *
+ * 알림함과 입찰함이 같은 사실을 말하므로 글자가 **한 자리**에 산다.
+ */
+export const NOTICE_ROW_ABSENT_TEXT = '공고를 모름 — 파기됐거나 아직 수집되지 않았습니다';
 
 /**
  * 다음 확인 시점 — **「없음」은 빈 값이 아니라 답이다**(§6.1). 시각 하나로 접으면 화면이

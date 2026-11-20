@@ -35,6 +35,10 @@ export const VOCABULARY_DECLARATIONS = [
   'display/moneyDisplay.ts#compactAmountTextOf',
   'display/moneyDisplay.ts#vatTreatmentDisplayOf',
   'display/noticeDisplay.ts#amountDisplayOf',
+  // M14/14D — 입찰함 카드의 「내 투찰」. 금액 글자를 **내는** 자리라 어휘다(글자는 금액 표시의
+  // 한 자리에서 받고 이 함수가 짓지 않는다). 씨앗으로 두면 이것을 그리는 카드가 DOM 게이트의
+  // 의무로 끌려온다 — 오늘 그리는 자리는 화면이고, 화면은 자기 test 가 같은 주장을 든다.
+  'display/myBidResultDisplay.ts#submittedAmountTextById',
   'display/timeDisplay.ts#instantDisplayOf',
 ];
 
@@ -212,8 +216,45 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
   },
   { key: 'display/profileDisplay.ts#capacityBodyOf', kind: OTHER_AXIS, why: '입력 → 요청 본문. 서버로 간다' },
 
+  {
+    // M14/14D 수정 라운드 1 — 보이는 글자가 있는가(집 안 원시 요소와 같은 `.trim()` 술어).
+    key: 'display/caseDisplay.ts#shownText',
+    kind: OTHER_AXIS,
+    why: '받은 글자를 그대로 내거나 없다고 답하는 술어. 자기 문면을 만들지 않는다',
+  },
+
   // ── 결과 단계 축 ───────────────────────────────────────────────────────────
   { key: 'display/resultDisplay.ts#isResultStage', kind: OTHER_AXIS, why: '결과 단계인가를 참·거짓으로 낸다' },
+  {
+    // M14/14D — 「아직 없는 자리」의 배지 문면. 분류(`LATER`·`PERMANENT`) → 낱말 하나이고
+    // 금액 토큰·명령 토큰·시각 원문이 아니다.
+    key: 'display/resultDisplay.ts#pendingBadgeOf',
+    kind: OTHER_AXIS,
+    why: '빈 자리 분류 → 배지 낱말. 이 게이트가 금지하는 어휘를 그리지 않는다',
+  },
+
+  // ── 입찰함의 고르기·레일 축(M14/14D) ──────────────────────────────────────
+  {
+    // M14/14D 수정 라운드 1 — 사이드바 배지가 세는 축. 셸·레일·짝 test 가 같은 자리를 읽는다.
+    key: 'display/bidBoxDisplay.ts#openCaseCountOf',
+    kind: OTHER_AXIS,
+    why: '지금 들여다볼 건의 **수**를 낸다. 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#isBidBoxSelection',
+    kind: OTHER_AXIS,
+    why: '바깥 문자열이 고르기인가를 참·거짓으로 낸다. 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#selectionShows',
+    kind: OTHER_AXIS,
+    why: '고른 것이 그 상태를 보이는가를 참·거짓으로 낸다. 글자를 만들지 않는다',
+  },
+  {
+    key: 'display/bidBoxDisplay.ts#stateMeaningsOf',
+    kind: OTHER_AXIS,
+    why: '보이는 상태의 라벨과 뜻을 **상태 표에서** 골라 낸다. 금액 토큰·명령 토큰·시각 원문이 아니다',
+  },
 
   // ── 표 조회의 틀 ───────────────────────────────────────────────────────────
   {

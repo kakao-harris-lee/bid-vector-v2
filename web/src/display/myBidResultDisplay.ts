@@ -1,5 +1,6 @@
 import type { MyBidAggregate, MyBidCase } from '../api/queries';
 
+import { amountTextOf } from './moneyDisplay';
 import type { StateDisplay } from './stateDisplay';
 
 /**
@@ -283,4 +284,28 @@ export function rateAxesOf(aggregate: MyBidAggregate): readonly [RateAxis, RateA
       undecidedCount: aggregate.reconciledUndecidedCount,
     },
   ];
+}
+
+/**
+ * 건 → **내 투찰 금액의 보이는 글자**(M14/14D · 와이어프레임 D 카드의 둘째 줄).
+ *
+ * 입찰함의 `BidCase` 에는 금액 칸이 없다 — 투찰 기록이 있는 건만 결과 조회가 낸다. 그래서 그
+ * 응답에서 **읽기만** 해서 접는다(새 operation 0 · 쓰기 0).
+ *
+ * **한 건에 행이 여럿이면 고르지 않는다**([caseResultsById] 와 같은 규율): 어느 쪽인지 모른 채
+ * 금액 하나를 보이면 운영자가 그것을 자기 투찰가로 읽는다. 그런 건은 자리를 **비운다** — 그
+ * 모호함을 진단으로 펼치는 것은 결과 화면의 일이고, 입찰함 카드는 그 자리를 갖지 않는다.
+ *
+ * 글자를 **짓지 않고** 금액 표시의 한 자리(`amountTextOf`)에서 받는다 — 자릿점·단위 규칙이
+ * 자리마다 갈리지 않는다. 통화 코드는 응답의 것이고, 모르는 코드는 그 함수가 띄워 보인다.
+ */
+export function submittedAmountTextById(cases: readonly MyBidCase[]): ReadonlyMap<number, string> {
+  const text = new Map<number, string>();
+  for (const [caseId, rows] of caseResultsById(cases)) {
+    const only = rows.length === 1 ? rows[0] : undefined;
+    if (only !== undefined) {
+      text.set(caseId, amountTextOf(only.submittedAmountWon, only.submittedAmountCurrency));
+    }
+  }
+  return text;
 }
