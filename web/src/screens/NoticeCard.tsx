@@ -75,7 +75,9 @@ function CompactAmount({ notice }: { readonly notice: NoticeSummary }) {
         두면 그 수가 무슨 금액인지 탭하기 전에는 알 수 없는데, 기초금액과 추정가격을 혼동하면
         투찰 금액이 틀린다(`AMOUNT_HINT` 가 적은 그 자리다).
       */}
-      <span className="text-ink-soft">{COMPACT_AMOUNT_LABEL}</span>
+      <span data-testid="notice-amount-compact-label" className="text-ink-soft">
+        {COMPACT_AMOUNT_LABEL}
+      </span>
       {/*
         **읽을 수 없는 금액은 사라지지 않고 사유를 말한다**(v M-2). 압축 자리를 통째로 비우면
         좁은 화면에서 「금액이 없다」와 「배치가 숨겼다」가 같은 얼굴이 된다 — 정확 금액의 부재

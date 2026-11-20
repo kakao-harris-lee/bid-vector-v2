@@ -1137,14 +1137,18 @@ describe('화면 B — 카드의 배치와 자격 슬롯 (M14/14B)', () => {
     expect(within(card).getByTestId('notice-amount').closest('dl')?.className).toContain('md:flex');
   });
 
-  /** 좁은 화면의 금액에도 **축 이름**이 붙는다(와이어프레임의 「기초 4.2억」 · v M-2). */
+  /**
+   * 좁은 화면의 금액에도 **축 이름**이 붙는다(와이어프레임의 「기초 4.2억」 · v M-2).
+   *
+   * **자기 노드로 잰다**: 묶음의 글자로 재면 아래층(정확 금액 + 부속 축)이 「기초금액」을 담고
+   * 있어 라벨을 지워도 초록이다(실측 — 그 변이가 지나갔다).
+   */
   it('압축 금액에 기초 축 이름이 붙는다', async () => {
     renderScreen();
     await searchFor('SYN-7E1');
 
     const card = await screen.findByTestId(`notice-card-${NOTICE.noticeNumber}`);
-    const wrapper = within(card).getByTestId('notice-amount-compact').closest('span.md\\:hidden');
 
-    expect(wrapper?.textContent).toContain('기초');
+    expect(within(card).getByTestId('notice-amount-compact-label').textContent).toBe('기초');
   });
 });
