@@ -1040,7 +1040,9 @@ describe('시작하기 — 레일 미리보기 (M14/14B)', () => {
     const row = await screen.findByTestId('onboarding-preview-SYN-PREVIEW-NOAMOUNT');
     const line = row.parentElement?.textContent ?? '';
 
-    expect(line, '없는 금액을 압축 글자로 지어냈다').not.toContain('약');
+    // **수 자체가 없음**을 본다(cr L-9). 「약」의 부재만 보면 정확히 떨어지는 글자를 지어내는
+    // 변이(`0원`·`1억원`)가 지나간다 — 그 꼴에는 원래 「약」이 없다.
+    expect(line, '없는 금액을 압축 글자로 지어냈다').not.toMatch(/[\d,]+(?:조|억|만)?원/u);
     expect(line).toMatch(/D[-+]\d+/u);
   });
 });

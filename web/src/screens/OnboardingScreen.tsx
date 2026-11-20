@@ -326,8 +326,12 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
 /**
  * 절 한 장 — 번호 · 제목 · 상태 알약 · 사유 · (쓰기 절이면) 항목과 단계 버튼.
  *
- * **준비 중 절은 여기서 일찍 끝난다**: 상태 문면만 그리고 입력칸도 버튼도 만들지 않는다. 그
- * 사실이 `steps` 가 비었다는 **구조**에서 나오므로, 절을 더하는 사람이 따로 선언할 것이 없다.
+ * **적을 칸이 없는 절은 여기서 일찍 끝난다**: 상태 문면만 그리고 입력칸도 버튼도 만들지 않는다.
+ * 그 사실은 `steps` 가 비었다는 **구조**에서 나온다.
+ *
+ * **「준비 중」은 거기서 나오지 않는다**(v L2 — 앞 판 주석이 그렇게 적어 두어 틀렸다): 적을 칸이
+ * 없는 것과 **그 기능이 아직 없는 것**은 다른 사실이고, 미리보기 절이 그 차이의 실물이다.
+ * 준비 중 알약은 절이 `notReady` 로 **선언**한다.
  */
 function SectionCard({
   section,
@@ -351,8 +355,19 @@ function SectionCard({
   return (
     <li data-testid={`onboarding-section-${section.id}`} className={cardClass('sm')}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-numeric text-sm text-ink-soft">{ordinal}.</span>
-        <span className="text-sm font-medium">{section.label}</span>
+        {/*
+          **절 제목은 제목이다**(cr L-6). 보조기기의 제목 목록으로 다섯 절을 건너뛸 수 있어야
+          한다 — 절 3 은 폼이 통째로 들어가 길다. 시각 크기는 클래스가 그대로 든다.
+
+          번호는 `aria-hidden` 이다: `ol` 이 이미 「목록 항목 1/5」를 읽으므로 그 글자를 트리에
+          남기면 같은 수를 두 번 읽는다.
+        */}
+        <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium">
+          <span aria-hidden="true" className="font-numeric text-ink-soft">
+            {ordinal}.
+          </span>
+          {section.label}
+        </h3>
         {/*
           알약은 **말할 것이 있을 때만** 단다. 쓰기 절은 항목 상태를 접어 말하고, 준비 중 절은
           그 사실을 말한다. 둘 다 아닌 절(미리보기)은 **아무 상태도 아니므로** 알약이 없다 —
