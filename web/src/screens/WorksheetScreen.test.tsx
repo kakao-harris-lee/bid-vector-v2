@@ -5,14 +5,21 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '../api/apiError';
+import { absenceTextOf } from '../display/absence';
 import * as queries from '../api/queries';
 import { stateDisplayOf } from '../display/caseDisplay';
 
 import { controlClass } from '../components/Button';
+import {
+  LAYOUT_SLOT_ATTRIBUTE,
+  TWO_COLUMN_BODY_SLOT,
+  TWO_COLUMN_RAIL_SLOT,
+} from '../components/twoColumnShape';
 
 import { SECTION_SUMMARY_CLASS } from './WorksheetGrounds';
 import { BID_CASE_STATE_DISPLAY } from '../display/caseDisplay';
 import { ACTION_INPUT, exitsOf } from '../display/bidBoxDisplay';
+import { nextActionOf } from '../display/caseDisplay';
 import { WorksheetScreen } from './WorksheetScreen';
 
 vi.mock('../api/queries');
@@ -1487,5 +1494,414 @@ describe('화면 C — 내려놓기의 입구는 하나다', () => {
     await screen.findByTestId('write-failure');
 
     expect(screen.queryByTestId('toast')?.textContent, '실패가 되돌릴 길을 걷었다').toContain('실행 취소');
+  });
+});
+
+/**
+ * **와이어프레임 배치**(M14/14C · 팀장 판정 ①). 계약 문장은 레일에 넷을 넣으라고 적었지만
+ * 원천(`design/Main.raw.html`)은 카운트다운을 **머리 행 오른쪽**에, 참가 자격을 **본문 첫
+ * 카드**에 둔다. 판정은 원천을 따른다.
+ *
+ * **자리를 표지로 재지 않고 두 단의 칸으로 잰다** — 칸 표지는 출하 모듈(`twoColumnShape`)의
+ * 것이고 배치 게이트가 읽는 바로 그 글자다(사본이 생기지 않는다). 상자 좌표 축은 14B 가
+ * 레일 모집단을 넓힐 때 서고, 그때까지는 **문서 순서**가 이 화면의 잠금이다.
+ */
+describe('화면 C — 와이어프레임 배치(M14/14C)', () => {
+  const slotOf = (slot: string): HTMLElement | null =>
+    document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${slot}"]`);
+
+  const body = (): HTMLElement => {
+    const found = slotOf(TWO_COLUMN_BODY_SLOT);
+    if (found === null) {
+      throw new Error('본문 칸을 찾지 못했다 — 두 단 배치가 서지 않았다');
+    }
+    return found;
+  };
+
+  const rail = (): HTMLElement => {
+    const found = slotOf(TWO_COLUMN_RAIL_SLOT);
+    if (found === null) {
+      throw new Error('레일 칸을 찾지 못했다 — 두 단 배치가 서지 않았다');
+    }
+    return found;
+  };
+
+  /** 문서 순서 — `second` 가 `first` 뒤에 오는가. */
+  const precedes = (first: Element, second: Element): boolean =>
+    (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+  it('마감 카운트다운은 두 단 밖 — 머리 행에 선다', async () => {
+    renderScreen();
+
+    const deadline = await screen.findByTestId('worksheet-deadline');
+    // 비공허: 두 단이 실제로 서 있다(안 서 있으면 「밖이다」가 늘 참이다).
+    expect(rail()).not.toBeNull();
+    expect(deadline.closest(`[${LAYOUT_SLOT_ATTRIBUTE}]`), '카운트다운이 두 단 안으로 들어갔다').toBeNull();
+  });
+
+  it('본문의 첫 카드가 참가 자격이다', async () => {
+    renderScreen();
+    await askPrice();
+
+    const qualification = await screen.findByTestId('qualification');
+    expect(body().contains(qualification), '자격 카드가 본문에 없다').toBe(true);
+    // 자격이 **근거 묶음의 앞**이다 — 와이어프레임의 첫 카드가 그것이다.
+    expect(precedes(qualification, screen.getByTestId('verdict')), '자격이 판정 뒤로 밀렸다').toBe(true);
+  });
+
+  it('본문 차례가 여정 차례다 — 자격 → 투찰가 → 나라장터 넘김 → 기록', async () => {
+    renderScreen();
+    await askPrice();
+
+    const order = [
+      await screen.findByTestId('qualification'),
+      screen.getByTestId('record-amount'),
+      screen.getByTestId('koneps-deeplink'),
+      screen.getByTestId('worksheet-record-card'),
+    ];
+    for (const one of order) {
+      expect(body().contains(one), '본문 밖으로 나간 자리가 있다').toBe(true);
+    }
+    for (let at = 0; at + 1 < order.length; at += 1) {
+      expect(precedes(order[at]!, order[at + 1]!), `${at} 번째와 그다음의 차례가 뒤집혔다`).toBe(true);
+    }
+  });
+
+  it('레일이 다음 확인 시점 · 타임라인 · 내려놓기를 이 차례로 든다', async () => {
+    renderScreen();
+
+    const checkpoint = await screen.findByTestId('worksheet-checkpoint');
+    const timeline = await screen.findByTestId('timeline');
+    const exit = await screen.findByTestId('worksheet-exit-DEFER');
+    for (const one of [checkpoint, timeline, exit]) {
+      expect(rail().contains(one), '레일 밖에 선 자리가 있다').toBe(true);
+    }
+    expect(precedes(checkpoint, timeline)).toBe(true);
+    expect(precedes(timeline, exit)).toBe(true);
+  });
+
+  it('레일은 문서 순서에서 본문 뒤다 — 좁은 화면에서 읽는 차례가 그것이다', async () => {
+    renderScreen();
+    await screen.findByTestId('worksheet-checkpoint');
+
+    expect(precedes(body(), rail())).toBe(true);
+  });
+
+  /**
+   * **옛 「필드명 / 빈 칸」 격자를 걷는다**(계약 C 행). 남는 용어 줄은 **기초금액 하나**다 —
+   * 그 줄의 아래층 문면이 보조기기와 손가락에 닿는 경로(13C r4 L-1 · 14A M13 잔여 ⓖ)가
+   * 거기 걸려 있다.
+   */
+  it('머리의 용어 줄은 기초금액 하나다 — 격자가 걷혔다', async () => {
+    renderScreen();
+    const amount = await screen.findByTestId('worksheet-amount');
+
+    const head = amount.closest('header');
+    expect(head, '기초금액이 머리 블록 밖으로 나갔다').not.toBeNull();
+    expect(head!.querySelectorAll('dt')).toHaveLength(1);
+  });
+
+  it('건이 입찰함에 없으면 두 단을 쓰지 않는다 — 빈 레일을 만들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-add-case');
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT), '레일에 담을 것이 없는데 두 단이 섰다').toBeNull();
+  });
+});
+
+/** 14A cr L-5 — 출처가 없는 기초금액이 `1,234,000 ()` 로 섰다. */
+describe('화면 C — 출처 없는 기초금액 (14A cr L-5)', () => {
+  it('출처가 없으면 빈 괄호를 그리지 않는다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, baseAmountBasis: null, baseAmountVatTreatment: null, baseAmountProvenance: null }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const amount = await screen.findByTestId('worksheet-amount');
+    expect(amount.textContent, '빈 괄호가 남았다').not.toContain('(');
+    expect(amount.textContent).toContain('1,200,000,000');
+  });
+});
+
+/**
+ * **§12.3 (x) ⓒ — 「되돌릴 길 기억」이 다른 토스트 자리에서 지워지지 않는다**(v N-1).
+ *
+ * 그 기억은 「지금 떠 있는 토스트가 실행 취소를 들었는가」를 뜻한다. 실행 취소가 **없는**
+ * 토스트로 바뀌었는데 기억이 참으로 남으면, 뒤이은 실패가 그 토스트를 걷지 않고 실패 얼굴
+ * 옆에 **무엇이 성공인지 흐리는 성공 문면**을 남긴다.
+ */
+describe('화면 C — 되돌릴 길 기억은 지금 토스트의 함수다 (§12.3 (x) ⓒ)', () => {
+  it('실행 취소 없는 토스트로 바뀌면 그 기억이 비워진다', async () => {
+    mocked.listBidCases.mockResolvedValueOnce([{ ...CASE, state: 'WATCHING' }]);
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED', caseVersion: 1 }]);
+    mocked.deferCase.mockResolvedValue({ ...CASE, state: 'DEFERRED', caseVersion: 1 });
+    mocked.resumeCase.mockResolvedValue({ ...CASE, state: 'WATCHING', caseVersion: 2 });
+    mocked.skipCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    // ① 나중에 — 실행 취소가 붙은 토스트(기억이 참이 된다).
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    expect((await screen.findByTestId('toast')).textContent).toContain('실행 취소');
+
+    // ② 다시 보기로 되돌림 — **실행 취소가 없는** 토스트가 그 자리를 덮는다.
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    await waitFor(() => expect(mocked.resumeCase).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByTestId('toast').textContent).toContain('다시 보기로 돌렸습니다'),
+    );
+    expect(screen.getByTestId('toast').textContent, '덮은 토스트에 실행 취소가 있다').not.toContain('실행 취소');
+
+    // ③ 뒤이은 내려놓기 실패 — 걷을 토스트이므로 걷혀야 한다.
+    fireEvent.click(await screen.findByTestId('worksheet-exit-SKIP'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.SKIP.label ?? ''), {
+      target: { value: '예산 초과' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+    fireEvent.click(screen.getByTestId('action-send'));
+    await screen.findByTestId('write-failure');
+
+    expect(screen.queryByTestId('toast'), '묵은 기억이 성공 문면을 실패 얼굴 옆에 남겼다').toBeNull();
+  });
+});
+
+/**
+ * **빈 글자 기관명은 부재다**(cr M-1). 계약 타입이 `string | null` 이라 wire 는 `''` 를 막지
+ * 않는다. 앞 판에서 이 값을 받던 `KeyValueRow` 는 그 꼴을 부재로 접었고, 머리를 직접 그리면서
+ * 그 가드가 사라졌다 — 여정의 머리 단언도 `?? ABSENT` 꼴이라 `''` 를 그대로 기대해 통과한다.
+ */
+describe('화면 C — 빈 글자 기관명 (cr M-1)', () => {
+  it.each([
+    ['빈 글자', ''],
+    ['공백뿐', '   '],
+  ])('%s 이면 부재 문면이 선다 — 조용한 빈칸이 아니다', async (_label, blank) => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: blank, noticeAgencyName: blank }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const agency = await screen.findByTestId('worksheet-agency');
+    expect(agency.textContent?.trim(), '빈칸이 그대로 섰다').not.toBe('');
+    expect(agency.textContent).toContain(absenceTextOf('notSent'));
+    // 요약 자리도 빈 문단이 아니다 — `PageHeader` 의 빈 자리 술어는 요소를 가리지 못한다.
+    expect(screen.getByTestId('worksheet-summary').textContent?.trim()).not.toBe('');
+  });
+
+  it('둘째 기관명이 성하면 그것이 선다 — 첫 칸이 비었다고 부재로 접지 않는다', async () => {
+    mocked.searchNotices.mockResolvedValue({
+      rows: [{ ...NOTICE, demandAgencyName: '  ', noticeAgencyName: '합성 공고기관' }],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-agency')).textContent).toBe('합성 공고기관');
+  });
+});
+
+/**
+ * **얼굴은 그 행동이 사는 칸에 선다**(cr M-2). 내려놓기는 레일에서 보내므로 그 실패와
+ * 「다시 시도」도 레일에 서야 한다 — 본문에 두면 1280px 에서 반대쪽 칸, 390px 에서는 몇 화면
+ * 위다. 그 버튼이 내려놓기 가드를 지나는 **유일한 입구**라 거리가 값을 낳는다.
+ */
+describe('화면 C — 실패 얼굴은 보낸 칸에서 말한다 (cr M-2)', () => {
+  const slotOf = (slot: string): HTMLElement | null =>
+    document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${slot}"]`);
+
+  it('레일에서 보낸 내려놓기의 실패는 레일에 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    mocked.deferCase.mockRejectedValue(new Error('409'));
+    renderScreen();
+
+    fireEvent.click(await screen.findByTestId('worksheet-exit-DEFER'));
+    fireEvent.change(await screen.findByLabelText(ACTION_INPUT.DEFER.label ?? ''), {
+      target: { value: '2026-12-01T09:00' },
+    });
+    fireEvent.click(screen.getByTestId('action-send'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT)?.contains(face), '내려놓기 실패가 레일 밖에 섰다').toBe(true);
+    expect(slotOf(TWO_COLUMN_BODY_SLOT)?.contains(face)).toBe(false);
+    // 다시 시도도 같은 칸이다 — 그 버튼이 가드를 지나는 유일한 입구다.
+    expect(face.contains(within(face).getByRole('button', { name: '다시 시도' }))).toBe(true);
+  });
+
+  it('본문에서 보낸 쓰기의 실패는 본문에 선다 — 음성 대조', async () => {
+    mocked.draftBid.mockRejectedValue(new Error('500'));
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
+
+    const face = await screen.findByTestId('write-failure');
+    expect(slotOf(TWO_COLUMN_BODY_SLOT)?.contains(face), '본문 쓰기의 실패가 본문 밖에 섰다').toBe(true);
+    expect(slotOf(TWO_COLUMN_RAIL_SLOT)?.contains(face)).toBe(false);
+  });
+});
+
+/**
+ * **다음 행동 하나의 자리 표를 행마다 잰다**(cr M-3 · v M-1).
+ *
+ * `satisfies` 는 **키 전수**만 닫는다 — 행의 **값**을 바꾸는 변이는 그 자리에서 조용하다.
+ * 앞 판에서 `RECORD_BID` 를 머리로 옮긴 변이가 vitest 전건 · tsc · 여정 e2e 를 모두 지나갔고,
+ * 그 변이는 기록 카드를 **행동 없는 빈 카드**로 남긴다(측정). 그래서 네 행을 각각 잠근다.
+ *
+ * 「어느 카드 안인가」와 「다른 카드 안이 아닌가」를 함께 센다 — 소속만 재면 자리 표가 아니라
+ * 「어딘가에 있다」를 재게 된다.
+ */
+describe('화면 C — 다음 행동의 자리 표 (cr M-3 · v M-1)', () => {
+  const inHead = (node: HTMLElement): boolean =>
+    node.closest('header') !== null && node.closest(`[${LAYOUT_SLOT_ATTRIBUTE}]`) === null;
+
+  async function primaryIn(where: 'head' | 'price' | 'record'): Promise<void> {
+    const primary = await screen.findByTestId('worksheet-primary');
+    const price = screen.queryByTestId('worksheet-price-card');
+    const record = screen.queryByTestId('worksheet-record-card');
+    expect(inHead(primary), '머리에 섰는가').toBe(where === 'head');
+    expect(price !== null && price.contains(primary), '투찰가 카드에 섰는가').toBe(where === 'price');
+    expect(record !== null && record.contains(primary), '기록 카드에 섰는가').toBe(where === 'record');
+  }
+
+  it('REQUEST_PRICE 는 투찰가 카드에 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-primary')).textContent).toBe('투찰가 요청');
+    await primaryIn('price');
+  });
+
+  it('DRAFT_BID 는 투찰가 카드에 선다 — 「이 금액으로 진행」의 자리다', async () => {
+    renderScreen();
+    await askPrice();
+
+    await waitFor(() => expect(screen.getByTestId('worksheet-primary').textContent).toBe('투찰 예정 초안'));
+    await primaryIn('price');
+  });
+
+  it('RECORD_BID 는 기록 카드에 선다 — 그 카드를 빈 카드로 두지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-primary')).textContent).toBe('제출함');
+    await primaryIn('record');
+  });
+
+  it('RESUME 은 머리에 선다 — 본문·레일 어느 칸에도 들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED' }]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-primary');
+    await primaryIn('head');
+  });
+});
+
+/** cr LOW 셋 — 종단의 질문 문면 · 카운트다운 라벨의 묶임 · 레일이 서는 전제. */
+describe('화면 C — 수정 라운드의 LOW 셋', () => {
+  /**
+   * **종단 상태에 「투찰했나요?」는 거짓 질문이다**(cr L-1). 뒤 캡처의 낙찰 건에 그 카드가
+   * 행동 없이 서 있었다. 조건은 다음 전이의 표에서 유도하므로 종단 집합을 화면이 한 벌 더
+   * 적지 않는다 — 상태 전수로 그 등식을 센다.
+   */
+  it.each(Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][])(
+    '%s 에서 앞으로 갈 걸음 둘이 서는지는 다음 전이가 있는지와 같다',
+    async (state) => {
+      mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
+      renderScreen();
+      await screen.findByTestId('worksheet-case-state');
+
+      const hasNext = nextActionOf(state) !== null;
+      expect(screen.queryByTestId('worksheet-record-card') !== null, '기록 카드').toBe(hasNext);
+      // cr N-2 — 넘김 카드도 같은 표를 따른다. 하나만 걷으면 남은 하나가 같은 거짓말을 한다.
+      expect(screen.queryByTestId('koneps-deeplink') !== null, '나라장터 넘김 카드').toBe(hasNext);
+    },
+  );
+
+  it('종단 상태에서는 그 질문 문면이 화면에 없다 — 비공허 대조', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WON' }]);
+    renderScreen();
+    await screen.findByTestId('worksheet-case-state');
+
+    expect(screen.queryByText(/투찰했나요/u)).toBeNull();
+    expect(screen.queryByText(/나라장터에서 투찰하기/u), '종단에 넘김 카드가 섰다').toBeNull();
+    // 같은 fixture 의 다른 상태에서는 선다(이 단언이 늘 참이 아니다).
+    cleanup();
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+    expect(await screen.findByText(/투찰했나요/u)).not.toBeNull();
+    expect(screen.getByText(/나라장터에서 투찰하기/u)).not.toBeNull();
+  });
+
+  /**
+   * cr L-2 · N-1 — 라벨과 값이 **프로그램적으로** 묶인다. 속성이 **있는지**가 아니라 계산된
+   * **접근 가능한 이름**을 잰다: 역할 없는 일반 요소에 `aria-labelledby` 를 걸면 속성은 있어도
+   * 이름이 서지 않는다(앞 판의 단언이 그 꼴을 통과시켰다).
+   */
+  it('카운트다운 묶음이 자기 이름으로 선다', async () => {
+    renderScreen();
+
+    const group = await screen.findByRole('group', { name: '투찰 마감까지' });
+    expect(group.contains(await screen.findByTestId('worksheet-deadline')), '값이 그 묶음 밖이다').toBe(true);
+    // 머리의 용어 줄은 여전히 하나다 — 격자 하나 규율을 지킨 채 묶었다.
+    expect(group.closest('header')!.querySelectorAll('dt')).toHaveLength(1);
+  });
+
+  /**
+   * cr L-3 — 레일이 서는 전제는 **건이 있는가**다. 다음 확인 시점의 표기가 「없음」이어도
+   * 레일은 선다(그 값으로 레일 전체를 가리면 뒤 라운드가 조용히 레일을 지운다).
+   */
+  it('다음 확인 시점이 없는 건에서도 레일이 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, nextCheckpointKind: 'NONE', nextCheckpointAt: null }]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-checkpoint');
+    expect(document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_RAIL_SLOT}"]`)).not.toBeNull();
+    expect(await screen.findByTestId('timeline')).not.toBeNull();
+  });
+});
+
+/**
+ * **「첫 카드」는 「본문 안 어딘가」가 아니다**(v L-2). 앞 판의 단언은 「본문 안 + 판정 절
+ * 앞」까지였고, 자격을 **투찰가 카드 안** 맨 위로 넣은 변이가 초록이었다 — 이름의 주장보다
+ * 단언이 좁았다. 본문 칸의 **첫 요소 자식**인지로 좁힌다.
+ */
+describe('화면 C — 참가 자격은 본문의 첫 카드다 (v L-2)', () => {
+  it('본문 칸의 첫 요소 자식이 자격 카드다', async () => {
+    renderScreen();
+    await askPrice();
+
+    // 응답이 닿아 카드가 선 **뒤에** 자리를 읽는다(요청 직후에는 투찰가 카드뿐이다).
+    const qualification = await screen.findByTestId('qualification');
+    const body = document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_BODY_SLOT}"]`);
+    expect(body, '본문 칸을 찾지 못했다').not.toBeNull();
+    const first = body!.firstElementChild;
+    expect(first, '본문이 비었다').not.toBeNull();
+    expect(first, '첫 자식이 자격 카드가 아니다').toBe(qualification);
+    // 비공허: 투찰가 카드는 그 **뒤**에 있고, 자격을 품고 있지 않다.
+    const price = screen.getByTestId('worksheet-price-card');
+    expect(price.contains(first), '자격이 투찰가 카드 안으로 들어갔다').toBe(false);
+  });
+
+  /** 쓰기 실패 얼굴이 본문 맨 위에 설 때도 자격은 **그다음 카드**다(얼굴은 카드가 아니다). */
+  it('본문에 실패 얼굴이 서면 자격은 그 바로 다음이다', async () => {
+    mocked.draftBid.mockRejectedValue(new Error('500'));
+    renderScreen();
+    await askPrice();
+    fillAmount('1050000000');
+    fireEvent.click(await screen.findByTestId('worksheet-primary'));
+    fireEvent.click(await screen.findByTestId('bid-confirm-accept'));
+    await screen.findByTestId('write-failure');
+
+    const body = document.querySelector(`[${LAYOUT_SLOT_ATTRIBUTE}="${TWO_COLUMN_BODY_SLOT}"]`);
+    const cards = [...body!.children].filter((one) => one.getAttribute('data-testid') !== 'write-failure');
+    expect(cards[0]).toBe(screen.getByTestId('qualification'));
   });
 });
