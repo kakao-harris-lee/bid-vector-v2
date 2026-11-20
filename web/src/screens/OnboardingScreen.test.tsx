@@ -101,6 +101,8 @@ beforeEach(() => {
   mocked.listConstructionCapacities.mockResolvedValue([]);
   mocked.readStrategy.mockResolvedValue(emptyStrategy());
   mocked.readOnboardingChecklist.mockResolvedValue(checklist({ pending: [...ONBOARDING_ITEM_ORDER] }));
+  // 레일의 미리보기(M14/14B) — 기본은 **감시 조건이 없는** 계정이다(절을 아직 안 채웠으므로).
+  mocked.listSuggestions.mockResolvedValue({ rows: [], total: 0, resultState: 'WATCH_NOT_CONFIGURED' });
 });
 
 afterEach(() => {
@@ -358,27 +360,39 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
     expect(await screen.findByTestId('signed-out')).toBeTruthy();
   });
 
-  /** D-7E2b-3 — 빈 자리 + 「준비 중」뿐이다. 입력칸·버튼을 만들지 않는다. */
-  it('사업자번호·알림 채널·첫 공고 미리보기는 빈 자리뿐이다', async () => {
+  /**
+   * D-7E2b-3 — 빈 자리 + 「준비 중」뿐이다. 입력칸·버튼을 만들지 않는다.
+   *
+   * **M14/14B 로 자리가 셋으로 갈렸다**(팀장 판정 ①): 준비 중인 셋이 와이어프레임의 번호 절
+   * 1 · 4 · 5 가 되어 쓰기 절 사이에 끼었으므로, 그 셋을 함께 담는 한 상자가 더는 없다. 주장은
+   * 그대로이고 **재는 자리가 절마다**로 좁아졌다 — 한 상자로 재던 앞 판보다 센 단언이다(그때는
+   * 셋 가운데 하나에 버튼이 생겨도 다른 둘이 그 상자를 비워 주면 지나갔다).
+   */
+  const NOT_READY_SECTIONS = [
+    { id: 'nts', label: '사업자번호' },
+    { id: 'channels', label: '알림 받는 곳' },
+    { id: 'preview', label: '지금 맞는 공고 미리보기' },
+  ] as const;
+
+  it.each(NOT_READY_SECTIONS)('$label 절은 빈 자리와 「준비 중」뿐이다', async ({ id, label }) => {
     renderScreen();
 
-    const notReady = await screen.findByTestId('onboarding-not-ready');
-    expect(notReady.textContent).toContain('사업자번호');
-    expect(notReady.textContent).toContain('알림 채널');
-    expect(notReady.textContent).toContain('첫 공고');
-    expect(within(notReady).queryAllByRole('textbox')).toStrictEqual([]);
-    expect(within(notReady).queryAllByRole('button')).toStrictEqual([]);
+    const section = await screen.findByTestId(`onboarding-section-${id}`);
+    expect(section.textContent).toContain(label);
+    expect(within(section).getByTestId(`onboarding-section-state-${id}`).textContent).toBe('준비 중');
+    expect(within(section).queryAllByRole('textbox')).toStrictEqual([]);
+    expect(within(section).queryAllByRole('button')).toStrictEqual([]);
   });
 
   /**
    * M13/13A — **내부 용어를 걷은 자리**다. 금지 꼴 게이트는 개발 코드를 잡지만 「계약」·「API」
    * 같은 내부 용어는 열거할 수 없어(그 판단은 사람의 것이다) 고친 자리만 축어로 잠근다.
    */
-  it('사유 문면에 내부 용어가 돌아오지 않는다', async () => {
+  it.each(NOT_READY_SECTIONS)('$label 절의 사유 문면에 내부 용어가 돌아오지 않는다', async ({ id }) => {
     renderScreen();
 
-    const notReady = await screen.findByTestId('onboarding-not-ready');
-    const text = notReady.textContent ?? '';
+    const section = await screen.findByTestId(`onboarding-section-${id}`);
+    const text = section.textContent ?? '';
     expect(text.trim()).not.toBe('');
     for (const term of ['계약에', 'API']) {
       expect(text).not.toContain(term);
@@ -739,5 +753,173 @@ describe('시작하기 — 끝난 세션에서 빠져나갈 길', () => {
     fireEvent.click(await screen.findByTestId('edit-session-dismiss'));
 
     await waitFor(() => expect(mocked.readOnboardingChecklist.mock.calls.length).toBeGreaterThan(before));
+  });
+});
+
+/**
+ * **와이어프레임 A 의 번호 절 다섯**(M14/14B · 팀장 판정 ①).
+ *
+ * 신원은 와이어프레임이 정하고 **쓰기 단위는 바뀌지 않는다** — 절 3 이 네 단계를 「한 곳에서」
+ * 담는 것이 그 판정이다. 절의 차례와 번호는 선언 하나에서 나온다(둘을 따로 적으면 갈린다).
+ */
+describe('시작하기 — 번호 절 다섯 (M14/14B)', () => {
+  const SECTION_ORDER = ['nts', 'nara', 'qualification', 'channels', 'preview'] as const;
+
+  it('절이 와이어프레임의 차례로 다섯 선다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('onboarding-section-nts');
+    const sections = [...document.querySelectorAll('[data-testid^="onboarding-section-"]')]
+      .map((node) => node.getAttribute('data-testid') ?? '')
+      .filter((one) => !one.includes('-state-'));
+
+    expect(sections).toStrictEqual(SECTION_ORDER.map((id) => `onboarding-section-${id}`));
+  });
+
+  it('절마다 번호가 그 차례와 같다', async () => {
+    renderScreen();
+
+    await screen.findByTestId('onboarding-section-nts');
+
+    for (const [at, id] of SECTION_ORDER.entries()) {
+      expect(screen.getByTestId(`onboarding-section-${id}`).textContent, id).toContain(`${at + 1}.`);
+    }
+  });
+
+  /** 쓰기 단계는 **절 안**에 산다 — 그 배정이 와이어프레임의 「한 곳에서」다. */
+  it.each([
+    ['나라장터 준비', 'nara', ['BUSINESS_DETAILS']],
+    ['자격과 관심 조건', 'qualification', ['QUALIFICATION_FACTS', 'CONSTRUCTION_CAPACITY', 'BUDGET', 'WATCH']],
+  ])('%s 절이 그 단계를 담는다', async (_label, id, steps) => {
+    renderScreen();
+
+    const section = await screen.findByTestId(`onboarding-section-${id}`);
+
+    for (const step of steps) {
+      expect(within(section).getByTestId(`onboarding-step-${step}`), step).toBeTruthy();
+    }
+  });
+
+  /**
+   * 절의 알약은 **그 절이 담은 항목들의 가장 약한 상태**다 — 새 어휘를 세우지 않고 서버의 세
+   * 목록에서 온 상태를 접기만 한다. 하나라도 미완이면 그 절은 미완이다.
+   */
+  it('항목 하나가 미완이면 그 절의 알약이 미완이다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({
+        completed: ['TRADE_NAME', 'HEADQUARTERS_REGION'],
+        pending: ['NARA_READINESS'],
+      }),
+    );
+    renderScreen();
+
+    const pill = await screen.findByTestId('onboarding-section-state-nara');
+
+    expect(pill.textContent).toContain(ITEM_STATE_DISPLAY.PENDING.label);
+  });
+
+  it('그 절의 항목이 모두 완료면 알약이 완료다', async () => {
+    mocked.readOnboardingChecklist.mockResolvedValue(
+      checklist({ completed: ['TRADE_NAME', 'NARA_READINESS', 'HEADQUARTERS_REGION'] }),
+    );
+    renderScreen();
+
+    const pill = await screen.findByTestId('onboarding-section-state-nara');
+
+    expect(pill.textContent).toContain(ITEM_STATE_DISPLAY.COMPLETED.label);
+  });
+});
+
+/**
+ * **레일의 지금 맞는 공고 미리보기**(와이어프레임 A 의 오른쪽 · 계약 14B 행).
+ *
+ * 기존 제안 질의를 그대로 쓴다 — 새 operation 도 새 인자도 없다. 비는 이유는 **서버가 주는
+ * 만큼만** 말한다(화면이 「조건이 좁다」를 추론하지 않는다).
+ */
+describe('시작하기 — 레일 미리보기 (M14/14B)', () => {
+  function suggestion(noticeNumber: string, won: number | null): queries.SuggestedNotice {
+    return {
+      noticeNumber,
+      noticeRound: '000',
+      status: 'Open',
+      title: `합성 공고 ${noticeNumber}`,
+      demandAgencyName: '합성 수요기관',
+      noticeAgencyName: null,
+      baseAmountWon: won,
+      baseAmountCurrency: 'KRW',
+      baseAmountBasis: 'BASE_AMOUNT',
+      baseAmountVatTreatment: 'UNKNOWN',
+      baseAmountProvenance: 'PUBLISHED',
+      deadlineAt: '2099-01-03T00:00:00Z',
+      licenseVerdict: 'ELIGIBLE',
+      licenseUncertainReason: null,
+      unjudgedAxes: [],
+    };
+  }
+
+  it('레일이 본문 뒤의 두 단 묶음 안에 선다', async () => {
+    renderScreen();
+
+    const layout = await screen.findByTestId('onboarding-layout');
+    const rail = layout.querySelector('[data-layout-slot="rail"]');
+
+    expect(rail, '레일 칸을 찾지 못했다').not.toBeNull();
+    expect(within(rail as HTMLElement).getByTestId('onboarding-preview')).toBeTruthy();
+  });
+
+  it('제안을 받으면 그 줄이 압축 금액과 D-day 로 선다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [suggestion('SYN-PREVIEW-1', 420_000_000)],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const row = await screen.findByTestId('onboarding-preview-SYN-PREVIEW-1');
+
+    expect(row.getAttribute('href')).toBe('/notices/SYN-PREVIEW-1/000');
+    const line = row.parentElement?.textContent ?? '';
+    expect(line).toContain('4.2억원');
+    expect(line).toMatch(/D[-+]\d+/u);
+  });
+
+  /** 상한 밖은 **그 사실을 말한다** — 몇 장만 보이고 끝나면 운영자가 그것을 전수로 읽는다. */
+  it('보이는 것보다 많으면 전체 수와 오늘의 공고로 가는 길을 준다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [1, 2, 3, 4].map((at) => suggestion(`SYN-PREVIEW-${at}`, 420_000_000)),
+      total: 9,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const more = await screen.findByTestId('onboarding-preview-more');
+
+    expect(more.textContent).toContain('9');
+    expect(within(more).getByRole('link', { name: /오늘의 공고/u }).getAttribute('href')).toBe('/');
+    expect(screen.queryByTestId('onboarding-preview-SYN-PREVIEW-4')).toBeNull();
+  });
+
+  it('비면 서버가 준 사유를 그대로 말한다 — 화면이 짐작하지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({ rows: [], total: 0, resultState: 'NO_OPEN_NOTICES' });
+    renderScreen();
+
+    const empty = await screen.findByTestId('onboarding-preview-empty');
+
+    expect(empty.textContent).toContain('입찰 가능한 열린 공고가 없습니다');
+  });
+
+  it('금액이 없는 줄에는 압축 글자를 지어내지 않는다', async () => {
+    mocked.listSuggestions.mockResolvedValue({
+      rows: [suggestion('SYN-PREVIEW-NOAMOUNT', null)],
+      total: 1,
+      resultState: 'MATCHED',
+    });
+    renderScreen();
+
+    const row = await screen.findByTestId('onboarding-preview-SYN-PREVIEW-NOAMOUNT');
+    const line = row.parentElement?.textContent ?? '';
+
+    expect(line, '없는 금액을 압축 글자로 지어냈다').not.toContain('약');
+    expect(line).toMatch(/D[-+]\d+/u);
   });
 });
