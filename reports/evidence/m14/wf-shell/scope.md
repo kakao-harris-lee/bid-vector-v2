@@ -150,8 +150,30 @@ rollback: rollback.md
 **거동 0** 이며 `tsc` 가 빠짐없이 잡는다. 14A 가 먼저 혼자 머지되므로 비용이 한 번이다. 쓰는
 자리 파일 여섯(그 가운데 넷이 뒤 레인 소유)이 in_scope 에 든다.
 
+**(6) in_scope 의 글이 덮지 않던 경로를 기계로 다시 뽑아 등재한다**(v L-3). 아래는
+`git diff --name-only <base>..HEAD` 와 위 목록을 대조해 **기계로** 낸 것이고, 손으로 적은 열거가
+아니다. rollback 과 clean-tree 는 영향이 없다 — 복원 목록도 같은 diff 에서 기계로 뽑는다.
+
+| 경로 | 왜 열렸나 |
+| --- | --- |
+| `web/src/LoginScreen.tsx` | 컨트롤 경계 토큰(입력칸 둘) — 계약 갱신 (4) |
+| `web/src/screens/BidBoxCard.tsx` | 같음(입력칸 둘) |
+| `web/src/screens/TodayNoticesScreen.tsx` | 같음(검색칸·칩 입력) |
+| `web/src/screens/WorksheetScreen.tsx` | `Field` → `KeyValueRow` 개명 — 계약 갱신 (5) |
+| `web/src/screens/OnboardingScreen.tsx` | 질의 키 이동의 import 한 줄 — 계약 갱신 (3) |
+| `web/e2e/touch-measure.spec.ts` | 터치 가로 축(M13 잔여 ⓑ)의 합성 대조와, r2 의 컨트롤 경계 색 대조 |
+
+**(7) 수정 라운드 2 가 더한 자리**(팀장 판정 2026-11-20 · 리뷰 지적 반영).
+
+| 경로 | 무엇 |
+| --- | --- |
+| `web/e2e/journey/controlBorderMeasure.ts` | 컨트롤 경계의 **그려진 색**을 재는 공용 함수(v M-1) |
+| `web/src/screens/absenceRender.test.tsx` | 부재 어휘의 **렌더 층**(v M-2 · 계약 게이트 절) |
+| `web/src/display/bidBoxDisplay.ts` 읽기 | 배지가 종단 집합을 **그 표에서 유도**한다(cr M-2 · 편집 0) |
+
 ## 갱신 이력
 
 - 2026-11-20 초판(착수 보고와 함께).
 - 2026-11-20 구현 중 계약 갱신 (1)~(3) 등재.
 - 2026-11-20 수정 라운드 1 — 팀장 판정 둘을 (4)·(5) 로 등재(선 분리 · KeyValueRow 개명).
+- 2026-11-20 수정 라운드 2 — 장부 (6)(기계 재산출)과 (7)(라운드가 더한 자리)을 등재.

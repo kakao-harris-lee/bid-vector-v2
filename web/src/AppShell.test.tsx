@@ -336,6 +336,29 @@ describe('탐색의 안 읽음 배지', () => {
   });
 });
 
+/**
+ * **머리글은 문서에 하나다**(v L-1). 오늘의 코드는 그렇지만 그 사실을 **아무도 잠그지
+ * 않았다** — 폭마다 다른 `h1` 을 그리는 꼴(`md:hidden` 로 하나를 가리는)이 jsdom 과 스모크
+ * 둘 다에서 초록이었다(스모크의 머리글 단언은 넓은 폭에서만 돈다).
+ *
+ * **숨은 것도 센다**: jsdom 은 CSS 를 풀지 않으므로 여기서 세는 수가 곧 **DOM 의 수**이고,
+ * 그것이 이 축에서 재고 싶은 것이다(폭에 따라 다른 머리글을 그리지 않는다).
+ */
+describe('머리글의 단일성 (v L-1)', () => {
+  it('어느 자리에서도 h1 이 하나다', async () => {
+    for (const path of ['/', '/start', '/bids', '/results', '/inbox', '/settings', '/login', '/no-such-place']) {
+      cleanup();
+      queryClient.clear();
+      stub();
+      await renderAt(path);
+
+      expect(document.querySelectorAll('h1'), path).toHaveLength(1);
+      eject?.();
+      eject = undefined;
+    }
+  });
+});
+
 describe('사이드바 (M14/14A)', () => {
   /**
    * 와이어프레임의 사이드바는 항목이 다섯이고 「시작하기」가 없다 — 그것이 **시작하기가 끝난
