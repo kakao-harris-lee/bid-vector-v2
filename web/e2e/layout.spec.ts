@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { CATCH_ALL_ADDRESS, measureRails, railViolations, shippedAddresses } from './railMeasure';
 import {
   LAYOUT_SLOT_ATTRIBUTE,
   TWO_COLUMN_ATTRIBUTE,
@@ -216,41 +217,13 @@ async function mountTwoColumn(
   );
 }
 
-/** 표지를 단 묶음 **전수**의 두 칸 상자 — 화면 이름을 적지 않는다. */
-async function twoColumnBoxes(page: Page): Promise<readonly { body: Box; rail: Box }[]> {
-  return page.evaluate(
-    ({ attribute, slotAttribute, bodySlot, railSlot }) => {
-      const read = (node: Element) => {
-        const rect = node.getBoundingClientRect();
-        return { left: rect.left, right: rect.right, top: rect.top, width: rect.width };
-      };
-      const found: { body: ReturnType<typeof read>; rail: ReturnType<typeof read> }[] = [];
-      for (const group of document.querySelectorAll(`[${attribute}]`)) {
-        const body = group.querySelector(`[${slotAttribute}="${bodySlot}"]`);
-        const rail = group.querySelector(`[${slotAttribute}="${railSlot}"]`);
-        if (body === null || rail === null) {
-          throw new Error('두 단 묶음에 칸이 빠졌다');
-        }
-        found.push({ body: read(body), rail: read(rail) });
-      }
-      return found;
-    },
-    {
-      attribute: TWO_COLUMN_ATTRIBUTE,
-      slotAttribute: LAYOUT_SLOT_ATTRIBUTE,
-      bodySlot: TWO_COLUMN_BODY_SLOT,
-      railSlot: TWO_COLUMN_RAIL_SLOT,
-    },
-  );
-}
-
 test.describe('두 단 — 레일의 자리', () => {
   test('1280px 에서 레일이 본문 오른쪽이다', async ({ page }) => {
     await page.setViewportSize({ ...WIDE });
     await page.goto('/');
     await mountTwoColumn(page);
 
-    const groups = await twoColumnBoxes(page);
+    const groups = await measureRails(page);
 
     // **비공허**: 묶음이 하나라도 있고 두 칸의 폭이 0 이 아니다.
     expect(groups.length, '두 단 묶음을 하나도 찾지 못했다').toBeGreaterThan(0);
@@ -266,7 +239,7 @@ test.describe('두 단 — 레일의 자리', () => {
     await page.goto('/');
     await mountTwoColumn(page, { railFirst: true });
 
-    const groups = await twoColumnBoxes(page);
+    const groups = await measureRails(page);
 
     expect(groups.length).toBeGreaterThan(0);
     expect(groups.some((group) => group.rail.left < group.body.right - 1), '뒤집었는데 좌표가 그대로다').toBe(true);
@@ -277,7 +250,7 @@ test.describe('두 단 — 레일의 자리', () => {
     await page.goto('/');
     await mountTwoColumn(page);
 
-    const groups = await twoColumnBoxes(page);
+    const groups = await measureRails(page);
 
     expect(groups.length).toBeGreaterThan(0);
     for (const group of groups) {
@@ -295,5 +268,79 @@ test.describe('두 단 — 레일의 자리', () => {
     await mountTwoColumn(page, { plantWide: true });
 
     expect(await overflowOf(page, NARROW.width)).not.toStrictEqual([]);
+  });
+});
+
+/**
+ * **출하 화면의 레일**(M14/14B · 팀장 판정 — 14B 소유).
+ *
+ * 위 묶음은 합성 두 단을 꽂아 **술어**를 재고, 이 묶음은 **출하 화면이 실제로 그린 레일**을
+ * 잰다. 14A 가 「레일을 붙이면 같은 단언이 함께 든다」고 적었지만 그 문장은 **게이트가 그
+ * 화면을 도는 경우에만** 참이었다 — 레일 축이 `/` 한 자리만 돌고 있었다.
+ *
+ * **열거가 아니라 구성이다.** 도는 주소는 `src/routes.tsx` 의 자리 표에서 오고(AST 로 읽는
+ * 공용 술어), 잴 묶음은 표지 전수다. 그래서 14C 의 워크시트 레일·14D 의 입찰함 레일은 머지되는
+ * 순간 이 spec 을 고치지 않아도 든다.
+ *
+ * **이 레인의 모집단은 「데이터 없이 그려지는 레일」이다.** preview 서버는 모든 `/api/*` 에
+ * **`200 text/html`** 를 돌려준다(SPA 폴백) — 그래서 화면은 401 을 받는 것이 **아니라** 파싱
+ * 실패를 받고, 로그인 얼굴 대신 적재 중·오류 얼굴을 낸다(실측: 아홉 자리 전부 자기 `screen-*` ·
+ * 로그인 얼굴 0). 레일이 본문의 얼굴과 무관하게 서야 여기 든다.
+ *
+ * **화면마다의 보증은 이 레인이 지지 않는다.** 데이터가 있어야 서는 레일(워크시트의 건 레일)은
+ * 여기서 영영 안 그려지기 때문이다. 그 의무는 세션과 씨앗을 쥔 **여정 레인**
+ * (`journey/layout-rails.spec.ts`)이 `railScreenSlots` 전수로 진다. 여기 남는 것은 자리 판정과
+ * 「적어도 하나는 봤다」뿐이다.
+ *
+ * **재는 것은 레일의 자리뿐이다.** 가로 넘침은 **다른 축**이고 정책도 다르다 — 일부러 가로로
+ * 스크롤되는 줄(입찰함의 상태 탭)이 출하에 있고 그것은 위반이 아니다. 그 축을 여기서 함께 재면
+ * 그 줄이 거짓으로 붉는다(실측: `/bids` 에서 탭 버튼 둘이 뷰포트 밖 좌표를 냈다 — 그 줄은
+ * `overflow-x-auto` 라 스크롤된다). 넘침은 `/` 에서 위 묶음이, 모바일 전수는 터치 타깃 게이트가
+ * 자기 술어로 든다.
+ */
+const SHIPPED_RAIL_FLOOR = 1;
+
+const SHIPPED_ADDRESSES = shippedAddresses();
+
+test.describe('출하 화면의 레일', () => {
+  test('자리 표를 실제로 읽었다 — 빈 목록은 아래 단언을 공허하게 만든다', () => {
+    expect(SHIPPED_ADDRESSES.length).toBeGreaterThan(5);
+    expect(SHIPPED_ADDRESSES.every((one) => one.address.startsWith('/'))).toBe(true);
+    expect(SHIPPED_ADDRESSES.map((one) => one.address)).toContain(CATCH_ALL_ADDRESS);
+  });
+
+  test('1280px 에서 출하 레일이 본문 오른쪽이다', async ({ page }) => {
+    await page.setViewportSize({ ...WIDE });
+    let seen = 0;
+    for (const { address } of SHIPPED_ADDRESSES) {
+      await page.goto(address);
+      await expect(page.getByTestId('app-shell')).toBeVisible();
+      // 느린 러너에서 라우트 컴포넌트가 아직 안 붙었으면 계수가 0 이 된다(cr Open Q) — 그려질
+      // 기회를 준 뒤 잰다.
+      await page.waitForLoadState('networkidle');
+
+      const groups = await measureRails(page);
+      seen += groups.length;
+      expect(railViolations(groups, 'wide'), `${address}: 넓은 화면의 레일 자리`).toStrictEqual([]);
+    }
+
+    // **비공허** — 출하 레일을 하나도 보지 못했으면 위 루프는 아무것도 재지 않았다.
+    expect(seen, '출하 화면에서 레일을 하나도 찾지 못했다').toBeGreaterThanOrEqual(SHIPPED_RAIL_FLOOR);
+  });
+
+  test('390px 에서 출하 레일이 한 단으로 본문 아래에 선다', async ({ page }) => {
+    await page.setViewportSize({ ...NARROW });
+    let seen = 0;
+    for (const { address } of SHIPPED_ADDRESSES) {
+      await page.goto(address);
+      await expect(page.getByTestId('app-shell')).toBeVisible();
+      await page.waitForLoadState('networkidle');
+
+      const groups = await measureRails(page);
+      seen += groups.length;
+      expect(railViolations(groups, 'narrow'), `${address}: 좁은 화면의 레일 자리`).toStrictEqual([]);
+    }
+
+    expect(seen, '출하 화면에서 레일을 하나도 찾지 못했다').toBeGreaterThanOrEqual(SHIPPED_RAIL_FLOOR);
   });
 });

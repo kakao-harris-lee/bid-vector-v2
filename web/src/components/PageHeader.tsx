@@ -79,7 +79,12 @@ export function PageHeader({
   return (
     <div data-testid={testId} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+        {/* **제목도 자기 자리의 표지를 든다**(M14/14C · additive). 바깥 상자의 표지로는 제목을
+            집을 수 없다 — 그 글자에 요약과 행동이 섞여, 제목을 **정확 일치**로 재는 자리가
+            그것을 쓸 수 없다. 요약·행동과 같은 규율이다. */}
+        <h2 data-testid={slotTestId(testId, 'title')} className="text-xl font-bold tracking-tight">
+          {title}
+        </h2>
         {isBlankNode(summary) ? null : (
           <p data-testid={slotTestId(testId, 'summary')} className="text-sm text-ink-soft">
             {summary}

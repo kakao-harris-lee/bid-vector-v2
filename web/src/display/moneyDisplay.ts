@@ -182,6 +182,64 @@ export function koreanAmountTextOf(won: number): string | null {
 }
 
 /**
+ * 압축 꼴이 남기는 소수 자리 — 두 자리다. 상수 하나로 두는 까닭은 **셈이 전부 이 값에 매여
+ * 있기** 때문이다(내림의 단위 · 소수 자릿수 · 정확 판정이 같은 수를 쓴다).
+ */
+const COMPACT_FRACTION_SCALE = 100;
+
+/**
+ * 버린 자리가 있다는 **표지**. 압축 꼴의 핵심이 이 글자다 — 이 꼴은 자리를 일부러 버리므로,
+ * 버렸다는 사실을 말하지 않으면 운영자가 그 수를 금액 그 자체로 읽는다.
+ */
+const APPROXIMATE_MARK = '약 ';
+
+/**
+ * 금액의 **압축 읽기**(M14/14B · 와이어프레임 모바일 카드의 「기초 4.2억」).
+ *
+ * [koreanAmountTextOf] 와 **다른 꼴**이다. 그쪽은 같은 수의 **무손실** 다른 읽기라 끊긴 자리를
+ * 버리지 않고, 이쪽은 좁은 카드에 들어가려고 일부러 버린다. 재사용이 아니라 새 꼴인 이유가
+ * 그것이고, 그래서 **버렸다는 사실 자체가 문면의 일부**다.
+ *
+ * 규율 둘.
+ *  · **내림이다.** 올리면 화면이 없는 돈을 보이고, 그 수로 금액대를 가늠한 운영자가 자기
+ *    상한을 넘은 공고를 담는다. 셈은 **정수 연산만** 지난다 — 나눗셈을 부동소수로 하면 경계
+ *    값에서 한 자리가 위로 튄다(그 튐이 곧 올림이다).
+ *  · **버린 자리가 있을 때만 「약」**이다. 늘 붙이면 정확히 떨어지는 금액까지 「대충 그쯤」으로
+ *    읽히고, 한 번도 안 붙이면 버린 자리를 숨긴다.
+ *
+ * 자리 이름은 [KOREAN_UNITS] **그 표**에서 온다 — 두 꼴이 자기 어휘를 따로 가지면 같은 금액이
+ * 화면에서 두 말로 읽힌다. 금액 부속 토큰 표 넷에는 **키를 더하지 않는다**: 이 꼴은 어휘가
+ * 아니라 서식이고, [MONEY_TOKENS] 는 그 넷의 키에서 유도되므로 움직이지 않는다.
+ *
+ * 만 미만은 **끊을 자리가 없다** — 그때는 정확 금액 그대로이고 표지도 서지 않는다(근사가
+ * 아니므로). 읽을 수 없는 값에는 글자를 지어내지 않는다.
+ */
+export function compactAmountTextOf(won: number, token: string | null | undefined): string | null {
+  if (!Number.isSafeInteger(won) || won < 0) {
+    return null;
+  }
+  const unit = currencyUnitOf(token);
+  const withCurrency = (numeral: string): string =>
+    unit.known ? `${numeral}${unit.text}` : `${numeral} ${unit.text}`;
+
+  const place = KOREAN_UNITS.find((one) => won >= one.unit);
+  if (place === undefined) {
+    return withCurrency(won.toLocaleString('ko-KR'));
+  }
+
+  // 내림을 **나머지로** 한다: `floor(won / step)` 은 경계에서 위로 튀지만, 나머지를 빼면 남는
+  // 수가 step 의 배수라 그 나눗셈이 정확하다(둘 다 안전 정수 안에 있다).
+  const step = place.unit / COMPACT_FRACTION_SCALE;
+  const kept = (won - (won % step)) / step;
+  const whole = Math.floor(kept / COMPACT_FRACTION_SCALE);
+  const fraction = kept % COMPACT_FRACTION_SCALE;
+  const decimals = fraction === 0 ? '' : `.${String(fraction).padStart(2, '0').replace(/0$/u, '')}`;
+  const numeral = `${whole.toLocaleString('ko-KR')}${decimals}${place.name}`;
+
+  return `${kept * step === won ? '' : APPROXIMATE_MARK}${withCurrency(numeral)}`;
+}
+
+/**
  * 금액 부속 토큰의 **전수 집합**(D-4). 「DOM 에 원문 토큰 0」 게이트가 이 목록을 금지 목록으로
  * 쓴다 — 네 표의 키에서 **유도하므로** 어휘가 늘면 금지 목록도 함께 는다(손으로 적은 목록은
  * 어휘가 늘 때 조용히 뒤처진다).

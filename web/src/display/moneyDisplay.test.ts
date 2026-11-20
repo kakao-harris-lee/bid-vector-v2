@@ -13,6 +13,7 @@ import {
   amountQualifierTextOf,
   currencyDisplayOf,
   KOREAN_UNIT_NAMES,
+  compactAmountTextOf,
   koreanAmountTextOf,
   vatTreatmentDisplayOf,
   type AmountBasis,
@@ -346,5 +347,107 @@ describe('한글 금액 병기', () => {
 
       expect(sum, `${won} 의 병기가 다른 값을 말한다: ${text}`).toBe(won);
     }
+  });
+});
+
+/**
+ * **압축 금액 꼴**(M14/14B · 계약 14B 행). 모바일 카드가 쓰는 짧은 읽기다 — `koreanAmountTextOf`
+ * 는 **무손실** 병기라 재사용이 아니고(끊긴 자리를 버리지 않는다), 이 꼴은 일부러 버린다.
+ *
+ * 그래서 **버렸다는 사실 자체가 문면의 일부**다: 자리를 내림하고(지어낸 큰 수를 보이지 않는다),
+ * 버린 것이 있으면 「약」을 앞에 세운다.
+ */
+describe('압축 금액 꼴 (M14/14B)', () => {
+  /**
+   * 자리 이름은 **`koreanAmountTextOf` 와 같은 표**에서 온다 — 두 꼴이 서로 다른 자리 이름을
+   * 쓰면 같은 금액이 화면에서 두 어휘로 읽힌다. 새 어휘를 세우지 않는 것이 계약의 조건이다.
+   */
+  it('자리 이름이 한글 금액 표와 같은 집합이다 — 새 어휘를 세우지 않는다', () => {
+    const used = new Set<string>();
+    for (const won of [1_200_000_000_000, 420_000_000, 9_800_000]) {
+      for (const name of KOREAN_UNIT_NAMES) {
+        if ((compactAmountTextOf(won, 'KRW') ?? '').includes(name)) {
+          used.add(name);
+        }
+      }
+    }
+
+    expect([...used].sort()).toStrictEqual([...KOREAN_UNIT_NAMES].sort());
+  });
+
+  /**
+   * **내림이다.** 위로 올리면 화면이 **없는 돈**을 보이고, 그 수로 금액대를 가늠한 운영자가
+   * 상한을 넘은 공고를 담는다. 두 자리까지 남기고 그 아래는 버린다.
+   */
+  it.each([
+    ['조 자리 — 끊긴 자리가 있다', 1_205_000_000_000, '약 1.2조원'],
+    ['억 자리 — 정확히 떨어진다', 420_000_000, '4.2억원'],
+    ['억 자리 — 둘째 자리까지 떨어진다', 183_000_000, '1.83억원'],
+    // **소수 첫 자리가 0 인 칸**(v HIGH-2). 이 값이 없으면 `padStart` 를 지우는 변이가 초록이고,
+    // 그때 1.05억이 **「1.5억원」**(열 배 가까이 큰 수)으로, 그것도 「약」 없이 선다.
+    ['억 자리 — 소수 첫 자리가 0 이다', 105_000_000, '1.05억원'],
+    ['조 자리 — 소수 첫 자리가 0 이다', 2_090_000_000_000, '2.09조원'],
+    ['만 자리 — 소수 첫 자리가 0 이다', 10_900_000, '1,090만원'],
+    // 두 자리 **아래**는 버린다 — 0.009억이 사라지고 그 사실을 「약」이 말한다.
+    ['억 자리 — 두 자리 아래를 버린다', 100_900_000, '약 1억원'],
+    ['억 자리 — 셋째 자리를 버린다', 187_654_321, '약 1.87억원'],
+    ['억 자리 — 딱 1억', 100_000_000, '1억원'],
+    ['만 자리', 9_800_000, '980만원'],
+    ['만 자리 — 버린 자리가 있다', 99_999_999, '약 9,999.99만원'],
+    ['만 미만 — 끊을 자리가 없다', 9_999, '9,999원'],
+    ['0 도 값이다', 0, '0원'],
+  ])('%s', (_label, won, expected) => {
+    expect(compactAmountTextOf(won, 'KRW')).toBe(expected);
+  });
+
+  /**
+   * **내림의 방향을 수로 잰다**(문면 대조만으로는 올림 변이가 한 줄짜리 표에서만 걸린다).
+   * 압축이 말하는 수는 원래 수를 **넘지 않는다**.
+   */
+  it('압축이 말하는 수가 원래 수를 넘지 않는다', () => {
+    const over: string[] = [];
+    for (const won of [
+      1, 9_999, 10_000, 10_001, 99_999_999, 100_000_000, 100_000_001, 187_654_321, 999_999_999_999,
+      1_205_000_000_000, 9_007_199_254_740_991,
+    ]) {
+      const text = compactAmountTextOf(won, 'KRW') ?? '';
+      const match = /^(?:약 )?([\d,.]+)(조|억|만)?원$/u.exec(text);
+      expect(match, `${won} 의 압축 글자를 읽지 못했다: ${text}`).not.toBeNull();
+      const unit = { 조: 1_000_000_000_000, 억: 100_000_000, 만: 10_000 }[match![2] ?? ''] ?? 1;
+      const said = Number((match![1] ?? '').replaceAll(',', '')) * unit;
+      if (said > won) {
+        over.push(`${won} → ${text} (${said})`);
+      }
+    }
+
+    expect(over, '압축이 원래 수보다 큰 값을 말했다').toStrictEqual([]);
+  });
+
+  /**
+   * **「약」은 근사일 때만 선다.** 늘 붙이면 정확히 떨어지는 금액까지 「대충 그쯤」으로 읽히고,
+   * 한 번도 안 붙이면 버린 자리를 숨긴다 — 두 방향을 같은 자리에서 잰다.
+   */
+  it('버린 자리가 있을 때만 「약」이 선다', () => {
+    const approximate = compactAmountTextOf(187_654_321, 'KRW') ?? '';
+    const exact = compactAmountTextOf(420_000_000, 'KRW') ?? '';
+
+    expect(approximate.startsWith('약 '), `끊겼는데 표지가 없다: ${approximate}`).toBe(true);
+    expect(exact.startsWith('약 '), `정확한데 표지가 섰다: ${exact}`).toBe(false);
+  });
+
+  /** 모르는 통화 코드는 **지어내지 않고** 띄어 적는다 — 정확 금액 꼴과 같은 규율이다. */
+  it('모르는 통화 코드는 띄어 적는다', () => {
+    expect(compactAmountTextOf(420_000_000, 'USD')).toBe('4.2억 USD');
+    expect(compactAmountTextOf(420_000_000, null)).toBe('4.2억원');
+  });
+
+  /** 읽을 수 없는 값에는 글자를 지어내지 않는다 — 무손실 꼴과 같은 경계다. */
+  it.each([
+    ['음수', -1],
+    ['정수가 아님', 1_000.5],
+    ['안전 정수 밖', Number.MAX_SAFE_INTEGER + 2],
+    ['수가 아님', Number.NaN],
+  ])('%s 이면 글자가 없다', (_label, won) => {
+    expect(compactAmountTextOf(won, 'KRW')).toBeNull();
   });
 });
