@@ -1,14 +1,9 @@
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { expect, test, type Page } from '@playwright/test';
 
-// @ts-expect-error — 게이트 술어는 `scripts/` 의 평범한 ESM 이고 이 레인은 타입 선언을 두지 않는다.
-import { readPalette } from '../../scripts/contrast.mjs';
 import { BUTTON_TONES, controlClass } from '../../src/components/Button';
 
 import { journeyContext, search, signIn } from './shared';
-import { measureControlBordersInPage } from './controlBorderMeasure';
+import { computeBorderColorsInPage, measureControlBordersInPage } from './controlBorderMeasure';
 import { measureInPage, type Measurement } from './touchMeasure';
 
 /**
@@ -22,61 +17,36 @@ import { measureInPage, type Measurement } from './touchMeasure';
  * 그래서 이 spec 은 이관 전 트리에서 **붉고**, 이관이 끝나야 초록이다.
  */
 /**
- * 컨트롤 경계로 **허용되는 색**(v M-1 · cr L-2) — `index.css` 에서 **유도한다**.
+ * 컨트롤 경계로 **허용되는 클래스**(v M-1 · cr L-2 · cr M-1) — 색이 아니라 **클래스**를 모은다.
  *
- * 값을 여기 적지 않는 이유는 대비 게이트와 같다: 적으면 파일을 고쳐도 이 집합이 옛 값을 들고,
- * 그 둘이 갈린 날 아무도 붉지 않는다.
+ * 색을 Node 에서 글자로 조립하던 앞 판은 틀렸다(cr M-1 실측): 출하 CSS 의 어조 테두리는
+ * `color-mix(in oklab, …)` 이고 브라우저는 그것을 `oklab(… / 0.4)` 로 돌려준다 — 조립한
+ * `rgba(…)` 와 **영영 맞지 않는다**. 그래서 허용 색은 **브라우저가 계산하게** 한다(아래
+ * `computeBorderColorsInPage`). 재는 쪽과 재어지는 쪽이 같은 파서를 지난다.
  *
- * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **공유 버튼의 어조 표가 실제로 쓰는 경계 색**
- * (`danger` 의 경고 테두리가 그 꼴이다. 그 색은 경계가 아니라 그 버튼이 무엇인지를 말한다).
- * **카드 선은 들어 있지 않다** — 그것이 이 축이 잡으려는 바로 그 값이다.
- *
- * **어조 글자색 전수를 허용하지 않는다**(v r2-low). 앞 판은 `*-ink` 를 모두 받았고 거기에
- * `accent-ink`(**흰색**)가 들어 있었다 — 흰 카드 위의 흰 테두리는 **보이지 않는 경계**인데 그
- * 축이 그것을 받고 있었다. 허용 집합을 **표가 실제로 쓰는 것**에서 유도해 좁힌다.
- *
- * 투명·없음도 받는다: 테두리를 그리지 않는 컨트롤(`primary` 버튼)은 위에서 두께로 이미 빠지지만,
- * 브라우저가 색만 투명으로 주는 꼴도 있어 함께 둔다.
+ * 허용은 둘이다 — **컨트롤 선**(중립 경계)과 **공유 버튼의 어조 표가 실제로 쓰는 경계 클래스**
+ * (`danger` 의 경고 테두리). **카드 선은 들어 있지 않다** — 그것이 이 축이 잡으려는 값이다.
+ * 어조 글자색 **전수**를 받지도 않는다(v r2-low — `accent-ink` 는 흰색이라 보이지 않는 경계다).
  */
-function allowedBorderColorSet(): ReadonlySet<string> {
-  const { light } = readPalette(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'index.css'));
-  const allowed = new Set<string>(['rgba(0, 0, 0, 0)', 'transparent']);
-  const add = (hex: string | undefined, alpha?: number): void => {
-    if (hex === undefined) {
-      return;
-    }
-    const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(hex.trim());
-    if (match === null) {
-      return;
-    }
-    const [red, green, blue] = [match[1], match[2], match[3]].map((one) => Number.parseInt(one ?? '0', 16));
-    allowed.add(alpha === undefined ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`);
-  };
-  add(light.get('control-line'));
-
-  /**
-   * 어조 표가 쓰는 경계 색만 더한다 — 표를 **읽어서** 낸다(사본을 만들지 않는다).
-   * `border-bad-ink/40` 처럼 투명도가 붙은 꼴도 그대로 받는다.
-   */
+function allowedBorderClasses(): readonly string[] {
+  const classes = ['border-control-line'];
   let fromTable = 0;
   for (const tone of BUTTON_TONES) {
     for (const token of controlClass(tone, 'md').split(/\s+/u)) {
-      const match = /^border-([a-z-]+?)(?:\/(\d+))?$/u.exec(token);
-      if (match === null || match[1] === 'control-line') {
+      if (!token.startsWith('border-') || token === 'border-control-line') {
         continue;
       }
-      const alpha = match[2] === undefined ? undefined : Number.parseInt(match[2], 10) / 100;
-      add(light.get(match[1]), alpha);
+      classes.push(token);
       fromTable += 1;
     }
   }
   if (fromTable === 0) {
-    throw new Error('어조 표에서 경계 색을 하나도 읽지 못했다 — 허용 집합이 공허하다');
+    throw new Error('어조 표에서 경계 클래스를 하나도 읽지 못했다 — 허용 집합이 공허하다');
   }
-  return allowed;
+  return classes;
 }
 
-const allowedBorderColors = allowedBorderColorSet();
+const ALLOWED_BORDER_CLASSES = allowedBorderClasses();
 
 /** 측정은 **공용 자리**를 지난다(`touchMeasure.ts`) — 합성 대조가 같은 함수를 본다. */
 const measure = async (page: Page): Promise<Measurement> => page.evaluate(measureInPage);
@@ -363,6 +333,11 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
    * 테두리 없는 버튼만 선 화면이 있어서 화면별 하한은 거짓으로 붉는다. 모집단 전체로 센다.
    */
   let borderedControls = 0;
+  /**
+   * **그려진 경계에 실제로 맞은 허용 색**(cr M-1). 앞 판은 「표에서 읽은 색 수」를 셌는데, 그
+   * 수는 화면을 한 번도 보지 않고도 선다 — 허용이 틀려도(색 꼴이 어긋나도) 알 수 없었다.
+   */
+  let matchedAllowed = new Set<string>();
   for (const screen of TOUCH_TARGET_SCREENS) {
     await page.goto(screen.path);
     await expect(page.getByTestId(screen.ready)).toBeVisible();
@@ -381,10 +356,17 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
      * 그린 색을 본다. 허용 집합은 `index.css` 에서 **유도한다**(값을 여기 복사하지 않는다):
      * 컨트롤 선이거나 어조 자신의 글자색이다. 카드 선은 그 집합에 없다.
      */
+    // 허용 색은 **그 페이지에서** 계산한다 — 출하 CSS 와 같은 파서를 지난다(cr M-1).
+    const allowed = new Set([
+      ...(await page.evaluate(computeBorderColorsInPage, ALLOWED_BORDER_CLASSES)),
+      'rgba(0, 0, 0, 0)',
+      'transparent',
+    ]);
     const borders = await page.evaluate(measureControlBordersInPage);
     const drawn = borders.filter((one) => one.width > 0);
     borderedControls += drawn.length;
-    const wrong = drawn.filter((one) => !allowedBorderColors.has(one.color));
+    matchedAllowed = new Set([...matchedAllowed, ...drawn.map((one) => one.color).filter((one) => allowed.has(one))]);
+    const wrong = drawn.filter((one) => !allowed.has(one.color));
     expect(
       wrong.map((one) => `${one.tag}[${one.testId}] ${one.color} "${one.name}"`),
       `${screen.slotId}: 컨트롤 경계가 허용 토큰 밖의 색이다(카드 선을 쓴 자리일 수 있다)`,
@@ -426,6 +408,11 @@ test('화면마다 보이는 터치 타깃 전수가 44px 이상이고 가로 �
    * 하한은 오늘의 수보다 넉넉히 낮게 두어 화면이 바뀔 때 잡음으로 흔들리지 않는다.
    */
   expect(borderedControls, '경계를 그리는 컨트롤을 하나도 보지 못했다 — 색 단언이 공허하다').toBeGreaterThan(10);
+  /**
+   * **허용 색이 실제로 쓰였는가**(cr M-1). 이 수가 0 이면 허용 집합이 그려진 경계와 한 번도
+   * 맞지 않았다는 뜻이고, 그때 위 전수 단언은 「전부 위반」이거나 「허용이 공허」 둘 중 하나다.
+   */
+  expect(matchedAllowed.size, '허용 색이 그려진 경계와 한 번도 맞지 않았다').toBeGreaterThan(0);
 });
 
 /**

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import { measureControlBordersInPage } from './journey/controlBorderMeasure';
+import { computeBorderColorsInPage, measureControlBordersInPage } from './journey/controlBorderMeasure';
+import { BUTTON_TONES, controlClass } from '../src/components/Button';
 import { measureInPage } from './journey/touchMeasure';
 
 /**
@@ -12,6 +13,19 @@ import { measureInPage } from './journey/touchMeasure';
  * 지나므로 이 대조가 게이트의 술어를 그대로 말한다.
  */
 const VIEWPORT = { width: 390, height: 844 } as const;
+
+/** 합성 `danger` 버튼이 입는 **출하 클래스** — 표에서 가져온다(사본을 만들지 않는다). */
+const DANGER_CLASS = controlClass('danger', 'md');
+
+/** 허용 클래스 — 게이트와 같은 규칙(컨트롤 선 + 어조 표의 경계 클래스). */
+const ALLOWED_PROBE_CLASSES = [
+  'border-control-line',
+  ...BUTTON_TONES.flatMap((tone) =>
+    controlClass(tone, 'md')
+      .split(/\s+/u)
+      .filter((one) => one.startsWith('border-') && one !== 'border-control-line'),
+  ),
+];
 
 test.use({ viewport: { ...VIEWPORT } });
 
@@ -337,4 +351,38 @@ test('숨은 컨트롤은 모집단 밖이다', async ({ page: browserPage }) =>
   const measured = await browserPage.evaluate(measureControlBordersInPage);
 
   expect(measured).toHaveLength(1);
+});
+
+/**
+ * **어조 테두리가 허용 집합에 실제로 든다**(cr M-1 · 리뷰가 실측으로 찾은 자리).
+ *
+ * 출하 CSS 의 `danger` 테두리는 `color-mix(in oklab, …)` 이라 브라우저가 `oklab(… / 0.4)` 로
+ * 돌려준다. 앞 판은 허용 색을 Node 에서 `rgba(…)` 글자로 조립해서 **영영 맞지 않았고**, 그런데도
+ * 초록이었다 — `danger` 버튼이 모집단에 **없었기** 때문이다(쓰기 실패 얼굴은 쓰기가 실패해야
+ * 선다). 14C·14D 가 그 얼굴을 띄우는 순간 붉었을 자리다.
+ *
+ * 그래서 **출하 클래스로 그린 `danger` 버튼**을 여기 세운다. 허용 집합도 같은 페이지에서
+ * 계산하므로 둘이 같은 파서를 지난다. 앞 판에서는 이 test 가 붉고 지금은 초록이다.
+ */
+test('어조 테두리(danger)가 허용 집합에 든다 — 같은 파서를 지난다', async ({ page: browserPage }) => {
+  // 출하 CSS 가 적재된 문서여야 한다 — `setContent` 로는 어조 테두리가 서지 않는다.
+  await browserPage.goto('/');
+  await browserPage.evaluate((danger) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'danger-probe';
+    button.className = danger;
+    button.textContent = '되돌리기';
+    document.querySelector('#main')?.append(button);
+  }, DANGER_CLASS);
+
+  const measured = await browserPage.evaluate(measureControlBordersInPage);
+  const probe = measured.find((one) => one.name === '되돌리기');
+  const allowed = new Set(await browserPage.evaluate(computeBorderColorsInPage, ALLOWED_PROBE_CLASSES));
+
+  expect(probe, 'danger 버튼을 찾지 못했다').toBeTruthy();
+  expect(probe?.width, '테두리를 그리지 않았다 — 이 대조가 공허하다').toBeGreaterThan(0);
+  // **조립한 글자와 다른 꼴이다**(이 대조의 요점) — 그런데도 허용에 든다.
+  expect(probe?.color).toContain('oklab');
+  expect(allowed.has(probe?.color ?? ''), `${probe?.color} 가 허용 집합 밖이다`).toBe(true);
 });

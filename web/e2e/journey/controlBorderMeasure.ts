@@ -54,3 +54,31 @@ export function measureControlBordersInPage(): readonly MeasuredBorder[] {
   }
   return found;
 }
+
+/**
+ * **허용 색을 브라우저가 계산하게 한다**(cr M-1 · 실측).
+ *
+ * 앞 판은 허용 색을 Node 에서 **글자로 조립**했다(`rgba(178, 58, 58, 0.4)` 꼴). 그런데 출하
+ * CSS 의 어조 테두리는 `color-mix(in oklab, …)` 이고 Chromium 은 그것을
+ * `oklab(0.522668 … / 0.4)` 로 돌려준다 — **영영 맞지 않는 두 글자**다. 그래서 `danger` 버튼의
+ * 경계는 사실상 한 번도 허용되지 않았고, 오늘 통과한 것은 그 버튼이 모집단에 **없었기** 때문이다
+ * (쓰기 실패 얼굴은 쓰기가 실패해야 선다). 14C·14D 가 실패 얼굴을 띄우는 순간 붉었을 자리다.
+ *
+ * 고치는 길은 **같은 파서를 지나게** 하는 것이다: 허용 클래스를 버릴 요소에 걸어 브라우저가 낸
+ * computed 값을 쓴다. 그러면 재는 쪽과 재어지는 쪽이 같은 자리에서 온다.
+ *
+ * 이 함수도 **브라우저 안에서** 돈다 — 바깥 식별자를 쓰지 않는다.
+ */
+export function computeBorderColorsInPage(classes: readonly string[]): readonly string[] {
+  const found: string[] = [];
+  for (const one of classes) {
+    const probe = document.createElement('div');
+    probe.className = `border ${one}`;
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.append(probe);
+    found.push(getComputedStyle(probe).borderTopColor);
+    probe.remove();
+  }
+  return found;
+}
