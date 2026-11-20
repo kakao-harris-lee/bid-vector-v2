@@ -371,24 +371,48 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
   const NOT_READY_SECTIONS = [
     { id: 'nts', label: '사업자번호' },
     { id: 'channels', label: '알림 받는 곳' },
-    { id: 'preview', label: '지금 맞는 공고 미리보기' },
   ] as const;
 
-  it.each(NOT_READY_SECTIONS)('$label 절은 빈 자리와 「준비 중」뿐이다', async ({ id, label }) => {
+  /** 적을 칸이 없는 절 전수 — 준비 중 둘과, **준비 중이 아닌** 미리보기 하나다. */
+  const STEPLESS_SECTIONS = [...NOT_READY_SECTIONS, { id: 'preview', label: '지금 맞는 공고 미리보기' }] as const;
+
+  it.each(STEPLESS_SECTIONS)('$label 절은 빈 자리뿐이다 — 입력칸도 버튼도 없다', async ({ id, label }) => {
     renderScreen();
 
     const section = await screen.findByTestId(`onboarding-section-${id}`);
     expect(section.textContent).toContain(label);
-    expect(within(section).getByTestId(`onboarding-section-state-${id}`).textContent).toBe('준비 중');
     expect(within(section).queryAllByRole('textbox')).toStrictEqual([]);
     expect(within(section).queryAllByRole('button')).toStrictEqual([]);
+  });
+
+  it.each(NOT_READY_SECTIONS)('$label 절은 「준비 중」이라고 말한다', async ({ id }) => {
+    renderScreen();
+
+    const section = await screen.findByTestId(`onboarding-section-${id}`);
+
+    expect(within(section).getByTestId(`onboarding-section-state-${id}`).textContent).toBe('준비 중');
+  });
+
+  /**
+   * **미리보기는 준비 중이 아니다.** 적을 칸이 없을 뿐이고 미리보기 자체는 곁에서 돌고 있다 —
+   * 거기에 「준비 중」을 달면 화면이 **있는 기능을 없다고** 말한다. 쓰기 칸의 부재와 기능의
+   * 부재가 한 술어로 접히지 않는 것을 여기서 잰다.
+   */
+  it('미리보기 절에는 준비 중 알약이 없다 — 곁에서 돌고 있는 기능이다', async () => {
+    renderScreen();
+
+    const section = await screen.findByTestId('onboarding-section-preview');
+
+    expect(within(section).queryByTestId('onboarding-section-state-preview')).toBeNull();
+    expect(section.textContent, '없는 기능이라고 말했다').not.toContain('준비 중');
+    expect(await screen.findByTestId('onboarding-preview')).toBeTruthy();
   });
 
   /**
    * M13/13A — **내부 용어를 걷은 자리**다. 금지 꼴 게이트는 개발 코드를 잡지만 「계약」·「API」
    * 같은 내부 용어는 열거할 수 없어(그 판단은 사람의 것이다) 고친 자리만 축어로 잠근다.
    */
-  it.each(NOT_READY_SECTIONS)('$label 절의 사유 문면에 내부 용어가 돌아오지 않는다', async ({ id }) => {
+  it.each(STEPLESS_SECTIONS)('$label 절의 사유 문면에 내부 용어가 돌아오지 않는다', async ({ id }) => {
     renderScreen();
 
     const section = await screen.findByTestId(`onboarding-section-${id}`);

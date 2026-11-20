@@ -66,16 +66,21 @@ const STEP_BODY_ID = 'onboarding-step-body';
  * 신원은 와이어프레임이 정하고 **쓰기 단위는 바뀌지 않는다**: 절이 담는 것은 기존 단계이고,
  * 자격·관심 조건은 와이어프레임이 「한 곳에서」라고 적은 그대로 네 단계를 한 절에 묶는다.
  *
- * `steps` 가 비면 **준비 중**이다 — 그 절은 **상태 문면만** 보인다(입력칸·버튼을 만들지
- * 않는다, D-7E2b-3). 「언젠가 된다」는 약속을 그리지 않는 것이 요점이고, `why` 가 **왜 지금
- * 없는지**를 말한다.
+ * `steps` 가 비면 **적을 칸이 없다** — 그 절은 상태 문면만 보인다(입력칸·버튼을 만들지 않는다,
+ * D-7E2b-3). 「언젠가 된다」는 약속을 그리지 않는 것이 요점이고, `why` 가 지금의 사실을 말한다.
  */
 interface OnboardingSection {
   readonly id: string;
   readonly label: string;
-  /** 이 절이 담는 쓰기 단계. 비면 준비 중이다. */
+  /** 이 절이 담는 쓰기 단계. 비면 적을 칸이 없다. */
   readonly steps: readonly OnboardingStepId[];
   readonly why: string;
+  /**
+   * **그 기능이 아직 없다**는 알약을 단다. 쓰기 칸이 없는 것과 **같은 사실이 아니다** —
+   * 미리보기 절은 적을 칸이 없지만 미리보기 자체는 곁에서 **돌고 있다**. 거기에 「준비 중」을
+   * 달면 화면이 **있는 기능을 없다고** 말한다(그 반대 방향의 거짓이라 더 눈에 띄지 않는다).
+   */
+  readonly notReady?: true;
 }
 
 const ONBOARDING_SECTIONS = [
@@ -83,6 +88,7 @@ const ONBOARDING_SECTIONS = [
     id: 'nts',
     label: '사업자번호 확인',
     steps: [],
+    notReady: true,
     why: '저장할 자리가 아직 없어 입력을 받지 않습니다',
   },
   {
@@ -101,20 +107,22 @@ const ONBOARDING_SECTIONS = [
     id: 'channels',
     label: '알림 받는 곳',
     steps: [],
+    notReady: true,
     why: '보내는 방법을 정한 뒤에 엽니다',
   },
   {
     id: 'preview',
     label: '지금 맞는 공고 미리보기',
     steps: [],
+    // **준비 중이 아니다**: 미리보기는 곁에서 돌고 있고, 아직 없는 것은 「어느 입력이 좁혔는가」뿐이다.
     why: '조건을 채우면 곁의 미리보기에 뜹니다 — 어느 입력이 결과를 좁혔는지 알려 주는 기능은 아직 없습니다',
   },
 ] as const satisfies readonly OnboardingSection[];
 
-/** 준비 중인 절 — `steps` 가 비어 있다는 **구조**가 그 사실이다(따로 선언하지 않는다). */
-const isNotReady = (section: OnboardingSection): boolean => section.steps.length === 0;
+/** 적을 칸이 있는 절인가 — `steps` 가 비어 있다는 **구조**가 그 사실이다(따로 선언하지 않는다). */
+const hasSteps = (section: OnboardingSection): boolean => section.steps.length > 0;
 
-/** 준비 중 절의 알약 — 값이 없다는 뜻이 아니라 **그 기능이 아직 없다**는 뜻이다. */
+/** 준비 중 알약 — 값이 없다는 뜻이 아니라 **그 기능이 아직 없다**는 뜻이다. */
 const NOT_READY_PILL = { tone: 'unjudged', label: '준비 중' } as const;
 
 /**
@@ -339,19 +347,24 @@ function SectionCard({
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-numeric text-sm text-ink-soft">{ordinal}.</span>
         <span className="text-sm font-medium">{section.label}</span>
-        {state === null ? (
+        {/*
+          알약은 **말할 것이 있을 때만** 단다. 쓰기 절은 항목 상태를 접어 말하고, 준비 중 절은
+          그 사실을 말한다. 둘 다 아닌 절(미리보기)은 **아무 상태도 아니므로** 알약이 없다 —
+          빈 알약을 달면 그 자리가 거짓을 말한다.
+        */}
+        {state !== null ? (
+          <StateBadge display={ITEM_STATE_DISPLAY[state]} testId={`onboarding-section-state-${section.id}`} />
+        ) : section.notReady === true ? (
           <StatusPill
             tone={NOT_READY_PILL.tone}
             label={NOT_READY_PILL.label}
             testId={`onboarding-section-state-${section.id}`}
           />
-        ) : (
-          <StateBadge display={ITEM_STATE_DISPLAY[state]} testId={`onboarding-section-state-${section.id}`} />
-        )}
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-ink-soft">{section.why}</p>
 
-      {isNotReady(section) ? null : (
+      {hasSteps(section) ? (
         <>
           <ul className="mt-2 flex flex-col gap-1">
             {rows.map((row) => (
@@ -400,7 +413,7 @@ function SectionCard({
               갈린다. id 는 한 자리이므로 `aria-controls` 의 대상도 하나다. */}
           {holdsCurrent ? stepBody : null}
         </>
-      )}
+      ) : null}
     </li>
   );
 }

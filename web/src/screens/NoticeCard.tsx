@@ -103,17 +103,22 @@ function NoticeCardBody({
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        {/* 제목은 **블록 타깃**이다(M13/13B) — 모바일에서 손가락이 닿는 것은 글자가 아니라
-            상자다. 이동 대상과 동작은 그대로이고 상자만 커진다. */}
-        <Link
-          to={worksheetPathOf(notice)}
-          className="flex min-h-11 min-w-0 items-center rounded-md hover:underline"
-        >
-          <span data-testid="notice-title" className="block text-sm font-semibold break-words">
-            {notice.title ?? notice.noticeNumber}
-          </span>
-        </Link>
+        {/*
+          **제목과 판정이 한 줄**이다(와이어프레임 B). 좁아지면 `flex-wrap` 이 배지를 아래로
+          내린다 — 배치를 CSS 로 뒤집지 않으므로 읽는 차례와 보는 차례가 갈리지 않는다.
+
+          제목은 **블록 타깃**이다(M13/13B) — 모바일에서 손가락이 닿는 것은 글자가 아니라 상자다.
+          이동 대상과 동작은 그대로이고 상자만 커진다.
+        */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Link
+            to={worksheetPathOf(notice)}
+            className="flex min-h-11 min-w-0 items-center rounded-md hover:underline"
+          >
+            <span data-testid="notice-title" className="block text-sm font-semibold break-words">
+              {notice.title ?? notice.noticeNumber}
+            </span>
+          </Link>
           {verdict}
           <StateBadge display={noticeStatusDisplayOf(notice.status)} testId="notice-status" />
           <CompactAmount notice={notice} />
@@ -127,19 +132,25 @@ function NoticeCardBody({
           없다(nullable 도 아니다). 부재 사유를 지어 그리면 화면이 「서버가 방식을 빚졌다」고
           주장하게 된다 — 대조표 B 행의 처분이 「방식 = 데이터로 막힘」이다.
         */}
-        <dl className="mt-1 hidden flex-wrap gap-x-5 gap-y-1 md:flex">
-          <div className="flex flex-col gap-0.5">
-            <dt className="text-xs text-ink-soft">발주기관</dt>
-            <dd data-testid="notice-agency" className="text-sm break-words">
+        <dl className="hidden flex-wrap items-baseline gap-x-2 gap-y-1 text-sm md:flex">
+          {/* 발주기관은 **값만** 보인다(와이어프레임의 사실 줄) — 라벨은 보조기기에만 남긴다.
+              `dl` 의 내용 모형을 지키려면 `dt` 가 있어야 하고, 그 글자를 눈에까지 두면 와이어프레임
+              한 줄이 라벨 둘로 늘어난다. */}
+          <div className="flex min-w-0 items-baseline gap-1">
+            <dt className="sr-only">발주기관</dt>
+            <dd data-testid="notice-agency" className="break-words">
               {notice.demandAgencyName ?? notice.noticeAgencyName ?? <AbsentValue reason="notSent" />}
             </dd>
           </div>
-          <div className="flex flex-col gap-0.5">
+          <span aria-hidden="true" className="text-ink-soft">
+            ·
+          </span>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-1">
             {/* CR r3 M-5 · M14/14A(M13 잔여 ⓖ) — 같은 문면의 **세 번째 자리**였다. `title` 하나로
                 두면 터치·보조기기에서 볼 수 없다. 이제 라벨이 누를 수 있는 자리이고 배선은
                 `useTermHint` 한 자리다. */}
             <dt className="text-xs text-ink-soft">{amountHint.termNode('기초금액')}</dt>
-            <dd aria-describedby={amountHint.describedBy} className="font-numeric text-sm">
+            <dd aria-describedby={amountHint.describedBy} className="font-numeric">
               {/* 값은 **자기 요소**가 들고 아래층 문면은 그 옆에 둔다 — 값 단언이 설명까지 읽지
                   않게 하면서 `dl` 내용 모형도 지킨다(한 용어에 `<dd>` 하나). */}
               <span data-testid="notice-amount">{amount.amount}</span>
