@@ -117,6 +117,19 @@ describe('행동', () => {
     expect(heading.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  /**
+   * **빈 자리로 읽히는 값은 그리지 않는다**(cr R3-L1) — 요약과 같은 규율이다. 조건부로 만든
+   * 행동 묶음이 비면 빈 상자가 `gap` 을 벌려 머리의 오른쪽이 까닭 없이 밀린다.
+   */
+  it('빈 자리로 읽히는 행동에는 자리를 만들지 않는다', () => {
+    for (const blank of [undefined, null, false, true, '', '   ', [], ['', null]]) {
+      cleanup();
+      render(<PageHeader title="내 입찰함" actions={blank} testId="probe" />);
+
+      expect(screen.queryByTestId('probe-actions'), String(blank)).toBeNull();
+    }
+  });
+
   it('주지 않으면 빈 버튼 자리를 만들지 않는다', () => {
     render(<PageHeader title="내 입찰함" testId="probe" />);
 

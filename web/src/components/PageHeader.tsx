@@ -13,8 +13,10 @@ const slotTestId = (testId: string | undefined, slot: string): string | undefine
 /**
  * **빈 자리로 읽히는 노드인가**(cr L-1 의 구멍을 `ReactNode` 로 넓힌 뒤에도 닫아 둔다).
  *
- * 없음·참/거짓은 React 가 아무것도 그리지 않는 값이고, 공백뿐인 글자·숫자 0 자리는 **글자로는
- * 비어 있다**. 배열은 그 안이 전부 비어 있을 때만 비었다.
+ * 없음·참/거짓은 React 가 아무것도 그리지 않는 값이고, 공백뿐인 글자는 **글자로는 비어 있다**.
+ * **숫자는 비어 있지 않다** — `0` 은 값이고 그려야 한다(0 을 빈 값으로 접으면 「없다」와 「0 이다」가
+ * 같은 얼굴이 되는데, 그것이 이 slice 가 없애려는 바로 그 혼동이다). 배열은 그 안이 전부 비어
+ * 있을 때만 비었다.
  *
  * **알려진 제한**: 요소(`<></>` 처럼 비어 있는 조각)는 그려 봐야 비었는지 알 수 있어 여기서
  * 가리지 못한다 — 그 꼴은 호출부의 실수이고 이 술어가 잡는 범위 밖이다.
@@ -64,7 +66,13 @@ export function PageHeader({
    * 빈 자리로 읽히는 값(없음 · 참/거짓 · 공백뿐인 글자 · 그것들만 담은 배열)은 **그리지 않는다**.
    */
   readonly summary?: ReactNode;
-  /** 머리의 오른쪽에 서는 행동. 제목 **뒤**라 탭 차례가 제목을 건너뛰지 않는다. */
+  /**
+   * 머리의 오른쪽에 서는 행동. 제목 **뒤**라 탭 차례가 제목을 건너뛰지 않는다.
+   *
+   * **빈 자리로 읽히는 값은 그리지 않는다**(cr R3-L1) — 요약과 같은 규율이다. 조건부로 만든
+   * 행동 묶음이 비면(`{open && <Button/>}` 꼴이 거짓일 때) 빈 상자가 서고, 그 상자가 `gap` 을
+   * 벌려 머리의 오른쪽이 까닭 없이 밀린다.
+   */
   readonly actions?: ReactNode;
   readonly testId?: string;
 }) {
@@ -78,7 +86,7 @@ export function PageHeader({
           </p>
         )}
       </div>
-      {actions === undefined ? null : (
+      {isBlankNode(actions) ? null : (
         <div data-testid={slotTestId(testId, 'actions')} className="flex flex-wrap items-center gap-2">
           {actions}
         </div>
