@@ -899,11 +899,14 @@ export function WorksheetScreen() {
             */}
             {primarySlot === 'price' ? <div className="mt-3">{primaryNode}</div> : null}
           </section>
-          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
-          {/* **종단 상태에서는 묻지 않는다**(cr L-1). 이미 낙찰·유찰·건너뜀인 건에
-              「투찰했나요?」는 거짓 질문이다. 조건은 **다음 전이의 표에서 유도한다** —
-              그 표가 종단에서 `null` 을 내므로 종단 집합을 화면이 한 벌 더 적지 않는다. */}
+          {/* **앞으로 갈 걸음은 종단에서 그리지 않는다**(cr L-1 · N-2). 이미 낙찰·유찰·
+              건너뜀인 건에 「나라장터에서 투찰하기」와 「투찰했나요?」는 둘 다 거짓 안내다 —
+              하나만 걷으면 남은 하나가 같은 거짓말을 계속한다. 조건은 **다음 전이의 표에서
+              유도한다**: 그 표가 종단에서 `null` 을 내므로 종단 집합을 화면이 한 벌 더 적지
+              않고, 상태가 늘어도 이 자리가 따라온다. */}
           {action === null ? null : (
+            <>
+          <KonepsHandoff noticeNumber={notice.noticeNumber} amountWon={amountWon} margin={margin} />
           <section data-testid="worksheet-record-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰했나요? 기록을 확인해 주세요</h3>
             <p className="mt-1 text-xs text-ink-soft">
@@ -912,6 +915,7 @@ export function WorksheetScreen() {
             </p>
             {primarySlot === 'record' ? <div className="mt-3">{primaryNode}</div> : null}
           </section>
+            </>
           )}
         </>
       )}

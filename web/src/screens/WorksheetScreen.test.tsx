@@ -1812,14 +1812,16 @@ describe('화면 C — 수정 라운드의 LOW 셋', () => {
    * 적지 않는다 — 상태 전수로 그 등식을 센다.
    */
   it.each(Object.keys(BID_CASE_STATE_DISPLAY) as readonly queries.BidCase['state'][])(
-    '%s 에서 기록 카드가 서는지는 다음 전이가 있는지와 같다',
+    '%s 에서 앞으로 갈 걸음 둘이 서는지는 다음 전이가 있는지와 같다',
     async (state) => {
       mocked.listBidCases.mockResolvedValue([{ ...CASE, state }]);
       renderScreen();
       await screen.findByTestId('worksheet-case-state');
 
       const hasNext = nextActionOf(state) !== null;
-      expect(screen.queryByTestId('worksheet-record-card') !== null).toBe(hasNext);
+      expect(screen.queryByTestId('worksheet-record-card') !== null, '기록 카드').toBe(hasNext);
+      // cr N-2 — 넘김 카드도 같은 표를 따른다. 하나만 걷으면 남은 하나가 같은 거짓말을 한다.
+      expect(screen.queryByTestId('koneps-deeplink') !== null, '나라장터 넘김 카드').toBe(hasNext);
     },
   );
 
@@ -1829,11 +1831,13 @@ describe('화면 C — 수정 라운드의 LOW 셋', () => {
     await screen.findByTestId('worksheet-case-state');
 
     expect(screen.queryByText(/투찰했나요/u)).toBeNull();
+    expect(screen.queryByText(/나라장터에서 투찰하기/u), '종단에 넘김 카드가 섰다').toBeNull();
     // 같은 fixture 의 다른 상태에서는 선다(이 단언이 늘 참이 아니다).
     cleanup();
     mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
     renderScreen();
     expect(await screen.findByText(/투찰했나요/u)).not.toBeNull();
+    expect(screen.getByText(/나라장터에서 투찰하기/u)).not.toBeNull();
   });
 
   /**
