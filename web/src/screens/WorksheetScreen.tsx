@@ -807,7 +807,7 @@ export function WorksheetScreen() {
       {bidCase === undefined ? null : (
         <>
           {price === null ? null : <WorksheetQualification price={price} />}
-          <section className={cardClass()}>
+          <section data-testid="worksheet-price-card" className={cardClass()}>
             <h3 className="text-sm font-semibold">투찰가</h3>
             {/* 요청의 전제다 — 선언이 없으면 요청이 가지 않는다(CR H-1). */}
             {action !== null && action.kind === 'REQUEST_PRICE' ? (

@@ -1746,3 +1746,59 @@ describe('화면 C — 실패 얼굴은 보낸 칸에서 말한다 (cr M-2)', ()
     expect(slotOf(TWO_COLUMN_RAIL_SLOT)?.contains(face)).toBe(false);
   });
 });
+
+/**
+ * **다음 행동 하나의 자리 표를 행마다 잰다**(cr M-3 · v M-1).
+ *
+ * `satisfies` 는 **키 전수**만 닫는다 — 행의 **값**을 바꾸는 변이는 그 자리에서 조용하다.
+ * 앞 판에서 `RECORD_BID` 를 머리로 옮긴 변이가 vitest 전건 · tsc · 여정 e2e 를 모두 지나갔고,
+ * 그 변이는 기록 카드를 **행동 없는 빈 카드**로 남긴다(측정). 그래서 네 행을 각각 잠근다.
+ *
+ * 「어느 카드 안인가」와 「다른 카드 안이 아닌가」를 함께 센다 — 소속만 재면 자리 표가 아니라
+ * 「어딘가에 있다」를 재게 된다.
+ */
+describe('화면 C — 다음 행동의 자리 표 (cr M-3 · v M-1)', () => {
+  const inHead = (node: HTMLElement): boolean =>
+    node.closest('header') !== null && node.closest(`[${LAYOUT_SLOT_ATTRIBUTE}]`) === null;
+
+  async function primaryIn(where: 'head' | 'price' | 'record'): Promise<void> {
+    const primary = await screen.findByTestId('worksheet-primary');
+    const price = screen.queryByTestId('worksheet-price-card');
+    const record = screen.queryByTestId('worksheet-record-card');
+    expect(inHead(primary), '머리에 섰는가').toBe(where === 'head');
+    expect(price !== null && price.contains(primary), '투찰가 카드에 섰는가').toBe(where === 'price');
+    expect(record !== null && record.contains(primary), '기록 카드에 섰는가').toBe(where === 'record');
+  }
+
+  it('REQUEST_PRICE 는 투찰가 카드에 선다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'WATCHING' }]);
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-primary')).textContent).toBe('투찰가 요청');
+    await primaryIn('price');
+  });
+
+  it('DRAFT_BID 는 투찰가 카드에 선다 — 「이 금액으로 진행」의 자리다', async () => {
+    renderScreen();
+    await askPrice();
+
+    await waitFor(() => expect(screen.getByTestId('worksheet-primary').textContent).toBe('투찰 예정 초안'));
+    await primaryIn('price');
+  });
+
+  it('RECORD_BID 는 기록 카드에 선다 — 그 카드를 빈 카드로 두지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'BID_PLANNED' }]);
+    renderScreen();
+
+    expect((await screen.findByTestId('worksheet-primary')).textContent).toBe('제출함');
+    await primaryIn('record');
+  });
+
+  it('RESUME 은 머리에 선다 — 본문·레일 어느 칸에도 들지 않는다', async () => {
+    mocked.listBidCases.mockResolvedValue([{ ...CASE, state: 'DEFERRED' }]);
+    renderScreen();
+
+    await screen.findByTestId('worksheet-primary');
+    await primaryIn('head');
+  });
+});
