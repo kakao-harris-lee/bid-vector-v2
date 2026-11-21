@@ -20,13 +20,16 @@ in_scope:
   - adapters/src/test/kotlin/bidvector/adapters/persistence/BusinessProfileColumnSpecs.kt
   - adapters/src/test/kotlin/bidvector/adapters/profile/BusinessProfileSchemaGuardTest.kt
   - adapters/src/test/kotlin/bidvector/adapters/profile/JdbcBusinessProfileStoreTest.kt
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt   # 계약 갱신 (1)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/MigrationLockTimeoutTest.kt  # 계약 갱신 (1)
   # ── HTTP (app) ──────────────────────────────────────────────────────────
   - app/src/main/kotlin/bidvector/app/http/ProfileRequests.kt
   - app/src/main/kotlin/bidvector/app/http/ProfileResponses.kt
   - app/src/test/kotlin/bidvector/app/http/ProfileRequestsTest.kt
   - app/src/test/kotlin/bidvector/app/http/ProfileResponseTest.kt
   - app/src/test/kotlin/bidvector/app/http/ProfileEndpointTest.kt
-  - app/src/test/kotlin/bidvector/app/http/OpenApiProfileContractTest.kt   # 있으면 칸 집합 등식 갱신
+  - app/src/test/kotlin/bidvector/app/http/MyBidResultEndpointTest.kt      # 계약 갱신 (2) — 조립 한 줄
+  - app/src/test/kotlin/bidvector/app/wiring/ProfileWiringTradeNameTest.kt # 계약 갱신 (2) — 조립 한 줄
   # ── 계약과 생성 타입 ────────────────────────────────────────────────────
   - openapi/bidvector-operator-api.yaml    # BusinessDetailsRequest · Profile · 두 머리말
   - web/src/api/generated/operator-api.ts  # 재생성(바이트 등식 W-5)
@@ -40,6 +43,7 @@ in_scope:
   - web/src/screens/OnboardingScreen.test.tsx
   - web/src/screens/ProfileSection.test.tsx    # 공유 고정물이 새 칸을 지난다
   - web/src/api/approvedOperations.ts          # 주석만 — operation 집합은 **불변**이다
+  - web/scripts/screen-vocabulary-registry.mjs # 계약 갱신 (3) — 새 표시 함수 둘의 분류
   # ── 누출 게이트 (e2e) ───────────────────────────────────────────────────
   - web/e2e/journey/privateValues.ts           # 신설 — 술어 한 자리 + 예외 testId 한 자리
   - web/e2e/journey/journey.spec.ts
@@ -164,6 +168,34 @@ rollback: rollback.md
 줄이 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에
 있다. 귀속은 라운드마다 기계로 재산출해 확인한다.
 
+## 계약 갱신
+
+**(1) 마이그레이션 게이트 둘이 in_scope 에 든다** — 착수 실측이 놓친 자리다. V30 은 **기존 표를
+`ALTER`** 하므로 저장소의 두 래칫이 함께 움직인다: 잠금 상한 선언의 관례 lint
+(`MigrationLockTimeoutTest` 의 번호 집합)와 표별 CHECK 수(`CleanMigrationCheckTest`). 둘 다
+**사람이 보는 자리에 수를 두는** 관용구라, 새 마이그레이션이 그 수를 바꾸면 그 줄을 함께 고치는
+것이 설계된 동작이다.
+
+**(2) 사업 정보 조립 두 자리가 더 든다** — `BusinessDetails` 에 기본값 없는 칸을 더한 귀결이다.
+컴파일이 멈춘 자리가 곧 목록이고, 그 가운데 둘이 착수 목록 밖이었다(둘 다 위치 인자 한 줄).
+
+**(3) 화면 어휘 등록부가 든다** — `src/display/**` 의 새 export 는 「어휘인가」를 분류해야 한다
+(저장소의 전수 등식). 새 함수 둘을 금액·시각·명령 축 **밖**으로 등재했다.
+
+## 알려진 제한 (라운드 중 추가)
+
+6. **이 브랜치 단독으로는 `check` 가 초록이 아니다 — 번호가 결번이기 때문이다.**
+   `migrationOrderGate` 는 「읽어낸 version 다중집합 == (1..max ∖ 은퇴)」를 요구한다(Flyway
+   `outOfOrder=false` 아래에서 **낮은 번호가 나중에 들어오면 조용히 건너뛰어진다**). V28·V29 가
+   15A·15B 의 브랜치에만 있으므로 이 브랜치의 V30 은 결번 둘을 만든다. **게이트가 옳다** — 이
+   slice 가 먼저 머지되면 운영 DB 에서 V28·V29 가 실제로 건너뛰어진다. 그래서 **머지 차례가
+   15A → 15B → 15C 로 고정**되고, 이 브랜치의 acceptance 는 main 에 그 둘이 들어온 뒤에 선다.
+   마일스톤 계약의 「15C 는 언제든」은 이 게이트를 보기 전의 문장이고, 「먼저 머지된 쪽과 번호가
+   엇갈리면 뒤 slice 가 번호를 옮긴다」는 같은 계약의 다른 문장이 이 처분과 어긋나지 않는다.
+   측정은 **번호만 연속으로 바꾼 임시 트리**에서 했다(`commands.md`) — 바꾼 자리는 파일 이름과
+   그 번호를 드는 래칫 한 줄 둘뿐이고 어느 것도 커밋하지 않았다.
+
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
+- 2026-11-21 계약 갱신 (1)~(3) 과 알려진 제한 6(번호 결번과 머지 차례).
