@@ -27,6 +27,7 @@ internal val ALLOWED_ROOTS: Set<String> =
     java.util.Set.copyOf(
         setOf(
             "bidvector.workflow.strategy",
+            "bidvector.workflow.access",
             "bidvector.strategy",
             "bidvector.sharedkernel",
             "bidvector.adapters.persistence",

@@ -125,7 +125,8 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
     fun `저장된 요건이 없으면 Uncertain RequirementDataAbsent 다`() {
         val id = insertNotice("GATE-ABSENT")
 
-        gate().verdictFor(testAccount(), findNotice(id)) shouldBe LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
+        gate().verdictFor(testAccount(), findNotice(id)) shouldBe
+            LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
     }
 
     @Test
@@ -133,7 +134,8 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
         val id = insertNotice("GATE-FAILED")
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.CollectionFailed)
 
-        gate().verdictFor(testAccount(), findNotice(id)) shouldBe LicenseVerdict.Uncertain(UncertainReason.CollectionFailed)
+        gate().verdictFor(testAccount(), findNotice(id)) shouldBe
+            LicenseVerdict.Uncertain(UncertainReason.CollectionFailed)
     }
 
     @Test

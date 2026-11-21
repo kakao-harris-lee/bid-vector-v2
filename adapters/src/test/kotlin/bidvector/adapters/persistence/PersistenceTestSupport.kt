@@ -83,7 +83,8 @@ abstract class PersistenceTestSupport {
      * **처음 부를 때 심는다**: 표 비우기와 같은 `@BeforeEach` 를 하나 더 두면 둘의 순서가
      * 정해지지 않아 비우기가 계정을 지우는 실행이 섞인다.
      */
-    protected fun testAccount(): AccountId = cachedAccount ?: seedAccount(DEFAULT_TEST_LOGIN).also { cachedAccount = it }
+    protected fun testAccount(): AccountId =
+        cachedAccount ?: seedAccount(DEFAULT_TEST_LOGIN).also { cachedAccount = it }
 
     /**
      * 계정 한 행 — 격리 축 test 가 둘째 계정을 심는 자리이기도 하다. 소유자 자격으로 심는다
