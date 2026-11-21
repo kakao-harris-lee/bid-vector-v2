@@ -234,7 +234,12 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         val owner = account()
         HeadquartersRegion.entries.forEach { region ->
             val details =
-                BusinessDetails(null, region, NaraReadiness.Registered(NaraRegistrationField.entries.toSet(), null))
+                BusinessDetails(
+                    null,
+                    null,
+                    region,
+                    NaraReadiness.Registered(NaraRegistrationField.entries.toSet(), null),
+                )
             store.replaceDetails(owner, details, now)
             store.details(owner) shouldBe details
         }
