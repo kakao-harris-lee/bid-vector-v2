@@ -2,7 +2,7 @@ package bidvector.app.wiring
 
 import bidvector.app.http.InMemoryBusinessProfileStore
 import bidvector.settlement.OperatorTradeName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.NaraReadiness
 import bidvector.workflow.profile.TradeName

@@ -2,7 +2,7 @@ package bidvector.workflow.profile
 
 import bidvector.qualification.LicenseName
 import bidvector.qualification.OperatorLicenses
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.evaluation.UnjudgedQualificationAxis

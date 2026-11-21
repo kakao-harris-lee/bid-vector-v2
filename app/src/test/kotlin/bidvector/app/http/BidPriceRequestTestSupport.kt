@@ -13,6 +13,7 @@ import bidvector.qualification.LicenseName
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.RequirementSourceField
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRate
@@ -182,7 +183,10 @@ class MutableLicenseJudgementPort : LicenseJudgementPort {
     @Volatile
     var judgement: LicenseJudgement = licenseJudgementFixture()
 
-    override fun judgementFor(notice: Notice): LicenseJudgement = judgement
+    override fun judgementFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseJudgement = judgement
 }
 
 /** 자격 판정 봉투를 내는 이중체 — **요청당 한 번만 불려야 한다**는 성질을 이 계수가 잰다. */
@@ -192,7 +196,10 @@ class FakeLicenseJudgementPort(
     var callCount: Int = 0
         private set
 
-    override fun judgementFor(notice: Notice): LicenseJudgement {
+    override fun judgementFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseJudgement {
         callCount += 1
         return judgement
     }
@@ -219,6 +226,7 @@ class CountingMlAnalysisPort(
         private set
 
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome {

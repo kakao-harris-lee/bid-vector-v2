@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
@@ -70,14 +71,17 @@ private class RacingStrategyRepository(
     var loads: Int = 0
         private set
 
-    override fun load(): OperatorStrategy {
+    override fun load(account: AccountId): OperatorStrategy {
         val current = strategy
         loads += 1
         if (loads == mutateAfterLoad) strategy = mutation()
         return current
     }
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         strategy = applied.strategy
     }
 }
@@ -85,9 +89,15 @@ private class RacingStrategyRepository(
 private class RaceSessionRepository : EditSessionRepository {
     private val stored = mutableMapOf<EditSessionId, EditSessionSnapshot>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = stored[id]
 
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         stored[session.id] = session.toSnapshot()
     }
 }
@@ -113,9 +123,13 @@ private class DirectStrategyEditTransaction(
     private val sessions: EditSessionRepository,
     private val events: EventSink,
 ) : StrategyEditTransaction {
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T =
+    override fun <T> inTransaction(
+        account: AccountId,
+        action: (EditStrategyWorkflow) -> T,
+    ): T =
         action(
             EditStrategyWorkflow(
+                account,
                 sessions,
                 strategies,
                 RaceClock(),
@@ -128,6 +142,9 @@ private class DirectStrategyEditTransaction(
 
 /** 행위자는 이제 인증 주체에서 온다 — 이 test 는 그 값의 축을 재지 않으므로 고정값 하나를 쓴다. */
 private val RACE_ACTOR = OperatorId("race-test-operator")
+
+/** 계정도 같은 이유로 고정값 하나다(M15/15A) — 이 test 의 축은 경합이지 계정이 아니다. */
+private val RACE_ACCOUNT = AccountId(1)
 
 /**
  * D-6A2b-28 회귀 — **기준 revision 은 draft 를 만든 그 읽기에서 온다.**
@@ -153,10 +170,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { strategyOf(StrategyDraft(candidateLimit = 13), revision = 1) },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACCOUNT, RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACCOUNT,
                 RACE_ACTOR,
                 started.session.id,
                 CommandId("race-value"),
@@ -185,10 +203,11 @@ class StrategyEditExecutorRaceTest {
                 mutation = { error("이 대조에서는 값이 바뀌지 않는다") },
             )
         val executor = executorOver(strategies)
-        val started = executor.begin(RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
+        val started = executor.begin(RACE_ACCOUNT, RACE_ACTOR, EditableField.MaxActiveBids) as BeginOutcome.Started
 
         val outcome =
             executor.provideValue(
+                RACE_ACCOUNT,
                 RACE_ACTOR,
                 started.session.id,
                 CommandId("plain-value"),

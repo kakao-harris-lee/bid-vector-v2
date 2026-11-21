@@ -9,7 +9,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.tag
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.bidding.AppliedTransition
 import bidvector.workflow.bidding.BidCaseStorePort
 import bidvector.workflow.bidding.OpenCaseResult

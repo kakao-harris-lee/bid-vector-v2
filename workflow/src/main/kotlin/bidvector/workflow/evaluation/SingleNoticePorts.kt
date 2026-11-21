@@ -3,6 +3,7 @@ package bidvector.workflow.evaluation
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
+import bidvector.sharedkernel.AccountId
 
 /**
  * 공고 **하나**를 식별자로 읽는 포트(M7/7C ②) — 읽기 하나뿐이다. 쓰기·상태 전이 메서드가
@@ -32,5 +33,9 @@ fun interface NoticeByIdPort {
  * 응답의 근거와 커널이 쓴 판정이 같은 값에서 나온다(두 자리에 같은 사실을 두지 않는다).
  */
 fun interface LicenseJudgementPort {
-    fun judgementFor(notice: Notice): LicenseJudgement
+    /** **M15/15A** — 자격 사실(V12)이 계정 소유라 판정도 계정을 받는다([LicenseGatePort] 와 같은 사유). */
+    fun judgementFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseJudgement
 }

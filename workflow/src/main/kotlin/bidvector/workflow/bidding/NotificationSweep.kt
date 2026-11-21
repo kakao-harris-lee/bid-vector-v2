@@ -3,7 +3,7 @@ package bidvector.workflow.bidding
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.notificationinbox.NotificationFact
 import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome

@@ -31,11 +31,6 @@ class LoginName(
     }
 }
 
-/** 계정 한 행의 식별자 — 저장 층이 발급한다(애플리케이션이 지어내지 않는다). */
-class AccountId(
-    val value: Long,
-)
-
 /**
  * 제시된 비밀 문구(로그인 요청 본문·부트스트랩 환경변수) — `toString()` 을 가려 로그·예외
  * 문면에 원문이 실리지 않게 한다([bidvector.adapters.koneps.ServiceKey] 와 같은 관례).

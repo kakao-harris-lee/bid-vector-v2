@@ -7,7 +7,7 @@ import bidvector.bidding.BidState
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.tag
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 /** 소유 필터를 **포트 안에서** 지는 fake — 실 DB 축은 `adapters` 쪽이 따로 잰다. */

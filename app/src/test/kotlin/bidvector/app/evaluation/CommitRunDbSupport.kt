@@ -67,11 +67,21 @@ internal fun clearOutbox(dataSource: DataSource) =
         connection.createStatement().use { it.execute("TRUNCATE TABLE outbox, inbox") }
     }
 
+/**
+ * 알림함도 매 test 전에 비운다(M15/15A) — 커밋 run 이 이제 **실제로** 항목을 쌓으므로, 비우지
+ * 않으면 「변한 표」 등식이 앞 test 의 잔여 행 덕분에 우연히 참이 된다(기록은 멱등이라 둘째
+ * run 은 행 수를 늘리지 않는다). 소유자 자격이 필요하다 — 앱 역할에 DELETE 가 없다.
+ */
+internal fun clearNotificationInbox(dataSource: DataSource) =
+    dataSource.connection.use { connection ->
+        connection.createStatement().use { it.execute("TRUNCATE TABLE notification_inbox") }
+    }
+
 internal fun setStrategyRevision(
     dataSource: DataSource,
     revision: Int,
 ) = dataSource.connection.use { connection ->
-    connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
+    connection.prepareStatement("UPDATE operator_strategy SET revision = ?").use { statement ->
         statement.setInt(1, revision)
         statement.executeUpdate()
     }
@@ -96,3 +106,20 @@ internal fun unblockNotificationInserts(
 ) = dataSource.connection.use { connection ->
     connection.createStatement().use { it.execute("ALTER TABLE outbox DROP CONSTRAINT $constraint") }
 }
+
+/**
+ * outbox 의 멱등 키 전수(M15/15A) — 전역 발송 채널에 **무엇이** 갔는지를 행 수가 아니라 **값**으로
+ * 본다. 키가 계정을 담으므로 「몇 건인가」와 「누구 것인가」를 한 단언이 함께 말한다.
+ */
+internal fun outboxIdempotencyKeys(dataSource: DataSource): List<String> =
+    dataSource.connection.use { connection ->
+        connection
+            .prepareStatement("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")
+            .use { statement ->
+                statement.executeQuery().use { rows ->
+                    val keys = mutableListOf<String>()
+                    while (rows.next()) keys += rows.getString("idempotency_key")
+                    keys
+                }
+            }
+    }

@@ -2,6 +2,7 @@ package bidvector.adapters.persistence
 
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.adapters.strategy.JdbcStrategyRepository
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
@@ -67,9 +68,15 @@ internal fun testPolicy(matchScoreMax: BigDecimal = BigDecimal.ONE): Resolution.
 private class InMemorySessionRepository : EditSessionRepository {
     private val sessions = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = sessions[id]?.toSnapshot()
 
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         sessions[session.id] = session
     }
 }
@@ -100,6 +107,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         policy: Resolution.Resolved<StrategyPolicyData> = testPolicy(),
     ): EditStrategyWorkflow =
         EditStrategyWorkflow(
+            account = testAccount(),
             sessions = InMemorySessionRepository(),
             strategies = strategies,
             clock = StrategyFixedClock(CLOCK_INSTANT),
@@ -271,7 +279,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         applyDraft(workflow, EditSessionId("s-round-trip"), draft, StrategyRevision(0))
 
         // 새 인스턴스로 다시 읽어 프로세스 내 캐시가 없음을 함께 확인한다.
-        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
 
         reloaded.watchRules.focusCategories shouldBe setOf(CategoryCode("BC01"), CategoryCode("BC02"))
         reloaded.watchRules.focusRegionTerms shouldBe listOf("서울", "경기")
@@ -304,13 +312,13 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
         val workflow = workflowWith(repository)
 
         applyDraft(workflow, EditSessionId("s-rev-1"), fullDraft(), StrategyRevision(0))
-        val afterFirst = repository.load()
+        val afterFirst = repository.load(testAccount())
         afterFirst.revision shouldBe StrategyRevision(1)
 
         val secondDraft = fullDraft().copy(candidateLimit = 25, bidNowThreshold = BigDecimal("0.80"))
         applyDraft(workflow, EditSessionId("s-rev-2"), secondDraft, StrategyRevision(1))
 
-        val afterSecond = repository.load()
+        val afterSecond = repository.load(testAccount())
         afterSecond.revision shouldBe StrategyRevision(2)
         afterSecond.candidateLimit?.value shouldBe 25
         afterSecond.actionThresholds.bidNowThreshold
@@ -356,7 +364,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
 
         // 정책이 바뀌어 이제 matchScore 상한이 0.5 다 — 저장된 0.90은 이제 무효다.
         val stricterRepository = JdbcStrategyRepository(dataSource(), testPolicy(matchScoreMax = BigDecimal("0.5")))
-        val thrown = shouldThrow<InvalidStoredStrategyException> { stricterRepository.load() }
+        val thrown = shouldThrow<InvalidStoredStrategyException> { stricterRepository.load(testAccount()) }
         thrown.violations shouldBe listOf(StrategyViolation.ScoreOutOfRange(ThresholdField.MinimumMatchScore))
     }
 
@@ -365,7 +373,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
     fun `전략 없음 — 첫 기동은 예외 없이 빈 전략을 내고 isConfigured 는 거짓이다`() {
         val repository = JdbcStrategyRepository(dataSource(), testPolicy())
 
-        val strategy = repository.load()
+        val strategy = repository.load(testAccount())
 
         strategy.isConfigured() shouldBe false
         strategy.revision shouldBe StrategyRevision(0)
@@ -397,7 +405,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
 
         applyDraft(workflow, EditSessionId("s-edge"), edgeDraft, StrategyRevision(0))
 
-        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
         reloaded.watchRules.focusCategories shouldBe emptySet()
         reloaded.watchRules.excludeRegionTerms shouldBe listOf("단독_제외")
         reloaded.watchRules.budget.min shouldBe null
@@ -463,7 +471,7 @@ class JdbcStrategyRepositoryTest : PersistenceTestSupport() {
 
         applyDraft(workflow, EditSessionId("s-won-boundary"), draft, StrategyRevision(0))
 
-        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val reloaded = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
         reloaded.watchRules.budget.min shouldBe boundary
     }
 

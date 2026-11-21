@@ -1,7 +1,7 @@
 package bidvector.workflow.notificationinbox
 
 import bidvector.procurement.NoticeId
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 /**

@@ -9,12 +9,12 @@ import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
 import bidvector.procurement.ObservedBidAmount
 import bidvector.settlement.AwardWinnerTradeName
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.AwardAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.opening.CanonicalOpeningFacts
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.OpeningResultFigures

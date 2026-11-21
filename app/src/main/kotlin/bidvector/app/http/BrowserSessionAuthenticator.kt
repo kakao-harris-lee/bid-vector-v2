@@ -1,8 +1,8 @@
 package bidvector.app.http
 
 import bidvector.app.wiring.BrowserAccessExecutor
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.access.AccessVerdict
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.access.CsrfDemand
 import bidvector.workflow.access.CsrfStamp
 import jakarta.servlet.http.HttpServletRequest

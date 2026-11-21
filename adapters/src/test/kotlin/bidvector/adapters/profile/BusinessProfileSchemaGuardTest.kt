@@ -2,7 +2,7 @@ package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.qualification.LicenseName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity

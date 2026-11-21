@@ -8,7 +8,7 @@ import bidvector.bidding.SubmittedBidAmount
 import bidvector.procurement.NoticeId
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.settlement.OperatorTradeName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.opening.NoticeOpeningFacts
 import java.time.Instant
 

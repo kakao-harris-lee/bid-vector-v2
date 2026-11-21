@@ -1,5 +1,6 @@
 package bidvector.workflow.strategy
 
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
@@ -49,9 +50,12 @@ private class BaseRevisionClock : Clock {
 private class BaseRevisionStrategyRepository : StrategyRepository {
     var strategy: OperatorStrategy = initialStrategy()
 
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         strategy = applied.strategy
     }
 }
@@ -60,9 +64,15 @@ private class BaseRevisionStrategyRepository : StrategyRepository {
 private class BaseRevisionSessionRepository : EditSessionRepository {
     private val stored = mutableMapOf<EditSessionId, EditSessionSnapshot>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = stored[id]
 
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         stored[session.id] = session.toSnapshot()
     }
 
@@ -96,6 +106,7 @@ class EditSessionBaseRevisionTest {
     private val events = BaseRevisionEventSink()
     private val workflow =
         EditStrategyWorkflow(
+            account = EDITOR_ACCOUNT,
             sessions,
             strategies,
             BaseRevisionClock(),
@@ -105,7 +116,8 @@ class EditSessionBaseRevisionTest {
         )
 
     /** 어댑터가 하는 일과 같다 — 현재 전략을 초안으로 내보내 그 필드 하나만 바꾼다(D-6A2b-2). */
-    private fun draftWith(patch: StrategyDraft.() -> StrategyDraft): StrategyDraft = strategies.load().toDraft().patch()
+    private fun draftWith(patch: StrategyDraft.() -> StrategyDraft): StrategyDraft =
+        strategies.load(EDITOR_ACCOUNT).toDraft().patch()
 
     private fun provideValue(
         session: EditSessionId,
@@ -121,7 +133,7 @@ class EditSessionBaseRevisionTest {
                 Actor.Operator(OPERATOR),
                 field,
                 draft,
-                baseRevision ?: strategies.load().revision,
+                baseRevision ?: strategies.load(EDITOR_ACCOUNT).revision,
             ),
         )
 
@@ -167,7 +179,7 @@ class EditSessionBaseRevisionTest {
 
         val applied = confirm(SESSION_A, "a-confirm", seenRevision = 1)
         applied.shouldBeInstanceOf<TransitionOutcome.Applied>()
-        strategies.load().revision shouldBe StrategyRevision(2)
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(2)
 
         // B 는 확인 직전에 조회해 최신 revision(2)을 보낸다 — ① 축은 통과한다.
         val rejected = confirm(SESSION_B, "b-confirm", seenRevision = 2)
@@ -175,9 +187,9 @@ class EditSessionBaseRevisionTest {
         rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         rejected.reason shouldBe RejectionReason.StaleRevision
         // A 의 값이 보존된다 — 이전 판에서는 여기서 null 이 됐다.
-        strategies.load().candidateLimit?.value shouldBe 13
-        strategies.load().maxActiveBids shouldBe null
-        strategies.load().revision shouldBe StrategyRevision(2)
+        strategies.load(EDITOR_ACCOUNT).candidateLimit?.value shouldBe 13
+        strategies.load(EDITOR_ACCOUNT).maxActiveBids shouldBe null
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(2)
         events.published.size shouldBe 1
     }
 
@@ -199,9 +211,9 @@ class EditSessionBaseRevisionTest {
         val applied = confirm(SESSION_B, "b-confirm-2", seenRevision = 2)
 
         applied.shouldBeInstanceOf<TransitionOutcome.Applied>()
-        strategies.load().candidateLimit?.value shouldBe 13
-        strategies.load().maxActiveBids?.value shouldBe 4
-        strategies.load().revision shouldBe StrategyRevision(3)
+        strategies.load(EDITOR_ACCOUNT).candidateLimit?.value shouldBe 13
+        strategies.load(EDITOR_ACCOUNT).maxActiveBids?.value shouldBe 4
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(3)
     }
 
     /**
@@ -247,7 +259,7 @@ class EditSessionBaseRevisionTest {
     fun `command 의 기준이 없는 행도 조회·취소가 되고 값 제출만 거부된다`() {
         workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)
         provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draftWith { copy(candidateLimit = 13) })
-        val stored = requireNotNull(sessions.load(SESSION_A))
+        val stored = requireNotNull(sessions.load(EDITOR_ACCOUNT, SESSION_A))
         sessions.put(stored.copy(lastCommand = requireNotNull(stored.lastCommand).copy(baseRevision = null)))
 
         val viewed = workflow.view(SESSION_A)
@@ -292,7 +304,7 @@ class EditSessionBaseRevisionTest {
         val rejected = (result as CommandResult.Processed).outcome
         rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         rejected.reason shouldBe RejectionReason.StaleRevision
-        val stored = requireNotNull(sessions.load(SESSION_B))
+        val stored = requireNotNull(sessions.load(EDITOR_ACCOUNT, SESSION_B))
         stored.stateKind shouldBe "WAITING_FOR_VALUE"
         stored.stateDraft shouldBe null
     }
@@ -302,13 +314,13 @@ class EditSessionBaseRevisionTest {
         workflow.begin(SESSION_A, OPERATOR, EditableField.CandidateLimit)
         provideValue(SESSION_A, "a-value", EditableField.CandidateLimit, draftWith { copy(candidateLimit = 13) })
         // 이 필드가 생기기 전에 저장된 행을 그대로 흉내낸다(마이그레이션 0 — 낡은 행이 실재할 수 있다).
-        sessions.put(requireNotNull(sessions.load(SESSION_A)).copy(stateBaseRevision = null))
+        sessions.put(requireNotNull(sessions.load(EDITOR_ACCOUNT, SESSION_A)).copy(stateBaseRevision = null))
 
         val rejected = confirm(SESSION_A, "a-confirm", seenRevision = 1)
 
         rejected.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         rejected.reason shouldBe RejectionReason.StaleRevision
-        strategies.load().revision shouldBe StrategyRevision(1)
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(1)
         events.published.size shouldBe 0
     }
 }

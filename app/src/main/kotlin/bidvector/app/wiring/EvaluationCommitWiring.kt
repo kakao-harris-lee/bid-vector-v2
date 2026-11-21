@@ -1,8 +1,6 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.evaluation.EvaluationCommitRun
-import bidvector.adapters.evaluation.PinnedStrategyRepository
-import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
@@ -15,7 +13,7 @@ import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
-import bidvector.workflow.strategy.StrategyRepository
+import bidvector.workflow.strategy.StrategyReader
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -64,11 +62,8 @@ data class EvaluationCommitProperties(
  * 하나다: dry-run 은 `RecordingNotificationRequestPort`, 커밋은 production
  * `OutboxNotificationRequestPort`(어댑터 조립 안).
  *
- * 전략은 **run 당 정확히 한 번** 저장소에서 읽는다(R1-M-4) — 배선이 한 번 읽어 여력·후보
- * 상한을 뽑고, **그 값을** `PinnedStrategyRepository` 로 고정해 use case 에 넘긴다. use case 의
- * `evaluate()` 진입 `load()` 는 그 고정값을 돌려받을 뿐 저장소를 다시 두드리지 않는다 —
- * 그래서 판정에 쓰인 상한과 payload 에 적힌 개정이 **같은 스냅샷**에서 온다(dry-run 이 같은
- * 이유로 쓰는 선례, D-6A3-5).
+ * 전략은 **계정마다 run 당 정확히 한 번** 저장소에서 읽는다(R1-M-4 의 계정별 판) — 그 읽기와
+ * 고정은 `EvaluationCommitRuns` 가 진다. 이 조립이 하는 일은 협력자를 꽂는 것뿐이다.
  */
 @Configuration
 // NOTI-01(M9/ops-code) — 알림함 쓰기·청중 빈을 **명시 import** 한다. 그 조립은 production 에서
@@ -79,11 +74,19 @@ data class EvaluationCommitProperties(
 @ConditionalOnProperty(prefix = "bidvector.evaluation", name = ["mode"], havingValue = "once")
 @EnableConfigurationProperties(EvaluationCommitProperties::class, EvaluationProperties::class)
 open class EvaluationCommitWiring {
+    /**
+     * **M15/15A — run 하나가 아니라 계정별 run 공장이다.** 앞 판은 이 자리에서 싱글턴 전략을
+     * **기동 시점에** 한 번 읽어 run 하나를 만들었고, 그 run 이 모든 계정의 알림함에 같은 새
+     * 후보를 적었다. 이제 계정 전수와 계정별 전략 읽기는 공장이 지고, 조립은 협력자만 꽂는다.
+     *
+     * 전략을 **읽기 port 타입으로** 받는다(`StrategyReader`) — 이 조립은 전략을 쓰지 않는다
+     * (`SuggestionWiring` 과 같은 규율).
+     */
     @Suppress("LongParameterList")
     @Bean
-    open fun evaluationCommitRun(
+    open fun evaluationCommitRuns(
         dataSource: DataSource,
-        strategyRepository: StrategyRepository,
+        strategyReader: StrategyReader,
         candidateSourcePort: CandidateSourcePort,
         watchSubjectPort: WatchSubjectPort,
         licenseGatePort: LicenseGatePort,
@@ -96,45 +99,31 @@ open class EvaluationCommitWiring {
         notificationInboxPort: NotificationInboxPort,
         notificationAudiencePort: NotificationAudiencePort,
         release: ReleaseIdentifier,
-    ): EvaluationCommitRun {
-        require(commitProperties.currentActiveBids >= 0) {
-            "bidvector.evaluation.commit.current-active-bids 는 음수일 수 없다"
-        }
-        val strategy = strategyRepository.load()
-        val maxActiveBids =
-            requireNotNull(strategy.maxActiveBids) {
-                "전략에 여력 상한(maxActiveBids)이 없다 — 커밋 run 을 거부한다(dry-run 과 같은 fail-closed)"
-            }.value
-        return EvaluationCommitRun(
+    ): EvaluationCommitRuns =
+        EvaluationCommitRuns(
             dataSource = dataSource,
-            // R1-M-4 — **읽은 값을 고정한다.** 앞 판은 저장소를 그대로 넘겨 use case 가
-            // `evaluate()` 진입에서 다시 읽었고, 그 사이에 전략이 바뀌면 payload 에 적힌 개정과
-            // 실제로 쓴 상한이 **다른 개정에서** 온다(6D-2 재현 등식의 입력 불일치). dry-run 이
-            // 같은 이유로 쓰는 선례를 그대로 쓴다.
-            strategies = PinnedStrategyRepository(strategy),
+            strategies = strategyReader,
             candidateSource = candidateSourcePort,
             watchSubjects = watchSubjectPort,
             licenseGate = licenseGatePort,
             mlAnalysis = mlAnalysisPort,
-            capacity = RequestCapacityPort(commitProperties.currentActiveBids, maxActiveBids),
             correlationIds = correlationIdFactory,
             clock = clock,
-            analysisBudget = strategy.candidateLimit?.value,
             notificationInbox = notificationInboxPort,
             audience = notificationAudiencePort,
+            currentActiveBids = commitProperties.currentActiveBids,
             release = release,
         )
-    }
 
     @Bean
     open fun evaluationCommitRunner(
-        run: EvaluationCommitRun,
+        runs: EvaluationCommitRuns,
         properties: EvaluationProperties,
         termination: CollectionTermination,
     ): EvaluationCommitRunner {
         val logger = LoggerFactory.getLogger(EvaluationCommitRunner::class.java)
         return EvaluationCommitRunner(
-            run = run,
+            runs = runs,
             candidateCap = properties.candidateCap,
             log = CollectionLog { logger.info(it) },
             termination = termination,

@@ -312,9 +312,10 @@ internal object Sql {
         RETURNING (xmax = 0) AS inserted, revision
         """
 
-    // 전략 영속(D-6F1-1). `operator_strategy`는 싱글턴(id=1, 리터럴), `revision`이
-    // 두 표 모두 플레이스홀더 순서의 첫 자리다(`StrategyRow.bindStrategyRow`가 그 순서로
-    // 채운다 — 표 둘이 한 바인더를 공유한다).
+    // 전략 영속(D-6F1-1). **M15/15A(V28) — 계정 소유다**: 싱글턴 리터럴 `1` 이 있던 자리에
+    // `account_id` 플레이스홀더가 선다. `revision`이 두 표 모두 그 다음 자리이고
+    // (`StrategyRow.bindStrategyRow`가 그 순서로 채운다 — 표 둘이 한 바인더를 공유한다),
+    // 그래서 계정은 **바인더 앞**에서 따로 꽂는다.
     private const val STRATEGY_COLUMNS =
         """
         focus_categories, focus_region_terms, exclude_region_terms,
@@ -325,15 +326,15 @@ internal object Sql {
         max_active_bids
         """
 
-    const val SELECT_STRATEGY = "SELECT revision, $STRATEGY_COLUMNS FROM operator_strategy WHERE id = 1"
+    const val SELECT_STRATEGY = "SELECT revision, $STRATEGY_COLUMNS FROM operator_strategy WHERE account_id = ?"
 
     const val UPSERT_STRATEGY =
         """
-        INSERT INTO operator_strategy (id, revision, $STRATEGY_COLUMNS)
+        INSERT INTO operator_strategy (account_id, revision, $STRATEGY_COLUMNS)
         VALUES (
-            1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
-        ON CONFLICT (id) DO UPDATE SET
+        ON CONFLICT (account_id) DO UPDATE SET
             revision = EXCLUDED.revision,
             focus_categories = EXCLUDED.focus_categories,
             focus_region_terms = EXCLUDED.focus_region_terms,
@@ -364,13 +365,13 @@ internal object Sql {
     // 이 표까지 같은 revision 이 두 번 오는 정상 경로가 없다).
     const val INSERT_STRATEGY_REVISION =
         """
-        INSERT INTO operator_strategy_revision (revision, $STRATEGY_COLUMNS)
+        INSERT INTO operator_strategy_revision (account_id, revision, $STRATEGY_COLUMNS)
         VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
         """
 
-    // 프로필 영속(D-6F6-1~3). 싱글턴(id=1, operator_strategy 와 같은 관례).
+    // 프로필 영속(D-6F6-1~3). **M15/15A(V28) — 계정 소유다**(operator_strategy 와 같은 관례).
     // `licenses_declared`·`license_names`가 짝을 이뤄 세 상태(미설정=행 없음·NotDeclared·
     // Declared(빈 목록 포함))를 구분한다 — V12 CHECK 가 그 짝의 모순만 막고, 세 상태 자체의
     // 구분은 이 열 형태가 진다.
@@ -379,13 +380,13 @@ internal object Sql {
         business_types, licenses_declared, license_names, region_terms
         """
 
-    const val SELECT_PROFILE = "SELECT $PROFILE_COLUMNS FROM operator_profile WHERE id = 1"
+    const val SELECT_PROFILE = "SELECT $PROFILE_COLUMNS FROM operator_profile WHERE account_id = ?"
 
     const val UPSERT_PROFILE =
         """
-        INSERT INTO operator_profile (id, $PROFILE_COLUMNS)
-        VALUES (1, ?, ?, ?, ?)
-        ON CONFLICT (id) DO UPDATE SET
+        INSERT INTO operator_profile (account_id, $PROFILE_COLUMNS)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (account_id) DO UPDATE SET
             business_types = EXCLUDED.business_types,
             licenses_declared = EXCLUDED.licenses_declared,
             license_names = EXCLUDED.license_names,
@@ -406,7 +407,7 @@ internal object Sql {
     const val SELECT_EDIT_SESSION =
         """
         SELECT operator_id, state, state_payload, expires_at, session_version, last_command
-        FROM edit_session WHERE id = ?
+        FROM edit_session WHERE id = ? AND account_id = ?
         """
 
     // D-6B1-3·D-6B1-4 — 낙관적 동시성의 유일한 write 경로(우회 (3)). WHERE 절이
@@ -432,8 +433,10 @@ internal object Sql {
     // 서로 조용히 덮어써 우회 (3)이 다시 열린다.
     const val UPSERT_EDIT_SESSION =
         """
-        INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version, last_command)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO edit_session (
+            id, account_id, operator_id, state, state_payload, expires_at, session_version, last_command
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (id) DO UPDATE SET
             operator_id = EXCLUDED.operator_id,
             state = EXCLUDED.state,
@@ -441,8 +444,9 @@ internal object Sql {
             expires_at = EXCLUDED.expires_at,
             session_version = EXCLUDED.session_version,
             last_command = EXCLUDED.last_command
-        WHERE (edit_session.state IN ('APPLIED', 'CANCELLED', 'EXPIRED') AND EXCLUDED.session_version = 0)
-           OR edit_session.session_version = EXCLUDED.session_version - 1
+        WHERE edit_session.account_id = EXCLUDED.account_id
+          AND ((edit_session.state IN ('APPLIED', 'CANCELLED', 'EXPIRED') AND EXCLUDED.session_version = 0)
+               OR edit_session.session_version = EXCLUDED.session_version - 1)
         RETURNING id
         """
 }

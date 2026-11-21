@@ -8,6 +8,7 @@ import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
 import bidvector.decision.MlUnavailableReason
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
@@ -54,12 +55,12 @@ class BidPriceRequestDifferentialTest {
                 strategyRepository = TestStrategyRepository(strategy),
                 candidateSource = CandidateSourcePort { analysisBudgetNotices },
                 watchSubjects = NoticeWatchSubjectPort(),
-                licenseGate = { licenseJudgementFixture().verdict },
+                licenseGate = { _, _ -> licenseJudgementFixture().verdict },
                 mlAnalysis = CountingMlAnalysisPort(unavailable()),
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
             )
-        return runBlocking { factory.forRequest(currentActiveBids).useCase.evaluate() }
+        return runBlocking { factory.forRequest(TEST_BID_ACCOUNT, currentActiveBids).useCase.evaluate() }
     }
 
     private fun singleRun(
@@ -76,7 +77,7 @@ class BidPriceRequestDifferentialTest {
             correlationIds = SequentialCorrelationIdFactory(),
             clock = clock,
             notificationInbox = InMemoryNotificationInbox(),
-        ).forRequest(id, currentActiveBids)
+        ).forRequest(TEST_BID_ACCOUNT, id, currentActiveBids)
 
     private fun unavailable(): MlAnalysisOutcome = MlAnalysisOutcome.Unavailable(MlUnavailableReason.ScoreNotProvided)
 
@@ -180,7 +181,7 @@ class BidPriceRequestDifferentialTest {
                 notificationInbox = InMemoryNotificationInbox(),
             )
 
-        val prepared = factory.forRequest(biddable.id, 0) as BidPriceRequestOutcome.Prepared
+        val prepared = factory.forRequest(TEST_BID_ACCOUNT, biddable.id, 0) as BidPriceRequestOutcome.Prepared
         runBlocking { prepared.run.evaluate() }
 
         judgements.callCount shouldBe 1
@@ -208,7 +209,7 @@ class BidPriceRequestDifferentialTest {
                 notificationInbox = InMemoryNotificationInbox(),
             )
 
-        val prepared = factory.forRequest(biddable.id, 0) as BidPriceRequestOutcome.Prepared
+        val prepared = factory.forRequest(TEST_BID_ACCOUNT, biddable.id, 0) as BidPriceRequestOutcome.Prepared
         runBlocking { prepared.run.evaluate() }
 
         notices.callCount shouldBe 1
@@ -238,3 +239,6 @@ class BidPriceRequestDifferentialTest {
             }
         }
 }
+
+/** 이 test 의 계정(M15/15A) — 축은 판정 동치이지 계정이 아니다. */
+private val TEST_BID_ACCOUNT = AccountId(1)

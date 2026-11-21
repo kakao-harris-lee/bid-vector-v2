@@ -17,8 +17,8 @@ import bidvector.bidding.asReal
 import bidvector.bidding.isOverdue
 import bidvector.bidding.isReconciliationCandidate
 import bidvector.bidding.nextCheckpoint
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.notificationinbox.NotificationInboxRecord

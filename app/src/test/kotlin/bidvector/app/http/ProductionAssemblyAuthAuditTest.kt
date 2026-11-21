@@ -201,7 +201,7 @@ class ProductionAssemblyAuthAuditTest {
     fun `D-6A1-27 — production 조립에서 올바른 자격증명은 통과하고 미매핑 경로도 같은 REQUEST 디스패치에서 끝난다`() {
         val authorized =
             restTemplate.exchange(
-                url("/api/strategy"),
+                url(CREDENTIAL_REACHABLE_PATH),
                 HttpMethod.GET,
                 HttpEntity<Void>(authorizedHeaders()),
                 String::class.java,
@@ -236,14 +236,14 @@ class ProductionAssemblyAuthAuditTest {
     fun `D-6A1-40 — production 조립에서 성공·인증실패·예외 각각 api_request_audit 행이 정확히 하나다`() {
         val authorized =
             restTemplate.exchange(
-                url("/api/strategy"),
+                url(CREDENTIAL_REACHABLE_PATH),
                 HttpMethod.GET,
                 HttpEntity<Void>(authorizedHeaders()),
                 String::class.java,
             )
         authorized.statusCode.value() shouldBe 200
 
-        val unauthenticated = restTemplate.getForEntity(url("/api/strategy"), String::class.java)
+        val unauthenticated = restTemplate.getForEntity(url(CREDENTIAL_REACHABLE_PATH), String::class.java)
         unauthenticated.statusCode.value() shouldBe 401
 
         val unmapped =
@@ -261,3 +261,10 @@ class ProductionAssemblyAuthAuditTest {
         auditRowCount() shouldBe 3
     }
 }
+
+/**
+ * 두 축이 재는 것은 **audit 행의 수**이지 경로가 아니다 — 자격 헤더로 **닿는** 경로여야
+ * 성공(200)·인증실패(401) 두 갈래가 같은 경로에서 갈린다. M15/15A 가 전략을 계정 전용으로
+ * 옮기면서 그 경로는 자격 축에서 늘 401 이 됐고, 그러면 성공 갈래를 잴 수 없다.
+ */
+private const val CREDENTIAL_REACHABLE_PATH = "/api/notices"

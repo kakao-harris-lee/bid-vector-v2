@@ -123,14 +123,23 @@ class BidPriceRequestE2ETest {
                 it.execute(
                     "TRUNCATE TABLE notice, notice_audit, rejected_write, raw_observation, " +
                         "provenance_authority, operator_strategy, operator_strategy_revision, " +
-                        "outbox, api_request_audit RESTART IDENTITY CASCADE",
+                        "outbox, api_request_audit, browser_session, account RESTART IDENTITY CASCADE",
                 )
             }
         }
+        session =
+            ProductionSessionSupport(restTemplate, ::url)
+                .seedAndSignIn(adminDataSource(postgres), "bid-price-e2e-owner")
     }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+    /**
+     * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
+     * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가
+     * `account` 까지 지우므로 세션도 함께 사라진다.
+     */
+    private lateinit var session: ProductionSessionSupport
+
+    private fun authorizedHeaders(): HttpHeaders = session.writeHeaders()
 
     private fun post(
         number: String,
@@ -159,20 +168,21 @@ class BidPriceRequestE2ETest {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setArray(1, empty)
+                    statement.setLong(1, session.accountId)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
-                    statement.setArray(5, connection.createArrayOf("text", arrayOf("이-문구는-공고에-없다")))
-                    statement.setBigDecimal(6, BigDecimal("0.80"))
-                    statement.setBigDecimal(7, BigDecimal("0.50"))
-                    statement.setInt(8, maxActiveBids)
+                    statement.setArray(5, empty)
+                    statement.setArray(6, connection.createArrayOf("text", arrayOf("이-문구는-공고에-없다")))
+                    statement.setBigDecimal(7, BigDecimal("0.80"))
+                    statement.setBigDecimal(8, BigDecimal("0.50"))
+                    statement.setInt(9, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -258,9 +268,11 @@ class BidPriceRequestE2ETest {
         // 가격 세 축은 상태와 사유만 낸다.
         body["bidPriceMenuState"] shouldBe "NOT_COMPUTED"
         body["floorShortfallState"] shouldBe "NOT_COMPUTED"
-        // 자격 헤더 경로에는 계정 주체가 없다 — 지어내지 않고 사유를 낸다(M7/7C③-b).
-        body["inboxRecordState"] shouldBe "NOT_RECORDED"
-        body["inboxRecordNotRecordedReason"] shouldBe "NO_ACCOUNT_SUBJECT"
+        // **M15/15A — 이 경로는 계정 전용이 됐다.** 세션 주체에는 계정이 있으므로 알림함에 적힌다.
+        // 앞 판의 「적지 않음 + `NO_ACCOUNT_SUBJECT`」(M7/7C③-b)는 자격 헤더 주체의 갈래였고, 그
+        // 주체는 이제 이 경로에 401 이다 — 갈래가 사라진 것이 아니라 입구가 닫혔다.
+        body["inboxRecordState"] shouldBe "RECORDED_NEW"
+        body["inboxRecordNotRecordedReason"] shouldBe null
     }
 
     /**

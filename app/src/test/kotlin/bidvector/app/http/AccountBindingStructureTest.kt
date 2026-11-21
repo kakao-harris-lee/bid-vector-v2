@@ -299,7 +299,7 @@ private fun jacksonSubclasses(outputs: Map<String, String>): Set<String> =
             text.lineSequence().any { JACKSON_SUPERTYPE.containsMatchIn(it) }
         }.keys
 
-private val ACCOUNT_ID_CLASS: Class<*> = bidvector.workflow.access.AccountId::class.java
+private val ACCOUNT_ID_CLASS: Class<*> = bidvector.sharedkernel.AccountId::class.java
 
 /** 요청 매핑 메서드 — `@RequestMapping` 과 그 합성(`@GetMapping` 등)을 Spring 의 메타 애너테이션 판정으로 고른다. */
 private fun requestMappingMethods(classes: List<Class<*>>): List<java.lang.reflect.Method> =
@@ -359,17 +359,17 @@ private fun appClasses(): List<Class<*>> {
 /** G11 양성 대조용 — 매핑 애너테이션을 가진 메서드 넷(직접 · 묶음 · 목록 · 평범). */
 private class G11Probe {
     class Wrapped(
-        val account: bidvector.workflow.access.AccountId,
+        val account: bidvector.sharedkernel.AccountId,
     )
 
     @org.springframework.web.bind.annotation.GetMapping("/direct")
-    fun direct(account: bidvector.workflow.access.AccountId): String = account.toString()
+    fun direct(account: bidvector.sharedkernel.AccountId): String = account.toString()
 
     @org.springframework.web.bind.annotation.GetMapping("/wrapped")
     fun wrapped(form: Wrapped): String = form.account.toString()
 
     @org.springframework.web.bind.annotation.PostMapping("/listed")
-    fun listed(accounts: List<bidvector.workflow.access.AccountId>): String = accounts.toString()
+    fun listed(accounts: List<bidvector.sharedkernel.AccountId>): String = accounts.toString()
 
     @org.springframework.web.bind.annotation.GetMapping("/plain")
     fun plain(caseId: String): String = caseId
@@ -402,7 +402,7 @@ private val MODEL_ATTRIBUTE = org.springframework.web.bind.annotation.ModelAttri
 /** (c) 양성 대조용 — 모델 속성 메서드 하나 · 모델 속성 매개변수를 받는 핸들러 하나. */
 private class ModelAttributeProbe {
     @org.springframework.web.bind.annotation.ModelAttribute("vrAccount")
-    fun vrAccount(account: bidvector.workflow.access.AccountId): String = account.toString()
+    fun vrAccount(account: bidvector.sharedkernel.AccountId): String = account.toString()
 
     fun handler(
         @org.springframework.web.bind.annotation.ModelAttribute("vrAccount") held: Any,

@@ -2,7 +2,7 @@ package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.qualification.LicenseName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity
@@ -164,7 +164,7 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
         store.replaceDetails(owner, BusinessDetails.EMPTY, now)
 
         store.capacities(owner) shouldBe listOf(capacity("합성토목"))
-        JdbcOperatorProfileRepository(dataSource()).current() shouldBe null
+        JdbcOperatorProfileRepository(dataSource()).current(owner) shouldBe null
     }
 
     @Test

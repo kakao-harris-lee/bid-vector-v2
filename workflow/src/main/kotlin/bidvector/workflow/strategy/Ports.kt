@@ -1,5 +1,6 @@
 package bidvector.workflow.strategy
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyEvent
 import java.time.Instant
@@ -34,7 +35,10 @@ fun interface Clock {
  * 3D/4C 의 write 게이트 소관이다.
  */
 interface StrategyRepository : StrategyReader {
-    fun save(applied: AppliedStrategy)
+    fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    )
 }
 
 /**
@@ -50,7 +54,14 @@ interface StrategyRepository : StrategyReader {
  * 구현해도 쓰기 경로는 생기지 않는다.
  */
 interface StrategyReader {
-    fun load(): OperatorStrategy
+    /**
+     * **M15/15A — 계정 소유다.** 그 계정의 행이 없으면 빈 전략(`StrategyDraft()` + `revision 0`)이고,
+     * 다른 계정의 행을 빌려 오지 않는다(V28 뒤 질의의 술어가 `account_id = ?` 하나다).
+     *
+     * 계정이 **인자**인 것이 이 축의 구조다: 받지 않으면 「계정을 빠뜨린 읽기」가 시그니처상
+     * 존재하고 그것을 막는 것은 배선 관례뿐이다. 인자로 두면 빠뜨린 자리가 컴파일에서 멈춘다.
+     */
+    fun load(account: AccountId): OperatorStrategy
 }
 
 /**
@@ -69,9 +80,16 @@ interface StrategyReader {
  * 필요 없다).
  */
 interface EditSessionRepository {
-    fun load(id: EditSessionId): EditSessionSnapshot?
+    /** **M15/15A** — 남의 계정의 세션은 `null` 이다(`StrategyReader.load` 와 같은 사유로 계정이 인자다). */
+    fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot?
 
-    fun save(session: EditSession)
+    fun save(
+        account: AccountId,
+        session: EditSession,
+    )
 }
 
 /**

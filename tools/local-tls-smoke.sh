@@ -369,11 +369,20 @@ case "$(_body /no-such-page)" in
 esac
 
 # ---- (C) /api 가 app 에 닿는다 ----
-_step "(C) /api/** 가 app 에 닿는다 — 무인증 401 · 인증 200"
+# **M15/15A — 200 을 내는 경로를 바꾼다.** V28 이 전략을 계정 소유로 옮기면서 `/api/strategy` 는
+# 계정 전용 뿌리가 됐고 자격 헤더 주체에는 계정이 없다(그 축에서 401 이 맞는 답이다). 이 블록이
+# 재는 것은 **프록시가 `/api/**` 를 app 으로 보내는가**이므로, 둘 다 401 이면 「app 이 거부했다」와
+# 「프록시가 스스로 401 을 냈다」가 구별되지 않는다 — 그래서 자격 축으로 **아직 200 을 내는**
+# 경로를 하나 남겨 그 구별을 지킨다.
+_step "(C) /api/** 가 app 에 닿는다 — 무인증 401 · 계정 전용 뿌리 401 · 자격 축 200"
 code="$(_code /api/strategy)"
 [ "$code" = "401" ] || fail "무인증 /api/strategy 가 401 이 아니다: $code"
 code="$(_auth_code /api/strategy)"
-[ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
+[ "$code" = "401" ] || fail "자격 헤더 /api/strategy 가 401 이 아니다 — 계정 전용 뿌리가 열렸다: $code"
+code="$(_code /api/notices)"
+[ "$code" = "401" ] || fail "무인증 /api/notices 가 401 이 아니다: $code"
+code="$(_auth_code /api/notices)"
+[ "$code" = "200" ] || fail "인증 /api/notices 가 200 이 아니다 — /api 가 app 에 닿지 않는다: $code"
 
 # ---- (D) 보안 헤더 ----
 _step "(D) 보안 헤더 — 값 등식 · 이름마다 1개 · Server·HSTS 부재 · **/api 응답도 같다**"

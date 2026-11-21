@@ -24,7 +24,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
 
     @Test
     fun `프로필 미설정 — 행이 없으면 current 는 null`() {
-        repository().current() shouldBe null
+        repository().current(testAccount()) shouldBe null
     }
 
     @Test
@@ -36,9 +36,9 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = listOf("서울", "경기"),
             )
 
-        writer().save(facts)
+        writer().save(testAccount(), facts)
 
-        repository().current() shouldBe facts
+        repository().current(testAccount()) shouldBe facts
     }
 
     /**
@@ -53,11 +53,11 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val declaredEmpty =
             ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(emptyList()), emptyList())
 
-        writer().save(notDeclared)
-        val afterNotDeclared = repository().current()
+        writer().save(testAccount(), notDeclared)
+        val afterNotDeclared = repository().current(testAccount())
 
-        writer().save(declaredEmpty)
-        val afterDeclaredEmpty = repository().current()
+        writer().save(testAccount(), declaredEmpty)
+        val afterDeclaredEmpty = repository().current(testAccount())
 
         afterNotDeclared shouldBe notDeclared
         afterDeclaredEmpty shouldBe declaredEmpty
@@ -75,36 +75,44 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val second =
             ProfileFacts(setOf(CategoryCode("전기공사업")), OperatorLicenses.NotDeclared, listOf("부산", "울산"))
 
-        writer().save(first)
-        writer().save(second)
+        writer().save(testAccount(), first)
+        writer().save(testAccount(), second)
 
-        repository().current() shouldBe second
+        repository().current(testAccount()) shouldBe second
     }
 
     /**
-     * D-6F6-3·우회 (7) — 표 자신의 `CHECK (id = 1)`이 두 번째 행을 거부한다. 애플리케이션
-     * 경로([JdbcOperatorProfileWriter.save])는 늘 `id=1`만 쓰므로, 이 test 는 그 경로를
-     * 우회하는 직접 SQL로 표 제약 자체를 잰다(`bidvector_app` 역할, `appConnection()`).
+     * **주장이 뒤집혔다**(M15/15A — V28). 앞 판은 표 자신의 `CHECK (id = 1)` 이 **둘째 행을
+     * 거부한다**를 쟀다. 이 slice 가 그 CHECK 를 걷고 `account_id` 를 PK 로 두었으므로, 같은
+     * 자리에서 재는 것이 바뀐다 — **계정이 다르면 둘째 행이 선다**(그것이 계정별 분리의 뜻이다).
+     *
+     * 유일 제약 자체는 사라지지 않았다: **같은 계정**의 둘째 행은 PK 가 거부한다. 두 단언을 함께
+     * 두는 이유는 한쪽만 보면 「아무 행도 안 들어간다」와 「아무거나 들어간다」가 각각 초록이기
+     * 때문이다. 애플리케이션 경로를 우회하는 직접 SQL 로 **표 제약 자체**를 잰다.
      */
     @Test
-    fun `싱글턴 제약 — id 2 로 두 번째 행을 직접 SQL 로 넣으면 표 제약이 거부한다`() {
-        val insertSecondRow =
-            "INSERT INTO operator_profile (id, business_types, licenses_declared, license_names, region_terms) " +
-                "VALUES (2, '{}', false, '{}', '{}')"
+    fun `계정별 한 행 — 다른 계정은 둘째 행이 서고 같은 계정의 둘째 행은 거부된다`() {
+        val other = seedAccount("profile-second-owner")
         appConnection().use { connection ->
             connection.autoCommit = true
-            connection.prepareStatement(insertSecondRow).use { statement ->
+            connection.prepareStatement(insertProfileRow(testAccount().value)).use { it.executeUpdate() shouldBe 1 }
+            connection.prepareStatement(insertProfileRow(other.value)).use { it.executeUpdate() shouldBe 1 }
+            connection.prepareStatement(insertProfileRow(other.value)).use { statement ->
                 shouldThrow<SQLException> { statement.executeUpdate() }
             }
         }
     }
+
+    private fun insertProfileRow(account: Long): String =
+        "INSERT INTO operator_profile (account_id, business_types, licenses_declared, license_names, region_terms) " +
+            "VALUES ($account, '{}', false, '{}', '{}')"
 
     /**
      * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10) — 이 표가 싣는
      * `bidvector.strategy.CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리
      * 정규화가 없는 평범한 `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다.
      *
-     * **HIGH-1 시정** — `repository().current()!!.businessTypes shouldBe
+     * **HIGH-1 시정** — `repository().current(testAccount())!!.businessTypes shouldBe
      * facts.businessTypes`처럼 양변이 같은 `CategoryCode(...)` 생성자를 지나면, 그 생성자
      * 안에 멱등 정규화가 들어올 때 양변이 함께 접혀 단언이 계속 통과하는 항진명제가 된다(
      * 함수와 그 함수 본문 재계산값의 비교와 같은 결함 클래스). 이 판은 복원된
@@ -126,9 +134,9 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = emptyList(),
             )
 
-        writer().save(facts)
+        writer().save(testAccount(), facts)
 
-        val restoredProfile = repository().current()!!
+        val restoredProfile = repository().current(testAccount())!!
         val restoredValues = restoredProfile.businessTypes.map(CategoryCode::value).toSet()
 
         // 원소 수 — 정규화가 들어오면 두 리터럴이 생성 시점에 이미 하나로 접혀 여기서 붉어진다.

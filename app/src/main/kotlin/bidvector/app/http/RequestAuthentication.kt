@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest

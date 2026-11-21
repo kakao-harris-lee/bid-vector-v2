@@ -299,15 +299,17 @@ class ManagementHealthSurfaceTest {
             authorized.statusCode.value() shouldBe 404
         }
 
-        // 기존 API 는 그대로 — 관리 포트 분리가 인증 경계를 건드리지 않았다.
-        val strategy =
+        // 기존 API 는 그대로 — 관리 포트 분리가 인증 경계를 건드리지 않았다. **자격 헤더로 닿는**
+        // 경로로 잰다(M15/15A): 전략은 V28 이후 계정 전용이라 이 축으로는 401 이고, 그러면 이
+        // 단언이 「API 포트가 산다」가 아니라 「거부된다」를 재게 된다 — 404 와 구별이 흐려진다.
+        val notices =
             restTemplate.exchange(
-                api("/api/strategy"),
+                api("/api/notices"),
                 HttpMethod.GET,
                 HttpEntity<Void>(authorizedHeaders()),
                 String::class.java,
             )
-        strategy.statusCode.value() shouldBe 200
+        notices.statusCode.value() shouldBe 200
     }
 
     @Test
