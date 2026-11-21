@@ -58,11 +58,48 @@ class BusinessProfileValuesTest {
         }
     }
 
+    /**
+     * 받는 꼴은 **둘**이고 저장되는 꼴은 **하나**다(M15/15C). 하이픈 표기가 숫자 열 자리와 같은
+     * 값이 되는 것이 「정규화가 한 번」의 뜻이다.
+     */
     @Test
-    fun `가림 — 상호 · 시평액 · 인증서 만료일이 toString 에 실리지 않는다`() {
+    fun `사업자번호 — 숫자 10자리와 3-2-5 표기가 같은 값이다`() {
+        BusinessRegistrationNumber.of("1234567890").digits shouldBe "1234567890"
+        BusinessRegistrationNumber.of("123-45-67890") shouldBe BusinessRegistrationNumber("1234567890")
+    }
+
+    /**
+     * 그 둘 **밖**은 값이 아니다. 「하이픈을 지우고 남은 숫자가 10 이면 받는다」로 열면 아래 셋이
+     * 전부 같은 값이 되고, 그때부터 적은 것과 저장된 것이 다르다.
+     */
+    @Test
+    fun `사업자번호 — 하이픈 자리가 다르거나 자릿수가 어긋나면 값이 아니다`() {
+        listOf(
+            "1-2-3-4-5-6-7-8-9-0",
+            "-1234567890",
+            "1234567890-",
+            "12345-67890",
+            "123456789",
+            "12345678901",
+            "123-45-6789O", // 영문 대문자 O
+            " 1234567890",
+            "１２３４５６７８９０", // 전각 숫자
+        ).forEach { shouldThrow<IllegalArgumentException> { BusinessRegistrationNumber.of(it) } }
+    }
+
+    /** 저장에서 읽어 오는 생성자도 열 자리만 받는다 — 표 CHECK 가 갈리면 여기서 크게 실패한다. */
+    @Test
+    fun `사업자번호 — 값 자체는 숫자 10자리만이다(하이픈을 담지 않는다)`() {
+        shouldThrow<IllegalArgumentException> { BusinessRegistrationNumber("123-45-67890") }
+        shouldThrow<IllegalArgumentException> { BusinessRegistrationNumber("") }
+    }
+
+    @Test
+    fun `가림 — 상호 · 사업자번호 · 시평액 · 인증서 만료일이 toString 에 실리지 않는다`() {
         val details =
             BusinessDetails(
                 tradeName = TradeName("합성상호표지"),
+                businessRegistrationNumber = BusinessRegistrationNumber("1098765432"),
                 headquartersRegion = HeadquartersRegion.JEJU,
                 naraReadiness =
                     NaraReadiness.Registered(setOf(NaraRegistrationField.SERVICE), LocalDate.of(2031, 7, 9)),
@@ -70,9 +107,16 @@ class BusinessProfileValuesTest {
         val capacity = ConstructionCapacity(LicenseName("합성면허표지"), 987_654_321L, 2026)
 
         details.toString() shouldNotContain "합성상호표지"
+        details.toString() shouldNotContain "1098765432"
         details.toString() shouldNotContain "2031"
         capacity.toString() shouldNotContain "987654321"
         capacity.toString() shouldNotContain "합성면허표지"
+    }
+
+    /** 행이 없는 계정은 사업자번호도 **미설정**이다 — 빈 문자열이나 0 을 지어내지 않는다. */
+    @Test
+    fun `빈 사업 정보의 사업자번호는 미설정이다`() {
+        BusinessDetails.EMPTY.businessRegistrationNumber shouldBe null
     }
 
     /** 실패 문면도 출력 경로다 — 거부 사유가 입력값을 되울리면 로그로 샌다. */
@@ -83,5 +127,7 @@ class BusinessProfileValuesTest {
         failure.message.orEmpty() shouldNotContain "표지"
         val badAmount = shouldThrow<IllegalArgumentException> { ConstructionCapacity(LicenseName("x"), -424242L, 2026) }
         badAmount.message.orEmpty() shouldNotContain "424242"
+        val badNumber = shouldThrow<IllegalArgumentException> { BusinessRegistrationNumber.of("535353535353") }
+        badNumber.message.orEmpty() shouldNotContain "535353"
     }
 }

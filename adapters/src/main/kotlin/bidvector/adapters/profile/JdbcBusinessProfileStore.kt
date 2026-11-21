@@ -6,6 +6,7 @@ import bidvector.qualification.LicenseName
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.BusinessProfileStorePort
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
@@ -142,8 +143,9 @@ private inline fun writingRow(write: () -> Unit): StorageWriteOutcome =
 private const val INTEGRITY_CONSTRAINT_VIOLATION = "23"
 
 /**
- * 사업 정보 다섯 열을 `UPSERT_DETAILS` 순서대로 싣고 **다음 자리를 낸다** — 자리 수를 상수로 손으로
+ * 사업 정보 **여섯** 열을 `UPSERT_DETAILS` 순서대로 싣고 **다음 자리를 낸다** — 자리 수를 상수로 손으로
  * 적지 않는다(r1 CR M-2: 열을 하나 더하면 그 상수가 조용히 어긋나 다른 열 위에 덮어쓴다).
+ * M15/15C 가 열을 하나 더했고, 그 규율 덕에 호출부는 한 줄도 바뀌지 않았다.
  */
 private fun PreparedStatement.bindDetails(
     startIndex: Int,
@@ -153,6 +155,8 @@ private fun PreparedStatement.bindDetails(
     val registered = readiness as? NaraReadiness.Registered
     var index = startIndex
     setString(index++, details.tradeName?.raw)
+    // 저장되는 꼴은 숫자 10자리 하나다 — 값 타입이 이미 그 꼴을 보증한다(여기서 다시 지우지 않는다).
+    setString(index++, details.businessRegistrationNumber?.digits)
     setString(index++, details.headquartersRegion?.name)
     setString(index++, readiness.registration.name)
     val fields = registered?.fields ?: emptySet()
@@ -165,6 +169,9 @@ private fun ResultSet.toBusinessDetails(): BusinessDetails =
     BusinessDetails(
         // 운영자가 입력한 원문 그대로 — 정규화하지 않는다(이중 정규화 금지).
         tradeName = getString("trade_name")?.let(::TradeName),
+        // 열 값이 꼴을 어기면(V30 CHECK 를 우회한 직접 SQL) **크게 실패한다** — 값은 싣지 않는다.
+        businessRegistrationNumber =
+            getString("business_registration_number")?.let(::BusinessRegistrationNumber),
         headquartersRegion = getString("headquarters_region")?.let { stored(it, HeadquartersRegion.entries) },
         naraReadiness = toNaraReadiness(),
     )

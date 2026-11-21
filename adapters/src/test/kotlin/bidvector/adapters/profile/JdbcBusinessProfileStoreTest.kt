@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.qualification.LicenseName
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.profile.BusinessDetails
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
@@ -33,6 +34,7 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
     private val registered =
         BusinessDetails(
             tradeName = TradeName(" (주)합성상호 "),
+            businessRegistrationNumber = BusinessRegistrationNumber("3141592653"),
             headquartersRegion = HeadquartersRegion.GYEONGNAM,
             naraReadiness =
                 NaraReadiness.Registered(
@@ -94,14 +96,21 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
         store.details(owner).naraReadiness shouldBe NaraReadiness.Unanswered
     }
 
+    /**
+     * 절 단위 교체라 **지우기도 왕복의 일부**다. 사업자번호를 함께 재는 이유(M15/15C): upsert 의
+     * `DO UPDATE SET` 에서 그 열이 빠지면 **첫 저장은 보이는데 지우기만 조용히 실패한다** —
+     * 「왕복이 된다」만 재는 단언은 그 결함을 지나간다.
+     */
     @Test
-    fun `절 교체는 null 로 되돌릴 수 있다 — 상호를 지우면 미설정이다`() {
+    fun `절 교체는 null 로 되돌릴 수 있다 — 상호 · 사업자번호를 지우면 미설정이다`() {
         val owner = account("owner")
         store.replaceDetails(owner, registered, now)
+        store.details(owner).businessRegistrationNumber shouldBe BusinessRegistrationNumber("3141592653")
 
-        store.replaceDetails(owner, registered.copy(tradeName = null), now)
+        store.replaceDetails(owner, registered.copy(tradeName = null, businessRegistrationNumber = null), now)
 
         store.details(owner).tradeName shouldBe null
+        store.details(owner).businessRegistrationNumber shouldBe null
     }
 
     @Test

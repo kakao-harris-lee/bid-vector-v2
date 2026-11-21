@@ -54,6 +54,26 @@ class OnboardingChecklistTest {
 
     private val constructionRegistered = withDetails(BusinessDetails.EMPTY.copy(naraReadiness = registeredConstruction))
 
+    /** 걸리는 여덟이 **전부 완료**인 스냅샷 — 사업자번호만 비어 있다(M15/15C 의 기준점). */
+    private val everythingDone =
+        OnboardingSnapshot(
+            qualification = ProfileFacts(setOf(CategoryCode("합성업종")), OperatorLicenses.NotDeclared, emptyList()),
+            details =
+                BusinessDetails(
+                    tradeName = TradeName("합성상호"),
+                    businessRegistrationNumber = null,
+                    headquartersRegion = HeadquartersRegion.SEJONG,
+                    naraReadiness = registeredConstruction,
+                ),
+            capacities = listOf(capacity),
+            watchRules =
+                emptyWatch.copy(
+                    budget = BudgetBound(null, won, emptyWatch.budget.inclusivity),
+                    focusCategories = setOf(CategoryCode("합성업종")),
+                ),
+            today = today,
+        )
+
     /** 항목 → (그 항목이 적용되면서 미완인 스냅샷, 같은 조건에서 그 항목만 채운 스냅샷). */
     private val pairs: Map<OnboardingItem, Pair<OnboardingSnapshot, OnboardingSnapshot>> =
         mapOf(
@@ -186,6 +206,28 @@ class OnboardingChecklistTest {
         val expired = readiness(today.minusDays(1))
         judgeOnboardingChecklist(expired).pending.contains(OnboardingItem.NARA_READINESS) shouldBe true
         judgeOnboardingChecklist(readiness(null)).pending.contains(OnboardingItem.NARA_READINESS) shouldBe true
+    }
+
+    /**
+     * M15/15C — 사업자번호는 **선택**이다. 「비워 둬도 끝낼 수 있다」와 「채워도 판정이 같다」를
+     * 함께 잰다: 앞만 재면 그 칸을 항목으로 더한 구현에서도 초록일 수 있다(채운 쪽을 안 보므로).
+     */
+    @Test
+    fun `사업자번호는 항목이 아니다 — 비워 둬도 완료를 막지 않고 채워도 판정이 같다`() {
+        val withoutNumber = judgeOnboardingChecklist(everythingDone)
+        withoutNumber.pending shouldBe emptyList()
+        withoutNumber.awaiting shouldBe emptyList()
+        withoutNumber.completed shouldContainExactly OnboardingItem.entries
+
+        val filled =
+            everythingDone.copy(
+                details =
+                    everythingDone.details.copy(
+                        businessRegistrationNumber = BusinessRegistrationNumber("1234567890"),
+                    ),
+            )
+
+        judgeOnboardingChecklist(filled) shouldBe withoutNumber
     }
 
     @Test
