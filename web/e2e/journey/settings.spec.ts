@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import {
+  assertNoPrivateValues,
+  OWN_BUSINESS_REGISTRATION_NUMBER,
+  PLANTED_BUSINESS_REGISTRATION_NUMBER,
+  PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED,
+  privateValueProblems,
+} from './privateValues';
 import { nameSourcesInPage } from './touchMeasure';
 
 import {
@@ -295,21 +302,130 @@ test('설정 — 쉼표 금액은 보내지 않고, 보낸 값은 본문의 값�
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
-/** D-7E2-7 — 사업자번호는 **입력칸이 없다**. 화면·콘솔에 그 꼴의 값이 0 인 것도 함께 센다. */
-test('설정에 사업자번호 입력칸이 없고 화면·콘솔에 그 꼴이 없다', async ({ page }) => {
+/**
+ * 심는 값은 이 실행이 실제로 저장하는 **합성** 번호다(실제 사업자의 것이 아니다). 두 꼴 모두
+ * `privateValues.ts` 가 한 값에서 낸다 — 술어가 금지하는 것과 여정이 심는 것이 같은 값이어야
+ * 양성 대조가 공허하지 않다.
+ */
+const PLANTED_NUMBER = PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED;
+
+/**
+ * 셸의 전역 탐색으로 한 화면 간다 — 주소를 손으로 적지 않는다(`openSettings` 와 같은 관례).
+ *
+ * **이름을 정확히 맞추지 않는다**: 배지를 다는 자리는 접근성 이름이 「내 입찰함 3」처럼 **수를
+ * 품는다**(실측). 그 수는 앞 여정들이 남긴 상태라 고정값이 아니다. 대신 **탐색으로 좁혀** 같은
+ * 글자를 품은 본문의 걸음과 갈린다.
+ */
+async function goToScreen(page: Page, label: string, screen: string): Promise<void> {
+  await page.getByRole('navigation', { name: '화면' }).getByRole('link', { name: label }).click();
+  await expect(page.getByTestId(screen)).toBeVisible();
+}
+
+/** 사업 정보 절을 저장하고 **그 응답**을 돌려준다 — 화면의 믿음이 아니라 서버의 사실을 본다. */
+async function saveBusinessDetails(page: Page): Promise<{ readonly businessRegistrationNumber: string | null }> {
+  const written = page.waitForResponse(
+    (one) =>
+      one.url().endsWith('/api/profile/business-details') &&
+      one.request().method() === 'POST' &&
+      one.status() === 200,
+  );
+  await page.getByRole('button', { name: '사업 정보 저장' }).click();
+  return (await (await written).json()) as { readonly businessRegistrationNumber: string | null };
+}
+
+/**
+ * M15/15C — **주장이 뒤집혔다**(앞 판은 「입력칸이 없다」였다): 사업자번호는 선택 입력이 되었고
+ * 「준비 중」에 남은 것은 진위 확인이다. 그 칸은 **자기 계정의 값**이라 누출 게이트의 예외
+ * 하나이고, 이 test 가 그 예외의 **범위**를 잰다.
+ *
+ * 양성 대조가 이 test 의 절반이다: 같은 값을 **상호 칸**에 두면 같은 술어가 문제를 내야 한다.
+ * 그것을 재지 않으면 「예외를 주었더니 조용하다」와 「게이트가 통째로 눈이 멀었다」가 같은 값이다.
+ * 심은 값은 **칸을 옮긴다**(r1 cr L-1) — ③ 전에 자기 칸을 비워, 그 시점에 값이 예외 **밖에만**
+ * 있게 한다. 두 칸에 함께 두면 대조의 힘이 남아 있어도 주석이 참이 아니다.
+ *
+ * 이 test 는 **저장하지 않는다** — 서버 상태는 아래 test 가 쥔다.
+ */
+test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 같은 게이트가 붉어진다', async ({ page }) => {
   const consoleLines: string[] = [];
   page.on('console', (message) => consoleLines.push(message.text()));
   await signIn(page);
   await openSettings(page);
 
   const notReady = page.getByTestId('settings-not-ready');
-  await expect(notReady).toContainText('사업자번호');
+  await expect(notReady).toContainText('진위 확인');
   await expect(notReady.getByRole('textbox')).toHaveCount(0);
 
-  const body = await page.locator('body').innerText();
-  expect(body).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
-  expect(body).not.toContain(journeyContext().passphrase);
+  // ① 아무것도 적기 전 — 화면에 그 꼴이 0 이다.
+  await assertNoPrivateValues(page);
+
+  // ② 자기 칸에 적으면 통과한다(예외가 듣는다).
+  const own = page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER);
+  await own.fill(PLANTED_NUMBER);
+  await assertNoPrivateValues(page);
+
+  // ③ **양성 대조** — 값을 예외 **밖으로 옮기면** 같은 술어가 문제를 낸다(더하기가 아니다).
+  await own.fill('');
+  const tradeName = page.getByTestId('profile-trade-name-input');
+  await tradeName.fill(PLANTED_NUMBER);
+  expect(await privateValueProblems(page), '예외가 화면 전체를 열었다').not.toStrictEqual([]);
+
+  // ④ 되돌리면 다시 조용하다 — ③ 의 붉음이 심은 값 때문이라는 것을 이 쌍이 말한다.
+  await tradeName.fill('');
+  await assertNoPrivateValues(page);
+
   expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
+});
+
+/**
+ * **저장된 번호가 있는 상태**를 재는 자리(r1 cr H-1 · v F1). 앞 판의 모집단은 공허했다 —
+ * 어느 여정도 사업자번호를 **저장하지 않아서**, 넓힌 술어가 「저장된 값이 있는 화면」을 한 번도
+ * 보지 못했다. 방어가 없는 것과 재지 않은 것이 같은 값이 되는 꼴이고, 이 slice 가 스스로
+ * 경고한 바로 그 패턴이다.
+ *
+ * 그래서 **저장하고 · 재진입하고 · 다른 화면을 돈다**. 술어는 그 합성 번호의 **숫자 열 자리
+ * 축어**도 금지하므로, 계약 값을 그대로 그리는 자리가 생기면(표시 서식을 거치지 않는 줄)
+ * 여기서 붉어진다 — 꼴 정규식이 영영 못 보는 사각이다.
+ *
+ * **전역 상태를 되돌린다**: 끝에서 칸을 비워 저장하고 그 응답이 `null` 인 것을 단언한다. 사업
+ * 정보는 계정당 한 행이고 여정들이 한 하네스를 차례로 쓰므로, 남기면 뒤 여정이 다른 전제에서 돈다.
+ */
+test('사업자번호 — 저장한 뒤 재진입·다른 화면에서도 그 값이 서지 않는다', async ({ page }) => {
+  await signIn(page);
+  await openSettings(page);
+
+  const own = page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER);
+  await own.fill(PLANTED_NUMBER);
+  expect((await saveBusinessDetails(page)).businessRegistrationNumber).toBe(
+    PLANTED_BUSINESS_REGISTRATION_NUMBER,
+  );
+
+  // ① 저장 직후의 설정 화면 — 값은 예외 칸 하나에만 있다.
+  await expect(own).toHaveValue(PLANTED_NUMBER);
+  await assertNoPrivateValues(page);
+
+  // ② 재진입 — 서버에서 다시 읽어 그린 화면에서도 같다.
+  await goToScreen(page, '오늘의 공고', 'screen-home');
+  await assertNoPrivateValues(page);
+  await openSettings(page);
+  await expect(page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER)).toHaveValue(PLANTED_NUMBER);
+  await assertNoPrivateValues(page);
+
+  // ③ 다른 화면들 — 같은 카드가 서는 시작하기와, 카드가 없는 화면 셋.
+  for (const [label, screen] of [
+    ['시작하기', 'screen-onboarding'],
+    ['내 입찰함', 'screen-bid-box'],
+    ['결과 확인', 'screen-results'],
+    ['알림함', 'screen-inbox'],
+  ] as const) {
+    await goToScreen(page, label, screen);
+    await assertNoPrivateValues(page);
+  }
+
+  // ④ 되돌린다 — 비워 저장하고 **서버의 답**이 「비워 둠」인 것을 본다.
+  await openSettings(page);
+  await page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER).fill('');
+  expect((await saveBusinessDetails(page)).businessRegistrationNumber).toBeNull();
+  await assertNoPrivateValues(page);
 });
 
 /**

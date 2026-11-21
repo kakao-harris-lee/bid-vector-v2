@@ -5,8 +5,9 @@ package bidvector.adapters.persistence
  * (7B 의 `BidCaseColumnSpecs` 와 같은 전례 — 그 test 의 합성에 이 목록이 그대로 더해진다).
  *
  * 등재가 **전수**라는 것이 이 목록의 뜻이다: 컬럼 하나를 더하거나 타입을 바꾸면 그 test 가
- * 붉어진다. **사업자번호 · 대표자명 · 인증서 원문 슬롯이 없다**(scope P4)는 주장도 이 목록이
- * 증거다 — 그 열이 생기면 여기 없는 컬럼으로 잡힌다.
+ * 붉어진다. **대표자명 · 인증서 원문 슬롯이 없다**는 주장도 이 목록이 증거다 — 그 열이 생기면
+ * 여기 없는 컬럼으로 잡힌다. 사업자번호는 V30 이 **선택 열**로 더했다(M15/15C) — 그 전까지
+ * 「슬롯 없음」이었고(V22 scope P4), 그 뒤집기의 사유와 날짜는 V30 머리말에 있다.
  *
  * DEFAULT 가 있는 열이 **하나도 없다** — 시각은 애플리케이션이 싣는다(V22 머리말).
  */
@@ -16,6 +17,8 @@ internal val businessProfileColumns =
         // --- account_business_profile
         ColumnSpec("account_business_profile", "account_id", "bigint", false),
         ColumnSpec("account_business_profile", "trade_name", "text", true),
+        // M15/15C 신규(추가만) — V30__business_registration_number.sql. NULL 이 「비워 둠」이다.
+        ColumnSpec("account_business_profile", "business_registration_number", "text", true),
         ColumnSpec("account_business_profile", "headquarters_region", "text", true),
         ColumnSpec("account_business_profile", "nara_registration", "text", false),
         ColumnSpec("account_business_profile", "nara_registered_fields", "ARRAY", false),

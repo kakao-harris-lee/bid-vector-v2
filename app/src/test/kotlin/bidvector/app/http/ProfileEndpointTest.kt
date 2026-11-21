@@ -131,6 +131,60 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
         read shouldContain "\"businessCertificateExpiresOn\":\"2027-03-31\""
     }
 
+    /**
+     * M15/15C — **선택 칸의 HTTP 왕복.** 하이픈 표기로 보내도 응답은 숫자 10자리 하나이고,
+     * 비워 두면 `null` 이다. 왕복만 재면 「첫 저장은 되는데 지우기가 안 되는」 결함을 지나가므로
+     * 지우기까지 같은 test 가 본다(어댑터 쪽의 짝 단언과 같은 축).
+     */
+    @Test
+    fun `사업자번호 왕복 — 3-2-5 로 보내도 숫자 10자리로 돌아오고 비우면 null 이다`() {
+        val hyphenated =
+            """{"tradeName":null,"businessRegistrationNumber":"123-45-67890",""" +
+                """"headquartersRegion":null,"naraRegistration":"UNANSWERED"}"""
+
+        session.post(BUSINESS_DETAILS, hyphenated).statusCode.value() shouldBe OK
+
+        val read = session.get(AccountScopedRoutes.PROFILE).body.orEmpty()
+        read shouldContain "\"businessRegistrationNumber\":\"1234567890\""
+        // **하이픈 표기가 wire 에 남지 않는다** — 저장되는 꼴이 하나라는 주장이 여기서 선다.
+        read shouldNotContain "123-45-67890"
+
+        session.post(BUSINESS_DETAILS, detailsBody()).statusCode.value() shouldBe OK
+        session.get(AccountScopedRoutes.PROFILE).body.orEmpty() shouldContain
+            "\"businessRegistrationNumber\":null"
+    }
+
+    /** 꼴이 어긋나면 400 이고, **저장된 값은 그대로다**(절 교체가 일어나지 않았다). */
+    @Test
+    fun `사업자번호 — 꼴이 어긋나면 400 이고 저장된 값을 건드리지 않는다`() {
+        val good =
+            """{"tradeName":null,"businessRegistrationNumber":"1234567890",""" +
+                """"headquartersRegion":null,"naraRegistration":"UNANSWERED"}"""
+        session.post(BUSINESS_DETAILS, good).statusCode.value() shouldBe OK
+
+        // **길이 상한 안쪽의 꼴 오류**를 함께 담는다(r1 v F2) — 19자 표본만으로는 길이 축만 재어진다.
+        listOf("12-345-67890", "123-456-7890", "1-2-3-4-5-6-7-8-9-0", "123456789", "77777777777", "   ").forEach { raw ->
+            val rejected =
+                session.post(
+                    BUSINESS_DETAILS,
+                    """{"tradeName":null,"businessRegistrationNumber":"$raw",""" +
+                        """"headquartersRegion":null,"naraRegistration":"UNANSWERED"}""",
+                )
+            rejected.statusCode.value() shouldBe BAD_REQUEST
+        }
+        // 거부 본문이 그 값을 되울리지 않는다 — 400 본문도 출력 경로다(P4).
+        session
+            .post(
+                BUSINESS_DETAILS,
+                """{"tradeName":null,"businessRegistrationNumber":"77777777777",""" +
+                    """"headquartersRegion":null,"naraRegistration":"UNANSWERED"}""",
+            ).body
+            .orEmpty() shouldNotContain "7777777"
+
+        session.get(AccountScopedRoutes.PROFILE).body.orEmpty() shouldContain
+            "\"businessRegistrationNumber\":\"1234567890\""
+    }
+
     @Test
     fun `시평액 목록은 최상위 배열이고 삭제는 없는 행에 404 다`() {
         session.post(CAPACITIES, capacityBody("합성토목", 1_000L))

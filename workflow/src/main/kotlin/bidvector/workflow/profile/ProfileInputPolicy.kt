@@ -22,6 +22,13 @@ object ProfileInputPolicy {
     /** 시평액 행의 면허명 길이 상한 — 코드포인트 수. */
     const val LICENSE_NAME_MAX_CODE_POINTS: Int = 100
 
+    /**
+     * 사업자번호 입력의 길이 상한 — **도출이다**(선언이 아니다): 받는 두 꼴 가운데 긴 쪽
+     * (`3-2-5` 하이픈 표기)의 길이다. 값의 꼴은 [BusinessRegistrationNumber] 하나가 정하고, 이 수는
+     * 요청 판독이 **그 꼴보다 긴 문자열을 값 타입에 넘기지 않게** 막는 앞 울타리일 뿐이다.
+     */
+    const val BUSINESS_REGISTRATION_NUMBER_MAX_CODE_POINTS: Int = 12
+
     /** 시평액 상한(원). 하한은 0 초과다 — 0 은 「모름」의 기본값으로 흘러들기 쉬운 값이라 받지 않는다. */
     const val CAPACITY_AMOUNT_MAX_WON: Long = 1_000_000_000_000_000L
 

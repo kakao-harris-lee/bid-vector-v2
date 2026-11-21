@@ -215,6 +215,25 @@ export const VOCABULARY_MODULE_EXCLUSIONS = [
     why: '입력 → 요청 본문. 서버로 간다',
   },
   { key: 'display/profileDisplay.ts#capacityBodyOf', kind: OTHER_AXIS, why: '입력 → 요청 본문. 서버로 간다' },
+  {
+    // M15/15C — 사업자번호의 자리 구분(`3-2-5`). 금액 토큰·명령 토큰·시각 원문 어느 쪽도 아니고,
+    // 통화 표처럼 어휘를 빌려 오지도 않는다 — 입력받은 숫자에 하이픈만 넣는다.
+    key: 'display/profileDisplay.ts#businessRegistrationNumberText',
+    kind: OTHER_AXIS,
+    why: '사업자번호 축의 자리 구분. 금액·시각·명령 어휘가 아니다',
+  },
+  {
+    key: 'display/profileDisplay.ts#businessRegistrationNumberStateOf',
+    kind: OTHER_AXIS,
+    why: '값의 유무 → 두 상태. 번호 자체를 글자로 내지 않는다',
+  },
+  {
+    // M15/15C r1 — 적은 값이 받는 꼴인가에 대한 **안내**(판정이 아니다). 고정 문구 하나를 내고
+    // 입력값을 되울리지 않는다 — 금액·시각·명령 어휘 어느 쪽도 아니다.
+    key: 'display/profileDisplay.ts#businessRegistrationNumberHint',
+    kind: OTHER_AXIS,
+    why: '사업자번호 입력 안내. 고정 문구이고 입력값을 싣지 않는다',
+  },
 
   {
     // M14/14D 수정 라운드 1 — 보이는 글자가 있는가(집 안 원시 요소와 같은 `.trim()` 술어).

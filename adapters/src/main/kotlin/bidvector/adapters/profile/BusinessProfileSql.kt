@@ -13,8 +13,8 @@ package bidvector.adapters.profile
 internal object BusinessProfileSql {
     const val SELECT_DETAILS =
         """
-        SELECT trade_name, headquarters_region, nara_registration, nara_registered_fields,
-               business_certificate_expires_on
+        SELECT trade_name, business_registration_number, headquarters_region, nara_registration,
+               nara_registered_fields, business_certificate_expires_on
         FROM account_business_profile
         WHERE account_id = ?
         """
@@ -22,11 +22,12 @@ internal object BusinessProfileSql {
     const val UPSERT_DETAILS =
         """
         INSERT INTO account_business_profile (
-            account_id, trade_name, headquarters_region, nara_registration, nara_registered_fields,
-            business_certificate_expires_on, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            account_id, trade_name, business_registration_number, headquarters_region, nara_registration,
+            nara_registered_fields, business_certificate_expires_on, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (account_id) DO UPDATE SET
             trade_name = EXCLUDED.trade_name,
+            business_registration_number = EXCLUDED.business_registration_number,
             headquarters_region = EXCLUDED.headquarters_region,
             nara_registration = EXCLUDED.nara_registration,
             nara_registered_fields = EXCLUDED.nara_registered_fields,

@@ -27,6 +27,7 @@ data class ProfileResponse(
     val licenseNames: List<String>,
     val regionTerms: List<String>,
     val tradeName: String?,
+    val businessRegistrationNumber: String?,
     val headquartersRegion: String?,
     val naraRegistration: String,
     val naraRegisteredFields: List<String>,
@@ -52,6 +53,9 @@ data class ProfileResponse(
                 regionTerms = facts?.regionTerms.orEmpty(),
                 // 상호는 **입력 원문 그대로** 나간다(앞뒤 공백도 자르지 않는다 — 이중 정규화 금지).
                 tradeName = view.details.tradeName?.raw,
+                // 사업자번호는 **정규화된 꼴 하나**로 나간다(숫자 10자리). `3-2-5` 는 화면의 서식이고
+                // wire 가 두 꼴을 나르면 소비자마다 다르게 접는다(M15/15C).
+                businessRegistrationNumber = view.details.businessRegistrationNumber?.digits,
                 headquartersRegion = view.details.headquartersRegion?.name,
                 naraRegistration = readiness.registration.name,
                 naraRegisteredFields =

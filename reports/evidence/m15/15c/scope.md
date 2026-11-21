@@ -1,0 +1,227 @@
+# M15 / 15c — 사업자번호 선택 입력 — slice 계약
+
+```yaml
+milestone: M15
+slice: 15c
+base_sha: 99f2fb25989078d7ab1640de0dc8e399f5d1688d   # 착수 커밋에서 기계로 확인했다(아래 「base 확인」)
+head_sha: 리뷰 시점의 PR head      # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다
+in_scope:
+  # ── 마이그레이션 (V30 — 번호는 계약이 배정했다) ─────────────────────────
+  - adapters/src/main/resources/db/migration/V30__business_registration_number.sql   # 신설
+  # ── 도메인 값 (workflow) ────────────────────────────────────────────────
+  - workflow/src/main/kotlin/bidvector/workflow/profile/BusinessProfileValues.kt   # 값 타입 + BusinessDetails 칸
+  - workflow/src/main/kotlin/bidvector/workflow/profile/ProfileInputPolicy.kt      # 입력 길이 상한 한 자리
+  - workflow/src/main/kotlin/bidvector/workflow/profile/OnboardingChecklist.kt     # KDoc — 「슬롯 금지」가 거짓이 된다
+  - workflow/src/test/kotlin/bidvector/workflow/profile/BusinessProfileValuesTest.kt
+  - workflow/src/test/kotlin/bidvector/workflow/profile/OnboardingChecklistTest.kt  # 비워 둬도 완료를 막지 않는다
+  # ── 어댑터 (adapters) ───────────────────────────────────────────────────
+  - adapters/src/main/kotlin/bidvector/adapters/profile/BusinessProfileSql.kt
+  - adapters/src/main/kotlin/bidvector/adapters/profile/JdbcBusinessProfileStore.kt
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/BusinessProfileColumnSpecs.kt
+  - adapters/src/test/kotlin/bidvector/adapters/profile/BusinessProfileSchemaGuardTest.kt
+  - adapters/src/test/kotlin/bidvector/adapters/profile/JdbcBusinessProfileStoreTest.kt
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationCheckTest.kt   # 계약 갱신 (1)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/MigrationLockTimeoutTest.kt  # 계약 갱신 (1)
+  # ── HTTP (app) ──────────────────────────────────────────────────────────
+  - app/src/main/kotlin/bidvector/app/http/ProfileRequests.kt
+  - app/src/main/kotlin/bidvector/app/http/ProfileResponses.kt
+  - app/src/test/kotlin/bidvector/app/http/ProfileRequestsTest.kt
+  - app/src/test/kotlin/bidvector/app/http/ProfileResponseTest.kt
+  - app/src/test/kotlin/bidvector/app/http/ProfileEndpointTest.kt
+  - app/src/test/kotlin/bidvector/app/http/MyBidResultEndpointTest.kt      # 계약 갱신 (2) — 조립 한 줄
+  - app/src/test/kotlin/bidvector/app/wiring/ProfileWiringTradeNameTest.kt # 계약 갱신 (2) — 조립 한 줄
+  # ── 계약과 생성 타입 ────────────────────────────────────────────────────
+  - openapi/bidvector-operator-api.yaml    # BusinessDetailsRequest · Profile · 두 머리말
+  - web/src/api/generated/operator-api.ts  # 재생성(바이트 등식 W-5)
+  # ── 화면 (web) ──────────────────────────────────────────────────────────
+  - web/src/display/profileDisplay.ts
+  - web/src/display/profileDisplay.test.ts
+  - web/src/screens/ProfileDetailsCard.tsx     # 선택 입력 칸 하나(testId 하나)
+  - web/src/screens/SettingsScreen.tsx         # 「준비 중」 목록에서 사업자번호 행을 걷는다
+  - web/src/screens/SettingsScreen.test.tsx
+  - web/src/screens/OnboardingScreen.tsx       # 「사업자번호」 절 — 입력함 / 비워 둠(선택)
+  - web/src/screens/OnboardingScreen.test.tsx
+  - web/src/api/approvedOperations.ts          # 주석만 — operation 집합은 **불변**이다
+  - web/scripts/screen-vocabulary-registry.mjs # 계약 갱신 (3) — 새 표시 함수 둘의 분류
+  # ── 누출 게이트 (e2e) ───────────────────────────────────────────────────
+  - web/e2e/journey/privateValues.ts           # 신설 — 술어 한 자리 + 예외 testId 한 자리
+  - web/e2e/journey/journey.spec.ts
+  - web/e2e/journey/onboarding.spec.ts
+  - web/e2e/journey/settings.spec.ts
+  - reports/evidence/m15/15c/
+out_of_scope:
+  - adapters/src/main/resources/db/migration/V28__* · V29__*   # 15A · 15B 가 쥔 번호
+  - operator_strategy · operator_profile · edit_session 의 계정 단위 전환   # 15A
+  - POST /api/accounts · OPEN_ROUTES · 가입 화면                            # 15B
+  - 체크섬(검증번호) 검증 · 국세청 진위 확인 API                            # 계약 「범위 밖」
+  - 체크리스트 항목 신설                                        # 「비워 두어도 완료를 막지 않는다」
+  - 알림함 본문 · Telegram 문면 · 로그 — 사업자번호를 **싣지 않는다**(새 자리 0)
+  - web/e2e/capture/usecase-captures.mjs       # 예외를 주지 않는다(아래 「누출 게이트」)
+  - .github/workflows/ci.yml                   # acceptance 는 오늘의 job 명령 그대로
+acceptance_commands:
+  # ci.yml `check` job — Kotlin 전건
+  - ./gradlew --no-daemon check
+  - ./gradlew --no-daemon qualityBaseline
+  # ci.yml `web` job 전건 W-1~W-13 (`web/` 에서 돈다)
+  - npm ci · npm run lint · npm run typecheck · npm run gate:src-tree
+  - npm run api:types:check · npm run test · npm run gate:tests · npm run build
+  - npm run gate:boundary-canary · npx playwright install chromium · npm run test:e2e
+  - ./gradlew --no-daemon :app:bootJar · npm run test:e2e:journey
+rollback: rollback.md
+```
+
+## 이 slice 가 더하는 것
+
+`account_business_profile` 에 **선택** 열 `business_registration_number`(NULL 허용 · 숫자
+10자리 CHECK)를 두고, 프로필 쓰기 요청의 선택 칸과 읽기 응답의 선택 칸으로 잇는다. 설정의
+사업 정보 카드에 입력칸 하나가 서고, 시작하기의 「사업자번호」 절은 **입력함 / 비워
+둠(선택)** 을 말한다.
+
+운영자 지시 「사업자번호 필수 사항도 옵션으로」의 읽기는 계약이 정했다 — 지금 이 값은
+**어디에도 저장되지 않으므로**(V22 에 열이 없다) 「필수를 선택으로 낮추는 일」이 아니라
+**선택 입력 칸을 새로 두는 일**이다.
+
+## 받는 꼴 — 둘로 **열거**하고 10자리로 정규화한다
+
+| 입력 | 저장·응답 |
+| --- | --- |
+| `1234567890` | `1234567890` |
+| `123-45-67890` | `1234567890` |
+| 그 밖(공백 포함 · 하이픈 자리가 다름 · 자릿수 부족·초과 · 숫자 아님) | **400** |
+
+**체크섬(검증번호)을 걸지 않는다** — 계약의 완화 지시다. 국세청 진위 확인도 범위 밖이다.
+
+꼴을 **둘로 못박는** 이유: 「하이픈을 지우고 남은 숫자가 10 이면 받는다」로 열면
+`1-2-3-4-5-6-7-8-9-0` 과 `--1234567890--` 이 같은 값이 된다. 지우는 규칙은 끝이 없고,
+그 관용이 곧 「운영자가 적은 것과 저장된 것이 다르다」가 된다. 받는 꼴이 둘이면
+정규화가 한 번이고 **되돌릴 수 있다**.
+
+정규화 자리는 **값 타입 하나**다(`BusinessRegistrationNumber`). HTTP 판독·어댑터 읽기·화면이
+각자 지우면 이중 정규화가 되고, 그 가운데 하나만 바뀌어도 아무것도 붉지 않는다. 화면은
+**표시 서식**(3-2-5)만 가지며 그것은 정규화가 아니다 — 금액의 `toLocaleString` 과 같은 축이다.
+
+## 누출 게이트 — 예외는 testId 하나, 그 밖의 0 은 유지한다
+
+기존 e2e 셋(`journey` · `onboarding` · `settings`)이 「사업자번호 꼴(3-2-5)이 화면에 0」을
+잰다. 그 게이트가 막는 것은 **남의 업체 번호**이고, 자기 계정 설정 칸의 자기 값은 예외다.
+
+**예외를 주기 전에 게이트를 먼저 넓힌다.** 착수 실측: 셋의 술어는 `body.innerText()` 뿐인데
+그것은 **입력칸의 `value` 를 담지 않는다**. 그 상태로 입력칸을 더하면 게이트는 「예외를 주지
+않아도 조용」하다 — 방어 부재와 미측정이 같은 값이 된다. 그래서 술어를 **보이는 글 + 폼
+값·속성**으로 넓히고(캡처 하네스가 이미 쓰는 꼴), 넓힌 집합에서 **testId 하나**만 뺀다.
+
+- 술어와 예외 testId 는 **각각 한 자리에만 선언**한다(`web/e2e/journey/privateValues.ts`).
+  부르는 자리가 예외를 고르지 않으므로 「어느 spec 에서만 열려 있다」가 생기지 않는다.
+- **양성 대조**: 같은 값을 **다른 칸**(상호 입력)에 두면 같은 술어가 문제를 낸다. 예외가
+  화면 전체를 열지 않는다는 것을 그 한 쌍이 잰다(더하기만 한 변이가 아니라 **자리를
+  바꾼** 변이다).
+- 캡처 하네스(`usecase-captures.mjs`)에는 **예외를 주지 않는다** — 그 산출물은 PNG 로 남아
+  저장소 밖으로 나간다. 캡처 경로에서는 0 이 그대로 0 이다.
+- 로그 · 알림함 본문 · Telegram 문면에 **싣는 자리를 만들지 않는다**. 값 타입의
+  `toString()` 은 가려지고(상호와 같은 규율), 저장 거부는 SQLSTATE 다섯 글자만 나른다.
+
+## 착수 실측 (base `99f2fb25`)
+
+수치와 그것을 낸 명령은 `commands.md` 가 정본이다.
+
+| 축 | 잰 것 | 결과 |
+| --- | --- | --- |
+| 오늘 저장되는가 | V22 의 열 · `BusinessProfileColumnSpecs` | **아니다** — 열이 없고 그 부재를 열 전수 test 가 잠근다 |
+| 마이그레이션 번호 | `db/migration` 의 최대 | main 최대 V27 · 계약이 15C 에 **V30** 배정 |
+| 앱 역할 권한 | V22 의 GRANT | 표 단위 `INSERT`, **열 단위 `UPDATE`** — 새 열은 UPDATE 를 따로 줘야 한다 |
+| 누출 게이트의 술어 | e2e 셋 | `body.innerText()` 뿐 — **입력칸 `value` 를 담지 않는다**(위 절) |
+| 그 꼴의 정규식 | e2e 셋 + 캡처 하네스 | 3-2-5 하이픈 꼴 — 숫자 10자리 연속은 **안 잡는다**(금액이 그 꼴이다) |
+| 입력 판독 수단 | `RequestValues.kt` | `declaredText(key, max)` + `requestValue(key){…}` 가 이미 있다 — 새 판독 함수 0 |
+| 화면의 공유 | `ProfileDetailsCard` | 설정과 **시작하기 2 절**이 같은 카드를 쓴다 — 입력칸은 한 번 더하고 두 화면에 선다 |
+| operation 집합 | `approvedOperations.ts` | **불변** — 기존 `POST /api/profile/business-details` 가 칸 하나를 더 받는다 |
+
+## 알려진 제한 (착수 시점)
+
+1. **체크섬을 걸지 않는다** — 자릿수만 맞으면 받는다. 상용 전 재결정은
+   `OPEN-M15-SIGNUP-HARDENING` 이 든다.
+2. **진위 확인이 없다** — 저장된 값이 실제 사업자의 것인지 아무도 모른다. 시작하기의
+   「입력함」은 **적었다**는 뜻일 뿐이다.
+3. **표시 서식은 화면이 만든다** — 저장·wire 는 10자리이고 3-2-5 는 화면의 서식이다. 두
+   자리가 갈리면 화면 test 가 붉어지는 것이 유일한 경보다(상호의 어휘 비대칭과 같은 꼴).
+4. **입력칸이 두 화면에 선다**(위 실측) — 계약의 「설정의 사업자 정보 카드」는 카드 하나를
+   가리키고, 그 카드가 시작하기 2 절에도 서므로 입력칸도 거기 선다. 1 절은 상태만 말한다.
+5. **누출 게이트의 정규식은 하이픈 꼴만 본다** — 숫자 10자리 연속을 금지하면 금액·공고번호가
+   전부 걸린다. 화면이 그 값을 보일 때 하이픈 꼴로 보이는 것이 이 게이트가 서는 전제다.
+
+## 승인 경계
+
+- **마이그레이션은 V30 하나**다. 15A·15B 의 표·열에 닿지 않는다.
+- 새 operation · 새 외부 호출 · 새 의존성 **0**.
+- 기존 게이트의 술어를 **넓히되 좁히지 않는다**(누출 게이트 — 예외 testId 하나).
+- 운영 DB write · push · merge 는 하지 않는다. 재작업 상한 5 에 닿으면 보고한다.
+
+## base 확인
+
+`git rev-parse origin/main` → `99f2fb25989078d7ab1640de0dc8e399f5d1688d` ·
+`git merge-base --is-ancestor 99f2fb25 HEAD` 를 착수 커밋에서 기계로 확인했다(위 yaml 의
+40자는 손으로 적은 값이라 그 자체가 근거가 아니다).
+
+## 하네스 레인 변경
+
+`git log --oneline <base>..HEAD --no-merges -- CLAUDE.md .claude/` — **착수 때 없음.** 이 절에
+줄이 서면 그것은 이 slice 의 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 range 에
+있다. 귀속은 라운드마다 기계로 재산출해 확인한다.
+
+## 계약 갱신
+
+**(1) 마이그레이션 게이트 둘이 in_scope 에 든다** — 착수 실측이 놓친 자리다. V30 은 **기존 표를
+`ALTER`** 하므로 저장소의 두 래칫이 함께 움직인다: 잠금 상한 선언의 관례 lint
+(`MigrationLockTimeoutTest` 의 번호 집합)와 표별 CHECK 수(`CleanMigrationCheckTest`). 둘 다
+**사람이 보는 자리에 수를 두는** 관용구라, 새 마이그레이션이 그 수를 바꾸면 그 줄을 함께 고치는
+것이 설계된 동작이다.
+
+**(2) 사업 정보 조립 두 자리가 더 든다** — `BusinessDetails` 에 기본값 없는 칸을 더한 귀결이다.
+컴파일이 멈춘 자리가 곧 목록이고, 그 가운데 둘이 착수 목록 밖이었다(둘 다 위치 인자 한 줄).
+
+**(3) 화면 어휘 등록부가 든다** — `src/display/**` 의 새 export 는 「어휘인가」를 분류해야 한다
+(저장소의 전수 등식). 새 함수 둘을 금액·시각·명령 축 **밖**으로 등재했다. 수정 라운드 1 이
+`businessRegistrationNumberHint` 를 더해 같은 자리에 한 줄이 더 든다.
+
+**(4) 수정 라운드 1 이 in_scope 를 두 방향으로 맞춘다.**
+- **뺀다**: `web/src/screens/ProfileSection.test.tsx` — 목록에 있었으나 **손대지 않았다**
+  (r1 cr L-3). in_scope 는 clean-tree 게이트의 인자이자 rollback 복원 목록의 출처라, 손대지 않은
+  경로가 섞이면 두 집합이 어긋난다. 새 칸이 선택이라 그 고정물은 컴파일도 단언도 바뀌지 않았고,
+  「저장된 값이 입력칸 밖에 그려지지 않는다」는 설정 화면 test 가 든다(전체 프로필 절을 그린다).
+- **새 파일 0**: 이 라운드는 파일을 만들지 않았다(기존 경로의 편집뿐).
+
+## 알려진 제한 (수정 라운드 1 추가)
+
+7. **키를 빼면 저장된 번호가 지워진다**(절 단위 교체 · r1 v F3). 계약 문면이 이제 그 말을 하고
+   (`BusinessDetailsRequest` 설명) 현행 클라이언트는 언제나 키를 싣는다. 그러나 **캐시에 남은 옛
+   번들 탭**이 사업 정보를 저장하면 키 없는 본문이 가서 저장된 번호가 200 과 함께 사라진다.
+   이번 반입의 노출은 0 에 가깝다(열이 신설이라 새 번들이 뜰 때 저장된 값이 없다). 구조로 닫으려면
+   부분 갱신(PATCH) 의미를 들이는 일이고 그것은 이 절의 설계를 뒤집는 별 판단이다.
+8. **속성 경로(title·aria-label·alt·placeholder)에는 양성 대조가 없다**(r1 v F4). 넓힌 술어는 그
+   넷을 모집단에 넣지만, 실제로 붉어지는 것을 잰 것은 `value` 경로뿐이다. 그 넷에 값을 심으려면
+   화면을 고쳐야 해서 변이 대조로만 설 수 있다.
+9. **`ProfileResponse` 의 `toString()` 은 번호를 평문으로 싣는다**(r1 v F5 · data class). 상호가 같은
+   선례이고 오늘 그 값을 로그로 찍는 자리는 0 이다(grep). 응답 DTO 전체의 가림은 이 slice 밖이다.
+10. **사업자번호 꼴은 `leak-patterns.txt` 에 없다**(r1 cr L-5). 이 축의 evidence 검사는 게이트가
+    아니라 육안이다. 더하면 이 slice 의 evidence·test 가 담은 **합성** 번호가 붉어지므로 합성
+    allowlist 나 「축어로 적지 않기」가 함께 와야 한다 — M15 종결의 결정으로 미룬다. 여정 술어가
+    그 합성 번호의 축어를 금지하는 것으로 **화면 축**은 갈음했다.
+
+## 알려진 제한 (라운드 중 추가)
+
+6. **이 브랜치 단독으로는 `check` 가 초록이 아니다 — 번호가 결번이기 때문이다.**
+   `migrationOrderGate` 는 「읽어낸 version 다중집합 == (1..max ∖ 은퇴)」를 요구한다(Flyway
+   `outOfOrder=false` 아래에서 **낮은 번호가 나중에 들어오면 조용히 건너뛰어진다**). V28·V29 가
+   15A·15B 의 브랜치에만 있으므로 이 브랜치의 V30 은 결번 둘을 만든다. **게이트가 옳다** — 이
+   slice 가 먼저 머지되면 운영 DB 에서 V28·V29 가 실제로 건너뛰어진다. 그래서 **머지 차례가
+   15A → 15B → 15C 로 고정**되고, 이 브랜치의 acceptance 는 main 에 그 둘이 들어온 뒤에 선다.
+   마일스톤 계약의 「15C 는 언제든」은 이 게이트를 보기 전의 문장이고, 「먼저 머지된 쪽과 번호가
+   엇갈리면 뒤 slice 가 번호를 옮긴다」는 같은 계약의 다른 문장이 이 처분과 어긋나지 않는다.
+   측정은 **번호만 연속으로 바꾼 임시 트리**에서 했다(`commands.md`) — 바꾼 자리는 파일 이름과
+   그 번호를 드는 래칫 한 줄 둘뿐이고 어느 것도 커밋하지 않았다.
+
+## 갱신 이력
+
+- 2026-11-21 초판(착수).
+- 2026-11-21 계약 갱신 (1)~(3) 과 알려진 제한 6(번호 결번과 머지 차례).
+- 2026-11-21 수정 라운드 1 — 계약 갱신 (4), 알려진 제한 7~10. B-1 은 팀장 판정대로 **지금 손대지
+  않는다**(머지 차례 15A → 15B → 15C 확정 · 번호 V30 유지 · main 병합 지시를 따로 받는다).

@@ -4,6 +4,7 @@ import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.qualification.LicenseName
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.profile.BusinessDetails
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
@@ -25,7 +26,7 @@ import javax.sql.DataSource
  * 막는지 보이지 않는다.
  *
  * 셋이다. (1) 어댑터의 모든 쓰기가 앱 역할 권한만으로 성립한다(열 단위 UPDATE 로 upsert 가 되는가).
- * (2) 열 단위 UPDATE 집합이 정확히 V22 가 준 것이다 — **소유자 열(`account_id`)이 그 밖**이다.
+ * (2) 열 단위 UPDATE 집합이 정확히 V22 + V30 이 준 것이다 — **소유자 열(`account_id`)이 그 밖**이다.
  * (3) CHECK 가 [ProfileInputPolicy] 와 같은 경계에서 갈린다(앱 타입을 우회한 직접 SQL 로).
  */
 class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
@@ -89,6 +90,7 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         val details =
             BusinessDetails(
                 TradeName("합성상호"),
+                BusinessRegistrationNumber("2109876543"),
                 HeadquartersRegion.SEOUL,
                 NaraReadiness.Registered(setOf(NaraRegistrationField.GOODS), LocalDate.of(2027, 1, 1)),
             )
@@ -105,7 +107,7 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
     }
 
     @Test
-    fun `열 단위 UPDATE 집합이 V22 그대로다 — 소유자 열은 밖이다`() {
+    fun `열 단위 UPDATE 집합이 V22 + V30 그대로다 — 소유자 열은 밖이다`() {
         val granted =
             dataSource().connection.use { connection ->
                 connection
@@ -123,6 +125,8 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         granted shouldBe
             setOf(
                 "account_business_profile.trade_name",
+                // M15/15C — V30 이 더한 선택 열. 이 줄이 없으면 사업 정보 upsert 가 권한 거부로 떨어진다.
+                "account_business_profile.business_registration_number",
                 "account_business_profile.headquarters_region",
                 "account_business_profile.nara_registration",
                 "account_business_profile.nara_registered_fields",
@@ -164,6 +168,24 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         shouldThrow<SQLException> {
             asApp(insert, account().value, "가".repeat(ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS + 1))
         }
+    }
+
+    /**
+     * M15/15C — **표도 숫자 10자리만 받는다.** 값 타입이 같은 꼴을 보증하지만, 그것만으로는
+     * 직접 SQL 이 넣은 하이픈 표기·빈 문자열이 저장되고 **그 행을 읽는 순간 앱이 던진다**
+     * (상호의 공백 CHECK 가 같은 결함을 막는 자리다). 양쪽이 같은 문자 집합(`[0-9]`)을 쓰는지도
+     * 함께 잰다 — 전각 숫자는 둘 다 거부해야 한다.
+     */
+    @Test
+    fun `CHECK — 사업자번호는 숫자 10자리만 받고 NULL 은 비워 둠이다`() {
+        val insert =
+            "INSERT INTO account_business_profile (account_id, business_registration_number, " +
+                "nara_registration, nara_registered_fields, updated_at) VALUES (?, ?, 'UNANSWERED', '{}', now())"
+
+        asApp(insert, account().value, "1234567890")
+        asApp(insert, account().value, null)
+        listOf("123-45-67890", "", " ", "123456789", "12345678901", "123456789O", "１２３４５６７８９０")
+            .forEach { rejected -> shouldThrow<SQLException> { asApp(insert, account().value, rejected) } }
     }
 
     @Test
@@ -212,7 +234,12 @@ class BusinessProfileSchemaGuardTest : PersistenceTestSupport() {
         val owner = account()
         HeadquartersRegion.entries.forEach { region ->
             val details =
-                BusinessDetails(null, region, NaraReadiness.Registered(NaraRegistrationField.entries.toSet(), null))
+                BusinessDetails(
+                    null,
+                    null,
+                    region,
+                    NaraReadiness.Registered(NaraRegistrationField.entries.toSet(), null),
+                )
             store.replaceDetails(owner, details, now)
             store.details(owner) shouldBe details
         }
