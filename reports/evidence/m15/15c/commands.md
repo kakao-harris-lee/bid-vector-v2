@@ -36,6 +36,31 @@
 이 명령은 `.github/workflows/ci.yml` 의 세 job(`check`·`ml-engine`·`web`)이 돌리는 명령을 순서까지
 그대로 든다(스크립트 머리말) — 그래서 scope.md 의 acceptance 목록을 한 번에 덮는다.
 
+## 2026-11-21T10:05Z — 수정 라운드 1 (팀장 지시: 전건 대신 **건드린 모듈의 표적 test + web job**)
+
+전건 `check` 와 되돌리기 ①~⑥ 은 **병합 라운드에 한 번** 돈다(B-1 처분 · `rollback.md` 머리말).
+
+| 명령 | exit | 핵심 결과 |
+| --- | --- | --- |
+| `./gradlew --no-daemon --continue :adapters:test(SchemaGuard·JdbcStore·CleanMigrationCheck·MigrationLockTimeout·CleanMigrationColumn) :app:test(ProfileRequests·ProfileResponse·ProfileEndpoint) :workflow:test(BusinessProfileValues·OnboardingChecklist)` | 0 | suite 10 · test 88 · 실패 0 |
+| CI `web` job 단계 전수 W-1~W-13 | 0 | vitest 74 파일 2010 test · 스모크 39 · **여정 29**(새 test 하나 포함) · `api:types:check` 바이트 등식 |
+
+### 변이 — verifier W3 를 이 라운드가 잡는다
+
+| 변이 | 결과 |
+| --- | --- |
+| `ProfileDetailsCard` 읽기 전용 줄에 저장된 번호를 `3-2-5` 로 그린다(W3 재현) | **RED** — 설정 화면 test 「저장된 사업자번호는 입력칸 밖 어디에도 그려지지 않는다」 |
+| 같은 변이를 되돌린다 | GREEN(36/36) — 붉음이 심은 줄 때문임을 쌍이 말한다 |
+
+변이는 파일 사본으로 심고 사본으로 되돌렸다(`git checkout --` 을 쓰지 않는다 — 같은 트리에
+미커밋 산출물이 있었다). `git diff --numstat` 으로 **줄이 실제로 바뀐 것**을 먼저 확인했다.
+
+### 라운드 중 고친 자기 결함
+
+새 여정이 `내 입찰함` 을 `exact: true` 로 집다 120초 타임아웃으로 멈췄다. 그 자리의 접근성
+이름은 안 읽음 수를 품어 **「내 입찰함 3」**이고 그 수는 앞 여정들이 남긴 상태다 — 탐색으로
+좁혀 부분 일치로 집는 꼴(여정 ①·결과 여정의 선례)로 고쳤다.
+
 ## 비밀값 스캔
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m15/15c/`

@@ -1,6 +1,11 @@
 # M15 / 15c — 되돌리기
 
-실측 HEAD: `e5914053` (이 slice 의 **마지막 산출물 커밋**. 뒤의 커밋은 evidence 전용이다)
+실측 HEAD: `e5914053` — **낡았다.** 수정 라운드 1 이 복원 목록의 파일을 더 바꿨고(여정 술어 ·
+화면 · 계약 · 생성 타입 · 두 test), 그래서 아래 ①~⑥ 은 **이 라운드의 판정 SHA 에 대해 미검증**이다.
+이 slice 는 15A·15B 머지 뒤에 main 을 병합하므로 그때 **복원 원천이 착수 base 에서 병합한 main
+SHA 로 옮겨 간다** — 목록 재산출의 양끝과 ①~⑥ 을 그 자리에서 **통째로 다시 잰다**(앞 라운드의
+실측을 옮기지 않는다). 그 재측정에는 셋째 단언(복원 대상 blob 이 두 원천에서 같은가)과 공유 파일의
+hunk 격리가 함께 든다 — 15A·15B 가 아래 「공유 파일」 절이 말하는 경로들을 만진다.
 
 **전제: 이 slice 는 아직 main 에 없다.** 머지 뒤의 되돌림은 아래 절차가 아니라 그 PR 의 머지 커밋
 revert 다 — 머지된 트리에서 아래 복원을 돌리면 **아무것도 지우지 않으면서 exit 0** 을 낸다.
@@ -29,11 +34,20 @@ git diff --name-status 99f2fb25989078d7ab1640de0dc8e399f5d1688d..<실측 HEAD> -
 인자와 복원 목록이 같은 집합이다. 하네스 경로(`CLAUDE.md`·`.claude/**`)도 되돌리지 않는다
 (이 range 에 그 변경이 **없다**).
 
-**공유 파일의 hunk 격리는 필요 없다.** 이 브랜치는 origin/main 에서 갈라져 나온 뒤 이 slice 의
-커밋만 쌓였고, 복원 목록의 어느 경로도 다른 slice 가 같은 range 에서 만지지 않았다
-(`git log --oneline 99f2fb25..HEAD --no-merges -- <경로>` 가 전부 이 slice 의 커밋뿐이다).
+## 공유 파일 — **머지 전인 지금은** 격리가 필요 없고, 병합 뒤에는 필요하다
 
-## 실측 (임시 clone, 실측 HEAD `e5914053`)
+지금 이 브랜치는 origin/main 에서 갈라져 나온 뒤 이 slice 의 커밋만 쌓였고, 복원 목록의 어느
+경로도 다른 slice 가 같은 range 에서 만지지 않았다(`git log --oneline 99f2fb25..HEAD --no-merges
+-- <경로>` 가 전부 이 slice 의 커밋뿐이다).
+
+**그 문장은 main 병합 뒤에 거짓이 된다**(r1 v 「남은 일」). 15A 는 `JdbcBusinessProfileStore.kt` ·
+`CleanMigrationCheckTest` · `MigrationLockTimeoutTest` · `BusinessProfileSchemaGuardTest` ·
+`JdbcBusinessProfileStoreTest` · `MyBidResultEndpointTest` · `ProfileWiringTradeNameTest` · 계약
+파일을, 15B 는 `MigrationLockTimeoutTest` · 계약 파일 · `approvedOperations.ts` · 생성 타입을
+만진다. 병합 라운드의 재측정은 그 경로들에 **커밋 해시 hunk 격리**를 쓰고, 「내 표지 0 · 남의 표지
+보존」을 **계수로** 확인한다(종료 코드로 갈음하지 않는다).
+
+## 실측 (임시 clone, 실측 HEAD `e5914053` — 위 머리말대로 **이 라운드에는 낡았다**)
 
 | 단계 | 결과 |
 | --- | --- |
@@ -52,12 +66,13 @@ git diff --name-status 99f2fb25989078d7ab1640de0dc8e399f5d1688d..<실측 HEAD> -
 ## 이 실측이 유효한가 — verifier 가 재는 술어
 
 ```
-git diff --name-only e5914053..<판정 SHA> -- <위 복원 목록의 경로들>
-git rev-list --merges e5914053..<판정 SHA>
+git diff --name-only <실측 HEAD>..<판정 SHA> -- <위 복원 목록의 경로들>
+git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
 
-둘 다 **빈 출력**이면 실측이 유효하다. `e5914053` 뒤의 커밋은 evidence 전용이고 복원 목록은
-evidence 를 제외하므로 첫 술어가 빈 출력으로 선다. 병합 커밋도 없다.
+둘 다 **빈 출력**이면 실측이 유효하다. 수정 라운드 1 의 판정 SHA 에 대해서는 **첫 술어가 비지
+않는다**(위 머리말) — 그래서 이 라운드에 대해 ①~⑥ 은 미검증이고, 병합 라운드가 새 원천·새 실측
+HEAD 로 다시 잰다. 그 사실을 숨기지 않는 것이 이 절의 몫이다.
 
 ## 라운드마다 다시 한다
 
