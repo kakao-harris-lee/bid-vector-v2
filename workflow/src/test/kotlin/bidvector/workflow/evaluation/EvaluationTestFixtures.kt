@@ -17,6 +17,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
@@ -137,17 +138,29 @@ internal class FixedClock(
     override fun now(): Instant = instant
 }
 
+/** 이 모듈 test 의 기본 계정 — 계정 축을 재지 않는 test 가 쓰는 한 값(M15/15A). */
+internal val TEST_ACCOUNT = AccountId(1)
+
+/**
+ * **계정을 받아 기록한다**(M15/15A) — 인자를 버리면 「계정을 빠뜨린 조립」이 이 fake 위에서
+ * 초록이 된다. [loadedFor] 가 어느 계정으로 물었는지를 남기므로 계정 축 test 가 그것을 잰다.
+ */
 internal class FakeStrategyRepository(
     var strategy: OperatorStrategy,
 ) : StrategyRepository {
     var loadCount = 0
+    val loadedFor = mutableListOf<Long>()
 
-    override fun load(): OperatorStrategy {
+    override fun load(account: AccountId): OperatorStrategy {
         loadCount += 1
+        loadedFor += account.value
         return strategy
     }
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         error("이 use case는 전략을 저장하지 않는다")
     }
 }
@@ -198,8 +211,15 @@ internal class FakeLicenseGatePort(
 ) : LicenseGatePort {
     val calledFor = mutableListOf<NoticeId>()
 
-    override fun verdictFor(notice: Notice): LicenseVerdict {
+    /** 계정도 기록한다(M15/15A) — 커널이 어느 계정으로 자격을 물었는지가 이 목록이다. */
+    val calledForAccount = mutableListOf<Long>()
+
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict {
         calledFor += notice.id
+        calledForAccount += account.value
         return verdictFor.invoke(notice)
     }
 }
@@ -210,10 +230,15 @@ internal class FakeMlAnalysisPort(
     val callCountFor = mutableMapOf<NoticeId, AtomicInteger>()
     val correlationIdSeenFor = mutableMapOf<NoticeId, CorrelationId>()
 
+    /** 계정도 기록한다(M15/15A) — 기회 분석이 어느 계정의 프로필을 합성했는지가 이 목록이다. */
+    val accountsSeen = mutableListOf<Long>()
+
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome {
+        accountsSeen += account.value
         callCountFor.getOrPut(notice.id) { AtomicInteger(0) }.incrementAndGet()
         correlationIdSeenFor[notice.id] = correlationId
         return outcomeFor(notice)
@@ -301,9 +326,11 @@ internal fun useCase(
     notifications: FakeNotificationRequestPort = FakeNotificationRequestPort(),
     correlationIds: SequentialCorrelationIdFactory = SequentialCorrelationIdFactory(),
     analysisBudget: Int? = null,
+    account: AccountId = TEST_ACCOUNT,
     judge: (LadderInput, Resolution.Resolved<VerdictLadderPolicyData>) -> Verdict = VerdictLadder::judge,
 ): EvaluateCandidatesUseCase =
     EvaluateCandidatesUseCase(
+        account = account,
         strategies = strategyRepository,
         candidateSource = candidateSource,
         watchSubjects = watchSubjects,

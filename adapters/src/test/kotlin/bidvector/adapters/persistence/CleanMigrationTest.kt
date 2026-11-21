@@ -133,12 +133,12 @@ class CleanMigrationTest : PersistenceTestSupport() {
             "inbox" to setOf("idempotency_key"),
             // 애플리케이션이 발급하는 TEXT PK(추가만, D-6B1-8). V8__edit_session.sql.
             "edit_session" to setOf("id"),
-            // 싱글턴 고정 키(operator_strategy)·도메인 개정 번호(operator_strategy_revision).
-            // 둘 다 시퀀스를 만들지 않는다(D-6F1-5, D-6F1-1 추가만).
-            "operator_strategy" to setOf("id"),
-            "operator_strategy_revision" to setOf("revision"),
-            // 싱글턴 고정 키(D-6F6-3, 추가만). V12__operator_profile.sql.
-            "operator_profile" to setOf("id"),
+            // M15/15A(V28) — 싱글턴 고정 키가 **계정 소유 키**로 바뀌었다. 전략·프로필은 계정당
+            // 한 행이고, 개정 이력은 계정 범위 키라 두 계정이 같은 개정 번호를 각자 가진다.
+            // 시퀀스는 여전히 만들지 않는다(D-6F1-5 — `account.id` 의 identity 를 빌려 쓴다).
+            "operator_strategy" to setOf("account_id"),
+            "operator_strategy_revision" to setOf("account_id", "revision"),
+            "operator_profile" to setOf("account_id"),
             // 헤더는 공고 복합키, 행은 그 위에 자연 키(serialNo)를 더한다(D-6F5-4).
             "notice_requirement" to setOf("notice_number", "notice_round"),
             "notice_requirement_row" to setOf("notice_number", "notice_round", "serial_no"),
@@ -270,6 +270,12 @@ class CleanMigrationTest : PersistenceTestSupport() {
             // 비운다. 알림함은 공고 행보다 오래 살아야 하므로 공고 키 두 열은 주제 참조로만 둔다.
             // 그 부재가 이 등식에 적혀 있으므로 「빠뜨린 FK」가 아니고, 누가 FK 를 더하면 붉다.
             FkSpec("notification_inbox", "account_id", "account", "id"),
+            // M15/15A(V28) — 전략·개정 이력·프로필·편집 세션이 계정을 참조한다. CASCADE 없음
+            // (계정을 지우는 경로가 아직 없다 — 생기면 이 행들의 파기가 그 경로의 일이다).
+            FkSpec("operator_strategy", "account_id", "account", "id"),
+            FkSpec("operator_strategy_revision", "account_id", "account", "id"),
+            FkSpec("operator_profile", "account_id", "account", "id"),
+            FkSpec("edit_session", "account_id", "account", "id"),
         )
 
     @Test

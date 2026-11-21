@@ -26,6 +26,7 @@ import bidvector.qualification.OperatorLicenses
 import bidvector.qualification.RequirementCollection
 import bidvector.qualification.RequirementRow
 import bidvector.qualification.RequirementSourceField
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
@@ -110,6 +111,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
     /** 운영자 프로필 — `OpportunityAnalysis` 가 프로필 없이는 분석을 시작하지 않는다(`findProfile`). */
     protected fun seedProfile(licenses: List<String> = listOf(E2E_LICENSE)) {
         profileWriter().save(
+            testAccount(),
             ProfileFacts(
                 businessTypes = emptySet(),
                 licenses = OperatorLicenses.Declared(licenses.map(::LicenseName)),
@@ -151,21 +153,22 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setInt(1, E2E_STRATEGY_REVISION)
-                    statement.setArray(2, empty)
+                    statement.setLong(1, testAccount().value)
+                    statement.setInt(2, E2E_STRATEGY_REVISION)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
                     statement.setArray(5, empty)
-                    statement.setArray(6, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
-                    statement.setBigDecimal(7, BigDecimal(bidNowThreshold))
-                    statement.setBigDecimal(8, BigDecimal(reviewThreshold))
-                    statement.setInt(9, maxActiveBids)
+                    statement.setArray(6, empty)
+                    statement.setArray(7, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
+                    statement.setBigDecimal(8, BigDecimal(bidNowThreshold))
+                    statement.setBigDecimal(9, BigDecimal(reviewThreshold))
+                    statement.setInt(10, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -207,10 +210,16 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      */
     protected fun setStrategyRevision(revision: Int) =
         dataSource().connection.use { connection ->
-            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
-                statement.setInt(1, revision)
-                check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
-            }
+            // **계정을 묶는다**(r1 리뷰 MEDIUM). 앞 판은 싱글턴 술어(`WHERE id = 1`)를 계정 키로
+            // 바꾸는 대신 **지웠고**, 이 fixture 가 전략 행을 하나만 심어서 초록이었다. 둘째 계정을
+            // 심는 slice 가 오면 두 행을 함께 고치거나 `== 1` 이 엉뚱한 사유로 터진다.
+            connection
+                .prepareStatement("UPDATE operator_strategy SET revision = ? WHERE account_id = ?")
+                .use { statement ->
+                    statement.setInt(1, revision)
+                    statement.setLong(2, testAccount().value)
+                    check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
+                }
         }
 
     protected fun outboxIdempotencyKeys(): List<String> =
@@ -253,7 +262,10 @@ internal fun noticeIdOf(number: String): NoticeId = NoticeId(NoticeNumber.of(num
  * 이 형태가 필요하다(review G-3: 부분 일치는 어느 칸에 있는지를 가르지 못한다). 형식 자체의
  * 정본은 그 production 클래스이고 `OutboxNotificationRequestPortTest` 가 축어로 잠근다.
  */
-internal fun idempotencyKeyFor(number: String): String = "notification-requested-$number-000"
+internal fun idempotencyKeyFor(
+    account: AccountId,
+    number: String,
+): String = "notification-requested-${account.value}-$number-000"
 
 /**
  * 합성 공고 항목 — `bssamt`(기초금액)가 있어야 예측 호출이 일어난다(`OpportunityAnalysis`

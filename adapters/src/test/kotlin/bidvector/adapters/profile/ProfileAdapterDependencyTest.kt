@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test
  * 참조할 수 있어야 하므로 포함한다.
  *
  * M7/7C④ — V22 어댑터가 사업 정보 값 타입([bidvector.workflow.profile])과 주체 식별자
- * (`bidvector.workflow.access.AccountId`)를 본다. 이 test 의 단위는 **패키지**라 루트로 적는다.
+ * (`bidvector.sharedkernel.AccountId`)를 본다. 이 test 의 단위는 **패키지**라 루트로 적는다.
  * **어느 class 가 그 좌표를 지녀도 되는지는 이 test 가 정하지 않는다** — `adapters` 모듈 전체에
  * 걸리는 `BusinessProfileIsolationGateTest` 가 `SourceFile` 속성으로 그 자리를 정한다(r2 F5 처분).
  */
@@ -26,7 +26,7 @@ internal val ALLOWED_ROOTS: Set<String> =
         setOf(
             "bidvector.workflow.evaluation",
             "bidvector.workflow.profile",
-            "bidvector.workflow.access",
+            "bidvector.sharedkernel",
             "bidvector.qualification",
             "bidvector.strategy",
             "bidvector.adapters.persistence",

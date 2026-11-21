@@ -1,5 +1,6 @@
 package bidvector.workflow.evaluation
 
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.event.AggregateId
 import bidvector.workflow.event.AggregateVersion
 import bidvector.workflow.event.EventIdFactory
@@ -61,6 +62,15 @@ import java.sql.SQLException
  * (`OPEN-6F-ASSEMBLY`)의 몫이다.
  */
 class OutboxNotificationRequestPort(
+    /**
+     * 이 채널을 쥔 계정(M15/15A) — **행을 누구의 요청인지로 만든다.**
+     *
+     * 멱등 키가 공고만 담던 앞 판에서는 두 계정이 같은 공고에 `BidNow` 를 내면 **같은 키의 행이
+     * 둘** 섰고(`outbox` 에 그 열의 UNIQUE 가 없다, 아래 클래스 KDoc), 소비자가 둘을 가를 길이
+     * 없었다. 오늘은 전역 채널을 가장 작은 계정만 쥐므로 그 상황이 서지 않지만, 키에 계정을
+     * 담아 두면 그 억제가 미래에 풀려도 행이 **스스로** 주인을 말한다.
+     */
+    private val account: AccountId,
     private val outbox: OutboxPort,
     private val ids: EventIdFactory,
     private val clock: Clock,
@@ -74,7 +84,7 @@ class OutboxNotificationRequestPort(
                 occurredAt = clock.now(),
                 correlationId = notification.correlationId,
                 causationId = null,
-                idempotencyKey = idempotencyKeyFor(notification),
+                idempotencyKey = idempotencyKeyFor(account, notification),
                 actor = null,
                 payload = notification.toOutboxPayload(),
             )
@@ -97,9 +107,18 @@ private val AGGREGATE_VERSION_NO_OPTIMISTIC_LOCK = AggregateVersion(0)
 private fun aggregateIdFor(notification: NotificationRequest): AggregateId =
     AggregateId("notice-${notification.noticeId.number.value}-${notification.noticeId.round.value}")
 
-/** D-6F7-3 — 업무 사실(이 notice에 대한 BidNow 요청) 단위로 고정한다. 권고적 키다(우회 2, 클래스 KDoc). */
-private fun idempotencyKeyFor(notification: NotificationRequest): IdempotencyKey =
-    IdempotencyKey("notification-requested-${notification.noticeId.number.value}-${notification.noticeId.round.value}")
+/**
+ * D-6F7-3 — 업무 사실(**이 계정의** 이 notice 에 대한 BidNow 요청) 단위로 고정한다. 권고적
+ * 키다(우회 2, 클래스 KDoc). 계정은 M15/15A 가 더했다(생성자 [OutboxNotificationRequestPort.account] KDoc).
+ */
+private fun idempotencyKeyFor(
+    account: AccountId,
+    notification: NotificationRequest,
+): IdempotencyKey =
+    IdempotencyKey(
+        "notification-requested-${account.value}-" +
+            "${notification.noticeId.number.value}-${notification.noticeId.round.value}",
+    )
 
 /**
  * `NotificationRequest` → [NotificationRequestedPayload] 투영(D-6F7-2). `bidNowReasons`는

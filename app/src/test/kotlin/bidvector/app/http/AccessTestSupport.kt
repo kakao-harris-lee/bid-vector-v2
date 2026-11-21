@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 import bidvector.adapters.access.BrowserAccessTransaction
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountStorePort
 import bidvector.workflow.access.BrowserAccessPolicyData

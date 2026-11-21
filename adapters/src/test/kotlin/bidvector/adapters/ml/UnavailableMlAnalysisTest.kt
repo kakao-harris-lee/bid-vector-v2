@@ -11,6 +11,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
@@ -116,9 +117,12 @@ private class FixedClock : Clock {
 private class FakeStrategyRepository(
     val strategy: OperatorStrategy,
 ) : StrategyRepository {
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         error("이 test 는 전략을 저장하지 않는다")
     }
 }
@@ -134,7 +138,10 @@ private class FakeWatchSubjectPort : WatchSubjectPort {
 }
 
 private class FakeLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
 }
 
 private class FakeCapacityPort : CapacityPort {
@@ -172,6 +179,7 @@ class UnavailableMlAnalysisTest {
         val notifications = RecordingNotificationRequestPort()
         val useCase =
             EvaluateCandidatesUseCase(
+                account = AccountId(1),
                 strategies = FakeStrategyRepository(testStrategy()),
                 candidateSource = FakeCandidateSource(listOf(notice)),
                 watchSubjects = FakeWatchSubjectPort(),

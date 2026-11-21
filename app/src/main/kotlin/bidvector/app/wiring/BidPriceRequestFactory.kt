@@ -12,9 +12,9 @@ import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
@@ -158,6 +158,7 @@ class BidPriceRequestFactory(
         )
 
     fun forRequest(
+        account: AccountId,
         id: NoticeId,
         currentActiveBids: Int,
     ): BidPriceRequestOutcome {
@@ -166,17 +167,18 @@ class BidPriceRequestFactory(
             throw InvalidEvaluationRequestException("currentActiveBids는 음수일 수 없다: $currentActiveBids")
         }
         val notice = notices.find(id) ?: return BidPriceRequestOutcome.NoticeNotFound
-        val strategy = strategyRepository.load()
+        val strategy = strategyRepository.load(account)
         val maxActiveBids = strategy.maxActiveBids?.value ?: throw MaxActiveBidsNotConfiguredException()
-        val judgement = licenseJudgements.judgementFor(notice)
+        val judgement = licenseJudgements.judgementFor(account, notice)
         val notifications = RecordingNotificationRequestPort()
         val recordingMl = RecordingMlAnalysis(mlAnalysis)
         val useCase =
             EvaluateCandidatesUseCase(
-                strategies = PinnedStrategyRepository(strategy),
+                account = account,
+                strategies = PinnedStrategyRepository(account, strategy),
                 candidateSource = SingleNoticeCandidateSource(notice),
                 watchSubjects = watchSubjects,
-                licenseGate = PinnedLicenseGate(judgement.verdict),
+                licenseGate = PinnedLicenseGate(account, judgement.verdict),
                 mlAnalysis = recordingMl,
                 capacity = RequestCapacityPort(currentActiveBids, maxActiveBids),
                 notifications = notifications,

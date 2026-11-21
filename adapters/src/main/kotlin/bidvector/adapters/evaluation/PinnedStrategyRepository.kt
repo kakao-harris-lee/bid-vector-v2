@@ -1,5 +1,6 @@
 package bidvector.adapters.evaluation
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.StrategyRepository
@@ -21,10 +22,26 @@ import bidvector.workflow.strategy.StrategyRepository
  * 참조도 생성자에 없다 — `load()` 가 [loaded] 만으로 완결된다.
  */
 class PinnedStrategyRepository(
+    private val account: AccountId,
     private val loaded: OperatorStrategy,
 ) : StrategyRepository {
-    override fun load(): OperatorStrategy = loaded
+    /**
+     * **M15/15A — 고정한 계정이 아니면 크게 실패한다.** 인자를 조용히 무시하면 이 데코레이터가
+     * 「어느 계정으로 물어도 같은 전략」을 내는 자리가 되고, 그것은 이 slice 가 막으려는 바로 그
+     * 빌려 오기다(조립 실수가 **거동 없는 통과**로 보인다). 받은 계정이 고정한 계정과 같다는 것은
+     * 조립의 불변식이므로, 어긋나면 그것은 입력이 아니라 조립 결함이다.
+     */
+    override fun load(account: AccountId): OperatorStrategy {
+        // `AccountId` 는 값 비교를 제공하지 않는다(해시 검증을 비껴가는 길을 막는 규율) —
+        // 식별자 자체를 비교한다. 객체 `==` 를 쓰면 비교 구조 게이트의 허용 목록도 늘어난다.
+        check(account.value == this.account.value) {
+            "고정 저장소는 고정한 계정의 전략만 돌려준다 — 고정=${this.account.value} 요청=${account.value}"
+        }
+        return loaded
+    }
 
-    override fun save(applied: AppliedStrategy): Nothing =
-        error("고정 저장소는 쓰기를 받지 않는다 — 한 번 읽은 값만 돌려준다(PinnedStrategyRepository)")
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ): Nothing = error("고정 저장소는 쓰기를 받지 않는다 — 한 번 읽은 값만 돌려준다(PinnedStrategyRepository)")
 }

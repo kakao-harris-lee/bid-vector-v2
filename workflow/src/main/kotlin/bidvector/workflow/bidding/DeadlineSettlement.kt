@@ -11,7 +11,7 @@ import bidvector.bidding.BidStateTag
 import bidvector.bidding.TransitionOutcome
 import bidvector.bidding.applyCommand
 import bidvector.bidding.tag
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 /**

@@ -72,7 +72,7 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
         evaluations.filterIsInstance<CandidateEvaluation.NotReached>().map { it.noticeId.number.value } shouldBe
             listOf(BLOCKED_NOTICE)
         outboxIdempotencyKeys() shouldHaveSize 1
-        outboxIdempotencyKeys().single() shouldBe idempotencyKeyFor(PASSING_NOTICE)
+        outboxIdempotencyKeys().single() shouldBe idempotencyKeyFor(testAccount(), PASSING_NOTICE)
     }
 
     /**
@@ -125,6 +125,7 @@ internal class PipelineOneLineE2ETest : PipelineE2ESupport() {
             servers += server
             PipelineAssembly(
                 dataSource = dataSource(),
+                account = testAccount(),
                 mlChannel = server.channel,
                 at = E2E_NOW,
                 correlationPrefix = "one-line",

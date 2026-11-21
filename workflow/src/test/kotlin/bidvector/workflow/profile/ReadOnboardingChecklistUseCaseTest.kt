@@ -1,9 +1,8 @@
 package bidvector.workflow.profile
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
-import bidvector.workflow.access.AccountId
-import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.evaluation.testStrategy
 import bidvector.workflow.strategy.Clock
@@ -131,7 +130,7 @@ class ReadOnboardingChecklistUseCaseTest {
         facts: ProfileFacts? = null,
     ): ReadOnboardingChecklistUseCase =
         ReadOnboardingChecklistUseCase(
-            qualification = OperatorProfilePort { facts },
+            qualification = { _ -> facts },
             business = business,
             strategies = strategy,
             clock = Clock { now },
@@ -168,5 +167,5 @@ private class RecordingBusinessProfileReader(
 private class FixedStrategyReader(
     private val strategy: OperatorStrategy,
 ) : StrategyReader {
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 }

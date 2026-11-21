@@ -8,8 +8,11 @@ import bidvector.sharedkernel.NoticeRound
  * `UNIQUE (account_id, notice_number, notice_round, bid_kind)` 가 함께 진다.
  *
  * **계정 식별자를 이 모듈이 선언하지 않는다.** 주체는 application 층이 쥐고
- * (`workflow.bidding.BidActor`), 도메인은 주체의 *종류*만 안다([ActorKind]) — domain 이
- * `workflow.access.AccountId` 를 참조하면 의존 방향이 뒤집힌다(ADR 0006 D-3).
+ * (`workflow.bidding.BidActor`), 도메인은 주체의 *종류*만 안다([ActorKind]).
+ *
+ * M15/15A 뒤로 그 식별자는 `bidvector.sharedkernel` 에 있어 **도메인이 볼 수는 있다**(순환을 끊은
+ * 결과다). 보이는 것과 쥐는 것은 다르다 — 종류만 아는 쪽이 「누구의 건인가」를 도메인 불변식에서
+ * 떼어 놓고, 그 질문을 포트 서명 한 자리로 모은다.
  */
 data class BidCaseId(
     val value: Long,

@@ -2,8 +2,8 @@ package bidvector.workflow.notificationinbox
 
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
-import bidvector.workflow.access.AccountId
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.assertions.withClue

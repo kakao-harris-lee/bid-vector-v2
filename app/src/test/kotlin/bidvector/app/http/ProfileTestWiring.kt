@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 import bidvector.qualification.LicenseName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.evaluation.ProfileFacts
@@ -155,9 +155,12 @@ class InMemoryOperatorProfile :
         facts = null
     }
 
-    override fun current(): ProfileFacts? = facts
+    override fun current(account: AccountId): ProfileFacts? = facts
 
-    override fun save(facts: ProfileFacts) {
+    override fun save(
+        account: AccountId,
+        facts: ProfileFacts,
+    ) {
         this.facts = facts
     }
 }

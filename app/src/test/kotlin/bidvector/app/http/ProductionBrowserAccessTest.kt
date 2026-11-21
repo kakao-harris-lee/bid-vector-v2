@@ -241,12 +241,18 @@ class ProductionBrowserAccessTest {
         ).toSet() shouldBe setOf(expected)
     }
 
+    /**
+     * **M15/15A — 탐침 경로가 바뀌었다.** 전략은 계정 전용 뿌리가 됐고 자격 헤더 경로는 계정을
+     * 내지 않는다. 재는 것은 「자격 헤더 경로가 여전히 선다」이므로 계정을 요구하지 않는 경로로
+     * 옮긴다 — 공고 검색이다. 그 경로가 계정 전용이 아니라는 사실은 선언 한 자리가 든다.
+     */
     @Test
     fun `기존 운영자 자격 헤더 경로는 그대로다 — 무회귀`() {
         val headers =
             HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        AccountScopedRoutes.covers("/api/notices") shouldBe false
 
-        exchange("/api/strategy", HttpMethod.GET, headers).statusCode.value() shouldBe 200
+        statusOf("/api/notices", headers) shouldBe 200
         auditSubjects().contains("operator") shouldBe true
     }
 
@@ -287,6 +293,20 @@ class ProductionBrowserAccessTest {
 
     private fun cookieAndStamp(session: ProductionSession): HttpHeaders =
         cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }
+
+    /**
+     * 상태 코드만 보는 GET — `/api/notices` 의 본문은 JSON **배열**이라 위 [exchange] 의 `Map`
+     * 역직렬화로는 읽히지 않는다(실측: `RestClientException`). 자격 헤더 축의 무회귀는 본문이
+     * 아니라 「닿는가」가 축이므로 상태 코드만 본다.
+     */
+    private fun statusOf(
+        path: String,
+        headers: HttpHeaders,
+    ): Int =
+        restTemplate
+            .exchange(url(path), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
+            .statusCode
+            .value()
 
     @Suppress("UNCHECKED_CAST")
     private fun exchange(

@@ -8,6 +8,7 @@ import bidvector.bidding.BidAmountOrigin
 import bidvector.bidding.BidSubmission
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRateOrigin
@@ -16,7 +17,6 @@ import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.BidCaseWorkflow
 import bidvector.workflow.bidding.EvidenceRetentionPolicyData
 import java.math.BigDecimal

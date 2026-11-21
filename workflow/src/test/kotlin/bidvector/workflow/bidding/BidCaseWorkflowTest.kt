@@ -19,13 +19,13 @@ import bidvector.bidding.TransitionEffect
 import bidvector.bidding.TransitionKey
 import bidvector.bidding.TransitionOutcome
 import bidvector.bidding.tag
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf

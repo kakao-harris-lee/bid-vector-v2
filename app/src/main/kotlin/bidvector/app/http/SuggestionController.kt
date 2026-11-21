@@ -6,6 +6,7 @@ import bidvector.qualification.UncertainReason
 import bidvector.workflow.suggestion.SUGGESTION_UNJUDGED_AXES
 import bidvector.workflow.suggestion.Suggestion
 import bidvector.workflow.suggestion.SuggestionList
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
@@ -30,9 +31,11 @@ const val COMPUTED_AT_HEADER = "X-Computed-At"
 class SuggestionController(
     private val suggestions: SuggestionQuery,
 ) {
-    @GetMapping("/api/suggestions")
-    fun list(): ResponseEntity<List<SuggestedNoticeResponse>> {
-        val result = suggestions.list()
+    /** **M15/15A** — 세션 계정의 제안이다(계정 없는 인증은 401, `StrategyReadController` 와 같은 규율). */
+    @GetMapping(AccountScopedRoutes.SUGGESTIONS)
+    fun list(request: HttpServletRequest): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
+        val result = suggestions.list(account)
         return ResponseEntity
             .ok()
             .header(STRATEGY_REVISION_HEADER, result.strategyRevision.value.toString())

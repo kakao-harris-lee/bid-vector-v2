@@ -578,11 +578,31 @@ async function main() {
  * 전략 여력 상한을 **하네스가** 심는다(D-7E-8) — 투찰가 요청은 이 값이 없으면 409
  * `MAX_ACTIVE_BIDS_NOT_CONFIGURED` 다(fail-closed, 계약 선언). 그 값을 세우는 편집 세션
  * operation 은 화면 B·C 의 목록 밖(설정 화면 = 7E-2)이므로 **운영자 설정 행위를 하네스가
- * 대신한다** — 자격 헤더를 쓰고 브라우저 세션을 쓰지 않는다(화면 경로와 섞지 않는다).
+ * 대신한다.**
+ *
+ * **M15/15A — 자격 헤더가 아니라 여정 계정의 세션으로 심는다.** V28 이 전략을 계정 소유로
+ * 옮기면서 두 가지가 함께 바뀌었다: 자격 헤더 주체에는 계정이 없어 이 경로가 401 이고(실측),
+ * 전략에 **주인이 생겼다**. 다른 주체로 심으면 그 상한은 여정이 로그인하는 계정의 것이 아니라
+ * 아무도 읽지 않는 행이 된다 — 그래서 축을 바꾼 것은 우회가 아니라 **같은 계정이어야 한다는
+ * 요구**다. 화면 경로와 섞이지 않는다는 원래 사유는 그대로다(하네스는 HTTP 로만 심고 화면을
+ * 열지 않는다).
  */
 async function seedMaxActiveBids(appPort) {
   const origin = `http://127.0.0.1:${appPort}`;
-  const headers = { 'content-type': 'application/json', 'X-Operator-Credential': OPERATOR_CREDENTIAL };
+  const signIn = await fetch(`${origin}/api/session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ loginName: LOGIN_NAME, passphrase: PASSPHRASE }),
+  });
+  if (!signIn.ok) {
+    throw new Error(`하네스 로그인 실패: POST /api/session → ${signIn.status}`);
+  }
+  const cookie = (signIn.headers.get('set-cookie') ?? '').split(';')[0];
+  const { csrf } = await signIn.json();
+  if (!cookie || !csrf) {
+    throw new Error('하네스 로그인 응답에 쿠키나 csrf 가 없다');
+  }
+  const headers = { 'content-type': 'application/json', cookie, 'X-Operator-Csrf': csrf };
   const post = async (path, body) => {
     const response = await fetch(`${origin}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
     if (!response.ok) {

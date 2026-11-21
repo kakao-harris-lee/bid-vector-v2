@@ -448,6 +448,7 @@ class OpportunityAnalysisTest {
 
         val useCase =
             EvaluateCandidatesUseCase(
+                account = TEST_ACCOUNT,
                 strategies = strategyRepository,
                 candidateSource = candidateSource,
                 watchSubjects = watchSubjects,

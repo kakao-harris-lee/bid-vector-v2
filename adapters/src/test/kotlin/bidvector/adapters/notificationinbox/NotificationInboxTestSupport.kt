@@ -10,8 +10,8 @@ import bidvector.procurement.PersistOutcome
 import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.BidKindAxis
 import bidvector.workflow.notificationinbox.NotificationBidKind

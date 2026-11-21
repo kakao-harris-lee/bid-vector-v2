@@ -2,7 +2,7 @@ package bidvector.adapters.bidding
 
 import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidStateTag
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.bidding.TimelineEntry
 import java.sql.Connection
 import java.sql.Timestamp
