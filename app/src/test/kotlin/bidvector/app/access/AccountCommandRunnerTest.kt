@@ -22,6 +22,9 @@ import org.springframework.boot.DefaultApplicationArguments
 import java.time.Instant
 
 private val LOGIN = LoginName("runner-test-operator")
+
+/** 완화된 `create` 가 만드는 둘째 계정(M15/15B). */
+private val SECOND_LOGIN = LoginName("runner-test-operator-two")
 private const val INITIAL = "runner-test-fixture-initial-value"
 private const val NEXT = "runner-test-fixture-next-value"
 private val NOW: Instant = Instant.parse("2026-10-19T00:00:00Z")
@@ -40,7 +43,7 @@ private class StubHasher : PassphraseHasher {
 private class StubProvisioningStore : AccountProvisioningPort {
     private val rows: MutableMap<String, Pair<AccountId, PassphraseHash>> = mutableMapOf()
 
-    override fun anyExists(): Boolean = rows.isNotEmpty()
+    override fun existsWithLogin(login: LoginName): Boolean = rows.containsKey(login.value)
 
     override fun insert(
         login: LoginName,
@@ -127,7 +130,7 @@ class AccountCommandRunnerTest {
     }
 
     @Test
-    fun `이미 계정이 있으면 거부하고 종료 코드가 0 이 아니다 — 덮어쓰지 않는다`() {
+    fun `같은 아이디가 있으면 거부하고 종료 코드가 0 이 아니다 — 덮어쓰지 않는다`() {
         run(AccountCommandMode.CREATE)
         val stored = store.storedHash(LOGIN)
         run(AccountCommandMode.CREATE, NEXT)
@@ -135,6 +138,30 @@ class AccountCommandRunnerTest {
         lines.last() shouldBe "account command=create result=refused cause=account-exists"
         exitCodes.last() shouldBe 1
         store.storedHash(LOGIN) shouldBe stored
+    }
+
+    /**
+     * M15/15B — **완화된 조건의 반대쪽**. 앞 판은 계정이 하나라도 있으면 거부했고, 그래서 운영자가
+     * 둘째 계정을 손으로 만들 수 없었다. 가입이 열린 뒤 그 금지는 아무것도 지키지 않는다.
+     */
+    @Test
+    fun `다른 아이디는 계정이 이미 있어도 만든다 — 운영자가 둘째 계정을 만들 수 있다`() {
+        run(AccountCommandMode.CREATE)
+
+        AccountCommandRunner(
+            transaction = transaction,
+            mode = AccountCommandMode.CREATE,
+            login = SECOND_LOGIN,
+            initial = ClearPassphrase.wrap(NEXT),
+            log = AccountCommandLog { lines += it },
+            termination = AccountCommandTermination { exitCodes += it },
+        ).run(DefaultApplicationArguments())
+
+        lines.last() shouldBe "account command=create result=created login=${SECOND_LOGIN.value}"
+        exitCodes.last() shouldBe 0
+        store.storedHash(SECOND_LOGIN) shouldBe hasher.hash(ClearPassphrase.wrap(NEXT)).encoded
+        // 첫 계정의 자격은 그대로다 — 둘째 생성이 앞 행을 건드리지 않는다.
+        store.storedHash(LOGIN) shouldBe hasher.hash(ClearPassphrase.wrap(INITIAL)).encoded
     }
 
     @Test

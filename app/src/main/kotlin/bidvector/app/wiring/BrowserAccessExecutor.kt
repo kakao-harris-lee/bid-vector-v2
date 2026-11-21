@@ -8,6 +8,7 @@ import bidvector.workflow.access.CsrfDemand
 import bidvector.workflow.access.LoginName
 import bidvector.workflow.access.SessionDescription
 import bidvector.workflow.access.SignInOutcome
+import bidvector.workflow.access.SignUpOutcome
 
 /**
  * HTTP 가 부르는 유일한 접근 실행기(M7/7D, `StrategyEditExecutor` 와 같은 자리·같은 이유) —
@@ -34,6 +35,18 @@ class BrowserAccessExecutor(
         login: LoginName,
         clear: ClearPassphrase,
     ): SignInOutcome = transaction.inSignInScope { it.signIn(login, clear) }
+
+    /**
+     * 열린 가입(M15/15B) — **로그인과 같은 경계**다. 가입도 KDF 를 돌리므로 그 느린 구간이 풀
+     * 커넥션을 쥐면 안 되고(그 이유가 [BrowserAccessTransaction.inSignInScope] 의 사유 그대로다),
+     * 무인증으로 닿는 자리라 그 증폭의 입구가 **더 싸다**.
+     *
+     * 남용 상한은 여기 없다 — 키가 원격 주소라 HTTP 층이 진다(`SignUpThrottle`).
+     */
+    fun signUp(
+        login: LoginName,
+        clear: ClearPassphrase,
+    ): SignUpOutcome = transaction.inSignInScope { it.signUp(login, clear) }
 
     fun authenticate(
         key: BrowserSessionKey,

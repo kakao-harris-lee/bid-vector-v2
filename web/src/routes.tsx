@@ -2,6 +2,8 @@ import type { RouteObject } from 'react-router';
 
 import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
+import { LOGIN_PATH, SIGN_UP_PATH } from './paths';
+import { SignUpScreen } from './SignUpScreen';
 import { BidBoxScreen } from './screens/BidBoxScreen';
 import { InboxScreen } from './screens/InboxScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
@@ -68,9 +70,28 @@ export const screenRoutes: RouteObject[] = screenSlots.map((slot) => ({
  */
 export const loginRoute: RouteObject = {
   id: 'login',
+  // **문자열 리터럴이다**(상수를 쓰지 않는다) — 여정 화면 표 게이트가 이 파일을 AST 로 읽어
+  // `id`·`path` 를 리터럴로 요구한다(식이면 「읽지 못한다」로 던진다). 같은 값이 두 자리에
+  // 있는 것은 `routes.test.ts` 의 등식이 든다.
   path: '/login',
   element: <LoginScreen />,
 };
+
+/**
+ * 가입 자리(M15/15B) — 로그인과 **같은 축**이다(요구표의 화면 구분 밖, 인증 자리). 그래서 화면
+ * 자리 표에 넣지 않고 셸의 전역 탐색에도 뜨지 않는다.
+ */
+export const signUpRoute: RouteObject = {
+  id: 'signup',
+  path: SIGN_UP_PATH,
+  element: <SignUpScreen />,
+};
+
+/**
+ * **세션 전 자리 전수** — 셸이 탐색을 그리지 않는 경로다. 집합으로 두는 이유는 자리가 둘이 된
+ * 순간 「로그인이면」이라는 술어가 가입 화면에서 조용히 틀리기 때문이다.
+ */
+export const PRE_SESSION_PATHS: ReadonlySet<string> = new Set([LOGIN_PATH, SIGN_UP_PATH]);
 
 /**
  * 알 수 없는 URL 자리(code-review r1 F-10). **화면 자리 표에는 넣지 않는다** — 이것은 화면이

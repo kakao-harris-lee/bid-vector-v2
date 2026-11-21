@@ -9,6 +9,7 @@ import bidvector.workflow.access.BrowserAccessWorkflow
 import bidvector.workflow.access.BrowserSessionKey
 import bidvector.workflow.access.BrowserSessionKeySource
 import bidvector.workflow.access.PassphraseHasher
+import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.strategy.Clock
 import java.security.SecureRandom
 import java.util.Base64
@@ -67,6 +68,7 @@ class JdbcBrowserAccessTransaction(
     private val keys: BrowserSessionKeySource,
     private val clock: Clock,
     private val policy: BrowserAccessPolicyData,
+    private val signUpPolicy: SignUpPolicyData,
 ) : BrowserAccessTransaction {
     /**
      * 로그인 전용 공급원 — **호출 하나가 트랜잭션 하나**다(`JdbcStrategyRepository` 의
@@ -91,10 +93,13 @@ class JdbcBrowserAccessTransaction(
             accounts = JdbcAccountStore(bounded),
             sessions = JdbcBrowserSessionStore(connections),
             completion = JdbcSignInCompletion(bounded),
+            // 가입 쓰기도 계정 표에 닿는 문장이라 같은 상한 아래 선다(M15/15B).
+            signUps = JdbcAccountSignUpStore(bounded),
             hasher = hasher,
             keys = keys,
             clock = clock,
             policy = policy,
+            signUpPolicy = signUpPolicy,
         )
     }
 }

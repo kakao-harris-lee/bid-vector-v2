@@ -9,7 +9,7 @@ import { openCaseCountOf } from './display/bidBoxDisplay';
 import { AbsentValue } from './components/AbsentValue';
 import { Button } from './components/Button';
 import { queryClient } from './queryClient';
-import { notFoundSlot, screenSlots, type ScreenSlot } from './routes';
+import { notFoundSlot, PRE_SESSION_PATHS, screenSlots, type ScreenSlot } from './routes';
 
 /** 셸의 이름 — 문서 제목도 이 한 자리를 쓴다(머리글과 탭 이름이 갈리지 않는다). */
 const APP_NAME = 'bid-vector 운영자';
@@ -174,8 +174,10 @@ function ShellFrame() {
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
   const firstRender = useRef(true);
 
-  // 로그인 자리에는 탐색을 그리지 않는다 — 세션 전이고, 그 화면에서 갈 수 있는 곳이 없다.
-  const atLogin = pathname === LOGIN_PATH;
+  // **세션 전 자리**에는 탐색을 그리지 않는다 — 로그인과 가입 둘이고, 그 화면에서 전역 탐색으로
+  // 갈 수 있는 곳이 없다(M15/15B 가 가입을 더하면서 술어를 집합으로 바꿨다 — 「로그인이면」이라는
+  // 술어는 자리가 둘이 된 순간 가입 화면에서 조용히 틀린다).
+  const atLogin = PRE_SESSION_PATHS.has(pathname);
   if (more.at !== pathname) {
     // 렌더 중 갱신 — React 가 커밋 없이 곧바로 다시 렌더한다(「props 가 바뀔 때 state 를 맞추는」
     // 표준 꼴). 자리를 옮기면 펼침이 **값으로** 풀린다.

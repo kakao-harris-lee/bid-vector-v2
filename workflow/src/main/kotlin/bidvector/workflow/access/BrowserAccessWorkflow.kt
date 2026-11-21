@@ -23,6 +23,33 @@ sealed interface SignInOutcome {
     data object Refused : SignInOutcome
 }
 
+/**
+ * 열린 가입의 결과(M15/15B) — **거부의 사유를 나눈다.** 로그인([SignInOutcome])과 반대인 것이
+ * 의도다: 로그인에서 사유를 나누면 「그 계정이 있다」가 새지만, 가입은 그 사실을 **말해야 하는**
+ * 자리다(이미 쓰는 이름을 쓸 수 없다는 것은 어느 가입 화면에서나 보이는 사실이다). 형식 거부를
+ * 칸별로 가르는 것도 같은 이유다 — 화면이 어느 칸 옆에 문장을 둘지 알아야 한다.
+ */
+sealed interface SignUpOutcome {
+    class Granted(
+        val session: IssuedSession,
+    ) : SignUpOutcome
+
+    /** 아이디의 길이·글자가 정책 밖이다. */
+    data object RefusedLoginNameShape : SignUpOutcome
+
+    /** 비밀번호가 하한에 못 미치거나 바이트 상한을 넘는다. */
+    data object RefusedPassphraseShape : SignUpOutcome
+
+    /** 그 이름의 계정이 이미 있다 — **다른 정보를 함께 내지 않는다**(누가 언제 만들었는지 0). */
+    data object RefusedDuplicate : SignUpOutcome
+
+    /**
+     * 계정은 만들어졌는데 세션이 서지 않았다(경합·자격 이동). 가입자는 로그인으로 들어올 수
+     * 있으므로 **계정을 지우지 않는다** — 권한이 새는 방향이 아니다.
+     */
+    data object SessionUnavailable : SignUpOutcome
+}
+
 /** 요청 인증 결과. */
 sealed interface AccessVerdict {
     class Granted(
@@ -61,11 +88,58 @@ class BrowserAccessWorkflow(
     private val accounts: AccountStorePort,
     private val sessions: BrowserSessionStorePort,
     private val completion: SignInCompletionPort,
+    private val signUps: AccountSignUpPort,
     private val hasher: PassphraseHasher,
     private val keys: BrowserSessionKeySource,
     private val clock: Clock,
     private val policy: BrowserAccessPolicyData,
+    private val signUpPolicy: SignUpPolicyData,
 ) {
+    /**
+     * 열린 가입(M15/15B) — 만들고 **곧바로 로그인 세션을 낸다**. 초대 코드도 운영자 승인도 없다
+     * (운영자 지시 2026-11-21, 테스트 단계 진입용).
+     *
+     * **발급은 [signIn] 과 같은 자리다**([issue]) — 세션을 만드는 함수가 둘이 되면 한쪽만 고쳐지는
+     * 날이 온다(기존 세션 폐기·CSRF 유도·절대 창이 그 안에 있다).
+     *
+     * 순서가 정해져 있다: ⓐ 형식 → ⓑ 해시 → ⓒ 삽입 → ⓓ 발급. 형식이 해시보다 **앞**인 것은
+     * 비용 때문이다(틀린 입력에 KDF 를 돌리지 않는다). 남용 상한은 이 use case 가 아니라 HTTP 층이
+     * 진다 — 그 키가 원격 주소라 도메인 어휘가 아니다(`SignUpThrottle`).
+     */
+    fun signUp(
+        login: LoginName,
+        clear: ClearPassphrase,
+    ): SignUpOutcome =
+        // 거부의 갈래 셋이 **한 표**에 선다(`signIn` 과 같은 모양) — 반환 자리가 하나뿐이라
+        // 「한 갈래만 다르게 끝내는」 편집이 눈에 띈다.
+        when {
+            !signUpPolicy.accepts(login) -> {
+                SignUpOutcome.RefusedLoginNameShape
+            }
+
+            !signUpPolicy.accepts(clear) -> {
+                SignUpOutcome.RefusedPassphraseShape
+            }
+
+            else -> {
+                opened(login, hasher.hash(clear))
+            }
+        }
+
+    /**
+     * 이름이 비어 있으면 행을 세우고 세션까지 낸다. 막 만든 행이라 잠금이 없고 자격이 그대로지만
+     * **조건부 확정을 그대로 지난다** — 조건을 건너뛰는 둘째 경로를 두지 않는다.
+     */
+    private fun opened(
+        login: LoginName,
+        hash: PassphraseHash,
+    ): SignUpOutcome {
+        val account = signUps.insertIfAbsent(login, hash) ?: return SignUpOutcome.RefusedDuplicate
+        return issue(AccountSnapshot(account, hash, null), clock.now())
+            ?.let { SignUpOutcome.Granted(it) }
+            ?: SignUpOutcome.SessionUnavailable
+    }
+
     /**
      * 로그인 — 잠금 확인 → 해시 검증 → **재발급**. 실패는 계수를 올리고 상한에서 잠근다.
      *
