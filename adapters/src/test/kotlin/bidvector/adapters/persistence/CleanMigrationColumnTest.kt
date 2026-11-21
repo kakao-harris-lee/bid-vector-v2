@@ -304,14 +304,19 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
     private val operatorProfileColumns =
         listOf(
             // M7/7D V20(추가만) — 평문 열이 없다: 비밀 문구는 bcrypt 문면, 세션 식별자와 CSRF 는
-            // SHA-256 hex 다. `created_at` 만 DB 가 찍고(보존 기준 시각 축) 나머지 시각은
-            // 애플리케이션의 시계가 정한다(세션 판정의 입력이라 test 가 그 시계를 민다).
+            // SHA-256 hex 다.
+            //
+            // M15/15B V29 — **시각 둘과 실패 계수가 DEFAULT 를 받았다**(`hasDefault=true`). 열린
+            // 가입이 적는 열은 `login_name`·`passphrase_hash` 둘뿐이고(V29 의 열 단위 GRANT),
+            // 나머지 NOT NULL 열은 DB 가 채워야 그 INSERT 가 선다. **권한을 넓히지 않으려는
+            // 선택**이다 — 다섯 열로 넓혔다면 앱이 `created_at` 을 먼 미래로 지정해 보존 cutoff 를
+            // 비껴갈 수 있다. 운영자 명령은 지금처럼 명시 값을 실으므로 그 경로의 거동은 그대로다.
             ColumnSpec("account", "id", "bigint", false),
             ColumnSpec("account", "login_name", "text", false),
             ColumnSpec("account", "passphrase_hash", "text", false),
-            ColumnSpec("account", "created_at", "timestamp with time zone", false),
-            ColumnSpec("account", "updated_at", "timestamp with time zone", false),
-            ColumnSpec("account", "failed_attempts", "integer", false),
+            ColumnSpec("account", "created_at", "timestamp with time zone", false, true),
+            ColumnSpec("account", "updated_at", "timestamp with time zone", false, true),
+            ColumnSpec("account", "failed_attempts", "integer", false, true),
             ColumnSpec("account", "locked_until", "timestamp with time zone", true),
             ColumnSpec("browser_session", "session_digest", "text", false),
             ColumnSpec("browser_session", "account_id", "bigint", false),

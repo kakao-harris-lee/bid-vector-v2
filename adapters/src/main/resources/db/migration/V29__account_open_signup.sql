@@ -26,6 +26,13 @@
 --    운영자 명령(`bidvector.account.mode=CREATE`)은 지금처럼 **명시 값**을 싣는다 — DEFAULT 는
 --    적지 않은 자리에만 적용되므로 그 경로의 거동은 바뀌지 않는다.
 -- =============================================================================
+-- 잠금 대기의 상한(V18·V19 가 세운 관례, V23~V27 과 같은 사유) — 이 파일이 쥐는 것은 `account`
+-- 한 표의 ACCESS EXCLUSIVE 뿐이고 창이 짧지만, 기본 `lock_timeout` 은 0 이고 migrate 가 기동의
+-- 부수효과라 그 대기는 곧 **기동 정지**다. 상한을 두면 「정지」가 아니라 「실패」가 된다.
+-- **이 표에서 특히 현실적이다**: 로그인·가입 경로가 같은 행을 잠그고, 반입은 compose 교체라
+-- 구판 컨테이너가 그 연결을 쥔 채 신판이 migrate 를 시작할 수 있다.
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE account ALTER COLUMN created_at SET DEFAULT now();
 ALTER TABLE account ALTER COLUMN updated_at SET DEFAULT now();
 ALTER TABLE account ALTER COLUMN failed_attempts SET DEFAULT 0;
