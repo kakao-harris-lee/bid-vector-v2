@@ -41,7 +41,7 @@
 | `operator.credential` | `OperatorCredentialProperties` | **항상 필수** — 조립 근이 모드와 무관하게 바인딩한다 |
 | `bidvector.persistence` | `PersistenceProperties` | **항상 필수** |
 | `bidvector.release` | `ReleaseProperties` | **항상 필수**(M9/OPS-10 — `sha`, 기본값 없음). 조립에 조건이 없다: 어느 모드로 뜨든 행을 쓰는 경로가 있으므로 전부 이 값을 요구한다 |
-| `bidvector.evaluation` | `EvaluationProperties` | **항상 필수**(`candidate-cap`; 수집 모드에서도 부팅 요건) |
+| `bidvector.evaluation` | `EvaluationProperties` | **항상 필수**(`candidate-cap`; 수집 모드에서도 부팅 요건). 같은 prefix 의 run 당 계정 상한 둘은 **기본값이 있다**(§1.4) — 상한은 「주지 않으면 무제한」이 되면 안 되는 값이라 기본값 자리를 비우지 않았다 |
 | `bidvector.access` | `AccessCookieProperties` | 기본값이 있어 **주지 않아도 뜬다**(§2 참조) |
 | `bidvector.notification` | `NotificationChannelProperties`(· `TelegramChannelProperties`) | **relay 를 켤 때만** 바인딩된다(`RelayWiring` 이 그 자리를 든 유일한 곳이다). 전부 기본값 — 채널 설정이 없으면 그 채널이 비활성이다(M9/STR12) |
 | `bidvector.evaluation.commit` | `EvaluationCommitProperties` | 평가 커밋 러너를 켤 때만 |
@@ -99,7 +99,7 @@
 | `bidvector.persistence` | `jdbc-url` · `username` · `credential` |
 | `bidvector.access` | `cookie-secure` (기본 `true`) |
 | `bidvector.notification` | `site-base-url` · `telegram.{bot-credential,chat-id,route-key,base-url,connect-timeout,response-timeout}` — `telegram.bot-credential` 은 **위 문단의 자격 값과 같은 취급**이다 |
-| `bidvector.evaluation` | `candidate-cap` · `mode` |
+| `bidvector.evaluation` | `candidate-cap` · `mode` · `max-accounts-per-run` (기본 `50`) · `max-consecutive-account-failures` (기본 `3`) — 뒤 둘은 **run 당 계정 상한**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`)이고 읽는 법은 §3.4 다. 둘 다 **1 미만이면 기동 실패**(0 은 「아무도 평가하지 않는다」라 상한이 아니다) |
 | `bidvector.evaluation.commit` | `current-active-bids` |
 | `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` |
 | `bidvector.koneps` | `base-url` · `service-key` · `operations.<업종>.path` · `operations.<업종>.division` |
@@ -361,8 +361,42 @@ fixture 의 DDL 뿐). 남는 것은 구조적 사각이고, 새 표·새 DML 을
 | 코드 | 이름 | 뜻 | 처방 |
 |---|---|---|---|
 | 0 | `COMPLETE` | 요청이 전부 접수됐다(승격이 0 건이어도 0) | 없음 |
-| 1 | `FAILED` | 협력자가 던졌다 | §3.5 로 사유 토큰을 읽고 **두 갈래로 간다** — SQLSTATE 가 붙었으면 DB 쪽(권한·공간·연결 한도)을 보고 고친 뒤 재실행, 붙지 않았으면 클래스 이름으로 좁혀 그 협력자(ML gateway·전략 저장소)의 가용성을 본다. 재실행 전에 원인을 없앤다 — 같은 원인이면 같은 자리에서 또 죽는다 |
-| 2 | `INCOMPLETE` | 요청 하나 이상이 실패했다 — outbox 쓰기가 실패했다 | outbox 쓰기 실패 사유(SQLSTATE)를 본다. **「판정이 보존돼 있다」고 읽지 않는다** — 판정 기록 표가 없어 outbox 행이 판정의 유일한 영속 흔적이므로(§6.6) 쓰이지 않은 판정은 **사라진 것과 같다**. 재실행이 중복 발송을 내지 않는 근거는 「판정이 보존됐다」가 아니라 **relay 가 멱등 키로 중복을 접는다**는 것이다(`skippedDuplicates`). outbox 에 그 키의 UNIQUE 가 **없으므로** 앞 run 에서 성공했던 공고의 행은 재실행마다 **새로 생긴다** — 행 수가 늘어나는 것은 정상이고, 발송이 한 번인 것은 relay 가 보장한다 |
+| 1 | `FAILED` | **계정 전수를 못 읽어 run 이 서지 못했다** — 이 값의 원천은 그 하나뿐이다(M15/15A). 줄은 `evaluation-commit failed cause=audience-unavailable:<예외 클래스>` | 그 예외 클래스로 좁힌다 — 계정 질의가 닿는 곳은 DB 하나다(권한·연결 한도·종료). **평가는 한 계정도 돌지 않았다** — 재실행이 중복을 낳을 걱정이 없으니 원인을 없앤 뒤 그대로 다시 돈다 |
+| 2 | `INCOMPLETE` | 둘 중 하나 — (a) outbox 쓰기가 실패한 요청이 있다(`requestFailed>0`) (b) **평가 중에 터진 계정이 있다**(`failed>0`, M15/15A). 한 계정이 터져도 순회는 이어지고, 그 계정의 판정만 사라진다 | (b) 면 `account-failed cause=` 줄들을 §3.5 로 읽는다 — 그 줄은 **계정 id 를 싣지 않는다**(공개 로그). (a) 면 outbox 쓰기 실패 사유(SQLSTATE)를 본다. 어느 쪽이든 **「판정이 보존돼 있다」고 읽지 않는다** — 판정 기록 표가 없어 outbox 행이 판정의 유일한 영속 흔적이므로(§6.6) 쓰이지 않은 판정은 **사라진 것과 같다**. 재실행이 중복 발송을 내지 않는 근거는 「판정이 보존됐다」가 아니라 **relay 가 멱등 키로 중복을 접는다**는 것이다(`skippedDuplicates`). outbox 에 그 키의 UNIQUE 가 **없으므로** 앞 run 에서 성공했던 공고의 행은 재실행마다 **새로 생긴다** — 행 수가 늘어나는 것은 정상이고, 발송이 한 번인 것은 relay 가 보장한다 |
+
+**「협력자가 던졌다」를 `FAILED`(1) 로 읽지 않는다.** ML gateway·전략 저장소가 던지면 그것은 **그 계정의**
+실패이고 종료 코드는 `INCOMPLETE`(2) 다 — 순회는 다음 계정으로 간다. `FAILED`(1) 는 **계정 목록 자체를
+못 읽은 run**, 곧 아무것도 평가하지 못한 run 에만 선다.
+
+**마침 줄의 계정 계수 넷을 가려 읽는다**(`evaluation-commit finished accounts=… skipped=… failed=…
+deferred=…`). 넷은 서로 다른 사건이고, 종료 코드에 미치는 영향도 다르다.
+
+| 계수 | 무슨 일이 있었나 | 종료 코드 | 처방 |
+|---|---|---|---|
+| `accounts=` | 실제로 평가가 돈 계정 수 | — | `0` 인데 `skipped`·`deferred` 도 `0` 이면 **청중이 비었다**. 갓 설치한 체계의 정상 상태라 비-0 이 아니다 — 경보로 바꾸는 것은 cron 쪽 일이다 |
+| `skipped=` | 쓸 수 있는 전략이 없어 건너뛴 계정 수 | 바꾸지 않는다 | 그 계정이 전략을 저장한 적이 없다는 뜻이다. 수가 늘기만 한다면 가입은 되는데 설정이 안 되는 것이니 **가입 경로**를 본다 |
+| `failed=` | 평가 중에 예외로 터진 계정 수 | **`INCOMPLETE`(2)** | 같은 run 의 `account-failed cause=` 줄과 짝지어 읽는다. 그 계정들의 판정은 **사라졌다** |
+| `deferred=` | 이 run 이 **평가하지 않고 미룬** 계정 수 | 바꾸지 않는다 | 아래 두 원천을 가린다 |
+
+`deferred` 는 **실패가 아니다** — 그 계정의 평가는 사라진 것이 아니라 다음 run 으로 미뤄졌다. 원천이
+둘이고, 둘을 가르는 것은 계수가 아니라 **줄의 유무**다.
+
+- **run 당 계정 상한 밖**(`bidvector.evaluation.max-accounts-per-run`, 기본 50). 시작 줄의
+  `maxAccountsPerRun=` 과 맞대 본다. 계정은 **id 순으로** 잘리므로 가장 작은 id(운영 계정)는 언제나
+  포함된다. `deferred` 가 매 run 반복되면 상한을 올리거나 run 을 더 자주 돌린다 — 그 전에 **비용**을
+  본다(계정 수 × 평가 1회).
+- **연속 실패로 멈췄다.** `evaluation-commit stopped cause=consecutive-account-failures consecutive=N
+  remaining=M` 줄이 **있으면** 그 run 은 끝까지 돌지 않았다(기본 N=3,
+  `bidvector.evaluation.max-consecutive-account-failures`). 끊기지 않는 실패는 그 계정들의 일이 아니라
+  **체계가 내려간 것**의 신호다 — `account-failed cause=` 를 먼저 고치고 재실행한다. 그 run 은 `failed>0`
+  이므로 종료 코드는 이미 `INCOMPLETE`(2) 다.
+
+**`suppressed=` 는 계정 계수가 아니다**(요청 계수다, 마침 줄의 `requested`·`requestFailed` 옆).
+전역 발송 채널을 쥐지 않은 계정의 `BidNow` 판정 수이고 — 오늘 그 채널은 가장 작은 id 하나가 쥔다 —
+**계약대로 도는 정상 상태라 종료 코드를 바꾸지 않는다**(M15/15A). `requested` 에 접으면 마침 줄이 보내지
+않은 건을 보냈다고 말하고, `requestFailed` 에 접으면 정상 run 이 매번 `INCOMPLETE` 로 끝난다. 그 판정이
+**사라진 것은 아니다** — 그 계정의 앱 알림함에는 남는다. 수가 커도 고칠 자리는 run 이 아니라 **계정별
+발송 채널**이고, 그 자리는 오늘 없다(§6).
 
 ### 3.5 cause code 를 읽는 법
 
@@ -372,6 +406,13 @@ fixture 의 DDL 뿐). 남는 것은 구조적 사각이고, 새 표·새 DML 을
 |---|---|
 | `<예외 클래스 FQN>:sqlState=<5자리>` | SQL 예외. SQLSTATE 가 진짜 정보다(`23505` 유일성 위반, `53300` 연결 한도, `57P01` 관리자 종료 등) |
 | `<예외 클래스 FQN>` | 그 밖의 예외 |
+
+**평가 레인의 `audience-unavailable:` 은 예외 클래스가 아니라 자리 표지다**(M15/15A). `evaluation-commit
+failed cause=audience-unavailable:<예외 클래스 **단순 이름**>` 은 「계정 전수를 읽다가 터졌다」는 뜻이고,
+콜론 뒤는 위 두 형태가 아니라 **단순 이름 하나**다(SQLSTATE 가 붙지 않는다 — 그 질의가 닿는 곳이 DB
+하나라 자리가 이미 사유를 좁힌다). 같은 레인의 `evaluation-commit account-failed cause=` 는 접두사 없이
+위 두 형태를 그대로 쓴다 — **그 둘을 같은 줄로 읽지 않는다**(§3.4: 앞은 `FAILED`(1), 뒤는
+`INCOMPLETE`(2)).
 
 **메시지는 싣지 않는다** — 접속 문자열·호스트·공고 내용이 거기로 샌다. 「메시지가 없어서 못 고친다」면
 SQLSTATE 와 클래스 이름으로 좁힌 뒤 DB 쪽 로그를 본다. 수집 레인의 사유 코드는 아직 자기 사본을
@@ -688,7 +729,11 @@ probe 가 **하지 않는 것**: 개찰 갈래를 켜지 않는다(축 다섯이
     base digest 핀)과 같은 자리에서 CI 가 잰다. 남는 것은 **서명과 레지스트리 push** 이고, 그 둘이
     없으므로 「CI 가 잰 이미지」와 「배포된 이미지」가 같은 바이트라는 보증은 아직 없다(§8.7).
 11. **멀티아키 빌드가 없다**(`OPEN-6C-MULTIARCH`) — 배포 대상이 정해질 때.
-12. **RBAC·다중 사용자·TLS·네트워크 배치를 다루지 않는다**(`OPEN-6A-RBAC`). 단일 운영자 전용이다.
+12. **RBAC·역할·TLS·네트워크 배치를 다루지 않는다**(`OPEN-6A-RBAC`). **「단일 운영자 전용」은 M15 가
+    깼다** — 15A 가 전략·프로필·편집 세션을 계정마다 두고, 15B 가 초대·승인 없이 가입을 열었다
+    (테스트 단계 한정 — `OPEN-M15-SIGNUP-HARDENING`). 그래도 **역할 구분은 없다**: 계정은 전부 같은
+    권한을 갖는다. **계정별 발송 채널도 없다** — 실 발송(Telegram)을 쥐는 자리는 **가장 작은 id
+    하나**뿐이고, 나머지 계정의 `BidNow` 판정은 그 계정의 앱 알림함에만 남는다(§3.4 의 `suppressed=`).
 13. **자격증명 원문 경계가 완전히 닫히지 않았다**(`OPEN-6A1-CREDENTIAL-RAW-REINTRODUCTION`) — 환경변수
     원문은 어딘가에 `String` 으로 존재해야 한다는 구조적 뿌리가 남아 있다.
 14. **소유자 자격 값이 앱 환경에 남는다**(§2.6·§3.6, `OPEN-6E2A-OWNER-CREDENTIAL-IN-APP`) — 접속

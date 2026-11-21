@@ -94,23 +94,37 @@ internal fun exitCodeOf(
         EvaluationCommitExitCode.COMPLETE
     }
 
-/** 계수와 열거값만 싣는다 — 공고 ID·기관명·판정 사유는 이 줄에 없다(수집 러너와 같은 근거). */
-internal fun evaluationCommitStartLine(candidateCap: Int): String = "evaluation-commit start candidateCap=$candidateCap"
+/**
+ * 계수와 열거값만 싣는다 — 공고 ID·기관명·판정 사유는 이 줄에 없다(수집 러너와 같은 근거).
+ *
+ * **M15/15B — run 당 계정 상한도 싣는다**(`OPEN-M15-EVAL-COST-PER-ACCOUNT`). 그 수가 시작 줄에
+ * 있어야 운영자가 「오늘 몇 계정까지 돌 수 있었나」를 끝 줄의 `deferred=` 와 맞댈 수 있다.
+ */
+internal fun evaluationCommitStartLine(
+    candidateCap: Int,
+    maxAccountsPerRun: Int,
+): String = "evaluation-commit start candidateCap=$candidateCap maxAccountsPerRun=$maxAccountsPerRun"
 
 /**
  * **M15/15A — 계정 계수 셋을 함께 싣는다.** `accounts` 는 실제로 평가한 계정 수, `skipped` 는
  * 전략을 쓸 수 없어 건너뛴 계정 수, `failed` 는 평가 중에 터진 계정 수다. 따로 세지 않으면
  * 「후보 0」이 「감시 조건이 아무도 안 걸렸다」인지 「평가한 계정이 하나도 없다」인지 구별되지
  * 않고, `accounts=0 skipped=0 failed=0` 이라는 **아무도 없는 run** 도 줄에서 보인다.
+ *
+ * **M15/15B — 넷째 계수 `deferred`**(`OPEN-M15-EVAL-COST-PER-ACCOUNT`). run 당 계정 상한 밖이거나
+ * 연속 실패로 멈춘 뒤에 남은 계정 수다. **실패가 아니다** — 그 계정의 평가는 사라진 것이 아니라
+ * 다음 run 으로 미뤄졌고, 그래서 종료 코드를 바꾸지 않는다(`skipped` 와 같은 자격, `failed` 와
+ * 다른 자격). 상한이 서지 않았다면 이 수는 늘 0 이다.
  */
 internal fun evaluationCommitFinishLine(
     tally: EvaluationCommitTally,
     accounts: Int,
     skipped: Int,
     failed: Int,
+    deferred: Int,
     exitCode: EvaluationCommitExitCode,
 ): String =
-    "evaluation-commit finished accounts=$accounts skipped=$skipped failed=$failed " +
+    "evaluation-commit finished accounts=$accounts skipped=$skipped failed=$failed deferred=$deferred " +
         "candidates=${tally.candidates} reached=${tally.reached} " +
         "notReached=${tally.notReached} bidNow=${tally.bidNow} requested=${tally.requested} " +
         "requestFailed=${tally.requestFailed} suppressed=${tally.suppressed} " +
@@ -151,3 +165,16 @@ internal fun evaluationCommitAudienceFailureLine(exceptionType: String): String 
  */
 internal fun evaluationCommitAccountFailureLine(causeCode: String): String =
     "evaluation-commit account-failed cause=$causeCode"
+
+/**
+ * **연속 실패로 멈췄다**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`). 끊기지 않는 실패는 그 계정의
+ * 일이 아니라 **체계가 내려간 것**의 신호이고, 그때 남은 계정을 계속 도는 것은 K × 타임아웃을
+ * 치르는 일이다. 종료 코드는 이미 `INCOMPLETE` 이고(실패가 0 이 아니다) 이 줄은 **왜 끝까지 돌지
+ * 않았는지**를 말한다 — 끝 줄의 `deferred=` 가 그 수를 담지만, 그 수는 상한 밖과 한 자리에 선다.
+ */
+internal fun evaluationCommitStoppedLine(
+    consecutiveFailures: Int,
+    remaining: Int,
+): String =
+    "evaluation-commit stopped cause=consecutive-account-failures " +
+        "consecutive=$consecutiveFailures remaining=$remaining"

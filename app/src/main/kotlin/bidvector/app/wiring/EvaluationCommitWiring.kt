@@ -125,6 +125,8 @@ open class EvaluationCommitWiring {
         return EvaluationCommitRunner(
             runs = runs,
             candidateCap = properties.candidateCap,
+            maxAccountsPerRun = properties.maxAccountsPerRun,
+            maxConsecutiveAccountFailures = properties.maxConsecutiveAccountFailures,
             log = CollectionLog { logger.info(it) },
             termination = termination,
         )

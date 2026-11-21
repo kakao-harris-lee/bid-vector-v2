@@ -3,6 +3,7 @@ package bidvector.app.evaluation
 import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
+import bidvector.app.collection.CollectionTermination
 import bidvector.app.http.TestStrategyRepository
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.procurement.Notice
@@ -73,7 +74,7 @@ class EvaluationCommitRunnerTest {
         val log = RecordingLog()
         val termination = RecordedExitCodes()
 
-        EvaluationCommitRunner(deadCommitRuns(), CANDIDATE_CAP, log, termination)
+        runnerFor(deadCommitRuns(), log, termination)
             .run(DefaultApplicationArguments())
 
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
@@ -95,7 +96,7 @@ class EvaluationCommitRunnerTest {
         val log = RecordingLog()
         val termination = RecordedExitCodes()
 
-        EvaluationCommitRunner(partiallyDeadCommitRuns(), CANDIDATE_CAP, log, termination)
+        runnerFor(partiallyDeadCommitRuns(), log, termination)
             .run(DefaultApplicationArguments())
 
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
@@ -116,7 +117,7 @@ class EvaluationCommitRunnerTest {
         val log = RecordingLog()
         val termination = RecordedExitCodes()
 
-        EvaluationCommitRunner(emptyAudienceRuns(), CANDIDATE_CAP, log, termination)
+        runnerFor(emptyAudienceRuns(), log, termination)
             .run(DefaultApplicationArguments())
 
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
@@ -135,7 +136,7 @@ class EvaluationCommitRunnerTest {
     fun `계정 실패 줄은 예외 메시지를 싣지 않는다`() {
         val log = RecordingLog()
 
-        EvaluationCommitRunner(deadCommitRuns(), CANDIDATE_CAP, log, RecordedExitCodes())
+        runnerFor(deadCommitRuns(), log, RecordedExitCodes())
             .run(DefaultApplicationArguments())
 
         val failureLine = log.written.single { it.startsWith("evaluation-commit account-failed") }
@@ -153,7 +154,7 @@ class EvaluationCommitRunnerTest {
         val log = RecordingLog()
         val termination = RecordedExitCodes()
 
-        EvaluationCommitRunner(audienceUnavailableRuns(), CANDIDATE_CAP, log, termination)
+        runnerFor(audienceUnavailableRuns(), log, termination)
             .run(DefaultApplicationArguments())
 
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.FAILED.value)
@@ -161,7 +162,144 @@ class EvaluationCommitRunnerTest {
         failureLine shouldContain "audience-unavailable:SQLException"
         log.written.none { it.startsWith("evaluation-commit finished") } shouldBe true
     }
+
+    /**
+     * **M15/15B — run 당 계정 상한**(`OPEN-M15-EVAL-COST-PER-ACCOUNT`, 팀장 결정 2026-11-22).
+     * 상한 밖 계정은 **미룬 것**이지 실패가 아니다 — 종료 코드가 0 으로 남는 것이 그 사실이다.
+     */
+    @Test
+    fun `상한을 넘는 계정은 미루고 종료 코드를 바꾸지 않는다`() {
+        val log = RecordingLog()
+        val termination = RecordedExitCodes()
+
+        runnerFor(healthyRuns(accounts = 5), log, termination, maxAccountsPerRun = 2)
+            .run(DefaultApplicationArguments())
+
+        termination.recorded() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+        val finishLine = log.written.single { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "accounts=2"
+        finishLine shouldContain "deferred=3"
+        finishLine shouldContain "failed=0"
+        log.written.single { it.startsWith("evaluation-commit start") } shouldContain "maxAccountsPerRun=2"
+    }
+
+    /** 상한이 계정 수보다 크면 미룬 계정이 0 이다 — 상한이 평소에 아무것도 바꾸지 않는다. */
+    @Test
+    fun `상한이 넉넉하면 미룬 계정이 0 이다 — 대조`() {
+        val log = RecordingLog()
+
+        runnerFor(healthyRuns(accounts = 3), log, RecordedExitCodes(), maxAccountsPerRun = 50)
+            .run(DefaultApplicationArguments())
+
+        val finishLine = log.written.single { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "accounts=3"
+        finishLine shouldContain "deferred=0"
+    }
+
+    /**
+     * **운영 계정이 언제나 먼저다.** 청중이 순서를 잃어도(`[3, 1, 2]`) 상한 1 이 고르는 것은
+     * 가장 작은 id 다 — 정렬을 질의에 기대지 않는다. 순회가 목록 순서였다면 3 이 평가된다.
+     */
+    @Test
+    fun `상한이 1 이면 가장 작은 id 가 평가된다 — 청중 순서가 뒤섞여도`() {
+        val log = RecordingLog()
+        val evaluatedAccounts = mutableListOf<Long>()
+
+        runnerFor(
+            recordingRuns(listOf(3L, 1L, 2L), evaluatedAccounts),
+            log,
+            RecordedExitCodes(),
+            maxAccountsPerRun = 1,
+        ).run(DefaultApplicationArguments())
+
+        evaluatedAccounts shouldBe listOf(1L)
+        log.written.single { it.startsWith("evaluation-commit finished") } shouldContain "deferred=2"
+    }
+
+    /**
+     * **채널 보유자를 값으로 고른다**(15A r1 리뷰 LOW ⓐ — 15B 로 넘어온 축). 청중이 `[2, 1]` 이면
+     * 보유자는 1 이다. `minByOrNull` 을 `firstOrNull` 로 바꾸면 2 가 되어 이 단언이 붉는다
+     * (앞 판은 청중이 늘 오름차순이라 그 변이가 초록이었다).
+     */
+    @Test
+    fun `채널 보유자는 가장 작은 id 다 — 청중이 내림차순이어도`() {
+        // `AccountId` 는 값 비교를 제공하지 않는다(7D 규율) — **값**으로 센다.
+        channelHolderOf(listOf(AccountId(2), AccountId(1)))?.value shouldBe 1L
+        channelHolderOf(listOf(AccountId(3), AccountId(1), AccountId(2)))?.value shouldBe 1L
+        channelHolderOf(emptyList()) shouldBe null
+    }
+
+    /**
+     * **끊기지 않는 실패는 run 을 멈춘다**(팀장 결정 2026-11-22). 체계가 내려간 상태에서 남은
+     * 계정을 계속 도는 것은 K × 타임아웃을 치르는 일이다. 멈춘 뒤의 나머지는 `deferred` 로 세고,
+     * 종료 코드는 실패가 있으므로 `INCOMPLETE` 다.
+     */
+    @Test
+    fun `연속 실패가 상한에 닿으면 남은 계정을 멈추고 미룬다`() {
+        val log = RecordingLog()
+        val termination = RecordedExitCodes()
+        val attempted = mutableListOf<Long>()
+
+        runnerFor(
+            failingRuns(listOf(1L, 2L, 3L, 4L, 5L), failing = setOf(1L, 2L, 3L, 4L, 5L), attempted = attempted),
+            log,
+            termination,
+            maxConsecutiveAccountFailures = 3,
+        ).run(DefaultApplicationArguments())
+
+        termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
+        attempted shouldBe listOf(1L, 2L, 3L)
+        val finishLine = log.written.single { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "failed=3"
+        finishLine shouldContain "deferred=2"
+        val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
+        stoppedLine shouldContain "cause=consecutive-account-failures"
+        stoppedLine shouldContain "remaining=2"
+    }
+
+    /**
+     * **흩어진 실패는 멈추지 않는다** — 성공 하나가 연속을 끊는다. 실패 넷이 상한(3)보다 많아도
+     * 연속이 아니면 run 은 끝까지 간다(그 실패들은 그 계정들의 일이다).
+     */
+    @Test
+    fun `연속이 아닌 실패는 run 을 멈추지 않는다`() {
+        val log = RecordingLog()
+        val attempted = mutableListOf<Long>()
+
+        runnerFor(
+            failingRuns(listOf(1L, 2L, 3L, 4L, 5L), failing = setOf(1L, 3L, 5L), attempted = attempted),
+            log,
+            RecordedExitCodes(),
+            maxConsecutiveAccountFailures = 3,
+        ).run(DefaultApplicationArguments())
+
+        attempted shouldBe listOf(1L, 2L, 3L, 4L, 5L)
+        val finishLine = log.written.single { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "failed=3"
+        finishLine shouldContain "deferred=0"
+        log.written.none { it.startsWith("evaluation-commit stopped") } shouldBe true
+    }
 }
+
+/** 두 상한의 test 기본값 — 그 축을 재지 않는 test 는 둘 다 넉넉히 받는다. */
+private const val ROOMY_ACCOUNT_CAP = 100
+private const val ROOMY_CONSECUTIVE_CAP = 100
+
+private fun runnerFor(
+    runs: EvaluationCommitRuns,
+    log: CollectionLog,
+    termination: CollectionTermination,
+    maxAccountsPerRun: Int = ROOMY_ACCOUNT_CAP,
+    maxConsecutiveAccountFailures: Int = ROOMY_CONSECUTIVE_CAP,
+): EvaluationCommitRunner =
+    EvaluationCommitRunner(
+        runs = runs,
+        candidateCap = CANDIDATE_CAP,
+        maxAccountsPerRun = maxAccountsPerRun,
+        maxConsecutiveAccountFailures = maxConsecutiveAccountFailures,
+        log = log,
+        termination = termination,
+    )
 
 /**
  * 전략 읽기에서 던지는 조립 — 그 뒤 협력자는 불리지 않는다.
@@ -228,6 +366,59 @@ private fun partiallyDeadCommitRuns(): EvaluationCommitRuns =
         clock = Clock { Instant.parse("2026-10-07T00:00:00Z") },
         notificationInbox = { error("후보가 없으므로 알림함 쓰기는 불리지 않는다") },
         audience = { NotificationAudience.Accounts(listOf(AccountId(1), AccountId(2))) },
+        currentActiveBids = 0,
+        release = ReleaseIdentifier("commit-runner-test"),
+    )
+
+/**
+ * 계정 N 개가 전부 정상으로 도는 조립(M15/15B) — 후보 원천이 비어 평가는 **효과 없이** 끝난다.
+ * 재는 것은 판정이 아니라 **몇 계정이 돌았고 몇이 미뤄졌는가**다.
+ */
+private fun healthyRuns(accounts: Int): EvaluationCommitRuns = recordingRuns((1L..accounts).toList(), mutableListOf())
+
+/** 평가된 계정 id 를 순서대로 적는 조립 — 「누가 먼저인가」를 그 목록이 말한다. */
+private fun recordingRuns(
+    ids: List<Long>,
+    evaluated: MutableList<Long>,
+): EvaluationCommitRuns =
+    emptyCandidateRuns(ids) { account ->
+        evaluated += account.value
+        strategyWithCap()
+    }
+
+/** 지정한 계정에서 전략 읽기가 던지는 조립 — 시도 순서를 함께 적는다. */
+private fun failingRuns(
+    ids: List<Long>,
+    failing: Set<Long>,
+    attempted: MutableList<Long>,
+): EvaluationCommitRuns =
+    emptyCandidateRuns(ids) { account ->
+        attempted += account.value
+        if (account.value in failing) throw IllegalStateException(DEAD_STORE_MESSAGE) else strategyWithCap()
+    }
+
+/**
+ * 후보가 **비어 있는** 조립의 공통 틀 — 평가가 DB 에 닿지 않으므로 계수 축만 남는다.
+ * 전략 읽기 자리에 test 가 주는 람다를 꽂아 「누가 불렸나」와 「누가 던지나」를 그 자리에서 정한다.
+ */
+private fun emptyCandidateRuns(
+    ids: List<Long>,
+    strategyOf: (AccountId) -> OperatorStrategy,
+): EvaluationCommitRuns =
+    EvaluationCommitRuns(
+        dataSource = PGSimpleDataSource(),
+        strategies =
+            object : StrategyReader {
+                override fun load(account: AccountId): OperatorStrategy = strategyOf(account)
+            },
+        candidateSource = CandidateSourcePort { emptyList() },
+        watchSubjects = WatchSubjectPort { error("후보가 없으므로 감시 port 는 불리지 않는다") },
+        licenseGate = LicenseGatePort { _, _ -> error("후보가 없으므로 면허 게이트는 불리지 않는다") },
+        mlAnalysis = MlAnalysisPort { _, _: Notice, _ -> error("후보가 없으므로 ML port 는 불리지 않는다") },
+        correlationIds = CorrelationIdFactory { CorrelationId("commit-runner-test") },
+        clock = Clock { Instant.parse("2026-10-07T00:00:00Z") },
+        notificationInbox = { error("후보가 없으므로 알림함 쓰기는 불리지 않는다") },
+        audience = { NotificationAudience.Accounts(ids.map { AccountId(it) }) },
         currentActiveBids = 0,
         release = ReleaseIdentifier("commit-runner-test"),
     )

@@ -29,11 +29,18 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/OperatorSessionController.kt    # r1 — 201 응답 조립을 공유 함수로
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt              # 가입 상한 빈(app.http 를 아는 유일한 자리)
   - app/src/main/kotlin/bidvector/app/access/AccountCommandRunner.kt       # (변경 없음 — 완화는 use case 쪽이고 로그 어휘는 그대로다)
+  - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitRunner.kt # r3 — run 당 계정 상한 · 연속 실패 중단 · 인터럽트 플래그 (계약 갱신 (7))
+  - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitLines.kt  # r3 — 시작·마침 줄 계수, 채널 보유자 값 함수, 멈춤 줄
+  - app/src/main/kotlin/bidvector/app/wiring/EvaluationWiring.kt           # r3 — 상한 둘(여기만 기본값을 갖는다)
+  - app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt     # r3 — 상한 둘을 러너로
   - app/src/test/kotlin/bidvector/app/http/                                # 집합 등식 둘 · 가입 endpoint · 상한
   - app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt  # 면제 수 래칫(r1 cr N-2 — 누락 등재)
   - app/src/test/kotlin/bidvector/app/SignUpThrottleWiringTest.kt          # r2 — 출하 상한의 값·배선
   - web/src/paths.ts                                                       # r2 — 세션 전 자리 주소 한 자리(순환 import 제거)
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
+  - app/src/test/kotlin/bidvector/app/evaluation/                          # r3 — 상한 경계 · 운영 계정 우선 · 연속 실패 중단 · 보유자 값 선택
+  - workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt  # r3 — 멱등 키 형식을 축어로 고정(15A LOW ⓓ)
+  - docs/runbook/m6-6e-operations.md                                       # r3 — 종료 코드 어휘 정정 · 계정 계수 넷 · 설정 키 둘(15A 알려진 제한 ⑦)
   - config/quality/architecture-policy.properties                          # handler · 주입 타입 · 비밀값 참조자
   - config/quality/gate-tests.properties                                   # 새 test class 를 만드는 커밋에서 등재
   - openapi/bidvector-operator-api.yaml                                    # operation 하나 + 스키마 + ErrorBody 코드 둘
@@ -115,6 +122,11 @@ V20 은 「앱 역할에 `account` INSERT 가 없다 — 앱이 뚫려도 계정
   상한임을 KDoc 이 적는다.
 ③ **가입과 세션 발급이 한 트랜잭션이 아니다.** 로그인 경로와 같은 경계(문장마다 제 트랜잭션)를 쓰므로,
   세션 발급이 실패하면 계정만 남는다 — 그 계정은 로그인으로 들어올 수 있다(권한이 새지 않는다).
+④ **`deferred` 를 읽는 경보가 없다**(계약 갱신 (7)). 상한은 비용을 묶지만, 계정 수가 상한을 넘은 날
+  **매 run 이 뒤쪽 계정을 미룬다** — 그 계정들은 cron 이 성공을 보고하는 동안 평가를 받지 못한다. 종료
+  코드로 알리지 않기로 한 것은 결정이고(미룬 것은 실패가 아니다), 그 결정의 대가가 이 공백이다. 닫는
+  자리는 경보 쪽이지 종료 코드가 아니다 — 15A 알려진 제한 ⑧(「`accounts=0 skipped=N` 을 읽는 경보가
+  없다」)과 **같은 자리**다.
 
 ## base 확인
 
@@ -164,9 +176,46 @@ INSERT 문장을 직접 쏘아 성공을 잰다).
 「bcrypt 72바이트 상한 초과는 거부」는 **이 저장소에서 거짓**이다 — 해시 어댑터가 긴 입력을
 SHA-512 로 접지 자르지 않는다. 상한은 입력 위생 경계로만 남는다. 계약 문면은 PR #190 이 이미 고쳤다.
 
+**(7) 15A 가 넘긴 축을 이 slice 가 닫는다 — 머리는 run 당 계정 상한이다**(팀장 결정 2026-11-22,
+`OPEN-M15-EVAL-COST-PER-ACCOUNT`). 계약에 없던 축이고, **가입을 여는 slice 가 닫아야 하는 이유**가
+그 OPEN 의 문면이다 — 가입이 열리면 계정 수가 운영자의 손을 떠나고, 평가 비용은 계정 수에 선형이다.
+
+- **전역 상한** `bidvector.evaluation.max-accounts-per-run`(기본 **50**). 계정을 **id 순으로** 잘라
+  **운영 계정(가장 작은 id)이 언제나 먼저**다 — 정렬을 질의에 기대지 않는 이유는 채널 보유자 선택과
+  같다. 상한 밖은 **버리는 것이 아니라 미루는 것**이라 마침 줄의 `deferred=` 로 세고 **종료 코드를
+  바꾸지 않는다**(`skipped` 와 같은 자격, `failed` 와 다른 자격).
+- **연속 실패 중단** `bidvector.evaluation.max-consecutive-account-failures`(기본 **3**). 끊기지 않는
+  실패는 그 계정들의 일이 아니라 체계가 내려간 신호이고, 그때 남은 계정을 계속 도는 것은 K × 타임아웃을
+  치르는 일이다(15A 가 계정별 격리를 넣으며 생긴 대가, 그 OPEN 의 둘째 문단). 남은 수는 같은
+  `deferred` 에 들어가고, **왜 멈췄는지는 따로 한 줄**이 말한다
+  (`evaluation-commit stopped cause=consecutive-account-failures`). 그 run 은 `failed>0` 이라 종료
+  코드가 이미 `INCOMPLETE`(2) 다 — 중단 자체가 새 종료 코드를 만들지 않는다.
+- **둘 다 기본값을 갖는다** — `candidate-cap` 과 반대다. 상한은 「주지 않으면 무제한」이 되면 안 되는
+  값이고, 기본값 자리를 비우면 미설정이 곧 무제한이 된다. 대신 **1 미만은 기동 실패**다(0 은 상한이
+  아니라 「아무도 평가하지 않는다」다).
+- **오늘의 실비는 0 에 가깝다** — 출하 배선의 `MlAnalysisPort` 가 `UnavailableMlAnalysis` 고정이라
+  (D-6A3-2, 그 사실은 조립 게이트가 잠근다) 계정당 ML 호출 비용이 서지 않는다. 기본값 **50** 은 측정이
+  아니라 **ML 배선이 서는 날을 위한 자리**이고, 그 근거를 적어 두지 않으면 수가 실측처럼 읽힌다.
+
+**(8) 15A 가 넘긴 나머지 셋도 같은 커밋에서 닫는다.** ⓐ 채널 보유자 선택을 `channelHolderOf` 값 함수로
+빼고 `[2, 1]` 청중 한 건으로 잰다(앞 판은 청중이 늘 오름차순이라 `minByOrNull` → `firstOrNull` 변이가
+초록이었다). ⓒ 계정별 `catch` 가 `InterruptedException` 의 플래그를 되세운다 — 삼키면 그 스레드의 다음
+blocking 호출이 인터럽트를 보지 못한다. ⓓ `OutboxNotificationRequestPortTest` 가 멱등 키 형식을 축어로
+고정한다. **ⓑ 는 닫지 않는다**(불변식을 공장 쪽에도 두는 축) — 러너 밖으로 옮기면 이 slice 가 만지지
+않는 조립이 함께 움직인다.
+
+**(9) runbook §3.4·§3.5 의 종료 코드 어휘를 고친다**(15A 알려진 제한 ⑦ — 그 slice 가 15B 로 넘긴 축).
+`FAILED`(1) 은 **청중을 못 읽은 run 하나**이고 계정 하나의 실패는 `INCOMPLETE`(2) + `account-failed
+cause=` 줄이다. 마침 줄의 계정 계수 **넷**(`accounts`·`skipped`·`failed`·`deferred`)과 요청 계수
+`suppressed` 가 종료 코드에 각각 어떻게 닿는지를 표로 세웠다. §1.2·§1.4 에 설정 키 둘을, §6 의 「단일
+운영자 전용」 한 줄에 M15 가 그것을 깼다는 사실을 적었다 — **그 줄을 이 slice 가 거짓으로 만든다.**
+§7 이 요구하는 §3.4 등식(표의 종료 코드 == `EvaluationCommitExitCode`)은 재측정했다(commands.md).
+
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
 - 2026-11-21 전건 acceptance 뒤 계약 갱신 (2)~(4) 와 in_scope 둘 등재.
 - 2026-11-21 수정 라운드 1 — 계약 갱신 (5)·(6), in_scope 다섯 등재(누락 셋 + 이 라운드가 더한 둘).
 - 2026-11-21 수정 라운드 2 — in_scope 셋 등재(누락 하나 + 신설 둘), 계약 갱신 (5)·(6) 의 main 반영 표시.
+- 2026-11-22 15A 머지(main `d2c0513d`) 병합 후 라운드 3 — 계약 갱신 (7)~(9), in_scope 여덟 등재
+  (평가 러너 축 여섯 + 멱등 키 test + runbook), 알려진 제한 ④ 등재.

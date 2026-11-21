@@ -271,6 +271,11 @@ class OutboxNotificationRequestPortTest {
         outbox.registered shouldHaveSize 2
         val keys = outbox.registered.map { it.idempotencyKey }.toSet()
         keys shouldHaveSize 1
+        // **형식을 축어로 고정한다**(15A r1 리뷰 LOW ⓓ — 15B 로 넘어온 축). 앞 판은 「같은 키가
+        // 하나」만 재서 형식이 바뀌어도(계정 칸이 빠지거나 차수가 사라져도) 초록이었다. 이 키는
+        // 운영 outbox 행에 남는 값이고, 계정 칸은 M15/15A 가 더한 것이라 되돌아가면 두 계정의
+        // 같은 공고가 한 키로 접힌다.
+        keys.single().value shouldBe "notification-requested-${SINK_ACCOUNT.value}-N9-000"
     }
 
     @Test

@@ -38,6 +38,8 @@ import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.boot.DefaultApplicationArguments
 import java.time.LocalDate
 
+private const val E2E_ACCOUNT_CAP = 100
+private const val E2E_CONSECUTIVE_CAP = 100
 private const val CANDIDATE_CAP = 100
 private const val MAX_ACTIVE_BIDS = 10
 private const val BLOCK_CONSTRAINT = "outbox_commit_run_blocked"
@@ -312,8 +314,15 @@ class EvaluationCommitRunE2ETest {
                 currentActiveBids = 0,
                 release = fixture.release,
             )
-        EvaluationCommitRunner(runs, CANDIDATE_CAP, CollectionLog { commitLog += it }, termination)
-            .run(DefaultApplicationArguments())
+        EvaluationCommitRunner(
+            runs = runs,
+            candidateCap = CANDIDATE_CAP,
+            // 이 E2E 가 재는 축은 상한이 아니다 — 둘 다 넉넉히 준다(그 축은 러너 unit test).
+            maxAccountsPerRun = E2E_ACCOUNT_CAP,
+            maxConsecutiveAccountFailures = E2E_CONSECUTIVE_CAP,
+            log = CollectionLog { commitLog += it },
+            termination = termination,
+        ).run(DefaultApplicationArguments())
         return termination.recorded()
     }
 
