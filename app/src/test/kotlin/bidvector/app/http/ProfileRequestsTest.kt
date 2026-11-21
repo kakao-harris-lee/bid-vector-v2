@@ -95,14 +95,20 @@ class ProfileRequestsTest {
             }
     }
 
-    /** 거부 문면에 입력값이 실리지 않는다 — 400 본문·로그 어느 쪽으로도 새지 않게(P4). */
+    /**
+     * 거부 문면에 입력값이 실리지 않는다 — 400 본문·로그 어느 쪽으로도 새지 않게(P4).
+     *
+     * 심는 값은 **거부되는 꼴**이어야 한다(실측으로 고친 자리): `777-77-77777` 은 3-2-5 를 지켜
+     * **받아들여지므로** 그 값으로는 이 단언이 아무것도 재지 못했다. 열한 자리는 길이 상한 안이라
+     * 값 타입까지 내려가 거부되고, 그 경로의 문면을 재는 것이 이 test 의 목적이다.
+     */
     @Test
     fun `사업자번호 — 거부 문면이 입력값을 싣지 않는다`() {
         val failure =
             shouldThrow<InvalidEditRequestException> {
-                ProfileRequests.businessDetails(detailsWithNumber("777-77-77777"))
+                ProfileRequests.businessDetails(detailsWithNumber("77777777777"))
             }
 
-        failure.message.orEmpty() shouldNotContain "77777"
+        failure.message.orEmpty() shouldNotContain "7777777"
     }
 }

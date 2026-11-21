@@ -20,6 +20,14 @@
 --
 -- NULL 이 「비워 둠」이다 — 빈 문자열을 「미설정」으로 쓰지 않는다(상호와 같은 규율). 그래서 빈
 -- 문자열은 CHECK 가 거부하고, 지우기는 NULL 로 쓴다.
+
+-- 잠금 대기의 상한(V18·V19 가 세운 관례, V23~V27 과 같은 사유) — 기본 `lock_timeout` 은 0 이고
+-- migrate 가 기동의 부수효과라 그 대기는 곧 **기동 정지**다. 상한을 두면 「정지」가 아니라
+-- 「실패」가 된다. 이 파일은 **기존 표 하나**의 ACCESS EXCLUSIVE 를 쥔다 — 운영자 요청 경로가 그
+-- 표를 읽고 쓰므로 경합 상대가 있다. `SET LOCAL` 은 트랜잭션 범위이고 Flyway 는 마이그레이션마다
+-- 자기 트랜잭션이라, 앞 파일의 같은 줄이 이 파일을 덮어 주지 않는다.
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE account_business_profile
     ADD COLUMN business_registration_number TEXT
         CHECK (business_registration_number IS NULL
