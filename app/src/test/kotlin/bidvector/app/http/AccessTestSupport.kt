@@ -305,13 +305,22 @@ class MutableSignInCompletion(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
-    ): SignInWrite {
-        if (contended) return SignInWrite.Contended
-        if (!accounts.claim(session.account, verified, at)) return SignInWrite.CredentialMoved
-        sessions.revokeAllOf(session.account, at)
-        sessions.put(session)
-        return SignInWrite.Applied
-    }
+    ): SignInWrite =
+        when {
+            contended -> {
+                SignInWrite.Contended
+            }
+
+            !accounts.claim(session.account, verified, at) -> {
+                SignInWrite.CredentialMoved
+            }
+
+            else -> {
+                sessions.revokeAllOf(session.account, at)
+                sessions.put(session)
+                SignInWrite.Applied
+            }
+        }
 }
 
 /** 발급 값을 셀 수 있는 난수원 — 「로그인마다 새 값」을 HTTP 응답에서 단언할 수 있게 한다. */

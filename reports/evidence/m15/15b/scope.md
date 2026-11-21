@@ -38,7 +38,7 @@ in_scope:
   - app/src/test/kotlin/bidvector/app/SignUpThrottleWiringTest.kt          # r2 — 출하 상한의 값·배선
   - web/src/paths.ts                                                       # r2 — 세션 전 자리 주소 한 자리(순환 import 제거)
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
-  - app/src/test/kotlin/bidvector/app/evaluation/                          # r3 — 상한 경계 · 운영 계정 우선 · 연속 실패 중단 · 보유자 값 선택
+  - app/src/test/kotlin/bidvector/app/evaluation/                          # r3 — 상한 경계 · 운영 계정 우선 · 연속 실패 중단 · 보유자 값 선택 / r4 — 회전 · 보존 등식 · 인터럽트(조립은 `EvaluationCommitRunnerFixtures.kt` 로 나눴다, 크기 게이트)
   - workflow/src/test/kotlin/bidvector/workflow/evaluation/OutboxNotificationRequestPortTest.kt  # r3 — 멱등 키 형식을 축어로 고정(15A LOW ⓓ)
   - docs/runbook/m6-6e-operations.md                                       # r3 — 종료 코드 어휘 정정 · 계정 계수 넷 · 설정 키 둘(15A 알려진 제한 ⑦)
   - config/quality/architecture-policy.properties                          # handler · 주입 타입 · 비밀값 참조자
