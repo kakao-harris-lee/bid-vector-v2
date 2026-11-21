@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.adapters.access.BrowserAccessTransaction
 import bidvector.workflow.access.AccountId
 import bidvector.workflow.access.AccountSnapshot
+import bidvector.workflow.access.AccountSignUpPort
 import bidvector.workflow.access.AccountStorePort
 import bidvector.workflow.access.BrowserAccessPolicyData
 import bidvector.workflow.access.BrowserAccessWorkflow
@@ -18,6 +19,7 @@ import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.PassphraseHasher
 import bidvector.workflow.access.SignInCompletionPort
 import bidvector.workflow.access.SignInWrite
+import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.strategy.Clock
 import java.time.Duration
 import java.time.Instant
@@ -26,6 +28,18 @@ import java.time.Instant
 const val TEST_LOGIN = "http-layer-test-login"
 const val TEST_PASSPHRASE = "http-layer-test-fixture-passphrase"
 const val TEST_ACCOUNT_ID = 7L
+
+/** 출하 가입 정책과 **같은 값** — 경계 단언이 이 값을 읽는다(M15/15B). */
+val TEST_SIGN_UP_POLICY: SignUpPolicyData =
+    SignUpPolicyData(
+        loginNameMinLength = 4,
+        loginNameMaxLength = 32,
+        loginNameCharacter = "[a-z0-9._-]",
+        passphraseMinLength = 10,
+        passphraseMaxBytes = 72,
+        signUpsPerAddress = 10,
+        signUpWindow = Duration.ofHours(1),
+    )
 
 /** 출하 정책과 **같은 모양**의 값 — 쿠키 Max-Age·만료 단언이 이 값을 읽는다. */
 val TEST_ACCESS_POLICY: BrowserAccessPolicyData =
@@ -51,6 +65,9 @@ class InMemoryBrowserAccessTransaction(
     val accounts: MutableAccountStore = MutableAccountStore(FakeHasher().hash(ClearPassphrase.wrap(TEST_PASSPHRASE)))
     val sessions: MutableSessionStore = MutableSessionStore()
     val keys: SequentialKeySource = SequentialKeySource()
+
+    /** M15/15B — 가입이 만든 계정은 **같은 계정 표**에 선다(그래야 그 자격으로 로그인이 된다). */
+    val signUps: MutableSignUpStore = MutableSignUpStore(accounts)
     private val completion = MutableSignInCompletion(accounts, sessions)
 
     override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T = action(workflow())
@@ -66,10 +83,12 @@ class InMemoryBrowserAccessTransaction(
             accounts = accounts,
             sessions = sessions,
             completion = completion,
+            signUps = signUps,
             hasher = FakeHasher(),
             keys = keys,
             clock = clock,
             policy = TEST_ACCESS_POLICY,
+            signUpPolicy = TEST_SIGN_UP_POLICY,
         )
 
     /** Spring 컨텍스트가 test 사이에 재사용되므로 상태를 매 test 전에 비운다. */
@@ -77,6 +96,7 @@ class InMemoryBrowserAccessTransaction(
         accounts.reset()
         sessions.clear()
         keys.reset()
+        signUps.clear()
     }
 }
 
@@ -91,45 +111,95 @@ class FakeHasher : PassphraseHasher {
     ): Boolean = hash.encoded == hash(clear).encoded
 }
 
+/**
+ * 계정 표의 이중체 — **고정 계정 하나로 시작하고 가입이 행을 더한다**(M15/15B). 앞 판은 스냅숏
+ * 하나였고, 그러면 가입이 만든 계정으로는 로그인도 세션 확정도 설 수 없다.
+ */
 class MutableAccountStore(
-    private val hash: PassphraseHash,
+    private val seedHash: PassphraseHash,
 ) : AccountStorePort {
-    private var snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, null)
-    private var attempts = 0
+    private val rows: MutableMap<String, MutableRow> = mutableMapOf()
 
-    override fun byLogin(login: LoginName): AccountSnapshot? = snapshot.takeIf { login.value == TEST_LOGIN }
+    init {
+        reset()
+    }
+
+    override fun byLogin(login: LoginName): AccountSnapshot? = rows[login.value]?.snapshot()
 
     override fun registerFailure(
         account: AccountId,
         attemptLimit: Int,
         lockUntil: Instant,
     ) {
-        val next = attempts + 1
+        val row = rows.values.firstOrNull { it.id == account.value } ?: return
+        val next = row.attempts + 1
         if (next >= attemptLimit) {
-            attempts = 0
-            snapshot = AccountSnapshot(snapshot.id, hash, lockUntil)
+            row.attempts = 0
+            row.lockedUntil = lockUntil
         } else {
-            attempts = next
+            row.attempts = next
         }
     }
 
     /** 확정 이중체가 쓰는 자리 — 실물에서는 조건부 UPDATE 한 문장이다(자격·잠금·행 잠금). */
     fun claim(
+        account: AccountId,
         verified: PassphraseHash,
         now: Instant,
     ): Boolean {
-        val claimable = hash.encoded == verified.encoded && snapshot.lockedUntil?.isAfter(now) != true
+        val row = rows.values.firstOrNull { it.id == account.value } ?: return false
+        val claimable = row.hash.encoded == verified.encoded && row.lockedUntil?.isAfter(now) != true
         if (claimable) {
-            attempts = 0
-            snapshot = AccountSnapshot(snapshot.id, hash, null)
+            row.attempts = 0
+            row.lockedUntil = null
         }
         return claimable
     }
 
-    fun reset() {
-        snapshot = AccountSnapshot(AccountId(TEST_ACCOUNT_ID), hash, null)
-        attempts = 0
+    /** 가입이 부르는 자리 — 이름이 비어 있을 때만 행이 선다(실물의 `ON CONFLICT DO NOTHING`). */
+    fun addIfAbsent(
+        login: LoginName,
+        hash: PassphraseHash,
+    ): AccountId? {
+        if (rows.containsKey(login.value)) return null
+        val id = nextId
+        nextId += 1
+        rows[login.value] = MutableRow(id, hash)
+        return AccountId(id)
     }
+
+    fun reset() {
+        rows.clear()
+        nextId = TEST_ACCOUNT_ID + 1
+        rows[TEST_LOGIN] = MutableRow(TEST_ACCOUNT_ID, seedHash)
+    }
+
+    private var nextId: Long = TEST_ACCOUNT_ID + 1
+
+    private class MutableRow(
+        val id: Long,
+        val hash: PassphraseHash,
+    ) {
+        var attempts: Int = 0
+        var lockedUntil: Instant? = null
+
+        fun snapshot(): AccountSnapshot = AccountSnapshot(AccountId(id), hash, lockedUntil)
+    }
+}
+
+/** 가입 쓰기의 이중체 — 계정 표에 그대로 행을 더한다(출처가 둘이 되지 않게). */
+class MutableSignUpStore(
+    private val accounts: MutableAccountStore,
+) : AccountSignUpPort {
+    /** 이 이중체가 만든 아이디 전수 — HTTP test 가 「몇 개가 섰나」를 센다. */
+    val created: MutableList<String> = mutableListOf()
+
+    override fun insertIfAbsent(
+        login: LoginName,
+        hash: PassphraseHash,
+    ): AccountId? = accounts.addIfAbsent(login, hash)?.also { created += login.value }
+
+    fun clear() = created.clear()
 }
 
 class MutableSessionStore : BrowserSessionStorePort {
@@ -215,7 +285,7 @@ class MutableSignInCompletion(
         verified: PassphraseHash,
         at: Instant,
     ): SignInWrite {
-        if (!accounts.claim(verified, at)) return SignInWrite.CredentialMoved
+        if (!accounts.claim(session.account, verified, at)) return SignInWrite.CredentialMoved
         sessions.revokeAllOf(session.account, at)
         sessions.put(session)
         return SignInWrite.Applied

@@ -9,8 +9,11 @@ import bidvector.workflow.access.ClearPassphrase
 import bidvector.workflow.access.CsrfDemand
 import bidvector.workflow.access.IssuedSession
 import bidvector.workflow.access.LoginName
+import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.ProvisionOutcome
 import bidvector.workflow.access.SignInOutcome
+import bidvector.workflow.access.SignUpOutcome
+import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -40,6 +43,18 @@ private val POLICY =
         lockWindow = Duration.ofMinutes(15),
         hashCost = TEST_HASH_COST,
         lockWait = Duration.ofMillis(500),
+    )
+
+/** 출하 가입 정책과 같은 값 — 이 test 가 재는 축은 SQL·열이고 값의 축은 정책 test 가 잰다. */
+private val SIGN_UP_POLICY_VALUE =
+    SignUpPolicyData(
+        loginNameMinLength = 4,
+        loginNameMaxLength = 32,
+        loginNameCharacter = "[a-z0-9._-]",
+        passphraseMinLength = 10,
+        passphraseMaxBytes = 72,
+        signUpsPerAddress = 10,
+        signUpWindow = Duration.ofHours(1),
     )
 
 /** 밀 수 있는 시계 — 만료·폐기 시각을 실 DB 에서 재려면 시간을 통제해야 한다. */
@@ -100,16 +115,31 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
     }
 
     @Test
-    fun `부트스트랩은 계정을 만들고 두 번째 실행은 거부한다 — 덮어쓰지 않는다`() {
+    fun `부트스트랩은 계정을 만들고 같은 아이디의 두 번째 실행은 거부한다 — 덮어쓰지 않는다`() {
         provisioning().inTransaction { it.create(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe ProvisionOutcome.Created
         val stored = storedHash()
 
         provisioning().inTransaction {
-            it.create(LoginName("another"), ClearPassphrase.wrap(SECOND))
+            it.create(LOGIN, ClearPassphrase.wrap(SECOND))
         } shouldBe ProvisionOutcome.RefusedAccountExists
 
         accountCount() shouldBe 1
         storedHash() shouldBe stored
+    }
+
+    /**
+     * M15/15B — **완화된 조건의 반대쪽**(실 DB). 앞 판은 계정이 하나라도 있으면 거부했고, 그래서
+     * 운영자가 둘째 계정을 손으로 만들 수 없었다. 조건이 `login_name` 하나로 좁아졌다.
+     */
+    @Test
+    fun `다른 아이디는 계정이 이미 있어도 만든다 — 운영자 명령의 둘째 계정`() {
+        provisioning().inTransaction { it.create(LOGIN, ClearPassphrase.wrap(FIRST)) } shouldBe ProvisionOutcome.Created
+
+        provisioning().inTransaction {
+            it.create(LoginName("another-operator"), ClearPassphrase.wrap(SECOND))
+        } shouldBe ProvisionOutcome.Created
+
+        accountCount() shouldBe 2
     }
 
     @Test
@@ -281,6 +311,44 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
         } shouldBe AccessVerdict.Denied
     }
 
+    /**
+     * M15/15B — **열린 가입의 실 DB 왕복**. 요청 경로의 조립이 계정 행을 세우고(V29 의 열 단위
+     * INSERT), 시각 세 열은 **DB 의 DEFAULT** 가 채운다(앱이 그 값을 고를 수 없다).
+     */
+    @Test
+    fun `가입은 계정 행을 세우고 시각 세 열을 DB 가 채운다 — 앱이 그 값을 고르지 않는다`() {
+        val login = LoginName("opened-operator")
+
+        val granted =
+            access()
+                .inSignInScope { it.signUp(login, ClearPassphrase.wrap(FIRST)) }
+                .shouldBeInstanceOf<SignUpOutcome.Granted>()
+
+        accountCount() shouldBe 1
+        // 해시 문면이 저장되고 원문은 어느 열에도 없다.
+        storedHash().contains(FIRST) shouldBe false
+        hasher.verify(ClearPassphrase.wrap(FIRST), PassphraseHash(storedHash())) shouldBe true
+        // 세션이 그 계정으로 선다 — 가입 직후 보호 경로가 열린다.
+        access()
+            .inTransaction { it.authenticate(granted.session.key, CsrfDemand.Exempt) }
+            .shouldBeInstanceOf<AccessVerdict.Granted>()
+        queryStrings("SELECT created_at IS NOT NULL AND updated_at IS NOT NULL FROM account").single() shouldBe "t"
+        queryStrings("SELECT failed_attempts FROM account").single() shouldBe "0"
+    }
+
+    @Test
+    fun `같은 아이디로 두 번 가입하면 둘째는 행을 세우지 않는다 — ON CONFLICT 가 판정한다`() {
+        val login = LoginName("opened-operator")
+        access().inSignInScope { it.signUp(login, ClearPassphrase.wrap(FIRST)) }
+            .shouldBeInstanceOf<SignUpOutcome.Granted>()
+
+        access().inSignInScope { it.signUp(login, ClearPassphrase.wrap(SECOND)) } shouldBe
+            SignUpOutcome.RefusedDuplicate
+
+        accountCount() shouldBe 1
+        hasher.verify(ClearPassphrase.wrap(FIRST), PassphraseHash(storedHash())) shouldBe true
+    }
+
     // --- 조립·조회 헬퍼 -------------------------------------------------------
 
     private fun access(): JdbcBrowserAccessTransaction =
@@ -291,6 +359,7 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
             keys = SecureBrowserSessionKeySource(),
             clock = clock,
             policy = POLICY,
+            signUpPolicy = SIGN_UP_POLICY_VALUE,
         )
 
     private fun provisioning(): JdbcAccountProvisioningTransaction =

@@ -134,7 +134,12 @@ class RequestAuthenticationFilter(
          * **무인증으로 열리는 자리 전부**(계약 산출물 4 「로그인 endpoint 만」). 이 집합이
          * 하나라는 것과, 그 밖 모든 등록 매핑이 401 이라는 것을 test 가 각각 잠근다.
          */
-        val OPEN_ROUTES: Set<String> = setOf("POST /api/session")
+        /**
+         * M15/15B — **둘째 자리가 열렸다**: 열린 가입(`POST /api/accounts`). 운영자 지시
+         * 2026-11-21 「초대 코드 + 운영자 승인 없이 바로 가입」이고, 그 경로가 여는 것은
+         * **계정 생성 하나**다(그 뒤의 모든 요청은 다시 이 필터를 지난다).
+         */
+        val OPEN_ROUTES: Set<String> = setOf("POST /api/session", "POST $ACCOUNTS_PATH")
 
         fun routeOf(request: HttpServletRequest): String = "${request.method} ${request.requestURI}"
     }

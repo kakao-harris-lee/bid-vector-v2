@@ -173,6 +173,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 열린 가입 — 계정 생성과 동시에 세션 발급(M15/15B)
+         * @description **무인증으로 열리는 둘째 operation 이다**(기본 거부 필터의 허용 목록 둘 가운데 하나). 초대 코드도 운영자 승인도 없다 — 운영자 지시 2026-11-21 의 **테스트 단계 완화**이고, 상용 전 재결정은 `OPEN-M15-SIGNUP-HARDENING` 이 든다.
+         *     성공하면 `POST /api/session` 과 **같은 응답**이다: `Set-Cookie` 로 `__Host-bidvector_session`(HttpOnly·Secure·SameSite=Strict·Path=/·Domain 없음)을 내고 본문으로 CSRF 값을 준다. 그래서 화면은 가입 뒤 따로 로그인하지 않는다.
+         *     입력 규칙: `loginName` 은 4~32자의 `[a-z0-9._-]`, `passphrase` 는 10자 이상이고 UTF-8 로 72바이트를 넘지 않는다(bcrypt 가 그 위를 조용히 자른다). 거부는 **칸별로 코드가 갈린다** — 로그인과 반대인 것이 의도다: 가입 화면은 어느 칸 옆에 문장을 둘지 알아야 하고, 그 규칙은 공개된 값이다. 중복은 409 이고 **그 이름이 쓰인다는 사실만** 말한다.
+         *     남용 상한은 같은 원격 주소에서 시간당 10건이다(초과는 429). 창은 **프로세스 메모리**에 있어 재기동이면 초기화되고, 역방향 프록시 뒤에서는 그 주소가 하나라 상한이 사실상 전역이다 — 테스트 단계 한정의 성질이다.
+         *     CSRF 대책은 로그인과 같다: `application/json` 만 받으므로 교차 사이트 HTML form 이 preflight 없이 닿지 못하고, 발급 쿠키가 `SameSite=Strict` 다.
+         */
+        post: operations["signUp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session": {
         parameters: {
             query?: never;
@@ -1013,6 +1037,10 @@ export interface components {
             /** @description 정정은 **사유가 필수**다 — 원본은 타임라인에 남는다(500자 상한). */
             reason: string;
         };
+        SignUpRequest: {
+            loginName: string;
+            passphrase: string;
+        };
         SignInRequest: {
             loginName: string;
             passphrase: string;
@@ -1576,7 +1604,7 @@ export interface components {
         };
         ErrorBody: {
             /** @enum {string} */
-            code: "UNAUTHENTICATED" | "NOT_FOUND" | "NOTICE_NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE" | "CAPACITY_ROWS_EXCEEDED";
+            code: "UNAUTHENTICATED" | "NOT_FOUND" | "NOTICE_NOT_FOUND" | "INVALID_STORED_STRATEGY" | "INTERNAL_ERROR" | "MAX_ACTIVE_BIDS_NOT_CONFIGURED" | "CANDIDATE_CAP_EXCEEDED" | "INVALID_REQUEST" | "STRATEGY_CHANGED_DURING_COMPUTATION" | "SESSION_NOT_FOUND" | "SESSION_EXPIRED" | "IDEMPOTENCY_CONFLICT" | "ACTOR_MISMATCH" | "SYSTEM_ACTOR_NOT_PERMITTED" | "STALE_REVISION" | "INVALID_TRANSITION" | "SESSION_ALREADY_ACTIVE" | "EDIT_SESSION_CONFLICT" | "STRATEGY_VALUE_INVALID" | "METHOD_NOT_ALLOWED" | "UNSUPPORTED_MEDIA_TYPE" | "NOTICE_SNAPSHOT_UNAVAILABLE" | "CAPACITY_ROWS_EXCEEDED" | "LOGIN_NAME_INVALID" | "PASSPHRASE_INVALID" | "ACCOUNT_EXISTS" | "SIGN_UP_RATE_LIMITED" | "SIGN_UP_SESSION_UNAVAILABLE";
             message: string;
             correlationId: string;
         };
@@ -2214,6 +2242,84 @@ export interface operations {
             };
             /** @description 내부 오류. code: INVALID_STORED_STRATEGY | INTERNAL_ERROR */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    signUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignUpRequest"];
+            };
+        };
+        responses: {
+            /** @description 계정 생성과 세션 발급 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description 요청 본문 형식 오류(알 수 없는 키·빈 값 포함) 또는 입력 규칙 위반. code: INVALID_REQUEST | LOGIN_NAME_INVALID | PASSPHRASE_INVALID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 그 아이디가 이미 쓰인다. code: ACCOUNT_EXISTS */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 요청 본문이 application/json 이 아니다. code: UNSUPPORTED_MEDIA_TYPE */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 같은 원격 주소의 가입 시도가 창 상한을 넘었다. code: SIGN_UP_RATE_LIMITED */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 내부 오류 또는 감사 기록 실패(D-6A1-17, fail-closed). code: INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description 계정은 만들어졌으나 로그인 세션을 열지 못했다 — 그 자격으로 로그인하면 들어온다. code: SIGN_UP_SESSION_UNAVAILABLE */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

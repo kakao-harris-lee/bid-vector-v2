@@ -59,8 +59,21 @@ class BrowserAccessWorkflowTest {
 
     private val completion = InMemorySignInCompletion(accounts, sessions)
 
+    /** 이 class 의 축은 로그인·세션이다 — 가입 포트는 조립에만 선다(여기서 부르는 test 가 없다). */
+    private val signUps = InMemorySignUpStore()
+
     private fun workflow(): BrowserAccessWorkflow =
-        BrowserAccessWorkflow(accounts, sessions, completion, hasher, keys, clock, POLICY)
+        BrowserAccessWorkflow(
+            accounts,
+            sessions,
+            completion,
+            signUps,
+            hasher,
+            keys,
+            clock,
+            POLICY,
+            shippedSignUpPolicy(),
+        )
 
     private fun signIn(value: String = RIGHT): SignInOutcome = workflow().signIn(LOGIN, ClearPassphrase.wrap(value))
 
@@ -180,7 +193,17 @@ class BrowserAccessWorkflowTest {
         val rotating =
             RotatingHasher(hasher) { accounts.replaceHash(hasher.hash(ClearPassphrase.wrap(WRONG))) }
         val workflow =
-            BrowserAccessWorkflow(accounts, sessions, completion, rotating, keys, clock, POLICY)
+            BrowserAccessWorkflow(
+                accounts,
+                sessions,
+                completion,
+                signUps,
+                rotating,
+                keys,
+                clock,
+                POLICY,
+                shippedSignUpPolicy(),
+            )
 
         workflow.signIn(LOGIN, ClearPassphrase.wrap(RIGHT)) shouldBe SignInOutcome.Refused
 

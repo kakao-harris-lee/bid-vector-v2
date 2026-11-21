@@ -11,8 +11,10 @@ import bidvector.app.http.OperatorCredentialAuthenticator
 import bidvector.app.http.RequestAuditFilter
 import bidvector.app.http.RequestAuthenticationFilter
 import bidvector.app.http.SessionCookieWriter
+import bidvector.app.http.SignUpThrottle
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.workflow.access.BrowserAccessPolicyData
+import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.strategy.Clock
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter
@@ -125,6 +127,19 @@ open class BidVectorApplication {
         properties: AccessCookieProperties,
         resolvedBrowserAccessPolicy: BrowserAccessPolicyData,
     ): SessionCookieWriter = SessionCookieWriter(properties.cookieSecure, resolvedBrowserAccessPolicy.absoluteWindow)
+
+    /**
+     * 열린 가입의 남용 상한(M15/15B) — **이 자리에 있는 이유도 패키지 방향**이다(위 빈과 같다):
+     * `app.wiring` 이 `app.http` 를 이름 부르면 두 패키지가 순환한다.
+     *
+     * **빈 하나**인 것이 중요하다 — 계수가 그 인스턴스의 메모리에 살므로, 요청마다 새로 만들면
+     * 상한이 아무것도 세지 않는다.
+     */
+    @Bean
+    open fun signUpThrottle(
+        clock: Clock,
+        resolvedSignUpPolicy: SignUpPolicyData,
+    ): SignUpThrottle = SignUpThrottle(clock, resolvedSignUpPolicy)
 
     /**
      * `RequestAuditFilter`가 부르는 sink — [ApiAuditRecord](app/http, HTTP 어휘) →

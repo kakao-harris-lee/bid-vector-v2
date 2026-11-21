@@ -1,8 +1,17 @@
 package bidvector.workflow.access
 
+import bidvector.sharedkernel.Resolution
 import bidvector.workflow.strategy.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+
+/**
+ * **출하 가입 정책을 test 가 읽는 한 자리**(M15/15B) — 경계값을 test 에 베껴 적으면 정책을 바꾼
+ * 날 둘이 갈리고, 그때 그 test 는 바뀐 값이 아니라 옛 값을 지킨다.
+ */
+fun shippedSignUpPolicy(): SignUpPolicyData =
+    (SIGN_UP_POLICY.resolve(LocalDate.of(2026, 11, 21)) as Resolution.Resolved<SignUpPolicyData>).value
 
 /**
  * 7D use case test 의 이중체 — **mock framework 를 쓰지 않는다**(v2-지침서 §5: 도메인·use case
@@ -182,7 +191,10 @@ class InMemoryProvisioningStore : AccountProvisioningPort {
     private val byLogin: MutableMap<String, Pair<AccountId, PassphraseHash>> = mutableMapOf()
     private var nextId: Long = 1
 
-    override fun anyExists(): Boolean = byLogin.isNotEmpty()
+    /** 「만든 것이 하나도 없다」를 test 가 볼 수 있게 — 포트 표면에는 없다(M15/15B 가 좁혔다). */
+    val isEmpty: Boolean get() = byLogin.isEmpty()
+
+    override fun existsWithLogin(login: LoginName): Boolean = byLogin.containsKey(login.value)
 
     override fun insert(
         login: LoginName,
@@ -206,4 +218,76 @@ class InMemoryProvisioningStore : AccountProvisioningPort {
     }
 
     fun hashOf(login: LoginName): PassphraseHash? = byLogin[login.value]?.second
+}
+
+/**
+ * 열린 가입의 쓰기 fake(M15/15B) — 실물에서는 `ON CONFLICT DO NOTHING` 한 문장이다. 「읽고 나서
+ * 쓴다」가 아니라 **쓰기 하나가 판정까지 한다**는 성질을 같은 모양으로 둔다.
+ */
+class InMemorySignUpStore : AccountSignUpPort {
+    private val byLogin: MutableMap<String, Pair<AccountId, PassphraseHash>> = mutableMapOf()
+    private var nextId: Long = 100
+
+    val count: Int get() = byLogin.size
+
+    override fun insertIfAbsent(
+        login: LoginName,
+        hash: PassphraseHash,
+    ): AccountId? {
+        if (byLogin.containsKey(login.value)) return null
+        val id = AccountId(nextId)
+        nextId += 1
+        byLogin[login.value] = id to hash
+        return id
+    }
+
+    fun hashOf(login: LoginName): PassphraseHash? = byLogin[login.value]?.second
+
+    fun idOf(login: LoginName): AccountId? = byLogin[login.value]?.first
+}
+
+/**
+ * 가입이 낸 계정을 **로그인 경로가 그대로 읽을 수 있게** 잇는 fake — 실물에서는 같은 `account`
+ * 표다. 이 이음이 없으면 「가입 → 로그아웃 → 로그인」을 use case 층에서 잴 수 없다.
+ */
+class SignUpBackedAccountStore(
+    private val signUps: InMemorySignUpStore,
+) : AccountStorePort {
+    override fun byLogin(login: LoginName): AccountSnapshot? {
+        val id = signUps.idOf(login) ?: return null
+        return AccountSnapshot(id, requireNotNull(signUps.hashOf(login)), null)
+    }
+
+    override fun registerFailure(
+        account: AccountId,
+        attemptLimit: Int,
+        lockUntil: Instant,
+    ) = Unit
+}
+
+/**
+ * 가입이 만든 계정의 세션 확정 — 막 만든 행이라 자격 조건이 늘 성립한다(실물에서는 그 조건이
+ * `WHERE passphrase_hash = ?` 다). 조건이 **깨지는** 쪽은 아래 [ContendedCompletion] 이 든다.
+ */
+class SignUpBackedCompletion(
+    private val sessions: InMemorySessionStore,
+) : SignInCompletionPort {
+    override fun complete(
+        session: NewBrowserSession,
+        verified: PassphraseHash,
+        at: Instant,
+    ): SignInWrite {
+        sessions.revokeAllOf(session.account, at)
+        sessions.put(session)
+        return SignInWrite.Applied
+    }
+}
+
+/** 확정이 늘 경합으로 끝나는 fake — 「계정은 섰는데 세션이 서지 않았다」 갈래를 만든다. */
+class ContendedCompletion : SignInCompletionPort {
+    override fun complete(
+        session: NewBrowserSession,
+        verified: PassphraseHash,
+        at: Instant,
+    ): SignInWrite = SignInWrite.Contended
 }

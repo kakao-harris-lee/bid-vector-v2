@@ -267,8 +267,13 @@ class CleanMigrationPrivilegeTest : PersistenceTestSupport() {
             // 시각)이고 `has_table_privilege(…, 'UPDATE')` 는 **열 단위 부여를 세지 않는다**(실측).
             // 그래서 이 행렬이 내는 값은 「표 전체를 갱신할 권한은 없다」는 더 강한 사실이고,
             // 「어느 열이 열려 있는가」는 `AccessPrivilegeTest`(adapters) 가 아홉 문장으로 직접 쏜다.
-            // 계정에 INSERT 가 없는 것도 같은 축이다 — 계정을 만드는 것은 운영자 명령의 소유자
-            // 연결이고, 세션 등록(INSERT)만 요청 경로의 일이다. DELETE 는 둘 다 없다(파기는 6B-3).
+            // DELETE 는 둘 다 없다(파기는 6B-3).
+            //
+            // M15/15B — **`insert` 는 V29 뒤에도 `false` 다.** V29 가 `GRANT INSERT
+            // (login_name, passphrase_hash)` 를 주었지만 `has_table_privilege(…, 'INSERT')` 는 열 단위
+            // 부여를 세지 않는다(위 UPDATE 와 같은 자리). 그래서 이 행이 내는 값은 「표 전체에 넣을
+            // 권한은 없다」는 더 강한 사실이고, **어느 열이 열렸는가**는
+            // `AccountColumnPrivilegeTest` 가 직접 잰다(`BidCaseColumnPrivilegeTest` 와 같은 분담).
             "account" to
                 TablePrivileges(
                     select = true,

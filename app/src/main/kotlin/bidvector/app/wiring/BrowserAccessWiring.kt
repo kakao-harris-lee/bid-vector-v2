@@ -8,6 +8,8 @@ import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.access.BROWSER_ACCESS_POLICY
 import bidvector.workflow.access.BrowserAccessPolicyData
+import bidvector.workflow.access.SIGN_UP_POLICY
+import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.strategy.Clock
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -47,12 +49,24 @@ open class BrowserAccessWiring {
      * 풀 자신이어야 한다. **같은 풀**이다(`PersistenceWiring` 의 빈 하나) — 역할·한도가 갈리지
      * 않는다.
      */
+    /**
+     * 가입 정책(M15/15B) — 세션 정책과 **다른 빈**이다. 해소되지 않으면 지어내지 않고 기동을
+     * 실패시킨다(위 빈과 같은 규율).
+     */
+    @Bean
+    open fun resolvedSignUpPolicy(): SignUpPolicyData {
+        val resolution = SIGN_UP_POLICY.resolve(LocalDate.now())
+        return (resolution as? Resolution.Resolved<SignUpPolicyData>)?.value
+            ?: error("가입 정책이 해소되지 않았다: $resolution")
+    }
+
     @Bean
     open fun browserAccessTransaction(
         transactionBoundary: TransactionBoundary,
         dataSource: DataSource,
         clock: Clock,
         resolvedBrowserAccessPolicy: BrowserAccessPolicyData,
+        resolvedSignUpPolicy: SignUpPolicyData,
     ): BrowserAccessTransaction =
         JdbcBrowserAccessTransaction(
             transactions = transactionBoundary,
@@ -61,6 +75,7 @@ open class BrowserAccessWiring {
             keys = SecureBrowserSessionKeySource(),
             clock = clock,
             policy = resolvedBrowserAccessPolicy,
+            signUpPolicy = resolvedSignUpPolicy,
         )
 
     @Bean

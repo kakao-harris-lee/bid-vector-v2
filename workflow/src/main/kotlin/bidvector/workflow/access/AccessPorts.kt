@@ -85,8 +85,15 @@ interface SignInCompletionPort {
  * **들어가지 않는다**(배선이 소유자 연결 위에서만 만든다, `JdbcRetentionStore` 선례).
  */
 interface AccountProvisioningPort {
-    /** 계정이 하나라도 있는가 — 「이미 있으면 거부」의 판정 입력이다. */
-    fun anyExists(): Boolean
+    /**
+     * 그 이름의 계정이 이미 있는가 — 「같은 이름이면 거부」의 판정 입력이다.
+     *
+     * **M15/15B 가 술어를 좁혔다.** 앞 판은 `anyExists()`(계정이 하나라도 있는가)였고, 그것이
+     * 「운영 계정이 있으면 둘째 계정을 손으로 만들 수 없다」는 뜻이었다 — 가입이 열린 뒤 그 금지는
+     * 아무것도 지키지 않는다(가입자가 이미 계정을 만든다). 지켜야 하는 것은 **덮어쓰지 않는 것**
+     * 이고 그 조건은 이름 하나다.
+     */
+    fun existsWithLogin(login: LoginName): Boolean
 
     fun insert(
         login: LoginName,
@@ -99,6 +106,30 @@ interface AccountProvisioningPort {
         login: LoginName,
         hash: PassphraseHash,
         at: Instant,
+    ): AccountId?
+}
+
+/**
+ * 열린 가입이 쓰는 **쓰기 하나**(M15/15B) — 요청 경로가 계정을 만들 수 있게 된 뒤에도
+ * **만드는 것 말고는 못 한다**는 사실을 타입이 진다.
+ *
+ * [AccountProvisioningPort] 와 **다른 포트**로 둔다: 그쪽에는 [AccountProvisioningPort.replaceHash]
+ * 가 있고 그것은 계정 탈취의 서명이다. 요청 경로의 조립이 받는 것은 이 포트뿐이라, 인증 결함
+ * 하나가 **해시 교체**로 번지는 길이 오늘도 타입에 없다. 같은 경계를 V29 의 열 단위 GRANT 가 한 겹
+ * 더 진다(`login_name`·`passphrase_hash` 의 INSERT 만, UPDATE 는 여전히 0).
+ */
+interface AccountSignUpPort {
+    /**
+     * 그 이름이 비어 있으면 계정을 만들고 식별자를 낸다. **이미 있으면 아무것도 쓰지 않고
+     * `null`** 이다 — 「읽어 보고 없으면 쓴다」가 아니라 **한 문장**이라, 같은 이름으로 동시에
+     * 들어온 둘 가운데 하나만 성립한다(판정이 코드가 아니라 UNIQUE 제약이다).
+     *
+     * **시각을 받지 않는다**: V29 가 `created_at`·`updated_at` 에 DEFAULT 를 두고 앱 역할에는 그
+     * 열의 INSERT 권한이 없다 — 요청 경로는 계정이 언제 생겼는지를 **고를 수 없다**.
+     */
+    fun insertIfAbsent(
+        login: LoginName,
+        hash: PassphraseHash,
     ): AccountId?
 }
 

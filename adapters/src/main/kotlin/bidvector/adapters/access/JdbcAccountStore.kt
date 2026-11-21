@@ -2,10 +2,12 @@ package bidvector.adapters.access
 
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.workflow.access.AccountId
+import bidvector.workflow.access.AccountSignUpPort
 import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountStorePort
 import bidvector.workflow.access.LoginName
 import bidvector.workflow.access.PassphraseHash
+import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
@@ -57,15 +59,55 @@ internal class JdbcAccountStore(
 }
 
 /**
+ * 열린 가입의 저장소(M15/15B) — **메서드가 하나뿐**이고 그 하나가 「없으면 만든다」다.
+ *
+ * 요청 경로의 조립이 받는 쓰기가 이것뿐이라, 인증 결함 하나가 해시 교체나 계정 삭제로 번지는 길이
+ * 타입에 없다(같은 경계를 V29 의 열 단위 GRANT 가 한 겹 더 진다).
+ *
+ * [SignInConnections] 를 받는 이유는 [JdbcAccountStore] 와 같다 — 이 문장도 **자격 없이 칠 수 있는
+ * 경로**이고, 같은 이름으로 동시에 들어오면 UNIQUE 색인에서 잠깐 기다린다. 그 대기가 상한 아래 선다.
+ */
+internal class JdbcAccountSignUpStore(
+    private val connections: SignInConnections,
+) : AccountSignUpPort {
+    override fun insertIfAbsent(
+        login: LoginName,
+        hash: PassphraseHash,
+    ): AccountId? =
+        // 대기 상한을 넘기면 `null` 이고 호출부는 그것을 **중복**으로 읽는다 — 안전한 방향이다
+        // (계정이 서지 않을 뿐 권한이 새지 않는다). 그 창은 같은 이름이 동시에 들어올 때뿐이다.
+        connections.withBoundedConnection { connection -> inserted(connection, login, hash) }?.firstOrNull()
+
+    /**
+     * 그 문장이 **돌려준 행**(0 또는 1). 목록으로 받는 이유는 경계의 서명이다 — `withBoundedConnection`
+     * 의 결과 `null` 은 **「경합으로 못 했다」** 하나를 뜻하므로, 블록이 자기 몫의 `null`(「이미 있다」)을
+     * 같은 자리에 실으면 두 사실이 한 값으로 접힌다.
+     */
+    private fun inserted(
+        connection: Connection,
+        login: LoginName,
+        hash: PassphraseHash,
+    ): List<AccountId> =
+        connection.prepareStatement(AccessSql.INSERT_ACCOUNT_IF_ABSENT).use { statement ->
+            statement.setString(1, login.value)
+            statement.setString(2, hash.encoded)
+            statement.executeQuery().use { rs ->
+                if (rs.next()) listOf(AccountId(rs.getLong(1))) else emptyList()
+            }
+        }
+}
+
+/**
  * 운영자 명령 전용 저장소 — **소유자 연결 위에서만 조립된다**(배선이 풀을 넘기지 않는다,
  * `JdbcRetentionStore` 선례). 요청 경로의 컨텍스트에는 이 타입의 빈이 없다.
  */
 class JdbcAccountProvisioningStore(
     private val connections: ConnectionSource,
 ) : bidvector.workflow.access.AccountProvisioningPort {
-    override fun anyExists(): Boolean =
+    override fun existsWithLogin(login: LoginName): Boolean =
         connections.withConnection { connection ->
-            connection.prepareStatement(AccessSql.SELECT_ACCOUNT_EXISTS).use { statement ->
+            connection.prepareStatement(AccessSql.SELECT_ACCOUNT_EXISTS_BY_LOGIN).use { statement ->
+                statement.setString(1, login.value)
                 statement.executeQuery().use { rs ->
                     rs.next()
                     rs.getBoolean(1)

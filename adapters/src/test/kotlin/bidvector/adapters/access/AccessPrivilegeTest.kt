@@ -43,12 +43,48 @@ class AccessPrivilegeTest : PersistenceTestSupport() {
         }
     }
 
+    /**
+     * **M15/15B 가 이 단언을 뒤집었다.** V20 은 계정 INSERT 를 0 으로 뒀고(「앱이 뚫려도 계정을 만들
+     * 수 없다」), V29 가 그 결정의 DB 권한 절반을 되돌린다 — 열린 가입(운영자 지시 2026-11-21).
+     * 열린 것은 **열 둘**뿐이고 그 사실이 이 두 문장이다: 가입이 쓰는 꼴은 서고, 열을 하나라도 더
+     * 적으면 거부다(음성 대조).
+     *
+     * `id` 를 적지 않는 것이 전제다 — identity 열의 시퀀스는 열에 소유되어 있어 `serial` 과 달리
+     * 별도 USAGE GRANT 를 요구하지 않는다. 그 사실을 문장이 아니라 **이 성공**이 든다.
+     */
     @Test
-    fun `앱 역할은 계정을 만들 수 없다 — INSERT 권한이 없다`() {
-        refused(
-            "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
-                "VALUES ('forged', 'forged-hash', now(), now(), 0)",
-        )
+    fun `앱 역할은 가입이 쓰는 두 열로만 계정을 만들 수 있다 — 열을 더 적으면 거부`() {
+        allowed("INSERT INTO account (login_name, passphrase_hash) VALUES ('opened', 'opened-hash')")
+
+        refused("INSERT INTO account (login_name, passphrase_hash, created_at) VALUES ('f1', 'h', now())")
+        refused("INSERT INTO account (login_name, passphrase_hash, updated_at) VALUES ('f2', 'h', now())")
+        refused("INSERT INTO account (login_name, passphrase_hash, failed_attempts) VALUES ('f3', 'h', 0)")
+        refused("INSERT INTO account (login_name, passphrase_hash, locked_until) VALUES ('f4', 'h', now())")
+    }
+
+    /**
+     * 가입이 쓰는 **실제 문장**(production 상수)이 앱 역할로 돈다 — 위 test 는 손으로 적은 꼴이고,
+     * 이쪽은 `ON CONFLICT … RETURNING` 까지 그대로다(그 구문은 UNIQUE 색인 읽기와 `id` 의 SELECT
+     * 권한을 함께 요구한다).
+     */
+    @Test
+    fun `가입의 production 문장이 앱 역할로 돈다 — ON CONFLICT 와 RETURNING 포함`() {
+        allowedPrepared(AccessSql.INSERT_ACCOUNT_IF_ABSENT) { statement ->
+            statement.setString(1, "opened-via-production-sql")
+            statement.setString(2, "opened-hash")
+        }
+    }
+
+    /**
+     * **V29 가 열지 않은 것** — 계정 생성이 열렸다고 해서 해시 교체나 파기가 열리지 않는다. 이 셋이
+     * 그 사실의 음성 대조이고, 위 「두 열만」과 짝이다(아래 열 단위 UPDATE test 와 다른 축: 저쪽은
+     * V20 의 기존 경계, 이쪽은 **V29 뒤에도 그대로인가**를 묻는다).
+     */
+    @Test
+    fun `가입이 열려도 해시 교체와 파기는 그대로 막혀 있다 — V29 가 열지 않은 것`() {
+        refused("UPDATE account SET passphrase_hash = 'overwritten'")
+        refused("DELETE FROM account")
+        refused("TRUNCATE TABLE account")
     }
 
     @Test

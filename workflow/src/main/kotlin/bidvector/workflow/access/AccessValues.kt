@@ -53,6 +53,22 @@ class ClearPassphrase private constructor(
      */
     fun hashInput(): CharArray = chars.copyOf()
 
+    /**
+     * 길이가 정책 범위 안인가(M15/15B) — **판정이 타입 안에 있다.** 밖에서 재려면 [hashInput]
+     * 의 둘째 소비자가 생기고, 그러면 위 (2b) 축의 「접근자 하나뿐」이 사실이 아니게 된다.
+     *
+     * 상한을 **바이트**로 재는 이유는 bcrypt 다 — 72바이트를 넘는 입력을 구현이 조용히 자르므로,
+     * 넘는 값을 받아 주면 운영자가 입력한 것과 **다른 값**이 자격이 된다. 하한은 사람이 세는
+     * 단위(글자 수)로 재고, 둘의 단위가 다른 것은 각자의 근거가 달라서다.
+     */
+    fun fitsLength(
+        minimumCharacters: Int,
+        maximumBytes: Int,
+    ): Boolean {
+        if (chars.size < minimumCharacters) return false
+        return chars.concatToString().toByteArray(StandardCharsets.UTF_8).size <= maximumBytes
+    }
+
     override fun toString(): String = "ClearPassphrase(***)"
 
     companion object {
