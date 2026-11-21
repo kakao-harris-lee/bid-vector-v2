@@ -12,6 +12,7 @@ import {
   ONBOARDING_ITEM_ORDER,
   ONBOARDING_STEPS,
 } from '../display/onboardingDisplay';
+import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from '../display/profileDisplay';
 
 import { ONBOARDING_QUERY_KEY, OnboardingBanner, OnboardingScreen } from './OnboardingScreen';
 
@@ -405,6 +406,20 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
     const section = await screen.findByTestId(`onboarding-section-${id}`);
 
     expect(within(section).getByTestId(`onboarding-section-state-${id}`).textContent).toBe('준비 중');
+  });
+
+  /**
+   * L-4 — **예외 testId 의 유일성을 둘째 화면에서도 잰다.** 같은 사업 정보 카드가 시작하기 2 절
+   * 에도 서는데 앞 판의 유일성 단언은 설정 화면에만 있었다 — 여기 하나가 더 생기면 누출 게이트의
+   * 예외가 거기서 넓어지고 설정 쪽 test 는 초록으로 남는다. (여정 쪽은 술어 자신이 면제 노드
+   * 수를 세므로 그 축도 함께 닫힌다.)
+   */
+  it('사업자번호 입력칸은 시작하기에서도 하나뿐이다', async () => {
+    renderScreen();
+    fireEvent.click(await screen.findByTestId('onboarding-step-BUSINESS_DETAILS'));
+
+    await screen.findByTestId(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    expect(screen.queryAllByTestId(BUSINESS_REGISTRATION_NUMBER_TEST_ID)).toHaveLength(1);
   });
 
   /**

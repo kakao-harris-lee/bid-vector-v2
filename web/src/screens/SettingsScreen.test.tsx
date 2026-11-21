@@ -536,6 +536,67 @@ describe('설정 — 범위 밖 자리', () => {
     });
   });
 
+  /**
+   * **저장된 번호는 입력칸 하나에만 선다**(r1 cr H-1 · v F1 의 단위 쪽 절반).
+   *
+   * 여정의 넓힌 술어는 입력칸을 모집단에서 빼므로, **입력칸 밖에 그려지는 값**은 그 예외 덕에
+   * 조용하다. 그 자리를 재는 것이 이 단언이다: 카드의 **보이는 글**(`textContent` — 입력칸의
+   * `value` 를 담지 않는다)에 두 꼴 어느 쪽도 없어야 한다.
+   *
+   * 변이 대조(verifier W3): 읽기 전용 줄에 저장된 번호를 그리면 이 단언이 붉어진다. 앞 판에는
+   * 그 변이를 잡는 test 가 vitest·e2e 어디에도 없었다.
+   */
+  it('저장된 사업자번호는 입력칸 밖 어디에도 그려지지 않는다', async () => {
+    mocked.readProfile.mockResolvedValue({
+      qualificationDeclared: false,
+      businessTypes: [],
+      licensesDeclared: false,
+      licenseNames: [],
+      regionTerms: [],
+      naraRegistration: 'UNANSWERED',
+      naraRegisteredFields: [],
+      unjudgedAxes: [],
+      businessRegistrationNumber: '1234567890',
+    });
+    renderScreen();
+
+    const input = await screen.findByTestId<HTMLInputElement>(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    expect(input.value).toBe('123-45-67890');
+
+    // 값이 실제로 화면에 **있는** 상태에서 재는 것이 요점이다(빈 모집단이면 이 단언이 공허하다).
+    const shown = screen.getByTestId('settings-profile').textContent ?? '';
+    expect(shown).not.toContain('1234567890');
+    expect(shown).not.toContain('123-45-67890');
+  });
+
+  /** 도움말은 라벨 **밖**이고 `aria-describedby` 로 이어진다 — 라벨 안에 두면 이름에 붙는다. */
+  it('사업자번호 칸의 이름은 라벨뿐이고 도움말은 설명으로 이어진다', async () => {
+    renderScreen();
+
+    const input = await screen.findByTestId<HTMLInputElement>(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    expect(input.getAttribute('aria-describedby')).toBe('profile-business-registration-number-help');
+    expect(screen.getByLabelText('사업자번호 (선택)')).toBe(input);
+    expect(screen.getByTestId('profile-business-registration-number-help').textContent).toContain('숫자 열 자리');
+  });
+
+  /** 안내는 **판정이 아니다** — 꼴이 어긋나도 보내는 값은 그대로이고 고칠 자리만 말한다. */
+  it('꼴이 어긋나면 고칠 자리를 말하고 그 값을 그대로 보낸다', async () => {
+    mocked.replaceBusinessDetails.mockResolvedValue(await mocked.readProfile());
+    renderScreen();
+
+    const input = await screen.findByTestId<HTMLInputElement>(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    fireEvent.change(input, { target: { value: '123-456-7890' } });
+
+    expect(screen.getByTestId('profile-business-registration-number-help').textContent).toContain('3자리');
+
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+    await waitFor(() => {
+      expect(mocked.replaceBusinessDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ businessRegistrationNumber: '123-456-7890' }),
+      );
+    });
+  });
+
   /** 비워 두고 저장하면 **「비워 둠」이 간다** — 빈 문자열이 아니다(그 값은 서버가 400 이다). */
   it('비운 채 저장하면 비워 둠이 간다', async () => {
     mocked.replaceBusinessDetails.mockResolvedValue(await mocked.readProfile());
