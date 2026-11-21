@@ -26,7 +26,7 @@ internal val ALLOWED_ROOTS: Set<String> =
         setOf(
             "bidvector.workflow.evaluation",
             "bidvector.workflow.profile",
-            "bidvector.workflow.access",
+            "bidvector.sharedkernel",
             "bidvector.qualification",
             "bidvector.strategy",
             "bidvector.adapters.persistence",

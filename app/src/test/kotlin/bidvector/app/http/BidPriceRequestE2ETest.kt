@@ -268,9 +268,11 @@ class BidPriceRequestE2ETest {
         // 가격 세 축은 상태와 사유만 낸다.
         body["bidPriceMenuState"] shouldBe "NOT_COMPUTED"
         body["floorShortfallState"] shouldBe "NOT_COMPUTED"
-        // 자격 헤더 경로에는 계정 주체가 없다 — 지어내지 않고 사유를 낸다(M7/7C③-b).
-        body["inboxRecordState"] shouldBe "NOT_RECORDED"
-        body["inboxRecordNotRecordedReason"] shouldBe "NO_ACCOUNT_SUBJECT"
+        // **M15/15A — 이 경로는 계정 전용이 됐다.** 세션 주체에는 계정이 있으므로 알림함에 적힌다.
+        // 앞 판의 「적지 않음 + `NO_ACCOUNT_SUBJECT`」(M7/7C③-b)는 자격 헤더 주체의 갈래였고, 그
+        // 주체는 이제 이 경로에 401 이다 — 갈래가 사라진 것이 아니라 입구가 닫혔다.
+        body["inboxRecordState"] shouldBe "RECORDED_NEW"
+        body["inboxRecordNotRecordedReason"] shouldBe null
     }
 
     /**
