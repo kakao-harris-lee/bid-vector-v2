@@ -44,6 +44,9 @@ import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notificationinbox.NotificationAudience
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
+import bidvector.workflow.notificationinbox.NotificationInboxPort
+import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -136,6 +139,9 @@ class DryRunCommitParityTest {
     private val licenseGate = LicenseGatePort { _, _ -> LicenseVerdict.Eligible(emptySet()) }
     private val clock = Clock { NOW }
 
+    /** 커밋 경로의 알림함 쓰기 계수(M15/15A) — 내용이 아니라 **몇 번 불렸는가**만 센다. */
+    private val inboxWrites = CountingInboxPort()
+
     @Test
     fun `같은 공고를 dry-run 과 커밋 두 진입점으로 흘리면 액션과 근거가 같다`() {
         val dryRun =
@@ -170,16 +176,23 @@ class DryRunCommitParityTest {
         val judgedRevision = dryRun.strategy.revision
         payload shouldContain judgedRevision.value.toString()
         payload shouldContain EVALUATION_LADDER_POLICY_VERSION.source
+
+        // ③ 커밋 경로는 그 계정의 알림함에 **한 번** 적는다 — 0 이면 청중 고정이 꺼진 것이고,
+        //    둘 이상이면 계정 하나짜리 run 이 여러 청중을 본 것이다(둘 다 15A 가 막는 것이다).
+        inboxWrites.calls shouldBe 1
     }
 
     /**
      * 커밋 진입점 — 일회 러너가 받는 빈을 **production 조립 메서드**가 짓는다.
      *
      * **M15/15A** — 그 메서드가 이제 계정별 run 공장을 내므로, 이 test 는 그 공장에서 자기 계정의
-     * run 을 받는다. 청중은 **그 계정 하나**로 run 안에서 고정되고, 쓰기 포트는 여전히 「불리면
-     * 터지는」 구현이다 — 이 test 가 재는 것은 판정 동일성이고 알림함 축은 그 등식의 입력이 아니다
-     * (기록 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로 잰다).
+     * run 을 받는다. 청중이 **그 계정 하나**로 run 안에서 고정되면서 알림함 쓰기가 **늘 일어난다**
+     * — 앞 판에서 이 자리의 「불리면 터지는」 포트가 성립했던 것은 청중이 비어 쓰기에 닿지 않았기
+     * 때문이고, 그 전제는 15A 가 없앴다. 그래서 여기서는 **세는** 이중체를 준다: 이 test 가 재는
+     * 것은 판정 동일성이고, 기록의 내용 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로
+     * 잰다. 쓰기가 **한 번**인지는 아래 단언이 지킨다(0 이 되면 그것도 거동 변화다).
      */
+
     private fun commitRun() =
         requireNotNull(
             EvaluationCommitWiring()
@@ -193,11 +206,25 @@ class DryRunCommitParityTest {
                     correlationIdFactory = SequentialCorrelationIdFactory(),
                     clock = clock,
                     commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
-                    notificationInboxPort = { error("이 등식에 알림함 쓰기가 끼어들었다") },
+                    notificationInboxPort = inboxWrites,
                     notificationAudiencePort = { NotificationAudience.Accounts(listOf(PARITY_ACCOUNT)) },
                     release = ReleaseIdentifier("parity-test"),
                 ).forAccount(PARITY_ACCOUNT),
         ) { "전략에 여력 상한이 있으므로 run 이 서야 한다" }
+}
+
+/**
+ * 불린 횟수만 세는 알림함 이중체 — 이 등식의 축은 판정이고 기록의 내용은 아니다.
+ * 값을 지어내지 않도록 [NotificationInboxOutcome.Created] 하나만 낸다.
+ */
+private class CountingInboxPort : NotificationInboxPort {
+    var calls: Int = 0
+        private set
+
+    override fun record(record: NotificationInboxRecord): NotificationInboxOutcome {
+        calls++
+        return NotificationInboxOutcome.Created
+    }
 }
 
 /** 이 등식의 계정(M15/15A) — 두 진입점이 **같은 계정**을 보는 것이 등식의 전제다. */

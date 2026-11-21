@@ -215,7 +215,15 @@ class SuggestionEndpointTest : HttpIntegrationTestBase() {
         candidates.notices = listOf(paving)
 
         get("?candidateLimit=999").body?.size shouldBe 1
-        rawGet(port, "/api/suggestions?foo=%G1", TEST_CREDENTIAL).status shouldBe 200
+        // M15/15A — 제안은 계정 전용 뿌리다. 같은 세션으로 두드려야 「질의를 읽지 않는다」가
+        // 200 으로 보인다(자격 헤더 축은 401 이고 그것은 이 test 의 축이 아니다).
+        rawGet(
+            port,
+            "/api/suggestions?foo=%G1",
+            credential = null,
+            sessionCookie = session.cookieValue(),
+        ).status shouldBe
+            200
     }
 }
 

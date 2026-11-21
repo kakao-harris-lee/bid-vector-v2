@@ -252,7 +252,7 @@ class ProductionBrowserAccessTest {
             HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
         AccountScopedRoutes.covers("/api/notices") shouldBe false
 
-        exchange("/api/notices", HttpMethod.GET, headers).statusCode.value() shouldBe 200
+        statusOf("/api/notices", headers) shouldBe 200
         auditSubjects().contains("operator") shouldBe true
     }
 
@@ -293,6 +293,20 @@ class ProductionBrowserAccessTest {
 
     private fun cookieAndStamp(session: ProductionSession): HttpHeaders =
         cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }
+
+    /**
+     * 상태 코드만 보는 GET — `/api/notices` 의 본문은 JSON **배열**이라 위 [exchange] 의 `Map`
+     * 역직렬화로는 읽히지 않는다(실측: `RestClientException`). 자격 헤더 축의 무회귀는 본문이
+     * 아니라 「닿는가」가 축이므로 상태 코드만 본다.
+     */
+    private fun statusOf(
+        path: String,
+        headers: HttpHeaders,
+    ): Int =
+        restTemplate
+            .exchange(url(path), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
+            .statusCode
+            .value()
 
     @Suppress("UNCHECKED_CAST")
     private fun exchange(

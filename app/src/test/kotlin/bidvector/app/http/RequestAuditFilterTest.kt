@@ -34,10 +34,14 @@ class RequestAuditFilterTest : HttpIntegrationTestBase() {
 
     @BeforeEach
     fun resetFixtures() {
-        auditSink.records.clear()
         auditSink.failNext = false
         strategyRepository.loadFailure = null
         strategyRepository.strategy = freshStrategy()
+        // **M15/15A — 로그인을 계수 초기화 **앞**에 세운다.** `POST /api/session` 도 요청이라
+        // audit 행을 남긴다. 세션을 test 본문에서 지연 초기화하면 그 행이 「요청 하나 = 행 하나」
+        // 계수에 섞이고(실측 2), audit 쓰기를 깨뜨리는 test 에서는 로그인 자체가 500 이 된다.
+        session.headers()
+        auditSink.records.clear()
     }
 
     @AfterEach

@@ -81,6 +81,12 @@ internal class SessionTestClient(
      */
     fun headers(): HttpHeaders = json(cookieOnly()).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, stamp) }
 
+    /**
+     * 이 세션의 쿠키 값(M15/15A) — 소켓으로 직접 쓰는 test 가 같은 세션으로 두드리는 자리다
+     * ([rawGet] 은 `HttpHeaders` 를 받지 않는다). 헤더 **이름**은 그쪽이 짓는다.
+     */
+    fun cookieValue(): String = cookie
+
     private fun cookieOnly(): HttpHeaders =
         HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=$cookie") }
 

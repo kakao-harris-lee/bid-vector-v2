@@ -206,7 +206,12 @@ class ProfileOwnershipE2ETest {
 
         write(QUALIFICATION_FACTS, qualificationBody("합성면허B"), b) shouldBe OK
 
-        read(AccountScopedRoutes.PROFILE, a) shouldContain "\"licensesDeclared\":null"
+        // 행이 없는 계정은 **미설정 기본값**을 본다 — 「선언한 면허가 없다」가 아니라 「아직 아무것도
+        // 적지 않았다」이고, 그 wire 표현은 15A 가 만들지 않았다(D-6F6-3, 행 없음 = 포트가 `null`).
+        // 재는 것은 그 기본값이 **남의 행으로 채워지지 않는다**는 것이다.
+        val seenByA = read(AccountScopedRoutes.PROFILE, a)
+        seenByA shouldNotContain "합성면허B"
+        seenByA shouldContain "\"licenseNames\":[]"
         read(AccountScopedRoutes.PROFILE, b) shouldContain "합성면허B"
     }
 

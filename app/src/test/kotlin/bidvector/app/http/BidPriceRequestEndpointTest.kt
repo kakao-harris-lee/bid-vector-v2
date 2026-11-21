@@ -120,9 +120,12 @@ class BidPriceRequestEndpointTest : HttpIntegrationTestBase() {
         body["bidPriceMenuState"] shouldBe "NOT_COMPUTED"
         body["confidenceState"] shouldBe "NOT_AVAILABLE"
         body["floorShortfallState"] shouldBe "NOT_COMPUTED"
-        // 자격 헤더 경로에는 계정 주체가 없다 — 적지 않고 그 사실을 사유로 낸다(D-7C3B-9).
-        body["inboxRecordState"] shouldBe "NOT_RECORDED"
-        body["inboxRecordNotRecordedReason"] shouldBe "NO_ACCOUNT_SUBJECT"
+        // **M15/15A — 이 경로는 계정 전용이 됐다.** 주체가 세션이고 세션에는 계정이 있으므로 알림함에
+        // 적힌다. 앞 판의 「적지 않음 + `NO_ACCOUNT_SUBJECT`」(D-7C3B-9)는 자격 헤더 주체의 갈래였고,
+        // 그 주체는 이제 이 경로에 401 이라 여기로 오지 않는다 — 갈래가 사라진 것이 아니라 **입구가
+        // 닫혔다**. 사유 칸은 기록된 갈래에 서지 않는다(둘을 함께 읽는 화면을 만들지 않는다).
+        body["inboxRecordState"] shouldBe "RECORDED_NEW"
+        body["inboxRecordNotRecordedReason"] shouldBe null
     }
 
     /**

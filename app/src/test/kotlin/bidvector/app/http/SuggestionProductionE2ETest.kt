@@ -57,7 +57,7 @@ private const val E2E_CANDIDATE_CAP = 200
  *  ③ **계산 중 저장된 결과는 채택하지 않는다** — [SuggestionE2EProbes] 가 출하 조립의 `strategyRepository`
  *    빈을 감싸, 그 GET 의 N 번째 `load()` 직후 실 SQL 로 전략을 바꾼다(수정 라운드 1, cr H-1).
  *
- * 덧붙여 GET 한 번의 읽기 문장 수(`5 + 2n + h`, cr M-2)를 단언하고, 마감 임박 순서와 표시 상한이 마감
+ * 덧붙여 GET 한 번의 읽기 문장 수(`6 + 2n + h`, cr M-2 · M15/15A 가 세션 조회 하나를 더했다)를 단언하고, 마감 임박 순서와 표시 상한이 마감
  * 임박 쪽을 남기는 것(cr M-3)을 잰다. 계산 예산(스캔 상한) 초과는 조용히 자르지 않고 409 이고, 상한까지
  * 채운 조회 한 번의 소요를 남긴다(관측값, `System.out`).
  */
@@ -271,6 +271,10 @@ class SuggestionProductionE2ETest {
         withHeader: Int,
     ): Map<String, Int> =
         buildMap {
+            // M15/15A — 제안은 계정 전용 뿌리다. 요청의 주체를 세션에서 푸는 읽기 하나가 **요청마다**
+            // 선다(자격 헤더 축은 DB 를 읽지 않았다). 그 하나를 상수 자리에 **이름으로** 적는다 —
+            // 합에만 더하면 「어느 표가 늘었는지」가 사라진다.
+            put("browser_session", 1)
             put("operator_strategy", 2)
             put("operator_profile", 2 + watchPassed)
             put("notice", 1)
@@ -343,7 +347,7 @@ class SuggestionProductionE2ETest {
     }
 
     @Test
-    fun `GET 한 번의 읽기 문장 수는 5 + 2n + h 다(n 감시 통과 · h 그 가운데 요건 헤더 보유)`() {
+    fun `GET 한 번의 읽기 문장 수는 6 + 2n + h 다(n 감시 통과 · h 그 가운데 요건 헤더 보유)`() {
         confirmRequiredKeyword("포장", seenRevision = 0)
         val passing = (1..3).map { insertNotice("PAVE-$it", "포장 $it") }
         val notPassing = (1..2).map { insertNotice("SEWER-$it", "하수관로 $it") }
@@ -351,7 +355,7 @@ class SuggestionProductionE2ETest {
         val (headerless, headerlessCounts) = selectCountsOfOneGet()
         headerless.body?.size shouldBe 3
         headerlessCounts shouldBe expectedSelects(watchPassed = 3, withHeader = 0)
-        headerlessCounts.values.sum() shouldBe 5 + 2 * 3
+        headerlessCounts.values.sum() shouldBe 6 + 2 * 3
 
         // 헤더는 통과 후보 하나와 비통과 후보 하나에 — 비통과 쪽은 문장을 늘리지 않는다.
         insertRequirementHeader(passing.first())
@@ -359,7 +363,7 @@ class SuggestionProductionE2ETest {
         val (mixed, mixedCounts) = selectCountsOfOneGet()
         mixed.body?.size shouldBe 3
         mixedCounts shouldBe expectedSelects(watchPassed = 3, withHeader = 1)
-        mixedCounts.values.sum() shouldBe 5 + 2 * 3 + 1
+        mixedCounts.values.sum() shouldBe 6 + 2 * 3 + 1
     }
 
     @Test

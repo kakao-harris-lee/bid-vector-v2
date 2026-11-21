@@ -54,6 +54,9 @@ private const val RAISED_REVISION = 11
 /** 최소 권한 역할에 GRANT 가 **하나도** 없는 표 — 권한으로 걸러지는 모집단의 증거다. */
 private const val NO_GRANT_TABLE = "flyway_schema_history"
 
+/** 알림함 표 — outbox 거부를 주입한 ③ 에서 **유일하게** 늘어나는 표다(M15/15A). */
+private const val INBOX_TABLE = "notification_inbox"
+
 /**
  * **R1-H-1 의 답** — production 커밋 조립(`EvaluationCommitRun`)과 그 러너를 **실 DB 위에서
  * 끝까지 돌린다.** 앞 판은 이 경로를 어떤 test 도 돌리지 않아, 알림 port 를
@@ -273,8 +276,11 @@ class EvaluationCommitRunE2ETest {
             val exitCodes = runCommitRunner()
 
             exitCodes shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
-            // 행이 하나도 안 생겼다 = 쓰기가 실제로 거부됐다(주입이 들었다는 증거).
-            changedTables(before, rowCountsByTable(fixture.adminDataSource())).shouldBeEmpty()
+            // **outbox 에 행이 안 생겼다 = 주입이 들었다**는 증거다. 바뀐 표를 **등식**으로 적는다
+            // (「비었다」가 아니라) — M15/15A 이후 알림함 기록은 그 run 의 계정 하나로 고정돼 outbox
+            // 쓰기 **앞**에서 끝나므로, outbox 가 거부돼도 그 앞 효과는 남는다. 등식이라 outbox 가
+            // 끼어들면 그 자리에서 붉다(「비었다」로 두면 주입이 빠져도 알아채지 못한다).
+            changedTables(before, rowCountsByTable(fixture.adminDataSource())) shouldBe setOf(INBOX_TABLE)
         } finally {
             unblockNotificationInserts(fixture.adminDataSource(), BLOCK_CONSTRAINT)
         }
