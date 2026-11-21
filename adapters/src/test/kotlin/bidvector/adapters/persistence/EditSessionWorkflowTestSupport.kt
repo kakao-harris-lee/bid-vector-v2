@@ -65,9 +65,9 @@ abstract class EditSessionWorkflowTestSupport : PersistenceTestSupport() {
         override fun load(account: AccountId): OperatorStrategy = strategy
 
         override fun save(
-        account: AccountId,
-        applied: AppliedStrategy,
-    ) {
+            account: AccountId,
+            applied: AppliedStrategy,
+        ) {
             strategy = applied.strategy
         }
     }
