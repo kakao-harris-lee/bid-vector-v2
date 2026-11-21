@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router';
 
 import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
+import { SIGN_UP_PATH, SignUpScreen } from './SignUpScreen';
 import { BidBoxScreen } from './screens/BidBoxScreen';
 import { InboxScreen } from './screens/InboxScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
@@ -71,6 +72,24 @@ export const loginRoute: RouteObject = {
   path: '/login',
   element: <LoginScreen />,
 };
+
+/**
+ * 가입 자리(M15/15B) — 로그인과 **같은 축**이다(요구표의 화면 구분 밖, 인증 자리). 그래서 화면
+ * 자리 표에 넣지 않고 셸의 전역 탐색에도 뜨지 않는다.
+ */
+export const signUpRoute: RouteObject = {
+  id: 'signup',
+  path: SIGN_UP_PATH,
+  element: <SignUpScreen />,
+};
+
+/**
+ * **세션 전 자리 전수** — 셸이 탐색을 그리지 않는 경로다. 집합으로 두는 이유는 자리가 둘이 된
+ * 순간 「로그인이면」이라는 술어가 가입 화면에서 조용히 틀리기 때문이다.
+ */
+export const PRE_SESSION_PATHS: ReadonlySet<string> = new Set([loginRoute.path, SIGN_UP_PATH].filter(
+  (one): one is string => one !== undefined,
+));
 
 /**
  * 알 수 없는 URL 자리(code-review r1 F-10). **화면 자리 표에는 넣지 않는다** — 이것은 화면이
