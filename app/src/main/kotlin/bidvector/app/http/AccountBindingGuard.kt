@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order

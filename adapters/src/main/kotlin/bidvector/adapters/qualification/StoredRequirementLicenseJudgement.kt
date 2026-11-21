@@ -5,8 +5,8 @@ import bidvector.qualification.LicenseEligibility
 import bidvector.qualification.LicenseJudgement
 import bidvector.qualification.LicenseQualificationPolicyData
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.LicenseJudgementPort
 import bidvector.workflow.evaluation.OperatorProfilePort
 

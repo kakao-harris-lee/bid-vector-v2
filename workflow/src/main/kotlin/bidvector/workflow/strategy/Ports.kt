@@ -1,8 +1,8 @@
 package bidvector.workflow.strategy
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyEvent
-import bidvector.workflow.access.AccountId
 import java.time.Instant
 
 /** 시각 조회 port(scope.md ⑤) — 구현은 이 slice 밖(실 clock adapter 는 4C/후속). */

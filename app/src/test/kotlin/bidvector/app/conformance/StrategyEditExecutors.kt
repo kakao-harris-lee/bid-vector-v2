@@ -1,5 +1,6 @@
 package bidvector.app.conformance
 
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
@@ -20,7 +21,6 @@ import bidvector.strategy.ThresholdField
 import bidvector.strategy.WatchRuleId
 import bidvector.strategy.isConfigured
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.BeginOutcome

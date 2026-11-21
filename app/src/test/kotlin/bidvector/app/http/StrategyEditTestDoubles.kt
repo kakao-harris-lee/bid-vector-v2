@@ -1,11 +1,11 @@
 package bidvector.app.http
 
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.EDIT_SESSION_POLICY

@@ -1,9 +1,9 @@
 package bidvector.workflow.evaluation
 
 import bidvector.procurement.Notice
-import bidvector.workflow.access.AccountId
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
+import bidvector.sharedkernel.AccountId
 
 /**
  * 공고 **하나**를 식별자로 읽는 포트(M7/7C ②) — 읽기 하나뿐이다. 쓰기·상태 전이 메서드가

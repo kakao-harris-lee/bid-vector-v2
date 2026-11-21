@@ -4,7 +4,7 @@ import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.ReleaseIdentifier
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort

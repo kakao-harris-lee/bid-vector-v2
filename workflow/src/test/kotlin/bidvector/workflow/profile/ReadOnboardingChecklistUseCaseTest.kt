@@ -1,8 +1,8 @@
 package bidvector.workflow.profile
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.evaluation.testStrategy
 import bidvector.workflow.strategy.Clock

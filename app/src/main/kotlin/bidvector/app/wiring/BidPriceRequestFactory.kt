@@ -12,9 +12,9 @@ import bidvector.decision.PublishedFloorTrustPolicyData
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseJudgement
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase

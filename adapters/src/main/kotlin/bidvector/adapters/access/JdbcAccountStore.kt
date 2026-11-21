@@ -1,7 +1,7 @@
 package bidvector.adapters.access
 
 import bidvector.adapters.persistence.ConnectionSource
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountStorePort
 import bidvector.workflow.access.LoginName

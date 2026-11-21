@@ -2,6 +2,7 @@ package bidvector.adapters.persistence
 
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.adapters.strategy.JdbcStrategyRepository
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.BaseAmount
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
@@ -19,7 +20,6 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyViolation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.isConfigured
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.Clock

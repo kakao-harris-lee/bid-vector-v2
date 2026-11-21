@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.UncertainReason
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
@@ -11,7 +12,6 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.notice.NoticeSearchCriteria

@@ -17,6 +17,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
@@ -32,7 +33,6 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.WatchSubject
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock

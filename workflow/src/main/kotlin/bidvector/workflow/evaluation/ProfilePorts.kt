@@ -3,8 +3,8 @@ package bidvector.workflow.evaluation
 import bidvector.decision.UnitScore
 import bidvector.decision.priority.derive.DerivationOutcome
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.CategoryCode
-import bidvector.workflow.access.AccountId
 
 /**
  * 사업자 프로필 fact(scope.md ⑤, D-4B6A-1) — [synthesizeProfileText]의 합성 fact allow-list

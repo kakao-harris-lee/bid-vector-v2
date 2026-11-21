@@ -1,9 +1,9 @@
 package bidvector.workflow.evaluation
 
 import bidvector.procurement.Notice
-import bidvector.workflow.access.AccountId
 import bidvector.procurement.isBiddable
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.WatchVerdict
 import bidvector.strategy.evaluate

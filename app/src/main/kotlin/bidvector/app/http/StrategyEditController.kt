@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 import bidvector.app.wiring.StrategyEditExecutor
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.OperatorId
 import jakarta.servlet.http.HttpServletRequest
@@ -50,11 +50,11 @@ class StrategyEditController(
     fun view(
         @PathVariable sessionId: String,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val session = executor.view(account, sessionIdOf(sessionId)) ?: return sessionNotFound(request)
-        return ResponseEntity.ok(EditSessionResponse.from(session))
-    }
+    ): ResponseEntity<Any> =
+        withAccount(request) { account ->
+            val session = executor.view(account, sessionIdOf(sessionId))
+            if (session == null) sessionNotFound(request) else ResponseEntity.ok(EditSessionResponse.from(session))
+        }
 
     @PostMapping("/{sessionId}/value")
     fun provideValue(

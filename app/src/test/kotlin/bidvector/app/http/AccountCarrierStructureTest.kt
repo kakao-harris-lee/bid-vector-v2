@@ -113,7 +113,7 @@ class AccountCarrierStructureTest {
             listOf(
                 "4: invokevirtual #9 // Method jakarta/servlet/ServletRequestWrapper.getAttribute:" +
                     "(Ljava/lang/String;)Ljava/lang/Object;",
-                "12: ldc #15 // class bidvector/workflow/access/AccountId",
+                "12: ldc #15 // class bidvector/sharedkernel/AccountId",
             ).joinToString("\n")
         val simulated = mapOf("http/Bypass" to bypass)
 
@@ -126,10 +126,10 @@ class AccountCarrierStructureTest {
     fun `속성을 직접 읽거나 AccountId 를 만들거나 주입받는 class 는 새 술어에 걸린다 — 양성 대조`() {
         val handler =
             listOf(
-                "  public bidvector.app.http.NewHandler(bidvector.workflow.access.AccountId);",
+                "  public bidvector.app.http.NewHandler(bidvector.sharedkernel.AccountId);",
                 "4: invokeinterface #9 // InterfaceMethod " +
                     "jakarta/servlet/http/HttpServletRequest.getAttribute:(Ljava/lang/String;)Ljava/lang/Object;",
-                "9: invokespecial #12  // Method bidvector/workflow/access/AccountId.\"<init>\":(J)V",
+                "9: invokespecial #12  // Method bidvector/sharedkernel/AccountId.\"<init>\":(J)V",
             ).joinToString("\n")
         val simulated = mapOf("http/NewHandler" to handler)
 
@@ -165,9 +165,9 @@ class AccountCarrierStructureTest {
 
         /** 소유자(타입)와 무관한 **메서드 서명** — 요청 · 래퍼 · 하위 타입 어느 것으로 불러도 같은 서명이다(V2-N1). */
         const val GET_ATTRIBUTE_SIGNATURE = ".getAttribute:(Ljava/lang/String;)Ljava/lang/Object;"
-        const val ACCOUNT_ID_INTERNAL = "bidvector/workflow/access/AccountId"
-        const val ACCOUNT_ID_INIT = "bidvector/workflow/access/AccountId.\"<init>\":"
-        const val ACCOUNT_ID_TYPE = "bidvector.workflow.access.AccountId"
+        const val ACCOUNT_ID_INTERNAL = "bidvector/sharedkernel/AccountId"
+        const val ACCOUNT_ID_INIT = "bidvector/sharedkernel/AccountId.\"<init>\":"
+        const val ACCOUNT_ID_TYPE = "bidvector.sharedkernel.AccountId"
         const val BID_ACTOR_SYSTEM_INIT = "bidvector/workflow/bidding/BidActor\$System.\"<init>\":"
         const val GUARD = "http/AccountBindingGuard"
 
@@ -221,6 +221,13 @@ class AccountCarrierStructureTest {
                 // 그래서 이 경로는 401 로 떨어지지 않으면서 접근자를 쓴다. 읽는 길은 여전히 이
                 // 접근자 하나이고, 주체 라벨(`account:`)을 읽는 자리는 늘지 않았다(위 등식 그대로).
                 "http/BidPriceRequestController",
+                // M15/15A — 전략·제안·dry-run 이 계정 전용 뿌리가 됐다(V28 이 네 표를 계정 소유로
+                // 옮긴 결과다). 넷 다 주체를 얻는 길은 같은 접근자 하나이고, 주체 라벨(`account:`)을
+                // 읽는 자리는 늘지 않았다 — 위 세 등식이 그대로 초록이다.
+                "http/StrategyReadController",
+                "http/StrategyEditController",
+                "http/SuggestionController",
+                "http/EvaluationDryRunController",
             )
     }
 }

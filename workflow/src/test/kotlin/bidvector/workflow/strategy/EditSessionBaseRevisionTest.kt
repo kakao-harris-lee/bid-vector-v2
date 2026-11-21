@@ -1,5 +1,6 @@
 package bidvector.workflow.strategy
 
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
@@ -13,7 +14,6 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.toDraft
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -116,7 +116,8 @@ class EditSessionBaseRevisionTest {
         )
 
     /** 어댑터가 하는 일과 같다 — 현재 전략을 초안으로 내보내 그 필드 하나만 바꾼다(D-6A2b-2). */
-    private fun draftWith(patch: StrategyDraft.() -> StrategyDraft): StrategyDraft = strategies.load(EDITOR_ACCOUNT).toDraft().patch()
+    private fun draftWith(patch: StrategyDraft.() -> StrategyDraft): StrategyDraft =
+        strategies.load(EDITOR_ACCOUNT).toDraft().patch()
 
     private fun provideValue(
         session: EditSessionId,

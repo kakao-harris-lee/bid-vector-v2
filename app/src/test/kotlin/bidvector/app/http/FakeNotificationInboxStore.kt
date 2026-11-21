@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.notificationinbox.MarkReadOutcome
 import bidvector.workflow.notificationinbox.NotificationGroupKey
 import bidvector.workflow.notificationinbox.NotificationInboxPage

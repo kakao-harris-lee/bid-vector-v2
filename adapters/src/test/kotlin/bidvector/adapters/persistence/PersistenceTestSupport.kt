@@ -3,8 +3,8 @@ package bidvector.adapters.persistence
 import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.procurement.RawNoticeObservation
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway

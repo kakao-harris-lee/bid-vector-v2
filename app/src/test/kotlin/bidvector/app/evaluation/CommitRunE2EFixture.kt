@@ -215,7 +215,7 @@ internal class CommitRunE2EFixture(
  */
 internal class AlwaysBidNowMl : MlAnalysisPort {
     override suspend fun analyze(
-        account: bidvector.workflow.access.AccountId,
+        account: bidvector.sharedkernel.AccountId,
         notice: bidvector.procurement.Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome =

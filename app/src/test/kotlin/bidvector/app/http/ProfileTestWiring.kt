@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 import bidvector.qualification.LicenseName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.OperatorProfileStorePort
 import bidvector.workflow.evaluation.ProfileFacts

@@ -3,9 +3,9 @@ package bidvector.archfixture.violating.app.rules
 import bidvector.adapters.archfixture.UnlistedAdapterException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyPolicyData
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.EditSessionPolicyData
 import bidvector.workflow.strategy.EditSessionRepository

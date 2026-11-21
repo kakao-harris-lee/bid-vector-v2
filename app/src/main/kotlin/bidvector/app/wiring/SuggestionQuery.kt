@@ -1,6 +1,6 @@
 package bidvector.app.wiring
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import bidvector.workflow.suggestion.SuggestionList
 

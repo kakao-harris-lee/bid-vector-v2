@@ -2,9 +2,9 @@ package bidvector.workflow.suggestion
 
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyRevision
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateScreening
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort

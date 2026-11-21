@@ -17,11 +17,11 @@ import bidvector.decision.priority.derive.competitivenessNotCollected
 import bidvector.decision.priority.derive.deriveExecutionComplexity
 import bidvector.decision.priority.derive.deriveUrgency
 import bidvector.procurement.Notice
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.WatchSubject
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.embedding.EmbedTextPort
 import bidvector.workflow.embedding.EmbedTextRequest
 import bidvector.workflow.embedding.EmbeddingOutcome

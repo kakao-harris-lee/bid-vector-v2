@@ -8,10 +8,10 @@ import bidvector.procurement.CategoryCode
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.WatchSubject
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.prediction.CompetitionSample
 import java.time.Instant

@@ -1,6 +1,7 @@
 package bidvector.app.wiring
 
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyPolicyData
@@ -9,7 +10,6 @@ import bidvector.strategy.StrategyValidation
 import bidvector.strategy.StrategyViolation
 import bidvector.strategy.toDraft
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.CancellationReason

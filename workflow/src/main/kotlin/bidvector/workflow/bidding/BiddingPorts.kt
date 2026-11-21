@@ -10,7 +10,7 @@ import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.TransitionEffect
 import bidvector.bidding.TransitionReason
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 /**

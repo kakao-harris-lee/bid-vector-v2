@@ -11,6 +11,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
@@ -29,7 +30,6 @@ import bidvector.strategy.WatchSubject
 import bidvector.strategy.assembleFullScopeText
 import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort

@@ -2,7 +2,7 @@ package bidvector.app.http
 
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.WatchSubjectOutcome

@@ -3,7 +3,7 @@ package bidvector.adapters.strategy
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.Sql
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionConflictException

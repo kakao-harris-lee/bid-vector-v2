@@ -5,8 +5,8 @@ import bidvector.decision.priority.derive.DerivationAbsence
 import bidvector.decision.priority.derive.DerivationOutcome
 import bidvector.qualification.LicenseName
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.CategoryCode
-import bidvector.workflow.access.AccountId
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 

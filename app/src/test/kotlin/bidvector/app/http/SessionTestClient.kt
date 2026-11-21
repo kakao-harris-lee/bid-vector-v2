@@ -79,8 +79,7 @@ internal class SessionTestClient(
      * test 가 **같은 세션으로** 두드릴 수 있게 하는 자리다. 계정 전용 뿌리가 넷 늘면서 자격
      * 헤더로 두드리던 endpoint test 들이 이 헤더로 옮겨 왔다.
      */
-    fun headers(): HttpHeaders =
-        json(cookieOnly()).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, stamp) }
+    fun headers(): HttpHeaders = json(cookieOnly()).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, stamp) }
 
     private fun cookieOnly(): HttpHeaders =
         HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=$cookie") }

@@ -5,8 +5,8 @@ import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.procurement.NoticeId
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase

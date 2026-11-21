@@ -8,12 +8,12 @@ import bidvector.decision.Verdict
 import bidvector.decision.VerdictLadder
 import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.Notice
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.PriorityScore
 import bidvector.strategy.StrategyRevision
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository

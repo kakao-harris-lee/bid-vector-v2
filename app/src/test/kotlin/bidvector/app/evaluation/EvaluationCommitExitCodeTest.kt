@@ -74,7 +74,8 @@ class EvaluationCommitExitCodeTest {
     /** 계수 이름은 Kotlin 상수 이름에서 파생되지 않는다 — DEC-10 이 `floor_implausible` 을 고정한다. */
     @Test
     fun `제외 사유 전수가 줄에 서로 다른 이름으로 나온다`() {
-        val line = evaluationCommitFinishLine(tally(), accounts = 1, skipped = 0, exitCode = EvaluationCommitExitCode.COMPLETE)
+        val line =
+            evaluationCommitFinishLine(tally(), accounts = 1, skipped = 0, exitCode = EvaluationCommitExitCode.COMPLETE)
         val names = PublishedFloorExclusion.entries.map { exclusion -> "$exclusion" }
 
         names.forEach { name -> line.contains(name) shouldBe false }

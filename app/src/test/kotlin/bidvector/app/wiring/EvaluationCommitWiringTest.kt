@@ -8,6 +8,7 @@ import bidvector.app.http.TestStrategyRepository
 import bidvector.app.http.freshStrategy
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
@@ -15,7 +16,6 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort

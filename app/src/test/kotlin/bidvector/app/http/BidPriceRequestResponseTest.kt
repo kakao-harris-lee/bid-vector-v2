@@ -13,9 +13,9 @@ import bidvector.qualification.LmtGrpNo
 import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.RequirementSourceField
 import bidvector.qualification.UncertainReason
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import io.kotest.assertions.withClue

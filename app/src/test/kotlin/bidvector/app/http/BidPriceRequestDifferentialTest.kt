@@ -8,8 +8,8 @@ import bidvector.app.wiring.MaxActiveBidsNotConfiguredException
 import bidvector.decision.MlUnavailableReason
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.EvaluationDropReason

@@ -17,6 +17,7 @@ import bidvector.procurement.ResolvedBaseAmount
 import bidvector.procurement.ResolvedEstimatedAmount
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.EstimatedAmount
@@ -28,7 +29,6 @@ import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.CategoryCode
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.embedding.EmbedTextPort
 import bidvector.workflow.embedding.EmbedTextRequest
 import bidvector.workflow.embedding.EmbeddingOutcome

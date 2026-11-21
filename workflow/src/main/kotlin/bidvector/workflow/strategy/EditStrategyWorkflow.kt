@@ -1,9 +1,9 @@
 package bidvector.workflow.strategy
 
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyPolicyData
-import bidvector.workflow.access.AccountId
 
 /**
  * [EditStrategyWorkflow]의 command 처리 결과 — 세션 부재는 [TransitionOutcome] 밖의

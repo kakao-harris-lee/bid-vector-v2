@@ -6,8 +6,8 @@ import bidvector.app.collection.CollectionLog
 import bidvector.app.http.TestStrategyRepository
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.procurement.Notice
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
@@ -133,8 +133,7 @@ private fun audienceUnavailableRuns(): EvaluationCommitRuns =
         dataSource = PGSimpleDataSource(),
         strategies =
             object : StrategyReader {
-                override fun load(account: AccountId): OperatorStrategy =
-                    error("청중을 못 읽었는데 전략을 읽었다")
+                override fun load(account: AccountId): OperatorStrategy = error("청중을 못 읽었는데 전략을 읽었다")
             },
         candidateSource = CandidateSourcePort { error("후보 원천이 불렸다") },
         watchSubjects = WatchSubjectPort { error("감시 port 가 불렸다") },

@@ -2,8 +2,8 @@ package bidvector.app.wiring
 
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.NotificationBidKind
 import bidvector.workflow.notificationinbox.NotificationFact

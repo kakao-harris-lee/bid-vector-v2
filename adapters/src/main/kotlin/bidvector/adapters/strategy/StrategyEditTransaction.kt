@@ -4,9 +4,9 @@ import bidvector.adapters.event.JdbcEventIdFactory
 import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyPolicyData
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.EventIdFactory
 import bidvector.workflow.event.OutboxEventSink
 import bidvector.workflow.strategy.Clock

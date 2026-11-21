@@ -1,6 +1,6 @@
 package bidvector.workflow.profile
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader

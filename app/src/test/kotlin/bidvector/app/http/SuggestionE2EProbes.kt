@@ -1,7 +1,7 @@
 package bidvector.app.http
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.beans.factory.config.BeanPostProcessor
 import org.springframework.context.ApplicationContextInitializer

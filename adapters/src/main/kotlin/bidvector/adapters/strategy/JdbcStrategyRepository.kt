@@ -3,6 +3,7 @@ package bidvector.adapters.strategy
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.Sql
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
@@ -11,7 +12,6 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.StrategyViolation
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.StrategyRepository
 import java.sql.Connection

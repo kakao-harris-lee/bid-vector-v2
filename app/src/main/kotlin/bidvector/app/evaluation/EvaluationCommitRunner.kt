@@ -4,7 +4,6 @@ import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.relay.causeCodeOf
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.notificationinbox.NotificationAudience
 import kotlinx.coroutines.runBlocking
@@ -49,50 +48,37 @@ class EvaluationCommitRunner(
         log.write(evaluationCommitStartLine(candidateCap))
         val accounts =
             when (val audience = runs.accounts()) {
-                is NotificationAudience.Accounts -> audience.accounts
+                is NotificationAudience.Accounts -> {
+                    audience.accounts
+                }
+
                 is NotificationAudience.Unavailable -> {
                     log.write(evaluationCommitAudienceFailureLine(audience.exceptionType))
                     termination.terminate(EvaluationCommitExitCode.FAILED.value)
                     return
                 }
             }
-        val outcome =
-            try {
-                evaluateEach(accounts)
-            } catch (failure: Exception) {
-                log.write(evaluationCommitFailureLine(causeCodeOf(failure)))
-                termination.terminate(EvaluationCommitExitCode.FAILED.value)
-                return
-            }
-        val tally = tallyOf(outcome.results)
-        val exitCode = exitCodeOf(tally)
-        log.write(evaluationCommitFinishLine(tally, outcome.evaluated, outcome.skipped, exitCode))
-        termination.terminate(exitCode.value)
-    }
-
-    private fun evaluateEach(accounts: List<AccountId>): AccountRunOutcome {
         val results = mutableListOf<CandidateEvaluation>()
         var evaluated = 0
         var skipped = 0
-        accounts.forEach { account ->
-            val run = runs.forAccount(account)
-            if (run == null) {
-                skipped++
-            } else {
-                evaluated++
-                results += runBlocking { run.evaluate() }
+        try {
+            accounts.forEach { account ->
+                val run = runs.forAccount(account)
+                if (run == null) {
+                    skipped++
+                } else {
+                    evaluated++
+                    results += runBlocking { run.evaluate() }
+                }
             }
+        } catch (failure: Exception) {
+            log.write(evaluationCommitFailureLine(causeCodeOf(failure)))
+            termination.terminate(EvaluationCommitExitCode.FAILED.value)
+            return
         }
-        return AccountRunOutcome(results, evaluated, skipped)
+        val tally = tallyOf(results)
+        val exitCode = exitCodeOf(tally)
+        log.write(evaluationCommitFinishLine(tally, evaluated, skipped, exitCode))
+        termination.terminate(exitCode.value)
     }
 }
-
-/**
- * 계정 순회의 결과 — **계수 둘을 결과와 함께** 나른다(세는 자리를 둘로 두지 않는다, 로그와 종료
- * 코드가 같은 값에서 나오는 `EvaluationCommitTally` 와 같은 규율).
- */
-private class AccountRunOutcome(
-    val results: List<CandidateEvaluation>,
-    val evaluated: Int,
-    val skipped: Int,
-)

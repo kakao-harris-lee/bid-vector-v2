@@ -18,6 +18,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
@@ -26,7 +27,6 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.MlAnalysisOutcome

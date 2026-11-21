@@ -10,8 +10,8 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.NoticeSnapshot
 import bidvector.bidding.OPEN_CASE_COMMAND
 import bidvector.bidding.tag
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
 import bidvector.workflow.bidding.BidCaseStorePort
 import bidvector.workflow.bidding.BidCaseWorkflow

@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.ListConstructionCapacitiesUseCase
 import bidvector.workflow.profile.ReadProfileUseCase
 import bidvector.workflow.profile.RemoveConstructionCapacityUseCase

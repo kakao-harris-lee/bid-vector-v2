@@ -1,7 +1,7 @@
 package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.Sql
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
 import javax.sql.DataSource

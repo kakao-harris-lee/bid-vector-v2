@@ -13,6 +13,7 @@ import bidvector.qualification.LicenseName
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.RequirementSourceField
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.FloorRate
@@ -30,7 +31,6 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.LicenseJudgementPort
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort

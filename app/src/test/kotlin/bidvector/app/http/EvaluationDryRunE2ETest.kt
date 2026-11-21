@@ -133,7 +133,6 @@ class EvaluationDryRunE2ETest {
                 .seedAndSignIn(adminDataSource(postgres), "dry-run-e2e-owner")
     }
 
-
     /**
      * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
      * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가
@@ -170,23 +169,24 @@ class EvaluationDryRunE2ETest {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setArray(1, empty)
+                    statement.setLong(1, session.accountId)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
-                    statement.setArray(5, connection.createArrayOf("text", excludeKeywordTerms))
-                    statement.setBigDecimal(6, bidNowThreshold?.let(::BigDecimal))
-                    statement.setBigDecimal(7, reviewThreshold?.let(::BigDecimal))
+                    statement.setArray(5, empty)
+                    statement.setArray(6, connection.createArrayOf("text", excludeKeywordTerms))
+                    statement.setBigDecimal(7, bidNowThreshold?.let(::BigDecimal))
+                    statement.setBigDecimal(8, reviewThreshold?.let(::BigDecimal))
                     if (maxActiveBids != null) {
-                        statement.setInt(8, maxActiveBids)
+                        statement.setInt(9, maxActiveBids)
                     } else {
-                        statement.setNull(8, Types.INTEGER)
+                        statement.setNull(9, Types.INTEGER)
                     }
                     statement.executeUpdate()
                 }

@@ -25,10 +25,10 @@ import bidvector.adapters.qualification.StoredRequirementLicenseGate
 import bidvector.adapters.strategy.JdbcStrategyRepository
 import bidvector.qualification.LICENSE_QUALIFICATION_POLICY
 import bidvector.qualification.LicenseQualificationPolicyData
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.EvaluateCandidatesUseCase
 import bidvector.workflow.evaluation.OpportunityAnalysis

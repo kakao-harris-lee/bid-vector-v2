@@ -2,7 +2,7 @@ package bidvector.adapters.ml
 
 import bidvector.decision.MlUnavailableReason
 import bidvector.procurement.Notice
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.event.CorrelationId

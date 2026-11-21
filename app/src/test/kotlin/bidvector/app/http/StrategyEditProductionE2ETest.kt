@@ -109,7 +109,6 @@ class StrategyEditProductionE2ETest {
                 .seedAndSignIn(adminDataSource(postgres), "strategy-edit-e2e-owner")
     }
 
-
     /**
      * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
      * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가

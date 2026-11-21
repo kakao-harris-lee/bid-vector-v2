@@ -1,7 +1,7 @@
 package bidvector.workflow.notificationinbox
 
 import bidvector.procurement.NoticeId
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 // 왜 `workflow.notification` 이 아니라 별 패키지인가(M7/7C③ — 실측으로 갈린 자리)

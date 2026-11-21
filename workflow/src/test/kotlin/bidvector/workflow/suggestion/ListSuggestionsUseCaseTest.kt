@@ -6,9 +6,9 @@ import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.OperatorLicenses
 import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.UncertainReason
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.DEFAULT_FOCUS_CATEGORY
 import bidvector.workflow.evaluation.EMPTY_SUBJECT
 import bidvector.workflow.evaluation.FakeCandidateSource
@@ -146,9 +146,19 @@ class ListSuggestionsUseCaseTest {
         val notices = listOf(first, second, third, fourth)
 
         val narrowResult =
-            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 1))), notices, narrow, narrowLicense).list(TEST_ACCOUNT)
+            useCase(
+                SequenceStrategyReader(listOf(strategy(candidateLimit = 1))),
+                notices,
+                narrow,
+                narrowLicense,
+            ).list(TEST_ACCOUNT)
         val wideResult =
-            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 5))), notices, wide, wideLicense).list(TEST_ACCOUNT)
+            useCase(
+                SequenceStrategyReader(listOf(strategy(candidateLimit = 5))),
+                notices,
+                wide,
+                wideLicense,
+            ).list(TEST_ACCOUNT)
 
         narrowResult.ids() shouldBe listOf(second.id)
         wideResult.ids() shouldBe listOf(second.id, third.id, fourth.id)
@@ -176,7 +186,11 @@ class ListSuggestionsUseCaseTest {
 
     @Test
     fun `표시 상한이 미설정이면 자르지 않는다`() {
-        val result = useCase(SequenceStrategyReader(listOf(strategy())), listOf(first, second, third)).list(TEST_ACCOUNT)
+        val result =
+            useCase(
+                SequenceStrategyReader(listOf(strategy())),
+                listOf(first, second, third),
+            ).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(first.id, second.id, third.id)
     }
@@ -185,9 +199,16 @@ class ListSuggestionsUseCaseTest {
     fun `빈 결과의 뜻 — 열린 공고 없음 · 감시 미설정 · 통과 없음이 서로 다른 값이다`() {
         useCase(SequenceStrategyReader(listOf(strategy())), emptyList()).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.NO_OPEN_NOTICES
-        useCase(SequenceStrategyReader(listOf(strategy(watched = false))), listOf(first)).list(TEST_ACCOUNT).state shouldBe
+        useCase(
+            SequenceStrategyReader(listOf(strategy(watched = false))),
+            listOf(first),
+        ).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.WATCH_NOT_CONFIGURED
-        useCase(SequenceStrategyReader(listOf(strategy())), listOf(first), rejectingWatch(first)).list(TEST_ACCOUNT).state shouldBe
+        useCase(
+            SequenceStrategyReader(listOf(strategy())),
+            listOf(first),
+            rejectingWatch(first),
+        ).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.NO_MATCH
     }
 
@@ -211,7 +232,11 @@ class ListSuggestionsUseCaseTest {
         val before = strategy(revision = 3, watched = false)
         val sameRevisionDifferentValue = strategy(revision = 3)
 
-        val result = useCase(SequenceStrategyReader(listOf(before, sameRevisionDifferentValue)), listOf(first)).list(TEST_ACCOUNT)
+        val result =
+            useCase(
+                SequenceStrategyReader(listOf(before, sameRevisionDifferentValue)),
+                listOf(first),
+            ).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(first.id)
     }
@@ -224,7 +249,7 @@ class ListSuggestionsUseCaseTest {
         val licenseGate =
             FakeLicenseGatePort { _ ->
                 val verdict =
-                    if (profiles.current() == null) {
+                    if (profiles.current(TEST_ACCOUNT) == null) {
                         LicenseVerdict.Ineligible(mapOf(RequirementGroupId.Ungrouped to emptySet()))
                     } else {
                         LicenseVerdict.Eligible(emptySet())

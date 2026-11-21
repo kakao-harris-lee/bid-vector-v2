@@ -1,7 +1,7 @@
 package bidvector.adapters.evaluation
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.StrategyRepository
 

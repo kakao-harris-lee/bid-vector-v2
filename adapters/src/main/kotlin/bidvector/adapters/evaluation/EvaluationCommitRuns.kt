@@ -1,7 +1,7 @@
 package bidvector.adapters.evaluation
 
 import bidvector.adapters.persistence.ReleaseIdentifier
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
