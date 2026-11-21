@@ -102,6 +102,10 @@ BIDVECTOR_PROD_SERVICE_ENV_KEYS=(
   app.BIDVECTOR_PERSISTENCE_CREDENTIAL
   app.BIDVECTOR_PERSISTENCE_JDBCURL
   app.BIDVECTOR_PERSISTENCE_USERNAME
+  # M9/ops-migrations(V28): 실행 행에 찍는 릴리스 식별자. 값은 반입 스크립트가 스스로 내보내는
+  # `BIDVECTOR_RELEASE_TAG` 이고(compose.yaml) 운영 env 파일에서 오지 않는다 — app 설정을 바꾸는 통로가
+  # 아니다. 2026-11-21 첫 반입에서 이 목록에 빠진 것이 드러났다.
+  app.BIDVECTOR_RELEASE_SHA
   app.JAVA_TOOL_OPTIONS
   app.MANAGEMENT_SERVER_PORT
   app.OPERATOR_CREDENTIAL_VALUE
