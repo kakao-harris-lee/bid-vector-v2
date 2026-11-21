@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
+import { assertNoPrivateValues } from './privateValues';
 import { exitTargetsOf, measureInPage } from './touchMeasure';
 
 import {
@@ -490,7 +491,7 @@ test('여정 ④ — 내 입찰함: 상태 탭 · 다음 확인 시점 · 개찰
   assertOnlyAllowedOperations(watched.apiPaths);
 });
 
-/** D-7E-6 — 화면·콘솔에 사업자번호·토큰·세션 쿠키 평문이 0 이다. */
+/** D-7E-6 — 화면·콘솔에 사업자번호·토큰·세션 쿠키 평문이 0 이다(술어는 `privateValues.ts`). */
 test('개인정보·비밀값이 화면과 콘솔에 나오지 않는다', async ({ page }) => {
   const consoleLines: string[] = [];
   page.on('console', (message) => consoleLines.push(message.text()));
@@ -498,11 +499,9 @@ test('개인정보·비밀값이 화면과 콘솔에 나오지 않는다', async
   await search(page, 'SYN-7E1');
   await expect(page.getByTestId('notice-total')).toBeVisible();
 
-  const body = await page.locator('body').innerText();
   // 세션 쿠키는 HttpOnly 라 스크립트가 읽지 못한다 — 그 사실을 화면 쪽에서 확인한다.
   expect(await page.evaluate(() => document.cookie)).not.toContain('bidvector_session');
-  expect(body).not.toContain(journeyContext().passphrase);
   expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
-  // 사업자등록번호 형태(3-2-5)가 화면에 없다.
-  expect(body).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
+  // 비밀 문구와 사업자등록번호 꼴 — 술어는 `privateValues.ts` 한 자리다(보이는 글 + 폼 값·속성).
+  await assertNoPrivateValues(page);
 });
