@@ -26,6 +26,7 @@ import bidvector.qualification.OperatorLicenses
 import bidvector.qualification.RequirementCollection
 import bidvector.qualification.RequirementRow
 import bidvector.qualification.RequirementSourceField
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.collection.COLLECTION_RANGE_POLICY
@@ -209,10 +210,16 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      */
     protected fun setStrategyRevision(revision: Int) =
         dataSource().connection.use { connection ->
-            connection.prepareStatement("UPDATE operator_strategy SET revision = ?").use { statement ->
-                statement.setInt(1, revision)
-                check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
-            }
+            // **계정을 묶는다**(r1 리뷰 MEDIUM). 앞 판은 싱글턴 술어(`WHERE id = 1`)를 계정 키로
+            // 바꾸는 대신 **지웠고**, 이 fixture 가 전략 행을 하나만 심어서 초록이었다. 둘째 계정을
+            // 심는 slice 가 오면 두 행을 함께 고치거나 `== 1` 이 엉뚱한 사유로 터진다.
+            connection
+                .prepareStatement("UPDATE operator_strategy SET revision = ? WHERE account_id = ?")
+                .use { statement ->
+                    statement.setInt(1, revision)
+                    statement.setLong(2, testAccount().value)
+                    check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
+                }
         }
 
     protected fun outboxIdempotencyKeys(): List<String> =
@@ -255,7 +262,10 @@ internal fun noticeIdOf(number: String): NoticeId = NoticeId(NoticeNumber.of(num
  * 이 형태가 필요하다(review G-3: 부분 일치는 어느 칸에 있는지를 가르지 못한다). 형식 자체의
  * 정본은 그 production 클래스이고 `OutboxNotificationRequestPortTest` 가 축어로 잠근다.
  */
-internal fun idempotencyKeyFor(number: String): String = "notification-requested-$number-000"
+internal fun idempotencyKeyFor(
+    account: AccountId,
+    number: String,
+): String = "notification-requested-${account.value}-$number-000"
 
 /**
  * 합성 공고 항목 — `bssamt`(기초금액)가 있어야 예측 호출이 일어난다(`OpportunityAnalysis`

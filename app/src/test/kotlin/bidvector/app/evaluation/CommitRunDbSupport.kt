@@ -106,3 +106,20 @@ internal fun unblockNotificationInserts(
 ) = dataSource.connection.use { connection ->
     connection.createStatement().use { it.execute("ALTER TABLE outbox DROP CONSTRAINT $constraint") }
 }
+
+/**
+ * outbox 의 멱등 키 전수(M15/15A) — 전역 발송 채널에 **무엇이** 갔는지를 행 수가 아니라 **값**으로
+ * 본다. 키가 계정을 담으므로 「몇 건인가」와 「누구 것인가」를 한 단언이 함께 말한다.
+ */
+internal fun outboxIdempotencyKeys(dataSource: DataSource): List<String> =
+    dataSource.connection.use { connection ->
+        connection
+            .prepareStatement("SELECT idempotency_key FROM outbox ORDER BY idempotency_key")
+            .use { statement ->
+                statement.executeQuery().use { rows ->
+                    val keys = mutableListOf<String>()
+                    while (rows.next()) keys += rows.getString("idempotency_key")
+                    keys
+                }
+            }
+    }

@@ -50,7 +50,7 @@ internal class PipelineLadderBoundaryE2ETest : PipelineE2ESupport() {
         promotionReason(reached).threshold shouldBe BigDecimal(E2E_BID_NOW_THRESHOLD)
         promotionReason(reached).priority shouldBeGreaterThanOrEqualTo BigDecimal(E2E_BID_NOW_THRESHOLD)
         outboxIdempotencyKeys() shouldHaveSize 1
-        outboxIdempotencyKeys().single() shouldBe idempotencyKeyFor(HIGH_MATCH_NOTICE)
+        outboxIdempotencyKeys().single() shouldBe idempotencyKeyFor(testAccount(), HIGH_MATCH_NOTICE)
     }
 
     private fun promotedNoticeNumbers(reached: List<CandidateEvaluation.Reached>): List<String> =

@@ -66,7 +66,7 @@ enum class NotificationKind {
  * **왜 `bidvector.bidding.BidKind` 를 쓰지 않는가**(조사 뒤 채택): 알림함의 키 어휘는 저장 층
  * CHECK 와 **집합 등식**을 이루는 이 패키지의 닫힌 어휘이고, 그것을 `bidding` 의 enum 에 묶으면
  * 알림함이 입찰 모듈 없이는 서지 않는다(7C③ 이 이 패키지의 의존을 `procurement.NoticeId` ·
- * `workflow.access.AccountId` 둘로 묶어 둔 사유, [AwardResult] 가 `BidOutcome` 를 재활용하지 않은
+ * `sharedkernel.AccountId` 둘로 묶어 둔 사유, [AwardResult] 가 `BidOutcome` 를 재활용하지 않은
  * 것과 같은 축). 그리고 **두 집합은 실제로 다르다** — 아래 [NONE] 의 자리가 `BidKind` 에는 없다.
  * 두 벌이 갈리는 것은 사상 함수의 1:1 등식 test 가 막는다(`BidKind` 전수 ↔ 이 어휘의 건 축 전수).
  *
@@ -165,7 +165,7 @@ enum class NotificationDetail {
  * `WON`·`LOST`·`FAILED_OR_REBID` 로 **값이 같다**. 그래도 쓰지 않는다 — 알림함의 detail 어휘는
  * 저장 층 CHECK 와 **집합 등식**을 이루는 이 패키지의 닫힌 어휘이고, 그것을 `bidding` 의 enum 에
  * 묶으면 알림함이 입찰 모듈 없이는 서지 않는다(7C③ 이 이 패키지의 의존을 `procurement.NoticeId` ·
- * `workflow.access.AccountId` 둘로 묶어 둔 사유와 같은 축). 그리고 둘은 앞으로 갈린다: 자동 대사가
+ * `sharedkernel.AccountId` 둘로 묶어 둔 사유와 같은 축). 그리고 둘은 앞으로 갈린다: 자동 대사가
  * 들어오면 같은 종류의 원천이 `settlement` 쪽 4-state 가 되는데 그 집합에는 유찰이 **없다**. 즉
  * 어느 기존 타입도 알림함의 어휘가 아니다. 두 벌이 갈리는 것은 `BidCaseNotifications` 의 상태
  * 사상 등식이 막는다(상태 전수 ↔ 사실 전수).

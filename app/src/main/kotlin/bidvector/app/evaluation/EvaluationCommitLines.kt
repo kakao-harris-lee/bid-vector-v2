@@ -36,6 +36,12 @@ internal data class EvaluationCommitTally(
     val requested: Int,
     val requestFailed: Int,
     /**
+     * 전역 채널로 **보내지 않은** 건수(M15/15A) — 가장 작은 계정이 아닌 run 의 `BidNow` 다.
+     * `requested` 에 접으면 종료 줄이 보내지 않은 건을 보냈다고 말하고, `requestFailed` 에
+     * 접으면 계약대로 도는 run 이 매번 INCOMPLETE 로 끝난다.
+     */
+    val suppressed: Int,
+    /**
      * DEC-10 계수(D-DEC10-5) — 게시 하한율이 가격 경로에서 제외된 건수를 **사유별로** 센다.
      * 표는 사유 전수를 키로 갖는다(0 건도 줄에 나온다) — 「그 사유가 0 이었다」와 「그 사유를
      * 세지 않았다」가 구별되지 않으면 계수가 없는 것과 같다.
@@ -53,6 +59,7 @@ internal fun tallyOf(results: List<CandidateEvaluation>): EvaluationCommitTally 
         bidNow = reached.count { it.verdict is Verdict.BidNow },
         requested = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Requested },
         requestFailed = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Failed },
+        suppressed = dispositions.count { outcomeOf(it) == NotificationRequestOutcome.Suppressed },
         // **결과 전체**에서 센다(r1 CR M-1) — 최소 점수 드롭은 분석을 받은 뒤 `NotReached` 로
         // 떨어지는 자리라, `reached` 만 세면 그 가지의 제외가 줄에서 사라진다.
         floorExclusions =
@@ -72,27 +79,42 @@ private fun outcomeOf(disposition: NotificationDisposition): NotificationRequest
         is NotificationDisposition.Requested -> disposition.outcome
     }
 
-internal fun exitCodeOf(tally: EvaluationCommitTally): EvaluationCommitExitCode =
-    if (tally.requestFailed > 0) EvaluationCommitExitCode.INCOMPLETE else EvaluationCommitExitCode.COMPLETE
+/**
+ * **계정 하나가 터진 것도 비-0 이다**(r1 리뷰 MEDIUM). 그 계정의 판정이 사라진 사실은 계수에만
+ * 있으면 안 된다 — 종료 코드가 조용하면 cron 은 그 run 을 성공으로 적는다. 억제는 비-0 이
+ * 아니다(계약대로 도는 정상 상태다, [EvaluationCommitTally.suppressed]).
+ */
+internal fun exitCodeOf(
+    tally: EvaluationCommitTally,
+    failedAccounts: Int,
+): EvaluationCommitExitCode =
+    if (tally.requestFailed > 0 || failedAccounts > 0) {
+        EvaluationCommitExitCode.INCOMPLETE
+    } else {
+        EvaluationCommitExitCode.COMPLETE
+    }
 
 /** 계수와 열거값만 싣는다 — 공고 ID·기관명·판정 사유는 이 줄에 없다(수집 러너와 같은 근거). */
 internal fun evaluationCommitStartLine(candidateCap: Int): String = "evaluation-commit start candidateCap=$candidateCap"
 
 /**
- * **M15/15A — 계정 계수 둘을 함께 싣는다.** `accounts` 는 실제로 평가한 계정 수이고 `skipped` 는
- * 전략을 쓸 수 없어 건너뛴 계정 수다. 둘을 따로 세지 않으면 「후보 0」이 「감시 조건이 아무도
- * 안 걸렸다」인지 「평가한 계정이 하나도 없다」인지 구별되지 않는다.
+ * **M15/15A — 계정 계수 셋을 함께 싣는다.** `accounts` 는 실제로 평가한 계정 수, `skipped` 는
+ * 전략을 쓸 수 없어 건너뛴 계정 수, `failed` 는 평가 중에 터진 계정 수다. 따로 세지 않으면
+ * 「후보 0」이 「감시 조건이 아무도 안 걸렸다」인지 「평가한 계정이 하나도 없다」인지 구별되지
+ * 않고, `accounts=0 skipped=0 failed=0` 이라는 **아무도 없는 run** 도 줄에서 보인다.
  */
 internal fun evaluationCommitFinishLine(
     tally: EvaluationCommitTally,
     accounts: Int,
     skipped: Int,
+    failed: Int,
     exitCode: EvaluationCommitExitCode,
 ): String =
-    "evaluation-commit finished accounts=$accounts skipped=$skipped " +
+    "evaluation-commit finished accounts=$accounts skipped=$skipped failed=$failed " +
         "candidates=${tally.candidates} reached=${tally.reached} " +
         "notReached=${tally.notReached} bidNow=${tally.bidNow} requested=${tally.requested} " +
-        "requestFailed=${tally.requestFailed} ${floorExclusionFields(tally)} exit=${exitCode.value}"
+        "requestFailed=${tally.requestFailed} suppressed=${tally.suppressed} " +
+        "${floorExclusionFields(tally)} exit=${exitCode.value}"
 
 /**
  * 사유별 계수 필드 — 사유 전수를 돌아 **0 건도 적는다**. 키 이름은 소진 `when` 이 정한다
@@ -122,3 +144,10 @@ internal fun evaluationCommitFailureLine(causeCode: String): String = "evaluatio
  */
 internal fun evaluationCommitAudienceFailureLine(exceptionType: String): String =
     evaluationCommitFailureLine("audience-unavailable:$exceptionType")
+
+/**
+ * 계정 하나가 터졌다(M15/15A) — 순회는 **계속된다**. 싣는 것은 사유 코드뿐이고 어느 계정인지는
+ * 적지 않는다(이 줄은 공개 로그이고, 계정 id 는 계수로 충분하다).
+ */
+internal fun evaluationCommitAccountFailureLine(causeCode: String): String =
+    "evaluation-commit account-failed cause=$causeCode"

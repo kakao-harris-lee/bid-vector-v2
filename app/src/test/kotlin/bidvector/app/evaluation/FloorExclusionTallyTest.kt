@@ -80,9 +80,15 @@ class FloorExclusionTallyTest {
     fun `마침 줄에 두 사유가 각각 한 건으로 나온다`() {
         val tally = tallyOf(results)
 
-        evaluationCommitFinishLine(tally, accounts = 1, skipped = 0, exitCode = exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished accounts=1 skipped=0 candidates=2 reached=1 notReached=1 bidNow=1 " +
-            "requested=1 requestFailed=0 floorImplausible=1 floorOriginNotJudged=1 exit=0"
+        evaluationCommitFinishLine(
+            tally,
+            accounts = 1,
+            skipped = 0,
+            failed = 0,
+            exitCode = exitCodeOf(tally, failedAccounts = 0),
+        ) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=2 reached=1 notReached=1 bidNow=1 " +
+            "requested=1 requestFailed=0 suppressed=0 floorImplausible=1 floorOriginNotJudged=1 exit=0"
     }
 
     private fun evaluateTwoCandidates(): List<CandidateEvaluation> {

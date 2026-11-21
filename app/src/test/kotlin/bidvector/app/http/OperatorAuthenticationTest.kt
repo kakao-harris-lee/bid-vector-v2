@@ -94,13 +94,23 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
         }
     }
 
+    /**
+     * **자격 헤더로 닿는 경로에서 잰다**(r1 리뷰 MEDIUM). M15/15A 가 전략을 계정 전용으로 옮기면서
+     * `/api/strategy` 는 **올바른 자격에도** 401 이다 — 그 경로에서 이 둘을 재면 두 팔이 자격과
+     * 무관한 사유로 401 이 되어, 인증기가 아무 값이나 받아들이도록 바뀌어도 초록이다(공허).
+     */
     @Test
     fun `자격증명이 없든 틀리든 사유를 나누지 않는다`() {
         val wrongHeaders = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, "wrong-value") }
 
-        val missing = restTemplate.getForEntity(url("/api/strategy"), Map::class.java)
+        val missing = restTemplate.getForEntity(url(CREDENTIAL_REACHABLE_PATH), Map::class.java)
         val wrong =
-            restTemplate.exchange(url("/api/strategy"), HttpMethod.GET, HttpEntity<Void>(wrongHeaders), Map::class.java)
+            restTemplate.exchange(
+                url(CREDENTIAL_REACHABLE_PATH),
+                HttpMethod.GET,
+                HttpEntity<Void>(wrongHeaders),
+                Map::class.java,
+            )
 
         missing.statusCode.value() shouldBe 401
         wrong.statusCode.value() shouldBe 401
@@ -109,11 +119,23 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
         missing.body?.get("message") shouldBe wrong.body?.get("message")
     }
 
+    /** 같은 사유로 자격 헤더가 **닿는** 경로에서 잰다 — 위 test 의 주석 참고. */
     @Test
     fun `401 응답에 자격증명 값이 실리지 않는다`() {
         val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, "wrong-value") }
         val response =
-            restTemplate.exchange(url("/api/strategy"), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
+            restTemplate.exchange(
+                url(CREDENTIAL_REACHABLE_PATH),
+                HttpMethod.GET,
+                HttpEntity<Void>(headers),
+                String::class.java,
+            )
         (response.body ?: "").contains("wrong-value") shouldBe false
     }
 }
+
+/**
+ * 자격 헤더 축이 **아직 200 으로 닿는** 경로(M15/15A) — 계정 전용 뿌리가 아닌 자리다. 이 축의
+ * 거동을 재는 test 는 전부 여기를 쓴다(계정 전용 뿌리에서 재면 자격과 무관하게 401 이라 공허하다).
+ */
+private const val CREDENTIAL_REACHABLE_PATH = "/api/notices"

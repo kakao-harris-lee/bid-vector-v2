@@ -1,5 +1,6 @@
 package bidvector.adapters.persistence
 
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.StrategyDraft
 import bidvector.strategy.StrategyRevision
 import bidvector.workflow.strategy.Actor
@@ -199,11 +200,12 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         state: String,
         sessionVersion: Int,
         statePayload: String? = "{}",
+        account: AccountId = testAccount(),
     ): Int =
         prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
             var index = 1
             statement.setString(index++, id)
-            statement.setLong(index++, testAccount().value)
+            statement.setLong(index++, account.value)
             statement.setString(index++, "op-raw")
             statement.setString(index++, state)
             statement.setString(index++, statePayload)
@@ -212,6 +214,37 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
             statement.setString(index, null)
             statement.executeQuery().use { rs -> if (rs.next()) 1 else 0 }
         }
+
+    /**
+     * **종단 상태의 세션 id 를 다른 계정이 가져가지 못한다**(r1 리뷰 MEDIUM · verifier F2).
+     *
+     * `edit_session` 의 PK 는 아직 `id` 하나다. 그래서 다른 계정이 **같은 id** 로 upsert 하면
+     * `ON CONFLICT (id) DO UPDATE` 가 그 행을 덮어쓸 수 있고, 그것을 막는 것은
+     * `Sql.UPSERT_EDIT_SESSION` 의 `WHERE edit_session.account_id = EXCLUDED.account_id` 한 줄뿐이다.
+     *
+     * **그 줄이 실제로 지는 짐은 종단 상태에서만 드러난다.** 비종단 행이면 버전 절이 이미 0 행을
+     * 내므로 계정 절을 지워도 결과가 같다(변이가 살아남은 이유다 — 저장소 test 20 건이 전부 비종단
+     * 경로였다). 종단 + 버전 0 은 「재개는 새 세션」(D-4A-4) 갈래라 **통과하는** 자리이고, 거기서만
+     * 계정 절이 유일한 방벽이 된다.
+     *
+     * 그래서 **양성 대조를 같은 자리에서** 민다 — 같은 모양을 내 계정으로 밀면 1 행이다. 둘을
+     * 나란히 재지 않으면 0 행이 「계정이 달라서」인지 「그 갈래가 애초에 막혀서」인지 알 수 없다.
+     */
+    @Test
+    fun `종단 상태의 세션 id 는 다른 계정이 가져가지 못한다`() {
+        val id = "jdbc-cross-account-takeover"
+        val intruder = seedAccount("edit-session-intruder")
+        appConnection().use { connection ->
+            connection.rawUpsertEditSession(id, "CANCELLED", sessionVersion = 1) shouldBe 1
+
+            connection.rawUpsertEditSession(id, "WAITING_FOR_VALUE", sessionVersion = 0, account = intruder) shouldBe 0
+
+            // 양성 대조 — 같은 전이를 **소유 계정**으로 밀면 선다(갈래 자체는 열려 있다).
+            connection.rawUpsertEditSession(id, "WAITING_FOR_VALUE", sessionVersion = 0) shouldBe 1
+        }
+        // 침입자에게는 그 id 가 보이지 않는다 — 행이 옮겨 가지 않았다.
+        repository().load(intruder, EditSessionId(id)) shouldBe null
+    }
 
     @Test
     fun `종단 상태 위의 다른 종단 전이는 버전이 같으면 충돌한다 — HIGH-1 잃어버린 갱신 재현`() {

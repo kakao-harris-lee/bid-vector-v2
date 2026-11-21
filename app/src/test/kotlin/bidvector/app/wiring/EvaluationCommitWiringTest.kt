@@ -196,7 +196,9 @@ class EvaluationCommitWiringTest {
             // M15/15A — run 은 이제 **계정마다** 선다. 공장이 그 계정의 전략을 한 번 읽어 고정하고
             // 넘기므로, 「run 당 한 번」의 run 이 `forAccount` 가 낸 것 하나다.
             val runs = booted.context.getBean(EvaluationCommitRuns::class.java)
-            val run = runs.forAccount(WIRING_TEST_ACCOUNT) ?: error("여력 상한이 있는 전략인데 run 이 없다")
+            val run =
+                runs.forAccount(WIRING_TEST_ACCOUNT, channelHolder = WIRING_TEST_ACCOUNT)
+                    ?: error("여력 상한이 있는 전략인데 run 이 없다")
             runBlocking { run.evaluate() }
 
             counting.loads shouldBe 1
@@ -218,7 +220,9 @@ class EvaluationCommitWiringTest {
             strategyRepository = TestStrategyRepository(freshStrategy()),
         ) { booted ->
             booted.failure shouldBe null
-            booted.context.getBean(EvaluationCommitRuns::class.java).forAccount(WIRING_TEST_ACCOUNT) shouldBe null
+            booted.context
+                .getBean(EvaluationCommitRuns::class.java)
+                .forAccount(WIRING_TEST_ACCOUNT, channelHolder = WIRING_TEST_ACCOUNT) shouldBe null
         }
     }
 }

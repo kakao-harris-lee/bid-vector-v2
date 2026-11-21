@@ -816,19 +816,31 @@ jobs:
             -e SPRING_MAIN_WEB_APPLICATION_TYPE=none -e BIDVECTOR_ACCOUNT_INITIAL_VALUE \
             app --bidvector.account.mode=create "--bidvector.account.login=$smoke_login" 2>&1)" \
             || fail "계정 생성 일회 명령이 실패했다"
-          # 출력 전문을 싣지 않는다 — 결과 **표지**만 본다(runbook 의 결과 줄 형태).
+          # 출력 전문을 싣지 않는다 — 결과 **표지**만 본다(runbook 의 결과 줄 형태). 실패할 때는
+          # 그 표지 줄 **하나만** 찍는다(r1 리뷰 LOW): `result=refused cause=account-exists` 가 로그에
+          # 닿지 않으면 `fail()` 이 붙이는 것은 상시 app 로그뿐이고 일회 컨테이너의 사유는 사라진다.
+          # 그 줄에 비밀은 없다(명령·결과·로그인 이름뿐).
           case "$created" in
             *"result=created"*) ;;
-            *) fail "계정 생성 결과가 created 가 아니다" ;;
+            *)
+              printf '%s\n' "$created" | grep -E '^account command=create result=' >&2 || true
+              fail "계정 생성 결과가 created 가 아니다"
+              ;;
           esac
           unset created
 
           bodies="$(mktemp -d)"
           chmod 700 "$bodies"
-          printf '{"loginName":"%s","passphrase":"%s"}' "$smoke_login" "$BIDVECTOR_ACCOUNT_INITIAL_VALUE" \
-            > "$bodies/sign-in.json"
           sess_headers="$(mktemp)"
           sess_body="$(mktemp)"
+          # 임시 파일은 **실패 경로에서도** 거둔다(r1 리뷰 LOW) — `fail()` 은 exit 1 이라 뒤의 rm 에
+          # 닿지 않는다. 러너가 일회용이라 피해는 없지만, 「지웠다」가 참이 아닌 채로 남는다.
+          trap 'rm -rf "$bodies" "$sess_headers" "$sess_body"' EXIT
+          printf '{"loginName":"%s","passphrase":"%s"}' "$smoke_login" "$BIDVECTOR_ACCOUNT_INITIAL_VALUE" \
+            > "$bodies/sign-in.json"
+          # 본문을 쓴 뒤 **바로** 환경에서 내린다(r1 리뷰 LOW) — 이 뒤의 자식 프로세스(curl·jq·docker)
+          # 가 `/proc/<pid>/environ` 으로 값을 들고 다닐 이유가 없다.
+          unset BIDVECTOR_ACCOUNT_INITIAL_VALUE
           code="$(printf 'header = "Content-Type: application/json"\nrequest = "POST"\ndata = "@%s"\ndump-header = "%s"\noutput = "%s"\n' \
             "$bodies/sign-in.json" "$sess_headers" "$sess_body" \
             | curl --config - -sS -w '%{http_code}' "$API/api/session")" || code="transport-error"
@@ -836,8 +848,12 @@ jobs:
           [ "$code" = "201" ] || fail "세션 로그인이 201 이 아니다: $code"
           SESSION_COOKIE="$(sed -n 's/^[Ss]et-[Cc]ookie: *\(__Host-bidvector_session=[^;]*\).*/\1/p' "$sess_headers" | head -n1)"
           SESSION_CSRF="$(jq -r '.csrf // empty' "$sess_body")" || fail "로그인 응답을 JSON 으로 읽지 못했다"
-          rm -f "$sess_headers" "$sess_body"
           [ -n "$SESSION_COOKIE" ] || fail "로그인 응답에 세션 쿠키가 없다"
+          # 이름만 있고 **값이 빈** 쿠키(`…=`)도 위 검사를 지난다 — 세션을 지우는 쿠키가 그 모양이다.
+          # 그대로 두면 다음 GET 이 401 로 떨어지고 사유가 「인증 경계」로 잘못 읽힌다(r1 리뷰 LOW).
+          case "$SESSION_COOKIE" in
+            *=) fail "로그인 응답의 세션 쿠키 값이 비었다" ;;
+          esac
           [ -n "$SESSION_CSRF" ] || fail "로그인 응답에 csrf 가 없다"
           # 쿠키·CSRF 도 비밀이다 — 뒤 단계의 실패 문면이 이 값을 싣지 않게 마스킹한다.
           echo "::add-mask::$SESSION_COOKIE"

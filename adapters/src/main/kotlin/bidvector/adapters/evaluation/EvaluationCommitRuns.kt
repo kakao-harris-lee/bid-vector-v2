@@ -1,11 +1,17 @@
 package bidvector.adapters.evaluation
 
+import bidvector.adapters.event.JdbcEventIdFactory
+import bidvector.adapters.event.JdbcOutboxPort
+import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.NotificationRequestPort
+import bidvector.workflow.evaluation.OutboxNotificationRequestPort
+import bidvector.workflow.evaluation.SuppressedNotificationChannel
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
@@ -73,12 +79,15 @@ class EvaluationCommitRuns(
      * 「전략 행이 없다」(빈 전략은 상한도 없다)와 「행은 있는데 상한을 안 정했다」를 함께 덮는다.
      * 둘을 가르지 않는 이유는 답이 같아서다 — 지어낸 상한으로 평가하지 않는다(D-6A3-4 fail-closed).
      */
-    fun forAccount(account: AccountId): EvaluationCommitRun? {
+    fun forAccount(
+        account: AccountId,
+        channelHolder: AccountId,
+    ): EvaluationCommitRun? {
         val strategy = strategies.load(account)
         val maxActiveBids = strategy.maxActiveBids?.value ?: return null
         return EvaluationCommitRun(
             account = account,
-            dataSource = dataSource,
+            channel = channelFor(account, channelHolder),
             strategies = PinnedStrategyRepository(account, strategy),
             candidateSource = candidateSource,
             watchSubjects = watchSubjects,
@@ -89,7 +98,30 @@ class EvaluationCommitRuns(
             clock = clock,
             analysisBudget = strategy.candidateLimit?.value,
             notificationInbox = notificationInbox,
-            release = release,
         )
     }
+
+    /**
+     * **전역 발송 채널은 한 계정만 쥔다**(계약 「Telegram」). 수신자가 운영자 한 사람뿐인 채널에
+     * 모든 계정의 후보를 흘리면 가입자의 후보가 운영자 전화기로 가고(이 slice 가 닫는 누출과 같은
+     * 부류), 두 계정이 같은 공고에 `BidNow` 를 내면 같은 멱등 키의 행이 둘 서기까지 한다.
+     *
+     * 판단은 **값 비교 하나**다 — [channelHolder] 는 러너가 청중에서 고른 가장 작은 계정이고,
+     * 그 계정의 run 만 outbox 채널을 받는다. 나머지는 억제 채널을 받아 알림함에만 남고 그 사실이
+     * [bidvector.workflow.evaluation.NotificationRequestOutcome.Suppressed] 로 집계에 실린다.
+     */
+    private fun channelFor(
+        account: AccountId,
+        channelHolder: AccountId,
+    ): NotificationRequestPort =
+        if (account.value == channelHolder.value) {
+            OutboxNotificationRequestPort(
+                account,
+                JdbcOutboxPort(OwnTransactionConnectionSource(dataSource), release),
+                JdbcEventIdFactory(),
+                clock,
+            )
+        } else {
+            SuppressedNotificationChannel
+        }
 }

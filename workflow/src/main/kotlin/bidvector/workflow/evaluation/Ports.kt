@@ -165,11 +165,27 @@ data class NotificationRequest internal constructor(
     val strategyRevision: StrategyRevision,
 )
 
-/** [NotificationRequestPort]의 결과 — 배달 성공을 주장하지 않는다(요청 접수/실패만). */
+/** [NotificationRequestPort]의 결과 — 배달 성공을 주장하지 않는다(요청 접수/실패/억제만). */
 sealed interface NotificationRequestOutcome {
     data object Requested : NotificationRequestOutcome
 
     data object Failed : NotificationRequestOutcome
+
+    /**
+     * **전역 채널로 보내지 않았다 — 실패가 아니다**(M15/15A, 계약 「Telegram」).
+     *
+     * 전역 발송 채널은 하나뿐이고 그 채널의 수신자는 운영자 한 사람이다. 계정이 여럿이 된 뒤
+     * 모든 계정의 후보를 그리로 보내면 **남의 후보가 운영자 전화기로 간다** — 이 slice 가 닫는
+     * 누출과 같은 부류다. 그래서 전역 채널은 **가장 작은 계정**(운영 계정)의 run 만 받고, 나머지
+     * 계정의 run 은 억제 채널을 받아 알림함에만 남긴다.
+     *
+     * **[Failed] 와 같은 값으로 접지 않는다.** 실패는 「보내려 했는데 안 됐다」(종료 코드가
+     * 비-0 이어야 한다)이고 억제는 「보내지 않기로 했다」(정상이다). 둘을 한 값으로 두면 계약대로
+     * 도는 run 이 매번 INCOMPLETE 로 끝나거나, 반대로 진짜 실패가 조용해진다. [Requested] 로
+     * 접지 않는 이유도 같다 — 그러면 종료 줄의 `requested=` 가 **보내지 않은 건수를 포함**해
+     * 거짓이 된다.
+     */
+    data object Suppressed : NotificationRequestOutcome
 }
 
 /**

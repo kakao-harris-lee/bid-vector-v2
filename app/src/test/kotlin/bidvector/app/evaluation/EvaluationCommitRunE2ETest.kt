@@ -116,6 +116,9 @@ class EvaluationCommitRunE2ETest {
     fun resetRunState() {
         clearOutbox(fixture.adminDataSource())
         clearNotificationInbox(fixture.adminDataSource())
+        // **전략 소유도 되돌린다**(r1 라운드) — 전역 채널 축 test 가 「누가 전략을 갖는가」를 바꾼다.
+        // 비우기가 outbox·inbox 만 덮으면 그 test 뒤의 run 이 다른 계정 집합을 평가한다.
+        fixture.seedStrategiesFor(listOf(fixture.primaryAccount))
         setStrategyRevision(fixture.dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
@@ -333,6 +336,61 @@ class EvaluationCommitRunE2ETest {
         val finishLine = commitLog.last { it.startsWith("evaluation-commit finished") }
         finishLine shouldContain "accounts=1"
         finishLine shouldContain "skipped=1"
+    }
+
+    /**
+     * **전역 발송 채널은 가장 작은 계정 하나만 쥔다**(계약 「Telegram」, r1 라운드 HIGH).
+     *
+     * 앞 판은 계정마다 선 run 이 **전부** outbox 채널을 들었다. 그 채널의 수신자는 운영자 한
+     * 사람이므로 15B 가 가입을 열면 가입자의 후보가 운영자 전화기로 가고, 두 계정이 같은 공고에
+     * `BidNow` 를 내면 같은 멱등 키의 행이 둘 섰다. 이 slice 가 전략·프로필에서 닫은 누출과 같은
+     * 부류이고, **이 test 가 없어서** 통과했다 — 그때 fixture 는 둘째 계정에 전략을 주지 않아
+     * run 이 하나뿐이었고, outbox 단언은 「+1」이라 「run 당 하나」와 「계정당 하나」를 가르지 못했다.
+     *
+     * 그래서 여기서는 **둘 다 전략을 갖는다**. 재는 것 셋 — ① 알림함은 **둘 다** 받는다(억제는
+     * 채널 억제이지 기록 억제가 아니다) ② 전역 채널의 행은 **가장 작은 계정의 것 하나**이고 키가
+     * 그 사실을 담는다 ③ 종료 줄이 그 억제를 계수로 말한다.
+     */
+    @Test
+    @Order(10)
+    fun `두 계정이 같은 공고에 BidNow 를 내도 전역 채널은 가장 작은 계정 것 하나다`() {
+        fixture.seedStrategiesFor(listOf(fixture.primaryAccount, fixture.secondAccount))
+
+        runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+
+        newCandidateAccounts() shouldBe listOf(fixture.primaryAccount, fixture.secondAccount).sorted()
+        outboxIdempotencyKeys(fixture.dataSource()) shouldBe
+            listOf("notification-requested-${fixture.primaryAccount}-$SEEDED_NOTICE_NUMBER-000")
+
+        val finishLine = commitLog.last { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "accounts=2"
+        finishLine shouldContain "requested=1"
+        finishLine shouldContain "suppressed=1"
+    }
+
+    /**
+     * **채널을 쥔 계정이 건너뛰어지면 전역 채널에는 아무것도 가지 않는다**(같은 축의 반대 갈래).
+     *
+     * 앞 판에서 **가장 위험했던** 모양이 이것이다: 운영 계정이 여력 상한을 비워 두면 그 run 은
+     * 서지 않는데, 다른 계정의 run 은 여전히 채널을 들고 있어 **남의 후보만** 운영자 채널로 갔다.
+     * 가장 작은 계정은 평가되지 않아도 채널의 주인이고, 주인이 안 돌면 채널은 빈다.
+     */
+    @Test
+    @Order(11)
+    fun `가장 작은 계정이 건너뛰어지면 전역 채널에는 아무것도 가지 않는다`() {
+        fixture.seedStrategiesFor(listOf(fixture.secondAccount))
+
+        runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+
+        // 둘째 계정은 평가됐고 자기 알림함에 남았다 — 기록이 0 이면 이 단언은 공허하다.
+        newCandidateAccounts() shouldBe listOf(fixture.secondAccount)
+        outboxIdempotencyKeys(fixture.dataSource()).shouldBeEmpty()
+
+        val finishLine = commitLog.last { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "accounts=1"
+        finishLine shouldContain "skipped=1"
+        finishLine shouldContain "requested=0"
+        finishLine shouldContain "suppressed=1"
     }
 
     /** `NEW_CANDIDATE` 항목이 실린 계정 전수 — 소유자 자격으로 읽어 역할 필터가 끼지 않게 한다. */

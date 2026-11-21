@@ -1,7 +1,10 @@
 package bidvector.adapters.evaluation
 
+import bidvector.adapters.event.JdbcEventIdFactory
+import bidvector.adapters.event.JdbcOutboxPort
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.persistence.JdbcNoticeRepository
+import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.PersistenceTestSupport
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.qualification.PinnedLicenseGate
@@ -31,6 +34,7 @@ import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
+import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.evaluation.PredictionEvidence
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
@@ -145,7 +149,19 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
     private fun commitRun(account: AccountId = testAccount()): EvaluationCommitRun =
         EvaluationCommitRun(
             account = account,
-            dataSource = dataSource(),
+            // M15/15A — 채널은 조립이 꽂는다. 이 test 가 재는 것은 **알림함 기록**이므로 전역 채널을
+            // 실제 outbox 로 꽂아 둔다(앞 판과 같은 효과). 어느 계정이 그 채널을 쥐는지는
+            // `EvaluationCommitRuns` 가 정하고 그 축은 `EvaluationCommitRunE2ETest` 가 잰다.
+            channel =
+                OutboxNotificationRequestPort(
+                    account,
+                    JdbcOutboxPort(
+                        OwnTransactionConnectionSource(dataSource()),
+                        ReleaseIdentifier("m9-ops-code-inbox-test"),
+                    ),
+                    JdbcEventIdFactory(),
+                    clock,
+                ),
             strategies = PinnedStrategyRepository(account, bidNowStrategy()),
             candidateSource = JdbcCandidateSource(dataSource(), clock, CANDIDATE_CAP),
             watchSubjects = NoticeWatchSubjectPort(),
@@ -156,10 +172,6 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
             clock = clock,
             analysisBudget = null,
             notificationInbox = JdbcNotificationInbox(dataSource()),
-            // M9/ops-migrations 병합 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(컴파일이 강제했다).
-            // 이 test 가 재는 것은 알림함 기록이라 값 자체는 축이 아니고, 그 축은 그 slice 의
-            // `ExecutionRowReleaseTest` 가 든다.
-            release = ReleaseIdentifier("m9-ops-code-inbox-test"),
         )
 
     private fun bidNowStrategy() =

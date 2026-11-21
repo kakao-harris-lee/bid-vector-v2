@@ -209,7 +209,7 @@ class DryRunCommitParityTest {
                     notificationInboxPort = inboxWrites,
                     notificationAudiencePort = { NotificationAudience.Accounts(listOf(PARITY_ACCOUNT)) },
                     release = ReleaseIdentifier("parity-test"),
-                ).forAccount(PARITY_ACCOUNT),
+                ).forAccount(PARITY_ACCOUNT, channelHolder = PARITY_ACCOUNT),
         ) { "전략에 여력 상한이 있으므로 run 이 서야 한다" }
 }
 

@@ -121,7 +121,7 @@ internal class PipelineAssembly(
                 ),
             mlAnalysis = mlAnalysis,
             capacity = capacity,
-            notifications = OutboxNotificationRequestPort(outbox, JdbcEventIdFactory(), clock),
+            notifications = OutboxNotificationRequestPort(account, outbox, JdbcEventIdFactory(), clock),
             correlationIds = SequentialCorrelationIdFactory(correlationPrefix),
             clock = clock,
         )

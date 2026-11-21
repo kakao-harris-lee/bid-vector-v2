@@ -8,6 +8,7 @@ import bidvector.decision.VerdictLadder
 import bidvector.decision.VerdictLadderPolicyData
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
@@ -180,6 +181,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -198,6 +200,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort(failRegister = true)
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -216,6 +219,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -234,6 +238,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -251,6 +256,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -272,6 +278,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -302,6 +309,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -329,6 +337,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -360,6 +369,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -379,6 +389,7 @@ class OutboxNotificationRequestPortTest {
         val outbox = NotificationInMemoryOutboxPort()
         val sink =
             OutboxNotificationRequestPort(
+                SINK_ACCOUNT,
                 outbox,
                 NotificationSequentialEventIdFactory(),
                 NotificationFixedClock(SINK_NOW),
@@ -440,3 +451,6 @@ class OutboxNotificationRequestPortTest {
         notPredictedFields shouldBe setOf("reason")
     }
 }
+
+/** 이 sink 를 쥔 계정 — 멱등 키에 실린다(M15/15A). 값 자체는 축이 아니고 0 이 아니기만 하면 된다. */
+private val SINK_ACCOUNT = AccountId(1)

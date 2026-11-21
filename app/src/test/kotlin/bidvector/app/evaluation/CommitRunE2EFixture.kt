@@ -74,23 +74,26 @@ internal class CommitRunE2EFixture(
     val release: ReleaseIdentifier = ReleaseIdentifier(TEST_RELEASE_LABEL)
 
     /**
-     * **계정 둘을 심는다**(M15/15A). 가장 작은 id 가 [primaryAccount](전략을 가진 쪽)이고 둘째가
-     * [strategylessAccount](전략 행이 없어 러너가 건너뛰는 쪽)다. 둘이 있어야 「건너뜀 계수」와
-     * 「알림함이 그 계정에만 쌓인다」가 **한 run 에서** 재진다.
+     * **계정 둘을 심는다**(M15/15A). 가장 작은 id 가 [primaryAccount] 이고 둘째가 [secondAccount] 다.
+     * 둘이 있어야 「건너뜀 계수」·「알림함이 그 계정에만 쌓인다」·「전역 채널은 가장 작은 계정만」이
+     * **한 run 에서** 재진다.
+     *
+     * 기본 seed 는 [primaryAccount] 에만 전략을 준다(그래서 둘째가 건너뛰어진다). 전역 채널 축
+     * test 는 [seedStrategiesFor] 로 그 소유를 바꾼다 — 그래서 이름이 「전략 없는 계정」이 아니다.
      */
     var primaryAccount: Long = 0
         private set
 
-    var strategylessAccount: Long = 0
+    var secondAccount: Long = 0
         private set
 
     fun start() {
         postgres.start()
         seedContext = boot()
         primaryAccount = insertAccount("commit-run-primary")
-        strategylessAccount = insertAccount("commit-run-strategyless")
+        secondAccount = insertAccount("commit-run-second")
         insertStrategy(primaryAccount)
-        insertNotice("20260101010", Instant.now().plusSeconds(86_400))
+        insertNotice(SEEDED_NOTICE_NUMBER, Instant.now().plusSeconds(86_400))
     }
 
     /** 앱 역할에는 `account` INSERT 권한이 없다(V20) — 소유자 자격으로 심는다. */
@@ -150,6 +153,19 @@ internal class CommitRunE2EFixture(
                         "bidvector.evaluation.candidate-cap" to candidateCap.toString(),
                     ),
             ).run()
+
+    /**
+     * 전략 행을 **그 계정 하나만** 남기고 다시 심는다(M15/15A, r1 라운드) — 전역 채널 축 test 가
+     * 「누가 전략을 갖는가」를 바꾸므로, 매 test 앞에서 이 상태를 세워야 순서가 답을 바꾸지 않는다.
+     */
+    fun seedStrategiesFor(accounts: List<Long>) {
+        // **소유자 자격으로 지운다** — 앱 역할에는 이 표의 DELETE 권한이 없다(V9 의 최소 권한).
+        // 심는 쪽은 앱 역할 그대로다(INSERT 는 있다) — 권한 경계를 fixture 가 넓히지 않는다.
+        adminDataSource().connection.use { connection ->
+            connection.prepareStatement("DELETE FROM operator_strategy").use { it.executeUpdate() }
+        }
+        accounts.forEach(::insertStrategy)
+    }
 
     /** `bidNowThreshold` 0.9 — fake ML 의 priority 0.9 가 확정 `BidNow` 를 낸다. */
     private fun insertStrategy(account: Long) {
@@ -230,3 +246,9 @@ internal class AlwaysBidNowMl : MlAnalysisPort {
             floorExclusion = PublishedFloorExclusion.IMPLAUSIBLE,
         )
 }
+
+/**
+ * seed 공고의 번호 — 멱등 키 단언이 **이 값에서** 온다(두 자리에 적으면 갈린다). 키는 계정과
+ * 공고로 이뤄지므로(M15/15A) 전역 채널 축 test 가 그 둘을 한 문자열로 맞댄다.
+ */
+internal const val SEEDED_NOTICE_NUMBER = "20260101010"

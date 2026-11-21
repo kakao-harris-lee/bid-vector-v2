@@ -53,9 +53,14 @@ in_scope:
   # import** 가 모듈 넷에 걸쳐 있다 — 아래 트리가 통째로 든다(195 파일 가운데 대부분이
   # import 한 줄이다). 거동을 바꾸는 자리는 위에 이름으로 적은 것들 그대로다.
   - shared-kernel/src/main/kotlin/bidvector/sharedkernel/AccountId.kt   # 신설
+  - shared-kernel/src/test/kotlin/bidvector/sharedkernel/AccountIdTest.kt   # 그 모듈의 변이 래칫 회복
   - workflow/src/main/kotlin/bidvector/workflow/**
   - adapters/src/main/kotlin/bidvector/adapters/**
   - app/src/main/kotlin/bidvector/app/**
+  # app test 트리의 `bidvector.app` **밖** 둘 — 아키텍처 음성 표본과 가드 probe 다. 글롭
+  # (`app/src/test/kotlin/bidvector/app/**`)이 덮지 않아 이름으로 적는다(r1 verifier L2).
+  - app/src/test/kotlin/bidvector/archfixture/violating/app/rules/RuleNegativeSamples.kt
+  - app/src/test/kotlin/bidvector/guardprobe/AccountBindingGuardTest.kt
   # ── 계약 · 게이트 장부 ──────────────────────────────────────────────────
   - openapi/bidvector-operator-api.yaml    # 계정 전용이 된 operation 의 보안 선언
   - config/quality/gate-tests.properties   # 새 Kotlin test class 를 **만드는 커밋에서** 등재
@@ -252,6 +257,10 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
   옮기는 것이 그 변을 없애는 유일한 길이다. in_scope 가 모듈 넷의 트리로 넓어진 사유다.
 - 2026-11-21 (3) **acceptance 에 `web` job 이 들었다**(위 「web 접촉」) — 여정 하네스가 자격
   헤더로 전략을 심고 있었고 그 경로가 401 이 됐다. `web/e2e/harness/journey-up.mjs` 등재.
+- 2026-11-22 (5) **r1 리뷰 라운드** — 계약 위반 하나(전역 Telegram 채널)를 구현으로 닫고,
+  장부 밖이던 경로 셋(`AccountIdTest` · `RuleNegativeSamples` · `AccountBindingGuardTest`)을
+  이름으로 등재했다. 전역 채널 축이 `workflow.evaluation` 에 타입 둘
+  (`SuppressedNotificationChannel` · `NotificationRequestOutcome.Suppressed`)을 더한다.
 - 2026-11-21 (4) **`container` job 과 그 스크립트 셋이 in_scope 에 들었다**(팀장 승인, 선택 (a)) —
   컨테이너 스모크가 `GET /api/strategy` 와 begin→value→confirm 왕복을 **자격 헤더**로 몰고
   있었고 V28 뒤 그 경로는 401 이다. 고친 모양은 **배포 표면을 건드리지 않는 쪽**이다:
