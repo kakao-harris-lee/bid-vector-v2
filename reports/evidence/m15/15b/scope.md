@@ -11,7 +11,9 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/access/JdbcAccountStore.kt # 가입 저장소(요청 경로, 좁은 포트)
   - adapters/src/main/kotlin/bidvector/adapters/access/BrowserAccessTransaction.kt  # 조립에 가입 포트 하나
   - adapters/src/test/kotlin/bidvector/adapters/access/                    # 열 권한 · 가입 저장소 test
-  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt  # 축9 주석 + 열 권한 축
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt  # 축9 주석(열 권한은 아래 신설 class)
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt     # 계약 갱신 (1) — DEFAULT 셋이 열 장부에 선다
+  - adapters/src/test/kotlin/bidvector/adapters/persistence/MigrationLockTimeoutTest.kt     # 계약 갱신 (3) — V29 가 관례 모집단에 든다
   - workflow/src/main/kotlin/bidvector/workflow/access/AccessPorts.kt      # AccountSignUpPort(좁은 쓰기 하나)
   - workflow/src/main/kotlin/bidvector/workflow/access/AccessValues.kt     # ClearPassphrase 의 길이 술어(값이 타입 안에 머문다)
   - workflow/src/main/kotlin/bidvector/workflow/access/SignUpPolicyData.kt # 가입 정책(신설, versioned)
@@ -128,6 +130,23 @@ V20 의 NOT NULL 세 열(`created_at`·`updated_at`·`failed_attempts`)에서 �
 열을 더 여는 것보다 **좁다** — 앱은 그 열에 값을 고를 수 없고(INSERT 권한 밖), 운영자 명령은 지금처럼
 명시 값을 싣는다(거동 0).
 
+**(2) 열 권한 축은 `CleanMigrationPrivilegeTest` 밖에 선다.** 그 class 의 행렬은
+`has_table_privilege` 라 **열 단위 부여를 세지 않는다** — V29 뒤에도 `account.insert` 가 `false`
+이고, 한 파일에 열 축을 합치면 크기 게이트(파일 500줄)를 넘는다. 그래서 신설
+`AccountColumnPrivilegeTest` 가 집합 등식으로 재고(`BidCaseColumnPrivilegeTest` 선례),
+`CleanMigrationPrivilegeTest` 는 **주석으로 그 분담을 적는다**. 거동이 실제로 뒤집힌 자리는
+`AccessPrivilegeTest` 의 계정 INSERT 이고 그쪽이 RED 로 먼저 섰다.
+
+**(3) V29 도 잠금 상한(`SET LOCAL lock_timeout`)을 선언한다.** 기존 표(`account`)를 `ALTER`
+하므로 V18 이 세운 관례의 모집단에 든다 — `MigrationLockTimeoutTest` 의 비공허성 래칫이 그
+사실을 든다.
+
+**(4) 계약이 적은 시퀀스 GRANT 를 두지 않는다.** `account.id` 는 `GENERATED ALWAYS AS IDENTITY`
+이고 그 시퀀스는 열에 소유되어 `serial` 과 달리 별도 USAGE 를 요구하지 않는다. 권한을 넓히지 않는
+쪽을 골랐고, 그 전제는 문장이 아니라 **실측**이 든다(`AccessPrivilegeTest` 가 앱 역할로 production
+INSERT 문장을 직접 쏘아 성공을 잰다).
+
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
+- 2026-11-21 전건 acceptance 뒤 계약 갱신 (2)~(4) 와 in_scope 둘 등재.
