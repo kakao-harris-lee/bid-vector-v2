@@ -55,7 +55,7 @@ in_scope:
   - web/config/gate-tests.txt                                              # 가입 화면 test 등재(r1 v LOW-1 — 누락 등재)
   - web/e2e/harness/journey-up.mjs                                         # r1 — 여정 레인의 상한 손잡이
   - docs/discovery/capability-map.md                                       # r1 — OPEN-M15-SIGNUP-HARDENING 등재
-  - web/src/**/*.test.tsx                                                  # 위 화면·셸·라우트의 짝 test
+  - web/src/**/*.test.ts · web/src/**/*.test.tsx                           # 위 화면·셸·라우트의 짝 test(`routes.test.ts` 는 `.ts` 다)
   - web/e2e/journey/signup.spec.ts                                         # 여정 하나(가입 → 시작하기 → 화면들)
   - web/e2e/journey/shared.ts                                              # 가입 자리의 ALLOWED_ROUTES 한 줄
   - web/config/journey-specs.txt                                           # 새 여정 spec 을 같은 커밋에서 등재
@@ -218,4 +218,5 @@ cause=` 줄이다. 마침 줄의 계정 계수 **넷**(`accounts`·`skipped`·`f
 - 2026-11-21 수정 라운드 1 — 계약 갱신 (5)·(6), in_scope 다섯 등재(누락 셋 + 이 라운드가 더한 둘).
 - 2026-11-21 수정 라운드 2 — in_scope 셋 등재(누락 하나 + 신설 둘), 계약 갱신 (5)·(6) 의 main 반영 표시.
 - 2026-11-22 15A 머지(main `d2c0513d`) 병합 후 라운드 3 — 계약 갱신 (7)~(9), in_scope 여덟 등재
-  (평가 러너 축 여섯 + 멱등 키 test + runbook), 알려진 제한 ④ 등재.
+  (평가 러너 축 여섯 + 멱등 키 test + runbook), 알려진 제한 ④ 등재, `web/src/**/*.test.ts`
+  누락 등재(`routes.test.ts` 가 `.tsx` 글롭 밖이었다), rollback 복원 원천을 병합된 main 으로.

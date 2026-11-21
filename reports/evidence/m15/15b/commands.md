@@ -12,12 +12,36 @@ base `99f2fb25` · 실측 자리는 라운드마다 움직인다 — **그 SHA �
 
 | 명령 | 결과 |
 | --- | --- |
-| `./gradlew --no-daemon check --continue` | **exit 1 — 실패 task 둘**: `:adapters:migrationOrderGate` · `:build-logic:test`(`MigrationOrderTest`). 둘 다 **같은 원인**(V28 부재)이고 그 밖의 task 는 전부 통과 |
+| `./gradlew --no-daemon check --continue` | **exit 0 — 실패 task 0**(15A 머지 뒤 라운드 3, 34분 37초). 아래 「낡은 산출물」을 먼저 읽는다 |
 
 수정 라운드 1 이 닫은 숨은 실패 아홉(모두 이 slice 가 낸 것): ktlint 넷(import 순서 둘 ·
 체인 줄바꿈 · `when` 중괄호 · KDoc 겹침 둘) · `sizeGate`(512줄) · `cpdCheck`(controller 둘의
 11줄 중복) · `detekt`(ReturnCount) · `:app:test`(의존 허용 목록 넷 · 상수 시간 비교 구조) ·
 `gateExecutionGate`(앞 것의 파급).
+
+수정 라운드 3 이 닫은 실패 여덟(15A 머지와 평가 상한이 낸 것): `:adapters:sizeGate`(병합
+합집합이 `CleanMigrationColumnTest` 를 501줄로 밀었다) · `:app:sizeGate`(러너 `run` 69줄) ·
+`:app:detekt`(파일당 함수 12 · 인지 복잡도 22) · ktlint 둘(main 셋 · test 넷) ·
+`:app:jarContentGate`·`:app:packageOwnershipGate`(**둘 다 같은 원인** — `sortedBy` 가
+`Comparisons.kt` 출처의 합성 비교자 클래스를 산출물에 남긴다. 명시 `Comparator` 로 바꿨고,
+선례는 `bidvector.adapters.snapshot` 의 행 정렬이다).
+
+## 낡은 산출물이 만든 가짜 RED (라운드 3)
+
+같은 라운드의 **첫** 전건은 `:app:test` 10건과 `gateExecutionGate` 를 붉혔고, 그 10건은
+이 slice 가 만지지 않은 제안·전략 경로였다. 사유는 결함이 아니라 **낡은 산출물**이다 —
+15A 가 `AccountId` 를 다른 패키지로 옮겼는데 공유 Gradle build cache·증분 컴파일이
+`HttpTestApplication` 의 SAM 람다를 다시 내지 않아, 호출이 `AbstractMethodError`(옛 서명)로
+떨어지고 HTTP 층이 그것을 500 으로 옮겼다. 판독은 **응답 본문**(배열이 아니라 오류 객체)이
+아니라 그 예외였다 — 일회용 probe 로 use case 를 직접 불러 잡았고, probe 는 같은 자리에서
+지웠다.
+
+처분: 모듈별 `build/classes`·`build/kotlin` 을 지우고 전건을 다시 돌렸다(위 표의 exit 0).
+그 run 에서 `:app:compileTestKotlin` 은 **cache 가 아니라 실행**이다(로그의 task 상태).
+CI 는 빈 cache 로 돌아 이 상태에 닿지 않는다(main `d2c0513d` 초록). 같은 서명의 오류
+(`AbstractMethodError`·`NoSuchMethod`·`ClassNotFound`)를 **만지지 않은 타입**에서 보면 결함으로
+읽기 전에 이 처분을 먼저 한다(15C 레인이 같은 날 같은 자리에서 독립으로 재현했다 — 그쪽은
+`--no-build-cache` 까지 썼다).
 
 중간 확인(전건 전에 좁혀 돌린 것):
 
@@ -46,16 +70,14 @@ base `99f2fb25` · 실측 자리는 라운드마다 움직인다 — **그 SHA �
 | W-12 | `./gradlew --no-daemon :app:bootJar` | exit 0 |
 | W-13 | `npm run test:e2e:journey` | exit 0 — 31 passed(가입 여정 셋 포함) |
 
-## 알려진 빨강 — `migrationOrderGate`
+## 닫힌 빨강 — `migrationOrderGate`
 
-등식은 `읽어낸 version 다중집합 == (1..max ∖ 은퇴{10,11})` 이다. 이 브랜치의 최대는 **29** 이고
-main 에는 아직 **28** 이 없다 — 15A 가 그 번호를 쓴다(그 레인 확인, 파일명까지). 결번 하나가
-남아 등식이 깨진다.
-
-**은퇴 목록에 28 을 넣지 않는다.** `config/quality/migration-policy.properties` 가 그 자리를
-「영구히 비워 둔 자리이지 머지 순서의 회피로가 아니다」로 못박고, 처방은 **뒤에 오는 레인이
-기다리는 것**이라고 적는다. 계약의 머지 순서도 15A → 15B 다. 15A 가 main 에 들어오면 이 게이트는
-다른 조치 없이 초록이 된다.
+등식은 `읽어낸 version 다중집합 == (1..max ∖ 은퇴{10,11})` 이다. 라운드 1·2 에서 이 브랜치의
+최대는 **29** 인데 main 에 **28** 이 없어 결번 하나로 등식이 깨졌다. **은퇴 목록에 28 을 넣지
+않았다** — `config/quality/migration-policy.properties` 가 그 자리를 「영구히 비워 둔 자리이지
+머지 순서의 회피로가 아니다」로 못박고, 처방은 **뒤에 오는 레인이 기다리는 것**이다.
+15A(V28)가 main 에 들어오고 이 브랜치가 그것을 병합한 라운드 3 에서, 다른 조치 없이 초록이
+됐다(V27 · V28 · V29 연속).
 
 ## 착수 실측에서 드러난 것 — 계약 갱신 (1)·(2)
 
@@ -96,6 +118,22 @@ NOT NULL 세 열에서 떨어진다. DEFAULT 는 권한을 넓히는 것보다 *
 | 상한 맵의 키 수 무제한(cr LOW) | `tracked-address-limit`(기본 10000) — 넘치면 가장 오래 전에 처음 본 주소부터 버린다 |
 | in_scope 누락 셋(v LOW-1) | 등재. 이 라운드가 더한 자리도 함께 등재했다 |
 
+## 수정 라운드 3 — 거동이 바뀐 자리
+
+15A 가 15B 로 넘긴 축을 닫는다(그 slice 의 알려진 제한 6~9).
+
+| 넘어온 축 | 처분 |
+| --- | --- |
+| run 비용이 계정 수에 선형(`OPEN-M15-EVAL-COST-PER-ACCOUNT`) | run 당 계정 상한 `bidvector.evaluation.max-accounts-per-run`(기본 **50**). **id 순**으로 잘라 운영 계정이 언제나 먼저이고, 상한 밖은 마침 줄의 `deferred=` 다 — 실패가 아니라 **미룬 것**이라 종료 코드를 바꾸지 않는다. test 셋: 상한 경계 · 넉넉한 상한의 음성 대조 · 상한 1 에서 `[3,1,2]` 가 1 을 고른다 |
+| 실패 비용도 계정 수에 선형(같은 OPEN, 둘째 문단) | 연속 실패 상한 `bidvector.evaluation.max-consecutive-account-failures`(기본 **3**). 닿으면 남은 계정을 `deferred` 로 세고 `evaluation-commit stopped cause=consecutive-account-failures` 한 줄을 남긴다. test 둘: 연속 셋에서 멈추고 시도가 `[1,2,3]` 이다 · **흩어진 실패 셋은 멈추지 않는다** |
+| runbook 의 종료 코드 어휘가 낡았다 | §3.4·§3.5 를 고쳤다 — `FAILED`(1) 은 청중을 못 읽은 run 하나, 계정 하나의 실패는 `INCOMPLETE`(2) + `account-failed cause=`. 계정 계수 **넷**과 `suppressed` 가 종료 코드에 닿는 방식을 표로 세우고, §1.2·§1.4 에 설정 키 둘, §6 에 「단일 운영자 전용」이 M15 로 깨진 사실을 적었다 |
+| 보유자 선택이 측정되지 않았다(LOW ⓐ) | `channelHolderOf` 값 함수 + `[2,1]`·`[3,1,2]` 단언. `minByOrNull` → `firstOrNull` 변이가 붉는다 |
+| 인터럽트 플래그를 잃는다(LOW ⓒ) | 계정별 `catch` 가 `InterruptedException` 에서 플래그를 되세운다 |
+| 멱등 키 형식이 안 잠겼다(LOW ⓓ) | `OutboxNotificationRequestPortTest` 가 `notification-requested-<계정>-<공고>-<차수>` 를 축어로 단언한다 |
+
+**ⓑ 는 닫지 않았다**(보유자 불변식을 공장 쪽에도 두는 축) — 러너 밖으로 옮기면 이 slice 가
+만지지 않는 조립이 함께 움직인다.
+
 ## 알려진 제한
 
 ① 남용 상한의 키가 `remoteAddr` 다 — 역방향 프록시 뒤에서는 상한이 **사실상 전역**이고, 형식이
@@ -105,4 +143,9 @@ NOT NULL 세 열에서 떨어진다. DEFAULT 는 권한을 넓히는 것보다 *
 ③ 가입과 세션 발급이 한 트랜잭션이 아니다 — 세션 발급이 실패하면 계정만 남고, 화면이 그 사람을
   로그인으로 안내한다(권한이 새는 방향이 아니다).
 ④ 이 slice 는 15A 의 계정별 분리를 전제한다. 15A 전에는 가입자가 운영 계정의 단일 행 전략·프로필을
-  본다 — 그래서 머지 순서가 고정이다.
+  본다 — 그래서 머지 순서가 고정이었다(15A 는 `d2c0513d` 로 main 에 들었고 이 브랜치가 병합했다).
+⑤ `deferred` 를 읽는 경보가 없다 — 계정 수가 상한을 넘은 날 매 run 이 뒤쪽 계정을 미루는데,
+  종료 코드는 0 이고 cron 은 성공을 적는다. 닫는 자리는 경보 쪽이지 종료 코드가 아니다
+  (15A 알려진 제한 ⑧ 과 같은 자리).
+⑥ 오늘의 run 실비는 0 에 가깝다 — 출하 `MlAnalysisPort` 가 `UnavailableMlAnalysis` 고정이다
+  (D-6A3-2). 기본값 50 은 **측정이 아니라** ML 배선이 서는 날을 위한 자리다.
