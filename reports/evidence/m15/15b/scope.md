@@ -36,6 +36,7 @@ in_scope:
   - app/src/test/kotlin/bidvector/app/http/                                # 집합 등식 둘 · 가입 endpoint · 상한
   - app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt  # (변경 없음 — r2 가 tier1 등재를 걷으면서 되돌렸다, r3 cr L-6)
   - app/src/test/kotlin/bidvector/app/SignUpThrottleWiringTest.kt          # r2 — 출하 상한의 값·배선
+  - app/src/test/kotlin/bidvector/app/wiring/EvaluationCommitWiringTest.kt # r4 — 평가 상한 기본값 50/3 · 접두 바인딩 · 1 미만 거부
   - web/src/paths.ts                                                       # r2 — 세션 전 자리 주소 한 자리(순환 import 제거)
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
   - app/src/test/kotlin/bidvector/app/evaluation/                          # r3 — 상한 경계 · 운영 계정 우선 · 연속 실패 중단 · 보유자 값 선택 / r4 — 회전 · 보존 등식 · 인터럽트(조립은 `EvaluationCommitRunnerFixtures.kt` 로 나눴다, 크기 게이트)

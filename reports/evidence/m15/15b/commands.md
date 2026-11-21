@@ -12,7 +12,7 @@ base `99f2fb25` · 실측 자리는 라운드마다 움직인다 — **그 SHA �
 
 | 명령 | 결과 |
 | --- | --- |
-| `./gradlew --no-daemon check --continue` | **exit 0 — 실패 task 0**(15A 머지 뒤 라운드 3, 34분 37초). 아래 「낡은 산출물」을 먼저 읽는다 |
+| `./gradlew --no-daemon check --continue` | **exit 0 — 실패 task 0**(라운드 4, 32분 37초). 라운드 3 의 같은 명령도 exit 0 이었다(34분 37초) — 아래 「낡은 산출물」을 먼저 읽는다 |
 
 수정 라운드 1 이 닫은 숨은 실패 아홉(모두 이 slice 가 낸 것): ktlint 넷(import 순서 둘 ·
 체인 줄바꿈 · `when` 중괄호 · KDoc 겹침 둘) · `sizeGate`(512줄) · `cpdCheck`(controller 둘의
@@ -54,21 +54,25 @@ CI 는 빈 cache 로 돌아 이 상태에 닿지 않는다(main `d2c0513d` 초�
 
 ## web job
 
+**W-1~W-9 의 실측 자리는 라운드 4 의 산출물 HEAD 다**(앞 판은 r1 의 수치를 그대로 두어 `test`
+건수가 어긋나 있었다 — r3 CR L-4). **W-10~W-13 은 PR 의 `web` 체크가 정본**이다(playwright
+브라우저와 출하 jar 가 붙는 구간이라 이 레인에서 다시 재지 않는다).
+
 | step | 명령 | 결과 |
 | --- | --- | --- |
 | W-1 | `npm ci` | exit 0 |
 | W-2 | `npm run lint` | exit 0 |
 | W-3 | `npm run typecheck` | exit 0 |
 | W-4 | `npm run gate:src-tree` | exit 0 |
-| W-5 | `npm run api:types:check` | exit 0 — 생성 타입이 문서와 바이트까지 같다 |
-| W-6 | `npm run test` | exit 0 — 75 파일 · 2009 test |
+| W-5 | `npm run api:types:check` | exit 0 — 생성 타입이 문서와 바이트까지 같다(201058 bytes). OpenAPI 주석 이동(CR L-7)이 생성물을 **바꾸지 않는다**는 측정이기도 하다 |
+| W-6 | `npm run test` | exit 0 — **75 파일 · 2014 test** |
 | W-7 | `npm run gate:tests` | exit 0 — 등록부 기준 skipped/todo 0 |
 | W-8 | `npm run build` | exit 0 |
 | W-9 | `npm run gate:boundary-canary` | exit 0 |
-| W-10 | `npx playwright install chromium` | exit 0 |
-| W-11 | `npm run test:e2e` | exit 0 — 39 passed |
-| W-12 | `./gradlew --no-daemon :app:bootJar` | exit 0 |
-| W-13 | `npm run test:e2e:journey` | exit 0 — 31 passed(가입 여정 셋 포함) |
+| W-10 | `npx playwright install chromium` | PR `web` 체크 |
+| W-11 | `npm run test:e2e` | PR `web` 체크 |
+| W-12 | `./gradlew --no-daemon :app:bootJar` | PR `web` 체크 |
+| W-13 | `npm run test:e2e:journey` | PR `web` 체크(가입 여정 셋 포함) |
 
 ## 닫힌 빨강 — `migrationOrderGate`
 
@@ -134,6 +138,43 @@ NOT NULL 세 열에서 떨어진다. DEFAULT 는 권한을 넓히는 것보다 *
 **ⓑ 는 닫지 않았다**(보유자 불변식을 공장 쪽에도 두는 축) — 러너 밖으로 옮기면 이 slice 가
 만지지 않는 조립이 함께 움직인다.
 
+## 수정 라운드 4 — 거동이 바뀐 자리
+
+| 지적 | 처분 |
+| --- | --- |
+| **`deferred` 가 「미룸」이 아니다**(CR M-1 · v F-1) — `take(n)` 고정 절단은 상한 밖 계정을 **영원히** 뺀다 | **거동으로 고쳤다**(팀장 결정). `accountsForRun` 이 보유자를 고정하고 나머지 `n-1` 칸을 **영업일마다 `n-1` 칸씩** 미끄러뜨린다 — 연속한 `ceil((K-1)/(n-1))` 영업일이면 전원이 한 번씩 돈다. 축은 KST 달력일의 **순수 함수**라 같은 날 재실행은 같은 집합이고(영속 커서 없음), 그래서 runbook 의 처방에서 「더 자주 돌린다」를 **뺐다** |
+| 멈춤 줄 `remaining` 의 뜻(CR L-2) | **run 전체의 남은 수**로 바꿨다 — 마침 줄의 `deferred` 와 같은 값이다. 두 원천이 함께 서는 판을 test 가 든다 |
+| 설정 KDoc 이 r2 가 지운 축출을 설명한다(CR M-3) | fail-closed 로 고쳤다 — 「이 수를 낮추면 **새 주소의 가입이 먼저 막힌다**」 |
+| `OPEN-M15-EVAL-COST-PER-ACCOUNT` 가 장부에 없다(CR M-2) | `capability-map.md` OPEN 표에 행 하나(닫은 것 둘 · 남는 것 셋). `OPEN-M15-SIGNUP-HARDENING` ④ 에 fail-closed 가 만든 **전역 잠금 문턱**을 한 줄(CR L-3) |
+| cause 값에 공백(CR L-1) | `window-limit` · `tracked-address-capacity` |
+| OpenAPI 고아 주석(CR L-7) | M7/7D 줄을 `SignInRequest` 위로 되돌렸다(생성 타입 바이트 무변화 — W-5) |
+| `paths.ts` 의 「한 자리」(CR L-5) | 주장을 「화면 둘과 라우트 표」로 좁히고 남은 리터럴 둘(`AppShell`·`WriteFailure`)을 적었다 |
+| in_scope 의 안 만지는 파일(CR L-6) | `AppHttpDependencyGateTest.kt` 에 「변경 없음」 주석 |
+| 평가 상한 기본값이 무측정(v L-3) | `EvaluationCommitWiringTest` 셋 — 기본 50/3 · 접두 바인딩 · 1 미만 거부 |
+| 인터럽트 복원이 무측정(v L-2) | 러너 test 하나(아래 변이 M-B RED) |
+| 건너뜀이 연속을 끊는지 미고정(v L-1) | **끊는다**로 결정하고 KDoc + test 로 고정했다 — 「전략이 없다」는 전략 **읽기가 성공했다**는 뜻이라 체계가 살아 있다는 증거다 |
+| 네 계수 보존 등식 무측정(CR L-8) | 상한·멈춤·건너뜀 test 에 `accounts + skipped + failed + deferred == 청중` 한 줄씩 |
+| web 표가 낡았다(CR L-4) | W-1~W-9 를 라운드 4 HEAD 에서 재측(그 자리에서 `test` 가 2009 → **2014**). W-10~W-13 은 PR 체크가 정본임을 표에 적었다 |
+
+### 열린 질문 ① — `SignUpOutcome.SessionUnavailable` 은 **죽은 분기가 아니다**
+
+두 라운드 미측정이던 축을 쟀다. 그 갈래는 가입이 행을 세운 **뒤** 세션 확정의 조건부 UPDATE 가
+0행을 고치는 순간이다(운영자 `rotate` · 행 소멸). 세 층이 같은 코드로 그 갈래를 지난다 —
+use case(`AccountSignUpTest`) · **HTTP 503 매핑과 「쿠키를 내지 않는다」**(신설 endpoint test) ·
+화면 문면(`SignUpScreen.test.tsx`). 그래서 503 매핑도 화면 안내도 OpenAPI 의 그 절도 살아 있다.
+
+### 변이 실측 (라운드 4, 표적 `EvaluationCommitRunnerTest`)
+
+변이마다 **바꿔치우고**(더하기 아님) 재고, 되돌린 뒤 `git status --porcelain` 이 빈 출력인 것을
+확인했다.
+
+| # | 변이 | 결과 | 죽인 test |
+| --- | --- | --- | --- |
+| M-A | 회전 오프셋을 `0` 고정 | **RED** | 연속한 영업일이면 모든 계정이 한 번씩 돈다 |
+| M-B | 인터럽트 플래그 복원 줄 제거 | **RED** | 인터럽트 예외는 플래그를 되세운다 |
+| M-C | 연속 reset 을 평가 성공 갈래로만 | **RED** | 건너뜀이 연속 실패를 끊는다 |
+| M-D | 멈춤 줄 `remaining` 을 창 안쪽만 세도록 | **RED** | 상한 밖과 멈춤이 함께 서면 두 줄의 수가 같다 |
+
 ## 알려진 제한
 
 ① 남용 상한의 키가 `remoteAddr` 다 — 역방향 프록시 뒤에서는 상한이 **사실상 전역**이고, 형식이
@@ -144,8 +185,13 @@ NOT NULL 세 열에서 떨어진다. DEFAULT 는 권한을 넓히는 것보다 *
   로그인으로 안내한다(권한이 새는 방향이 아니다).
 ④ 이 slice 는 15A 의 계정별 분리를 전제한다. 15A 전에는 가입자가 운영 계정의 단일 행 전략·프로필을
   본다 — 그래서 머지 순서가 고정이었다(15A 는 `d2c0513d` 로 main 에 들었고 이 브랜치가 병합했다).
-⑤ `deferred` 를 읽는 경보가 없다 — 계정 수가 상한을 넘은 날 매 run 이 뒤쪽 계정을 미루는데,
-  종료 코드는 0 이고 cron 은 성공을 적는다. 닫는 자리는 경보 쪽이지 종료 코드가 아니다
-  (15A 알려진 제한 ⑧ 과 같은 자리).
+⑤ `deferred` 를 읽는 경보가 없다 — 회전이 「영원히 빠지는 계정」은 없앴지만, 상한을 넘은 날 그
+  계정의 평가는 **최대 `ceil((K-1)/(n-1))` 영업일 늦는다**. 그 지연을 보는 자리가 없고 종료 코드는
+  0 이라 cron 은 성공을 적는다. 닫는 자리는 경보 쪽이지 종료 코드가 아니다(15A 알려진 제한 ⑧ 과
+  같은 자리).
+⑦ 회전은 **「가장 오래 평가되지 않은 순」이 아니다** — 축이 날짜의 순수 함수라 cron 을 거른 날의
+  창은 그냥 지나가고, 계정 집합이 바뀌면 창의 경계도 함께 움직인다. 영속 커서를 두지 않은 것은
+  결정이다(그 상태가 있으면 되돌림과 재실행이 서로 다른 판을 만든다). 등재 자리는
+  `OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ 다.
 ⑥ 오늘의 run 실비는 0 에 가깝다 — 출하 `MlAnalysisPort` 가 `UnavailableMlAnalysis` 고정이다
   (D-6A3-2). 기본값 50 은 **측정이 아니라** ML 배선이 서는 날을 위한 자리다.
