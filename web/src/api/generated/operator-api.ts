@@ -656,12 +656,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 사업 정보(상호 · 본사 소재지 · 나라장터 준비) 절 교체(M7/7C④)
+         * 사업 정보(상호 · 사업자번호 · 본사 소재지 · 나라장터 준비) 절 교체(M7/7C④ · M15/15C)
          * @description 절을 **통째로** 교체한다 — 부분 갱신이 다른 필드를 지우는 모양을 계약에서 없앤다. 상호는 **입력 원문 그대로** 저장된다(앞뒤 공백도 자르지 않는다 — 정규화는 대사 시점의 커널이 한 번만 한다).
          *
          *     `naraRegistration` 이 `REGISTERED` 가 아니면 `naraRegisteredFields` · `businessCertificateExpiresOn` 을 실을 수 없다(400) — 받아 두고 버리지 않는다.
          *
-         *     사업자번호 · 대표자명 · 인증서 원문은 **자리가 없다**(표에 열이 없다).
+         *     사업자번호는 **선택 칸**이다(M15/15C) — 비워 두어도 다른 화면을 쓰는 데 걸리지 않는다. 대표자명 · 인증서 원문은 여전히 **자리가 없다**(표에 열이 없다).
          */
         post: operations["replaceBusinessDetails"];
         delete?: never;
@@ -1339,6 +1339,12 @@ export interface components {
             regionTerms: string[];
             /** @description 입력 원문 그대로(앞뒤 공백 포함). null 은 「미설정」이다. 길이는 **코드포인트 수**로 센다 (`maxLength` 는 그 근사다 — 서버는 코드포인트로 거부한다). */
             tradeName?: string | null;
+            /**
+             * @description 사업자등록번호 — **숫자 10자리 하나**다(M15/15C). null 이 「비워 둠」이고, 비워 두어도 시작하기 체크리스트를 끝낼 수 있다(항목이 아니다).
+             *
+             *     `3-2-5` 하이픈 표기는 **화면의 서식**이지 이 값이 아니다 — 응답에는 들어오지 않는다. **검증번호(체크섬)를 보지 않고 국세청 진위 확인도 하지 않는다**: 이 값이 실제 사업자의 것인지는 서버가 모른다.
+             */
+            businessRegistrationNumber?: string | null;
             /** @enum {string|null} */
             headquartersRegion?: "SEOUL" | "BUSAN" | "DAEGU" | "INCHEON" | "GWANGJU" | "DAEJEON" | "ULSAN" | "SEJONG" | "GYEONGGI" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU" | null;
             /**
@@ -1376,6 +1382,14 @@ export interface components {
         BusinessDetailsRequest: {
             /** @description **공백뿐인 값은 400 이다** — 「미설정」은 키를 빼거나 `null` 이다(절 단위 교체라 공백이 조용히 「지우기」가 되지 않게 한다). */
             tradeName?: string | null;
+            /**
+             * @description **선택**이다(M15/15C) — 키를 빼거나 `null` 이 「비워 둠」이고, 공백뿐인 값은 400 이다 (상호와 같은 규율: 절 단위 교체에서 공백이 조용히 「지우기」가 되지 않게 한다).
+             *
+             *     받는 꼴은 숫자 10자리와 `3-2-5` 하이픈 표기 **둘뿐**이고 저장·응답은 숫자 10자리 하나다. 그 밖(하이픈 자리가 다름 · 자릿수 어긋남 · 숫자 아님)은 400 이다 — 「하이픈을 전부 지우고 열 자리면 받는다」로 열지 않는다.
+             *
+             *     **체크섬(검증번호)을 보지 않는다**(M15 계약의 완화 지시).
+             */
+            businessRegistrationNumber?: string | null;
             /** @enum {string|null} */
             headquartersRegion?: "SEOUL" | "BUSAN" | "DAEGU" | "INCHEON" | "GWANGJU" | "DAEJEON" | "ULSAN" | "SEJONG" | "GYEONGGI" | "GANGWON" | "CHUNGBUK" | "CHUNGNAM" | "JEONBUK" | "JEONNAM" | "GYEONGBUK" | "GYEONGNAM" | "JEJU" | null;
             /** @enum {string} */

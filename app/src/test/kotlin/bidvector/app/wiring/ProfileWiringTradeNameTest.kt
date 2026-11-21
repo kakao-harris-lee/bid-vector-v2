@@ -30,7 +30,7 @@ class ProfileWiringTradeNameTest {
     private fun port(tradeName: TradeName?) =
         ProfileWiring().operatorTradeNamePort(
             InMemoryBusinessProfileStore().apply {
-                replaceDetails(account, BusinessDetails(tradeName, null, NaraReadiness.Unanswered), at)
+                replaceDetails(account, BusinessDetails(tradeName, null, null, NaraReadiness.Unanswered), at)
             },
         )
 
