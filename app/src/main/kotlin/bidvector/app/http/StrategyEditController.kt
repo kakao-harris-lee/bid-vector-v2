@@ -1,6 +1,7 @@
 package bidvector.app.http
 
 import bidvector.app.wiring.StrategyEditExecutor
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.EditSessionId
 import bidvector.workflow.strategy.OperatorId
 import jakarta.servlet.http.HttpServletRequest
@@ -80,39 +81,54 @@ class StrategyEditController(
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val payload = body.requireObject().requireKnownKeys(setOf("commandId", "seenRevision"))
-        return executor
-            .confirm(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.seenRevision())
-            .toResponse(request)
-    }
+    ): ResponseEntity<Any> =
+        withAccount(request) { account ->
+            val payload = body.requireObject().requireKnownKeys(setOf("commandId", "seenRevision"))
+            executor
+                .confirm(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.seenRevision())
+                .toResponse(request)
+        }
 
     @PostMapping("/{sessionId}/edit")
     fun requestEdit(
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val payload = body.requireObject().requireKnownKeys(setOf("commandId", "field"))
-        return executor
-            .requestEdit(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.field())
-            .toResponse(request)
-    }
+    ): ResponseEntity<Any> =
+        withAccount(request) { account ->
+            val payload = body.requireObject().requireKnownKeys(setOf("commandId", "field"))
+            executor
+                .requestEdit(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.field())
+                .toResponse(request)
+        }
 
     @PostMapping("/{sessionId}/cancel")
     fun cancel(
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> {
-        val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        val payload = body.requireObject().requireKnownKeys(setOf("commandId"))
-        return executor
-            .cancel(account, actorOf(request), sessionIdOf(sessionId), payload.commandId())
-            .toResponse(request)
-    }
+    ): ResponseEntity<Any> =
+        withAccount(request) { account ->
+            val payload = body.requireObject().requireKnownKeys(setOf("commandId"))
+            executor
+                .cancel(account, actorOf(request), sessionIdOf(sessionId), payload.commandId())
+                .toResponse(request)
+        }
+
+    /**
+     * **계정 전용 핸들러의 공통 머리 한 자리**(M15/15A) — 세션 계정을 꺼내고 없으면 401 이다.
+     *
+     * 이 자리가 생긴 이유는 중복이다. 계정 인자가 들어오면서 command 핸들러 넷의 머리 두 줄이
+     * 글자까지 같아졌고 `cpdCheck` 가 그것을 잡았다. 핸들러마다 다른 것은 **읽는 키와 부르는
+     * command** 뿐이므로, 같은 두 줄을 네 벌 두는 대신 한 자리에 두고 다른 부분만 람다가 진다.
+     *
+     * 거동은 그대로다 — 주체를 본문 판독 **전에** 꺼내므로 인증되지 않은 요청은 본문 형식 오류가
+     * 아니라 401 로 떨어진다(`ProfileCommandController` 와 같은 관례).
+     */
+    private fun withAccount(
+        request: HttpServletRequest,
+        action: (AccountId) -> ResponseEntity<Any>,
+    ): ResponseEntity<Any> = request.authenticatedAccount()?.let(action) ?: unauthenticated(request)
 }
 
 /**
