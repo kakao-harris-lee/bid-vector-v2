@@ -84,8 +84,7 @@ class ProfileRequestsTest {
     /**
      * 꼴이 어긋나면 **400** 이다(500 이 아니다) — 값 타입의 `require` 가 `requestValue` 를 지나
      * 요청 오류로 옮겨지는지를 잰다. 공백뿐인 값도 「지우기」로 접지 않는다(상호와 같은 규율).
-     */
-    /**
+     *
      * 표본은 **길이 상한(12) 안쪽**도 담는다(r1 v F2). `1-2-3-4-5-6-7-8-9-0` 류는 19자라 길이에서
      * 먼저 거부되므로, 그것만 담으면 이 층은 「꼴」 축을 한 번도 재지 못한다 — `12-345-67890` ·
      * `123-456-7890` 은 열두 자 이하라 값 타입까지 내려가 **꼴로** 거부된다.
@@ -102,10 +101,10 @@ class ProfileRequestsTest {
             "   ",
             "",
         ).forEach { raw ->
-                shouldThrow<InvalidEditRequestException> {
-                    ProfileRequests.businessDetails(detailsWithNumber(raw))
-                }
+            shouldThrow<InvalidEditRequestException> {
+                ProfileRequests.businessDetails(detailsWithNumber(raw))
             }
+        }
     }
 
     /**
