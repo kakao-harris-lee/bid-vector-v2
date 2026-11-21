@@ -152,21 +152,22 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setInt(1, E2E_STRATEGY_REVISION)
-                    statement.setArray(2, empty)
+                    statement.setLong(1, testAccount().value)
+                    statement.setInt(2, E2E_STRATEGY_REVISION)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
                     statement.setArray(5, empty)
-                    statement.setArray(6, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
-                    statement.setBigDecimal(7, BigDecimal(bidNowThreshold))
-                    statement.setBigDecimal(8, BigDecimal(reviewThreshold))
-                    statement.setInt(9, maxActiveBids)
+                    statement.setArray(6, empty)
+                    statement.setArray(7, connection.createArrayOf("text", arrayOf(E2E_EXCLUDE_TERM)))
+                    statement.setBigDecimal(8, BigDecimal(bidNowThreshold))
+                    statement.setBigDecimal(9, BigDecimal(reviewThreshold))
+                    statement.setInt(10, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -208,7 +209,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
      */
     protected fun setStrategyRevision(revision: Int) =
         dataSource().connection.use { connection ->
-            connection.prepareStatement("UPDATE operator_strategy SET revision = ? WHERE id = 1").use { statement ->
+            connection.prepareStatement("UPDATE operator_strategy SET revision = ?").use { statement ->
                 statement.setInt(1, revision)
                 check(statement.executeUpdate() == 1) { "전략 행이 없어 revision 을 바꾸지 못했다" }
             }

@@ -295,15 +295,17 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version) " +
-                        "VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO edit_session " +
+                        "(id, account_id, operator_id, state, state_payload, expires_at, session_version) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     statement.setString(1, id)
-                    statement.setString(2, "op-seed")
-                    statement.setString(3, state)
-                    statement.setString(4, statePayload)
-                    statement.setTimestamp(5, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
-                    statement.setInt(6, 1)
+                    statement.setLong(2, testAccount().value)
+                    statement.setString(3, "op-seed")
+                    statement.setString(4, state)
+                    statement.setString(5, statePayload)
+                    statement.setTimestamp(6, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
+                    statement.setInt(7, 1)
                     statement.executeUpdate()
                 }
         }

@@ -373,7 +373,7 @@ class SuggestionProductionE2ETest {
 
         suggestions().numbers() shouldBe listOf("D01", "D10", "D30")
 
-        adminUpdate("UPDATE operator_strategy SET candidate_limit = 2 WHERE id = 1") shouldBe 1
+        adminUpdate("UPDATE operator_strategy SET candidate_limit = 2") shouldBe 1
         val limited = suggestions()
         limited.numbers() shouldBe listOf("D01", "D10")
         limited.headers.getFirst(TOTAL_COUNT_HEADER) shouldBe "3"

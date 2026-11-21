@@ -85,7 +85,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
     private fun storedRevision(): Long? =
         dataSource().connection.use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("SELECT revision FROM operator_strategy WHERE id = 1").use { rs ->
+                statement.executeQuery("SELECT revision FROM operator_strategy").use { rs ->
                     if (rs.next()) rs.getLong(1) else null
                 }
             }

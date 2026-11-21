@@ -82,22 +82,30 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
     }
 
     /**
-     * D-6F6-3·우회 (7) — 표 자신의 `CHECK (id = 1)`이 두 번째 행을 거부한다. 애플리케이션
-     * 경로([JdbcOperatorProfileWriter.save])는 늘 `id=1`만 쓰므로, 이 test 는 그 경로를
-     * 우회하는 직접 SQL로 표 제약 자체를 잰다(`bidvector_app` 역할, `appConnection()`).
+     * **주장이 뒤집혔다**(M15/15A — V28). 앞 판은 표 자신의 `CHECK (id = 1)` 이 **둘째 행을
+     * 거부한다**를 쟀다. 이 slice 가 그 CHECK 를 걷고 `account_id` 를 PK 로 두었으므로, 같은
+     * 자리에서 재는 것이 바뀐다 — **계정이 다르면 둘째 행이 선다**(그것이 계정별 분리의 뜻이다).
+     *
+     * 유일 제약 자체는 사라지지 않았다: **같은 계정**의 둘째 행은 PK 가 거부한다. 두 단언을 함께
+     * 두는 이유는 한쪽만 보면 「아무 행도 안 들어간다」와 「아무거나 들어간다」가 각각 초록이기
+     * 때문이다. 애플리케이션 경로를 우회하는 직접 SQL 로 **표 제약 자체**를 잰다.
      */
     @Test
-    fun `싱글턴 제약 — id 2 로 두 번째 행을 직접 SQL 로 넣으면 표 제약이 거부한다`() {
-        val insertSecondRow =
-            "INSERT INTO operator_profile (id, business_types, licenses_declared, license_names, region_terms) " +
-                "VALUES (2, '{}', false, '{}', '{}')"
+    fun `계정별 한 행 — 다른 계정은 둘째 행이 서고 같은 계정의 둘째 행은 거부된다`() {
+        val other = seedAccount("profile-second-owner")
         appConnection().use { connection ->
             connection.autoCommit = true
-            connection.prepareStatement(insertSecondRow).use { statement ->
+            connection.prepareStatement(insertProfileRow(testAccount().value)).use { it.executeUpdate() shouldBe 1 }
+            connection.prepareStatement(insertProfileRow(other.value)).use { it.executeUpdate() shouldBe 1 }
+            connection.prepareStatement(insertProfileRow(other.value)).use { statement ->
                 shouldThrow<SQLException> { statement.executeUpdate() }
             }
         }
     }
+
+    private fun insertProfileRow(account: Long): String =
+        "INSERT INTO operator_profile (account_id, business_types, licenses_declared, license_names, region_terms) " +
+            "VALUES (, '{}', false, '{}', '{}')"
 
     /**
      * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10) — 이 표가 싣는

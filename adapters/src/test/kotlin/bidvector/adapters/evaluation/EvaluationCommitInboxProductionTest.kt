@@ -84,10 +84,10 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
 
     @Test
     fun `가치 게이트를 통과한 후보가 운영자 알림함에 NEW_CANDIDATE 한 건을 남긴다`() {
-        val account = insertAccount("ops-code-operator")
+        val account = testAccount()
         val notice = insertNotice(NOTICE_NUMBER)
 
-        val results = runBlocking { commitRun().evaluate() }
+        val results = runBlocking { commitRun(account).evaluate() }
 
         results.single().shouldBeBidNow()
         val rows = inboxRows()
@@ -99,17 +99,24 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
     }
 
     /**
-     * 계정이 없으면(부트스트랩 전) 기록 0 건이고 **실패가 아니다** — 평가는 정상으로 끝나고
-     * 채널 축은 그대로 남는다. 팀장 승인 판단: 청중은 `account` 전수이고 빈 전수가 정상이다.
+     * **주장이 바뀌었다**(M15/15A). 앞 판은 「청중이 비면(계정 0) 기록 0 건」을 쟀다 — 청중이
+     * `account` 전수였기 때문이다. 이제 run 하나가 **자기 계정 하나**로 고정되므로 「청중이
+     * 비었다」는 상태가 없고, 대신 재는 것은 **다른 계정의 알림함이 비어 있다**는 것이다.
+     *
+     * 이것이 이 slice 가 닫는 누출의 직접 측정이다: 앞 판의 조립으로 돌리면 두 계정 모두에 행이
+     * 생겼다. 평가 자체와 채널 축은 그대로다.
      */
     @Test
-    fun `청중이 비면 알림함 기록이 0 건이고 평가는 정상으로 끝난다`() {
+    fun `다른 계정의 알림함은 비어 있다 — 기록은 평가한 계정에만 간다`() {
+        val evaluated = testAccount()
+        val bystander = seedAccount("ops-code-bystander")
         insertNotice(NOTICE_NUMBER)
 
-        val results = runBlocking { commitRun().evaluate() }
+        val results = runBlocking { commitRun(evaluated).evaluate() }
 
         results.single().shouldBeBidNow()
-        inboxRows().shouldBeEmpty()
+        inboxRows().map { it.accountId } shouldBe listOf(evaluated.value)
+        inboxRows().none { it.accountId == bystander.value } shouldBe true
         outboxCount() shouldBe 1
     }
 
@@ -119,7 +126,7 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
      */
     @Test
     fun `같은 공고로 두 번 돌려도 알림함 행은 하나다`() {
-        insertAccount("ops-code-operator")
+        testAccount()
         insertNotice(NOTICE_NUMBER)
 
         runBlocking { commitRun().evaluate() }
@@ -177,21 +184,6 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
         ) {
             is StrategyValidation.Valid -> result.strategy
             is StrategyValidation.Invalid -> error("test fixture 는 항상 Valid 여야 한다: ${result.violations}")
-        }
-
-    private fun insertAccount(loginName: String): AccountId =
-        dataSource().connection.use { connection ->
-            connection
-                .prepareStatement(
-                    "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
-                        "VALUES (?, 'ops-code-fixture-hash', now(), now(), 0) RETURNING id",
-                ).use { statement ->
-                    statement.setString(1, loginName)
-                    statement.executeQuery().use { rows ->
-                        rows.next()
-                        AccountId(rows.getLong("id"))
-                    }
-                }
         }
 
     /** 후보가 될 공고 한 행 — `JdbcCandidateSourceTest` 와 같은 조립이다(마감은 미래). */

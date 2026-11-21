@@ -59,7 +59,10 @@ class EvaluationCommitRuns(
     private val release: ReleaseIdentifier,
 ) {
     init {
-        require(currentActiveBids >= 0) { "bidvector.evaluation.commit.current-active-bids 는 음수일 수 없다" }
+        // 메시지에 설정 **키**를 적지 않는다 — adapters 클래스의 문자열 상수에 저장소 좌표가 들어가면
+        // 축별 바이트코드 좌표 게이트가 그것을 허용 뿌리 밖 참조로 읽는다(실측으로 걸렸다).
+        // 키 이름은 그 값을 바인딩하는 조립 쪽 properties 타입의 KDoc 이 든다.
+        require(currentActiveBids >= 0) { "현재 진행 입찰 수는 음수일 수 없다: $currentActiveBids" }
     }
 
     /** 평가할 계정 전수 — 못 읽으면 [NotificationAudience.Unavailable] 이고 러너가 run 을 멈춘다. */
