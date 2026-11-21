@@ -61,6 +61,46 @@
 이름은 안 읽음 수를 품어 **「내 입찰함 3」**이고 그 수는 앞 여정들이 남긴 상태다 — 탐색으로
 좁혀 부분 일치로 집는 꼴(여정 ①·결과 여정의 선례)로 고쳤다.
 
+## 2026-11-22T20:30Z(KST 11-22 05:30) — 15A 병합 라운드
+
+main `d2c0513db`(15A 머지)를 **보통 병합**으로 들였다(부모 둘). 충돌은 하나 — 잠금 상한 관례
+lint 의 번호 집합이고 **합집합**(28 과 30 둘 다 기존 표를 ALTER 한다)으로 풀었다.
+
+### 병합 합집합 점검
+
+| 축 | 결과 |
+| --- | --- |
+| 계약 파일 중복 키(파서로 전수) | **0** · `Profile` 12 속성 · `BusinessDetailsRequest` 6 속성 |
+| 계약 파일에서 main 쪽 줄이 지워졌나 | 삭제 3 줄 전부 **내 의도된 교체**(요약·문면·머리말) |
+| 생성 타입 바이트 등식 | 통과 — 15A 의 편집은 `security:` 뿐이라 생성 바이트를 바꾸지 않는다 |
+| 산출물 diff(main 대비) | 내 slice 20 파일뿐 — 15A 의 줄이 접힌 자리 **0** |
+| 옛 `AccountId` import 잔존 | **0**(15A 가 `bidvector.sharedkernel` 로 옮겼다) |
+
+### 전건 `check --continue`
+
+| 회차 | exit | 붉은 task |
+| --- | --- | --- |
+| 1 (공유 build cache 그대로) | 1 | `migrationOrderGate` · `build-logic:test` · `app:ktlintTestSourceSetCheck` · `app:detekt` · **`app:test`(11)** · `app:gateExecutionGate` |
+| 2 (`--no-build-cache` + 모듈 build 디렉터리 삭제) | 1 | `migrationOrderGate` · `build-logic:test` · `app:ktlintTestSourceSetCheck` |
+
+**`app:test` 11 건은 산출물 결함이 아니라 공유 build cache 의 낡은 산출물이었다.** 통제 셋으로
+갈랐다 — main `d2c0513db` 에서 같은 세 클래스 19 test **통과(실행)** · 내 병합 커밋의 **새 clone**
+에서 같은 실패 재현 · 같은 clone 에서 build 디렉터리 삭제 + `--no-build-cache` 로 **통과**.
+서버 쪽 예외는 `AbstractMethodError: … does not define or inherit … current(bidvector.sharedkernel.AccountId)`
+— 15A 가 타입을 **옮겨서** 생긴 낡은 `.class` 의 서명이다(저장소 교훈 「지운 타입의 낡은 .class」가
+이 모양을 미리 적어 둔 자리).
+
+### 남은 붉음 둘은 번호 결번 하나의 뿌리다
+
+`migrationOrderGate` 와 `build-logic:test` 의 `MigrationOrderTest` 는 같은 사실(V29 부재)을 잰다.
+15B 가 main 에 들어오면 함께 초록이 된다(scope.md 알려진 제한 6).
+
+### 이 라운드가 고친 자기 결함
+
+`ktlint`·`detekt` 가 수정 라운드 1 의 두 줄을 잡았다(길이 한도 · KDoc 둘 · 들여쓰기). 그 라운드는
+**표적 `test` 태스크만** 돌아 두 린트가 한 번도 돌지 않았다 — 「부분 게이트는 안 돌린 것과 같다」.
+고친 뒤 `:app:ktlint*` · `:app:detekt` **exit 0**, 두 프로필 test **exit 0**.
+
 ## 비밀값 스캔
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m15/15c/`
