@@ -1,9 +1,12 @@
 # M15 / 15A — 되돌리기
 
-실측 HEAD: `9fe69e4c591116364c70c2c14d7ccd9fa9fdea6a`
+실측 HEAD: `038a5c51436e20742941b35a6b7cc47342b34746` (main 병합 커밋)
 
 > **전제: 이 slice 는 아직 `main` 에 없다.** 머지 **뒤**의 되돌림은 아래 절차가 아니라 그 PR 의
 > 머지 커밋 revert 다 — 같은 복원은 머지 순간 아무것도 지우지 않으면서 exit 0 을 낸다.
+>
+> 이 브랜치가 **main 을 병합한 것**(`6ea304dd`)과 **main 에 머지된 것**은 다르다. 앞의 것은
+> 분기 보호의 up-to-date 요구를 채우려고 한 것이고, 그래서 복원 **원천**이 그 SHA 로 바뀌었다.
 
 ## 무엇을 끄는가
 
@@ -13,10 +16,14 @@
 ## 복원 목록 — 기계로 낸다
 
 ```
-git diff --name-status 99f2fb25989078d7ab1640de0dc8e399f5d1688d..HEAD -- ':!reports/evidence'
+git diff --name-status 6ea304dd3174402017b2039a326d4078e15fa276..HEAD -- ':!reports/evidence'
 ```
 
-`A` 는 삭제 대상, `M` 은 base 로 restore 다. **라운드마다 이 절차를 다시 돌린다** — 수정
+**기준이 착수 base 가 아니라 병합한 main 이다**(2026-11-22 병합 뒤). 착수 base 로 뽑으면 main 이
+가져온 `milestone-15.md` 가 `A` 로 끼어들어 **207** 이 된다 — 그 파일은 이 slice 의 산출물이
+아니고 되돌림이 지울 대상도 아니다. 병합한 main 을 기준으로 뽑으면 정확히 이 slice 의 **206** 이다.
+
+`A` 는 삭제 대상, `M` 은 그 원천으로 restore 다. **라운드마다 이 절차를 다시 돌린다** — 수정
 라운드가 파일을 더하면 목록이 낡는다(목록이 낡는 것이 이 결함의 실제 원인이다. r1 리뷰가 바로
 그것을 잡았다: 앞 판의 195 는 그 라운드가 더한 넷을 세지 않은 수였다).
 
@@ -25,7 +32,7 @@ git diff --name-status 99f2fb25989078d7ab1640de0dc8e399f5d1688d..HEAD -- ':!repo
 test · `PinnedLicenseGate` test 다.
 
 ```
-git restore --source=99f2fb25989078d7ab1640de0dc8e399f5d1688d --staged --worktree -- <위 목록의 모든 경로>
+git restore --source=6ea304dd3174402017b2039a326d4078e15fa276 --staged --worktree -- <위 목록의 모든 경로>
 ```
 
 `--source` 에 없는 경로(`A`)는 그 명령이 **삭제**하므로 별도 `git rm` 이 필요 없다.
@@ -43,13 +50,18 @@ git restore --source=99f2fb25989078d7ab1640de0dc8e399f5d1688d --staged --worktre
 `config/quality/architecture-policy.properties`(허용 뿌리 · 주입/2층 목록 · 어댑터 멤버 서술자) ·
 `.github/workflows/ci.yml`(컨테이너 스모크의 인증 축) · `tools/local-tls-smoke.sh` ·
 `tools/db-rehearsal.sh`. 뒤 셋은 r1 라운드에서 in_scope 에 들어왔다(scope.md 「갱신 이력」 (4)).
-이 slice 가 main 에 없는 동안에는 위 단일 `git restore` 로 base 복원하면 다른 slice 의 줄이
-함께 사라질 수 있으므로, **main 을 병합한 뒤**라면 그 병합 커밋 SHA 를 복원 원천으로 바꾸고
-아래 단언 셋을 다시 잰다(`evidence-pack` rollback 절). 오늘은 병합이 없어 착수 base 가 원천이다.
+**2026-11-22 에 main(`6ea304dd`)을 병합했다** — 분기 보호가 up-to-date 를 요구한다. 그래서
+복원 원천을 착수 base 에서 **그 병합 커밋 SHA 로 바꿨고**, 단언 셋을 다시 쟀다
+(`evidence-pack` rollback 절). 움직이는 `origin/main` 이 아니라 고정 40자를 쓴다.
 
-- 단언 ①: 착수 base 가 HEAD 의 조상인가 — `git merge-base --is-ancestor <base> HEAD` (exit 0).
-- 단언 ②: 원천에 이 slice 의 **첫** 산출물 커밋이 없는가 — 착수 base 이므로 자명하다.
-- 단언 ③(원천을 바꿀 때만): 복원 목록의 `M`·`D` 경로가 두 원천에서 같은 blob 인가.
+- 단언 ①: 원천이 HEAD 의 조상인가 — `git merge-base --is-ancestor 6ea304dd HEAD` → exit 0.
+  (착수 base 도 여전히 조상이다 — `99f2fb25` 역시 exit 0.)
+- 단언 ②: 원천에 이 slice 의 **첫** 산출물 커밋이 없는가 — `6ea304dd` 는 병합한 main 이고
+  이 slice 는 아직 main 에 없다(PR 미머지). 자명하다.
+- 단언 ③(원천을 바꿨으므로 **잰다**): 복원 목록 206 경로의 blob 이 착수 base 와 새 원천에서
+  같은가 — **다른 것 0**(`M` 198 전부 동일, 나머지 8 은 두 원천 모두에 없는 신설 파일이다).
+  즉 원천을 바꿔도 복원되는 내용은 같고, 앞 라운드의 수치가 그대로 선다. main 이 이 206 경로를
+  하나도 건드리지 않았기 때문이다(main 의 변경은 `milestone-15.md` 하나).
 
 ## DB — 되돌릴 수 없다
 
@@ -67,21 +79,24 @@ DB 에서는 네 표의 남은 행을 **버린다**. 적용된 DB 를 V27 로 �
 | --- | --- | --- | --- |
 | ① | 복원 명령의 종료 코드 | 위 `git restore` | exit 0 |
 | ② | 되돌린 파일 수 | 복원 뒤 `git status --porcelain` 의 D/M 수 | **206**(D 8 · M 198) — 복원 목록과 같다 |
-| ③ | in_scope 가 base 와 같은가 | `git diff <base> -- ':!reports/evidence'` | **빈 출력**(0 줄) |
-| ④ | 컴파일 | `./gradlew --no-daemon :app:compileTestKotlin` | exit 0 (BUILD SUCCESSFUL) |
+| ③ | 복원 트리가 원천과 같은가 | `git diff --stat 6ea304dd` | **evidence 문서 셋뿐**(아래) |
+| ④ | 컴파일 | `./gradlew --no-daemon :app:compileTestKotlin` | exit 0 (BUILD SUCCESSFUL, 15s) |
 | ⑤ | test | `./gradlew --no-daemon :adapters:test --rerun` | exit 0 (BUILD SUCCESSFUL, 3m25s) |
-| ⑥ | 게이트 | `./gradlew --no-daemon :app:test --rerun check --continue` | exit 0 (BUILD SUCCESSFUL, 31m54s) |
+| ⑥ | 게이트 | `./gradlew --no-daemon :app:test --rerun check --continue` | exit 0 (BUILD SUCCESSFUL, 32m) |
 
-**⑤⑥ 에 `--rerun` 을 붙인 이유**: 복원한 트리는 base 와 **바이트가 같아** 빌드 캐시가 두 test
-task 를 `FROM-CACHE`·`UP-TO-DATE` 로 집었다(첫 시도 실측: `check` 35초). 캐시 적중은 「같은
-입력이 전에 성공했다」는 사실이고 틀린 답은 아니지만 **이 라운드에서 돈 것은 아니다** — 이
-문서가 「실행했다」라고 적으려면 실제로 돌아야 한다. `--rerun` 으로 두 task 를 강제 실행한
-수치가 위 표다.
+③ 의 출력은 `reports/evidence/m15/15a/` 의 **셋뿐**이고 셋 다 **추가**다(원천에 없다). 즉 복원
+트리는 **병합한 main 의 트리 + 이 slice 의 evidence 문서 셋**이다.
 
-**④⑤⑥ 을 실행 대신 갈음하는 근거는 트리 동일성뿐이다** — 「HEAD 가 초록이다」는 근거가 아니다.
-여기서는 갈음하지 않고 **셋 다 실행했다.**
+**그 사실이 ⑤⑥ 의 갈음 근거가 된다 — 그런데 갈음하지 않고 돌렸다.** 갈음이 성립하는 논리는
+「원천(`6ea304dd`)은 CI 초록이고 복원 트리는 그 트리와 코드가 같다」인데, 더해진 셋 가운데
+evidence 문서를 **읽는 게이트가 있다**(`leakPatternGate` 가 저장소 파일을 훑는다). 그 문서들의
+내용은 앞 라운드 뒤에도 바뀌었으므로(알려진 제한 6~9 등재) 「코드가 같으니 같다」는 그 축까지
+덮지 못한다. 한 번 더 도는 비용이 그 불확실성보다 싸서 **셋 다 실행했다.**
 
-복원 뒤 base 와 다른 경로는 `reports/evidence/m15/15a/` 의 셋뿐이다(③ 의 출력이 그것을 말한다).
+**⑤⑥ 에 `--rerun` 을 붙인 이유**: 복원 트리가 원천과 바이트가 같아 빌드 캐시가 두 test task 를
+`FROM-CACHE`·`UP-TO-DATE` 로 집는다(앞 라운드 실측: `check` 35초). 캐시 적중은 「같은 입력이
+전에 성공했다」는 사실이고 틀린 답은 아니지만 **이 라운드에서 돈 것은 아니다** — 이 문서가
+「실행했다」라고 적으려면 실제로 돌아야 한다.
 
 ## §4 술어 (verifier 가 대조한다)
 
@@ -91,7 +106,11 @@ git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
 
 둘 다 빈 출력이면 실측이 유효하다. 실측 HEAD 뒤의 커밋은 **evidence 문서뿐**이고 그 경로는
-복원 목록 밖이므로(`':!reports/evidence'`) 첫 술어는 비어야 한다. 첫 출력이 비지 않을 때
+복원 목록 밖이므로(`':!reports/evidence'`) 첫 술어는 비어야 한다.
+
+**둘째 술어(머지 0)는 실측 자리를 병합 커밋으로 옮겼기 때문에 성립한다** — CLAUDE.md 가 적은
+그대로다(「main 병합이 마지막 산출물 커밋 뒤에 오면 실측 자리는 그 병합 커밋이다」). 병합을
+실측 **앞**에 두지 않았다면 이 술어가 그 병합을 잡아 실측을 무효로 읽었을 것이다. 첫 출력이 비지 않을 때
 유효로 읽는 예외는 하나뿐이다 — 나온 경로가 **전부 복원 원천에 없는 신설 파일**일 때다
 (복원이 그 파일을 내용과 무관하게 지우므로 그 사이의 편집이 되돌린 트리를 바꾸지 못한다).
 그 열거와 `git cat-file -e <원천>:<경로>` 실패 확인은 verifier 가 판정 SHA 에서 한다.
