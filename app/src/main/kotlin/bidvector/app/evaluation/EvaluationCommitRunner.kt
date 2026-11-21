@@ -4,7 +4,6 @@ import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.app.collection.CollectionLog
 import bidvector.app.collection.CollectionTermination
 import bidvector.app.relay.causeCodeOf
-import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.notificationinbox.NotificationAudience
 import kotlinx.coroutines.runBlocking
