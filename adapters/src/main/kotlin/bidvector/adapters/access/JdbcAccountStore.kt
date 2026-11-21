@@ -74,14 +74,19 @@ internal class JdbcAccountSignUpStore(
         login: LoginName,
         hash: PassphraseHash,
     ): AccountId? =
-        // 대기 상한을 넘기면 `null` 이고 호출부는 그것을 **중복**으로 읽는다 — 안전한 방향이다
-        // (계정이 서지 않을 뿐 권한이 새지 않는다). 그 창은 같은 이름이 동시에 들어올 때뿐이다.
+        // 대기 상한을 넘기면 `null` 이고 여기서 **중복과 같은 값으로 접는다** — 아래 KDoc 의 사유.
         connections.withBoundedConnection { connection -> inserted(connection, login, hash) }?.firstOrNull()
 
     /**
-     * 그 문장이 **돌려준 행**(0 또는 1). 목록으로 받는 이유는 경계의 서명이다 — `withBoundedConnection`
-     * 의 결과 `null` 은 **「경합으로 못 했다」** 하나를 뜻하므로, 블록이 자기 몫의 `null`(「이미 있다」)을
-     * 같은 자리에 실으면 두 사실이 한 값으로 접힌다.
+     * 그 문장이 **돌려준 행**(0 또는 1). 목록으로 받는 이유는 경계의 서명이다 —
+     * `withBoundedConnection` 의 결과 `null` 은 「경합으로 못 했다」이고 블록의 빈 목록은 「이미
+     * 있다」라, 두 사실이 **블록 안에서는** 갈려 있다.
+     *
+     * **호출부가 그 둘을 일부러 409 로 접는다**(code-review r1 LOW 정정). 앞 판의 이 주석은 접지
+     * 않는 것처럼 읽혔지만 바로 다음 줄의 `?.firstOrNull()` 이 접는다. 접는 이유는 **응답이
+     * 같아야 하기 때문**이다: 잠금 대기를 넘긴 쪽은 같은 이름으로 동시에 들어온 상대가 있다는
+     * 뜻이고, 그 상대가 커밋하면 실제로 중복이다. 상대가 롤백하는 좁은 창에서만 「비어 있는
+     * 이름인데 이미 쓰인다고 듣는다」가 되고, 그때 재시도가 성공한다 — 안전한 방향이다.
      */
     private fun inserted(
         connection: Connection,

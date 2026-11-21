@@ -10,7 +10,7 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/access/AccessSql.kt        # 가입 INSERT 문장 하나
   - adapters/src/main/kotlin/bidvector/adapters/access/JdbcAccountStore.kt # 가입 저장소(요청 경로, 좁은 포트)
   - adapters/src/main/kotlin/bidvector/adapters/access/BrowserAccessTransaction.kt  # 조립에 가입 포트 하나
-  - adapters/src/test/kotlin/bidvector/adapters/access/                    # 열 권한 · 가입 저장소 test
+  - adapters/src/test/kotlin/bidvector/adapters/access/                    # 열 권한 · 가입 저장소 test · 공유 정책 helper(r1)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationPrivilegeTest.kt  # 축9 주석(열 권한은 아래 신설 class)
   - adapters/src/test/kotlin/bidvector/adapters/persistence/CleanMigrationColumnTest.kt     # 계약 갱신 (1) — DEFAULT 셋이 열 장부에 선다
   - adapters/src/test/kotlin/bidvector/adapters/persistence/MigrationLockTimeoutTest.kt     # 계약 갱신 (3) — V29 가 관례 모집단에 든다
@@ -25,8 +25,10 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/http/SignUpThrottle.kt               # 신설 — 원격 주소별 메모리 창
   - app/src/main/kotlin/bidvector/app/http/ErrorBody.kt                    # 코드 둘(중복 · 상한 초과)
   - app/src/main/kotlin/bidvector/app/wiring/BrowserAccessExecutor.kt      # signUp 표면 하나
+  - app/src/main/kotlin/bidvector/app/wiring/BrowserAccessWiring.kt        # 가입 정책 빈(r1 v LOW-1 — 누락 등재)
+  - app/src/main/kotlin/bidvector/app/http/OperatorSessionController.kt    # r1 — 201 응답 조립을 공유 함수로
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt              # 가입 상한 빈(app.http 를 아는 유일한 자리)
-  - app/src/main/kotlin/bidvector/app/access/AccountCommandRunner.kt       # create 거부 어휘 한 줄
+  - app/src/main/kotlin/bidvector/app/access/AccountCommandRunner.kt       # (변경 없음 — 완화는 use case 쪽이고 로그 어휘는 그대로다)
   - app/src/test/kotlin/bidvector/app/http/                                # 집합 등식 둘 · 가입 endpoint · 상한
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
   - config/quality/architecture-policy.properties                          # handler · 주입 타입 · 비밀값 참조자
@@ -39,6 +41,10 @@ in_scope:
   - web/src/LoginScreen.tsx                                                # 「계정 만들기」 링크 하나
   - web/src/routes.tsx                                                     # 가입 자리(화면 자리 표 밖, 로그인과 같은 축)
   - web/src/AppShell.tsx                                                   # 가입 자리에도 탐색을 그리지 않는다
+  - web/src/AppRoot.tsx                                                    # 라우트 트리에 가입 자리(r1 v LOW-1 — 누락 등재)
+  - web/config/gate-tests.txt                                              # 가입 화면 test 등재(r1 v LOW-1 — 누락 등재)
+  - web/e2e/harness/journey-up.mjs                                         # r1 — 여정 레인의 상한 손잡이
+  - docs/discovery/capability-map.md                                       # r1 — OPEN-M15-SIGNUP-HARDENING 등재
   - web/src/**/*.test.tsx                                                  # 위 화면·셸·라우트의 짝 test
   - web/e2e/journey/signup.spec.ts                                         # 여정 하나(가입 → 시작하기 → 화면들)
   - web/e2e/journey/shared.ts                                              # 가입 자리의 ALLOWED_ROUTES 한 줄
@@ -146,7 +152,17 @@ V20 의 NOT NULL 세 열(`created_at`·`updated_at`·`failed_attempts`)에서 �
 쪽을 골랐고, 그 전제는 문장이 아니라 **실측**이 든다(`AccessPrivilegeTest` 가 앱 역할로 production
 INSERT 문장을 직접 쏘아 성공을 잰다).
 
+**(5) 남용 상한의 수가 정책이 아니라 설정이다**(수정 라운드 1, cr H-1). 계약은 「시간당 10건」을
+적었는데, 키가 `remoteAddr` 이라 프록시 뒤에서 버킷이 하나이고 10 은 **열 번의 싸구려 요청으로
+한 시간을 닫는다**. 수를 `bidvector.signup.attempts-per-hour`(기본 30)로 빼 운영자가 올릴 수 있게
+하고, 거부가 로그 한 줄을 남긴다. 계약 문면의 「10」은 팀장이 종결 때 고친다.
+
+**(6) 비밀번호 상한이 바이트가 아니라 글자 수이고 값이 1024 다**(수정 라운드 1, cr M-1). 계약의
+「bcrypt 72바이트 상한 초과는 거부」는 **이 저장소에서 거짓**이다 — 해시 어댑터가 긴 입력을
+SHA-512 로 접지 자르지 않는다. 상한은 입력 위생 경계로만 남는다. 계약 문면은 팀장이 종결 때 고친다.
+
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
 - 2026-11-21 전건 acceptance 뒤 계약 갱신 (2)~(4) 와 in_scope 둘 등재.
+- 2026-11-21 수정 라운드 1 — 계약 갱신 (5)·(6), in_scope 다섯 등재(누락 셋 + 이 라운드가 더한 둘).

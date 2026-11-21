@@ -12,11 +12,12 @@ import bidvector.app.http.RequestAuditFilter
 import bidvector.app.http.RequestAuthenticationFilter
 import bidvector.app.http.SessionCookieWriter
 import bidvector.app.http.SignUpThrottle
+import bidvector.app.http.SignUpThrottleLog
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.workflow.access.BrowserAccessPolicyData
-import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.strategy.Clock
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.builder.SpringApplicationBuilder
@@ -28,6 +29,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.FilterType
 import org.springframework.core.Ordered
+import java.time.Duration
 import javax.sql.DataSource
 
 /**
@@ -73,7 +75,11 @@ import javax.sql.DataSource
         ComponentScan.Filter(type = FilterType.ANNOTATION, classes = [SpringBootApplication::class]),
     ],
 )
-@EnableConfigurationProperties(OperatorCredentialProperties::class, AccessCookieProperties::class)
+@EnableConfigurationProperties(
+    OperatorCredentialProperties::class,
+    AccessCookieProperties::class,
+    SignUpThrottleProperties::class,
+)
 open class BidVectorApplication {
     @Bean
     open fun clock(): Clock = SystemClock()
@@ -134,12 +140,24 @@ open class BidVectorApplication {
      *
      * **빈 하나**인 것이 중요하다 — 계수가 그 인스턴스의 메모리에 살므로, 요청마다 새로 만들면
      * 상한이 아무것도 세지 않는다.
+     *
+     * 로거는 러너 레인의 관례대로 **배선이 한 줄 출구를 만들어** 넘긴다(`AccountCommandWiring` 과
+     * 같은 형태) — 상한 자신은 로거를 모른다.
      */
     @Bean
     open fun signUpThrottle(
         clock: Clock,
-        resolvedSignUpPolicy: SignUpPolicyData,
-    ): SignUpThrottle = SignUpThrottle(clock, resolvedSignUpPolicy)
+        properties: SignUpThrottleProperties,
+    ): SignUpThrottle {
+        val logger = LoggerFactory.getLogger(SignUpThrottle::class.java)
+        return SignUpThrottle(
+            clock = clock,
+            attemptsPerWindow = properties.attemptsPerHour,
+            window = properties.window,
+            trackedAddressLimit = properties.trackedAddressLimit,
+            log = SignUpThrottleLog { line -> logger.warn(line) },
+        )
+    }
 
     /**
      * `RequestAuditFilter`가 부르는 sink — [ApiAuditRecord](app/http, HTTP 어휘) →
@@ -202,6 +220,44 @@ class OperatorCredentialProperties(
 class AccessCookieProperties(
     val cookieSecure: Boolean = true,
 )
+
+/**
+ * 열린 가입의 **남용 상한 설정**(M15/15B, code-review r1 H-1) — 정책 데이터가 아니라 설정 키다.
+ *
+ * 왜 versioned policy 가 아닌가: 이 수는 **운영자가 환경에서 올릴 수 있어야 하는 값**이다.
+ * 키가 `remoteAddr` 이라 프록시 뒤에서 버킷이 하나가 되고(그 자리의 사유는 [SignUpThrottle] 의
+ * KDoc), 그동안 이 손잡이가 「가입이 닫혔다」를 푸는 유일한 길이다. 정책 데이터였다면 그 수를
+ * 바꾸는 데 배포가 필요하다.
+ *
+ * 기본값이 **30** 인 것은 계약의 10 보다 넉넉한 쪽을 고른 결과다 — 전역 버킷에서 10 은 열 번의
+ * 싸구려 요청으로 한 시간을 닫는다. 창은 **속성 이름이 정한다**(`attempts-per-hour`).
+ *
+ * **`data class` 가 아니다** — 합성 `toString()` 은 여기서 해롭지 않지만, 이 파일의 다른 설정
+ * 타입과 같은 규율을 지킨다(바인딩 실패 분석기가 객체를 문자열화하는 자리).
+ */
+@ConfigurationProperties(prefix = "bidvector.signup")
+class SignUpThrottleProperties(
+    val attemptsPerHour: Int = DEFAULT_ATTEMPTS_PER_HOUR,
+    /**
+     * 창 안에 시도를 가진 주소를 몇 개까지 기억하는가 — 넘치면 가장 오래 전에 처음 본 주소부터
+     * 버린다. 오늘은 프록시 뒤라 키가 하나뿐이지만, 키 축이 IP 로 바뀌는 날 맵이 창 길이만큼
+     * 자라는 것을 이 상한이 막는다(`OPEN-M15-SIGNUP-HARDENING`).
+     */
+    val trackedAddressLimit: Int = DEFAULT_TRACKED_ADDRESS_LIMIT,
+) {
+    init {
+        require(attemptsPerHour >= 1) { "bidvector.signup.attempts-per-hour 는 1 이상이어야 한다" }
+        require(trackedAddressLimit >= 1) { "bidvector.signup.tracked-address-limit 는 1 이상이어야 한다" }
+    }
+
+    /** 창은 **속성 이름**이 정한다 — `attempts-per-hour` 라 한 시간이다. */
+    val window: Duration get() = Duration.ofHours(1)
+
+    private companion object {
+        const val DEFAULT_ATTEMPTS_PER_HOUR = 30
+        const val DEFAULT_TRACKED_ADDRESS_LIMIT = 10_000
+    }
+}
 
 /**
  * D-6A1-21 — 위 클래스 문서의 실측 전제. 새 파일(application.yml)을 만들지 않는다

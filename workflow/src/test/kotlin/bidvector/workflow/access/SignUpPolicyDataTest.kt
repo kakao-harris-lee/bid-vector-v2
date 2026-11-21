@@ -5,7 +5,6 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
-import java.time.Duration
 import java.time.LocalDate
 
 /**
@@ -17,7 +16,7 @@ import java.time.LocalDate
  */
 class SignUpPolicyDataTest {
     @Test
-    fun `출하 정책이 계약의 값으로 해소된다 — 4~32자 · 10자 이상 · 72바이트 · 시간당 10건`() {
+    fun `출하 정책이 계약의 값으로 해소된다 — 아이디 4~32자 · 비밀번호 10~1024자`() {
         val resolved =
             SIGN_UP_POLICY
                 .resolve(LocalDate.of(2026, 11, 21))
@@ -28,9 +27,7 @@ class SignUpPolicyDataTest {
         resolved.loginNameMaxLength shouldBe 32
         resolved.loginNameCharacter shouldBe "[a-z0-9._-]"
         resolved.passphraseMinLength shouldBe 10
-        resolved.passphraseMaxBytes shouldBe 72
-        resolved.signUpsPerAddress shouldBe 10
-        resolved.signUpWindow shouldBe Duration.ofHours(1)
+        resolved.passphraseMaxLength shouldBe 1024
     }
 
     @Test
@@ -47,24 +44,31 @@ class SignUpPolicyDataTest {
         policy.accepts(LoginName("a+b@c")) shouldBe false
     }
 
+    /**
+     * **글자 수로 잰다**(code-review r1 M-1 뒤). 앞 판은 UTF-8 바이트로 재며 「bcrypt 가 72바이트
+     * 위를 조용히 자른다」를 근거로 들었는데, 이 저장소의 해시 어댑터는 긴 입력을 SHA-512 로
+     * **접는다** — 자르지도 거부하지도 않는다. 그래서 한글 비밀번호가 영문과 **같은 길이 규칙**
+     * 아래 선다(그 비대칭이 사라졌다는 것이 이 test 의 축이다).
+     */
     @Test
-    fun `비밀번호 술어는 바이트로 상한을 잰다 — 글자 수로 재면 bcrypt 가 조용히 자른다`() {
+    fun `비밀번호 술어는 글자 수로 잰다 — 한글이 영문과 같은 규칙 아래 선다`() {
         val policy = shippedSignUpPolicy()
 
         policy.accepts(ClearPassphrase.wrap("a".repeat(10))) shouldBe true
         policy.accepts(ClearPassphrase.wrap("a".repeat(9))) shouldBe false
-        policy.accepts(ClearPassphrase.wrap("a".repeat(72))) shouldBe true
-        policy.accepts(ClearPassphrase.wrap("a".repeat(73))) shouldBe false
-        // 한글 24자 = 72바이트(통과) · 25자 = 75바이트(거부) — 글자 수 술어였다면 둘 다 통과한다.
-        policy.accepts(ClearPassphrase.wrap("가".repeat(24))) shouldBe true
-        policy.accepts(ClearPassphrase.wrap("가".repeat(25))) shouldBe false
+        policy.accepts(ClearPassphrase.wrap("a".repeat(1024))) shouldBe true
+        policy.accepts(ClearPassphrase.wrap("a".repeat(1025))) shouldBe false
+        // 한글 25자(옛 판에서 75바이트라 막히던 값)가 이제 통과한다.
+        policy.accepts(ClearPassphrase.wrap("가".repeat(25))) shouldBe true
+        policy.accepts(ClearPassphrase.wrap("가".repeat(1024))) shouldBe true
+        policy.accepts(ClearPassphrase.wrap("가".repeat(1025))) shouldBe false
     }
 
     @Test
     fun `성립하지 않는 조합은 값 객체가 거부한다 — 조립 시점에 선다`() {
         shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(loginNameMinLength = 33) }
-        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(passphraseMinLength = 73) }
-        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(signUpsPerAddress = 0) }
-        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(signUpWindow = Duration.ZERO) }
+        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(passphraseMinLength = 1025) }
+        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(loginNameMinLength = 0) }
+        shouldThrow<IllegalArgumentException> { shippedSignUpPolicy().copy(passphraseMaxLength = 0) }
     }
 }

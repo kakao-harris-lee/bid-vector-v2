@@ -147,7 +147,15 @@ open class HttpTestApplication {
      * 「창 밖은 잊는다」와 **같은 경로**다(test 전용 초기화 메서드를 production 에 두지 않는다).
      */
     @Bean
-    open fun signUpThrottle(clock: FixedClock): SignUpThrottle = SignUpThrottle(clock, TEST_SIGN_UP_POLICY)
+    open fun signUpThrottle(clock: FixedClock): SignUpThrottle =
+        SignUpThrottle(
+            clock = clock,
+            attemptsPerWindow = TEST_SIGN_UP_ATTEMPTS,
+            window = TEST_SIGN_UP_WINDOW,
+            trackedAddressLimit = TEST_TRACKED_ADDRESS_LIMIT,
+            // 이 조립의 로그는 버린다 — 문면 축은 `SignUpThrottleTest` 가 직접 잡는다.
+            log = SignUpThrottleLog { },
+        )
 
     /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
     @Bean

@@ -451,7 +451,8 @@ async function main() {
     '개찰 결과 승격',
   );
 
-  // ② 로그인 계정 — 출하 운영자 명령(가입 화면·endpoint 는 없다).
+  // ② 로그인 계정 — 출하 운영자 명령. 가입 화면·endpoint 도 M15/15B 부터 있지만, 다른 여정이
+  //    쓰는 **운영 계정**은 그 경로가 아니라 이 명령이 만든다(여정 사이의 전제가 한 자리에 선다).
   runJar(
     [
       writeSecrets('account', [`bidvector.account.initial-value=${PASSPHRASE}`]),
@@ -473,6 +474,10 @@ async function main() {
         `--server.port=${appPort}`,
         `--management.server.port=${mgmtPort}`,
         '--bidvector.access.cookie-secure=false',
+        // 가입 남용 상한(M15/15B) — 이 레인은 **한 주소**에서 여러 번 가입을 시도하고, 출하
+        // 기본값(시간당 30)은 재실행·수동 재현에서 창을 넘길 수 있다. 상한 자체의 거동은
+        // `SignUpThrottleTest` 와 endpoint test 가 재므로, 여기서는 그 축을 비켜 둔다.
+        '--bidvector.signup.attempts-per-hour=1000',
       ],
       { stdio: ['ignore', 'inherit', 'inherit'] },
     ),

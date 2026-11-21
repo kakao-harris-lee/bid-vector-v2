@@ -13,7 +13,6 @@ import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.ProvisionOutcome
 import bidvector.workflow.access.SignInOutcome
 import bidvector.workflow.access.SignUpOutcome
-import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -43,18 +42,6 @@ private val POLICY =
         lockWindow = Duration.ofMinutes(15),
         hashCost = TEST_HASH_COST,
         lockWait = Duration.ofMillis(500),
-    )
-
-/** 출하 가입 정책과 같은 값 — 이 test 가 재는 축은 SQL·열이고 값의 축은 정책 test 가 잰다. */
-private val SIGN_UP_POLICY_VALUE =
-    SignUpPolicyData(
-        loginNameMinLength = 4,
-        loginNameMaxLength = 32,
-        loginNameCharacter = "[a-z0-9._-]",
-        passphraseMinLength = 10,
-        passphraseMaxBytes = 72,
-        signUpsPerAddress = 10,
-        signUpWindow = Duration.ofHours(1),
     )
 
 /** 밀 수 있는 시계 — 만료·폐기 시각을 실 DB 에서 재려면 시간을 통제해야 한다. */
@@ -339,7 +326,8 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
     @Test
     fun `같은 아이디로 두 번 가입하면 둘째는 행을 세우지 않는다 — ON CONFLICT 가 판정한다`() {
         val login = LoginName("opened-operator")
-        access().inSignInScope { it.signUp(login, ClearPassphrase.wrap(FIRST)) }
+        access()
+            .inSignInScope { it.signUp(login, ClearPassphrase.wrap(FIRST)) }
             .shouldBeInstanceOf<SignUpOutcome.Granted>()
 
         access().inSignInScope { it.signUp(login, ClearPassphrase.wrap(SECOND)) } shouldBe
@@ -359,7 +347,7 @@ class AccessStorePersistenceTest : PersistenceTestSupport() {
             keys = SecureBrowserSessionKeySource(),
             clock = clock,
             policy = POLICY,
-            signUpPolicy = SIGN_UP_POLICY_VALUE,
+            signUpPolicy = shippedSignUpPolicy(),
         )
 
     private fun provisioning(): JdbcAccountProvisioningTransaction =

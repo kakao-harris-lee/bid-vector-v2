@@ -159,7 +159,9 @@ describe('가입 화면 (M15/15B)', () => {
     ejectStub();
     ejectStub = stubResponse(BAD_REQUEST, { code: 'PASSPHRASE_INVALID', message: 'x', correlationId: 'c' });
     await submit(container, 'short');
-    expect(textOf(container, 'signup-error-passphrase')).toContain('비밀번호는');
+    expect(textOf(container, 'signup-error-passphrase')).toContain('10자 이상');
+    // 바이트 문면은 사라졌다 — 이 구현의 해시는 긴 입력을 접지 자르지 않는다(cr r1 M-1).
+    expect(textOf(container, 'signup-error-passphrase')).not.toContain('바이트');
     expect(container.querySelector('[data-testid="signup-error-login-name"]')).toBeNull();
   });
 
@@ -183,7 +185,7 @@ describe('가입 화면 (M15/15B)', () => {
 
     await submit(container, 'a-long-enough-passphrase');
 
-    expect(textOf(container, 'signup-failure')).toContain('로그인');
+    expect(textOf(container, 'signup-failure')).toContain('로그인으로');
   });
 
   /** 확인 칸은 **서버가 볼 수 없는 사실**이라 보내지 않는다 — 화면이 스스로 가른다. */
@@ -221,6 +223,38 @@ describe('가입 화면 (M15/15B)', () => {
 
     expect(container.querySelector('[data-testid="screen-signup"]')).not.toBeNull();
     expect(container.querySelectorAll('nav[aria-label="화면"]')).toHaveLength(0);
+  });
+
+  /** code-review r1 M-2 — 오류 문장이 `<label>` 밖이라 입력칸의 **접근 이름**을 오염시키지 않는다. */
+  it('오류 문장이 입력칸의 접근 이름에 섞이지 않고 aria 로 묶인다', async () => {
+    ejectStub = stubResponse(CONFLICT, { code: 'ACCOUNT_EXISTS', message: 'x', correlationId: 'c' });
+    await renderSignUp(container);
+
+    await submit(container, 'a-long-enough-passphrase');
+
+    const input = container.querySelector<HTMLInputElement>('input[name="loginName"]');
+    const label = container.querySelector<HTMLLabelElement>('label[for="signup-login-name"]');
+    expect(label?.textContent ?? '').toBe('아이디');
+    expect(input?.getAttribute('aria-invalid')).toBe('true');
+    expect(input?.getAttribute('aria-describedby')).toBe('signup-error-login-name');
+    // 오류 노드는 label 의 자손이 **아니다** — 안에 있으면 그 글자가 접근 이름이 된다.
+    expect(label?.querySelector('[data-testid="signup-error-login-name"]')).toBeNull();
+  });
+
+  it('거부가 없으면 aria-invalid 가 서지 않는다 — 대조', async () => {
+    await renderSignUp(container);
+
+    const input = container.querySelector<HTMLInputElement>('input[name="loginName"]');
+    expect(input?.getAttribute('aria-invalid')).toBe('false');
+    expect(input?.getAttribute('aria-describedby')).toBeNull();
+  });
+
+  /** code-review r1 M-3 — 세션 전 자리라 셸 탐색이 없다. 이 링크가 유일한 길이다. */
+  it('가입 화면에서 로그인으로 돌아가는 링크가 있다', async () => {
+    await renderSignUp(container);
+
+    const link = container.querySelector<HTMLAnchorElement>('[data-testid="go-login"]');
+    expect(link?.getAttribute('href')).toBe('/login');
   });
 
   it('로그인 화면에서 가입 자리로 가는 링크가 있다', async () => {

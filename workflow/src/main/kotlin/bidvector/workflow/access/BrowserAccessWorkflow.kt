@@ -109,13 +109,32 @@ class BrowserAccessWorkflow(
     fun signUp(
         login: LoginName,
         clear: ClearPassphrase,
+    ): SignUpOutcome =
+        // 거부의 갈래 셋이 **한 표**에 선다(`signIn` 과 같은 모양) — 반환 자리가 하나뿐이라
+        // 「한 갈래만 다르게 끝내는」 편집이 눈에 띈다.
+        when {
+            !signUpPolicy.accepts(login) -> {
+                SignUpOutcome.RefusedLoginNameShape
+            }
+
+            !signUpPolicy.accepts(clear) -> {
+                SignUpOutcome.RefusedPassphraseShape
+            }
+
+            else -> {
+                opened(login, hasher.hash(clear))
+            }
+        }
+
+    /**
+     * 이름이 비어 있으면 행을 세우고 세션까지 낸다. 막 만든 행이라 잠금이 없고 자격이 그대로지만
+     * **조건부 확정을 그대로 지난다** — 조건을 건너뛰는 둘째 경로를 두지 않는다.
+     */
+    private fun opened(
+        login: LoginName,
+        hash: PassphraseHash,
     ): SignUpOutcome {
-        if (!signUpPolicy.accepts(login)) return SignUpOutcome.RefusedLoginNameShape
-        if (!signUpPolicy.accepts(clear)) return SignUpOutcome.RefusedPassphraseShape
-        val hash = hasher.hash(clear)
         val account = signUps.insertIfAbsent(login, hash) ?: return SignUpOutcome.RefusedDuplicate
-        // 막 만든 행이라 잠금이 없고 자격이 그대로다 — 그래도 **조건부 확정**을 그대로 지난다
-        // (조건을 건너뛰는 둘째 경로를 두지 않는다).
         return issue(AccountSnapshot(account, hash, null), clock.now())
             ?.let { SignUpOutcome.Granted(it) }
             ?: SignUpOutcome.SessionUnavailable

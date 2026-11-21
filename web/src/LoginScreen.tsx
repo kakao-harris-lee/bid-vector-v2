@@ -13,7 +13,11 @@ import { SIGN_UP_PATH } from './SignUpScreen';
 const FAILURE_MESSAGE = '로그인에 실패했습니다. 입력값을 확인하세요.';
 
 const HOME_PATH = '/';
-const LOGIN_PATH = '/login';
+/**
+ * 로그인 자리의 주소 — **여기가 한 자리**다. 가입 화면의 「로그인으로」 링크가 이 값을 읽는다
+ * (라우트 표에 두면 화면 → 표 → 화면의 고리가 생긴다, `SIGN_UP_PATH` 와 같은 판단).
+ */
+export const LOGIN_PATH = '/login';
 
 /**
  * 로그인 뒤 **돌아갈 자리**(M13/13B). 세션이 끊겨 떠밀려 온 운영자를 홈이 아니라 하던 자리로

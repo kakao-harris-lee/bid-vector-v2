@@ -9,7 +9,6 @@ import bidvector.workflow.access.ClearPassphrase
 import bidvector.workflow.access.LoginName
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.PassphraseHasher
-import bidvector.workflow.access.SignUpPolicyData
 import bidvector.workflow.access.ProvisionOutcome
 import bidvector.workflow.access.SignInOutcome
 import bidvector.workflow.strategy.Clock
@@ -109,18 +108,6 @@ private val CONCURRENCY_POLICY =
         lockWindow = Duration.ofMinutes(15),
         hashCost = CONCURRENCY_HASH_COST,
         lockWait = Duration.ofMillis(500),
-    )
-
-/** 이 class 의 축은 로그인 경합이다 — 가입 정책은 조립에만 선다(출하 값과 같은 모양). */
-private val CONCURRENCY_SIGN_UP_POLICY =
-    SignUpPolicyData(
-        loginNameMinLength = 4,
-        loginNameMaxLength = 32,
-        loginNameCharacter = "[a-z0-9._-]",
-        passphraseMinLength = 10,
-        passphraseMaxBytes = 72,
-        signUpsPerAddress = 10,
-        signUpWindow = Duration.ofHours(1),
     )
 
 private class FixedClock(
@@ -363,7 +350,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
             keys = keys,
             clock = clock,
             policy = CONCURRENCY_POLICY,
-            signUpPolicy = CONCURRENCY_SIGN_UP_POLICY,
+            signUpPolicy = shippedSignUpPolicy(),
         )
 
     private fun signIn(

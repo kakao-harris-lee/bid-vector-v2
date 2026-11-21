@@ -2,8 +2,8 @@ package bidvector.app.http
 
 import bidvector.adapters.access.BrowserAccessTransaction
 import bidvector.workflow.access.AccountId
-import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountSignUpPort
+import bidvector.workflow.access.AccountSnapshot
 import bidvector.workflow.access.AccountStorePort
 import bidvector.workflow.access.BrowserAccessPolicyData
 import bidvector.workflow.access.BrowserAccessWorkflow
@@ -36,10 +36,20 @@ val TEST_SIGN_UP_POLICY: SignUpPolicyData =
         loginNameMaxLength = 32,
         loginNameCharacter = "[a-z0-9._-]",
         passphraseMinLength = 10,
-        passphraseMaxBytes = 72,
-        signUpsPerAddress = 10,
-        signUpWindow = Duration.ofHours(1),
+        passphraseMaxLength = 1024,
     )
+
+/**
+ * 상한의 test 값 — **출하 기본값(30)보다 작게** 둔다. 429 를 재는 test 가 그 수만큼 요청을
+ * 보내야 하므로, 작을수록 그 test 가 싸다. 상한 자체의 값은 설정 속성이고 그 기본값은
+ * `SignUpThrottlePropertiesTest` 가 아니라 출하 설정이 든다.
+ */
+const val TEST_SIGN_UP_ATTEMPTS = 10
+
+val TEST_SIGN_UP_WINDOW: Duration = Duration.ofHours(1)
+
+/** 추적 주소 상한의 test 값 — 이 레인의 요청은 모두 한 주소라 그 축을 재는 것은 순수 test 다. */
+const val TEST_TRACKED_ADDRESS_LIMIT = 100
 
 /** 출하 정책과 **같은 모양**의 값 — 쿠키 Max-Age·만료 단언이 이 값을 읽는다. */
 val TEST_ACCESS_POLICY: BrowserAccessPolicyData =

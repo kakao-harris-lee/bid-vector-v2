@@ -120,19 +120,28 @@ class AccountSignUpTest {
     }
 
     @Test
-    fun `비밀번호는 하한 미만과 바이트 상한 초과를 거부한다 — bcrypt 가 조용히 자르는 자리`() {
+    fun `비밀번호는 하한 미만과 상한 초과를 거부한다 — 입력 위생 경계`() {
         val tooShort = "a".repeat(policy().passphraseMinLength - 1)
-        // 한글 한 글자가 UTF-8 로 3바이트 — **글자 수가 아니라 바이트**로 재는 것을 이 값이 드러낸다.
-        val tooManyBytes = "가".repeat(policy().passphraseMaxBytes / 3 + 1)
+        val tooLong = "a".repeat(policy().passphraseMaxLength + 1)
 
         signUp(value = tooShort) shouldBe SignUpOutcome.RefusedPassphraseShape
-        signUp(value = tooManyBytes) shouldBe SignUpOutcome.RefusedPassphraseShape
+        signUp(value = tooLong) shouldBe SignUpOutcome.RefusedPassphraseShape
         signUps.count shouldBe 0
     }
 
     @Test
-    fun `바이트 상한 바로 아래는 받는다 — 경계가 거부 쪽으로 밀리지 않았다`() {
-        signUp(value = "a".repeat(policy().passphraseMaxBytes)).shouldBeInstanceOf<SignUpOutcome.Granted>()
+    fun `상한 바로 아래는 받는다 — 경계가 거부 쪽으로 밀리지 않았다`() {
+        signUp(value = "a".repeat(policy().passphraseMaxLength)).shouldBeInstanceOf<SignUpOutcome.Granted>()
+    }
+
+    /**
+     * code-review r1 M-1 — **한글 비밀번호가 영문과 같은 규칙 아래 선다.** 앞 판은 UTF-8 바이트로
+     * 재면서 「bcrypt 가 72바이트 위를 자른다」를 근거로 들었고, 그래서 한글 25자가 아무 이유 없이
+     * 막혔다. 이 저장소의 해시 어댑터는 긴 입력을 SHA-512 로 접는다 — 자르지 않는다.
+     */
+    @Test
+    fun `한글 비밀번호가 같은 길이 규칙으로 통과한다`() {
+        signUp(value = "비밀번호를적는다열글자".repeat(1)).shouldBeInstanceOf<SignUpOutcome.Granted>()
     }
 
     @Test

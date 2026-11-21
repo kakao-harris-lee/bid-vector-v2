@@ -57,17 +57,19 @@ class ClearPassphrase private constructor(
      * 길이가 정책 범위 안인가(M15/15B) — **판정이 타입 안에 있다.** 밖에서 재려면 [hashInput]
      * 의 둘째 소비자가 생기고, 그러면 위 (2b) 축의 「접근자 하나뿐」이 사실이 아니게 된다.
      *
-     * 상한을 **바이트**로 재는 이유는 bcrypt 다 — 72바이트를 넘는 입력을 구현이 조용히 자르므로,
-     * 넘는 값을 받아 주면 운영자가 입력한 것과 **다른 값**이 자격이 된다. 하한은 사람이 세는
-     * 단위(글자 수)로 재고, 둘의 단위가 다른 것은 각자의 근거가 달라서다.
+     * **글자 수로 잰다.** 앞 판은 UTF-8 바이트로 재면서 그 근거를 「bcrypt 가 72바이트 위를
+     * 조용히 자른다」로 적었는데, 이 저장소의 해시 어댑터는 긴 입력을 SHA-512 로 **접는다** —
+     * 자르지도 거부하지도 않는다(code-review r1 M-1). 그래서 바이트로 잴 이유가 사라졌고, 한글
+     * 비밀번호가 아무 이유 없이 막히던 자리도 함께 사라진다.
+     *
+     * **사본을 만들지 않는다**(code-review r1 LOW). 앞 판은 `concatToString()` 으로 지울 수 없는
+     * `String` 을 만들어 이 타입의 규율(「지울 수 있는 사본만 밖에 낸다」) 가장자리에 섰다 —
+     * 길이는 배열 자신이 안다.
      */
     fun fitsLength(
         minimumCharacters: Int,
-        maximumBytes: Int,
-    ): Boolean {
-        if (chars.size < minimumCharacters) return false
-        return chars.concatToString().toByteArray(StandardCharsets.UTF_8).size <= maximumBytes
-    }
+        maximumCharacters: Int,
+    ): Boolean = chars.size in minimumCharacters..maximumCharacters
 
     override fun toString(): String = "ClearPassphrase(***)"
 

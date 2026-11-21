@@ -46,7 +46,7 @@ class AccountSignUpEndpointTest : HttpIntegrationTestBase() {
     fun resetState() {
         access.reset()
         // 창을 지나 보내 상한의 계수를 비운다 — test 사이의 격리이자 「창 밖은 잊는다」의 측정이다.
-        clock.advance(TEST_SIGN_UP_POLICY.signUpWindow.toMillis() + 1)
+        clock.advance(TEST_SIGN_UP_WINDOW.toMillis() + 1)
     }
 
     @Test
@@ -94,7 +94,7 @@ class AccountSignUpEndpointTest : HttpIntegrationTestBase() {
 
     @Test
     fun `상한을 넘으면 429 다 — 그리고 창이 지나면 다시 열린다`() {
-        repeat(TEST_SIGN_UP_POLICY.signUpsPerAddress) { index ->
+        repeat(TEST_SIGN_UP_ATTEMPTS) { index ->
             signUp(login = "limit-probe-$index").statusCode.value() shouldBe 201
         }
 
@@ -102,8 +102,30 @@ class AccountSignUpEndpointTest : HttpIntegrationTestBase() {
         refused.statusCode.value() shouldBe 429
         refused.body?.get("code") shouldBe ErrorCode.SIGN_UP_RATE_LIMITED
 
-        clock.advance(TEST_SIGN_UP_POLICY.signUpWindow.toMillis() + 1)
+        clock.advance(TEST_SIGN_UP_WINDOW.toMillis() + 1)
         signUp(login = "limit-probe-after").statusCode.value() shouldBe 201
+    }
+
+    /**
+     * verifier r1 MEDIUM-1 — **상한이 「시도」를 KDF 앞에서 센다**는 성질. 앞 판의 429 test 는 성공
+     * 열 건으로 상한을 채워서, 상한을 use case **뒤**로 옮기고 성공만 세는 변이가 **살아남았다**
+     * (실측). 여기서는 **계정이 하나도 서지 않는** 요청으로 칸을 채운다 — 그 변이에서는 칸이
+     * 비어 있어 열한 번째가 201 이고, 이 test 가 붉는다.
+     */
+    @Test
+    fun `무효한 시도도 칸을 먹는다 — 상한이 KDF 앞에서 시도를 센다`() {
+        repeat(TEST_SIGN_UP_ATTEMPTS) { index ->
+            // 아이디 형식 거부 — use case 는 해시도 삽입도 돌지 않는다.
+            signUp(login = "X$index").statusCode.value() shouldBe 400
+        }
+        access.signUps.created shouldBe emptyList()
+
+        val refused = signUp()
+
+        refused.statusCode.value() shouldBe 429
+        refused.body?.get("code") shouldBe ErrorCode.SIGN_UP_RATE_LIMITED
+        // 상한이 뒤에 섰다면 이 요청이 201 이었을 것이다 — 계정도 서지 않는다.
+        access.signUps.created shouldBe emptyList()
     }
 
     @Test
