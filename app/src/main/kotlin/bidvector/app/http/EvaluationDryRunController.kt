@@ -6,7 +6,9 @@ import bidvector.app.wiring.EvaluationDryRunRun
 import bidvector.decision.Verdict
 import bidvector.procurement.NoticeId
 import bidvector.workflow.evaluation.CandidateEvaluation
+import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
@@ -36,14 +38,22 @@ import tools.jackson.databind.JsonNode
 class EvaluationDryRunController(
     private val factory: EvaluationDryRunFactory,
 ) {
-    @PostMapping("/api/evaluation-dry-runs")
+    /**
+     * **M15/15A — 세션 계정의 전략으로 돈다.** dry-run 은 계약이 이름으로 적지 않은 넷째 자리인데,
+     * 전략을 읽으므로 같은 규칙을 피할 수 없다 — 계정 없이 읽으면 그것은 남의 전략이다.
+     * 주체를 본문보다 **먼저** 꺼내 인증 거부가 본문 형식 오류보다 앞에 선다(`ProfileCommandController`
+     * 와 같은 관례).
+     */
+    @PostMapping(AccountScopedRoutes.EVALUATION_DRY_RUNS)
     fun evaluate(
         @RequestBody body: JsonNode,
-    ): EvaluationDryRunResponse {
+        httpRequest: HttpServletRequest,
+    ): ResponseEntity<Any> {
+        val account = httpRequest.authenticatedAccount() ?: return unauthenticated(httpRequest)
         val request = EvaluationDryRunRequest(parseCurrentActiveBids(body))
-        val run = factory.forRequest(request.currentActiveBids)
+        val run = factory.forRequest(account, request.currentActiveBids)
         val results = runBlocking { run.useCase.evaluate() }
-        return EvaluationDryRunResponse.from(request.currentActiveBids, run, results)
+        return ResponseEntity.ok(EvaluationDryRunResponse.from(request.currentActiveBids, run, results))
     }
 }
 

@@ -11,6 +11,7 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.StrategyViolation
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.StrategyRepository
 import java.sql.Connection
@@ -54,6 +55,9 @@ class JdbcStrategyRepository(
         this(OwnTransactionConnectionSource(dataSource), policy)
 
     /**
+     * **M15/15A(V28) — 계정 소유다.** 술어가 `account_id = ?` 하나라 다른 계정의 행이 결과집합에
+     * 들어올 구조가 없다. 「행이 없다」가 계정마다 서고, 그 갈래의 답은 아래 그대로다.
+     *
      * **D-6F1-4 — 전략 없음(첫 기동)은 실패가 아니라 빈 전략이다.** 행이 없으면
      * `StrategyDraft()`(전부 기본값)와 `StrategyRevision(0)`을 그대로 [validate]에
      * 넣는다 — 그 값도 검증 함수를 지난다(이 갈래가 `Invalid`로 떨어질 일은 없다: 빈
@@ -63,8 +67,8 @@ class JdbcStrategyRepository(
      * 않는다 — [StrategyValidation.Invalid]는 [InvalidStoredStrategyException]으로
      * 번역되어 그 사유(위반 목록)를 그대로 담아 전파된다.
      */
-    override fun load(): OperatorStrategy {
-        val row = connections.withConnection { it.querySingletonStrategyRow() }
+    override fun load(account: AccountId): OperatorStrategy {
+        val row = connections.withConnection { it.queryStrategyRow(account) }
         val draft = row?.toDraft() ?: StrategyDraft()
         val revision = StrategyRevision(row?.revision ?: 0)
         return when (val result = validate(draft, revision, policy)) {
@@ -85,22 +89,28 @@ class JdbcStrategyRepository(
      * `DataSource` 생성자에서는 [OwnTransactionConnectionSource] 가 주인이라 거동이
      * 이전과 같다.
      */
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         val row = applied.strategy.toRow()
         connections.withConnection { connection ->
             connection.prepareStatement(Sql.UPSERT_STRATEGY).use { statement ->
-                statement.bindStrategyRow(1, row)
+                statement.setLong(1, account.value)
+                statement.bindStrategyRow(2, row)
                 statement.executeUpdate()
             }
             connection.prepareStatement(Sql.INSERT_STRATEGY_REVISION).use { statement ->
-                statement.bindStrategyRow(1, row)
+                statement.setLong(1, account.value)
+                statement.bindStrategyRow(2, row)
                 statement.executeUpdate()
             }
         }
     }
 
-    private fun Connection.querySingletonStrategyRow(): StrategyRow? =
+    private fun Connection.queryStrategyRow(account: AccountId): StrategyRow? =
         prepareStatement(Sql.SELECT_STRATEGY).use { statement ->
+            statement.setLong(1, account.value)
             statement.executeQuery().use { rs -> if (rs.next()) rs.toStrategyRow() else null }
         }
 }

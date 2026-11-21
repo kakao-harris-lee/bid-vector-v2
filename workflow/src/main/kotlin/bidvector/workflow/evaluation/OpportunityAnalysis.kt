@@ -21,6 +21,7 @@ import bidvector.sharedkernel.EffectiveDatedPolicy
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.WatchSubject
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.embedding.EmbedTextPort
 import bidvector.workflow.embedding.EmbedTextRequest
 import bidvector.workflow.embedding.EmbeddingOutcome
@@ -91,11 +92,12 @@ class OpportunityAnalysis internal constructor(
     )
 
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome {
         val referenceDate = LocalDate.ofInstant(clock.now(), ZoneOffset.UTC)
-        return when (val result = runPipeline(notice, correlationId, referenceDate)) {
+        return when (val result = runPipeline(account, notice, correlationId, referenceDate)) {
             is Step.Ok -> result.value
             is Step.Halt -> result.outcome
         }
@@ -103,13 +105,14 @@ class OpportunityAnalysis internal constructor(
 
     /** scope.md ② 순서 고정 guard 체인 — 한 단계라도 [Step.Halt] 면 이후 단계를 부르지 않는다. */
     private suspend fun runPipeline(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
         referenceDate: LocalDate,
     ): Step<MlAnalysisOutcome> =
         resolvePolicies(referenceDate).andThen { policies ->
             findSubject(notice).andThen { subject ->
-                findProfile().andThen { profileFacts ->
+                findProfile(account).andThen { profileFacts ->
                     synthesizeTexts(subject, profileFacts, policies.opportunity).andThen { texts ->
                         embedPairStep(texts, policies, correlationId).andThen { vectors ->
                             matchScoreStep(vectors, policies).andThen { matchScore ->
@@ -161,8 +164,8 @@ class OpportunityAnalysis internal constructor(
             WatchSubjectOutcome.Unavailable -> halt(MlUnavailableReason.ScoreNotProvided)
         }
 
-    private fun findProfile(): Step<ProfileFacts> =
-        profile.current()?.let(::ok) ?: halt(MlUnavailableReason.ScoreNotProvided)
+    private fun findProfile(account: AccountId): Step<ProfileFacts> =
+        profile.current(account)?.let(::ok) ?: halt(MlUnavailableReason.ScoreNotProvided)
 
     /**
      * scope.md ②(4) — notice 를 먼저 부르고, 그 응답이 이미 `Unavailable` 이면 profile 은

@@ -13,6 +13,7 @@ import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.PriorityScore
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
@@ -47,6 +48,12 @@ import bidvector.workflow.strategy.StrategyRepository
  * 없다 — 아래 public 보조 생성자만 밖에 남는다.
  */
 class EvaluateCandidatesUseCase internal constructor(
+    /**
+     * **M15/15A — 이 run 은 계정 하나의 평가다.** 전략 · 자격 사실 · 기회 분석이 전부 이 계정의
+     * 것이고, 알림도 이 계정의 알림함으로만 간다(조립이 청중을 이 계정으로 고정한다).
+     * 계정마다 run 이 하나씩이라 인스턴스가 두 계정을 섞는 상태가 없다.
+     */
+    private val account: AccountId,
     private val strategies: StrategyRepository,
     private val candidateSource: CandidateSourcePort,
     private val watchSubjects: WatchSubjectPort,
@@ -77,6 +84,7 @@ class EvaluateCandidatesUseCase internal constructor(
 ) {
     /** 실 배선(public) — `judge`는 항상 [VerdictLadder.judge]다. */
     constructor(
+        account: AccountId,
         strategies: StrategyRepository,
         candidateSource: CandidateSourcePort,
         watchSubjects: WatchSubjectPort,
@@ -89,6 +97,7 @@ class EvaluateCandidatesUseCase internal constructor(
         ladderPolicySlot: LadderPolicySlot = EVALUATION_LADDER_POLICY_SLOT,
         analysisBudget: Int? = null,
     ) : this(
+        account,
         strategies,
         candidateSource,
         watchSubjects,
@@ -109,7 +118,7 @@ class EvaluateCandidatesUseCase internal constructor(
      * 병렬화는 이 slice 밖).
      */
     suspend fun evaluate(): List<CandidateEvaluation> {
-        val strategy = strategies.load()
+        val strategy = strategies.load(account)
         val candidates = candidateSource.openCandidates()
         val capacitySnapshot = capacity.snapshot()
         return candidates.mapIndexed { index, notice ->
@@ -157,7 +166,7 @@ class EvaluateCandidatesUseCase internal constructor(
         strategy: OperatorStrategy,
         correlationId: CorrelationId,
     ): CandidateEvaluation.NotReached? =
-        when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
+        when (val screening = screenCandidate(account, notice, strategy, clock, watchSubjects, licenseGate)) {
             is CandidateScreening.Passed -> null
             is CandidateScreening.Dropped -> notReached(notice, correlationId, screening.stage, screening.reason, null)
         }
@@ -203,7 +212,7 @@ class EvaluateCandidatesUseCase internal constructor(
     ): CandidateEvaluation {
         val bidNowThreshold = requireNotNull(strategy.actionThresholds.bidNowThreshold)
         val reviewThreshold = requireNotNull(strategy.actionThresholds.reviewThreshold)
-        return when (val outcome = mlAnalysis.analyze(notice, correlationId)) {
+        return when (val outcome = mlAnalysis.analyze(account, notice, correlationId)) {
             is MlAnalysisOutcome.SimilarityProjectionNotReady -> {
                 notReached(
                     notice,

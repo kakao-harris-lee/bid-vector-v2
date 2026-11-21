@@ -6,6 +6,7 @@ import bidvector.qualification.LicenseJudgement
 import bidvector.qualification.LicenseQualificationPolicyData
 import bidvector.qualification.OperatorLicenses
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.LicenseJudgementPort
 import bidvector.workflow.evaluation.OperatorProfilePort
 
@@ -24,7 +25,7 @@ import bidvector.workflow.evaluation.OperatorProfilePort
  * 감시한다**(`StoredRequirementLicenseGateTest`). 중복을 지우는 대신 **갈라지면 붉어지게** 둔 것이고,
  * 그 등식이 없으면 「같은 입력에 다른 판정」이 설 여지가 생긴다.
  *
- * 프로필 미설정(`current()` 가 `null`)은 [OperatorLicenses.NotDeclared] 이고 커널이 그 값을
+ * 프로필 미설정(`current(account)` 가 `null`)은 [OperatorLicenses.NotDeclared] 이고 커널이 그 값을
  * `Uncertain(OperatorLicensesNotDeclared)` 로 옮긴다 — `Uncertain ≠ Ineligible`(U-5).
  */
 class StoredRequirementLicenseJudgement(
@@ -32,9 +33,12 @@ class StoredRequirementLicenseJudgement(
     private val operatorProfilePort: OperatorProfilePort,
     private val policy: Resolution.Resolved<LicenseQualificationPolicyData>,
 ) : LicenseJudgementPort {
-    override fun judgementFor(notice: Notice): LicenseJudgement {
+    override fun judgementFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseJudgement {
         val collection = store.find(notice.id)
-        val operatorLicenses = operatorProfilePort.current()?.licenses ?: OperatorLicenses.NotDeclared
+        val operatorLicenses = operatorProfilePort.current(account)?.licenses ?: OperatorLicenses.NotDeclared
         return LicenseEligibility.judge(collection, operatorLicenses, policy)
     }
 }

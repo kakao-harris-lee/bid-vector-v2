@@ -14,7 +14,8 @@ import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.MlAnalysisPort
 import bidvector.workflow.evaluation.OutboxNotificationRequestPort
 import bidvector.workflow.evaluation.WatchSubjectPort
-import bidvector.workflow.notificationinbox.NotificationAudiencePort
+import bidvector.workflow.access.AccountId
+import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationInboxPort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyRepository
@@ -54,6 +55,11 @@ import javax.sql.DataSource
  */
 @Suppress("LongParameterList")
 class EvaluationCommitRun(
+    /**
+     * **M15/15A — run 하나는 계정 하나다.** 전략·자격·기회 분석이 전부 이 계정의 것이고, 알림함
+     * 기록도 이 계정으로만 간다(아래 [notifications] 의 청중).
+     */
+    private val account: AccountId,
     dataSource: DataSource,
     private val strategies: StrategyRepository,
     private val candidateSource: CandidateSourcePort,
@@ -75,7 +81,6 @@ class EvaluationCommitRun(
      * 단건 경로에 알림함 감싸기를 심은 변이를 그 둘이 RED 로 냈다).
      */
     private val notificationInbox: NotificationInboxPort,
-    private val audience: NotificationAudiencePort,
     release: ReleaseIdentifier,
 ) {
     /**
@@ -92,12 +97,17 @@ class EvaluationCommitRun(
                     clock,
                 ),
             inbox = notificationInbox,
-            audience = audience,
+            // **M15/15A — 청중은 이 run 의 계정 하나로 고정한다**(`PinnedStrategyRepository` 와 같은
+            // 꼴). 앞 판은 `JdbcNotificationAudience` 를 그대로 받아 **모든 계정**의 알림함에 같은 새
+            // 후보를 적었다 — 그것이 이 slice 가 닫는 누출이다. 계정 전수를 읽는 자리는 이제 러너
+            // 하나이고(`EvaluationCommitRuns.audience`), 그 목록의 계정마다 run 이 하나씩 선다.
+            audience = { NotificationAudience.Accounts(listOf(account)) },
             clock = clock,
         )
 
     suspend fun evaluate(): List<CandidateEvaluation> =
         EvaluateCandidatesUseCase(
+            account = account,
             strategies = strategies,
             candidateSource = candidateSource,
             watchSubjects = watchSubjects,

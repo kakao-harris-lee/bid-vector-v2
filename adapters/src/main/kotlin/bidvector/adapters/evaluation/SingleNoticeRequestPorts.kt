@@ -1,6 +1,7 @@
 package bidvector.adapters.evaluation
 
 import bidvector.procurement.Notice
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.evaluation.MlAnalysisPort
@@ -41,10 +42,11 @@ class RecordingMlAnalysis(
     private val recorded = mutableListOf<MlAnalysisOutcome>()
 
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome {
-        val outcome = delegate.analyze(notice, correlationId)
+        val outcome = delegate.analyze(account, notice, correlationId)
         recorded += outcome
         return outcome
     }

@@ -9,6 +9,7 @@ import bidvector.strategy.StrategyValidation
 import bidvector.strategy.StrategyViolation
 import bidvector.strategy.toDraft
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.BeginOutcome
 import bidvector.workflow.strategy.CancellationReason
@@ -47,10 +48,11 @@ class StrategyEditExecutor(
 ) {
     /** 세션 id 는 **서버가** 만든다(D-6A2b-1, 우회 (4)) — 요청이 고르면 남의 세션을 겨냥할 자리가 생긴다. */
     fun begin(
+        account: AccountId,
         actor: OperatorId,
         field: EditableField,
     ): BeginOutcome =
-        transaction.inTransaction { workflow ->
+        transaction.inTransaction(account) { workflow ->
             workflow.begin(EditSessionId(UUID.randomUUID().toString()), actor, field)
         }
 
@@ -64,7 +66,10 @@ class StrategyEditExecutor(
      * 만료된 세션의 command 는 fold 를 지나 거부되고, 낡은 기준 revision 은 D-6A2b-18 이
      * 다시 막는다.
      */
-    fun view(sessionId: EditSessionId): EditSession? = transaction.inTransaction { it.view(sessionId) }
+    fun view(
+        account: AccountId,
+        sessionId: EditSessionId,
+    ): EditSession? = transaction.inTransaction(account) { it.view(sessionId) }
 
     /**
      * 값 제출 — 현재 전략을 초안으로 내보내 **그 필드 하나만** 바꾼 뒤 command 로 넘긴다
@@ -76,13 +81,14 @@ class StrategyEditExecutor(
      * 방어) 이 앞선 거부는 판정을 바꾸지 않고 **사유를 HTTP 로 옮길 자리**를 만든다.
      */
     fun provideValue(
+        account: AccountId,
         actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         field: EditableField,
         value: EditValue,
     ): ProvideValueOutcome =
-        transaction.inTransaction { workflow ->
+        transaction.inTransaction(account) { workflow ->
             val current: OperatorStrategy = workflow.currentStrategy()
             val draft = current.toDraft().withFieldValue(field, value)
             when (val validation = validate(draft, current.revision, strategyPolicy)) {
@@ -109,31 +115,34 @@ class StrategyEditExecutor(
         }
 
     fun confirm(
+        account: AccountId,
         actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         seenRevision: StrategyRevision,
     ): CommandResult =
-        transaction.inTransaction { workflow ->
+        transaction.inTransaction(account) { workflow ->
             workflow.confirm(EditCommand.Confirm(commandId, sessionId, Actor.Operator(actor), seenRevision))
         }
 
     fun requestEdit(
+        account: AccountId,
         actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
         field: EditableField,
     ): CommandResult =
-        transaction.inTransaction { workflow ->
+        transaction.inTransaction(account) { workflow ->
             workflow.requestEdit(EditCommand.RequestEdit(commandId, sessionId, Actor.Operator(actor), field))
         }
 
     fun cancel(
+        account: AccountId,
         actor: OperatorId,
         sessionId: EditSessionId,
         commandId: CommandId,
     ): CommandResult =
-        transaction.inTransaction { workflow ->
+        transaction.inTransaction(account) { workflow ->
             workflow.cancel(
                 EditCommand.Cancel(
                     commandId,
@@ -169,5 +178,6 @@ sealed interface ProvideValueOutcome {
 class StrategyQuery(
     private val strategies: StrategyReader,
 ) {
-    fun current(): OperatorStrategy = strategies.load()
+    /** **M15/15A** — 그 계정의 전략이다. 행이 없으면 빈 전략이고 남의 행을 빌려 오지 않는다. */
+    fun current(account: AccountId): OperatorStrategy = strategies.load(account)
 }

@@ -1,5 +1,6 @@
 package bidvector.app.wiring
 
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.suggestion.ListSuggestionsUseCase
 import bidvector.workflow.suggestion.SuggestionList
 
@@ -10,5 +11,6 @@ import bidvector.workflow.suggestion.SuggestionList
 class SuggestionQuery(
     private val suggestions: ListSuggestionsUseCase,
 ) {
-    fun list(): SuggestionList = suggestions.list()
+    /** **M15/15A** — 그 계정의 전략·자격으로 계산한 목록이다. */
+    fun list(account: AccountId): SuggestionList = suggestions.list(account)
 }

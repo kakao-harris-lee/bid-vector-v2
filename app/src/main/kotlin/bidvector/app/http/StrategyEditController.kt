@@ -30,7 +30,7 @@ import tools.jackson.databind.JsonNode
  * 행위자를 위조할 길은 없다(우회 (8)).
  */
 @RestController
-@RequestMapping("/api/strategy/edit-sessions")
+@RequestMapping(STRATEGY_EDIT_SESSIONS)
 class StrategyEditController(
     private val executor: StrategyEditExecutor,
 ) {
@@ -38,17 +38,20 @@ class StrategyEditController(
     fun begin(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): ResponseEntity<Any> =
-        executor
-            .begin(actorOf(request), body.requireObject().requireKnownKeys(setOf("field")).field())
+    ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
+        return executor
+            .begin(account, actorOf(request), body.requireObject().requireKnownKeys(setOf("field")).field())
             .toResponse(request)
+    }
 
     @GetMapping("/{sessionId}")
     fun view(
         @PathVariable sessionId: String,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
-        val session = executor.view(sessionIdOf(sessionId)) ?: return sessionNotFound(request)
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
+        val session = executor.view(account, sessionIdOf(sessionId)) ?: return sessionNotFound(request)
         return ResponseEntity.ok(EditSessionResponse.from(session))
     }
 
@@ -58,10 +61,12 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val payload = body.requireObject()
         val field = payload.field()
         return executor
             .provideValue(
+                account,
                 actorOf(request),
                 sessionIdOf(sessionId),
                 payload.commandId(),
@@ -76,9 +81,10 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val payload = body.requireObject().requireKnownKeys(setOf("commandId", "seenRevision"))
         return executor
-            .confirm(actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.seenRevision())
+            .confirm(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.seenRevision())
             .toResponse(request)
     }
 
@@ -88,9 +94,10 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val payload = body.requireObject().requireKnownKeys(setOf("commandId", "field"))
         return executor
-            .requestEdit(actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.field())
+            .requestEdit(account, actorOf(request), sessionIdOf(sessionId), payload.commandId(), payload.field())
             .toResponse(request)
     }
 
@@ -100,14 +107,23 @@ class StrategyEditController(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val payload = body.requireObject().requireKnownKeys(setOf("commandId"))
-        return executor.cancel(actorOf(request), sessionIdOf(sessionId), payload.commandId()).toResponse(request)
+        return executor
+            .cancel(account, actorOf(request), sessionIdOf(sessionId), payload.commandId())
+            .toResponse(request)
     }
 }
 
 /**
- * 행위자 — 기본 거부 필터가 적은 **인증 주체** 그대로다(감사 행이 읽는 바로 그 값). 자격 헤더
- * 경로는 `operator`, 세션 경로는 `account:<id>` 다.
+ * 편집 세션의 뿌리(M15/15A) — `@RequestMapping` 과 `AccountScopedRoutes.STRATEGY` 가 같은 문자열을
+ * 쓰게 한다. 전략 뿌리 아래라 계정 전용 판정이 이 경로들에도 **선언 하나로** 따라온다.
+ */
+const val STRATEGY_EDIT_SESSIONS: String = AccountScopedRoutes.STRATEGY + "/edit-sessions"
+
+/**
+ * 행위자 — 기본 거부 필터가 적은 **인증 주체** 그대로다(감사 행이 읽는 바로 그 값). 세션 경로는
+ * `account:<id>` 이고, 이 경로들은 M15/15A 이후 세션으로만 닿는다.
  */
 private fun actorOf(request: HttpServletRequest): OperatorId = OperatorId(request.authenticatedSubject())
 

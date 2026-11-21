@@ -4,6 +4,7 @@ import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyRevision
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateScreening
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
@@ -92,14 +93,19 @@ class ListSuggestionsUseCase(
     private val licenseGate: LicenseGatePort,
     private val clock: Clock,
 ) {
-    fun list(): SuggestionList = attempt() ?: attempt() ?: throw StrategyChangedDuringComputationException()
+    /**
+     * **M15/15A — 계정의 목록이다.** 전략 · 자격 사실이 전부 그 계정의 것이고, 행이 없는 계정은
+     * 빈 전략을 받아 `WATCH_NOT_CONFIGURED` 로 끝난다(다른 계정의 전략을 빌려 오지 않는다).
+     */
+    fun list(account: AccountId): SuggestionList =
+        attempt(account) ?: attempt(account) ?: throw StrategyChangedDuringComputationException()
 
     /** 한 번의 계산 — 계산 중 입력이 바뀌었으면 `null`(그 결과는 채택하지 않는다). */
-    private fun attempt(): SuggestionList? {
-        val inputs = readInputs()
+    private fun attempt(account: AccountId): SuggestionList? {
+        val inputs = readInputs(account)
         val candidates = candidateSource.openCandidates()
-        val passed = candidates.mapNotNull { notice -> passedSuggestion(notice, inputs.strategy) }
-        if (readInputs() != inputs) return null
+        val passed = candidates.mapNotNull { notice -> passedSuggestion(account, notice, inputs.strategy) }
+        if (readInputs(account) != inputs) return null
         return SuggestionList(
             strategyRevision = inputs.strategy.revision,
             computedAt = clock.now(),
@@ -109,13 +115,15 @@ class ListSuggestionsUseCase(
         )
     }
 
-    private fun readInputs(): ComputationInputs = ComputationInputs(strategies.load(), profiles.current())
+    private fun readInputs(account: AccountId): ComputationInputs =
+        ComputationInputs(strategies.load(account), profiles.current(account))
 
     private fun passedSuggestion(
+        account: AccountId,
         notice: Notice,
         strategy: OperatorStrategy,
     ): Suggestion? =
-        when (val screening = screenCandidate(notice, strategy, clock, watchSubjects, licenseGate)) {
+        when (val screening = screenCandidate(account, notice, strategy, clock, watchSubjects, licenseGate)) {
             is CandidateScreening.Passed -> Suggestion(notice, screening.license)
             is CandidateScreening.Dropped -> null
         }

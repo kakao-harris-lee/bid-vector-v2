@@ -6,6 +6,7 @@ import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.adapters.persistence.TransactionBoundary
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyPolicyData
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.EventIdFactory
 import bidvector.workflow.event.OutboxEventSink
 import bidvector.workflow.strategy.Clock
@@ -23,7 +24,14 @@ import bidvector.workflow.strategy.EditStrategyWorkflow
  * (D-6A2b-8 의존 게이트가 그 두 층을 구조로 강제한다).
  */
 interface StrategyEditTransaction {
-    fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T
+    /**
+     * **M15/15A — 계정이 트랜잭션의 인자다.** use case 는 그 계정의 전략·세션만 보고, 조립은 그
+     * 계정을 요청에서 꺼낸 값 하나로 받는다. 계정 없이 이 경계를 여는 길이 시그니처상 없다.
+     */
+    fun <T> inTransaction(
+        account: AccountId,
+        action: (EditStrategyWorkflow) -> T,
+    ): T
 }
 
 /**
@@ -49,11 +57,14 @@ class JdbcStrategyEditTransaction(
     private val release: ReleaseIdentifier,
     private val eventIds: EventIdFactory = JdbcEventIdFactory(),
 ) : StrategyEditTransaction {
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T =
-        transactions.inTransaction { action(assemble()) }
+    override fun <T> inTransaction(
+        account: AccountId,
+        action: (EditStrategyWorkflow) -> T,
+    ): T = transactions.inTransaction { action(assemble(account)) }
 
-    private fun assemble(): EditStrategyWorkflow =
+    private fun assemble(account: AccountId): EditStrategyWorkflow =
         EditStrategyWorkflow(
+            account = account,
             sessions = JdbcEditSessionRepository(transactions),
             strategies = JdbcStrategyRepository(transactions, strategyPolicy),
             clock = clock,

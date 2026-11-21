@@ -3,6 +3,7 @@ package bidvector.workflow.strategy
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyPolicyData
+import bidvector.workflow.access.AccountId
 
 /**
  * [EditStrategyWorkflow]의 command 처리 결과 — 세션 부재는 [TransitionOutcome] 밖의
@@ -48,6 +49,12 @@ sealed interface BeginOutcome {
  * 실질적으로 닫힌다.
  */
 class EditStrategyWorkflow(
+    /**
+     * **M15/15A — 이 use case 는 계정 하나의 편집이다.** 조립이 트랜잭션마다 계정을 꽂고
+     * (`StrategyEditTransaction.inTransaction(account)`), 그 아래의 모든 읽기·쓰기가 이 값을 쓴다.
+     * 메서드마다 받지 않는 이유는 한 use case 인스턴스가 두 계정을 섞는 상태를 만들지 않기 위해서다.
+     */
+    private val account: AccountId,
     private val sessions: EditSessionRepository,
     private val strategies: StrategyRepository,
     private val clock: Clock,
@@ -80,16 +87,16 @@ class EditStrategyWorkflow(
         operator: OperatorId,
         field: EditableField,
     ): BeginOutcome {
-        val existing = sessions.load(sessionId)?.let(::restoreEditSession)
+        val existing = sessions.load(account, sessionId)?.let(::restoreEditSession)
         if (existing != null) {
             val folded = expireIfDue(existing, clock.now())
-            if (folded !== existing) sessions.save(folded)
+            if (folded !== existing) sessions.save(account, folded)
             if (!isTerminal(folded.state)) {
                 return BeginOutcome.Rejected(folded, RejectionReason.SessionAlreadyActive)
             }
         }
         val session = beginSession(sessionId, operator, field, clock.now(), sessionPolicy)
-        sessions.save(session)
+        sessions.save(account, session)
         return BeginOutcome.Started(session)
     }
 
@@ -100,7 +107,7 @@ class EditStrategyWorkflow(
      * 직접 쥐는 대신(우회 (1)) 이 use case 를 통해 읽는다 — 새 권한이 아니다: 같은 값이
      * 이미 `GET /api/strategy` 로 나간다.
      */
-    fun currentStrategy(): OperatorStrategy = strategies.load()
+    fun currentStrategy(): OperatorStrategy = strategies.load(account)
 
     fun provideValue(command: EditCommand.ProvideValue): CommandResult = process(command)
 
@@ -122,9 +129,9 @@ class EditStrategyWorkflow(
      * (`expire` 가 이 함수에 위임한다).
      */
     fun view(sessionId: EditSessionId): EditSession? {
-        val session = sessions.load(sessionId)?.let(::restoreEditSession) ?: return null
+        val session = sessions.load(account, sessionId)?.let(::restoreEditSession) ?: return null
         val expired = expireIfDue(session, clock.now())
-        if (expired !== session) sessions.save(expired)
+        if (expired !== session) sessions.save(account, expired)
         return expired
     }
 
@@ -153,13 +160,13 @@ class EditStrategyWorkflow(
      */
     private fun process(command: EditCommand): CommandResult {
         val session =
-            sessions.load(command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
-        val outcome = apply(session, command, clock.now(), strategies.load(), strategyPolicy)
+            sessions.load(account, command.sessionId)?.let(::restoreEditSession) ?: return CommandResult.SessionNotFound
+        val outcome = apply(session, command, clock.now(), strategies.load(account), strategyPolicy)
         if (outcome is TransitionOutcome.Applied) {
-            strategies.save(outcome.applied)
+            strategies.save(account, outcome.applied)
             events.publish(outcome.event, outcome.session.actor)
         }
-        if (outcome.session !== session) sessions.save(outcome.session)
+        if (outcome.session !== session) sessions.save(account, outcome.session)
         return CommandResult.Processed(outcome)
     }
 }

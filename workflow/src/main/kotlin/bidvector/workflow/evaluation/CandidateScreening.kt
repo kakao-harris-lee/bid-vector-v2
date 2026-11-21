@@ -1,6 +1,7 @@
 package bidvector.workflow.evaluation
 
 import bidvector.procurement.Notice
+import bidvector.workflow.access.AccountId
 import bidvector.procurement.isBiddable
 import bidvector.qualification.LicenseVerdict
 import bidvector.strategy.OperatorStrategy
@@ -32,6 +33,7 @@ internal sealed interface CandidateScreening {
  * **거동 그대로** 옮긴 것이다(`EvaluateCandidatesScreeningCharacterizationTest` 가 먼저 고정했다).
  */
 internal fun screenCandidate(
+    account: AccountId,
     notice: Notice,
     strategy: OperatorStrategy,
     clock: Clock,
@@ -40,7 +42,7 @@ internal fun screenCandidate(
 ): CandidateScreening =
     lifecycleDrop(notice, clock)
         ?: watchGateDrop(notice, strategy, watchSubjects)
-        ?: licenseScreening(notice, licenseGate)
+        ?: licenseScreening(account, notice, licenseGate)
 
 private fun lifecycleDrop(
     notice: Notice,
@@ -97,10 +99,11 @@ private fun watchVerdictDrop(verdict: WatchVerdict): CandidateScreening.Dropped?
     }
 
 private fun licenseScreening(
+    account: AccountId,
     notice: Notice,
     licenseGate: LicenseGatePort,
 ): CandidateScreening =
-    when (val verdict = licenseGate.verdictFor(notice)) {
+    when (val verdict = licenseGate.verdictFor(account, notice)) {
         is LicenseVerdict.Ineligible -> {
             CandidateScreening.Dropped(EvaluationStage.LicenseGate, EvaluationDropReason.LicenseIneligible(verdict))
         }

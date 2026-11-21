@@ -11,9 +11,8 @@ import java.time.Instant
 /**
  * 프로필 조회가 내는 것(M7/7C④ 2b) — **V12 자격 사실 + V22 사업 정보 + 판정 대기 축**이다.
  *
- * 두 저장소가 키 체계가 다르다는 2a 의 대가(checklist §0.2)가 여기서 보인다: [qualification] 은
- * 싱글턴 V12 에서 오고(계정을 받지 않는다) 나머지는 계정 소유 V22 에서 온다. 그 비대칭을 숨기지
- * 않는다 — 별 slice 가 V12 를 계정 단위로 옮기면 이 타입은 그대로 두고 port 만 바뀐다.
+ * **M15/15A — 세 원천이 모두 계정 소유다**(V28). 2a 가 적어 둔 키 체계의 비대칭(V12 싱글턴 ↔ V22
+ * 계정)은 이 slice 가 없앴고, 그 문장이 예고한 대로 **타입은 그대로이고 port 만 바뀌었다**.
  *
  * [qualification] 이 `null` 이면 「프로필 미설정」이다(V12 행 없음). [unjudgedAxes] 는 **이 use case 가
  * 정하는 목록**이고 HTTP 응답이 그것을 그대로 싣는다(순서까지) — 오늘은 선언 표 전체이고, 판정이 생긴
@@ -33,7 +32,7 @@ class ReadProfileUseCase(
 ) {
     fun read(account: AccountId): ProfileView =
         ProfileView(
-            qualification = qualification.current(),
+            qualification = qualification.current(account),
             details = business.details(account),
             capacities = business.capacities(account),
             unjudgedAxes = UnjudgedQualificationAxis.entries,
@@ -51,14 +50,16 @@ class ListConstructionCapacitiesUseCase(
 }
 
 /**
- * 자격 사실(V12 — 업종 · 면허 · 지역어) 절 교체. **계정을 받지 않는 port 에 계정을 넘기지 않는다**
- * — V12 는 아직 싱글턴이고, 받는 척하면 「이미 계정 단위다」라는 거짓 신호가 된다(2a §0.2 대가).
- * 그래서 이 use case 도 [AccountId] 를 받지 않는다. 계정 단위 전환(R-2 남은 절반)이 그 자리를 연다.
+ * 자격 사실(V12 — 업종 · 면허 · 지역어) 절 교체. **M15/15A — 계정을 받는다**(V28): 그 표가 계정
+ * 소유가 됐고, 앞 판의 KDoc 이 예고한 대로 서명이 바뀌면서 호출 자리가 컴파일에서 드러났다.
  */
 class ReplaceQualificationFactsUseCase(
     private val store: OperatorProfileStorePort,
 ) {
-    fun replace(facts: ProfileFacts) = store.save(facts)
+    fun replace(
+        account: AccountId,
+        facts: ProfileFacts,
+    ) = store.save(account, facts)
 }
 
 /** 사업 정보(V22) 절 교체 — 절 하나를 통째로 바꾼다(부분 갱신이 다른 절을 지우지 않는다, D-7C4-1 P5). */
