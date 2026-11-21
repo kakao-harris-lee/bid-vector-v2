@@ -309,6 +309,18 @@ test('설정 — 쉼표 금액은 보내지 않고, 보낸 값은 본문의 값�
  */
 const PLANTED_NUMBER = PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED;
 
+/**
+ * 셸의 전역 탐색으로 한 화면 간다 — 주소를 손으로 적지 않는다(`openSettings` 와 같은 관례).
+ *
+ * **이름을 정확히 맞추지 않는다**: 배지를 다는 자리는 접근성 이름이 「내 입찰함 3」처럼 **수를
+ * 품는다**(실측). 그 수는 앞 여정들이 남긴 상태라 고정값이 아니다. 대신 **탐색으로 좁혀** 같은
+ * 글자를 품은 본문의 걸음과 갈린다.
+ */
+async function goToScreen(page: Page, label: string, screen: string): Promise<void> {
+  await page.getByRole('navigation', { name: '화면' }).getByRole('link', { name: label }).click();
+  await expect(page.getByTestId(screen)).toBeVisible();
+}
+
 /** 사업 정보 절을 저장하고 **그 응답**을 돌려준다 — 화면의 믿음이 아니라 서버의 사실을 본다. */
 async function saveBusinessDetails(page: Page): Promise<{ readonly businessRegistrationNumber: string | null }> {
   const written = page.waitForResponse(
@@ -392,21 +404,20 @@ test('사업자번호 — 저장한 뒤 재진입·다른 화면에서도 그 �
   await assertNoPrivateValues(page);
 
   // ② 재진입 — 서버에서 다시 읽어 그린 화면에서도 같다.
-  await page.getByRole('link', { name: '오늘의 공고', exact: true }).click();
-  await expect(page.getByTestId('screen-home')).toBeVisible();
+  await goToScreen(page, '오늘의 공고', 'screen-home');
   await assertNoPrivateValues(page);
   await openSettings(page);
   await expect(page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER)).toHaveValue(PLANTED_NUMBER);
   await assertNoPrivateValues(page);
 
-  // ③ 다른 화면들 — 같은 카드가 서는 시작하기와, 카드가 없는 화면 둘.
-  for (const [name, screen] of [
+  // ③ 다른 화면들 — 같은 카드가 서는 시작하기와, 카드가 없는 화면 셋.
+  for (const [label, screen] of [
     ['시작하기', 'screen-onboarding'],
     ['내 입찰함', 'screen-bid-box'],
+    ['결과 확인', 'screen-results'],
     ['알림함', 'screen-inbox'],
   ] as const) {
-    await page.getByRole('link', { name, exact: true }).click();
-    await expect(page.getByTestId(screen)).toBeVisible();
+    await goToScreen(page, label, screen);
     await assertNoPrivateValues(page);
   }
 
