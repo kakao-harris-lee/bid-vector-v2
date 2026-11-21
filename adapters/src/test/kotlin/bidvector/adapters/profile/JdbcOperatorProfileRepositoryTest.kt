@@ -105,7 +105,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
 
     private fun insertProfileRow(account: Long): String =
         "INSERT INTO operator_profile (account_id, business_types, licenses_declared, license_names, region_terms) " +
-            "VALUES (, '{}', false, '{}', '{}')"
+            "VALUES ($account, '{}', false, '{}', '{}')"
 
     /**
      * `OPEN-6F6-CATEGORY-CODE-NORMALIZATION`(D-6F6-4, D-6F6-10) — 이 표가 싣는

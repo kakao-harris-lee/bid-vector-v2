@@ -73,7 +73,8 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
     private fun insertStrategyRow(row: StrategyRow) {
         dataSource().connection.use { connection ->
             connection.prepareStatement(Sql.UPSERT_STRATEGY).use { statement ->
-                statement.bindStrategyRow(1, row)
+                statement.setLong(1, testAccount().value)
+                statement.bindStrategyRow(2, row)
                 statement.executeUpdate()
             }
         }
@@ -82,7 +83,8 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
     private fun insertRevisionRow(row: StrategyRow) {
         dataSource().connection.use { connection ->
             connection.prepareStatement(Sql.INSERT_STRATEGY_REVISION).use { statement ->
-                statement.bindStrategyRow(1, row)
+                statement.setLong(1, testAccount().value)
+                statement.bindStrategyRow(2, row)
                 statement.executeUpdate()
             }
         }

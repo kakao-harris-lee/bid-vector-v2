@@ -203,6 +203,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
             var index = 1
             statement.setString(index++, id)
+            statement.setLong(index++, testAccount().value)
             statement.setString(index++, "op-raw")
             statement.setString(index++, state)
             statement.setString(index++, statePayload)
