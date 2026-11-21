@@ -5,13 +5,7 @@ import { rememberCsrf } from './api/client';
 import { signUp, type SignUpRefusal } from './api/queries';
 import { Button, LinkButton } from './components/Button';
 import { Card } from './components/Card';
-import { LOGIN_PATH } from './LoginScreen';
-
-/**
- * 가입 자리의 주소 — **여기가 한 자리**다. 라우트 표(`routes.tsx`)와 로그인 화면의 링크가 이 값을
- * 읽는다(라우트 표에 두면 화면 → 표 → 화면의 고리가 생긴다).
- */
-export const SIGN_UP_PATH = '/signup';
+import { LOGIN_PATH } from './paths';
 
 /** 가입 뒤 가는 자리 — 계약의 「성공하면 곧장 시작하기」. */
 const START_PATH = '/start';
@@ -46,7 +40,7 @@ const REFUSAL_FIELD = {
  */
 const REFUSAL_MESSAGE = {
   loginName: '아이디는 4~32자의 영문 소문자·숫자·마침표·밑줄·붙임표만 쓸 수 있습니다.',
-  passphrase: '비밀번호는 10자 이상이어야 합니다.',
+  passphrase: '비밀번호는 10자 이상 1024자 이하여야 합니다.',
   duplicate: '이미 쓰이는 아이디입니다. 다른 아이디를 적어 주세요.',
   rateLimited: '가입 시도가 너무 잦습니다. 잠시 뒤에 다시 시도해 주세요.',
   sessionUnavailable: '계정은 만들어졌습니다. 아래 「로그인으로」에서 로그인해 주세요.',
@@ -157,7 +151,7 @@ export function SignUpScreen() {
         <p className="mt-1 text-sm text-ink-soft">아이디와 비밀번호만 있으면 바로 시작할 수 있습니다.</p>
         <form className="mt-4 flex max-w-sm flex-col gap-3" onSubmit={(event) => void submit(event)}>
           <div className="flex flex-col gap-1">
-            <label className="flex flex-col gap-1 text-sm" htmlFor="signup-login-name">
+            <label className="text-sm" htmlFor="signup-login-name">
               <span>아이디</span>
             </label>
             <input
@@ -177,7 +171,7 @@ export function SignUpScreen() {
             <FieldError testId={FIELDS.loginName} message={loginNameError} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="flex flex-col gap-1 text-sm" htmlFor="signup-passphrase">
+            <label className="text-sm" htmlFor="signup-passphrase">
               <span>비밀번호</span>
             </label>
             <input
@@ -194,7 +188,7 @@ export function SignUpScreen() {
             <FieldError testId={FIELDS.passphrase} message={passphraseError} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="flex flex-col gap-1 text-sm" htmlFor="signup-passphrase-confirm">
+            <label className="text-sm" htmlFor="signup-passphrase-confirm">
               <span>비밀번호 확인</span>
             </label>
             <input
@@ -220,12 +214,12 @@ export function SignUpScreen() {
           `SIGN_UP_SESSION_UNAVAILABLE` 안내가 **갈 수 없는 곳**을 가리키고, 이미 계정이 있는
           사람이 이 주소를 직접 열었을 때도 뒤로 가기 말고는 길이 없다.
         */}
-        <p className="mt-6 flex max-w-sm flex-col gap-2 text-sm text-ink-soft">
+        <div className="mt-6 flex max-w-sm flex-col gap-2 text-sm text-ink-soft">
           <span>이미 계정이 있으신가요?</span>
           <LinkButton to={LOGIN_PATH} tone="secondary" fullWidth testId="go-login">
             로그인으로
           </LinkButton>
-        </p>
+        </div>
       </Card>
     </section>
   );

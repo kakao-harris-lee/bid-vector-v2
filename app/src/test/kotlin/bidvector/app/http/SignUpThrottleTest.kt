@@ -1,5 +1,6 @@
 package bidvector.app.http
 
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -87,42 +88,75 @@ class SignUpThrottleTest {
     @Test
     fun `거부는 로그 한 줄을 남기고 그 줄에 주소가 없다`() {
         repeat(TEST_SIGN_UP_ATTEMPTS) { throttle.admit("10.0.0.7") }
-        lines.shouldBeEmptyList()
+        lines.shouldBeEmpty()
 
         throttle.admit("10.0.0.7") shouldBe false
 
         lines.size shouldBe 1
+        lines.single() shouldContain "cause=window limit"
         lines.single() shouldContain "limit=$TEST_SIGN_UP_ATTEMPTS"
         lines.single() shouldContain "tracked-addresses="
         lines.single() shouldNotContain "10.0.0.7"
     }
 
     /**
-     * code-review r1 LOW — 창 안에 시도를 가진 주소가 상한을 넘으면 **가장 오래 전에 처음 본
-     * 주소부터 버린다.** 오늘은 프록시 뒤라 키가 하나뿐이지만, 키 축이 IP 로 바뀌는 날 이 상한이
-     * 없으면 맵이 창 길이만큼 자란다.
+     * cr r1 N-3 — **기억이 모자라면 거부한다**(fail-closed). 앞 판은 상한을 넘으면 가장 오래 전에
+     * 처음 본 주소를 버렸고, 그 축출이 ⓐ 상한에 걸린 주소의 창을 **지워 풀어 주고** ⓑ 창 안에서
+     * 계속 시도하는 주소를 **1순위로** 버렸다(조용한 주소가 더 오래 살았다). 둘 다 상한이 지키려는
+     * 방향의 반대다.
+     *
+     * 지금은 **이미 세고 있는 주소가 자기 창을 잃지 않고**, 모르는 주소가 거부된다.
      */
     @Test
-    fun `추적 주소가 상한을 넘으면 가장 오래된 주소부터 버린다`() {
-        val bounded =
-            SignUpThrottle(
-                clock = clock,
-                attemptsPerWindow = TEST_SIGN_UP_ATTEMPTS,
-                window = TEST_SIGN_UP_WINDOW,
-                trackedAddressLimit = 2,
-                log = SignUpThrottleLog { lines += it },
-            )
-        repeat(TEST_SIGN_UP_ATTEMPTS) { bounded.admit("first") }
-        bounded.admit("first") shouldBe false
+    fun `기억이 찼을 때 상한에 걸린 주소의 창은 지워지지 않는다`() {
+        val own = mutableListOf<String>()
+        val bounded = throttleWith(trackedAddressLimit = 2, into = own)
+        repeat(TEST_SIGN_UP_ATTEMPTS) { bounded.admit("persistent") }
+        bounded.admit("persistent") shouldBe false
 
-        // 둘째·셋째 주소가 들어오면 맨 처음 주소의 기록이 밀려난다.
+        // 둘째 주소가 자리를 채우고, 셋째(모르는 주소)는 기억이 없어 거부된다.
         bounded.admit("second") shouldBe true
-        bounded.admit("third") shouldBe true
+        bounded.admit("third") shouldBe false
 
-        bounded.admit("first") shouldBe true
+        // 앞 판은 여기서 `true` 였다 — 축출이 창을 지웠기 때문이다.
+        bounded.admit("persistent") shouldBe false
+        own.last() shouldContain "cause=window limit"
     }
 
-    private fun List<String>.shouldBeEmptyList() {
-        size shouldBe 0
+    /** 모르는 주소의 거부는 **다른 사유**로 적힌다 — 운영자가 둘을 가를 수 있어야 한다. */
+    @Test
+    fun `기억이 찬 뒤의 새 주소 거부는 사유가 다르다`() {
+        val own = mutableListOf<String>()
+        val bounded = throttleWith(trackedAddressLimit = 1, into = own)
+        bounded.admit("known") shouldBe true
+
+        bounded.admit("stranger") shouldBe false
+
+        own.single() shouldContain "cause=tracked-address capacity"
+        own.single() shouldNotContain "stranger"
     }
+
+    /** 창이 지나 기억이 비면 새 주소가 다시 들어온다 — 거부가 영구하지 않다. */
+    @Test
+    fun `창이 지나면 기억이 비고 새 주소가 다시 들어온다`() {
+        val bounded = throttleWith(trackedAddressLimit = 1, into = mutableListOf())
+        bounded.admit("known") shouldBe true
+        bounded.admit("stranger") shouldBe false
+
+        clock.advance(TEST_SIGN_UP_WINDOW.toMillis() + 1)
+
+        bounded.admit("stranger") shouldBe true
+    }
+
+    private fun throttleWith(
+        trackedAddressLimit: Int,
+        into: MutableList<String>,
+    ): SignUpThrottle =
+        SignUpThrottle(
+            clock = clock,
+            attemptsPerWindow = TEST_SIGN_UP_ATTEMPTS,
+            window = TEST_SIGN_UP_WINDOW,
+            trackedAddressLimit = trackedAddressLimit,
+            log = SignUpThrottleLog { into += it },
+        )
 }

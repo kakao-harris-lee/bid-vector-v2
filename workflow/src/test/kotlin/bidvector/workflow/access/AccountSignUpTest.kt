@@ -141,7 +141,21 @@ class AccountSignUpTest {
      */
     @Test
     fun `한글 비밀번호가 같은 길이 규칙으로 통과한다`() {
-        signUp(value = "비밀번호를적는다열글자".repeat(1)).shouldBeInstanceOf<SignUpOutcome.Granted>()
+        // **옛 규칙에서 RED 인 값이다**(cr r1 N-5): 한글 25자 = UTF-8 75바이트라 옛 72바이트
+        // 상한에서 거부됐다. 앞 판의 값(11자/33바이트)은 양쪽에서 초록이라 아무것도 재지 않았다.
+        signUp(value = "가".repeat(25)).shouldBeInstanceOf<SignUpOutcome.Granted>()
+    }
+
+    /**
+     * cr r1 N-8 — **코드 포인트로 센다.** BMP 밖 문자는 UTF-16 코드 단위로 둘이라, 코드 단위를
+     * 세던 앞 판에서는 이모지 다섯 글자가 「10자 이상」을 만족했다. 계약 문서의 `minLength` 는
+     * 코드 포인트를 세므로 그 둘이 어긋나 있었다.
+     */
+    @Test
+    fun `BMP 밖 문자는 한 글자로 센다 — 다섯 글자는 하한 미만이다`() {
+        signUp(value = "\uD83D\uDE00".repeat(5)) shouldBe SignUpOutcome.RefusedPassphraseShape
+        signUp(value = "\uD83D\uDE00".repeat(policy().passphraseMinLength))
+            .shouldBeInstanceOf<SignUpOutcome.Granted>()
     }
 
     @Test

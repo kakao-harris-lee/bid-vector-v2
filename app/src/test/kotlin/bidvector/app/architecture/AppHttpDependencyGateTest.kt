@@ -453,4 +453,4 @@ class AppHttpDependencyGateTest {
  * 위 규율대로 숫자를 옮기지 않고 병합된 세 목록을 기계로 다시 셌다: 41 + 11 + 43 = **95**
  * (목록 안 중복 0 · 목록 사이 교차 중복 0).
  */
-private const val EXPECTED_EXEMPT_COUNT = 96
+private const val EXPECTED_EXEMPT_COUNT = 95

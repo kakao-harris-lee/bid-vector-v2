@@ -65,11 +65,16 @@ class ClearPassphrase private constructor(
      * **사본을 만들지 않는다**(code-review r1 LOW). 앞 판은 `concatToString()` 으로 지울 수 없는
      * `String` 을 만들어 이 타입의 규율(「지울 수 있는 사본만 밖에 낸다」) 가장자리에 섰다 —
      * 길이는 배열 자신이 안다.
+     *
+     * **코드 포인트로 센다**(수정 라운드 2, cr r1 N-8). `chars.size` 는 UTF-16 코드 단위라 BMP
+     * 밖 문자(이모지 등)가 한 글자에 **둘**로 세어졌다 — 이모지 다섯 글자가 「10자 이상」을
+     * 만족하면서 계약 문서의 `minLength`(코드 포인트)에는 모자라는 어긋남이 있었다. 서버와
+     * 문서가 같은 단위를 센다. 세는 함수는 배열을 그대로 읽으므로 사본이 생기지 않는다.
      */
     fun fitsLength(
         minimumCharacters: Int,
         maximumCharacters: Int,
-    ): Boolean = chars.size in minimumCharacters..maximumCharacters
+    ): Boolean = Character.codePointCount(chars, 0, chars.size) in minimumCharacters..maximumCharacters
 
     override fun toString(): String = "ClearPassphrase(***)"
 

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { appRoutes } from './AppRoot';
 import { apiClient, hasCsrf, rememberCsrf } from './api/client';
-import { SIGN_UP_PATH } from './SignUpScreen';
+import { SIGN_UP_PATH } from './paths';
 
 /** React 19 는 `act(...)` 를 쓰는 환경에 이 표지를 요구한다(로그인 화면 test 와 같은 자리). */
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -160,6 +160,8 @@ describe('가입 화면 (M15/15B)', () => {
     ejectStub = stubResponse(BAD_REQUEST, { code: 'PASSPHRASE_INVALID', message: 'x', correlationId: 'c' });
     await submit(container, 'short');
     expect(textOf(container, 'signup-error-passphrase')).toContain('10자 이상');
+    // 상한도 함께 말한다 — 넘겨서 거부된 사람이 하한만 읽고 길이를 더 늘리는 일이 없게(v r1 L-r1-4).
+    expect(textOf(container, 'signup-error-passphrase')).toContain('1024자');
     // 바이트 문면은 사라졌다 — 이 구현의 해시는 긴 입력을 접지 자르지 않는다(cr r1 M-1).
     expect(textOf(container, 'signup-error-passphrase')).not.toContain('바이트');
     expect(container.querySelector('[data-testid="signup-error-login-name"]')).toBeNull();

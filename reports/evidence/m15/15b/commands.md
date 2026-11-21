@@ -1,6 +1,6 @@
 # M15 / 15B — acceptance 실측
 
-base `99f2fb25` · 실측 HEAD `48a88a17`(이 slice 의 마지막 산출물 커밋). 아래는 CI 의 job 명령
+base `99f2fb25` · 실측 자리는 라운드마다 움직인다 — **그 SHA 의 정본은 `rollback.md`** 다(여기 적으면 라운드마다 낡는다). 아래는 CI 의 job 명령
 그대로이고, 결과는 **한 줄**로만 적는다.
 
 ## Kotlin `check` job

@@ -54,49 +54,78 @@ class SignUpThrottle(
     private val lock = Any()
 
     /**
-     * 삽입 순서를 지키는 맵이다 — [trackedAddressLimit] 을 넘으면 **가장 오래 전에 처음 본 주소**
-     * 부터 버린다(code-review r1 LOW). 창 밖 기록을 매 호출에서 걷으므로 평소에는 그 상한에 닿지
-     * 않지만, 키 축이 IP 로 바뀌는 날(위 OPEN) 이 상한이 없으면 맵이 창 길이만큼 자란다.
+     * 창 안에 시도를 가진 주소만 산다 — 창 밖 기록은 매 호출에서 걷고, 비워진 항목은 지운다.
+     * 그래서 이 맵의 크기는 「창 안에 활동한 주소 수」이고 조용히 자라지 않는다.
      */
     private val attempts: MutableMap<String, MutableList<Instant>> = LinkedHashMap()
 
     /**
      * 이 주소의 시도 하나를 받아들일 수 있는가. 받아들이면 **그 시각을 적는다** — 호출자가 따로
      * 적을 자리가 없어야 「세지 않고 지나가는」 경로가 생기지 않는다.
+     *
+     * **기억이 모자라면 거부한다**(code-review r1 N-3, fail-closed). 앞 판은 상한을 넘으면 가장
+     * 오래 전에 **처음 본** 주소를 버렸고, 그 축출이 두 가지를 동시에 했다: ⓐ 상한에 걸린 주소의
+     * 창을 **지워 풀어 주고** ⓑ 순서가 삽입 순이라 **창 안에서 계속 시도하는 주소가 1순위**로
+     * 버려졌다(조용한 주소가 더 오래 살았다). 상한이 지키려는 방향의 반대다. 오늘은 프록시 뒤라
+     * 키가 하나뿐이지만, 키 축을 IP 로 되돌리는 라운드(`OPEN-M15-SIGNUP-HARDENING` ④)가 그
+     * 우회를 여는 라운드가 된다 — 그래서 **그 전에** 닫는다.
+     *
+     * 닫은 모양: 이미 세고 있는 주소는 **언제나** 그 창으로 판정하고, **모르는 주소**는 기억이
+     * 찼을 때 거부한다. 기억이 모자란 것이 상한을 **푸는** 이유가 되지 않는다.
      */
-    fun admit(address: String): Boolean =
+    fun admit(address: String): Boolean {
+        // 로그는 잠금 **밖**에서 쓴다(cr r1 N-6) — 로거가 막히면 그동안 모든 가입 시도가 이
+        // 잠금에 줄을 서고, 하필 공격 중에 가장 많이 도는 경로가 거부 경로다. 줄은 잠금 안에서
+        // 만든다(계수가 그 순간의 값이어야 한다).
+        val refusal: String?
+        val admitted: Boolean
         synchronized(lock) {
             val now = clock.now()
             forget(now.minus(window))
-            val recorded = attempts.getOrPut(address) { mutableListOf() }
-            if (recorded.size >= attemptsPerWindow) {
-                // 거부도 기록하지 않는다 — 거부가 창을 밀면 상한이 「창 동안 조용히 있어야 풀리는」
-                // 다른 규칙이 된다(계약은 그것을 말하지 않았다).
-                log.write(refusalLine(recorded.size))
-                return@synchronized false
+            val recorded = attempts[address]
+            refusal = refusalOf(recorded)
+            admitted = refusal == null
+            if (admitted) {
+                (recorded ?: mutableListOf<Instant>().also { attempts[address] = it }) += now
             }
-            recorded += now
-            evictOldestBeyondLimit()
-            true
+        }
+        refusal?.let { log.write(it) }
+        return admitted
+    }
+
+    /**
+     * 이 시도를 거부해야 하는 **사유 문면**, 받아들일 수 있으면 `null`. 거부는 **기록하지 않는다**
+     * — 거부가 창을 밀면 상한이 「창 동안 조용히 있어야 풀리는」 다른 규칙이 된다(계약은 그것을
+     * 말하지 않았다).
+     */
+    private fun refusalOf(recorded: MutableList<Instant>?): String? =
+        when {
+            recorded == null && attempts.size >= trackedAddressLimit -> {
+                line("tracked-address capacity", recorded = 0)
+            }
+
+            recorded != null && recorded.size >= attemptsPerWindow -> {
+                line("window limit", recorded.size)
+            }
+
+            else -> {
+                null
+            }
         }
 
     /**
      * 운영자가 읽는 한 줄 — **사유와 계수만**이다. 주소·아이디는 싣지 않는다(그 둘이 이 줄의
      * 쓸모를 늘리지 않으면서 로그를 식별 정보로 만든다).
      */
-    private fun refusalLine(recorded: Int): String =
-        "signup throttle refused limit=$attemptsPerWindow window=$window recorded=$recorded " +
-            "tracked-addresses=${attempts.size}"
+    private fun line(
+        cause: String,
+        recorded: Int,
+    ): String =
+        "signup throttle refused cause=$cause limit=$attemptsPerWindow window=$window " +
+            "recorded=$recorded tracked-addresses=${attempts.size}"
 
     private fun forget(floor: Instant) {
         attempts.values.forEach { recorded -> recorded.removeAll { at -> !at.isAfter(floor) } }
         attempts.entries.removeAll { entry -> entry.value.isEmpty() }
-    }
-
-    private fun evictOldestBeyondLimit() {
-        while (attempts.size > trackedAddressLimit) {
-            val oldest = attempts.keys.first()
-            attempts.remove(oldest)
-        }
     }
 }

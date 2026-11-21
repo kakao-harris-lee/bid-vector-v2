@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { LOGIN_PATH } from './LoginScreen';
+import { LOGIN_PATH, SIGN_UP_PATH } from './paths';
 import { fallbackRoute, loginRoute, PRE_SESSION_PATHS, screenRoutes, screenSlots, signUpRoute } from './routes';
-import { SIGN_UP_PATH } from './SignUpScreen';
 
 // 화면 자리 여섯에 M7/7E-2 가 「설정」 하나를 더해 일곱이다. M7/7E-3a 가 마지막 둘(E 결과 확인 ·
 // 알림함)을 채워 **일곱 자리가 전부 실화면**이다 — 아래 둘째 describe 가 그 경계를 잠근다(D-7E-5).
@@ -46,6 +45,11 @@ describe('화면 자리 표', () => {
    * M15/15B — 가입 자리도 같은 축이다(인증 자리, 표 밖). 그리고 **세션 전 자리 집합**이 그 둘과
    * 같다 — 셸이 전역 탐색을 지우는 모집단이라, 자리가 늘었는데 집합이 늘지 않으면 새 화면에
    * 탐색이 뜬다.
+   */
+  /**
+   * cr r1 N-9 — 이 단언은 **손으로 집합을 건드리는 편집**을 잡는다. 못 잡는 것은 「세션 전 화면이
+   * 하나 더 생겼는데 집합에 안 들어감」이다 — 그 축은 소비자(`AppShell`)에서 유도해야 서고,
+   * 오늘 그 자리는 `AppShell.test.tsx` 의 탐색 단언이 간접으로만 든다.
    */
   it('가입 자리는 표 밖에 있고 세션 전 자리 집합이 로그인과 가입 둘이다', () => {
     expect(signUpRoute.path).toBe(SIGN_UP_PATH);

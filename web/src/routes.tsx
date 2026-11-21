@@ -1,8 +1,9 @@
 import type { RouteObject } from 'react-router';
 
-import { LOGIN_PATH, LoginScreen } from './LoginScreen';
+import { LoginScreen } from './LoginScreen';
 import { ScreenPlaceholder } from './ScreenPlaceholder';
-import { SIGN_UP_PATH, SignUpScreen } from './SignUpScreen';
+import { LOGIN_PATH, SIGN_UP_PATH } from './paths';
+import { SignUpScreen } from './SignUpScreen';
 import { BidBoxScreen } from './screens/BidBoxScreen';
 import { InboxScreen } from './screens/InboxScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';

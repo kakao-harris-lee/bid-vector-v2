@@ -17,9 +17,13 @@ import { assertOnlyAllowedOperations, templated, watchRequests } from './shared'
 const PASSPHRASE = 'journey-signup-passphrase';
 
 /**
- * 이 spec 은 **전역 상한의 칸을 쓴다**(한 주소 = 한 버킷). 하네스가 그 상한을 높게 올려 두므로
- * (`journey-up.mjs` 의 `bidvector.signup.attempts-per-hour`) 재실행에서도 429 가 서지 않는다 —
- * 그 손잡이를 지우면 이 레인이 먼저 붉는다.
+ * 이 spec 은 **전역 상한의 칸을 쓴다**(한 주소 = 한 버킷) — 한 번 돌 때 가입 시도 다섯이다.
+ * 하네스가 그 상한을 높게 올려 두므로(`journey-up.mjs` 의 `bidvector.signup.attempts-per-hour`)
+ * 같은 app 인스턴스에 몇 번을 돌려도 429 가 서지 않는다.
+ *
+ * **그 손잡이를 지워도 이 레인은 한 번은 초록이다**(출하 기본값 30 > 5) — 창 안에서 여섯 번쯤
+ * 되돌린 뒤에야 붉는다. 그래서 이 문단은 손잡이의 **사유**이지 그것을 지키는 측정이 아니다
+ * (그 축은 `SignUpThrottleWiringTest` 와 endpoint test 가 든다).
  */
 
 /** 화면 자리와 그 얼굴 — **빈 설정으로도 들어갈 수 있다**가 이 표가 재는 것이다. */

@@ -30,6 +30,9 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/BidVectorApplication.kt              # 가입 상한 빈(app.http 를 아는 유일한 자리)
   - app/src/main/kotlin/bidvector/app/access/AccountCommandRunner.kt       # (변경 없음 — 완화는 use case 쪽이고 로그 어휘는 그대로다)
   - app/src/test/kotlin/bidvector/app/http/                                # 집합 등식 둘 · 가입 endpoint · 상한
+  - app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt  # 면제 수 래칫(r1 cr N-2 — 누락 등재)
+  - app/src/test/kotlin/bidvector/app/SignUpThrottleWiringTest.kt          # r2 — 출하 상한의 값·배선
+  - web/src/paths.ts                                                       # r2 — 세션 전 자리 주소 한 자리(순환 import 제거)
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
   - config/quality/architecture-policy.properties                          # handler · 주입 타입 · 비밀값 참조자
   - config/quality/gate-tests.properties                                   # 새 test class 를 만드는 커밋에서 등재
@@ -152,17 +155,18 @@ V20 의 NOT NULL 세 열(`created_at`·`updated_at`·`failed_attempts`)에서 �
 쪽을 골랐고, 그 전제는 문장이 아니라 **실측**이 든다(`AccessPrivilegeTest` 가 앱 역할로 production
 INSERT 문장을 직접 쏘아 성공을 잰다).
 
-**(5) 남용 상한의 수가 정책이 아니라 설정이다**(수정 라운드 1, cr H-1). 계약은 「시간당 10건」을
+**(5) 남용 상한의 수가 정책이 아니라 설정이다**(수정 라운드 1, cr H-1) — **main 반영됨**(PR #190, main `6ea304dd`). 계약은 「시간당 10건」을
 적었는데, 키가 `remoteAddr` 이라 프록시 뒤에서 버킷이 하나이고 10 은 **열 번의 싸구려 요청으로
 한 시간을 닫는다**. 수를 `bidvector.signup.attempts-per-hour`(기본 30)로 빼 운영자가 올릴 수 있게
-하고, 거부가 로그 한 줄을 남긴다. 계약 문면의 「10」은 팀장이 종결 때 고친다.
+하고, 거부가 로그 한 줄을 남긴다. 계약 문면은 PR #190 이 이미 고쳤다.
 
-**(6) 비밀번호 상한이 바이트가 아니라 글자 수이고 값이 1024 다**(수정 라운드 1, cr M-1). 계약의
+**(6) 비밀번호 상한이 바이트가 아니라 글자 수이고 값이 1024 다**(수정 라운드 1, cr M-1) — **main 반영됨**(PR #190, main `6ea304dd`). 계약의
 「bcrypt 72바이트 상한 초과는 거부」는 **이 저장소에서 거짓**이다 — 해시 어댑터가 긴 입력을
-SHA-512 로 접지 자르지 않는다. 상한은 입력 위생 경계로만 남는다. 계약 문면은 팀장이 종결 때 고친다.
+SHA-512 로 접지 자르지 않는다. 상한은 입력 위생 경계로만 남는다. 계약 문면은 PR #190 이 이미 고쳤다.
 
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
 - 2026-11-21 전건 acceptance 뒤 계약 갱신 (2)~(4) 와 in_scope 둘 등재.
 - 2026-11-21 수정 라운드 1 — 계약 갱신 (5)·(6), in_scope 다섯 등재(누락 셋 + 이 라운드가 더한 둘).
+- 2026-11-21 수정 라운드 2 — in_scope 셋 등재(누락 하나 + 신설 둘), 계약 갱신 (5)·(6) 의 main 반영 표시.

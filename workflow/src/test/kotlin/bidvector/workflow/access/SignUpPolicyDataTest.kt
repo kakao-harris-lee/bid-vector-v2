@@ -62,6 +62,9 @@ class SignUpPolicyDataTest {
         policy.accepts(ClearPassphrase.wrap("가".repeat(25))) shouldBe true
         policy.accepts(ClearPassphrase.wrap("가".repeat(1024))) shouldBe true
         policy.accepts(ClearPassphrase.wrap("가".repeat(1025))) shouldBe false
+        // cr r1 N-8 — BMP 밖 문자는 **한 글자**다(UTF-16 코드 단위로는 둘이다).
+        policy.accepts(ClearPassphrase.wrap("\uD83D\uDE00".repeat(9))) shouldBe false
+        policy.accepts(ClearPassphrase.wrap("\uD83D\uDE00".repeat(10))) shouldBe true
     }
 
     @Test

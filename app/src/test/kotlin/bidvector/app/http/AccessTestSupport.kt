@@ -41,8 +41,8 @@ val TEST_SIGN_UP_POLICY: SignUpPolicyData =
 
 /**
  * 상한의 test 값 — **출하 기본값(30)보다 작게** 둔다. 429 를 재는 test 가 그 수만큼 요청을
- * 보내야 하므로, 작을수록 그 test 가 싸다. 상한 자체의 값은 설정 속성이고 그 기본값은
- * `SignUpThrottlePropertiesTest` 가 아니라 출하 설정이 든다.
+ * 보내야 하므로, 작을수록 그 test 가 싸다. 상한 자체의 값과 **출하 배선**은
+ * `bidvector.app.SignUpThrottleWiringTest` 가 든다(앞 판은 없는 class 이름을 가리켰다 — cr r1 N-7).
  */
 const val TEST_SIGN_UP_ATTEMPTS = 10
 
