@@ -92,8 +92,16 @@ class ProfileRequestsTest {
      */
     @Test
     fun `사업자번호 — 꼴이 어긋나거나 공백뿐이면 400 이다`() {
-        listOf("123456789", "12345678901", "12-345-67890", "123-456-7890", "1-2-3-4-5-6-7-8-9-0", "123456789O", "   ", "")
-            .forEach { raw ->
+        listOf(
+            "123456789",
+            "12345678901",
+            "12-345-67890",
+            "123-456-7890",
+            "1-2-3-4-5-6-7-8-9-0",
+            "123456789O",
+            "   ",
+            "",
+        ).forEach { raw ->
                 shouldThrow<InvalidEditRequestException> {
                     ProfileRequests.businessDetails(detailsWithNumber(raw))
                 }
