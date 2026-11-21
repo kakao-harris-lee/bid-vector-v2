@@ -80,6 +80,25 @@
   `전략 심기 실패: POST /api/strategy/edit-sessions → 401`. 하네스를 여정 계정의 세션으로
   옮긴 뒤 **28/28 통과**이고 하네스가 `전략 여력 상한 5 적용(개정 1)` 을 낸다.
 
+## r1 리뷰 라운드 — 계약 위반 하나와 그 변이
+
+- cmd: `./gradlew --no-daemon --continue :adapters:test --tests '…JdbcEditSession*' --tests '…PinnedLicenseGateTest' --tests '…adapters.evaluation.*' :app:test --tests '…app.evaluation.*'`
+- exit: 0
+- 핵심 결과: 표적 전건 통과. 전역 채널 축 test 둘 · 편집 세션 소유 절 test · `PinnedLicenseGate`
+  불일치 test · 러너 계수 test 넷이 여기 든다.
+
+- cmd: (변이) `EvaluationCommitRuns.channelFor` 의 `account.value == channelHolder.value` → `true`
+  뒤 `./gradlew --no-daemon :app:test --rerun --tests '…EvaluationCommitRunE2ETest'`
+- exit: 1
+- 핵심 결과: **새 test 둘만 RED** — 「두 계정이 같은 공고에 BidNow 를 내도 전역 채널은 가장 작은
+  계정 것 하나다」·「가장 작은 계정이 건너뛰어지면 전역 채널에는 아무것도 가지 않는다」. 억제를
+  걷으면 붉고, 되돌리면 초록이다(변이 뒤 `git restore` 로 복원, 커밋 뒤에 변이했다).
+
+- cmd: `./gradlew --no-daemon check --continue` (r1 라운드)
+- exit: 0
+- 핵심 결과: **BUILD SUCCESSFUL in 32m 16s** — 실패 task 0 · 실패 test 0.
+  (직전 실행은 `:app:unusedImportGate` 하나로 붉었다 — 순회를 접으며 쓰지 않게 된 import.)
+
 ## 라운드별 전건 추이
 
 | 라운드 | 명령 | exit | 실패 task | 실패 test |
@@ -87,6 +106,7 @@
 | r1 | `check --continue` | 1 | 9 | 35 |
 | r2 | `check --continue` | 1 | 5 | 3 |
 | r3 | `check --continue` | 0 | 0 | 0 |
+| r1 리뷰 | `check --continue` | 0 | 0 | 0 | (직전 실행 1 task — 쓰지 않는 import)
 
 ## 비밀값 스캔
 

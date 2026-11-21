@@ -1,6 +1,6 @@
 # M15 / 15A — 되돌리기
 
-실측 HEAD: `9b01db20d9ec87d8d363723912c09c16b986e605`
+실측 HEAD: `9fe69e4c591116364c70c2c14d7ccd9fa9fdea6a`
 
 > **전제: 이 slice 는 아직 `main` 에 없다.** 머지 **뒤**의 되돌림은 아래 절차가 아니라 그 PR 의
 > 머지 커밋 revert 다 — 같은 복원은 머지 순간 아무것도 지우지 않으면서 exit 0 을 낸다.
@@ -17,9 +17,12 @@ git diff --name-status 99f2fb25989078d7ab1640de0dc8e399f5d1688d..HEAD -- ':!repo
 ```
 
 `A` 는 삭제 대상, `M` 은 base 로 restore 다. **라운드마다 이 절차를 다시 돌린다** — 수정
-라운드가 파일을 더하면 목록이 낡는다(목록이 낡는 것이 이 결함의 실제 원인이다). 실측 시점의
-목록은 **195 경로**(`A` 5 · `M` 190)이고, 그 가운데 `A` 다섯은 V28 SQL · 공유 커널의
-`AccountId` · 계정별 run 공장 · 출하 E2E 세션 지원 · 마이그레이션 갈래 test 다.
+라운드가 파일을 더하면 목록이 낡는다(목록이 낡는 것이 이 결함의 실제 원인이다. r1 리뷰가 바로
+그것을 잡았다: 앞 판의 195 는 그 라운드가 더한 넷을 세지 않은 수였다).
+
+실측 시점의 목록은 **206 경로**(`A` 8 · `M` 198)이고, `A` 여덟은 V28 SQL · 공유 커널의
+`AccountId` 와 그 test · 계정별 run 공장 · 억제 채널 · 출하 E2E 세션 지원 · 마이그레이션 갈래
+test · `PinnedLicenseGate` test 다.
 
 ```
 git restore --source=99f2fb25989078d7ab1640de0dc8e399f5d1688d --staged --worktree -- <위 목록의 모든 경로>
@@ -35,9 +38,11 @@ git restore --source=99f2fb25989078d7ab1640de0dc8e399f5d1688d --staged --worktre
 
 ## 공유 파일
 
-이 slice 가 만지는 파일 가운데 **다른 slice 의 줄이 있는 것은 둘**이다 —
-`config/quality/gate-tests.properties`(새 test class 한 줄 등재) ·
-`config/quality/architecture-policy.properties`(허용 뿌리 · 주입/2층 목록 · 어댑터 멤버 서술자).
+이 slice 가 만지는 파일 가운데 **다른 slice 의 줄이 있는 것은 다섯**이다 —
+`config/quality/gate-tests.properties`(새 test class 둘 등재) ·
+`config/quality/architecture-policy.properties`(허용 뿌리 · 주입/2층 목록 · 어댑터 멤버 서술자) ·
+`.github/workflows/ci.yml`(컨테이너 스모크의 인증 축) · `tools/local-tls-smoke.sh` ·
+`tools/db-rehearsal.sh`. 뒤 셋은 r1 라운드에서 in_scope 에 들어왔다(scope.md 「갱신 이력」 (4)).
 이 slice 가 main 에 없는 동안에는 위 단일 `git restore` 로 base 복원하면 다른 slice 의 줄이
 함께 사라질 수 있으므로, **main 을 병합한 뒤**라면 그 병합 커밋 SHA 를 복원 원천으로 바꾸고
 아래 단언 셋을 다시 잰다(`evidence-pack` rollback 절). 오늘은 병합이 없어 착수 base 가 원천이다.
@@ -61,11 +66,17 @@ DB 에서는 네 표의 남은 행을 **버린다**. 적용된 DB 를 V27 로 �
 | # | 재는 것 | 명령 | 결과 |
 | --- | --- | --- | --- |
 | ① | 복원 명령의 종료 코드 | 위 `git restore` | exit 0 |
-| ② | 되돌린 파일 수 | 복원 뒤 `git status --porcelain` 의 D/M 수 | **195**(D 5 · M 190) — 복원 목록과 같다 |
+| ② | 되돌린 파일 수 | 복원 뒤 `git status --porcelain` 의 D/M 수 | **206**(D 8 · M 198) — 복원 목록과 같다 |
 | ③ | in_scope 가 base 와 같은가 | `git diff <base> -- ':!reports/evidence'` | **빈 출력**(0 줄) |
-| ④ | 컴파일 | `./gradlew --no-daemon :app:compileTestKotlin` | exit 0 (BUILD SUCCESSFUL, 19s) |
-| ⑤ | test | `./gradlew --no-daemon :adapters:test` | exit 0 (BUILD SUCCESSFUL, 4m24s) |
-| ⑥ | 게이트 | `./gradlew --no-daemon check --continue` | exit 0 (BUILD SUCCESSFUL, 37m14s) |
+| ④ | 컴파일 | `./gradlew --no-daemon :app:compileTestKotlin` | exit 0 (BUILD SUCCESSFUL) |
+| ⑤ | test | `./gradlew --no-daemon :adapters:test --rerun` | exit 0 (BUILD SUCCESSFUL, 3m25s) |
+| ⑥ | 게이트 | `./gradlew --no-daemon :app:test --rerun check --continue` | exit 0 (BUILD SUCCESSFUL, 31m54s) |
+
+**⑤⑥ 에 `--rerun` 을 붙인 이유**: 복원한 트리는 base 와 **바이트가 같아** 빌드 캐시가 두 test
+task 를 `FROM-CACHE`·`UP-TO-DATE` 로 집었다(첫 시도 실측: `check` 35초). 캐시 적중은 「같은
+입력이 전에 성공했다」는 사실이고 틀린 답은 아니지만 **이 라운드에서 돈 것은 아니다** — 이
+문서가 「실행했다」라고 적으려면 실제로 돌아야 한다. `--rerun` 으로 두 task 를 강제 실행한
+수치가 위 표다.
 
 **④⑤⑥ 을 실행 대신 갈음하는 근거는 트리 동일성뿐이다** — 「HEAD 가 초록이다」는 근거가 아니다.
 여기서는 갈음하지 않고 **셋 다 실행했다.**
