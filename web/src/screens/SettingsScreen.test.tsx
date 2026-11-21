@@ -9,6 +9,7 @@ import * as queries from '../api/queries';
 import { absenceTextOf } from '../display/absence';
 import { EDIT_SESSION_STATE_DISPLAY, STRATEGY_FIELD_DISPLAY } from '../display/editSessionDisplay';
 
+import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from './ProfileDetailsCard';
 import { SettingsScreen } from './SettingsScreen';
 
 vi.mock('../api/queries');
@@ -487,14 +488,67 @@ describe('설정 — 세션 상태와 충돌은 서버가 말한다', () => {
 });
 
 describe('설정 — 범위 밖 자리', () => {
-  /** D-7E2-7 — 사업자번호는 **입력칸을 만들지 않는다**(계약에 칸이 0 이다). */
-  it('사업자번호는 「준비 중」 빈 자리이고 입력칸이 없다', async () => {
+  /**
+   * M15/15C — **주장이 뒤집혔다**(test 를 지우지 않고 주장을 바꾼다): 번호는 이제 사업 정보
+   * 카드가 받고, 「준비 중」에 남은 것은 **진위 확인**이다. 번호를 저장한다는 것과 그 번호가
+   * 진짜인지 확인한다는 것은 다른 사실이고, 그 구분을 문면이 말하는지도 함께 잰다.
+   */
+  it('사업자번호 진위 확인만 「준비 중」이고 그 자리에는 입력칸이 없다', async () => {
     renderScreen();
 
     const notReady = await screen.findByTestId('settings-not-ready');
-    expect(notReady.textContent).toContain('사업자번호');
+    expect(notReady.textContent).toContain('진위 확인');
     expect(within(notReady).queryAllByRole('textbox')).toStrictEqual([]);
     expect(within(notReady).queryAllByRole('button')).toStrictEqual([]);
+  });
+
+  /** 입력칸은 **사업 정보 카드에 하나**다 — 예외 testId 가 하나라는 주장의 화면 쪽 절반이다. */
+  it('사업자번호 입력칸은 사업 정보 카드에 하나뿐이다', async () => {
+    renderScreen();
+
+    expect(await screen.findAllByTestId(BUSINESS_REGISTRATION_NUMBER_TEST_ID)).toHaveLength(1);
+  });
+
+  /** 저장된 값은 **읽는 꼴**로 보이고, 그 글자를 그대로 보내도 같은 값이다(서식은 되돌릴 수 있다). */
+  it('저장된 사업자번호는 자리 구분을 입혀 보이고 그대로 보낸다', async () => {
+    mocked.readProfile.mockResolvedValue({
+      qualificationDeclared: false,
+      businessTypes: [],
+      licensesDeclared: false,
+      licenseNames: [],
+      regionTerms: [],
+      naraRegistration: 'UNANSWERED',
+      naraRegisteredFields: [],
+      unjudgedAxes: [],
+      businessRegistrationNumber: '1234567890',
+    });
+    mocked.replaceBusinessDetails.mockResolvedValue(await mocked.readProfile());
+    renderScreen();
+
+    const input = await screen.findByTestId<HTMLInputElement>(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    expect(input.value).toBe('123-45-67890');
+
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+    await waitFor(() => {
+      expect(mocked.replaceBusinessDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ businessRegistrationNumber: '123-45-67890' }),
+      );
+    });
+  });
+
+  /** 비워 두고 저장하면 **「비워 둠」이 간다** — 빈 문자열이 아니다(그 값은 서버가 400 이다). */
+  it('비운 채 저장하면 비워 둠이 간다', async () => {
+    mocked.replaceBusinessDetails.mockResolvedValue(await mocked.readProfile());
+    renderScreen();
+
+    await screen.findByTestId(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    fireEvent.click(screen.getByRole('button', { name: '사업 정보 저장' }));
+
+    await waitFor(() => {
+      expect(mocked.replaceBusinessDetails).toHaveBeenCalledWith(
+        expect.objectContaining({ businessRegistrationNumber: null }),
+      );
+    });
   });
 
   it('페이퍼 투찰과 알림 채널도 빈 자리뿐이다', async () => {

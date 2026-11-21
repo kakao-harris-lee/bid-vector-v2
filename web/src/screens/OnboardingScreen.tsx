@@ -24,7 +24,11 @@ import { isUnauthorized, SignedOutFace } from '../components/WriteFailure';
 import type { StrategyField } from '../display/editSessionDisplay';
 import { compactAmountTextOf } from '../display/moneyDisplay';
 import { SUGGESTIONS_RESULT_STATE_DISPLAY } from '../display/noticeDisplay';
-import { displayOrUnknown } from '../display/stateDisplay';
+import {
+  BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY,
+  businessRegistrationNumberStateOf,
+} from '../display/profileDisplay';
+import { displayOrUnknown, type StateDisplay } from '../display/stateDisplay';
 import { dayCountText, daysUntil, readClock } from '../display/timeDisplay';
 import {
   nextStepWithPending,
@@ -76,6 +80,12 @@ interface OnboardingSection {
   readonly steps: readonly OnboardingStepId[];
   readonly why: string;
   /**
+   * 그 절이 **값으로** 말하는 상태(M15/15C) — 쓰기 단계가 없는 절도 말할 것이 있을 수 있다.
+   * 사업자번호 절이 그 실물이다: 적는 자리는 다른 절에 있지만 **적었는지 아닌지**는 여기서 말한다.
+   * 프로필을 아직 읽지 못했으면 알약이 없다(없는 사실을 지어내지 않는다).
+   */
+  readonly status?: (profile: Profile) => StateDisplay;
+  /**
    * **그 기능이 아직 없다**는 알약을 단다. 쓰기 칸이 없는 것과 **같은 사실이 아니다** —
    * 미리보기 절은 적을 칸이 없지만 미리보기 자체는 곁에서 **돌고 있다**. 거기에 「준비 중」을
    * 달면 화면이 **있는 기능을 없다고** 말한다(그 반대 방향의 거짓이라 더 눈에 띄지 않는다).
@@ -86,10 +96,13 @@ interface OnboardingSection {
 const ONBOARDING_SECTIONS = [
   {
     id: 'nts',
-    label: '사업자번호 확인',
+    label: '사업자번호',
     steps: [],
-    notReady: true,
-    why: '저장할 자리가 아직 없어 입력을 받지 않습니다',
+    // **준비 중이 아니다**(M15/15C): 적을 자리가 생겼고, 그 자리는 다음 절의 사업 정보 폼이다.
+    // 여기서 말하는 것은 「적었는가」뿐이고 **적은 값은 보이지 않는다**.
+    status: (profile) =>
+      BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY[businessRegistrationNumberStateOf(profile)],
+    why: '선택입니다 — 비워 두어도 모든 화면을 쓸 수 있고, 적을 때는 사업 정보와 함께 저장합니다',
   },
   {
     id: 'nara',
@@ -289,6 +302,7 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
                 key={section.id}
                 section={section}
                 ordinal={at + 1}
+                profile={profile.data}
                 rows={rows.filter((row) =>
                   section.steps.some((step) => ONBOARDING_ITEM_STEP[row.item] === step),
                 )}
@@ -336,6 +350,7 @@ function OnboardingWizard({ checklist }: { readonly checklist: OnboardingCheckli
 function SectionCard({
   section,
   ordinal,
+  profile,
   rows,
   current,
   sessionOpen,
@@ -344,6 +359,8 @@ function SectionCard({
 }: {
   readonly section: OnboardingSection;
   readonly ordinal: number;
+  /** 아직 못 읽었으면 `undefined` — 그때 값에서 나오는 알약은 서지 않는다. */
+  readonly profile: Profile | undefined;
   readonly rows: readonly ItemRow[];
   readonly current: OnboardingStepId;
   readonly sessionOpen: boolean;
@@ -351,6 +368,9 @@ function SectionCard({
   readonly onPick: (step: OnboardingStepId) => void;
 }) {
   const state = sectionStateOf(rows);
+  // 알약의 출처는 **셋 중 하나**다 — 항목 상태(쓰기 절) · 값에서 나온 상태 · 「준비 중」 선언.
+  // 같은 자리를 세 사실이 다투지 않게 차례를 한 번만 적는다.
+  const declared = section.status === undefined || profile === undefined ? null : section.status(profile);
   const holdsCurrent = section.steps.some((step) => step === current);
   return (
     <li data-testid={`onboarding-section-${section.id}`} className={cardClass('sm')}>
@@ -375,6 +395,8 @@ function SectionCard({
         */}
         {state !== null ? (
           <StateBadge display={ITEM_STATE_DISPLAY[state]} testId={`onboarding-section-state-${section.id}`} />
+        ) : declared !== null ? (
+          <StateBadge display={declared} testId={`onboarding-section-state-${section.id}`} />
         ) : section.notReady === true ? (
           <StatusPill
             tone={NOT_READY_PILL.tone}

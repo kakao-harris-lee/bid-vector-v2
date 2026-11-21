@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { components } from '../api/generated/operator-api';
 
 import {
+  BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY,
   businessDetailsBodyOf,
+  businessRegistrationNumberStateOf,
+  businessRegistrationNumberText,
   capacityBodyOf,
   NARA_FIELD_DISPLAY,
   NARA_REGISTRATION_DISPLAY,
@@ -33,6 +36,7 @@ function profile(overrides: Partial<Profile> = {}): Profile {
 function form(overrides: Partial<BusinessDetailsForm> = {}): BusinessDetailsForm {
   return {
     tradeName: '',
+    businessRegistrationNumber: '',
     headquartersRegion: '',
     naraRegistration: 'UNANSWERED',
     naraRegisteredFields: [],
@@ -103,6 +107,41 @@ describe('자격 사실의 세 상태', () => {
   });
 });
 
+describe('사업자번호 — 서식과 상태(M15/15C)', () => {
+  /** 서식은 **되돌릴 수 있다** — 그 글자를 그대로 서버로 보내도 같은 값이 된다(서버가 두 꼴을 받는다). */
+  it('숫자 열 자리에 자리 구분을 입힌다', () => {
+    expect(businessRegistrationNumberText('1234567890')).toBe('123-45-67890');
+  });
+
+  /** 열 자리가 아니면 **그대로** 낸다 — 지어낸 자리 구분이 틀린 값을 옳은 꼴로 보이게 하지 않는다. */
+  it('계약 밖의 값에는 자리 구분을 지어 붙이지 않는다', () => {
+    ['123456789', '12345678901', '123-45-67890', '', '12345O7890'].forEach((raw) => {
+      expect(businessRegistrationNumberText(raw)).toBe(raw);
+    });
+  });
+
+  it('상태는 값의 유무 둘이고 비워 둠이 미완이 아니다', () => {
+    expect(businessRegistrationNumberStateOf(profile())).toBe('EMPTY');
+    expect(businessRegistrationNumberStateOf(profile({ businessRegistrationNumber: '1234567890' }))).toBe('FILLED');
+    expect(Object.keys(BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY).sort()).toStrictEqual(['EMPTY', 'FILLED']);
+    // 「비워 둠」이 **선택**임을 문면이 말한다 — 알약만 보고 미완으로 읽히지 않게.
+    expect(BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY.EMPTY.label).toContain('선택');
+  });
+
+  /**
+   * 폼의 값은 **적힌 그대로** 간다(앞뒤 공백만 턴다) — 화면이 꼴을 판정하지 않는다. 빈 입력은
+   * `null`(「비워 둠」)이고, 그 자리에 빈 문자열을 보내면 서버가 400 으로 거부한다.
+   */
+  it('본문은 적힌 그대로 보내고 빈 입력은 비워 둠이다', () => {
+    expect(businessDetailsBodyOf(form({ businessRegistrationNumber: '123-45-67890' })).businessRegistrationNumber)
+      .toBe('123-45-67890');
+    expect(businessDetailsBodyOf(form({ businessRegistrationNumber: ' 1234567890 ' })).businessRegistrationNumber)
+      .toBe('1234567890');
+    expect(businessDetailsBodyOf(form({ businessRegistrationNumber: '   ' })).businessRegistrationNumber).toBeNull();
+    expect(businessDetailsBodyOf(form()).businessRegistrationNumber).toBeNull();
+  });
+});
+
 describe('사업 정보 요청 본문 — 계약의 모양을 지킨다', () => {
   /** `REGISTERED` 가 아니면 두 칸을 **실을 수 없다**(400) — 받아 두고 버리지 않는다. */
   it('등록이 아니면 분야·인증서 만료일을 싣지 않는다', () => {
@@ -114,7 +153,9 @@ describe('사업 정보 요청 본문 — 계약의 모양을 지킨다', () => 
       }),
     );
 
-    expect(Object.keys(body).sort()).toStrictEqual(['naraRegistration', 'tradeName', 'headquartersRegion'].sort());
+    expect(Object.keys(body).sort()).toStrictEqual(
+      ['naraRegistration', 'tradeName', 'businessRegistrationNumber', 'headquartersRegion'].sort(),
+    );
     expect('naraRegisteredFields' in body).toBe(false);
     expect('businessCertificateExpiresOn' in body).toBe(false);
   });

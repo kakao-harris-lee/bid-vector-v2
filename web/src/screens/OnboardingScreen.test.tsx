@@ -373,13 +373,19 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
    * 그대로이고 **재는 자리가 절마다**로 좁아졌다 — 한 상자로 재던 앞 판보다 센 단언이다(그때는
    * 셋 가운데 하나에 버튼이 생겨도 다른 둘이 그 상자를 비워 주면 지나갔다).
    */
-  const NOT_READY_SECTIONS = [
-    { id: 'nts', label: '사업자번호' },
-    { id: 'channels', label: '알림 받는 곳' },
-  ] as const;
+  const NOT_READY_SECTIONS = [{ id: 'channels', label: '알림 받는 곳' }] as const;
 
-  /** 적을 칸이 없는 절 전수 — 준비 중 둘과, **준비 중이 아닌** 미리보기 하나다. */
-  const STEPLESS_SECTIONS = [...NOT_READY_SECTIONS, { id: 'preview', label: '지금 맞는 공고 미리보기' }] as const;
+  /**
+   * 적을 칸이 없는 절 전수 — 준비 중 하나와, **준비 중이 아닌** 둘(미리보기 · 사업자번호)이다.
+   *
+   * **M15/15C 로 사업자번호가 그 둘 쪽으로 옮겼다**: 적을 자리가 생겼고(사업 정보 폼), 이 절은
+   * 「적었는가」만 말한다. 적을 칸이 **이 절에** 없다는 사실은 그대로라 여기 남는다.
+   */
+  const STEPLESS_SECTIONS = [
+    ...NOT_READY_SECTIONS,
+    { id: 'nts', label: '사업자번호' },
+    { id: 'preview', label: '지금 맞는 공고 미리보기' },
+  ] as const;
 
   it.each(STEPLESS_SECTIONS)('$label 절은 빈 자리뿐이다 — 입력칸도 버튼도 없다', async ({ id, label }) => {
     renderScreen();
@@ -399,6 +405,27 @@ describe('시작하기 — 세 얼굴과 범위 밖 자리', () => {
     const section = await screen.findByTestId(`onboarding-section-${id}`);
 
     expect(within(section).getByTestId(`onboarding-section-state-${id}`).textContent).toBe('준비 중');
+  });
+
+  /**
+   * M15/15C — 사업자번호 절은 **「준비 중」이 아니라 상태**를 말한다. 「비워 둠」이 미완으로
+   * 읽히지 않게 그 알약이 선택임을 함께 적고, **적은 값은 이 절에 서지 않는다**(누출 게이트의
+   * 예외는 설정 입력칸 하나다 — 이 절이 둘째 예외가 되지 않는 것을 여기서 잰다).
+   */
+  it.each([
+    { stored: null, pill: '비워 둠(선택)' },
+    { stored: '1234567890', pill: '입력함' },
+  ])('사업자번호 절은 $pill 이라고 말하고 번호를 보이지 않는다', async ({ stored, pill }) => {
+    mocked.readProfile.mockResolvedValue({ ...emptyProfile(), businessRegistrationNumber: stored ?? undefined });
+    renderScreen();
+
+    // 알약은 **프로필을 읽은 뒤** 선다 — 절만 기다리면 값이 오기 전의 트리를 본다.
+    expect((await screen.findByTestId('onboarding-section-state-nts')).textContent).toBe(pill);
+
+    const section = screen.getByTestId('onboarding-section-nts');
+    expect(section.textContent).not.toContain('준비 중');
+    expect(section.textContent).not.toContain('1234567890');
+    expect(section.textContent).not.toContain('123-45-67890');
   });
 
   /**

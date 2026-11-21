@@ -68,8 +68,8 @@ export const APPROVED_OPERATIONS = [
   { method: 'POST', path: '/api/strategy/edit-sessions/{sessionId}/cancel' },
 
   // 설정 — 프로필(D-7E2-3). 자격 사실·사업 정보는 **절 단위 교체**이고 시평액은 행 단위다.
-  // 사업자번호는 계약에 칸이 없어 입력칸을 만들지 않는다(D-7E2-7) — 그래서 그 축의
-  // operation 도 없다.
+  // 사업자번호는 M15/15C 가 사업 정보 절의 **선택 칸**으로 열었다 — 기존 operation 이 칸 하나를
+  // 더 받을 뿐이라 이 목록은 그대로다(새 operation 0).
   { method: 'GET', path: '/api/profile' },
   { method: 'POST', path: '/api/profile/qualification-facts' },
   { method: 'POST', path: '/api/profile/business-details' },
