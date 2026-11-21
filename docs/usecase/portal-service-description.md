@@ -56,7 +56,8 @@ id 나 OPEN 홀더 id 를 인용한다 — 그 홀더가 닫히면 **그 slice �
 | 화면 | 캡처 |
 | --- | --- |
 | A 시작하기(설정 체크리스트) | `captures/a-start-desktop.png` · `captures/a-start-mobile.png` |
-| B 오늘의 공고 | `captures/b-notices-desktop.png` · `captures/b-notices-mobile.png` |
+| B 오늘의 공고(검색 결과) | `captures/b-notices-desktop.png` · `captures/b-notices-mobile.png` |
+| B 오늘의 공고(기본 — 감시 조건을 통과한 제안) | `captures/b2-notices-default-desktop.png` · `captures/b2-notices-default-mobile.png` |
 | C 공고 워크시트 | `captures/c-worksheet-desktop.png` · `captures/c-worksheet-mobile.png` |
 | D 내 입찰함 | `captures/d-bid-box-desktop.png` · `captures/d-bid-box-mobile.png` |
 | D 내 입찰함(제출 전 묶음 — 「나중에」·「건너뜀」) | `captures/d2-bid-box-watching-desktop.png` · `captures/d2-bid-box-watching-mobile.png` |

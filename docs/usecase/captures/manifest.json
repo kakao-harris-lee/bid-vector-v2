@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-11-19T21:01:08.633Z",
-  "head": "a4ce60e22a40c9cd3ef71a6d9bfb30ddf06ac8d6",
-  "totalBytes": 1113593,
+  "capturedAt": "2026-11-20T18:16:46.203Z",
+  "head": "5a8e0b853aefe86c5692bcf066a8d792b02642ac",
+  "totalBytes": 1611484,
   "files": [
     {
       "path": "a-start-desktop.png",
@@ -10,9 +10,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1527,
-      "bytes": 112368,
-      "sha256": "d69f1a056eed5397e36b827d8a30b334e43db74863067d0dc2d9bed752a913b6"
+      "imageHeight": 1162,
+      "bytes": 124824,
+      "sha256": "3d230de8083fbe60e9f06c055094cb6295b5cde7435350a9350e3108b7d8952b"
     },
     {
       "path": "b-notices-desktop.png",
@@ -22,8 +22,19 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 47387,
-      "sha256": "fb987bd8ca3d83ebdd54203732f6a5146dcd8517a371fd2085a2dcc374b69b8d"
+      "bytes": 53267,
+      "sha256": "388c93b5e089362395478bd4366cf2aaa4238217e1eb81c92abb3be15f36dc51"
+    },
+    {
+      "path": "b2-notices-default-desktop.png",
+      "screen": "b2-notices-default",
+      "viewport": "desktop",
+      "viewportWidth": 1280,
+      "viewportHeight": 800,
+      "imageWidth": 1280,
+      "imageHeight": 1696,
+      "bytes": 174218,
+      "sha256": "053e18139dd55b7c6d27f137d26f564d335b9cca9844b10f3a5b95bf0d910e30"
     },
     {
       "path": "c-worksheet-desktop.png",
@@ -32,9 +43,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1653,
-      "bytes": 129776,
-      "sha256": "da8786223844c15daabaa43bce4251b8a444fd45e5caabe0d4689ee7fc3a260b"
+      "imageHeight": 996,
+      "bytes": 110856,
+      "sha256": "e4d1e2077d8100ff134e9156de325c0d16896da51002ae5ea1186190130ff5bb"
     },
     {
       "path": "d-bid-box-desktop.png",
@@ -44,8 +55,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 29937,
-      "sha256": "a1fca38f9003102fbffaf1a93dff64d0597f60eba48ea5f476954570320981cf"
+      "bytes": 62711,
+      "sha256": "4878512ff077613310308027e77641de3e2e28de23b1246c5a24eaa0d293a975"
     },
     {
       "path": "d2-bid-box-watching-desktop.png",
@@ -55,8 +66,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 34277,
-      "sha256": "d967570393daba8d05638ccf31cade7f09cff498f06b6758010c5ce67876e249"
+      "bytes": 65338,
+      "sha256": "70ad0fef7093b8de38096bb1ff73b6c75ab1e2fe84dd4c578a3f0eedc7caf425"
     },
     {
       "path": "e-results-desktop.png",
@@ -65,9 +76,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1529,
-      "bytes": 147003,
-      "sha256": "c32a53ce1692672b87ff10ac06d4c8200b29b42dbdc534a4c887b2c51496dba8"
+      "imageHeight": 1634,
+      "bytes": 187781,
+      "sha256": "7f71eb09dc5b6866f9fd1024cbd26c9470d4dd5b71f4fe6aa9346d4b29b6800f"
     },
     {
       "path": "inbox-desktop.png",
@@ -76,9 +87,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 813,
-      "bytes": 88184,
-      "sha256": "f4c912e4e4072d37182815f8e53ada3c936dd8e22758918efbc585fc2cbcc2b3"
+      "imageHeight": 800,
+      "bytes": 86764,
+      "sha256": "85db5edf2bb3064b5f2cca742505286bc6c886b912ea13bfc7370f6bc4ffe233"
     },
     {
       "path": "a-start-mobile.png",
@@ -87,9 +98,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 1867,
-      "bytes": 99925,
-      "sha256": "80d20c32c38fda2cf8b2ec9d28cbcea6a0622f236fefe3615f0c3c54e78f92d7"
+      "imageHeight": 2039,
+      "bytes": 112428,
+      "sha256": "8dfb48986c9300fcfb18b500eaf4d6c3b0f452aa7915062b27a431982ea61471"
     },
     {
       "path": "b-notices-mobile.png",
@@ -99,8 +110,19 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 844,
-      "bytes": 40421,
-      "sha256": "f90f71ff6f71cb37e55b1fd34c0dc82f9ce744fd9b36c8b43325c55ff4e6b70f"
+      "bytes": 39306,
+      "sha256": "aed85dd89c00eec06b7ae839d945410e7b4750f409d1585e48b2478b4858de28"
+    },
+    {
+      "path": "b2-notices-default-mobile.png",
+      "screen": "b2-notices-default",
+      "viewport": "mobile",
+      "viewportWidth": 390,
+      "viewportHeight": 844,
+      "imageWidth": 390,
+      "imageHeight": 2413,
+      "bytes": 126139,
+      "sha256": "d300eeac88ab99fee062633b49a668f44a746db5c8e3698acd770440d00745ad"
     },
     {
       "path": "c-worksheet-mobile.png",
@@ -109,9 +131,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 1961,
-      "bytes": 115253,
-      "sha256": "2633b008b4e670affc15716f9be4de14cb7785ae7ece59d38b10ddf173f8f401"
+      "imageHeight": 1471,
+      "bytes": 94572,
+      "sha256": "4c9a38fcc924f54acf2e0d25647b1aeb5fcc0af2a3bfb199f61e8518091c0a5f"
     },
     {
       "path": "d-bid-box-mobile.png",
@@ -120,9 +142,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 844,
-      "bytes": 22011,
-      "sha256": "5166aaa11f1c4c666d10bb22aa6b0e9d1cb2a4835983b6e9a4eebc947839a037"
+      "imageHeight": 891,
+      "bytes": 55649,
+      "sha256": "15c7c86b5f32226b118c8f146d69198f04ed1fee69e2a0c241d17d8c4b6de8fd"
     },
     {
       "path": "d2-bid-box-watching-mobile.png",
@@ -131,9 +153,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 844,
-      "bytes": 26435,
-      "sha256": "be7e64930f71c15c2c7339a90d825969eebe3d380f856d8384f52181e953e993"
+      "imageHeight": 1005,
+      "bytes": 57872,
+      "sha256": "7f1f72f31d2e802ac49ac575163e63fdf67fc2b271b04766c753f0fedd17a2f9"
     },
     {
       "path": "e-results-mobile.png",
@@ -142,9 +164,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 2525,
-      "bytes": 143226,
-      "sha256": "a60b4b5da3d5f92baee45b03b3aee3c003695fba275eea2785c85d9fe1400d07"
+      "imageHeight": 2929,
+      "bytes": 181401,
+      "sha256": "7c0140079cca37bdf7230db891e7e8e401489550b74ed40fa629410bd79adc43"
     },
     {
       "path": "inbox-mobile.png",
@@ -154,8 +176,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 1225,
-      "bytes": 77390,
-      "sha256": "3f89dbfa228ecc35a7710180201c787fdccf85a6ef226e91bfc6d1057ae37549"
+      "bytes": 78358,
+      "sha256": "66374e1b9ae0123adcd731919a713aa97122234826cc0f32f0e07386c8533f76"
     }
   ]
 }
