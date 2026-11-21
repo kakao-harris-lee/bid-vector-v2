@@ -3,7 +3,6 @@ package bidvector.workflow.profile
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
 import bidvector.workflow.access.AccountId
-import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.evaluation.testStrategy
 import bidvector.workflow.strategy.Clock

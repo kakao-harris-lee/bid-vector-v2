@@ -1,7 +1,6 @@
 package bidvector.app.evaluation
 
 import bidvector.adapters.evaluation.EvaluationCommitRuns
-import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.collection.CollectionLog
 import bidvector.app.http.TestStrategyRepository
@@ -27,7 +26,9 @@ import org.springframework.boot.DefaultApplicationArguments
 import java.time.Instant
 
 private const val CANDIDATE_CAP = 5
-private const val MAX_ACTIVE_BIDS = 10
+
+// M15/15A — 여력 상한 상수는 사라졌다. 공장이 **그 계정의 전략에서** 상한을 읽으므로 이 test 가
+// 상한 값을 들고 있을 자리가 없다(전략 읽기에서 던지는 조립이라 거기까지 가지도 않는다).
 private const val DEAD_STORE_MESSAGE = "전략 저장소가 응답하지 않는다 jdbc:postgresql://secret-host/db"
 
 /**
