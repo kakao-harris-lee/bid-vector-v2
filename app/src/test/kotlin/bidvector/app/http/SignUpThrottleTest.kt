@@ -93,7 +93,7 @@ class SignUpThrottleTest {
         throttle.admit("10.0.0.7") shouldBe false
 
         lines.size shouldBe 1
-        lines.single() shouldContain "cause=window limit"
+        lines.single() shouldContain "cause=window-limit"
         lines.single() shouldContain "limit=$TEST_SIGN_UP_ATTEMPTS"
         lines.single() shouldContain "tracked-addresses="
         lines.single() shouldNotContain "10.0.0.7"
@@ -120,7 +120,7 @@ class SignUpThrottleTest {
 
         // 앞 판은 여기서 `true` 였다 — 축출이 창을 지웠기 때문이다.
         bounded.admit("persistent") shouldBe false
-        own.last() shouldContain "cause=window limit"
+        own.last() shouldContain "cause=window-limit"
     }
 
     /** 모르는 주소의 거부는 **다른 사유**로 적힌다 — 운영자가 둘을 가를 수 있어야 한다. */
@@ -132,7 +132,7 @@ class SignUpThrottleTest {
 
         bounded.admit("stranger") shouldBe false
 
-        own.single() shouldContain "cause=tracked-address capacity"
+        own.single() shouldContain "cause=tracked-address-capacity"
         own.single() shouldNotContain "stranger"
     }
 

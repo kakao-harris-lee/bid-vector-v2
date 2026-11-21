@@ -166,6 +166,28 @@ class AccountSignUpEndpointTest : HttpIntegrationTestBase() {
         access.signUps.created shouldBe emptyList()
     }
 
+    /**
+     * **`SessionUnavailable` 은 죽은 분기가 아니다**(r3 열린 질문 ① — 두 라운드 미측정이었다).
+     * 실물에서 그 갈래는 가입이 행을 세운 **뒤** 세션을 적기 전에 자격이 움직이는 순간이고
+     * (운영자 `rotate` · 행 소멸), 조건부 UPDATE 가 0행을 고쳐 `Contended` 로 끝난다. 여기서는
+     * 확정 이중체를 그 상태로 세워 **HTTP 층의 503 매핑과 「쿠키를 내지 않는다」**를 잰다.
+     *
+     * use case 층은 `AccountSignUpTest` 가, 화면 문면은 `SignUpScreen.test.tsx` 가 같은 코드로
+     * 잰다 — 셋이 함께 서야 이 갈래가 「살아 있다」가 된다.
+     */
+    @Test
+    fun `세션이 서지 않으면 503 이고 쿠키를 내지 않는다 — 계정은 남는다`() {
+        access.completion.contended = true
+
+        val response = signUp()
+
+        response.statusCode.value() shouldBe 503
+        response.body?.get("code") shouldBe ErrorCode.SIGN_UP_SESSION_UNAVAILABLE
+        response.headers.getFirst(HttpHeaders.SET_COOKIE) shouldBe null
+        // 계정은 섰다 — 그 사람은 로그인으로 들어올 수 있고, 그래서 화면이 로그인을 가리킨다.
+        access.signUps.created shouldBe listOf(FRESH_LOGIN)
+    }
+
     // --- 호출 헬퍼 -------------------------------------------------------------
 
     private fun signUp(

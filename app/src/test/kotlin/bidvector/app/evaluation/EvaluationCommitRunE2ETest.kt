@@ -318,8 +318,10 @@ class EvaluationCommitRunE2ETest {
             runs = runs,
             candidateCap = CANDIDATE_CAP,
             // 이 E2E 가 재는 축은 상한이 아니다 — 둘 다 넉넉히 준다(그 축은 러너 unit test).
+            // 상한이 청중보다 크면 회전 창이 서지 않아 날짜가 선택을 바꾸지 않는다.
             maxAccountsPerRun = E2E_ACCOUNT_CAP,
             maxConsecutiveAccountFailures = E2E_CONSECUTIVE_CAP,
+            clock = fixture.bean(Clock::class.java),
             log = CollectionLog { commitLog += it },
             termination = termination,
         ).run(DefaultApplicationArguments())

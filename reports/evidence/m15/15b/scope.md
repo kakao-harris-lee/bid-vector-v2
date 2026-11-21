@@ -34,7 +34,7 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/wiring/EvaluationWiring.kt           # r3 — 상한 둘(여기만 기본값을 갖는다)
   - app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt     # r3 — 상한 둘을 러너로
   - app/src/test/kotlin/bidvector/app/http/                                # 집합 등식 둘 · 가입 endpoint · 상한
-  - app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt  # 면제 수 래칫(r1 cr N-2 — 누락 등재)
+  - app/src/test/kotlin/bidvector/app/architecture/AppHttpDependencyGateTest.kt  # (변경 없음 — r2 가 tier1 등재를 걷으면서 되돌렸다, r3 cr L-6)
   - app/src/test/kotlin/bidvector/app/SignUpThrottleWiringTest.kt          # r2 — 출하 상한의 값·배선
   - web/src/paths.ts                                                       # r2 — 세션 전 자리 주소 한 자리(순환 import 제거)
   - app/src/test/kotlin/bidvector/app/access/AccountCommandRunnerTest.kt   # 완화된 create 의 로그·종료 코드
@@ -122,11 +122,15 @@ V20 은 「앱 역할에 `account` INSERT 가 없다 — 앱이 뚫려도 계정
   상한임을 KDoc 이 적는다.
 ③ **가입과 세션 발급이 한 트랜잭션이 아니다.** 로그인 경로와 같은 경계(문장마다 제 트랜잭션)를 쓰므로,
   세션 발급이 실패하면 계정만 남는다 — 그 계정은 로그인으로 들어올 수 있다(권한이 새지 않는다).
-④ **`deferred` 를 읽는 경보가 없다**(계약 갱신 (7)). 상한은 비용을 묶지만, 계정 수가 상한을 넘은 날
-  **매 run 이 뒤쪽 계정을 미룬다** — 그 계정들은 cron 이 성공을 보고하는 동안 평가를 받지 못한다. 종료
-  코드로 알리지 않기로 한 것은 결정이고(미룬 것은 실패가 아니다), 그 결정의 대가가 이 공백이다. 닫는
-  자리는 경보 쪽이지 종료 코드가 아니다 — 15A 알려진 제한 ⑧(「`accounts=0 skipped=N` 을 읽는 경보가
-  없다」)과 **같은 자리**다.
+④ **`deferred` 를 읽는 경보가 없다**(계약 갱신 (7)·(10)). 회전이 「영원히 빠지는 계정」은 없앴지만,
+  상한을 넘은 날 그 계정의 평가는 **최대 `ceil((K-1)/(n-1))` 영업일 늦는다** — 그 지연을 보는 자리가
+  없고 cron 은 성공을 적는다. 종료 코드로 알리지 않기로 한 것은 결정이고(미룬 것은 실패가 아니다),
+  그 결정의 대가가 이 공백이다. 닫는 자리는 경보 쪽이지 종료 코드가 아니다 — 15A 알려진 제한
+  ⑧(「`accounts=0 skipped=N` 을 읽는 경보가 없다」)과 **같은 자리**다.
+⑤ **회전은 「가장 오래 평가되지 않은 순」이 아니다.** 축이 날짜의 순수 함수라 **cron 을 거른 날의
+  창은 그냥 지나간다**(영속 커서가 없다 — 그 상태를 두면 되돌림과 재실행이 서로 다른 판을 만든다).
+  계정 집합이 바뀌면 창의 경계도 바뀌므로 한 바퀴가 정확히 맞아떨어지지 않는 날이 있다. 등재 자리는
+  `OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ 다.
 
 ## base 확인
 
@@ -211,6 +215,24 @@ cause=` 줄이다. 마침 줄의 계정 계수 **넷**(`accounts`·`skipped`·`f
 운영자 전용」 한 줄에 M15 가 그것을 깼다는 사실을 적었다 — **그 줄을 이 slice 가 거짓으로 만든다.**
 §7 이 요구하는 §3.4 등식(표의 종료 코드 == `EvaluationCommitExitCode`)은 재측정했다(commands.md).
 
+**(10) 상한 밖은 회전한다 — 거동 변경**(수정 라운드 4, r3 리뷰 M-1·F-1 · 팀장 결정 2026-11-22).
+라운드 3 의 `take(n)` 고정 절단은 **같은 계정을 매 run 미뤘다**: 상한이 오르거나 더 작은 id 가
+사라질 때까지 `n` 번째 뒤의 가입자는 **어느 run 에서도** 평가되지 않았고, 종료 코드는 0 이라
+cron 은 성공을 적었다. 줄이 그것을 「미룸」이라 부른 것이 결함이다.
+
+- **보유자(가장 작은 id)는 매일 든다** — 전역 발송 채널이 그 계정에 묶여 있어 그 자리를 비울 수 없다.
+- 남은 `n-1` 칸이 나머지 `K-1` 계정 위를 **영업일마다 `n-1` 칸씩** 미끄러진다
+  (`start = floorMod(영업일 × (n-1), K-1)`). 연속한 `ceil((K-1)/(n-1))` 영업일이면 전원이 한 번씩 돈다.
+- 축은 **KST 달력일**이고 **순수 함수**다 — 같은 날 다시 돌리면 같은 집합이다(영속 커서를 두지
+  않는다: 그 상태가 있으면 되돌림과 재실행이 서로 다른 판을 만든다). 그래서 runbook 의 처방에서
+  「더 자주 돌린다」를 **뺐다** — 그 수단은 이 원천에 효과가 0 이다.
+- `n = 1` 이면 칸이 0 이라 보유자만 돈다(공평성 등식의 분모가 0 인 자리, KDoc 이 적는다).
+
+같은 라운드에서 `SignUpOutcome.SessionUnavailable` 의 **생사도 쟀다** — 죽은 분기가 **아니다**.
+use case 층(`AccountSignUpTest`)·HTTP 층(503 매핑·쿠키 0, 신설)·화면(`SignUpScreen.test.tsx`)
+셋이 같은 코드로 그 갈래를 지난다. 실물에서 서는 순간은 가입이 행을 세운 **뒤** 세션 확정의 조건부
+UPDATE 가 0행을 고치는 때다(운영자 `rotate` · 행 소멸).
+
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
@@ -220,3 +242,6 @@ cause=` 줄이다. 마침 줄의 계정 계수 **넷**(`accounts`·`skipped`·`f
 - 2026-11-22 15A 머지(main `d2c0513d`) 병합 후 라운드 3 — 계약 갱신 (7)~(9), in_scope 여덟 등재
   (평가 러너 축 여섯 + 멱등 키 test + runbook), 알려진 제한 ④ 등재, `web/src/**/*.test.ts`
   누락 등재(`routes.test.ts` 가 `.tsx` 글롭 밖이었다), rollback 복원 원천을 병합된 main 으로.
+- 2026-11-22 수정 라운드 4 — 계약 갱신 (10) **상한 밖 회전**(거동 변경), `OPEN-M15-EVAL-COST-PER-ACCOUNT`
+  를 OPEN 장부에 등재, 알려진 제한 ④ 를 회전 기준으로 고쳐 씀, in_scope 에 `docs/discovery/capability-map.md`·
+  `openapi/*`·`web/src/paths.ts` 는 이미 있고 신설 경로 0.

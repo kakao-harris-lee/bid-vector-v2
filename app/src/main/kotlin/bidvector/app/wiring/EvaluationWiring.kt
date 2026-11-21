@@ -175,10 +175,13 @@ open class EvaluationWiring {
 data class EvaluationProperties(
     val candidateCap: Int,
     /**
-     * run 하나가 평가하는 계정 수의 상한 — 넘는 계정은 **다음 run 으로 미뤄지고**(`deferred=`)
-     * 종료 코드를 바꾸지 않는다. 순서는 계정 id 오름차순이라 **운영 계정(가장 작은 id)이 언제나
-     * 먼저**다. 기본 50 은 오늘의 비용에서 고른 수가 아니라 「손을 떠난 수를 묶는다」는 결정의
-     * 값이다 — 오늘 ML 호출이 `UnavailableMlAnalysis` 에 고정돼 있어 실제 run 비용은 0 에 가깝다.
+     * run 하나가 평가하는 계정 수의 상한 — 넘는 계정은 **다음 영업일의 창으로 미뤄지고**
+     * (`deferred=`) 종료 코드를 바꾸지 않는다. 창은 **보유자(가장 작은 id) 고정 + 나머지 회전**
+     * 이라, 연속한 `ceil((K-1)/(상한-1))` 영업일이면 모든 계정이 한 번씩 돈다
+     * (`accountsForRun` KDoc). 상한이 `1` 이면 칸이 0 이라 보유자만 돈다.
+     *
+     * 기본 50 은 오늘의 비용에서 고른 수가 아니라 「손을 떠난 수를 묶는다」는 결정의 값이다 —
+     * 오늘 ML 호출이 `UnavailableMlAnalysis` 에 고정돼 있어 실제 run 비용은 0 에 가깝다.
      */
     val maxAccountsPerRun: Int = DEFAULT_MAX_ACCOUNTS_PER_RUN,
     /**

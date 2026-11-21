@@ -99,7 +99,7 @@
 | `bidvector.persistence` | `jdbc-url` · `username` · `credential` |
 | `bidvector.access` | `cookie-secure` (기본 `true`) |
 | `bidvector.notification` | `site-base-url` · `telegram.{bot-credential,chat-id,route-key,base-url,connect-timeout,response-timeout}` — `telegram.bot-credential` 은 **위 문단의 자격 값과 같은 취급**이다 |
-| `bidvector.evaluation` | `candidate-cap` · `mode` · `max-accounts-per-run` (기본 `50`) · `max-consecutive-account-failures` (기본 `3`) — 뒤 둘은 **run 당 계정 상한**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`)이고 읽는 법은 §3.4 다. 둘 다 **1 미만이면 기동 실패**(0 은 「아무도 평가하지 않는다」라 상한이 아니다) |
+| `bidvector.evaluation` | `candidate-cap` · `mode` · `max-accounts-per-run` (기본 `50`) · `max-consecutive-account-failures` (기본 `3`) — 뒤 둘은 **run 당 계정 상한**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`)이고 읽는 법은 §3.4 다. 상한 밖은 **영업일마다 회전**하므로 `ceil((K-1)/(상한-1))` 일이면 전원이 한 번씩 돈다(회전 경계는 **KST 달력일**이다). 둘 다 **1 미만이면 기동 실패**(0 은 「아무도 평가하지 않는다」라 상한이 아니다) |
 | `bidvector.evaluation.commit` | `current-active-bids` |
 | `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` |
 | `bidvector.koneps` | `base-url` · `service-key` · `operations.<업종>.path` · `operations.<업종>.division` |
@@ -376,20 +376,24 @@ deferred=…`). 넷은 서로 다른 사건이고, 종료 코드에 미치는 �
 | `accounts=` | 실제로 평가가 돈 계정 수 | — | `0` 인데 `skipped`·`deferred` 도 `0` 이면 **청중이 비었다**. 갓 설치한 체계의 정상 상태라 비-0 이 아니다 — 경보로 바꾸는 것은 cron 쪽 일이다 |
 | `skipped=` | 쓸 수 있는 전략이 없어 건너뛴 계정 수 | 바꾸지 않는다 | 그 계정이 전략을 저장한 적이 없다는 뜻이다. 수가 늘기만 한다면 가입은 되는데 설정이 안 되는 것이니 **가입 경로**를 본다 |
 | `failed=` | 평가 중에 예외로 터진 계정 수 | **`INCOMPLETE`(2)** | 같은 run 의 `account-failed cause=` 줄과 짝지어 읽는다. 그 계정들의 판정은 **사라졌다** |
-| `deferred=` | 이 run 이 **평가하지 않고 미룬** 계정 수 | 바꾸지 않는다 | 아래 두 원천을 가린다 |
+| `deferred=` | 이 run 이 **평가하지 않고 미룬** 계정 수 | 바꾸지 않는다 | 아래 두 원천을 가린다. 네 계수는 청중과 닫힌다 — `accounts + skipped + failed + deferred` = 그 run 의 계정 전수 |
 
-`deferred` 는 **실패가 아니다** — 그 계정의 평가는 사라진 것이 아니라 다음 run 으로 미뤄졌다. 원천이
-둘이고, 둘을 가르는 것은 계수가 아니라 **줄의 유무**다.
+`deferred` 는 **실패가 아니다** — 그 계정의 평가는 사라진 것이 아니라 **다음 영업일의 창**으로
+미뤄졌다. 원천이 둘이고, 둘을 가르는 것은 계수가 아니라 **줄의 유무**다.
 
 - **run 당 계정 상한 밖**(`bidvector.evaluation.max-accounts-per-run`, 기본 50). 시작 줄의
-  `maxAccountsPerRun=` 과 맞대 본다. 계정은 **id 순으로** 잘리므로 가장 작은 id(운영 계정)는 언제나
-  포함된다. `deferred` 가 매 run 반복되면 상한을 올리거나 run 을 더 자주 돌린다 — 그 전에 **비용**을
-  본다(계정 수 × 평가 1회).
+  `maxAccountsPerRun=` 과 맞대 본다. 창은 **보유자 고정 + 나머지 회전**이다 — 가장 작은 id(운영
+  계정)는 **매일** 들고, 남은 `n-1` 칸이 나머지 계정 위를 **영업일마다 `n-1` 칸씩** 미끄러진다.
+  그래서 계정이 `K` 명이면 연속한 **`ceil((K-1)/(n-1))` 영업일**에 전원이 한 번씩 돈다(예: K=200 ·
+  n=50 → 5 영업일). **같은 날 다시 돌려도 같은 계정이 돈다** — 회전 축이 날짜라서다. 상한 밖 계정을
+  **오늘** 보려면 길은 하나, **상한을 올리는 것**이다(그 전에 비용을 본다: 계정 수 × 평가 1회).
+  상한이 `1` 이면 칸이 0 이라 **보유자만** 돌고 회전이 서지 않는다.
 - **연속 실패로 멈췄다.** `evaluation-commit stopped cause=consecutive-account-failures consecutive=N
   remaining=M` 줄이 **있으면** 그 run 은 끝까지 돌지 않았다(기본 N=3,
   `bidvector.evaluation.max-consecutive-account-failures`). 끊기지 않는 실패는 그 계정들의 일이 아니라
   **체계가 내려간 것**의 신호다 — `account-failed cause=` 를 먼저 고치고 재실행한다. 그 run 은 `failed>0`
-  이므로 종료 코드는 이미 `INCOMPLETE`(2) 다.
+  이므로 종료 코드는 이미 `INCOMPLETE`(2) 다. **`remaining=` 은 run 전체의 남은 수**이고 마침 줄의
+  `deferred=` 와 **같은 값**이다 — 두 수를 더하지 않는다.
 
 **`suppressed=` 는 계정 계수가 아니다**(요청 계수다, 마침 줄의 `requested`·`requestFailed` 옆).
 전역 발송 채널을 쥐지 않은 계정의 `BidNow` 판정 수이고 — 오늘 그 채널은 가장 작은 id 하나가 쥔다 —

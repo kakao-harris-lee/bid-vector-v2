@@ -78,7 +78,9 @@ class InMemoryBrowserAccessTransaction(
 
     /** M15/15B — 가입이 만든 계정은 **같은 계정 표**에 선다(그래야 그 자격으로 로그인이 된다). */
     val signUps: MutableSignUpStore = MutableSignUpStore(accounts)
-    private val completion = MutableSignInCompletion(accounts, sessions)
+
+    /** 공개한다 — 확정이 경합으로 끝나는 갈래를 HTTP test 가 세울 수 있어야 한다(r3 열린 질문 ①). */
+    val completion: MutableSignInCompletion = MutableSignInCompletion(accounts, sessions)
 
     override fun <T> inTransaction(action: (BrowserAccessWorkflow) -> T): T = action(workflow())
 
@@ -107,6 +109,7 @@ class InMemoryBrowserAccessTransaction(
         sessions.clear()
         keys.reset()
         signUps.clear()
+        completion.contended = false
     }
 }
 
@@ -290,11 +293,20 @@ class MutableSignInCompletion(
     private val accounts: MutableAccountStore,
     private val sessions: MutableSessionStore,
 ) : SignInCompletionPort {
+    /**
+     * 확정이 **경합으로 끝나게** 한다(M15/15B r3 — `SessionUnavailable` 이 죽은 분기인지 재는
+     * 자리). 실물에서 그 갈래는 조건부 UPDATE 가 0행을 고치는 순간이다 — 가입이 행을 세운 뒤
+     * 세션을 적기 전에 운영자 `rotate` 가 자격을 바꾸거나 행이 사라지면 선다.
+     */
+    @Volatile
+    var contended: Boolean = false
+
     override fun complete(
         session: NewBrowserSession,
         verified: PassphraseHash,
         at: Instant,
     ): SignInWrite {
+        if (contended) return SignInWrite.Contended
         if (!accounts.claim(session.account, verified, at)) return SignInWrite.CredentialMoved
         sessions.revokeAllOf(session.account, at)
         sessions.put(session)

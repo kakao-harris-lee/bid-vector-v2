@@ -33,8 +33,15 @@ import org.postgresql.ds.PGSimpleDataSource
 import org.springframework.boot.DefaultApplicationArguments
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 private const val CANDIDATE_CAP = 5
+
+// 회전 축을 재는 판 — 청중 K=10 · 상한 n=4 라 칸이 셋이고, ceil((K-1)/(n-1)) = ceil(9/3) = 3 일이면
+// 전원이 한 번씩 돈다. 세 수가 함께 움직여야 하므로 한자리에 둔다.
+private val ROTATION_AUDIENCE: List<Long> = (1L..10L).toList()
+private const val ROTATION_CAP = 4
+private const val ROTATION_DAYS = 3
 
 // M15/15A — 여력 상한 상수는 사라졌다. 공장이 **그 계정의 전략에서** 상한을 읽으므로 이 test 가
 // 상한 값을 들고 있을 자리가 없다(전략 읽기에서 던지는 조립이라 거기까지 가지도 않는다).
@@ -181,6 +188,66 @@ class EvaluationCommitRunnerTest {
         finishLine shouldContain "deferred=3"
         finishLine shouldContain "failed=0"
         log.written.single { it.startsWith("evaluation-commit start") } shouldContain "maxAccountsPerRun=2"
+        // 네 계수가 청중과 닫힌다(r3 CR L-8) — `deferred` 산술이 한 칸 밀리면 이 줄이 붉는다.
+        accountCountsOf(log.written).sum() shouldBe 5
+    }
+
+    /**
+     * **상한 밖은 회전한다**(r3 리뷰 M-1·F-1, 팀장 결정 2026-11-22). 앞 판은 `take(n)` 고정
+     * 절단이라 `n` 번째 뒤의 계정이 **어느 run 에서도** 평가되지 않았다 — 줄은 그것을 「미룸」이라
+     * 불렀고 cron 은 성공을 적었다. 이제 창이 영업일마다 `n-1` 칸씩 미끄러져
+     * `ceil((K-1)/(n-1))` 일이면 전원이 한 번씩 돈다(K=10 · n=4 → 3 일).
+     *
+     * 오프셋을 0 으로 고정하는 변이는 세 날의 집합을 같게 만들어 **두 단언 모두** 붉는다.
+     */
+    @Test
+    fun `연속한 영업일이면 모든 계정이 한 번씩 돈다 — 보유자는 매일 든다`() {
+        val coverage = mutableSetOf<Long>()
+        val perDay = mutableListOf<List<Long>>()
+
+        repeat(ROTATION_DAYS) { offset ->
+            val evaluated = mutableListOf<Long>()
+            runnerFor(
+                recordingRuns(ROTATION_AUDIENCE, evaluated),
+                RecordingLog(),
+                RecordedExitCodes(),
+                maxAccountsPerRun = ROTATION_CAP,
+                date = FIXED_DATE.plusDays(offset.toLong()),
+            ).run(DefaultApplicationArguments())
+
+            evaluated.size shouldBe ROTATION_CAP
+            evaluated.first() shouldBe ROTATION_AUDIENCE.first()
+            perDay += evaluated
+            coverage += evaluated
+        }
+
+        coverage shouldBe ROTATION_AUDIENCE.toSet()
+        perDay.toSet().size shouldBe ROTATION_DAYS
+    }
+
+    /**
+     * **회전 축은 날짜다** — 같은 날 다시 돌리면 같은 집합이 돈다. 그래서 상한 밖 계정을 오늘
+     * 보려면 「더 자주 돌린다」가 아니라 상한을 올려야 한다(runbook §3.4 의 처방이 그 문장이다).
+     */
+    @Test
+    fun `같은 날 다시 돌리면 같은 집합이다 — 더 자주 돌려도 바뀌지 않는다`() {
+        val first = mutableListOf<Long>()
+        val second = mutableListOf<Long>()
+
+        runnerFor(
+            recordingRuns(ROTATION_AUDIENCE, first),
+            RecordingLog(),
+            RecordedExitCodes(),
+            maxAccountsPerRun = ROTATION_CAP,
+        ).run(DefaultApplicationArguments())
+        runnerFor(
+            recordingRuns(ROTATION_AUDIENCE, second),
+            RecordingLog(),
+            RecordedExitCodes(),
+            maxAccountsPerRun = ROTATION_CAP,
+        ).run(DefaultApplicationArguments())
+
+        second shouldBe first
     }
 
     /** 상한이 계정 수보다 크면 미룬 계정이 0 이다 — 상한이 평소에 아무것도 바꾸지 않는다. */
@@ -254,7 +321,87 @@ class EvaluationCommitRunnerTest {
         finishLine shouldContain "deferred=2"
         val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
         stoppedLine shouldContain "cause=consecutive-account-failures"
+        // `remaining` 은 **run 전체의 남은 수** = 마침 줄의 `deferred`(r3 CR L-2).
         stoppedLine shouldContain "remaining=2"
+        accountCountsOf(log.written).sum() shouldBe 5
+    }
+
+    /**
+     * 두 원천이 **함께** 설 때의 수 — 청중 5 · 상한 3 · 연속 2 에서 멈춘다. 멈춤 줄의
+     * `remaining` 과 마침 줄의 `deferred` 가 **같은 값**(상한 밖 2 + 창 안 나머지 1 = 3)이다.
+     * 창 안쪽만 세던 앞 판은 여기서 `remaining=1` 을 적었고 그 관계가 어디에도 없었다.
+     */
+    @Test
+    fun `상한 밖과 멈춤이 함께 서면 두 줄의 수가 같다`() {
+        val log = RecordingLog()
+        val attempted = mutableListOf<Long>()
+
+        runnerFor(
+            failingRuns(listOf(1L, 2L, 3L, 4L, 5L), failing = setOf(1L, 2L, 3L, 4L, 5L), attempted = attempted),
+            log,
+            RecordedExitCodes(),
+            maxAccountsPerRun = 3,
+            maxConsecutiveAccountFailures = 2,
+        ).run(DefaultApplicationArguments())
+
+        attempted.size shouldBe 2
+        log.written.single { it.startsWith("evaluation-commit stopped") } shouldContain "remaining=3"
+        log.written.single { it.startsWith("evaluation-commit finished") } shouldContain "deferred=3"
+        accountCountsOf(log.written).sum() shouldBe 5
+    }
+
+    /**
+     * **건너뜀도 연속을 끊는다 — 그것이 결정이고 이 test 가 그 결정을 잠근다**(r3 verifier L-1).
+     * 「전략이 없다」는 전략 **읽기가 성공했다**는 뜻이라 체계가 살아 있다는 증거다. 그래서 F S F S F
+     * 는 연속 상한 2 에 닿지 않는다 — 비용은 run 당 계정 상한이 여전히 묶는다.
+     *
+     * 반대 의미(건너뜀은 연속을 안 끊는다)를 고르면 이 test 가 붉는다.
+     */
+    @Test
+    fun `건너뜀이 연속 실패를 끊는다 — 흩어진 실패로 멈추지 않는다`() {
+        val log = RecordingLog()
+        val attempted = mutableListOf<Long>()
+
+        runnerFor(
+            failingRuns(
+                listOf(1L, 2L, 3L, 4L, 5L),
+                failing = setOf(1L, 3L, 5L),
+                attempted = attempted,
+                skipping = setOf(2L, 4L),
+            ),
+            log,
+            RecordedExitCodes(),
+            maxConsecutiveAccountFailures = 2,
+        ).run(DefaultApplicationArguments())
+
+        attempted shouldBe listOf(1L, 2L, 3L, 4L, 5L)
+        log.written.none { it.startsWith("evaluation-commit stopped") } shouldBe true
+        accountCountsOf(log.written) shouldBe listOf(0, 2, 3, 0)
+    }
+
+    /**
+     * **인터럽트는 삼키지 않는다**(15A r1 리뷰 LOW ⓒ — r3 verifier L-2 가 「코드로만 닫혔다」고
+     * 실측했다). 플래그를 되세우지 않으면 이 스레드의 다음 blocking 호출이 인터럽트를 보지 못한다.
+     * 복원 줄을 지우는 변이에서 이 단언이 붉는다.
+     */
+    @Test
+    fun `인터럽트 예외는 플래그를 되세운다`() {
+        val log = RecordingLog()
+
+        runnerFor(
+            failingRuns(
+                listOf(1L),
+                failing = setOf(1L),
+                attempted = mutableListOf(),
+                failure = { InterruptedException(DEAD_STORE_MESSAGE) },
+            ),
+            log,
+            RecordedExitCodes(),
+        ).run(DefaultApplicationArguments())
+
+        // 읽으면서 **지운다** — 인터럽트된 채로 두면 같은 worker 의 뒤 test 가 그 상태를 물려받는다.
+        Thread.interrupted() shouldBe true
+        log.written.count { it.startsWith("evaluation-commit account-failed") } shouldBe 1
     }
 
     /**
@@ -285,21 +432,43 @@ class EvaluationCommitRunnerTest {
 private const val ROOMY_ACCOUNT_CAP = 100
 private const val ROOMY_CONSECUTIVE_CAP = 100
 
+/** 회전 창의 기준일 — 날짜 축을 재지 않는 test 는 이 하루에 고정한다. */
+private val FIXED_DATE: LocalDate = LocalDate.of(2026, 11, 22)
+
+/** cron 이 실제로 도는 시각대(04:10 KST)를 흉내 낸다 — 구역이 UTC 면 하루가 밀리는 자리다. */
+private fun clockAt(date: LocalDate): Clock =
+    Clock { date.atTime(4, 10).atZone(ZoneId.of("Asia/Seoul")).toInstant() }
+
 private fun runnerFor(
     runs: EvaluationCommitRuns,
     log: CollectionLog,
     termination: CollectionTermination,
     maxAccountsPerRun: Int = ROOMY_ACCOUNT_CAP,
     maxConsecutiveAccountFailures: Int = ROOMY_CONSECUTIVE_CAP,
+    date: LocalDate = FIXED_DATE,
 ): EvaluationCommitRunner =
     EvaluationCommitRunner(
         runs = runs,
         candidateCap = CANDIDATE_CAP,
         maxAccountsPerRun = maxAccountsPerRun,
         maxConsecutiveAccountFailures = maxConsecutiveAccountFailures,
+        clock = clockAt(date),
         log = log,
         termination = termination,
     )
+
+/**
+ * 마침 줄의 **계정 계수 넷**(r3 CR L-8). 네 수가 청중과 닫히는지를 시나리오마다 한 줄로 본다 —
+ * 개별 값만 단언하면 `deferred` 산술이 한 칸 밀리는 변경이 한 test 에서만 붉는다.
+ */
+private fun accountCountsOf(written: List<String>): List<Int> {
+    val line = written.single { it.startsWith("evaluation-commit finished") }
+    return listOf("accounts", "skipped", "failed", "deferred").map { field ->
+        requireNotNull(Regex("""\b$field=(\d+)""").find(line)) { "$field 가 마침 줄에 없다: $line" }
+            .groupValues[1]
+            .toInt()
+    }
+}
 
 /**
  * 전략 읽기에서 던지는 조립 — 그 뒤 협력자는 불리지 않는다.
@@ -386,15 +555,24 @@ private fun recordingRuns(
         strategyWithCap()
     }
 
-/** 지정한 계정에서 전략 읽기가 던지는 조립 — 시도 순서를 함께 적는다. */
+/**
+ * 지정한 계정에서 전략 읽기가 던지는 조립 — 시도 순서를 함께 적는다. [skipping] 의 계정은 상한
+ * 없는 전략을 받아 **건너뜀**이 된다(`forAccount` 가 `null` 을 낸다).
+ */
 private fun failingRuns(
     ids: List<Long>,
     failing: Set<Long>,
     attempted: MutableList<Long>,
+    skipping: Set<Long> = emptySet(),
+    failure: () -> Exception = { IllegalStateException(DEAD_STORE_MESSAGE) },
 ): EvaluationCommitRuns =
     emptyCandidateRuns(ids) { account ->
         attempted += account.value
-        if (account.value in failing) throw IllegalStateException(DEAD_STORE_MESSAGE) else strategyWithCap()
+        when (account.value) {
+            in failing -> throw failure()
+            in skipping -> strategyWithoutCap()
+            else -> strategyWithCap()
+        }
     }
 
 /**
@@ -444,11 +622,16 @@ private fun emptyAudienceRuns(): EvaluationCommitRuns =
     )
 
 /** 여력 상한이 있는 전략 — 이 값이 있어야 공장이 run 을 세운다. */
-private fun strategyWithCap(): OperatorStrategy =
+private fun strategyWithCap(): OperatorStrategy = strategyOf(maxActiveBids = 3)
+
+/** 여력 상한이 **없는** 전략 — 공장이 `null` 을 내므로 그 계정은 건너뜀으로 센다. */
+private fun strategyWithoutCap(): OperatorStrategy = strategyOf(maxActiveBids = null)
+
+private fun strategyOf(maxActiveBids: Int?): OperatorStrategy =
     when (
         val result =
             validate(
-                StrategyDraft(focusCategories = listOf("CAT-1"), maxActiveBids = 3),
+                StrategyDraft(focusCategories = listOf("CAT-1"), maxActiveBids = maxActiveBids),
                 StrategyRevision(1),
                 STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>,
             )

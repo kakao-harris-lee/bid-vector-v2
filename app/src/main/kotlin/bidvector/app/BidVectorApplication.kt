@@ -239,9 +239,13 @@ class AccessCookieProperties(
 class SignUpThrottleProperties(
     val attemptsPerHour: Int = DEFAULT_ATTEMPTS_PER_HOUR,
     /**
-     * 창 안에 시도를 가진 주소를 몇 개까지 기억하는가 — 넘치면 가장 오래 전에 처음 본 주소부터
-     * 버린다. 오늘은 프록시 뒤라 키가 하나뿐이지만, 키 축이 IP 로 바뀌는 날 맵이 창 길이만큼
-     * 자라는 것을 이 상한이 막는다(`OPEN-M15-SIGNUP-HARDENING`).
+     * 창 안에 시도를 가진 주소를 몇 개까지 기억하는가 — 키 축이 IP 로 바뀌는 날 맵이 창 길이만큼
+     * 자라는 것을 이 상한이 막는다(`OPEN-M15-SIGNUP-HARDENING`). 오늘은 프록시 뒤라 키가 하나다.
+     *
+     * **넘치면 모르는 주소를 거부한다**(fail-closed, cr r1 N-3) — 이미 세고 있는 주소는 자기 창을
+     * 잃지 않는다. 앞 판은 반대였다(가장 오래된 주소를 버렸고, 그래서 공격자가 남의 창을 지울 수
+     * 있었다). **이 수를 낮추면 새 주소의 가입이 먼저 막힌다** — 「오래된 주소가 밀려난다」가
+     * 아니다. 그래서 이 값은 곧 **전역 잠금의 문턱**이기도 하다(같은 OPEN ④).
      */
     val trackedAddressLimit: Int = DEFAULT_TRACKED_ADDRESS_LIMIT,
 ) {

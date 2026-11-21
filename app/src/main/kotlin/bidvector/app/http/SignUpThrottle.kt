@@ -97,15 +97,19 @@ class SignUpThrottle(
      * 이 시도를 거부해야 하는 **사유 문면**, 받아들일 수 있으면 `null`. 거부는 **기록하지 않는다**
      * — 거부가 창을 밀면 상한이 「창 동안 조용히 있어야 풀리는」 다른 규칙이 된다(계약은 그것을
      * 말하지 않았다).
+     *
+     * 사유 값에 **공백을 두지 않는다**(r3 CR L-1) — 저장소의 cause 어휘는 전부 붙임표이고
+     * (`account-absent`·`consecutive-account-failures`·`audience-unavailable:<클래스>`), 같은 줄이
+     * `limit=` 도 실으므로 공백으로 토막내는 파서에서 값의 뒷조각이 다음 필드와 섞인다.
      */
     private fun refusalOf(recorded: MutableList<Instant>?): String? =
         when {
             recorded == null && attempts.size >= trackedAddressLimit -> {
-                line("tracked-address capacity", recorded = 0)
+                line("tracked-address-capacity", recorded = 0)
             }
 
             recorded != null && recorded.size >= attemptsPerWindow -> {
-                line("window limit", recorded.size)
+                line("window-limit", recorded.size)
             }
 
             else -> {

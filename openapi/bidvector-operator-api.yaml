@@ -2981,7 +2981,6 @@ components:
           type: string
           maxLength: 500
           description: 정정은 **사유가 필수**다 — 원본은 타임라인에 남는다(500자 상한).
-    # M7/7D — 로그인 요청. 두 키뿐이고 알려진 키 밖은 400 이다(D-6A2b-25 와 같은 규율).
     # M15/15B — 가입 요청. 길이·글자 규칙은 operation description 이 정본이고, 여기서는 계약의
     # 상한만 적는다(서버가 정책 데이터로 판정한다 — 이 문서가 그 판정을 대신하지 않는다).
     SignUpRequest:
@@ -2998,6 +2997,7 @@ components:
           type: string
           minLength: 10
           maxLength: 1024
+    # M7/7D — 로그인 요청. 두 키뿐이고 알려진 키 밖은 400 이다(D-6A2b-25 와 같은 규율).
     SignInRequest:
       type: object
       required:
