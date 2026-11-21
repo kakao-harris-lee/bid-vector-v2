@@ -102,6 +102,35 @@ export function businessRegistrationNumberText(digits: string): string {
 /** 계약의 `Profile.businessRegistrationNumber` 와 같은 꼴 — 서식을 입힐지 가르는 술어다. */
 const BUSINESS_REGISTRATION_NUMBER_SHAPE = /^[0-9]{10}$/u;
 
+/** 계약의 `BusinessDetailsRequest` 가 **더** 받는 꼴 — 자리 구분을 넣어 적은 값이다. */
+const BUSINESS_REGISTRATION_NUMBER_TYPED_SHAPE = /^[0-9]{3}-[0-9]{2}-[0-9]{5}$/u;
+
+/**
+ * 사업자번호 칸의 **안내**(M15/15C r1 cr M-1) — **판정이 아니다.** 보내는 본문은 이 함수와
+ * 무관하게 적힌 값 그대로이고, 받을지 말지는 서버가 정한다. 여기서 하는 일은 **운영자에게
+ * 고칠 자리를 말해 주는 것**뿐이다.
+ *
+ * 왜 필요한가: 서버의 거부는 `{"code":"INVALID_REQUEST","message":"요청 값이 유효하지 않다"}`
+ * 하나이고 **어느 칸인지 말하지 않는다**(그 오류 계약은 이 slice 의 것이 아니다). 사업 정보 폼의
+ * 다섯 칸 가운데 꼴 거부가 실제로 일어나는 칸은 여기뿐이라, 안내가 없으면 운영자의 복구 수단이
+ * 추측이 된다.
+ *
+ * 왜 「사본을 들지 않는다」와 어긋나지 않는가: 사본이 금지된 이유는 **두 판정이 갈리면 「화면은
+ * 받았는데 서버는 거부」가 나기 때문**이다. 이 함수는 판정하지 않으므로 갈릴 답이 없다 — 어긋나도
+ * 안내가 한 번 빗나갈 뿐이고 **보내는 값도 서버의 답도 바뀌지 않는다**. 빈 값에는 아무 말도 하지
+ * 않는다(선택 칸이다).
+ */
+export function businessRegistrationNumberHint(raw: string): string | null {
+  const typed = raw.trim();
+  if (typed === '') {
+    return null;
+  }
+  if (BUSINESS_REGISTRATION_NUMBER_SHAPE.test(typed) || BUSINESS_REGISTRATION_NUMBER_TYPED_SHAPE.test(typed)) {
+    return null;
+  }
+  return '숫자 열 자리이거나, 앞에서부터 3자리 · 2자리 · 5자리로 끊어 적어야 합니다.';
+}
+
 /**
  * 자기 계정 사업자번호 입력칸의 testId — **누출 게이트의 유일한 예외**이고, 그래서 화면과 여정
  * 하네스가 **같은 한 값**을 읽어야 한다(둘이 갈리면 예외가 조용히 빈다).

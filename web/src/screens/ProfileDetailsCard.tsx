@@ -8,6 +8,7 @@ import { KeyValueRow } from '../components/KeyValueRow';
 import {
   BUSINESS_REGISTRATION_NUMBER_TEST_ID,
   businessDetailsBodyOf,
+  businessRegistrationNumberHint,
   businessRegistrationNumberText,
   NARA_FIELD_DISPLAY,
   NARA_REGISTRATION_DISPLAY,
@@ -19,6 +20,9 @@ import {
 import { displayOrUnknown } from '../display/stateDisplay';
 
 import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
+
+/** 사업자번호 칸의 도움말 문단 id — `aria-describedby` 가 가리키는 **한 자리**다. */
+const BUSINESS_REGISTRATION_NUMBER_HELP_ID = 'profile-business-registration-number-help';
 
 function detailsFormOf(profile: Profile): BusinessDetailsForm {
   return {
@@ -108,21 +112,45 @@ export function ProfileDetailsCard({
               className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
             />
           </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-ink-soft">사업자번호 (선택)</span>
-            <input
-              data-testid={BUSINESS_REGISTRATION_NUMBER_TEST_ID}
-              inputMode="numeric"
-              value={form.businessRegistrationNumber}
-              onChange={(event) =>
-                setDetails({ ...form, businessRegistrationNumber: event.target.value })
-              }
-              className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
-            />
-            {/* 보기 글(placeholder)로 번호 **꼴의 예시**를 두지 않는다 — 그 글자가 화면에 서는
-                순간 누출 게이트가 보는 값이 되고, 예외 하나로 좁힌 뜻이 흐려진다. */}
-            <span className="text-xs text-ink-soft">숫자 열 자리로 적습니다 — 하이픈을 넣어도 됩니다.</span>
-          </label>
+          <div className="flex flex-col gap-1">
+            {/*
+              도움말은 **라벨 밖**이다(r1 cr M-3). 라벨 안에 두면 그 글자가 입력칸의 **접근성
+              이름**에 붙어 「사업자번호 (선택) 숫자 열 자리로 …, 편집 텍스트」로 읽힌다 — 이 카드의
+              다른 칸 어느 것도 그 꼴이 아니다. 잇는 길은 `aria-describedby` 다.
+
+              `inputMode` 는 **`tel`** 이다(r1 cr M-2): `numeric` 키패드에는 `-` 가 없는데 화면은
+              저장된 값을 하이픈 꼴로 채우므로, 모바일 운영자가 **방금 본 값을 다시 칠 수 없다**.
+            */}
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-soft">사업자번호 (선택)</span>
+              <input
+                data-testid={BUSINESS_REGISTRATION_NUMBER_TEST_ID}
+                inputMode="tel"
+                aria-describedby={BUSINESS_REGISTRATION_NUMBER_HELP_ID}
+                value={form.businessRegistrationNumber}
+                onChange={(event) =>
+                  setDetails({ ...form, businessRegistrationNumber: event.target.value })
+                }
+                className="min-h-11 rounded-md border border-control-line bg-card px-3 text-sm"
+              />
+            </label>
+            {/*
+              보기 글(placeholder)로 번호 **꼴의 예시**를 두지 않는다 — 그 글자가 화면에 서는
+              순간 누출 게이트가 보는 값이 되고, 예외 하나로 좁힌 뜻이 흐려진다.
+
+              적은 값이 받는 두 꼴 어느 쪽도 아니면 **안내**가 그 자리를 대신한다. 판정이 아니다
+              (보내는 값은 그대로이고 서버가 정한다) — 서버의 거부가 어느 칸인지 말하지 않으므로
+              운영자에게 고칠 자리를 말해 주는 것이 이 한 줄의 전부다.
+            */}
+            <p
+              id={BUSINESS_REGISTRATION_NUMBER_HELP_ID}
+              data-testid="profile-business-registration-number-help"
+              className="text-xs text-ink-soft"
+            >
+              {businessRegistrationNumberHint(form.businessRegistrationNumber) ??
+                '숫자 열 자리로 적습니다 — 하이픈을 넣어도 됩니다.'}
+            </p>
+          </div>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-soft">본사 소재지</span>
             <select

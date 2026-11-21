@@ -5,6 +5,7 @@ import type { components } from '../api/generated/operator-api';
 import {
   BUSINESS_REGISTRATION_NUMBER_STATE_DISPLAY,
   businessDetailsBodyOf,
+  businessRegistrationNumberHint,
   businessRegistrationNumberStateOf,
   businessRegistrationNumberText,
   capacityBodyOf,
@@ -117,6 +118,19 @@ describe('사업자번호 — 서식과 상태(M15/15C)', () => {
   it('계약 밖의 값에는 자리 구분을 지어 붙이지 않는다', () => {
     ['123456789', '12345678901', '123-45-67890', '', '12345O7890'].forEach((raw) => {
       expect(businessRegistrationNumberText(raw)).toBe(raw);
+    });
+  });
+
+  /**
+   * 안내는 **판정이 아니다** — 보내는 본문은 적힌 그대로이고 받을지는 서버가 정한다. 그래서
+   * 여기서 재는 것은 「고칠 자리를 말해 주는가」뿐이고, 빈 값에는 아무 말도 하지 않는다.
+   */
+  it('받는 두 꼴에는 안내가 없고 그 밖에는 고칠 자리를 말한다', () => {
+    ['', '   ', '1234567890', '123-45-67890'].forEach((raw) => {
+      expect(businessRegistrationNumberHint(raw)).toBeNull();
+    });
+    ['123-456-7890', '12345678901', '12-345-67890', '123456789', 'abcdefghij'].forEach((raw) => {
+      expect(businessRegistrationNumberHint(raw)).toContain('3자리');
     });
   });
 
