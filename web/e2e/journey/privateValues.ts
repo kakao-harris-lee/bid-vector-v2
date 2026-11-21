@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from '../../src/screens/ProfileDetailsCard';
+import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from '../../src/display/profileDisplay';
 
 import { journeyContext } from './shared';
 

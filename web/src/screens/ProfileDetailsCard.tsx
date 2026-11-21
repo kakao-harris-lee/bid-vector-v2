@@ -6,6 +6,7 @@ import { Button } from '../components/Button';
 import { StateBadge } from '../components/StateBadge';
 import { KeyValueRow } from '../components/KeyValueRow';
 import {
+  BUSINESS_REGISTRATION_NUMBER_TEST_ID,
   businessDetailsBodyOf,
   businessRegistrationNumberText,
   NARA_FIELD_DISPLAY,
@@ -18,12 +19,6 @@ import {
 import { displayOrUnknown } from '../display/stateDisplay';
 
 import { attemptOf, ProfileWriteFailure, useProfileWrite } from './profileWrites';
-
-/**
- * 자기 계정 사업자번호 입력칸의 testId — **누출 게이트의 유일한 예외**다(M15/15C). 여정 e2e 가
- * 이 하나만 모집단에서 빼므로, 다른 자리에 같은 꼴의 값이 서면 그 게이트가 그대로 붉어진다.
- */
-export const BUSINESS_REGISTRATION_NUMBER_TEST_ID = 'profile-business-registration-number';
 
 function detailsFormOf(profile: Profile): BusinessDetailsForm {
   return {

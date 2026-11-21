@@ -102,6 +102,16 @@ export function businessRegistrationNumberText(digits: string): string {
 /** 계약의 `Profile.businessRegistrationNumber` 와 같은 꼴 — 서식을 입힐지 가르는 술어다. */
 const BUSINESS_REGISTRATION_NUMBER_SHAPE = /^[0-9]{10}$/u;
 
+/**
+ * 자기 계정 사업자번호 입력칸의 testId — **누출 게이트의 유일한 예외**이고, 그래서 화면과 여정
+ * 하네스가 **같은 한 값**을 읽어야 한다(둘이 갈리면 예외가 조용히 빈다).
+ *
+ * **이 파일에 두는 이유**: 여정 하네스는 node 에서 돌고, 화면 컴포넌트를 import 하면 그 사슬이
+ * `src/api/client.ts` 의 번들러 전용 설정 읽기까지 끌고 와 import 시점에 터진다. 이 모듈은
+ * 타입 import 만 있어 어느 실행기에서도 안전하다.
+ */
+export const BUSINESS_REGISTRATION_NUMBER_TEST_ID = 'profile-business-registration-number';
+
 /** 사업자번호 절이 말하는 **두 상태**(M15/15C). 「비워 둠」은 미완이 아니다 — 선택이기 때문이다. */
 export type BusinessRegistrationNumberState = 'FILLED' | 'EMPTY';
 

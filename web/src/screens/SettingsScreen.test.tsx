@@ -8,8 +8,8 @@ import { ApiError } from '../api/apiError';
 import * as queries from '../api/queries';
 import { absenceTextOf } from '../display/absence';
 import { EDIT_SESSION_STATE_DISPLAY, STRATEGY_FIELD_DISPLAY } from '../display/editSessionDisplay';
+import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from '../display/profileDisplay';
 
-import { BUSINESS_REGISTRATION_NUMBER_TEST_ID } from './ProfileDetailsCard';
 import { SettingsScreen } from './SettingsScreen';
 
 vi.mock('../api/queries');
