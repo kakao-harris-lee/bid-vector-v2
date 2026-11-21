@@ -91,8 +91,13 @@ class OpenApiContractTest : HttpIntegrationTestBase() {
                 .map { (propertyName, _) -> "$location.properties.$propertyName" }
         }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    /**
+     * **M15/15A — 이 경로는 계정 전용이다.** V28 뒤 자격 헤더 경로(계정을 내지 않는다)는 401 이라
+     * 세션으로 두드린다. 이 test 가 재는 축(문서 ↔ 응답 등식)은 그대로다.
+     */
+    private val session by lazy { SessionTestClient(restTemplate, ::url).signIn() }
+
+    private fun authorizedHeaders(): HttpHeaders = session.headers()
 
     @Test
     fun `D-6A1-20 ⓑ — 계약의 모든 속성 정의가 평탄한 형태(허용 목록)만 쓴다`() {

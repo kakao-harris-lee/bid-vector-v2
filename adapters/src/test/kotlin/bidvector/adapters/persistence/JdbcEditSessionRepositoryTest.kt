@@ -41,7 +41,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val begun = workflow(sessions).begin(id, OPERATOR, FIELD)
         check(begun is BeginOutcome.Started)
 
-        sessions.load(id) shouldBe begun.session.toSnapshot()
+        sessions.load(testAccount(), id) shouldBe begun.session.toSnapshot()
     }
 
     @Test
@@ -65,8 +65,8 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
             )
         check(provided is CommandResult.Processed)
 
-        sessions.load(id) shouldBe provided.outcome.session.toSnapshot()
-        sessions.load(id)!!.stateKind shouldBe "WAITING_FOR_CONFIRMATION"
+        sessions.load(testAccount(), id) shouldBe provided.outcome.session.toSnapshot()
+        sessions.load(testAccount(), id)!!.stateKind shouldBe "WAITING_FOR_CONFIRMATION"
     }
 
     @Test
@@ -89,7 +89,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
             flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
         check(confirmed is CommandResult.Processed)
 
-        val loaded = sessions.load(id)
+        val loaded = sessions.load(testAccount(), id)
         loaded shouldBe confirmed.outcome.session.toSnapshot()
         loaded!!.stateKind shouldBe "APPLIED"
         loaded.stateRevision shouldBe 2
@@ -106,7 +106,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val state = workflow(sessions, clock = afterExpiry).expire(id)
 
         state shouldBe EditSessionState.Expired
-        val loaded = sessions.load(id)
+        val loaded = sessions.load(testAccount(), id)
         loaded!!.stateKind shouldBe "EXPIRED"
         loaded.stateField shouldBe null
         loaded.stateDraft shouldBe null
@@ -141,12 +141,12 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         // workflow.provideValue 가 저장했다) — 같은 값을 다시 save 하면 전제조건
         // (저장소 버전 = 새 버전 - 1)이 거짓이라 0행 → 예외(동시 writer 가 같은 버전을
         // 다시 쓰려는 상황의 재현).
-        val exception = shouldThrow<EditSessionConflictException> { sessions.save(transitioned) }
+        val exception = shouldThrow<EditSessionConflictException> { sessions.save(testAccount(), transitioned) }
         exception.sessionId shouldBe id
         exception.expectedVersion shouldBe transitioned.sessionVersion - 1
 
         // 충돌 뒤에도 저장소의 값은 그대로다(덮이지 않았다 — 조용한 덮어쓰기가 아니다).
-        sessions.load(id) shouldBe transitioned.toSnapshot()
+        sessions.load(testAccount(), id) shouldBe transitioned.toSnapshot()
     }
 
     @Test
@@ -159,7 +159,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         // 같은 begin() 을 몰아 만든 두 번째 세션(둘 다 sessionVersion=0)을 그대로 다시
         // save 한다 — 저장소의 state 는 아직 비종단(WaitingForValue)이라 "버전 0 이면
         // 무조건 통과" 규칙이 있었다면 조용히 덮였을 자리(D-6B1-3, 구현 레인 실측 수정).
-        val exception = shouldThrow<EditSessionConflictException> { sessions.save(begun.session) }
+        val exception = shouldThrow<EditSessionConflictException> { sessions.save(testAccount(), begun.session) }
         exception.sessionId shouldBe id
     }
 
@@ -180,11 +180,11 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
             ),
         )
         flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
-        sessions.load(id)!!.stateKind shouldBe "APPLIED"
+        sessions.load(testAccount(), id)!!.stateKind shouldBe "APPLIED"
 
         val restarted = workflow(sessions).begin(id, OPERATOR, EditableField.CandidateLimit)
         restarted.shouldBeInstanceOf<BeginOutcome.Started>()
-        sessions.load(id)!!.stateKind shouldBe "WAITING_FOR_VALUE"
+        sessions.load(testAccount(), id)!!.stateKind shouldBe "WAITING_FOR_VALUE"
     }
 
     /**
@@ -203,6 +203,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
             var index = 1
             statement.setString(index++, id)
+            statement.setLong(index++, testAccount().value)
             statement.setString(index++, "op-raw")
             statement.setString(index++, state)
             statement.setString(index++, statePayload)
@@ -295,15 +296,17 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO edit_session (id, operator_id, state, state_payload, expires_at, session_version) " +
-                        "VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO edit_session " +
+                        "(id, account_id, operator_id, state, state_payload, expires_at, session_version) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     statement.setString(1, id)
-                    statement.setString(2, "op-seed")
-                    statement.setString(3, state)
-                    statement.setString(4, statePayload)
-                    statement.setTimestamp(5, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
-                    statement.setInt(6, 1)
+                    statement.setLong(2, testAccount().value)
+                    statement.setString(3, "op-seed")
+                    statement.setString(4, state)
+                    statement.setString(5, statePayload)
+                    statement.setTimestamp(6, Timestamp.from(Instant.parse("2026-09-17T00:00:00Z")))
+                    statement.setInt(7, 1)
                     statement.executeUpdate()
                 }
         }
@@ -314,7 +317,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val id = "jdbc-bad-revision"
         seedRawEditSessionRow(id, "APPLIED", """{"revision":"not-a-number"}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     @Test
@@ -322,7 +325,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val id = "jdbc-missing-list-key"
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":{}}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     @Test
@@ -333,7 +336,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 """"requiredKeywordTerms":[],"excludeKeywordTerms":[]}"""
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     /**
@@ -349,7 +352,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val id = "jdbc-fractional-revision"
         seedRawEditSessionRow(id, "APPLIED", """{"revision":1.2}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     @Test
@@ -357,7 +360,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
         val id = "jdbc-exponential-revision"
         seedRawEditSessionRow(id, "APPLIED", """{"revision":1e2}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     /** `requireLongValue`(`MoneySnapshot.won`) 쪽도 같은 결함이었다 — Int 축과 대칭으로 잠근다. */
@@ -371,7 +374,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minBudget":$minBudget}"""
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
-        shouldThrow<IllegalArgumentException> { repository().load(EditSessionId(id)) }
+        shouldThrow<IllegalArgumentException> { repository().load(testAccount(), EditSessionId(id)) }
     }
 
     /**
@@ -390,7 +393,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minBudget":$minBudget}"""
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
-        val loaded = repository().load(EditSessionId(id))
+        val loaded = repository().load(testAccount(), EditSessionId(id))
 
         loaded!!.stateDraft!!.minBudget!!.won shouldBe 1_200_000L
     }
@@ -412,7 +415,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"bidNowThreshold":0.70}"""
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
-        val loaded = repository().load(EditSessionId(id))
+        val loaded = repository().load(testAccount(), EditSessionId(id))
 
         loaded!!.stateDraft!!.bidNowThreshold shouldBe BigDecimal("0.70")
     }
@@ -426,7 +429,7 @@ class JdbcEditSessionRepositoryTest : EditSessionWorkflowTestSupport() {
                 """"requiredKeywordTerms":[],"excludeKeywordTerms":[],"minimumMatchScore":$precise}"""
         seedRawEditSessionRow(id, "WAITING_FOR_CONFIRMATION", """{"field":{"kind":"CANDIDATE_LIMIT"},"draft":$draft}""")
 
-        val loaded = repository().load(EditSessionId(id))
+        val loaded = repository().load(testAccount(), EditSessionId(id))
 
         loaded!!.stateDraft!!.minimumMatchScore shouldBe BigDecimal(precise)
     }

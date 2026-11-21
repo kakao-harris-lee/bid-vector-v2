@@ -5,6 +5,8 @@ import bidvector.sharedkernel.Provenance
 import bidvector.sharedkernel.export
 import bidvector.strategy.CategoryCode
 import bidvector.strategy.OperatorStrategy
+import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import java.math.BigDecimal
@@ -23,8 +25,16 @@ import java.math.BigDecimal
 class StrategyReadController(
     private val strategies: StrategyQuery,
 ) {
-    @GetMapping("/api/strategy")
-    fun read(): StrategyReadResponse = StrategyReadResponse.from(strategies.current())
+    /**
+     * **M15/15A — 세션 계정의 전략이다.** 계정 없는 인증(자격 헤더 경로)은 401 이고 사유를 나누지
+     * 않는다(D-6A1-6). 계정을 질의·본문에서 받을 자리가 없고, 7B 의 바인딩 가드가 요청 값으로
+     * `AccountId` 를 짓는 길을 앱 전역에서 막는다.
+     */
+    @GetMapping(AccountScopedRoutes.STRATEGY)
+    fun read(request: HttpServletRequest): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
+        return ResponseEntity.ok(StrategyReadResponse.from(strategies.current(account)))
+    }
 }
 
 /**

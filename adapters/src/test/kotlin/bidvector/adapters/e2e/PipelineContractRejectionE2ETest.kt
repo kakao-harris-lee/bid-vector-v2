@@ -117,6 +117,7 @@ internal class PipelineContractRejectionE2ETest : PipelineE2ESupport() {
         val assembly =
             PipelineAssembly(
                 dataSource = dataSource(),
+                account = testAccount(),
                 mlChannel = server.channel,
                 at = E2E_NOW,
                 correlationPrefix = "contract",

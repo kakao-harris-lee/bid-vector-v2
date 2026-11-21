@@ -60,12 +60,38 @@ class OperatorAuthenticationTest : HttpIntegrationTestBase() {
         }
     }
 
+    /**
+     * **M15/15A — 탐침 경로가 바뀌었다.** 전략은 이제 계정 전용 뿌리라 자격 헤더 경로(계정을
+     * 내지 않는다)로는 닿지 못한다. 이 test 가 재는 것은 「자격 헤더가 필터를 통과시키는가」라서
+     * 계정을 요구하지 않는 경로 하나로 옮긴다 — 공고 검색이다.
+     */
     @Test
     fun `올바른 자격증명이면 통과한다`() {
         val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
         val response =
-            restTemplate.exchange(url("/api/strategy"), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
+            restTemplate.exchange(url("/api/notices"), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
         response.statusCode.value() shouldBe 200
+    }
+
+    /**
+     * **M15/15A — 계정 전용 뿌리는 자격 헤더로 닿지 않는다.** 사유를 나누지 않으므로 401 이고,
+     * 그 값이 「자격증명이 틀렸다」와 같다(D-6A1-6). 위 test 의 음성 대조다 — 같은 자격증명이
+     * 한 경로에서는 200 이고 다른 경로에서는 401 이어야 이 slice 의 경계가 실재한다.
+     *
+     * **전수는 여기가 아니다** — 「자격 헤더로 닿는 매핑 ∩ 계정 전용 = ∅」은 표면 전수 test 가
+     * 실제 매핑을 훑어 잰다. 여기서는 GET 으로 닿는 뿌리 둘로 그 사실의 **거동**만 든다
+     * (POST 전용 뿌리는 자격이 통과한 뒤 405 라 이 축을 가리지 못한다).
+     */
+    @Test
+    fun `올바른 자격증명이어도 계정 전용 뿌리는 401 이다`() {
+        val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+
+        listOf(AccountScopedRoutes.STRATEGY, AccountScopedRoutes.SUGGESTIONS).forEach { root ->
+            val response =
+                restTemplate.exchange(url(root), HttpMethod.GET, HttpEntity<Void>(headers), Map::class.java)
+            response.statusCode.value() shouldBe 401
+            response.body?.get("code") shouldBe ErrorCode.UNAUTHENTICATED
+        }
     }
 
     @Test

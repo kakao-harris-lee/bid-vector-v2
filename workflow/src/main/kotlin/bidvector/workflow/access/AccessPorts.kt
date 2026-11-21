@@ -1,5 +1,6 @@
 package bidvector.workflow.access
 
+import bidvector.sharedkernel.AccountId
 import java.time.Instant
 
 /**

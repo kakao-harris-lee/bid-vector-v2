@@ -1,7 +1,7 @@
 package bidvector.adapters.notificationinbox
 
 import bidvector.adapters.notice.beginReadOnlySearchTransaction
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort
 import java.sql.Connection

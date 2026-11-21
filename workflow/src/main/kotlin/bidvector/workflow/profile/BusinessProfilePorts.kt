@@ -2,7 +2,7 @@ package bidvector.workflow.profile
 
 import bidvector.qualification.LicenseName
 import bidvector.settlement.OperatorTradeName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.result.OperatorTradeNamePort
 import java.time.Instant
 

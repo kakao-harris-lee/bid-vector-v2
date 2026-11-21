@@ -18,6 +18,7 @@ import bidvector.procurement.RawKey
 import bidvector.procurement.RawNoticeObservation
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Fact
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.ReasonCode
@@ -43,6 +44,9 @@ import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.WatchSubjectPort
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notificationinbox.NotificationAudience
+import bidvector.workflow.notificationinbox.NotificationInboxOutcome
+import bidvector.workflow.notificationinbox.NotificationInboxPort
+import bidvector.workflow.notificationinbox.NotificationInboxRecord
 import bidvector.workflow.strategy.Clock
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
@@ -132,8 +136,11 @@ class DryRunCommitParityTest {
     private val candidate = openCandidate()
     private val candidateSource = CandidateSourcePort { listOf(candidate) }
     private val watchSubjects = WatchSubjectPort { WatchSubjectOutcome.Found(PASSING_SUBJECT) }
-    private val licenseGate = LicenseGatePort { LicenseVerdict.Eligible(emptySet()) }
+    private val licenseGate = LicenseGatePort { _, _ -> LicenseVerdict.Eligible(emptySet()) }
     private val clock = Clock { NOW }
+
+    /** 커밋 경로의 알림함 쓰기 계수(M15/15A) — 내용이 아니라 **몇 번 불렸는가**만 센다. */
+    private val inboxWrites = CountingInboxPort()
 
     @Test
     fun `같은 공고를 dry-run 과 커밋 두 진입점으로 흘리면 액션과 근거가 같다`() {
@@ -146,7 +153,7 @@ class DryRunCommitParityTest {
                 mlAnalysis = BidNowMlAnalysis(),
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
-            ).forRequest(CURRENT_ACTIVE_BIDS)
+            ).forRequest(PARITY_ACCOUNT, CURRENT_ACTIVE_BIDS)
         val dryRunResults = runBlocking { dryRun.useCase.evaluate() }
 
         val commitResults = runBlocking { commitRun().evaluate() }
@@ -169,30 +176,59 @@ class DryRunCommitParityTest {
         val judgedRevision = dryRun.strategy.revision
         payload shouldContain judgedRevision.value.toString()
         payload shouldContain EVALUATION_LADDER_POLICY_VERSION.source
+
+        // ③ 커밋 경로는 그 계정의 알림함에 **한 번** 적는다 — 0 이면 청중 고정이 꺼진 것이고,
+        //    둘 이상이면 계정 하나짜리 run 이 여러 청중을 본 것이다(둘 다 15A 가 막는 것이다).
+        inboxWrites.calls shouldBe 1
     }
 
-    /** 커밋 진입점 — 일회 러너가 받는 빈을 **production 조립 메서드**가 짓는다. */
+    /**
+     * 커밋 진입점 — 일회 러너가 받는 빈을 **production 조립 메서드**가 짓는다.
+     *
+     * **M15/15A** — 그 메서드가 이제 계정별 run 공장을 내므로, 이 test 는 그 공장에서 자기 계정의
+     * run 을 받는다. 청중이 **그 계정 하나**로 run 안에서 고정되면서 알림함 쓰기가 **늘 일어난다**
+     * — 앞 판에서 이 자리의 「불리면 터지는」 포트가 성립했던 것은 청중이 비어 쓰기에 닿지 않았기
+     * 때문이고, 그 전제는 15A 가 없앴다. 그래서 여기서는 **세는** 이중체를 준다: 이 test 가 재는
+     * 것은 판정 동일성이고, 기록의 내용 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로
+     * 잰다. 쓰기가 **한 번**인지는 아래 단언이 지킨다(0 이 되면 그것도 거동 변화다).
+     */
+
     private fun commitRun() =
-        EvaluationCommitWiring().evaluationCommitRun(
-            dataSource = adminDataSource(postgres),
-            strategyRepository = TestStrategyRepository(strategy),
-            candidateSourcePort = candidateSource,
-            watchSubjectPort = watchSubjects,
-            licenseGatePort = licenseGate,
-            mlAnalysisPort = BidNowMlAnalysis(),
-            correlationIdFactory = SequentialCorrelationIdFactory(),
-            clock = clock,
-            commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
-            // NOTI-01(M9/ops-code) — 이 test 가 재는 것은 **dry-run 과 커밋의 판정 동일성**이고
-            // 알림함 축은 그 등식의 입력이 아니다. 청중을 비워 두면 두 경로 비교에 알림함 상태가
-            // 끼어들지 않는다(기록 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로 잰다).
-            // 쓰기 포트는 **불리면 터지는** 구현이라 「청중이 비었는데 기록이 나간다」는 회귀가
-            // 이 자리에서도 잡힌다.
-            notificationInboxPort = { error("청중이 비었는데 알림함 쓰기가 불렸다") },
-            notificationAudiencePort = { NotificationAudience.Accounts(emptyList()) },
-            release = ReleaseIdentifier("parity-test"),
-        )
+        requireNotNull(
+            EvaluationCommitWiring()
+                .evaluationCommitRuns(
+                    dataSource = adminDataSource(postgres),
+                    strategyReader = TestStrategyRepository(strategy),
+                    candidateSourcePort = candidateSource,
+                    watchSubjectPort = watchSubjects,
+                    licenseGatePort = licenseGate,
+                    mlAnalysisPort = BidNowMlAnalysis(),
+                    correlationIdFactory = SequentialCorrelationIdFactory(),
+                    clock = clock,
+                    commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
+                    notificationInboxPort = inboxWrites,
+                    notificationAudiencePort = { NotificationAudience.Accounts(listOf(PARITY_ACCOUNT)) },
+                    release = ReleaseIdentifier("parity-test"),
+                ).forAccount(PARITY_ACCOUNT),
+        ) { "전략에 여력 상한이 있으므로 run 이 서야 한다" }
 }
+
+/**
+ * 불린 횟수만 세는 알림함 이중체 — 이 등식의 축은 판정이고 기록의 내용은 아니다.
+ * 값을 지어내지 않도록 [NotificationInboxOutcome.Created] 하나만 낸다.
+ */
+private class CountingInboxPort : NotificationInboxPort {
+    var calls: Int = 0
+        private set
+
+    override fun record(record: NotificationInboxRecord): NotificationInboxOutcome {
+        calls++
+        return NotificationInboxOutcome.Created
+    }
+}
+
+/** 이 등식의 계정(M15/15A) — 두 진입점이 **같은 계정**을 보는 것이 등식의 전제다. */
+private val PARITY_ACCOUNT = AccountId(1)
 
 /**
  * 감시 게이트를 통과하는 대역 — 규칙 하나(절대 맞지 않는 제외 키워드)만 둔 전략과 짝이다
@@ -209,6 +245,7 @@ private val PASSING_SUBJECT =
 /** 확정 `BidNow` 를 내는 분석 — 우선도가 전략의 `bidNowThreshold` 이상이다. */
 private class BidNowMlAnalysis : MlAnalysisPort {
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome =

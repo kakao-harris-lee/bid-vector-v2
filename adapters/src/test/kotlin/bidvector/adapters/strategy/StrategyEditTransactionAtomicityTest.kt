@@ -85,7 +85,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
     private fun storedRevision(): Long? =
         dataSource().connection.use { connection ->
             connection.createStatement().use { statement ->
-                statement.executeQuery("SELECT revision FROM operator_strategy WHERE id = 1").use { rs ->
+                statement.executeQuery("SELECT revision FROM operator_strategy").use { rs ->
                     if (rs.next()) rs.getLong(1) else null
                 }
             }
@@ -117,10 +117,11 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
     private fun unblockOutboxInserts() = execute("DROP TRIGGER IF EXISTS reject_outbox ON outbox")
 
     private fun beginAndProvideValue(transaction: JdbcStrategyEditTransaction) {
-        val started = transaction.inTransaction { it.begin(SESSION, OPERATOR, EditableField.CandidateLimit) }
+        val started =
+            transaction.inTransaction(testAccount()) { it.begin(SESSION, OPERATOR, EditableField.CandidateLimit) }
         started.shouldBeStarted()
         val provided =
-            transaction.inTransaction { workflow ->
+            transaction.inTransaction(testAccount()) { workflow ->
                 workflow.provideValue(
                     EditCommand.ProvideValue(
                         CommandId("value-1"),
@@ -147,7 +148,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         blockOutboxInserts()
         try {
             shouldThrow<SQLException> {
-                transaction.inTransaction { workflow ->
+                transaction.inTransaction(testAccount()) { workflow ->
                     workflow.confirm(confirmCommand())
                 }
             }
@@ -166,7 +167,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         beginAndProvideValue(transaction)
 
         val confirmed =
-            transaction.inTransaction { workflow ->
+            transaction.inTransaction(testAccount()) { workflow ->
                 workflow.confirm(confirmCommand())
             }
 

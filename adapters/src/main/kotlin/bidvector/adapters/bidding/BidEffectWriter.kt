@@ -6,8 +6,8 @@ import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidDraft
 import bidvector.bidding.BidRecordEntry
 import bidvector.bidding.TransitionEffect
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.export
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.AppliedTransition
 import java.sql.Connection
 import java.sql.Date

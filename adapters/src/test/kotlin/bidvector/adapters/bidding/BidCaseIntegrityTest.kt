@@ -146,7 +146,7 @@ class BidCaseIntegrityTest : BidCaseDbFixture() {
     }
 
     private fun openCase(
-        account: bidvector.workflow.access.AccountId,
+        account: bidvector.sharedkernel.AccountId,
         suffix: String,
     ): Long =
         workflow()

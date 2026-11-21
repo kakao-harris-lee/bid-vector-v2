@@ -6,8 +6,8 @@ import bidvector.adapters.notificationinbox.JdbcNotificationSweepCandidates
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.NOTIFICATION_WINDOW_POLICY
 import bidvector.workflow.bidding.NotificationWindowPolicyData
 import bidvector.workflow.bidding.SweepNotifications

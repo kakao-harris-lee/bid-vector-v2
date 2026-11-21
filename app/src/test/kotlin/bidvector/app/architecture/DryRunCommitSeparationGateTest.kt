@@ -78,15 +78,32 @@ class DryRunCommitSeparationGateTest {
     @Test
     fun `커밋 등재는 어댑터 조립과 그 참조자의 닫힘과 같다 — 모집단 등식`() {
         val root = "bidvector.adapters.evaluation.EvaluationCommitRun"
-        val referrers =
-            production
-                .filter { candidate ->
-                    candidate.directDependenciesFromSelf.any { it.targetClass.fullName == root }
-                }.map { it.fullName.substringBefore('$') }
-                .toSet()
+        var closure = setOf(root)
+        while (true) {
+            val grown = closure + referrersOf(closure)
+            if (grown == closure) break
+            closure = grown
+        }
 
-        (referrers + root) shouldBe policy.evaluationCommitTypes.toSet()
+        closure shouldBe policy.evaluationCommitTypes.toSet()
     }
+
+    /**
+     * **한 걸음이 아니라 고정점이다**(M15/15A). 앞 판은 뿌리를 **직접** 참조하는 클래스만 셌는데,
+     * 15A 가 계정별 run 공장(`EvaluationCommitRuns`)을 뿌리와 조립 사이에 끼우면서 조립
+     * (`EvaluationCommitWiring`)이 뿌리를 직접 부르지 않게 됐다 — 한 걸음 닫힘은 그 조립을
+     * 모집단 밖으로 떨어뜨리고, 그러면 선택자가 **커밋 경로를 쥔 클래스**를 금지 집합에서 놓친다.
+     *
+     * 고정점은 「감싸는 층이 몇 겹이든」 모집단에 든다. 커지지 않는 이유는 이 경로가 조립에서
+     * 끝나기 때문이다 — 조립을 이름으로 부르는 production 클래스가 없다(Spring 이 설정으로 집는다).
+     * 새 층이 생기면 이 등식이 그 자리에서 붉어진다(그것이 이 test 의 목적이다).
+     */
+    private fun referrersOf(targets: Set<String>): Set<String> =
+        production
+            .filter { candidate ->
+                candidate.directDependenciesFromSelf.any { it.targetClass.fullName.substringBefore('$') in targets }
+            }.map { it.fullName.substringBefore('$') }
+            .toSet()
 
     /**
      * R1-L-1 음성 대조 — **중첩 클래스**가 커밋 타입을 참조해도 잡힌다. 선택자에 바깥 이름만

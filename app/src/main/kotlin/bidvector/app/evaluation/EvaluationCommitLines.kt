@@ -78,11 +78,19 @@ internal fun exitCodeOf(tally: EvaluationCommitTally): EvaluationCommitExitCode 
 /** 계수와 열거값만 싣는다 — 공고 ID·기관명·판정 사유는 이 줄에 없다(수집 러너와 같은 근거). */
 internal fun evaluationCommitStartLine(candidateCap: Int): String = "evaluation-commit start candidateCap=$candidateCap"
 
+/**
+ * **M15/15A — 계정 계수 둘을 함께 싣는다.** `accounts` 는 실제로 평가한 계정 수이고 `skipped` 는
+ * 전략을 쓸 수 없어 건너뛴 계정 수다. 둘을 따로 세지 않으면 「후보 0」이 「감시 조건이 아무도
+ * 안 걸렸다」인지 「평가한 계정이 하나도 없다」인지 구별되지 않는다.
+ */
 internal fun evaluationCommitFinishLine(
     tally: EvaluationCommitTally,
+    accounts: Int,
+    skipped: Int,
     exitCode: EvaluationCommitExitCode,
 ): String =
-    "evaluation-commit finished candidates=${tally.candidates} reached=${tally.reached} " +
+    "evaluation-commit finished accounts=$accounts skipped=$skipped " +
+        "candidates=${tally.candidates} reached=${tally.reached} " +
         "notReached=${tally.notReached} bidNow=${tally.bidNow} requested=${tally.requested} " +
         "requestFailed=${tally.requestFailed} ${floorExclusionFields(tally)} exit=${exitCode.value}"
 
@@ -106,3 +114,11 @@ private fun logKeyOf(exclusion: PublishedFloorExclusion): String =
     }
 
 internal fun evaluationCommitFailureLine(causeCode: String): String = "evaluation-commit failed cause=$causeCode"
+
+/**
+ * 계정 전수를 못 읽었다(M15/15A) — run 을 **시작하지 않는다**. 빈 목록으로 진행하면 「평가할 계정이
+ * 없다」와 「누가 있는지 못 읽었다」가 같은 종료 코드 0 이 된다. 싣는 것은 예외 **클래스 이름**뿐이다
+ * (`NotificationAudience.Unavailable` 이 이미 그만큼만 나른다).
+ */
+internal fun evaluationCommitAudienceFailureLine(exceptionType: String): String =
+    evaluationCommitFailureLine("audience-unavailable:$exceptionType")

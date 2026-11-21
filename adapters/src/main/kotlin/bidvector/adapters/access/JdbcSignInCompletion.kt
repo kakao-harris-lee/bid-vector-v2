@@ -1,6 +1,6 @@
 package bidvector.adapters.access
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.access.NewBrowserSession
 import bidvector.workflow.access.PassphraseHash
 import bidvector.workflow.access.SignInCompletionPort

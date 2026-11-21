@@ -63,11 +63,14 @@ class CleanMigrationCheckTest : PersistenceTestSupport() {
             // operator_strategy_revision: revision(PK 인라인) 1 + score 넷 + candidate_limit 1
             // + 예산 페어 여섯 = 12(id 가 없다) + 같은 won 범위 CHECK 둘 = 14.
             // 여력 상한 CHECK 하나씩 추가(D-6A3-4·D-6A3-14, V16, 추가만).
-            "operator_strategy" to 16,
+            // **M15/15A(V28)**: `id` 열이 사라지면서 그 열에 딸린 싱글턴 CHECK 도 함께 사라진다
+            // (16 → 15). 개정 이력은 `id` 가 없었으므로 그대로 15 다.
+            "operator_strategy" to 15,
             "operator_strategy_revision" to 15,
             // 신설(추가만, D-6F6-3). V12__operator_profile.sql: id 싱글턴 1 +
             // licenses_declared↔license_names 짝 1 = 2.
-            "operator_profile" to 2,
+            // **M15/15A(V28)**: 같은 사유로 1 이다(싱글턴 CHECK 소멸).
+            "operator_profile" to 1,
             // 신규(추가만, D-6F5-4). V13__notice_requirement.sql.
             // notice_requirement: status enum = 1.
             "notice_requirement" to 1,

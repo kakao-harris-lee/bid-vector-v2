@@ -1,7 +1,7 @@
 package bidvector.workflow.bidding
 
 import bidvector.bidding.ActorKind
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 
 /**
  * 전이를 일으킨 주체(M7/7B) — `workflow.strategy.Actor` 와 **같은 축의 다른 타입**이다.

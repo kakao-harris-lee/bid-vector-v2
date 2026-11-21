@@ -25,6 +25,7 @@ import bidvector.adapters.qualification.StoredRequirementLicenseGate
 import bidvector.adapters.strategy.JdbcStrategyRepository
 import bidvector.qualification.LICENSE_QUALIFICATION_POLICY
 import bidvector.qualification.LicenseQualificationPolicyData
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyPolicyData
@@ -64,6 +65,8 @@ import javax.sql.DataSource
  */
 internal class PipelineAssembly(
     private val dataSource: DataSource,
+    /** 이 조립이 평가하는 계정(M15/15A) — 전략·프로필·자격이 전부 이 계정의 것이다. */
+    private val account: AccountId,
     mlChannel: ManagedChannel,
     at: Instant,
     correlationPrefix: String,
@@ -106,6 +109,7 @@ internal class PipelineAssembly(
 
     private val useCase =
         EvaluateCandidatesUseCase(
+            account = account,
             strategies = JdbcStrategyRepository(dataSource, resolvedStrategyPolicy(at)),
             candidateSource = JdbcCandidateSource(dataSource, clock, CANDIDATE_CAP),
             watchSubjects = watchSubjects,

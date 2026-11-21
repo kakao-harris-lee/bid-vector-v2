@@ -3,8 +3,8 @@ package bidvector.adapters.notificationinbox
 import bidvector.adapters.notice.beginReadOnlySearchTransaction
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.MarkReadOutcome
 import bidvector.workflow.notificationinbox.NoticeDisplay
 import bidvector.workflow.notificationinbox.NoticeGroupCounts

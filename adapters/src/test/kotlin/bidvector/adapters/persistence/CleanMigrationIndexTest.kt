@@ -48,9 +48,14 @@ class CleanMigrationIndexTest : PersistenceTestSupport() {
             IndexSpec("outbox", "outbox_pkey", "USING btree (entry_id)"),
             IndexSpec("inbox", "inbox_pkey", "USING btree (idempotency_key)"),
             IndexSpec("edit_session", "edit_session_pkey", "USING btree (id)"),
-            IndexSpec("operator_strategy", "operator_strategy_pkey", "USING btree (id)"),
-            IndexSpec("operator_strategy_revision", "operator_strategy_revision_pkey", "USING btree (revision)"),
-            IndexSpec("operator_profile", "operator_profile_pkey", "USING btree (id)"),
+            // M15/15A(V28) — 계정이 PK 다(개정 이력은 계정 범위 키).
+            IndexSpec("operator_strategy", "operator_strategy_pkey", "USING btree (account_id)"),
+            IndexSpec(
+                "operator_strategy_revision",
+                "operator_strategy_revision_pkey",
+                "USING btree (account_id, revision)",
+            ),
+            IndexSpec("operator_profile", "operator_profile_pkey", "USING btree (account_id)"),
             IndexSpec("api_request_audit", "api_request_audit_pkey", "USING btree (id)"),
             // M7/7D(추가만). V20 — 세션 PK 는 쿠키 값의 **해시**이고, 계정의 UNIQUE 제약이
             // 자기 인덱스를 함께 만든다(축5 의 등재 하나와 같은 자리).

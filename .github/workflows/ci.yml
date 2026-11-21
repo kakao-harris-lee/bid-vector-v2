@@ -729,6 +729,8 @@ jobs:
           # R2-8 계열 — 도구 부재를 스모크 실패로 오인하지 않는다(`ubuntu-latest` 선탑재지만
           # 워크플로가 설치를 선언하지 않는다). 위생 게이트도 같은 자리에서 같은 이유로 끊는다.
           command -v jq >/dev/null 2>&1 || { echo "jq 가 필요하다 — 본문 키 집합 판정에 쓴다" >&2; exit 2; }
+          # M15/15A — 계정 비밀 문구를 실행 시점에 만든다(저장소·secret 에 두지 않는다).
+          command -v openssl >/dev/null 2>&1 || { echo "openssl 이 필요하다 — 일회 비밀 문구 생성에 쓴다" >&2; exit 2; }
           # M6/6A-2a r1(code-review LOW) — 전송 오류를 **`fail()` 로 옮긴다.** `set -euo pipefail`
           # 아래서는 curl 의 비-0(예: exit 7 연결 거부)이 대입 자체를 실패시켜 step 이 즉사하고,
           # `fail()` 이 붙이는 앱 로그를 잃는다. 실패는 정직한 사유로 나와야 한다.
@@ -783,27 +785,78 @@ jobs:
           [ "$groups" = "liveness,readiness" ] || fail "집계 health 그룹 이름이 liveness,readiness 가 아니다: [$groups]"
           [ "$(printf '%s' "$body" | jq -r '.status')" = "UP" ] || fail "집계 health 가 UP 이 아니다"
 
-          echo "-- API 포트 무인증 401 · 인증 GET /api/strategy 200 --"
+          # **M15/15A — 자격 헤더 축과 계정 축이 갈렸다.** V28 이 전략·프로필·편집 세션을 계정
+          # 소유로 옮기면서 `/api/strategy` 는 계정 전용 뿌리가 됐고, 자격 헤더 주체에는 계정이
+          # 없으므로 그 축에서 **401 이 맞는 답**이다(계약 「알려진 제한」 3). 그래서 이 step 은
+          # 축을 둘로 나눠 **둘 다** 잰다 — 자격 축이 조용히 죽는 것도 회귀이기 때문이다.
+          echo "-- API 포트 무인증 401 · 자격 헤더 축(계정 전용 뿌리 401 · 그 밖 200) --"
           code="$(_anon_code "$API/api/strategy")"
           [ "$code" = "401" ] || fail "무인증 /api/strategy 가 401 이 아니다: $code"
           code="$(_api_authorized_code /api/strategy)"
-          [ "$code" = "200" ] || fail "인증 /api/strategy 가 200 이 아니다: $code"
+          [ "$code" = "401" ] || fail "자격 헤더 /api/strategy 가 401 이 아니다 — 계정 전용 뿌리가 열렸다: $code"
+          code="$(_anon_code "$API/api/notices")"
+          [ "$code" = "401" ] || fail "무인증 /api/notices 가 401 이 아니다: $code"
+          code="$(_api_authorized_code /api/notices)"
+          [ "$code" = "200" ] || fail "자격 헤더 /api/notices 가 200 이 아니다 — 자격 축이 죽었다: $code"
+
+          # **계정 축은 세션으로만 닿는다**(D-7B-2). 계정을 만드는 길은 운영 runbook(m7-7f §12)이
+          # 쓰는 **일회 명령 그대로**다 — 스모크가 자기만의 생성 경로를 발명하면 그 경로가 운영과
+          # 갈린다. 비밀 문구는 **실행 시점에 만들고** 저장소·Actions secret 에 두지 않는다(이
+          # 계정은 이 job 의 버릴 DB 안에서만 산다). 값은 `-e NAME` 으로 **이름만** 싣고 argv 를
+          # 지나지 않으며, 로그 마스킹을 걸고 `set +x` 아래에서 만든다.
+          echo "-- 운영자 계정 생성(runbook 일회 명령) → 세션 로그인 --"
+          set +x
+          smoke_login="smoke-operator"
+          BIDVECTOR_ACCOUNT_INITIAL_VALUE="$(openssl rand -base64 33 | tr -d '\n')"
+          echo "::add-mask::$BIDVECTOR_ACCOUNT_INITIAL_VALUE"
+          export BIDVECTOR_ACCOUNT_INITIAL_VALUE
+          # `SPRING_MAIN_WEB_APPLICATION_TYPE=none` 은 선택이 아니다 — 끄지 않으면 일회 컨테이너
+          # 안에 무인증 `POST /api/session` 을 포함한 API 표면이 수 초 뜬다(runbook §12).
+          created="$($COMPOSE run --rm --no-deps \
+            -e SPRING_MAIN_WEB_APPLICATION_TYPE=none -e BIDVECTOR_ACCOUNT_INITIAL_VALUE \
+            app --bidvector.account.mode=create "--bidvector.account.login=$smoke_login" 2>&1)" \
+            || fail "계정 생성 일회 명령이 실패했다"
+          # 출력 전문을 싣지 않는다 — 결과 **표지**만 본다(runbook 의 결과 줄 형태).
+          case "$created" in
+            *"result=created"*) ;;
+            *) fail "계정 생성 결과가 created 가 아니다" ;;
+          esac
+          unset created
+
+          bodies="$(mktemp -d)"
+          chmod 700 "$bodies"
+          printf '{"loginName":"%s","passphrase":"%s"}' "$smoke_login" "$BIDVECTOR_ACCOUNT_INITIAL_VALUE" \
+            > "$bodies/sign-in.json"
+          sess_headers="$(mktemp)"
+          sess_body="$(mktemp)"
+          code="$(printf 'header = "Content-Type: application/json"\nrequest = "POST"\ndata = "@%s"\ndump-header = "%s"\noutput = "%s"\n' \
+            "$bodies/sign-in.json" "$sess_headers" "$sess_body" \
+            | curl --config - -sS -w '%{http_code}' "$API/api/session")" || code="transport-error"
+          rm -f "$bodies/sign-in.json"
+          [ "$code" = "201" ] || fail "세션 로그인이 201 이 아니다: $code"
+          SESSION_COOKIE="$(sed -n 's/^[Ss]et-[Cc]ookie: *\(__Host-bidvector_session=[^;]*\).*/\1/p' "$sess_headers" | head -n1)"
+          SESSION_CSRF="$(jq -r '.csrf // empty' "$sess_body")" || fail "로그인 응답을 JSON 으로 읽지 못했다"
+          rm -f "$sess_headers" "$sess_body"
+          [ -n "$SESSION_COOKIE" ] || fail "로그인 응답에 세션 쿠키가 없다"
+          [ -n "$SESSION_CSRF" ] || fail "로그인 응답에 csrf 가 없다"
+          # 쿠키·CSRF 도 비밀이다 — 뒤 단계의 실패 문면이 이 값을 싣지 않게 마스킹한다.
+          echo "::add-mask::$SESSION_COOKIE"
+          echo "::add-mask::$SESSION_CSRF"
 
           # M6/6A-2b D-6A2b-13 — 「뜬 이미지에서 쓰기가 인증 경계 아래에서 끝까지 간다」를 잰다.
-          # 자격 값은 argv 를 지나지 않는다(위 생성 step 주석과 같은 형태) — 본문은 비밀이
+          # 비밀 값은 argv 를 지나지 않는다(위 생성 step 주석과 같은 형태) — 본문은 비밀이
           # 아니지만 `--config` 의 `data = "@파일"` 로 넘겨 인용 규칙을 단순하게 둔다.
-          echo "-- API 포트 쓰기 왕복: begin → value → confirm → GET 반영 --"
-          bodies="$(mktemp -d)"
+          echo "-- API 포트 쓰기 왕복: begin → value → confirm → GET 반영 (세션 축) --"
           _api_get() {
             local out
-            out="$(printf 'header = "X-Operator-Credential: %s"\n' "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" \
+            out="$(printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" \
               | curl --config - -sS -w '\n%{http_code}' "$API$1")" || out=$'\ntransport-error'
             printf '%s' "$out"
           }
           _api_post() {
             local out
-            out="$(printf 'header = "X-Operator-Credential: %s"\nheader = "Content-Type: application/json"\nrequest = "POST"\ndata = "@%s"\n' \
-              "$BIDVECTOR_APP_OPERATOR_CREDENTIAL" "$2" \
+            out="$(printf 'header = "Cookie: %s"\nheader = "X-Operator-Csrf: %s"\nheader = "Content-Type: application/json"\nrequest = "POST"\ndata = "@%s"\n' \
+              "$SESSION_COOKIE" "$SESSION_CSRF" "$2" \
               | curl --config - -sS -w '\n%{http_code}' "$API$1")" || out=$'\ntransport-error'
             printf '%s' "$out"
           }

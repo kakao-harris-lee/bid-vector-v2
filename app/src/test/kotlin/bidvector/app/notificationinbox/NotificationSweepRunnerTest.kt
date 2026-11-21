@@ -5,8 +5,8 @@ import bidvector.app.wiring.RecordedExitCodes
 import bidvector.bidding.BidKind
 import bidvector.bidding.BidStateTag
 import bidvector.bidding.NoticeKey
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.NoticeRound
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.DaysBeforeWindow
 import bidvector.workflow.bidding.NotificationSweepCandidatePort
 import bidvector.workflow.bidding.NotificationSweepCase

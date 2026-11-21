@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 import bidvector.app.architecture.ArchitecturePolicy
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

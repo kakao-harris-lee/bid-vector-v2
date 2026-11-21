@@ -8,6 +8,7 @@ import bidvector.procurement.CategoryCode
 import bidvector.procurement.Notice
 import bidvector.procurement.NoticeId
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.WatchSubject
@@ -48,7 +49,15 @@ fun interface WatchSubjectPort {
  * 조립하지 않는다(port 뒤로 가른다 — 값 획득 축, 「경계로 처리」).
  */
 fun interface LicenseGatePort {
-    fun verdictFor(notice: Notice): LicenseVerdict
+    /**
+     * **M15/15A — 계정이 인자다.** 면허 판정의 입력 절반이 그 계정의 자격 사실(V12)이고, 그 표가
+     * V28 로 계정 소유가 됐다. 계정을 받지 않으면 구현이 프로필을 읽을 계정을 스스로 고르게 되고,
+     * 그 선택은 어떤 게이트도 보지 못한다.
+     */
+    fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict
 }
 
 /**
@@ -103,7 +112,12 @@ sealed interface MlAnalysisOutcome {
  * 그 전파를 끊는다(설계 검토 (1) 「동기 port 로 되돌아감」 우회의 차단).
  */
 fun interface MlAnalysisPort {
+    /**
+     * **M15/15A — 계정이 인자다.** 기회 분석의 합성 텍스트에 그 계정의 자격 사실(V12)이 들어간다
+     * ([OperatorProfilePort] 와 같은 사유).
+     */
     suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome

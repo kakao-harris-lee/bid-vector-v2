@@ -9,7 +9,7 @@ import bidvector.bidding.BidMemo
 import bidvector.bidding.NoticeKey
 import bidvector.procurement.NOTICE_NUMBER_RAW_KEY
 import bidvector.procurement.NOTICE_ROUND_RAW_KEY
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.bidding.BidActor
 import java.sql.Timestamp
 

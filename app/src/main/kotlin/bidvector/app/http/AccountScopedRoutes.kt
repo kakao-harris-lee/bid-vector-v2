@@ -1,7 +1,7 @@
 package bidvector.app.http
 
 /**
- * **계정 주체가 있어야 닿는 경로**(M7/7B · 7C③ · 7C④ 2b) — 입찰함 · 알림함 · 프로필 셋이다.
+ * **계정 주체가 있어야 닿는 경로**(M7/7B · 7C③ · 7C④ 2b · M15/15A).
  *
  * 왜 선언이 필요한가: 7D 의 기본 거부 필터는 「인증됐는가」까지만 보고 **어떤 주체인가**는
  * 보지 않는다. 인증 경로는 둘인데(운영자 자격 헤더 · 브라우저 세션) **계정을 내는 것은
@@ -60,8 +60,38 @@ object AccountScopedRoutes {
      */
     const val BID_RESULTS: String = "/api/bid-results"
 
+    /**
+     * 전략의 뿌리(M15/15A) — 조회(`GET /api/strategy`)와 편집 세션(`/api/strategy/edit-sessions/…`)이
+     * 함께 이 아래 선다. V28 로 전략이 계정 소유가 됐으므로 계정 없는 주체에게 전략을 주려면
+     * **누군가의 행을 빌려야** 하고, 그것이 이 slice 가 막는 것이다.
+     */
+    const val STRATEGY: String = "/api/strategy"
+
+    /** 제안 목록(M15/15A) — 그 계정의 전략·자격으로 계산한다. */
+    const val SUGGESTIONS: String = "/api/suggestions"
+
+    /** 투찰가 요청(M15/15A) — 그 계정의 전략·자격으로 평가하고 그 계정의 알림함에 적는다. */
+    const val BID_PRICE_REQUESTS: String = "/api/bid-price-requests"
+
+    /**
+     * 평가 dry-run(M15/15A) — 계약이 이름으로 적지 않은 넷째 자리다. 이 경로도 전략을 읽으므로
+     * 같은 규칙을 피할 수 없다(계정 없이 읽으면 남의 전략이다).
+     */
+    const val EVALUATION_DRY_RUNS: String = "/api/evaluation-dry-runs"
+
     /** 계정 전용 뿌리 전수. 늘어나면 여기만 늘린다. */
-    val ROOTS: Set<String> = setOf(BID_CASES, BID_RESULTS, NOTIFICATIONS, PROFILE, ONBOARDING_CHECKLIST)
+    val ROOTS: Set<String> =
+        setOf(
+            BID_CASES,
+            BID_RESULTS,
+            NOTIFICATIONS,
+            PROFILE,
+            ONBOARDING_CHECKLIST,
+            STRATEGY,
+            SUGGESTIONS,
+            BID_PRICE_REQUESTS,
+            EVALUATION_DRY_RUNS,
+        )
 
     /** 이 경로가 계정 주체를 요구하는가 — 표면 전수 test 가 선언↔판정 대조에 쓴다. */
     fun covers(path: String): Boolean = ROOTS.any { it == path || path.startsWith("$it/") }

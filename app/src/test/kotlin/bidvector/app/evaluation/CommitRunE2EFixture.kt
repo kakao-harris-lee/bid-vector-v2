@@ -73,12 +73,41 @@ internal class CommitRunE2EFixture(
     /** 이 fixture 가 찍는 릴리스 — 러너·relay 조립이 같은 값을 받아야 행과 속성이 어긋나지 않는다. */
     val release: ReleaseIdentifier = ReleaseIdentifier(TEST_RELEASE_LABEL)
 
+    /**
+     * **계정 둘을 심는다**(M15/15A). 가장 작은 id 가 [primaryAccount](전략을 가진 쪽)이고 둘째가
+     * [strategylessAccount](전략 행이 없어 러너가 건너뛰는 쪽)다. 둘이 있어야 「건너뜀 계수」와
+     * 「알림함이 그 계정에만 쌓인다」가 **한 run 에서** 재진다.
+     */
+    var primaryAccount: Long = 0
+        private set
+
+    var strategylessAccount: Long = 0
+        private set
+
     fun start() {
         postgres.start()
         seedContext = boot()
-        insertStrategy()
+        primaryAccount = insertAccount("commit-run-primary")
+        strategylessAccount = insertAccount("commit-run-strategyless")
+        insertStrategy(primaryAccount)
         insertNotice("20260101010", Instant.now().plusSeconds(86_400))
     }
+
+    /** 앱 역할에는 `account` INSERT 권한이 없다(V20) — 소유자 자격으로 심는다. */
+    private fun insertAccount(login: String): Long =
+        adminDataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
+                        "VALUES (?, 'fixture-hash', now(), now(), 0) RETURNING id",
+                ).use { statement ->
+                    statement.setString(1, login)
+                    statement.executeQuery().use { rows ->
+                        rows.next()
+                        rows.getLong("id")
+                    }
+                }
+        }
 
     fun stop() {
         seedContext.close()
@@ -123,24 +152,25 @@ internal class CommitRunE2EFixture(
             ).run()
 
     /** `bidNowThreshold` 0.9 — fake ML 의 priority 0.9 가 확정 `BidNow` 를 낸다. */
-    private fun insertStrategy() {
+    private fun insertStrategy(account: Long) {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "bid_now_threshold, review_threshold, max_active_bids) " +
-                        "VALUES (1, $seededRevision, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, $seededRevision, ?, ?, ?, ?, ?, ?, ?, ?)",
                 ).use { statement ->
                     val empty = connection.createArrayOf("text", emptyArray<String>())
-                    statement.setArray(1, empty)
+                    statement.setLong(1, account)
                     statement.setArray(2, empty)
                     statement.setArray(3, empty)
                     statement.setArray(4, empty)
-                    statement.setArray(5, connection.createArrayOf("text", arrayOf("없는-문구")))
-                    statement.setBigDecimal(6, java.math.BigDecimal("0.9"))
-                    statement.setBigDecimal(7, java.math.BigDecimal("0.1"))
-                    statement.setInt(8, maxActiveBids)
+                    statement.setArray(5, empty)
+                    statement.setArray(6, connection.createArrayOf("text", arrayOf("없는-문구")))
+                    statement.setBigDecimal(7, java.math.BigDecimal("0.9"))
+                    statement.setBigDecimal(8, java.math.BigDecimal("0.1"))
+                    statement.setInt(9, maxActiveBids)
                     statement.executeUpdate()
                 }
         }
@@ -185,6 +215,7 @@ internal class CommitRunE2EFixture(
  */
 internal class AlwaysBidNowMl : MlAnalysisPort {
     override suspend fun analyze(
+        account: bidvector.sharedkernel.AccountId,
         notice: bidvector.procurement.Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome =

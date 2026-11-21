@@ -9,6 +9,7 @@ import bidvector.procurement.NoticeNumber
 import bidvector.sharedkernel.NoticeRound
 import jakarta.servlet.http.HttpServletRequest
 import kotlinx.coroutines.runBlocking
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
@@ -36,14 +37,20 @@ import tools.jackson.databind.JsonNode
 class BidPriceRequestController(
     private val factory: BidPriceRequestFactory,
 ) {
-    @PostMapping("/api/bid-price-requests")
+    /**
+     * **M15/15A — 세션 계정의 평가다.** 앞 판은 계정이 **선택**이었다(없으면 알림함 기록만 건너뛰고
+     * 평가는 그대로 돌았다) — 그 평가가 읽는 전략이 V28 로 계정 소유가 됐으므로 그 자리는 이제
+     * 「누구의 전략으로 평가하는가」가 없는 상태다. 그래서 계정이 **필수**이고 없으면 401 이다.
+     */
+    @PostMapping(AccountScopedRoutes.BID_PRICE_REQUESTS)
     fun request(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
-    ): BidPriceRequestResponse {
+    ): ResponseEntity<Any> {
+        val account = request.authenticatedAccount() ?: return unauthenticated(request)
         val noticeId = parseBidPriceNoticeId(body)
         val currentActiveBids = parseCurrentActiveBids(body)
-        return when (val outcome = factory.forRequest(noticeId, currentActiveBids)) {
+        return when (val outcome = factory.forRequest(account, noticeId, currentActiveBids)) {
             // 표면이 404 로 옮긴다 — 오류 **형태**를 만드는 자리는 `ErrorBody.kt` 하나다.
             BidPriceRequestOutcome.NoticeNotFound -> {
                 throw NoticeNotFoundException()
@@ -52,9 +59,8 @@ class BidPriceRequestController(
             is BidPriceRequestOutcome.Prepared -> {
                 val evaluation = runBlocking { outcome.run.evaluate() }
                 // **평가가 끝난 뒤에만** 적는다 — 평가가 터진 요청은 알림함에 사실을 남기지 않는다.
-                // 계정이 없는 인증 경로에서는 `?.let` 이 호출 자체를 지운다(D-7C3B-9).
-                val inbox = request.authenticatedAccount()?.let { factory.recordInbox(it, noticeId) }
-                bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids, inbox)
+                val inbox = factory.recordInbox(account, noticeId)
+                ResponseEntity.ok(bidPriceRequestResponseOf(outcome.run, evaluation, currentActiveBids, inbox))
             }
         }
     }

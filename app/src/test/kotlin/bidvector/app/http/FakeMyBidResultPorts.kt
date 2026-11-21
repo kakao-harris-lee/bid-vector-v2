@@ -7,7 +7,7 @@ import bidvector.bidding.NoticeKey
 import bidvector.bidding.SubmittedBidAmount
 import bidvector.procurement.NoticeId
 import bidvector.settlement.AwardWinnerTradeName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.result.AwardWinnerNamePort
 import bidvector.workflow.result.BatchOpeningFactsPort

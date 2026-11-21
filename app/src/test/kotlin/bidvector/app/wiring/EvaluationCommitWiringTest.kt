@@ -1,6 +1,6 @@
 package bidvector.app.wiring
 
-import bidvector.adapters.evaluation.EvaluationCommitRun
+import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.adapters.persistence.ReleaseIdentifier
 import bidvector.app.evaluation.EvaluationCommitRunner
 import bidvector.app.http.SequentialCorrelationIdFactory
@@ -8,6 +8,7 @@ import bidvector.app.http.TestStrategyRepository
 import bidvector.app.http.freshStrategy
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
@@ -42,6 +43,9 @@ import javax.sql.DataSource
 /** M9/OPS-10 — 배선 test 가 꽂는 릴리스 식별자(값은 중요하지 않고 **있다는 사실**이 중요하다). */
 private val WIRING_TEST_RELEASE = ReleaseIdentifier("wiring-test-release")
 
+/** 배선 test 가 run 을 요구하는 계정(M15/15A) — 저장소 대역이 계정을 보지 않으므로 값은 아무거나다. */
+private val WIRING_TEST_ACCOUNT = AccountId(1)
+
 private val COMMIT_NOW: Instant = Instant.parse("2026-10-06T00:00:00Z")
 
 /**
@@ -74,7 +78,7 @@ class EvaluationCommitWiringTest {
             WatchSubjectPort::class.java,
             Supplier { WatchSubjectPort { WatchSubjectOutcome.Unavailable } },
         )
-        context.registerBean(LicenseGatePort::class.java, Supplier { LicenseGatePort { eligible() } })
+        context.registerBean(LicenseGatePort::class.java, Supplier { LicenseGatePort { _, _ -> eligible() } })
         context.registerBean(MlAnalysisPort::class.java, Supplier { alwaysUnavailableMl() })
         context.registerBean(
             CorrelationIdFactory::class.java,
@@ -188,21 +192,33 @@ class EvaluationCommitWiringTest {
             // **`evaluate()` 까지 돌려야 센다.** 배선 단계 읽기만 세면 고정 여부와 무관하게 늘
             // 1 이다(실측: 고정을 걷는 변이가 초록이었다) — 두 번째 읽기는 use case 안에 있다.
             // 후보가 빈 목록이라 DB·ML 에는 닿지 않는다.
-            runBlocking { booted.context.getBean(EvaluationCommitRun::class.java).evaluate() }
+            //
+            // M15/15A — run 은 이제 **계정마다** 선다. 공장이 그 계정의 전략을 한 번 읽어 고정하고
+            // 넘기므로, 「run 당 한 번」의 run 이 `forAccount` 가 낸 것 하나다.
+            val runs = booted.context.getBean(EvaluationCommitRuns::class.java)
+            val run = runs.forAccount(WIRING_TEST_ACCOUNT) ?: error("여력 상한이 있는 전략인데 run 이 없다")
+            runBlocking { run.evaluate() }
 
             counting.loads shouldBe 1
         }
     }
 
-    /** dry-run 과 같은 fail-closed — 여력 상한이 없는 전략으로는 커밋 run 을 만들지 않는다. */
+    /**
+     * dry-run 과 같은 fail-closed — 여력 상한이 없는 전략으로는 커밋 run 을 **만들지 않는다**.
+     *
+     * **M15/15A 가 뒤집은 것은 범위이지 결과가 아니다**(주장을 지우지 않고 바꾼다). 앞 판은 상한
+     * 미설정이 **기동 실패**였다. 계정이 여럿이면 한 계정의 미설정이 다른 계정의 평가까지 멈추므로,
+     * 이제는 **그 계정의 run 이 없다**(`null`)가 되고 러너가 그 수를 센다. 지어낸 상한으로
+     * 평가하지 않는다는 결과는 같다.
+     */
     @Test
-    fun `전략에 여력 상한이 없으면 기동에 실패한다`() {
+    fun `전략에 여력 상한이 없으면 그 계정의 run 이 없다 — 기동은 멈추지 않는다`() {
         withBoot(
             *validProperties(),
             strategyRepository = TestStrategyRepository(freshStrategy()),
         ) { booted ->
-            booted.failure shouldNotBe null
-            booted.failure!!.stackTraceToString() shouldContain "maxActiveBids"
+            booted.failure shouldBe null
+            booted.context.getBean(EvaluationCommitRuns::class.java).forAccount(WIRING_TEST_ACCOUNT) shouldBe null
         }
     }
 }
@@ -223,7 +239,7 @@ private fun strategyWithCap(maxActiveBids: Int = 10) =
 private fun eligible(): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
 
 private fun alwaysUnavailableMl(): MlAnalysisPort =
-    MlAnalysisPort { _: Notice, _ -> MlAnalysisOutcome.SimilarityProjectionNotReady }
+    MlAnalysisPort { _, _: Notice, _ -> MlAnalysisOutcome.SimilarityProjectionNotReady }
 
 /**
  * `load()` 호출을 세는 저장소 대역 — 「run 당 한 번」의 유일한 증거다(R1-M-4).
@@ -238,10 +254,13 @@ private class CommitCountingStrategyRepository(
     var loads = 0
         private set
 
-    override fun load(): bidvector.strategy.OperatorStrategy {
+    override fun load(account: AccountId): bidvector.strategy.OperatorStrategy {
         loads += 1
         return strategy
     }
 
-    override fun save(applied: bidvector.workflow.strategy.AppliedStrategy) = error("전략을 쓰지 않는다")
+    override fun save(
+        account: AccountId,
+        applied: bidvector.workflow.strategy.AppliedStrategy,
+    ) = error("전략을 쓰지 않는다")
 }

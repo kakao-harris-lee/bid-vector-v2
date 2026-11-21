@@ -9,7 +9,7 @@ import bidvector.procurement.NoticeNumber
 import bidvector.settlement.AwardMatchingPolicyData
 import bidvector.settlement.AwardWinnerTradeName
 import bidvector.settlement.OperatorTradeName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.opening.NoticeOpeningFacts
 import bidvector.workflow.opening.OpeningProgressPolicyData
 import bidvector.workflow.opening.OpeningResultView

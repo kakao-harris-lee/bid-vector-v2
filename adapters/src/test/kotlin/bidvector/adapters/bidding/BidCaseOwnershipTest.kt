@@ -12,13 +12,13 @@ import bidvector.bidding.EvidenceRef
 import bidvector.bidding.NoticeKey
 import bidvector.bidding.SkipReason
 import bidvector.bidding.SubmittedBidAmount
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCaseWorkflow
 import bidvector.workflow.bidding.BidCommandResult

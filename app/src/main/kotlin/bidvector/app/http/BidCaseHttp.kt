@@ -4,7 +4,7 @@ import bidvector.bidding.BidCaseId
 import bidvector.bidding.BidCommand
 import bidvector.bidding.RejectionReason
 import bidvector.bidding.TransitionOutcome
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.bidding.BidActor
 import bidvector.workflow.bidding.BidCaseWorkflow
 import bidvector.workflow.bidding.BidCommandResult
