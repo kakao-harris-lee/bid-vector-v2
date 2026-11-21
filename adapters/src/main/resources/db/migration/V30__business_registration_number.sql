@@ -26,6 +26,11 @@
 -- 「실패」가 된다. 이 파일은 **기존 표 하나**의 ACCESS EXCLUSIVE 를 쥔다 — 운영자 요청 경로가 그
 -- 표를 읽고 쓰므로 경합 상대가 있다. `SET LOCAL` 은 트랜잭션 범위이고 Flyway 는 마이그레이션마다
 -- 자기 트랜잭션이라, 앞 파일의 같은 줄이 이 파일을 덮어 주지 않는다.
+--
+-- **상한이 묶는 것은 잠금 「획득」이다**(r1 cr L-6) — NULL 허용·DEFAULT 없는 열은 rewrite 없이
+-- 붙지만 새 CHECK 는 제약 검증 스캔을 만들고, 그 스캔은 ACCESS EXCLUSIVE 를 쥔 채 돌며
+-- `lock_timeout` 은 그 구간에서 침묵한다(그 축은 `statement_timeout` 이다). 이 표는 계정당 한
+-- 행이라 오늘은 영향이 없다 — 큰 표를 만지는 마이그레이션이 이 머리말을 베낄 때가 실제 위험이다.
 SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE account_business_profile

@@ -162,7 +162,8 @@ class ProfileEndpointTest : HttpIntegrationTestBase() {
                 """"headquartersRegion":null,"naraRegistration":"UNANSWERED"}"""
         session.post(BUSINESS_DETAILS, good).statusCode.value() shouldBe OK
 
-        listOf("1-2-3-4-5-6-7-8-9-0", "123456789", "77777777777", "   ").forEach { raw ->
+        // **길이 상한 안쪽의 꼴 오류**를 함께 담는다(r1 v F2) — 19자 표본만으로는 길이 축만 재어진다.
+        listOf("12-345-67890", "123-456-7890", "1-2-3-4-5-6-7-8-9-0", "123456789", "77777777777", "   ").forEach { raw ->
             val rejected =
                 session.post(
                     BUSINESS_DETAILS,
