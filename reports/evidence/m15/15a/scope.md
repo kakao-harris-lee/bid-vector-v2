@@ -27,7 +27,6 @@ in_scope:
   - adapters/src/main/kotlin/bidvector/adapters/profile/JdbcOperatorProfileWriter.kt
   - adapters/src/main/kotlin/bidvector/adapters/evaluation/PinnedStrategyRepository.kt
   - adapters/src/main/kotlin/bidvector/adapters/evaluation/EvaluationCommitRun.kt
-  - adapters/src/main/kotlin/bidvector/adapters/notificationinbox/JdbcNotificationAudience.kt
   - adapters/src/main/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseGate.kt
   - adapters/src/main/kotlin/bidvector/adapters/qualification/StoredRequirementLicenseJudgement.kt
   - adapters/src/main/kotlin/bidvector/adapters/qualification/PinnedLicenseGate.kt
@@ -46,11 +45,22 @@ in_scope:
   - app/src/main/kotlin/bidvector/app/wiring/BidPriceRequestFactory.kt
   - app/src/main/kotlin/bidvector/app/wiring/EvaluationCommitWiring.kt
   - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitRunner.kt
-  - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitLog.kt   # 계수 한 줄
+  - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitLines.kt   # 계수 한 줄
   - app/src/test/kotlin/bidvector/app/**                   # 격리 test 다섯 축 · 기존 test 세션 전환
+  # ── 계정 식별자의 이사 (라운드 2, 「갱신 이력」 (2)) ─────────────────────
+  # 포트 서명에 계정을 넣자 `workflow.strategy -> workflow.access` 가 서고 패키지 순환
+  # 넷이 닫혔다. 끊는 변은 하나뿐이라 `AccountId` 를 공유 커널로 옮겼고, 그 **한 타입의
+  # import** 가 모듈 넷에 걸쳐 있다 — 아래 트리가 통째로 든다(195 파일 가운데 대부분이
+  # import 한 줄이다). 거동을 바꾸는 자리는 위에 이름으로 적은 것들 그대로다.
+  - shared-kernel/src/main/kotlin/bidvector/sharedkernel/AccountId.kt   # 신설
+  - workflow/src/main/kotlin/bidvector/workflow/**
+  - adapters/src/main/kotlin/bidvector/adapters/**
+  - app/src/main/kotlin/bidvector/app/**
   # ── 계약 · 게이트 장부 ──────────────────────────────────────────────────
   - openapi/bidvector-operator-api.yaml    # 계정 전용이 된 operation 의 보안 선언
   - config/quality/gate-tests.properties   # 새 Kotlin test class 를 **만드는 커밋에서** 등재
+  - config/quality/architecture-policy.properties   # 허용 뿌리 · 주입/2층 목록 · 어댑터 멤버 서술자
+  - web/e2e/harness/journey-up.mjs         # 여정 하네스의 전략 심기 축(라운드 4)
   - reports/evidence/m15/15a/
 out_of_scope:
   - 열린 가입(`POST /api/accounts`) · V29 · 공개 경로 집합            # 15B
@@ -58,12 +68,16 @@ out_of_scope:
   - 계정별 Telegram 채널 · 이메일 · 비밀번호 찾기 · 탈퇴             # 계약 「범위 밖」
   - `account_business_profile`(V22) · `account_construction_capacity` # 이미 계정 단위다
   - `notification_inbox`(V23) 의 스키마                               # 이미 계정 단위다
-  - web/**                                                            # 화면 변경 0(아래 「web 무접촉」)
+  - web/src/**                                                        # 화면 변경 0(아래 「web 접촉」)
   - .github/workflows/ci.yml                                          # acceptance 는 오늘의 job 명령 그대로
 acceptance_commands:
-  # ci.yml `check` job 의 Kotlin 전건. 이 slice 는 서버·DB 전용이라 그 job 하나다
-  # (워크플로가 `ml-engine`·`web` 과 소스가 겹치지 않음을 선언한다 — 「web 무접촉」 참고).
+  # ci.yml `check` job 의 Kotlin 전건.
   - ./gradlew --no-daemon check
+  # ci.yml `web` job 의 step 전건(W-1~W-13). **라운드 4 에서 acceptance 에 들었다** —
+  # 여정 하네스가 자격 헤더로 전략을 심고 있었고 그 경로가 401 이 됐다(「web 접촉」).
+  - (web/) npm ci · lint · typecheck · gate:src-tree · api:types:check · test · gate:tests ·
+    build · gate:boundary-canary · playwright install chromium · test:e2e ·
+    ./gradlew --no-daemon :app:bootJar · test:e2e:journey
 rollback: rollback.md
 ```
 
@@ -168,12 +182,21 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
 | 두 계정 E2E 선례 | `ProfileOwnershipE2ETest` | 실 DB · 실 세션 · 로그인 둘의 하네스가 **이미 있다**. 격리 test 는 그 꼴을 그대로 쓴다(새 하네스를 만들지 않는다) |
 | 마이그레이션 래칫 | `CleanMigration{,Check,Column,Index,Privilege}Test` | 표별 CHECK 수 · 열 전수 · PK 열 집합 · FK 목록 · 권한 전수가 **전부 등재형**이라 V28 이 그 다섯을 함께 움직인다 |
 
-## web 무접촉
+## web 접촉 — 화면 0, 하네스 하나
 
-이 slice 는 `web/` 을 열지 않는다. OpenAPI 의 변경은 **보안 선언**(`security:`)뿐이고
+**화면 소스(`web/src/**`)는 열지 않는다.** OpenAPI 의 변경은 **보안 선언**(`security:`)뿐이고
 `openapi-typescript` 는 그것을 타입으로 내보내지 않는다 — 생성 파일의 바이트가 그대로임을
-`npm run api:types:check` 상당의 재생성 대조로 확인하고 `commands.md` 에 한 줄 남긴다.
-바이트가 움직이면 그때 `web` job 전건이 acceptance 에 든다(계약 갱신으로 등재).
+`npm run api:types:check` 로 **실측했다**(재생성 대조, 195341 바이트 동일). 착수 때 이 절은
+그 등식을 예측으로 적었고, 라운드 4 가 그것을 측정으로 바꿨다.
+
+**그럼에도 `web` job 전건이 acceptance 에 들었다** — 바이트가 움직여서가 아니라, 여정 e2e 의
+**하네스**가 출하 jar 를 자격 헤더로 두드려 여력 상한을 심고 있었기 때문이다. 그 경로는 V28
+뒤 401 이고, 하네스는 기동 중에 죽어 여정 28 건이 **하나도 수집되지 않았다**(실측). Kotlin
+`check` 는 이 자리를 보지 못한다 — 다른 job 이고 다른 프로세스다.
+
+귀결 둘. ① `web/e2e/harness/journey-up.mjs` 가 in_scope 에 들어왔다(위). ② acceptance 가
+`check` 하나에서 **두 job**으로 늘었다. 「소스가 겹치지 않으니 job 하나」라는 착수 때의 근거는
+**소스 겹침만 보고 런타임 의존(하네스 → 출하 API)을 보지 않은 것**이었다.
 
 ## 알려진 제한 (착수 시점)
 
@@ -211,3 +234,15 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
 ## 갱신 이력
 
 - 2026-11-21 초판(착수).
+- 2026-11-21 (1) 라운드 1 이 만든 자리를 in_scope 와 대조해 등재했다 — 계정별 run 공장
+  (`EvaluationCommitRuns`) · 출하 E2E 의 세션 지원 · 마이그레이션 갈래 test · 평가 포트 셋 ·
+  `architecture-policy.properties`. 반대로 계약이 적었으나 **건드리지 않은** 둘
+  (`JdbcNotificationAudience` · `EvaluationCommitLog`)은 뺐다 — 청중 고정이 run 안에서
+  이뤄져 어댑터를 바꿀 필요가 없었고, 계수 줄은 `EvaluationCommitLines` 였다.
+- 2026-11-21 (2) **`AccountId` 를 `bidvector.sharedkernel` 로 옮겼다.** 포트 서명에 계정을 둔
+  결과 `workflow.strategy -> workflow.access` 가 서고, `workflow.access` 가 이미 반대 방향으로
+  시계·해시를 보고 있어 ArchUnit 슬라이스 규칙이 **순환 넷**을 냈다. 넷 다 `workflow.access`
+  로 들어오는 변을 요구하고 그 원천은 하나뿐이라, 식별자를 아무것도 참조하지 않는 자리로
+  옮기는 것이 그 변을 없애는 유일한 길이다. in_scope 가 모듈 넷의 트리로 넓어진 사유다.
+- 2026-11-21 (3) **acceptance 에 `web` job 이 들었다**(위 「web 접촉」) — 여정 하네스가 자격
+  헤더로 전략을 심고 있었고 그 경로가 401 이 됐다. `web/e2e/harness/journey-up.mjs` 등재.
