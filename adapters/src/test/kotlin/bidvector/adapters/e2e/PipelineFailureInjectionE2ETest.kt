@@ -212,6 +212,7 @@ internal class PipelineFailureInjectionE2ETest : PipelineE2ESupport() {
         servers += server
         return PipelineAssembly(
             dataSource = dataSource(),
+            account = testAccount(),
             mlChannel = server.channel,
             at = E2E_NOW,
             correlationPrefix = "failure",

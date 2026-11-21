@@ -58,8 +58,13 @@ class OpenApiDryRunContractTest : HttpIntegrationTestBase() {
 
     private val spec: Map<String, Any?> by lazy { loadOpenApiSpec() }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    /**
+     * **M15/15A — 이 경로는 계정 전용이다.** V28 뒤 자격 헤더 경로(계정을 내지 않는다)는 401 이라
+     * 세션으로 두드린다. 이 test 가 재는 축(문서 ↔ 응답 등식)은 그대로다.
+     */
+    private val session by lazy { SessionTestClient(restTemplate, ::url).signIn() }
+
+    private fun authorizedHeaders(): HttpHeaders = session.headers()
 
     private fun postDryRun(body: Map<String, Any?>): ResponseEntity<Map<String, Any?>> {
         @Suppress("UNCHECKED_CAST")

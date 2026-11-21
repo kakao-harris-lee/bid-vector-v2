@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.ListConstructionCapacitiesUseCase
 import bidvector.workflow.profile.ReadProfileUseCase
 import bidvector.workflow.profile.RemoveConstructionCapacityUseCase
@@ -37,18 +37,14 @@ class ProfileCommandController(
     private val upsertCapacity: UpsertConstructionCapacityUseCase,
     private val removeCapacity: RemoveConstructionCapacityUseCase,
 ) {
-    /**
-     * 자격 사실(V12) 절 교체 — **계정을 넘기지 않는다**: 그 표는 아직 싱글턴이고 use case 서명에 계정이
-     * 없다(받는 척하면 「이미 계정 단위다」라는 거짓 신호가 된다). 그래도 **경로는 계정 범위**라 세션
-     * 주체가 없으면 401 이다(R-2 남은 절반이 열릴 때 이 자리가 그대로 계정을 받는다).
-     */
+    /** 자격 사실(V12) 절 교체 — **M15/15A(V28)**: 그 표가 계정 소유가 되면서 이 자리가 계정을 넘긴다. */
     @PostMapping(AccountScopedRoutes.PROFILE_QUALIFICATION_FACTS)
     fun qualificationFacts(
         @RequestBody body: JsonNode,
         request: HttpServletRequest,
     ): ResponseEntity<Any> {
         val account = request.authenticatedAccount() ?: return unauthenticated(request)
-        replaceQualificationFacts.replace(ProfileRequests.qualificationFacts(body))
+        replaceQualificationFacts.replace(account, ProfileRequests.qualificationFacts(body))
         return ResponseEntity.ok(ProfileResponse.from(readProfile.read(account)))
     }
 

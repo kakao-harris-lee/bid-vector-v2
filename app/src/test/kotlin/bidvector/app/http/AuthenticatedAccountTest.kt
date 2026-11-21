@@ -1,6 +1,6 @@
 package bidvector.app.http
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain

@@ -1,5 +1,6 @@
 package bidvector.workflow.access
 
+import bidvector.sharedkernel.AccountId
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf

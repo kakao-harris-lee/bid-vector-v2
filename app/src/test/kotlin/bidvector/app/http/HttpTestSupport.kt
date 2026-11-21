@@ -3,6 +3,7 @@ package bidvector.app.http
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.UncertainReason
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.STRATEGY_POLICY
@@ -21,6 +22,7 @@ import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.boot.resttestclient.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.http.HttpHeaders
 import java.net.Socket
 import java.time.LocalDate
 import java.util.Collections
@@ -101,12 +103,18 @@ fun rawGet(
     port: Int,
     target: String,
     credential: String?,
+    sessionCookie: String? = null,
 ): RawHttpResponse =
     Socket("localhost", port).use { socket ->
         val credentialLine =
             // main 통합: 7D 가 그 상수를 인증기 쪽으로 옮겼다(필터 → 인증기 이름 변경). 값은 같다.
             credential?.let { "${OperatorCredentialAuthenticator.CREDENTIAL_HEADER}: $it\r\n" } ?: ""
-        val request = "GET $target HTTP/1.1\r\nHost: localhost\r\n${credentialLine}Connection: close\r\n\r\n"
+        // M15/15A — 계정 전용 뿌리는 세션 축으로만 닿는다. 소켓으로 쓰는 test 도 같은 축을 쓸 수
+        // 있어야 「질의를 읽지 않는 경로」를 그 경로의 **정상 응답**으로 잴 수 있다.
+        val cookieLine =
+            sessionCookie?.let { "${HttpHeaders.COOKIE}: ${SessionCookieWriter.HOST_PREFIXED_NAME}=$it\r\n" } ?: ""
+        val request =
+            "GET $target HTTP/1.1\r\nHost: localhost\r\n$credentialLine${cookieLine}Connection: close\r\n\r\n"
         socket.getOutputStream().apply {
             write(request.toByteArray(Charsets.ISO_8859_1))
             flush()
@@ -137,9 +145,12 @@ class TestStrategyRepository(
 ) : StrategyRepository {
     @Volatile var loadFailure: (() -> Throwable)? = null
 
-    override fun load(): OperatorStrategy = loadFailure?.let { throw it() } ?: strategy
+    override fun load(account: AccountId): OperatorStrategy = loadFailure?.let { throw it() } ?: strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         strategy = applied.strategy
     }
 }
@@ -178,7 +189,10 @@ class FakeSuggestionLicenseGate : LicenseGatePort {
         LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
     }
 
-    override fun verdictFor(notice: Notice): LicenseVerdict = verdictFor.invoke(notice)
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = verdictFor.invoke(notice)
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */

@@ -3,6 +3,7 @@ package bidvector.archfixture.violating.app.rules
 import bidvector.adapters.archfixture.UnlistedAdapterException
 import bidvector.adapters.strategy.InvalidStoredStrategyException
 import bidvector.adapters.strategy.StrategyEditTransaction
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.StrategyPolicyData
 import bidvector.workflow.strategy.Clock
@@ -42,14 +43,14 @@ class RogueUseCaseAssembler(
     private val sessionPolicy: EditSessionPolicyData,
 ) {
     fun assemble(): EditStrategyWorkflow =
-        EditStrategyWorkflow(sessions, strategies, clock, events, strategyPolicy, sessionPolicy)
+        EditStrategyWorkflow(AccountId(1), sessions, strategies, clock, events, strategyPolicy, sessionPolicy)
 }
 
 /** 어댑터 멤버 규칙(D-6A2b-36·43·44) — 등재된 쌍에 없는 어댑터 인터페이스 메서드를 부른다. */
 class RogueAdapterMemberCaller(
     private val transaction: StrategyEditTransaction,
 ) {
-    fun call(): Int = transaction.inTransaction { it.hashCode() }
+    fun call(): Int = transaction.inTransaction(AccountId(1)) { it.hashCode() }
 }
 
 /** 예외 멤버 규칙(D-6A2b-37) — 목록 **안**의 예외라도 자기 멤버는 부를 수 없다. */

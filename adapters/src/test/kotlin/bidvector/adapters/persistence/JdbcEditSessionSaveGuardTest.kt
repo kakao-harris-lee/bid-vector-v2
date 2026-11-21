@@ -41,7 +41,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val flow = workflow(sessions)
         val begun = flow.begin(id, OPERATOR, FIELD)
         check(begun is BeginOutcome.Started)
-        val versionBefore = sessions.load(id)!!.sessionVersion
+        val versionBefore = sessions.load(testAccount(), id)!!.sessionVersion
 
         val result =
             shouldNotThrowAny {
@@ -52,7 +52,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val outcome = result.outcome
         outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         outcome.reason shouldBe RejectionReason.InvalidTransition
-        sessions.load(id)!!.sessionVersion shouldBe versionBefore
+        sessions.load(testAccount(), id)!!.sessionVersion shouldBe versionBefore
     }
 
     @Test
@@ -73,13 +73,13 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
             )
         val first = flow.provideValue(command)
         check(first is CommandResult.Processed)
-        val versionAfterFirst = sessions.load(id)!!.sessionVersion
+        val versionAfterFirst = sessions.load(testAccount(), id)!!.sessionVersion
 
         val redelivered = shouldNotThrowAny { flow.provideValue(command) }
 
         redelivered.shouldBeInstanceOf<CommandResult.Processed>()
         redelivered.outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterFirst
+        sessions.load(testAccount(), id)!!.sessionVersion shouldBe versionAfterFirst
     }
 
     @Test
@@ -101,13 +101,13 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val confirmCommand = EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1))
         val confirmed = flow.confirm(confirmCommand)
         check(confirmed is CommandResult.Processed)
-        val versionAfterApplied = sessions.load(id)!!.sessionVersion
+        val versionAfterApplied = sessions.load(testAccount(), id)!!.sessionVersion
 
         val redelivered = shouldNotThrowAny { flow.confirm(confirmCommand) }
 
         redelivered.shouldBeInstanceOf<CommandResult.Processed>()
         redelivered.outcome.shouldBeInstanceOf<TransitionOutcome.Accepted>()
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterApplied
+        sessions.load(testAccount(), id)!!.sessionVersion shouldBe versionAfterApplied
     }
 
     @Test
@@ -127,7 +127,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
             ),
         )
         flow.confirm(EditCommand.Confirm(CommandId("cmd-2"), id, Actor.Operator(OPERATOR), StrategyRevision(1)))
-        val versionAfterApplied = sessions.load(id)!!.sessionVersion
+        val versionAfterApplied = sessions.load(testAccount(), id)!!.sessionVersion
         val cancelCommand =
             EditCommand.Cancel(CommandId("cmd-3"), id, Actor.Operator(OPERATOR), CancellationReason.OperatorRequested)
 
@@ -137,7 +137,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val outcome = result.outcome
         outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         outcome.reason shouldBe RejectionReason.InvalidTransition
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterApplied
+        sessions.load(testAccount(), id)!!.sessionVersion shouldBe versionAfterApplied
     }
 
     @Test
@@ -149,7 +149,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         check(begun is BeginOutcome.Started)
         val afterExpiry = Clock { Instant.parse("2026-09-17T00:10:00Z") }
         workflow(sessions, clock = afterExpiry).expire(id)
-        val versionAfterExpiry = sessions.load(id)!!.sessionVersion
+        val versionAfterExpiry = sessions.load(testAccount(), id)!!.sessionVersion
         val cancelCommand =
             EditCommand.Cancel(CommandId("cmd-1"), id, Actor.Operator(OPERATOR), CancellationReason.OperatorRequested)
 
@@ -159,7 +159,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val outcome = result.outcome
         outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         outcome.reason shouldBe RejectionReason.SessionExpired
-        sessions.load(id)!!.sessionVersion shouldBe versionAfterExpiry
+        sessions.load(testAccount(), id)!!.sessionVersion shouldBe versionAfterExpiry
     }
 
     /**
@@ -174,7 +174,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val clock = Clock { Instant.parse("2026-09-17T00:00:00Z") }
         val begun = workflow(sessions, clock = clock, timeout = Duration.ofMinutes(1)).begin(id, OPERATOR, FIELD)
         check(begun is BeginOutcome.Started)
-        val versionBefore = sessions.load(id)!!.sessionVersion
+        val versionBefore = sessions.load(testAccount(), id)!!.sessionVersion
 
         val afterExpiry = Clock { Instant.parse("2026-09-17T00:10:00Z") }
         val result =
@@ -193,7 +193,7 @@ class JdbcEditSessionSaveGuardTest : EditSessionWorkflowTestSupport() {
         val outcome = result.outcome
         outcome.shouldBeInstanceOf<TransitionOutcome.Rejected>()
         outcome.reason shouldBe RejectionReason.SessionExpired
-        val loaded = sessions.load(id)!!
+        val loaded = sessions.load(testAccount(), id)!!
         loaded.stateKind shouldBe "EXPIRED"
         loaded.sessionVersion shouldBe versionBefore + 1
     }

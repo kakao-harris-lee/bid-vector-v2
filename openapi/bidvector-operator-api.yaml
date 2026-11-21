@@ -32,6 +32,8 @@ paths:
     get:
       operationId: readStrategy
       summary: 현재 운영자 전략 조회
+      security:
+        - browserSession: []
       responses:
         "200":
           description: 현재 전략
@@ -60,7 +62,6 @@ paths:
       operationId: evaluateDryRun
       summary: 평가 dry-run(D-6A3-1·6 — 외부 effect 없음, outbox 미접촉)
       security:
-        - operatorCredential: []
         - browserSession: []
           operatorCsrf: []
       requestBody:
@@ -119,6 +120,9 @@ paths:
     post:
       operationId: requestBidPrice
       summary: 투찰가 요청 — 공고 단건·운영자 요청 평가(M7/7C ②)
+      security:
+        - browserSession: []
+          operatorCsrf: []
       description: >-
         운영자가 지목한 **공고 하나**를 평가하고 그 근거를 낸다. `evaluateDryRun`(전략 전체
         평가)과 **같은 판정 커널**을 돌아 같은 입력에서 같은 결과를 낸다 — 다른 점은 후보가
@@ -152,10 +156,6 @@ paths:
 
         **「근거 원문」은 (출처 필드 + 요건 면허명 + 정책 version)이다** — 원시 관측 blob·
         공고명·기관명·사업자번호는 이 응답에 자리가 없다.
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -220,15 +220,14 @@ paths:
     post:
       operationId: beginEditSession
       summary: 편집 세션 시작(D-6A2b-1) — 세션 id 는 서버가 만든다
+      security:
+        - browserSession: []
+          operatorCsrf: []
       description: >-
         409 `SESSION_ALREADY_ACTIVE` 는 선언하지 않는다(C-3) — 세션 id 를 서버가 UUID 로
         만들므로 「같은 id 에 이미 비종단 세션」 가드에 HTTP 로 닿을 길이 없다. 그 코드는
         use case 의 전수 `when` 을 총(total)으로 유지하려고 남아 있을 뿐이고, 도달 불가는
         알려진 제한으로 등재돼 있다. 버려진 세션의 처분은 `OPEN-6A2B-ABANDONED-SESSIONS`.
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -272,6 +271,8 @@ paths:
     get:
       operationId: readEditSession
       summary: 편집 세션 조회 — 접근 시점에 만료를 먼저 접는다(D-6A2b-11)
+      security:
+        - browserSession: []
       parameters:
         - name: sessionId
           in: path
@@ -322,16 +323,15 @@ paths:
     post:
       operationId: provideEditSessionValue
       summary: 값 제출(D-6A2b-2) — 현재 전략에서 그 필드 하나만 바꾼 초안을 만든다
+      security:
+        - browserSession: []
+          operatorCsrf: []
       parameters:
         - name: sessionId
           in: path
           required: true
           schema:
             type: string
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -391,16 +391,15 @@ paths:
     post:
       operationId: confirmEditSession
       summary: 확인 — seenRevision 이 지금 전략과 다르면 거부한다(우회 3)
+      security:
+        - browserSession: []
+          operatorCsrf: []
       parameters:
         - name: sessionId
           in: path
           required: true
           schema:
             type: string
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -455,6 +454,9 @@ paths:
     post:
       operationId: requestEditSessionEdit
       summary: 확인 화면에서 (같거나 다른) 필드로 되돌아간다
+      security:
+        - browserSession: []
+          operatorCsrf: []
       description: >-
         **확인 대기(WAITING_FOR_CONFIRMATION) 에서만 유효하다**(L-r2-4). 값 대기 상태에서
         필드를 바꿀 길은 없다 — `POST /{sessionId}/value` 는 세션이 기다리는 필드만 받고
@@ -466,10 +468,6 @@ paths:
           required: true
           schema:
             type: string
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -523,16 +521,15 @@ paths:
     post:
       operationId: cancelEditSession
       summary: 취소 — 종단 상태다(재개는 새 세션, D-4A-4)
+      security:
+        - browserSession: []
+          operatorCsrf: []
       parameters:
         - name: sessionId
           in: path
           required: true
           schema:
             type: string
-      security:
-        - operatorCredential: []
-        - browserSession: []
-          operatorCsrf: []
       requestBody:
         required: true
         content:
@@ -1711,6 +1708,8 @@ paths:
     get:
       operationId: listSuggestions
       summary: 제안 목록(STR-06·STR-07) — 현재 전략의 감시를 통과한 후보, 읽기 전용, 마감 임박 순
+      security:
+        - browserSession: []
       description: >-
         열린 공고 가운데 **현재 전략의 감시 조건을 통과하고 면허 자격이 미달이 아닌** 공고를 낸다
         (M7/7C①b). 쓰기 경로가 없고 전략을 바꾸지 않는다. 질의 매개변수가 없다.

@@ -3,7 +3,7 @@ package bidvector.adapters.profile
 import bidvector.adapters.persistence.getTextList
 import bidvector.adapters.persistence.setTextArray
 import bidvector.qualification.LicenseName
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.profile.BusinessDetails
 import bidvector.workflow.profile.BusinessProfileStorePort
 import bidvector.workflow.profile.ConstructionCapacity

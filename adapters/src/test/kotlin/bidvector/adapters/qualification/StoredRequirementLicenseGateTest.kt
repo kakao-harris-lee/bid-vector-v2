@@ -49,7 +49,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
             PolicyVersion(EffectiveFrom.Initial, "test"),
         )
 
-    private fun gate(operatorProfilePort: OperatorProfilePort = OperatorProfilePort { null }) =
+    private fun gate(operatorProfilePort: OperatorProfilePort = OperatorProfilePort { _ -> null }) =
         StoredRequirementLicenseGate(JdbcRequirementStore(dataSource()), operatorProfilePort, emptyPolicy)
 
     private fun declaredLicenses(vararg names: String) =
@@ -113,9 +113,9 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
         val notice = findNotice(id)
         val judgements = StoredRequirementLicenseJudgement(JdbcRequirementStore(dataSource()), profile, emptyPolicy)
 
-        val envelope = judgements.judgementFor(notice)
+        val envelope = judgements.judgementFor(testAccount(), notice)
 
-        gate(profile).verdictFor(notice) shouldBe envelope.verdict
+        gate(profile).verdictFor(testAccount(), notice) shouldBe envelope.verdict
         envelope.verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Numbered(LmtGrpNo("1"))))
         envelope.requiredLicenses shouldBe listOf(LicenseName("전기공사업"))
         envelope.requirementSourceFields shouldBe setOf(RequirementSourceField.LcnsLmtNm)
@@ -125,7 +125,8 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
     fun `저장된 요건이 없으면 Uncertain RequirementDataAbsent 다`() {
         val id = insertNotice("GATE-ABSENT")
 
-        gate().verdictFor(findNotice(id)) shouldBe LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
+        gate().verdictFor(testAccount(), findNotice(id)) shouldBe
+            LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
     }
 
     @Test
@@ -133,7 +134,8 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
         val id = insertNotice("GATE-FAILED")
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.CollectionFailed)
 
-        gate().verdictFor(findNotice(id)) shouldBe LicenseVerdict.Uncertain(UncertainReason.CollectionFailed)
+        gate().verdictFor(testAccount(), findNotice(id)) shouldBe
+            LicenseVerdict.Uncertain(UncertainReason.CollectionFailed)
     }
 
     @Test
@@ -148,7 +150,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
             )
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(listOf(row)))
 
-        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(findNotice(id))
+        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(testAccount(), findNotice(id))
 
         verdict shouldBe LicenseVerdict.Eligible(setOf(RequirementGroupId.Ungrouped))
     }
@@ -165,7 +167,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
             )
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(listOf(row)))
 
-        val verdict = gate(declaredLicenses("정보통신공사업")).verdictFor(findNotice(id))
+        val verdict = gate(declaredLicenses("정보통신공사업")).verdictFor(testAccount(), findNotice(id))
 
         verdict shouldBe
             LicenseVerdict.Ineligible(mapOf(RequirementGroupId.Ungrouped to setOf(LicenseName("전기공사업"))))
@@ -183,7 +185,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
             )
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(listOf(row)))
 
-        val verdict = gate(OperatorProfilePort { null }).verdictFor(findNotice(id))
+        val verdict = gate(OperatorProfilePort { _ -> null }).verdictFor(testAccount(), findNotice(id))
 
         verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
     }
@@ -199,7 +201,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
         val id = insertNotice("GATE-COLLECTED-EMPTY")
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(emptyList()))
 
-        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(findNotice(id))
+        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(testAccount(), findNotice(id))
 
         verdict shouldBe LicenseVerdict.Uncertain(UncertainReason.RequirementDataAbsent)
     }
@@ -225,7 +227,7 @@ class StoredRequirementLicenseGateTest : PersistenceTestSupport() {
             )
         JdbcRequirementStore(dataSource()).save(id, RequirementCollection.Collected(rows))
 
-        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(findNotice(id))
+        val verdict = gate(declaredLicenses("전기공사업")).verdictFor(testAccount(), findNotice(id))
 
         verdict shouldBe
             LicenseVerdict.Ineligible(

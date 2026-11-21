@@ -3,6 +3,7 @@ package bidvector.adapters.strategy
 import bidvector.adapters.persistence.ConnectionSource
 import bidvector.adapters.persistence.OwnTransactionConnectionSource
 import bidvector.adapters.persistence.Sql
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.EditSession
 import bidvector.workflow.strategy.EditSessionConflictException
@@ -37,25 +38,40 @@ class JdbcEditSessionRepository(
      */
     constructor(dataSource: DataSource) : this(OwnTransactionConnectionSource(dataSource))
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? =
+    /**
+     * **M15/15A(V28)** — 질의 술어가 `id` 와 `account_id` 둘이다. 남의 계정의 세션 id 를 들고 와도
+     * 결과집합이 비어 「없는 세션」과 같은 답이 된다(존재 여부를 알려주지 않는다 — 7D 의 관례).
+     */
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? =
         connections.withConnection { connection ->
             connection.prepareStatement(Sql.SELECT_EDIT_SESSION).use { statement ->
                 statement.setString(1, id.value)
+                statement.setLong(2, account.value)
                 statement.executeQuery().use { rs -> if (rs.next()) rs.toSnapshot(id) else null }
             }
         }
 
     /**
+     * **M15/15A(V28) — 소유도 전제조건이다.** upsert 의 `WHERE` 가 `edit_session.account_id =
+     * EXCLUDED.account_id` 를 함께 요구하므로, 남의 계정의 세션 id 로 쓰면 0행이고 아래 예외다 —
+     * 「덮어쓰지 못했다」가 술어가 아니라 **한 문장의 전제조건**이다.
+     *
      * 0행(낙관적 동시성 전제조건 불일치)은 [EditSessionConflictException] 으로 크게
      * 실패한다 — 트랜잭션의 주인이 그 예외를 보고 롤백한다(편집 경로에서는 전략 저장·
      * outbox 등록까지 함께 되돌아간다, 우회 (9)).
      */
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         val snapshot = session.toSnapshot()
         val affected =
             connections.withConnection { connection ->
                 connection.prepareStatement(Sql.UPSERT_EDIT_SESSION).use { statement ->
-                    bindEditSession(statement, snapshot)
+                    bindEditSession(statement, account, snapshot)
                     statement.executeQuery().use { rs -> if (rs.next()) 1 else 0 }
                 }
             }
@@ -78,10 +94,12 @@ private fun ResultSet.toSnapshot(id: EditSessionId): EditSessionSnapshot =
 
 private fun bindEditSession(
     statement: PreparedStatement,
+    account: AccountId,
     snapshot: EditSessionSnapshot,
 ) {
     var index = 1
     statement.setString(index++, snapshot.id.value)
+    statement.setLong(index++, account.value)
     statement.setString(index++, snapshot.operator.id.value)
     statement.setString(index++, snapshot.stateKind)
     statement.setString(index++, EditSessionRow.encodeStatePayload(snapshot))

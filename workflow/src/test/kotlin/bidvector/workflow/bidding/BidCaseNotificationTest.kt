@@ -10,11 +10,11 @@ import bidvector.bidding.SkipReason
 import bidvector.bidding.TransitionReason
 import bidvector.bidding.tag
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.sharedkernel.Resolution
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.notificationinbox.AwardResult
 import bidvector.workflow.notificationinbox.BidKindAxis
 import bidvector.workflow.notificationinbox.NotificationBidKind

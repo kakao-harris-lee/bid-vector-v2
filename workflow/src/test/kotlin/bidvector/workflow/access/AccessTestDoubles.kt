@@ -1,5 +1,6 @@
 package bidvector.workflow.access
 
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.strategy.Clock
 import java.time.Duration

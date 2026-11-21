@@ -1,6 +1,6 @@
 package bidvector.workflow.profile
 
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.StrategyReader
@@ -26,10 +26,8 @@ private val ONBOARDING_CALENDAR_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
  * 일은 원천을 모으고 시계를 달력일로 접는 것뿐이다. 진행 상태를 저장하지 않는다(D-7C4-1 P1) —
  * 매 요청이 원천에서 다시 판정한다.
  *
- * **원천의 키 체계가 둘**이라는 2a 의 대가가 여기서도 보인다(`ReadProfileUseCase` 와 같은 자리):
- * [qualification] 과 [strategies] 는 싱글턴에서 오고(계정을 받지 않는다) 사업 정보만 계정 소유다.
- * 그 비대칭을 숨기지 않는다 — V12 · 전략이 계정 단위로 옮겨 가면(R-2 남은 절반) port 만 바뀌고 이
- * 타입은 그대로다.
+ * **M15/15A — 원천 넷이 모두 계정 소유다**(V28). 2a 가 적어 둔 키 체계의 비대칭은 사라졌고, 그
+ * 문장이 예고한 대로 port 만 바뀌고 이 타입은 그대로다.
  */
 class ReadOnboardingChecklistUseCase(
     private val qualification: OperatorProfilePort,
@@ -40,10 +38,10 @@ class ReadOnboardingChecklistUseCase(
     fun read(account: AccountId): OnboardingChecklist =
         judgeOnboardingChecklist(
             OnboardingSnapshot(
-                qualification = qualification.current(),
+                qualification = qualification.current(account),
                 details = business.details(account),
                 capacities = business.capacities(account),
-                watchRules = strategies.load().watchRules,
+                watchRules = strategies.load(account).watchRules,
                 today = clock.now().atZone(ONBOARDING_CALENDAR_ZONE).toLocalDate(),
             ),
         )

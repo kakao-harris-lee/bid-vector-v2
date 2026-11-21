@@ -349,11 +349,24 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         TableSeed("inbox") { tag, at ->
             listOf("INSERT INTO inbox (idempotency_key, processed_at) VALUES ('ret-$tag', '$at')")
         },
+        // M7/7D — 계정은 제외 표이고 세션은 파기 대상이다. 세션이 계정을 FK 로 참조하므로
+        // **계정 먼저**다(목록 순서가 적용 순서다, `notice_requirement` → `…_row` 와 같은 자리).
+        //
+        // **M15/15A — 자리가 앞으로 왔다.** V28 뒤에는 편집 세션 · 전략 · 개정 · 프로필 넷도 계정을
+        // FK 로 참조하므로, 그 넷보다 먼저 서야 한다. 넷은 `(SELECT MIN(id) FROM account)` 로 이
+        // 씨앗이 심은 계정을 가리킨다 — 지어낸 id 를 쓰면 외래키가 거부한다.
+        TableSeed("account") { tag, at ->
+            listOf(
+                "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
+                    "VALUES ('ret-$tag', 'ret-fixture-hash-value', '$at', '$at', 0)",
+            )
+        },
         TableSeed("edit_session") { tag, at ->
             listOf(
                 "INSERT INTO edit_session " +
-                    "(id, operator_id, state, state_payload, expires_at, session_version, created_at) " +
-                    "VALUES ('ret-$tag', 'operator', 'WAITING_FOR_VALUE', '{}', '$at', 0, '$at')",
+                    "(id, account_id, operator_id, state, state_payload, expires_at, session_version, created_at) " +
+                    "VALUES ('ret-$tag', (SELECT MIN(id) FROM account), 'operator', 'WAITING_FOR_VALUE', " +
+                    "'{}', '$at', 0, '$at')",
             )
         },
         TableSeed("collection_run") { _, at ->
@@ -367,32 +380,28 @@ internal val RETENTION_SEEDS: List<TableSeed> =
         },
         TableSeed("operator_strategy") { _, at ->
             listOf(
-                "INSERT INTO operator_strategy (id, focus_categories, focus_region_terms, exclude_region_terms, " +
-                    "required_keyword_terms, exclude_keyword_terms, revision, updated_at) " +
-                    "VALUES (1, '{}', '{}', '{}', '{}', '{}', 0, '$at') ON CONFLICT (id) DO NOTHING",
+                "INSERT INTO operator_strategy (account_id, focus_categories, focus_region_terms, " +
+                    "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, revision, updated_at) " +
+                    "VALUES ((SELECT MIN(id) FROM account), '{}', '{}', '{}', '{}', '{}', 0, '$at') " +
+                    "ON CONFLICT (account_id) DO NOTHING",
             )
         },
         TableSeed("operator_strategy_revision") { _, at ->
             listOf(
-                "INSERT INTO operator_strategy_revision (revision, focus_categories, focus_region_terms, " +
-                    "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, applied_at) " +
-                    "VALUES ((SELECT COALESCE(MAX(revision), -1) + 1 FROM operator_strategy_revision), " +
+                "INSERT INTO operator_strategy_revision (account_id, revision, focus_categories, " +
+                    "focus_region_terms, exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
+                    "applied_at) " +
+                    "VALUES ((SELECT MIN(id) FROM account), " +
+                    "(SELECT COALESCE(MAX(revision), -1) + 1 FROM operator_strategy_revision), " +
                     "'{}', '{}', '{}', '{}', '{}', '$at')",
             )
         },
         TableSeed("operator_profile") { _, at ->
             listOf(
-                "INSERT INTO operator_profile (id, business_types, licenses_declared, license_names, " +
+                "INSERT INTO operator_profile (account_id, business_types, licenses_declared, license_names, " +
                     "region_terms, updated_at) " +
-                    "VALUES (1, '{}', false, '{}', '{}', '$at') ON CONFLICT (id) DO NOTHING",
-            )
-        },
-        // M7/7D — 계정은 제외 표이고 세션은 파기 대상이다. 세션이 계정을 FK 로 참조하므로
-        // **계정 먼저**다(목록 순서가 적용 순서다, `notice_requirement` → `…_row` 와 같은 자리).
-        TableSeed("account") { tag, at ->
-            listOf(
-                "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
-                    "VALUES ('ret-$tag', 'ret-fixture-hash-value', '$at', '$at', 0)",
+                    "VALUES ((SELECT MIN(id) FROM account), '{}', false, '{}', '{}', '$at') " +
+                    "ON CONFLICT (account_id) DO NOTHING",
             )
         },
         TableSeed("browser_session") { tag, at ->

@@ -2,7 +2,7 @@ package bidvector.app.access
 
 import bidvector.adapters.access.AccountProvisioningTransaction
 import bidvector.app.wiring.AccountCommandProperties
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.access.AccountProvisioning
 import bidvector.workflow.access.AccountProvisioningPort
 import bidvector.workflow.access.BrowserSessionDigest

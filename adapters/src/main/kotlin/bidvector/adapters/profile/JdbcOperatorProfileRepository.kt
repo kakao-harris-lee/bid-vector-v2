@@ -1,6 +1,7 @@
 package bidvector.adapters.profile
 
 import bidvector.adapters.persistence.Sql
+import bidvector.sharedkernel.AccountId
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
 import javax.sql.DataSource
@@ -20,17 +21,23 @@ import javax.sql.DataSource
  * public 값 타입이다 — 이 클래스는 [OperatorProfileRow]를 거쳐 그 public 생성자만 그대로
  * 부른다(`OperatorProfileRow.toProfileFacts`·`ProfileFacts.toRow`).
  *
- * **D-6F6-3 — 프로필은 싱글턴이다.** `id=1` 고정 조회·upsert — V12의 `CHECK (id = 1)`이
- * 표 층에서, 이 클래스는 SQL 층에서 각각 같은 불변식을 진다(심층 방어, `JdbcStrategyRepository`
- * 와 같은 관례).
+ * **M15/15A(V28) — 프로필은 계정 소유다.** 앞 판의 `id=1` 고정 조회는 V28 과 함께 사라졌다 —
+ * 표 층의 PK 가 `account_id` 이고 이 클래스의 술어가 같은 열이다(`JdbcStrategyRepository` 와
+ * 같은 관례).
  */
 class JdbcOperatorProfileRepository(
     private val dataSource: DataSource,
 ) : OperatorProfilePort {
-    /** 행이 없으면 「프로필 미설정」이다 — 빈 프로필을 지어내지 않는다(D-6F6-3). */
-    override fun current(): ProfileFacts? =
+    /**
+     * 행이 없으면 「프로필 미설정」이다 — 빈 프로필을 지어내지 않는다(D-6F6-3).
+     *
+     * **M15/15A(V28)** — 그 판정이 **계정마다** 선다. 술어가 `account_id = ?` 하나라 다른 계정의
+     * 행을 빌려 올 구조가 없다.
+     */
+    override fun current(account: AccountId): ProfileFacts? =
         dataSource.connection.use { connection ->
             connection.prepareStatement(Sql.SELECT_PROFILE).use { statement ->
+                statement.setLong(1, account.value)
                 statement.executeQuery().use { rs ->
                     if (rs.next()) rs.toOperatorProfileRow().toProfileFacts() else null
                 }

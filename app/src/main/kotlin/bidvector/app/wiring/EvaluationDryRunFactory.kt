@@ -5,6 +5,7 @@ import bidvector.adapters.evaluation.PinnedStrategyRepository
 import bidvector.adapters.evaluation.RecordingNotificationRequestPort
 import bidvector.adapters.evaluation.RequestCapacityPort
 import bidvector.procurement.NoticeId
+import bidvector.sharedkernel.AccountId
 import bidvector.strategy.OperatorStrategy
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
@@ -61,20 +62,24 @@ class EvaluationDryRunFactory(
     private val correlationIds: CorrelationIdFactory,
     private val clock: Clock,
 ) {
-    fun forRequest(currentActiveBids: Int): EvaluationDryRunRun {
+    fun forRequest(
+        account: AccountId,
+        currentActiveBids: Int,
+    ): EvaluationDryRunRun {
         // 요청 형태(400) 를 먼저 거부한다 — 저장소 상태(409) 보다 앞선다(입력 검증 우선
         // 원칙). RequestCapacityPort 생성자도 같은 조건을 다시 검사한다(심층 방어,
         // StrategyRow.toExactStrategyWon 과 같은 관례) — 이 자리에서 먼저 걸러 순서를 고정한다.
         if (currentActiveBids < 0) {
             throw InvalidEvaluationRequestException("currentActiveBids는 음수일 수 없다: $currentActiveBids")
         }
-        val strategy = strategyRepository.load()
+        val strategy = strategyRepository.load(account)
         val maxActiveBids = strategy.maxActiveBids?.value ?: throw MaxActiveBidsNotConfiguredException()
         val capacity = RequestCapacityPort(currentActiveBids, maxActiveBids)
         val notifications = RecordingNotificationRequestPort()
-        val pinnedStrategies = PinnedStrategyRepository(strategy)
+        val pinnedStrategies = PinnedStrategyRepository(account, strategy)
         val useCase =
             EvaluateCandidatesUseCase(
+                account = account,
                 strategies = pinnedStrategies,
                 candidateSource = candidateSource,
                 watchSubjects = watchSubjects,

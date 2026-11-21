@@ -2,7 +2,7 @@ package bidvector.guardprobe
 
 import bidvector.app.http.AccountBindingGuard
 import bidvector.app.http.GlobalErrorHandler
-import bidvector.workflow.access.AccountId
+import bidvector.sharedkernel.AccountId
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

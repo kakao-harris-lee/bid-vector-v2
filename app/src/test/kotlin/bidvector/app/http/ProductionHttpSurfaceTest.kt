@@ -223,6 +223,27 @@ class ProductionHttpSurfaceTest {
         ) as ResponseEntity<Map<String, Any?>>
     }
 
+    /**
+     * **M15/15A — 계정 전용 경로는 세션 축으로 두드린다.** V28 이 전략을 계정 소유로 옮기면서
+     * 자격 헤더 축은 그 경로들에 401 이고, 그 사실 자체는 위 「교집합 규칙」이 따로 잰다. 응답의
+     * **모양**을 재는 test 는 닿는 축의 자격으로 재야 모양을 볼 수 있다.
+     */
+    private fun sessionExchange(
+        path: String,
+        method: HttpMethod,
+        body: String? = null,
+        contentType: MediaType? = null,
+    ): ResponseEntity<Map<String, Any?>> {
+        val headers = sessionHeaders(signIn())
+        contentType?.let { headers.contentType = it }
+        return restTemplate.exchange(
+            url(path),
+            method,
+            HttpEntity(body, headers),
+            Map::class.java,
+        ) as ResponseEntity<Map<String, Any?>>
+    }
+
     private fun exchange(
         path: String,
         method: HttpMethod,
@@ -423,7 +444,7 @@ class ProductionHttpSurfaceTest {
     @Test
     fun `201 응답의 최상위 키 집합이 계약과 완전히 일치한다`() {
         val response =
-            exchange(
+            sessionExchange(
                 "/api/strategy/edit-sessions",
                 HttpMethod.POST,
                 """{"field":"CANDIDATE_LIMIT"}""",
@@ -437,7 +458,7 @@ class ProductionHttpSurfaceTest {
 
     @Test
     fun `404 응답의 최상위 키 집합이 ErrorBody 계약과 일치한다`() {
-        val response = exchange("/api/strategy/edit-sessions/no-such-session", HttpMethod.GET)
+        val response = sessionExchange("/api/strategy/edit-sessions/no-such-session", HttpMethod.GET)
 
         response.statusCode.value() shouldBe 404
         (response.body?.keys ?: emptySet()) shouldBe spec.propertyKeys("ErrorBody")

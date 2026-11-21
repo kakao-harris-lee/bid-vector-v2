@@ -14,7 +14,7 @@ class EvaluationCommitExitCodeTest {
     fun `요청이 전부 접수되면 COMPLETE 0 이다`() {
         val tally = tally(bidNow = 2, requested = 2)
 
-        exitCodeOf(tally) shouldBe EvaluationCommitExitCode.COMPLETE
+        exitCodeOf(tally, failedAccounts = 0) shouldBe EvaluationCommitExitCode.COMPLETE
         EvaluationCommitExitCode.COMPLETE.value shouldBe 0
     }
 
@@ -22,14 +22,14 @@ class EvaluationCommitExitCodeTest {
     fun `요청 하나라도 실패하면 INCOMPLETE 2 이고 0 이 아니다`() {
         val tally = tally(bidNow = 2, requested = 1, requestFailed = 1)
 
-        exitCodeOf(tally) shouldBe EvaluationCommitExitCode.INCOMPLETE
+        exitCodeOf(tally, failedAccounts = 0) shouldBe EvaluationCommitExitCode.INCOMPLETE
         EvaluationCommitExitCode.INCOMPLETE.value shouldBe 2
     }
 
     /** 승격이 0 인 run 은 실패가 아니다 — 요청할 것이 없었다는 사실과 실패는 다르다. */
     @Test
     fun `승격이 없으면 COMPLETE 다`() {
-        exitCodeOf(tally(candidates = 5, reached = 5)) shouldBe EvaluationCommitExitCode.COMPLETE
+        exitCodeOf(tally(candidates = 5, reached = 5), failedAccounts = 0) shouldBe EvaluationCommitExitCode.COMPLETE
     }
 
     @Test
@@ -43,9 +43,15 @@ class EvaluationCommitExitCodeTest {
     fun `완료 로그 줄은 계수 여섯과 하한 제외 사유 전수를 싣는다 — 공고 ID 는 싣지 않는다`() {
         val tally = tally(candidates = 4, reached = 3, notReached = 1, bidNow = 2, requested = 1, requestFailed = 1)
 
-        evaluationCommitFinishLine(tally, exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished candidates=4 reached=3 notReached=1 bidNow=2 " +
-            "requested=1 requestFailed=1 floorImplausible=0 floorOriginNotJudged=0 exit=2"
+        evaluationCommitFinishLine(
+            tally,
+            accounts = 1,
+            skipped = 0,
+            failed = 0,
+            exitCode = exitCodeOf(tally, failedAccounts = 0),
+        ) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=4 reached=3 notReached=1 bidNow=2 " +
+            "requested=1 requestFailed=1 suppressed=0 floorImplausible=0 floorOriginNotJudged=0 exit=2"
     }
 
     /**
@@ -66,15 +72,28 @@ class EvaluationCommitExitCodeTest {
                     ),
             )
 
-        evaluationCommitFinishLine(tally, exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished candidates=3 reached=3 notReached=0 bidNow=0 " +
-            "requested=0 requestFailed=0 floorImplausible=2 floorOriginNotJudged=1 exit=0"
+        evaluationCommitFinishLine(
+            tally,
+            accounts = 1,
+            skipped = 0,
+            failed = 0,
+            exitCode = exitCodeOf(tally, failedAccounts = 0),
+        ) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=3 reached=3 notReached=0 bidNow=0 " +
+            "requested=0 requestFailed=0 suppressed=0 floorImplausible=2 floorOriginNotJudged=1 exit=0"
     }
 
     /** 계수 이름은 Kotlin 상수 이름에서 파생되지 않는다 — DEC-10 이 `floor_implausible` 을 고정한다. */
     @Test
     fun `제외 사유 전수가 줄에 서로 다른 이름으로 나온다`() {
-        val line = evaluationCommitFinishLine(tally(), EvaluationCommitExitCode.COMPLETE)
+        val line =
+            evaluationCommitFinishLine(
+                tally(),
+                accounts = 1,
+                skipped = 0,
+                failed = 0,
+                exitCode = EvaluationCommitExitCode.COMPLETE,
+            )
         val names = PublishedFloorExclusion.entries.map { exclusion -> "$exclusion" }
 
         names.forEach { name -> line.contains(name) shouldBe false }
@@ -87,7 +106,7 @@ class EvaluationCommitExitCodeTest {
     fun `하한 제외는 종료 코드를 바꾸지 않는다`() {
         val tally = tally(reached = 1, floorExclusions = mapOf(PublishedFloorExclusion.IMPLAUSIBLE to 1))
 
-        exitCodeOf(tally) shouldBe EvaluationCommitExitCode.COMPLETE
+        exitCodeOf(tally, failedAccounts = 0) shouldBe EvaluationCommitExitCode.COMPLETE
     }
 }
 
@@ -99,6 +118,7 @@ private fun tally(
     bidNow: Int = 0,
     requested: Int = 0,
     requestFailed: Int = 0,
+    suppressed: Int = 0,
     floorExclusions: Map<PublishedFloorExclusion, Int> = emptyMap(),
 ) = EvaluationCommitTally(
     candidates = candidates,
@@ -107,5 +127,6 @@ private fun tally(
     bidNow = bidNow,
     requested = requested,
     requestFailed = requestFailed,
+    suppressed = suppressed,
     floorExclusions = floorExclusions,
 )

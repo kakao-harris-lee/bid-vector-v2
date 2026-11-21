@@ -53,6 +53,9 @@ import java.time.Instant
     ],
 )
 class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
+    /** 계정 전용 뿌리를 두드릴 세션 — 이 test 하나만 쓰므로 지연 초기화한다(M15/15A). */
+    private val session by lazy { SessionTestClient(restTemplate, ::url).signIn().cookieValue() }
+
     @Autowired
     private lateinit var notices: FakeNoticeSearchPort
 
@@ -346,6 +349,7 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
      *    없다(자기 문면을 바꾸지 않는다는 계약도 지킨다).
      *  - **없는 경로** — 전역 갈래가 **404** 를 400 으로 바꾸지 않는다.
      */
+
     @Test
     fun `다른 경로는 질의를 읽지 않아 거동이 그대로다 — 개방 경로·인증 경로·없는 경로`() {
         val malformed = listOf("%FF", "%G1")
@@ -356,7 +360,11 @@ class NoticeSearchEndpointTest : HttpIntegrationTestBase() {
                 rawGet(port, "/api/strategy?probe=$probe", credential = null).status shouldBe 401
             }
             withClue("인증 경로 probe=$probe") {
-                rawGet(port, "/api/strategy?probe=$probe", TEST_CREDENTIAL).status shouldBe 200
+                // M15/15A — 전략은 계정 전용 뿌리가 됐다. **세션 축**으로 두드려야 그 경로의
+                // 정상 응답(200)을 보고 「질의를 읽지 않는다」를 잴 수 있다. 자격 헤더로 두드리면
+                // 401 이 나는데, 그것은 개방 경로 갈래와 구별되지 않아 이 축이 비어 버린다.
+                rawGet(port, "/api/strategy?probe=$probe", credential = null, sessionCookie = session).status shouldBe
+                    200
                 rawGet(port, "/api/no-such-operation?probe=$probe", TEST_CREDENTIAL).status shouldBe 404
             }
         }

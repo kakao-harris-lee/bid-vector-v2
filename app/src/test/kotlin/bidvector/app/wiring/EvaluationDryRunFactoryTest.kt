@@ -3,6 +3,7 @@ package bidvector.app.wiring
 import bidvector.adapters.evaluation.InvalidEvaluationRequestException
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyDraft
@@ -35,12 +36,15 @@ private class CountingStrategyRepository(
     var loadCount: Int = 0
         private set
 
-    override fun load(): bidvector.strategy.OperatorStrategy {
+    override fun load(account: AccountId): bidvector.strategy.OperatorStrategy {
         loadCount++
         return strategy
     }
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         error("이 test 는 save() 를 쓰지 않는다")
     }
 }
@@ -55,9 +59,13 @@ private class UnreachablePort :
 
     override fun subjectFor(notice: Notice): WatchSubjectOutcome = error("forRequest() 는 이 port 를 부르지 않는다")
 
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("forRequest() 는 이 port 를 부르지 않는다")
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = error("forRequest() 는 이 port 를 부르지 않는다")
 
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome = error("forRequest() 는 이 port 를 부르지 않는다")
@@ -122,7 +130,7 @@ class EvaluationDryRunFactoryTest {
     fun `forRequest 는 전략을 정확히 한 번 읽는다`() {
         val repository = CountingStrategyRepository(strategyWithCap(10))
 
-        factoryWith(repository).forRequest(3)
+        factoryWith(repository).forRequest(DRY_RUN_ACCOUNT, 3)
 
         repository.loadCount shouldBe 1
     }
@@ -139,7 +147,7 @@ class EvaluationDryRunFactoryTest {
     fun `forRequest 뒤 evaluate 까지 돌려도 delegate 의 load 는 요청 전체에서 1회다`() {
         val repository = CountingStrategyRepository(strategyWithCap(10))
 
-        val run = factoryWith(repository, EmptyCandidateSource()).forRequest(3)
+        val run = factoryWith(repository, EmptyCandidateSource()).forRequest(DRY_RUN_ACCOUNT, 3)
         runBlocking { run.useCase.evaluate() }
 
         repository.loadCount shouldBe 1
@@ -149,7 +157,7 @@ class EvaluationDryRunFactoryTest {
     fun `maxActiveBids 가 없으면 MaxActiveBidsNotConfiguredException 이다`() {
         val repository = CountingStrategyRepository(strategyWithCap(null))
 
-        shouldThrow<MaxActiveBidsNotConfiguredException> { factoryWith(repository).forRequest(0) }
+        shouldThrow<MaxActiveBidsNotConfiguredException> { factoryWith(repository).forRequest(DRY_RUN_ACCOUNT, 0) }
     }
 
     @Test
@@ -157,8 +165,11 @@ class EvaluationDryRunFactoryTest {
         // strategy 자체는 maxActiveBids 가 없어도(둘 다 실패할 조건이어도) 400 이 먼저다.
         val repository = CountingStrategyRepository(strategyWithCap(null))
 
-        shouldThrow<InvalidEvaluationRequestException> { factoryWith(repository).forRequest(-1) }
+        shouldThrow<InvalidEvaluationRequestException> { factoryWith(repository).forRequest(DRY_RUN_ACCOUNT, -1) }
 
         repository.loadCount shouldBe 0
     }
 }
+
+/** 이 test 의 계정(M15/15A) — 축은 전략 읽기 횟수이지 계정이 아니다. */
+private val DRY_RUN_ACCOUNT = AccountId(1)

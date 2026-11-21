@@ -17,6 +17,7 @@ import bidvector.procurement.ResolvedBaseAmount
 import bidvector.procurement.ResolvedEstimatedAmount
 import bidvector.procurement.SourceEndpoint
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Currency
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.EstimatedAmount
@@ -146,7 +147,7 @@ internal fun analysis(
 internal fun analyzeNotice(
     instance: OpportunityAnalysis,
     notice: Notice = testNoticeWithMoney(),
-): MlAnalysisOutcome = runBlocking { instance.analyze(notice, CorrelationId("corr-1")) }
+): MlAnalysisOutcome = runBlocking { instance.analyze(TEST_ACCOUNT, notice, CorrelationId("corr-1")) }
 
 internal fun MlAnalysisOutcome.shouldBeAnalyzed(): MlAnalysisOutcome.Analyzed {
     check(this is MlAnalysisOutcome.Analyzed) { "Analyzed 가 아니다: $this" }
@@ -209,7 +210,7 @@ internal class FakeBidPredictionPort(
 internal class ConfigurableProfilePort(
     var profile: ProfileFacts?,
 ) : OperatorProfilePort {
-    override fun current(): ProfileFacts? = profile
+    override fun current(account: AccountId): ProfileFacts? = profile
 }
 
 internal class FakeWorkloadPort(

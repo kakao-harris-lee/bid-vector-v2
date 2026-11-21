@@ -5,6 +5,7 @@ import bidvector.qualification.LicenseEligibility
 import bidvector.qualification.LicenseQualificationPolicyData
 import bidvector.qualification.LicenseVerdict
 import bidvector.qualification.OperatorLicenses
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.Resolution
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.OperatorProfilePort
@@ -39,9 +40,12 @@ class StoredRequirementLicenseGate(
      * 증명하는 자리라 내 중복 제거를 위해 바꿀 것이 아니다 — 세 줄을 두 어댑터가 각자 들고,
      * 둘이 같은 판정을 내는지는 실 DB test 의 verdict 등식이 잰다(그 test 가 중복의 감시자다).
      */
-    override fun verdictFor(notice: Notice): LicenseVerdict {
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict {
         val collection = store.find(notice.id)
-        val operatorLicenses = operatorProfilePort.current()?.licenses ?: OperatorLicenses.NotDeclared
+        val operatorLicenses = operatorProfilePort.current(account)?.licenses ?: OperatorLicenses.NotDeclared
         return LicenseEligibility.judge(collection, operatorLicenses, policy).verdict
     }
 }

@@ -271,7 +271,10 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
     fun `기존 운영자 자격 헤더 경로는 그대로 통한다 — 무회귀`() {
         val headers = HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
 
-        exchange("/api/strategy", HttpMethod.GET, headers = headers).statusCode.value() shouldBe 200
+        // **자격 헤더로 닿는** 경로로 잰다(M15/15A) — 전략은 V28 이후 계정 전용이라 이 축에서
+        // 401 이고(그 사실은 계정 경계 test 가 따로 잰다), 여기서 재려는 것은 「자격 헤더 경로가
+        // 세션 도입 뒤에도 그대로 통한다」이지 전략 경로 자체가 아니다.
+        statusOf("/api/notices", headers) shouldBe 200
         // 그 경로에는 브라우저 세션이 없다 — 「지금 내 세션」은 404 다(401 이 아니다: 인증은 지났다).
         val absent = exchange(SESSION_PATH, HttpMethod.GET, headers = headers)
         absent.statusCode.value() shouldBe 404
@@ -337,6 +340,20 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
 
     private fun cookieAndStamp(session: SessionHandle): HttpHeaders =
         cookieOnly(session).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, session.stamp) }
+
+    /**
+     * 상태 코드만 보는 GET — `/api/notices` 의 본문은 JSON **배열**이라 위 [exchange] 의 `Map`
+     * 역직렬화로는 읽히지 않는다(실측: `RestClientException`). 자격 헤더 축의 무회귀는 본문이
+     * 아니라 「닿는가」가 축이므로 상태 코드만 본다.
+     */
+    private fun statusOf(
+        path: String,
+        headers: HttpHeaders,
+    ): Int =
+        restTemplate
+            .exchange(url(path), HttpMethod.GET, HttpEntity<Void>(headers), String::class.java)
+            .statusCode
+            .value()
 
     @Suppress("UNCHECKED_CAST")
     private fun exchange(

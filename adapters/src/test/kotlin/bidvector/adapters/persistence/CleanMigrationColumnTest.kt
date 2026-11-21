@@ -244,6 +244,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("edit_session", "session_version", "integer", false),
             ColumnSpec("edit_session", "last_command", "text", true),
             ColumnSpec("edit_session", "created_at", "timestamp with time zone", false, true),
+            // M15/15A(V28) — 계정 소유. 세션 id 는 서버가 만드는 UUID 라 PK 는 그대로다.
+            ColumnSpec("edit_session", "account_id", "bigint", false),
         )
 
     // 전략 영속(추가만, D-6F1-1). 두 표가 감시·임계·상한 열 형태를 공유한다
@@ -286,13 +288,16 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
 
     private val operatorStrategyColumns =
         listOf(
-            ColumnSpec("operator_strategy", "id", "smallint", false),
+            // M15/15A(V28) — 싱글턴 키(`id SMALLINT CHECK (id = 1)`)가 사라지고 계정이 PK 다.
+            ColumnSpec("operator_strategy", "account_id", "bigint", false),
             ColumnSpec("operator_strategy", "revision", "integer", false),
             ColumnSpec("operator_strategy", "updated_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy")
 
     private val operatorStrategyRevisionColumns =
         listOf(
+            // M15/15A(V28) — 개정 번호는 계정 범위 키의 둘째 열이다.
+            ColumnSpec("operator_strategy_revision", "account_id", "bigint", false),
             ColumnSpec("operator_strategy_revision", "revision", "integer", false),
             ColumnSpec("operator_strategy_revision", "applied_at", "timestamp with time zone", false, true),
         ) + operatorStrategySharedColumns("operator_strategy_revision")
@@ -343,7 +348,8 @@ class CleanMigrationColumnTest : PersistenceTestSupport() {
             ColumnSpec("notification_inbox", "created_at", "timestamp with time zone", false, true),
             ColumnSpec("notification_inbox", "updated_at", "timestamp with time zone", false),
             ColumnSpec("notification_inbox", "read_at", "timestamp with time zone", true),
-            ColumnSpec("operator_profile", "id", "smallint", false),
+            // M15/15A(V28) — 싱글턴 키가 사라지고 계정이 PK 다.
+            ColumnSpec("operator_profile", "account_id", "bigint", false),
             ColumnSpec("operator_profile", "business_types", "ARRAY", false),
             ColumnSpec("operator_profile", "licenses_declared", "boolean", false),
             ColumnSpec("operator_profile", "license_names", "ARRAY", false),

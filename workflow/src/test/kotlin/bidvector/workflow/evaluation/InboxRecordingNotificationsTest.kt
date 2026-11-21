@@ -3,11 +3,11 @@ package bidvector.workflow.evaluation
 import bidvector.decision.MlUnavailableReason
 import bidvector.procurement.NoticeId
 import bidvector.procurement.NoticeNumber
+import bidvector.sharedkernel.AccountId
 import bidvector.sharedkernel.EffectiveFrom
 import bidvector.sharedkernel.NoticeRound
 import bidvector.sharedkernel.PolicyVersion
 import bidvector.strategy.StrategyRevision
-import bidvector.workflow.access.AccountId
 import bidvector.workflow.event.CorrelationId
 import bidvector.workflow.notificationinbox.NotificationAudience
 import bidvector.workflow.notificationinbox.NotificationAudiencePort

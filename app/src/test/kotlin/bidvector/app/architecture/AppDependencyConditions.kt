@@ -235,12 +235,19 @@ internal class AppDependencyConditions(
             }
     }
 
-    /** 쌍의 좌표는 (호출자, 선언 타입, 메서드 이름, **서술자**) 넷이다 — 오버로드를 따로 센다(D-6A2b-44). */
+    /**
+     * 쌍의 좌표는 (호출자, 선언 타입, 메서드 이름, **서술자**) 넷이다 — 오버로드를 따로 센다(D-6A2b-44).
+     *
+     * **매개변수는 `;` 로 잇는다**(M15/15A). 계약 파일의 목록 자체가 `,` 로 끊기므로(`ArchitecturePolicy.list`)
+     * 서술자 안에 `,` 를 쓰면 매개변수 둘짜리 항목이 **항목 둘로 쪼개져** 등재가 조용히 무너진다 —
+     * 15A 가 `inTransaction` 에 계정을 더하며 처음 둘이 됐고, 그 전까지 등재가 전부 한 매개변수라
+     * 이 충돌이 드러나지 않았다.
+     */
     private fun callPairKey(
         caller: String,
         declarer: JavaClass,
         signature: MemberSignature,
-    ): String = "$caller|${declarer.fullName}|${signature.name}|${signature.parameterTypes.joinToString(",")}"
+    ): String = "$caller|${declarer.fullName}|${signature.name}|${signature.parameterTypes.joinToString(";")}"
 
     /** 예외 타입의 멤버는 `Throwable`·`Object` 가 선언한 것만 — 자기 메서드는 부를 수 없다. */
     private fun throwableMemberViolation(
