@@ -105,8 +105,13 @@ class SuggestionEndpointTest : HttpIntegrationTestBase() {
         )
     }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    /**
+     * **M15/15A — 이 경로는 계정 전용이다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더 경로
+     * (계정을 내지 않는다)는 401 이고, 그래서 이 test 는 세션으로 두드린다. 재는 축은 그대로다.
+     */
+    private val session by lazy { SessionTestClient(restTemplate, ::url).signIn() }
+
+    private fun authorizedHeaders(): HttpHeaders = session.headers()
 
     private fun get(query: String = ""): ResponseEntity<List<Map<String, Any?>>> =
         restTemplate.exchange(

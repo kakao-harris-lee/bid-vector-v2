@@ -51,6 +51,7 @@ private const val NOTICE_NUMBER = "M9OPS0001"
 /** 0.9 를 내는 ML — 아래 전략의 `bidNowThreshold`(0.5)를 넘겨 판정을 `BidNow` 로 보낸다. */
 private class AlwaysBidNowMl : MlAnalysisPort {
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome =
@@ -136,20 +137,20 @@ class EvaluationCommitInboxProductionTest : PersistenceTestSupport() {
         (reached.verdict is Verdict.BidNow) shouldBe true
     }
 
-    private fun commitRun(): EvaluationCommitRun =
+    private fun commitRun(account: AccountId = testAccount()): EvaluationCommitRun =
         EvaluationCommitRun(
+            account = account,
             dataSource = dataSource(),
-            strategies = PinnedStrategyRepository(bidNowStrategy()),
+            strategies = PinnedStrategyRepository(account, bidNowStrategy()),
             candidateSource = JdbcCandidateSource(dataSource(), clock, CANDIDATE_CAP),
             watchSubjects = NoticeWatchSubjectPort(),
-            licenseGate = PinnedLicenseGate(LicenseVerdict.Eligible(emptySet())),
+            licenseGate = PinnedLicenseGate(account, LicenseVerdict.Eligible(emptySet())),
             mlAnalysis = AlwaysBidNowMl(),
             capacity = RequestCapacityPort(0, MAX_ACTIVE_BIDS),
             correlationIds = CorrelationIdFactory { CorrelationId("m9-ops-code-1") },
             clock = clock,
             analysisBudget = null,
             notificationInbox = JdbcNotificationInbox(dataSource()),
-            audience = JdbcNotificationAudience(dataSource()),
             // M9/ops-migrations 병합 — 행을 쓰는 조립은 릴리스 식별자를 요구한다(컴파일이 강제했다).
             // 이 test 가 재는 것은 알림함 기록이라 값 자체는 축이 아니고, 그 축은 그 slice 의
             // `ExecutionRowReleaseTest` 가 든다.

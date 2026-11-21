@@ -20,6 +20,7 @@ import bidvector.strategy.ThresholdField
 import bidvector.strategy.WatchRuleId
 import bidvector.strategy.isConfigured
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.BeginOutcome
@@ -73,9 +74,12 @@ private val OPERATOR = Actor.Operator(OperatorId("corpus-operator"))
 private class FakeStrategyRepository(
     var strategy: OperatorStrategy,
 ) : StrategyRepository {
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         strategy = applied.strategy
     }
 }
@@ -90,9 +94,15 @@ private class FakeStrategyRepository(
 private class FakeSessionRepository : EditSessionRepository {
     private val sessions = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = sessions[id]?.toSnapshot()
 
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         sessions[session.id] = session
     }
 }
@@ -119,7 +129,11 @@ private fun workflowFor(
     strategies: StrategyRepository,
     events: EventSink,
     policy: Resolution.Resolved<StrategyPolicyData>,
-): EditStrategyWorkflow = EditStrategyWorkflow(sessions, strategies, Clock { NOW }, events, policy, SESSION_POLICY)
+): EditStrategyWorkflow =
+    EditStrategyWorkflow(CONFORMANCE_ACCOUNT, sessions, strategies, Clock { NOW }, events, policy, SESSION_POLICY)
+
+/** 적합성 실행기가 쓰는 계정(M15/15A) — 이 파일의 한 자리다. */
+internal val CONFORMANCE_ACCOUNT: AccountId = AccountId(1)
 
 private fun optionalDecimal(
     node: JsonNode,

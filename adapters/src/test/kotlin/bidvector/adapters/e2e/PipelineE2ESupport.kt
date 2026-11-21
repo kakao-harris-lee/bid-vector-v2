@@ -110,6 +110,7 @@ internal abstract class PipelineE2ESupport : PersistenceTestSupport() {
     /** 운영자 프로필 — `OpportunityAnalysis` 가 프로필 없이는 분석을 시작하지 않는다(`findProfile`). */
     protected fun seedProfile(licenses: List<String> = listOf(E2E_LICENSE)) {
         profileWriter().save(
+            testAccount(),
             ProfileFacts(
                 businessTypes = emptySet(),
                 licenses = OperatorLicenses.Declared(licenses.map(::LicenseName)),

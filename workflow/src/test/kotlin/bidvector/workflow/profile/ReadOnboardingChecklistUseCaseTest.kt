@@ -131,7 +131,7 @@ class ReadOnboardingChecklistUseCaseTest {
         facts: ProfileFacts? = null,
     ): ReadOnboardingChecklistUseCase =
         ReadOnboardingChecklistUseCase(
-            qualification = OperatorProfilePort { facts },
+            qualification = { _ -> facts },
             business = business,
             strategies = strategy,
             clock = Clock { now },
@@ -168,5 +168,5 @@ private class RecordingBusinessProfileReader(
 private class FixedStrategyReader(
     private val strategy: OperatorStrategy,
 ) : StrategyReader {
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 }

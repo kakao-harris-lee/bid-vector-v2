@@ -132,6 +132,7 @@ internal class PipelineTelegramDeliveryE2ETest : PipelineE2ESupport() {
             servers += server
             PipelineAssembly(
                 dataSource = dataSource(),
+                account = testAccount(),
                 mlChannel = server.channel,
                 at = E2E_NOW,
                 correlationPrefix = "telegram-delivery",

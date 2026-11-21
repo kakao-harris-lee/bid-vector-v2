@@ -241,12 +241,18 @@ class ProductionBrowserAccessTest {
         ).toSet() shouldBe setOf(expected)
     }
 
+    /**
+     * **M15/15A — 탐침 경로가 바뀌었다.** 전략은 계정 전용 뿌리가 됐고 자격 헤더 경로는 계정을
+     * 내지 않는다. 재는 것은 「자격 헤더 경로가 여전히 선다」이므로 계정을 요구하지 않는 경로로
+     * 옮긴다 — 공고 검색이다. 그 경로가 계정 전용이 아니라는 사실은 선언 한 자리가 든다.
+     */
     @Test
     fun `기존 운영자 자격 헤더 경로는 그대로다 — 무회귀`() {
         val headers =
             HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+        AccountScopedRoutes.covers("/api/notices") shouldBe false
 
-        exchange("/api/strategy", HttpMethod.GET, headers).statusCode.value() shouldBe 200
+        exchange("/api/notices", HttpMethod.GET, headers).statusCode.value() shouldBe 200
         auditSubjects().contains("operator") shouldBe true
     }
 

@@ -5,6 +5,7 @@ import bidvector.sharedkernel.Resolution
 import bidvector.strategy.STRATEGY_POLICY
 import bidvector.strategy.StrategyEvent
 import bidvector.strategy.StrategyPolicyData
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.Clock
 import bidvector.workflow.strategy.EDIT_SESSION_POLICY
@@ -49,11 +50,14 @@ class InMemoryStrategyEditTransaction(
         events.actors.clear()
     }
 
-    override fun <T> inTransaction(action: (EditStrategyWorkflow) -> T): T {
+    override fun <T> inTransaction(
+        account: AccountId,
+        action: (EditStrategyWorkflow) -> T,
+    ): T {
         val policy = STRATEGY_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<StrategyPolicyData>
         val sessionPolicy =
             (EDIT_SESSION_POLICY.resolve(LocalDate.now()) as Resolution.Resolved<EditSessionPolicyData>).value
-        return action(EditStrategyWorkflow(sessions, strategies, clock, events, policy, sessionPolicy))
+        return action(EditStrategyWorkflow(account, sessions, strategies, clock, events, policy, sessionPolicy))
     }
 }
 
@@ -61,9 +65,15 @@ class InMemoryStrategyEditTransaction(
 class InMemoryEditSessionRepository : EditSessionRepository {
     private val stored = mutableMapOf<EditSessionId, EditSession>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = stored[id]?.toSnapshot()
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = stored[id]?.toSnapshot()
 
-    override fun save(session: EditSession) {
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
         stored[session.id] = session
     }
 

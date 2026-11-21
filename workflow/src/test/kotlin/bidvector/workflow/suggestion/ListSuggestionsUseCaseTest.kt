@@ -8,6 +8,7 @@ import bidvector.qualification.RequirementGroupId
 import bidvector.qualification.UncertainReason
 import bidvector.strategy.OperatorStrategy
 import bidvector.strategy.StrategyDraft
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.DEFAULT_FOCUS_CATEGORY
 import bidvector.workflow.evaluation.EMPTY_SUBJECT
 import bidvector.workflow.evaluation.FakeCandidateSource
@@ -18,6 +19,7 @@ import bidvector.workflow.evaluation.MATCHING_SUBJECT
 import bidvector.workflow.evaluation.NOW
 import bidvector.workflow.evaluation.OperatorProfilePort
 import bidvector.workflow.evaluation.ProfileFacts
+import bidvector.workflow.evaluation.TEST_ACCOUNT
 import bidvector.workflow.evaluation.WatchSubjectOutcome
 import bidvector.workflow.evaluation.testNotice
 import bidvector.workflow.evaluation.testStrategy
@@ -43,7 +45,7 @@ class ListSuggestionsUseCaseTest {
     ) : StrategyReader {
         var loadCount = 0
 
-        override fun load(): OperatorStrategy = values[minOf(loadCount++, values.lastIndex)]
+        override fun load(account: AccountId): OperatorStrategy = values[minOf(loadCount++, values.lastIndex)]
     }
 
     private class SequenceProfilePort(
@@ -51,7 +53,7 @@ class ListSuggestionsUseCaseTest {
     ) : OperatorProfilePort {
         var readCount = 0
 
-        override fun current(): ProfileFacts? = values[minOf(readCount++, values.lastIndex)]
+        override fun current(account: AccountId): ProfileFacts? = values[minOf(readCount++, values.lastIndex)]
     }
 
     /** [flip] 전에는 [initial], 뒤에는 [next] 를 낸다 — 판정 **도중** 프로필 저장의 대역. */
@@ -65,7 +67,7 @@ class ListSuggestionsUseCaseTest {
             flipped = true
         }
 
-        override fun current(): ProfileFacts? = if (flipped) next else initial
+        override fun current(account: AccountId): ProfileFacts? = if (flipped) next else initial
     }
 
     private fun strategy(
@@ -125,7 +127,7 @@ class ListSuggestionsUseCaseTest {
                 listOf(first, second, third, fourth),
                 watchSubjects = rejectingWatch(third),
                 licenseGate = licenseGate,
-            ).list()
+            ).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(first.id, fourth.id)
         result.suggestions.map { it.license } shouldBe listOf(LicenseVerdict.Eligible(emptySet()), uncertain)
@@ -144,9 +146,9 @@ class ListSuggestionsUseCaseTest {
         val notices = listOf(first, second, third, fourth)
 
         val narrowResult =
-            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 1))), notices, narrow, narrowLicense).list()
+            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 1))), notices, narrow, narrowLicense).list(TEST_ACCOUNT)
         val wideResult =
-            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 5))), notices, wide, wideLicense).list()
+            useCase(SequenceStrategyReader(listOf(strategy(candidateLimit = 5))), notices, wide, wideLicense).list(TEST_ACCOUNT)
 
         narrowResult.ids() shouldBe listOf(second.id)
         wideResult.ids() shouldBe listOf(second.id, third.id, fourth.id)
@@ -167,25 +169,25 @@ class ListSuggestionsUseCaseTest {
                 SequenceStrategyReader(listOf(strategy(candidateLimit = 1))),
                 listOf(first, second, third, fourth),
                 watchSubjects = rejectingWatch(first, second, third),
-            ).list()
+            ).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(fourth.id)
     }
 
     @Test
     fun `표시 상한이 미설정이면 자르지 않는다`() {
-        val result = useCase(SequenceStrategyReader(listOf(strategy())), listOf(first, second, third)).list()
+        val result = useCase(SequenceStrategyReader(listOf(strategy())), listOf(first, second, third)).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(first.id, second.id, third.id)
     }
 
     @Test
     fun `빈 결과의 뜻 — 열린 공고 없음 · 감시 미설정 · 통과 없음이 서로 다른 값이다`() {
-        useCase(SequenceStrategyReader(listOf(strategy())), emptyList()).list().state shouldBe
+        useCase(SequenceStrategyReader(listOf(strategy())), emptyList()).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.NO_OPEN_NOTICES
-        useCase(SequenceStrategyReader(listOf(strategy(watched = false))), listOf(first)).list().state shouldBe
+        useCase(SequenceStrategyReader(listOf(strategy(watched = false))), listOf(first)).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.WATCH_NOT_CONFIGURED
-        useCase(SequenceStrategyReader(listOf(strategy())), listOf(first), rejectingWatch(first)).list().state shouldBe
+        useCase(SequenceStrategyReader(listOf(strategy())), listOf(first), rejectingWatch(first)).list(TEST_ACCOUNT).state shouldBe
             SuggestionState.NO_MATCH
     }
 
@@ -196,7 +198,7 @@ class ListSuggestionsUseCaseTest {
         // 시도 1: 고정(before) → 비교(after) — 다르다. 시도 2: 고정(after) → 비교(after).
         val reader = SequenceStrategyReader(listOf(before, after))
 
-        val result = useCase(reader, listOf(first)).list()
+        val result = useCase(reader, listOf(first)).list(TEST_ACCOUNT)
 
         result.strategyRevision.value shouldBe 2
         result.ids() shouldBe listOf(first.id)
@@ -209,7 +211,7 @@ class ListSuggestionsUseCaseTest {
         val before = strategy(revision = 3, watched = false)
         val sameRevisionDifferentValue = strategy(revision = 3)
 
-        val result = useCase(SequenceStrategyReader(listOf(before, sameRevisionDifferentValue)), listOf(first)).list()
+        val result = useCase(SequenceStrategyReader(listOf(before, sameRevisionDifferentValue)), listOf(first)).list(TEST_ACCOUNT)
 
         result.ids() shouldBe listOf(first.id)
     }
@@ -237,7 +239,7 @@ class ListSuggestionsUseCaseTest {
                 listOf(first),
                 licenseGate = licenseGate,
                 profiles = profiles,
-            ).list()
+            ).list(TEST_ACCOUNT)
 
         // 첫 시도를 채택했다면 빈 목록(옛 프로필 → 미달)이다. 새 프로필의 판정만 나와야 한다.
         result.ids() shouldBe listOf(first.id)
@@ -250,7 +252,7 @@ class ListSuggestionsUseCaseTest {
         // 시도 1: 1 → 2(다름). 시도 2: 3 → 4(다름).
         val reader = SequenceStrategyReader((1..4).map { strategy(revision = it) })
 
-        shouldThrow<StrategyChangedDuringComputationException> { useCase(reader, listOf(first)).list() }
+        shouldThrow<StrategyChangedDuringComputationException> { useCase(reader, listOf(first)).list(TEST_ACCOUNT) }
     }
 
     @Test

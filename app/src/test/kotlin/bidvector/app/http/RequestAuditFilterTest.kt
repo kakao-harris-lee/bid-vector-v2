@@ -1,6 +1,7 @@
 package bidvector.app.http
 
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldStartWith
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -45,8 +46,13 @@ class RequestAuditFilterTest : HttpIntegrationTestBase() {
         strategyRepository.loadFailure = null
     }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL) }
+    /**
+     * **M15/15A — 이 경로는 계정 전용이다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더 경로
+     * (계정을 내지 않는다)는 401 이고, 그래서 이 test 는 세션으로 두드린다. 재는 축은 그대로다.
+     */
+    private val session by lazy { SessionTestClient(restTemplate, ::url).signIn() }
+
+    private fun authorizedHeaders(): HttpHeaders = session.headers()
 
     @Test
     fun `성공 요청은 audit 행 하나를 남긴다`() {
@@ -61,7 +67,8 @@ class RequestAuditFilterTest : HttpIntegrationTestBase() {
         response.statusCode.value() shouldBe 200
         auditSink.records.size shouldBe 1
         auditSink.records.first().status shouldBe 200
-        auditSink.records.first().subject shouldBe "operator"
+        // M15/15A — 주체는 세션 계정 라벨이다(이 test 의 축은 audit 행이지 주체 어휘가 아니다).
+        auditSink.records.first().subject shouldStartWith "account:"
     }
 
     @Test

@@ -7,6 +7,8 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -43,9 +45,23 @@ class PinnedStrategyRepositoryTest {
     @Test
     fun `load 는 고정값을 그대로 돌려준다`() {
         val pinned = testStrategy(maxActiveBids = 7)
-        val repository = PinnedStrategyRepository(pinned)
+        val repository = PinnedStrategyRepository(PINNED_ACCOUNT, pinned)
 
-        repository.load() shouldBe pinned
-        repository.load() shouldBe pinned // 두 번째 호출도 여전히 같은 고정값이다.
+        repository.load(PINNED_ACCOUNT) shouldBe pinned
+        repository.load(PINNED_ACCOUNT) shouldBe pinned // 두 번째 호출도 여전히 같은 고정값이다.
+    }
+
+    /**
+     * **M15/15A — 다른 계정으로 물으면 크게 실패한다.** 인자를 조용히 무시하면 이 데코레이터가
+     * 「어느 계정으로 물어도 같은 전략」을 내는 자리가 되고, 그것이 15A 가 막는 빌려 오기다.
+     */
+    @Test
+    fun `고정한 계정이 아니면 load 가 거부한다`() {
+        val repository = PinnedStrategyRepository(PINNED_ACCOUNT, testStrategy(maxActiveBids = 7))
+
+        shouldThrow<IllegalStateException> { repository.load(OTHER_ACCOUNT) }
     }
 }
+
+private val PINNED_ACCOUNT = AccountId(1)
+private val OTHER_ACCOUNT = AccountId(2)

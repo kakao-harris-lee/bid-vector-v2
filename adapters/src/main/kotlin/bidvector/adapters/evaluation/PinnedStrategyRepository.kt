@@ -32,7 +32,9 @@ class PinnedStrategyRepository(
      * 조립의 불변식이므로, 어긋나면 그것은 입력이 아니라 조립 결함이다.
      */
     override fun load(account: AccountId): OperatorStrategy {
-        check(account == this.account) {
+        // `AccountId` 는 값 비교를 제공하지 않는다(해시 검증을 비껴가는 길을 막는 규율) —
+        // 식별자 자체를 비교한다. 객체 `==` 를 쓰면 비교 구조 게이트의 허용 목록도 늘어난다.
+        check(account.value == this.account.value) {
             "고정 저장소는 고정한 계정의 전략만 돌려준다 — 고정=${this.account.value} 요청=${account.value}"
         }
         return loaded

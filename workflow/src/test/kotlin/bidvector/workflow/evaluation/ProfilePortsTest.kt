@@ -6,6 +6,7 @@ import bidvector.decision.priority.derive.DerivationOutcome
 import bidvector.qualification.LicenseName
 import bidvector.qualification.OperatorLicenses
 import bidvector.strategy.CategoryCode
+import bidvector.workflow.access.AccountId
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -32,7 +33,7 @@ class ProfilePortsTest {
     fun `OperatorProfilePort fake — 미설정은 null`() {
         val port = FakeOperatorProfilePort(null)
 
-        port.current() shouldBe null
+        port.current(TEST_ACCOUNT) shouldBe null
     }
 
     @Test
@@ -45,7 +46,7 @@ class ProfilePortsTest {
             )
         val port = FakeOperatorProfilePort(facts)
 
-        port.current() shouldBe facts
+        port.current(TEST_ACCOUNT) shouldBe facts
     }
 
     @Test
@@ -61,7 +62,7 @@ class ProfilePortsTest {
 private class FakeOperatorProfilePort(
     private val facts: ProfileFacts?,
 ) : OperatorProfilePort {
-    override fun current(): ProfileFacts? = facts
+    override fun current(account: AccountId): ProfileFacts? = facts
 }
 
 private class AlwaysUnavailableWorkloadPort : WorkloadPort {

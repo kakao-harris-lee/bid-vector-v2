@@ -15,6 +15,7 @@ import bidvector.qualification.RequirementSourceField
 import bidvector.qualification.UncertainReason
 import bidvector.sharedkernel.FloorRate
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.MlAnalysisOutcome
 import bidvector.workflow.notificationinbox.NotificationInboxOutcome
 import io.kotest.assertions.withClue
@@ -63,7 +64,7 @@ class BidPriceRequestResponseTest {
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
                 notificationInbox = InMemoryNotificationInbox(),
-            ).forRequest(notice.id, currentActiveBids)
+            ).forRequest(TEST_BID_ACCOUNT, notice.id, currentActiveBids)
         return (outcome as BidPriceRequestOutcome.Prepared).run
     }
 
@@ -397,3 +398,6 @@ class BidPriceRequestResponseTest {
         response.notification.inboxRecordNotRecordedReason shouldBe "NO_ACCOUNT_SUBJECT"
     }
 }
+
+/** 이 test 의 계정(M15/15A) — 축은 판정 동치이지 계정이 아니다. */
+private val TEST_BID_ACCOUNT = AccountId(1)

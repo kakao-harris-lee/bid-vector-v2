@@ -15,6 +15,7 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CorrelationIdFactory
 import bidvector.workflow.evaluation.LicenseGatePort
@@ -74,7 +75,7 @@ class EvaluationCommitWiringTest {
             WatchSubjectPort::class.java,
             Supplier { WatchSubjectPort { WatchSubjectOutcome.Unavailable } },
         )
-        context.registerBean(LicenseGatePort::class.java, Supplier { LicenseGatePort { eligible() } })
+        context.registerBean(LicenseGatePort::class.java, Supplier { LicenseGatePort { _, _ -> eligible() } })
         context.registerBean(MlAnalysisPort::class.java, Supplier { alwaysUnavailableMl() })
         context.registerBean(
             CorrelationIdFactory::class.java,
@@ -223,7 +224,7 @@ private fun strategyWithCap(maxActiveBids: Int = 10) =
 private fun eligible(): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
 
 private fun alwaysUnavailableMl(): MlAnalysisPort =
-    MlAnalysisPort { _: Notice, _ -> MlAnalysisOutcome.SimilarityProjectionNotReady }
+    MlAnalysisPort { _, _: Notice, _ -> MlAnalysisOutcome.SimilarityProjectionNotReady }
 
 /**
  * `load()` 호출을 세는 저장소 대역 — 「run 당 한 번」의 유일한 증거다(R1-M-4).
@@ -238,10 +239,13 @@ private class CommitCountingStrategyRepository(
     var loads = 0
         private set
 
-    override fun load(): bidvector.strategy.OperatorStrategy {
+    override fun load(account: AccountId): bidvector.strategy.OperatorStrategy {
         loads += 1
         return strategy
     }
 
-    override fun save(applied: bidvector.workflow.strategy.AppliedStrategy) = error("전략을 쓰지 않는다")
+    override fun save(
+        account: AccountId,
+        applied: bidvector.workflow.strategy.AppliedStrategy,
+    ) = error("전략을 쓰지 않는다")
 }

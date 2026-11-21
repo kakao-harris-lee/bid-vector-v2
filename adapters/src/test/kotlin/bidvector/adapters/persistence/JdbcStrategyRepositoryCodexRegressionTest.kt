@@ -29,13 +29,14 @@ class JdbcStrategyRepositoryCodexRegressionTest : PersistenceTestSupport() {
         dataSource().connection.use { connection ->
             connection
                 .prepareStatement(
-                    "INSERT INTO operator_strategy (id, revision, focus_categories, focus_region_terms, " +
+                    "INSERT INTO operator_strategy (account_id, revision, focus_categories, focus_region_terms, " +
                         "exclude_region_terms, required_keyword_terms, exclude_keyword_terms, " +
                         "min_budget_won, min_budget_currency, min_budget_vat, min_budget_provenance) " +
-                        "VALUES (1, 0, '{}'::text[], $focusRegionTerms, '{}'::text[], '{}'::text[], '{}'::text[], " +
+                        "VALUES (?, 0, '{}'::text[], $focusRegionTerms, '{}'::text[], '{}'::text[], '{}'::text[], " +
                         "?, 'KRW', 'INCLUSIVE', 'OPERATOR_DECLARED')",
                 ).use { statement ->
-                    statement.setBigDecimal(1, minBudgetWon)
+                    statement.setLong(1, testAccount().value)
+                    statement.setBigDecimal(2, minBudgetWon)
                     statement.executeUpdate()
                 }
         }
@@ -54,7 +55,7 @@ class JdbcStrategyRepositoryCodexRegressionTest : PersistenceTestSupport() {
         insertRawStrategy(BigDecimal.TEN, "ARRAY['서울', NULL]::text[]")
         val repository = JdbcStrategyRepository(dataSource(), testPolicy())
 
-        shouldThrow<IllegalStateException> { repository.load() }
+        shouldThrow<IllegalStateException> { repository.load(testAccount()) }
     }
 
     /**
@@ -109,6 +110,6 @@ class JdbcStrategyRepositoryCodexRegressionTest : PersistenceTestSupport() {
         insertRawStrategy(BigDecimal("18446744073709551621"))
 
         val repository = JdbcStrategyRepository(dataSource(), testPolicy())
-        shouldThrow<IllegalStateException> { repository.load() }
+        shouldThrow<IllegalStateException> { repository.load(testAccount()) }
     }
 }

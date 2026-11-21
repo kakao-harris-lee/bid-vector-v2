@@ -52,6 +52,8 @@ class ProfileOwnershipE2ETest {
         private val CAPACITIES = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_CAPACITIES
         private val CAPACITIES_REMOVE = AccountScopedRoutes.PROFILE + AccountScopedRoutes.PROFILE_CAPACITIES_REMOVE
         private val CSRF = Regex("\"csrf\"\\s*:\\s*\"([^\"]+)\"")
+        private val SESSION_ID = Regex("\"sessionId\"\\s*:\\s*\"([^\"]+)\"")
+        private val EDIT_SESSIONS = STRATEGY_EDIT_SESSIONS
 
         private val postgres: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))
@@ -105,6 +107,10 @@ class ProfileOwnershipE2ETest {
                 statement.execute("TRUNCATE TABLE api_request_audit")
                 statement.execute("DELETE FROM account_construction_capacity")
                 statement.execute("DELETE FROM account_business_profile")
+                // M15/15A — 네 표가 계정을 FK 로 참조하므로 계정 삭제 전에 비운다.
+                statement.execute("DELETE FROM edit_session")
+                statement.execute("DELETE FROM operator_strategy_revision")
+                statement.execute("DELETE FROM operator_strategy")
                 statement.execute("DELETE FROM operator_profile")
                 statement.execute("DELETE FROM account")
             }
@@ -164,18 +170,101 @@ class ProfileOwnershipE2ETest {
     }
 
     /**
-     * **알려진 제한을 test 로 고정한다**(§5.5 제한 5 · v F3): V12 자격 사실은 싱글턴이라 **계정 경계
-     * 밖**이다. 어느 계정의 세션이 써도 모든 계정의 조회에 보인다. 이 test 가 붉어지면 그 제한이
-     * 사라졌다는 뜻이고, 그때는 장부와 OpenAPI 문면을 함께 고쳐야 한다.
+     * **주장이 뒤집혔다**(M15/15A — V28). 앞 판은 「V12 자격 사실은 싱글턴이라 계정 경계 **밖**이다」를
+     * 알려진 제한으로 고정했다(§5.5 제한 5 · v F3). 이 slice 가 그 표를 계정 소유로 옮겼으므로 같은
+     * 자리에서 같은 시나리오로 **반대**를 잰다 — test 를 지우지 않고 주장을 바꾼 이유는, 지우면
+     * 「그 제한이 언제 어떻게 사라졌는가」가 이력에서 사라지기 때문이다.
+     *
+     * **양방향으로 잰다**: 한 방향만 보면 「쓰기가 아무 데도 안 간다」는 구현도 초록이다.
      */
     @Test
-    fun `자격 사실은 계정 경계 밖이다 — B 가 쓰면 A 의 조회에도 보인다`() {
+    fun `자격 사실은 계정 경계 안이다 — B 가 쓴 면허가 A 에 보이지 않고 그 반대도 같다`() {
+        val a = signIn(LOGIN_A)
+        val b = signIn(LOGIN_B)
+
+        write(QUALIFICATION_FACTS, qualificationBody("합성면허B"), b) shouldBe OK
+        write(QUALIFICATION_FACTS, qualificationBody("합성면허A"), a) shouldBe OK
+
+        val seenByA = read(AccountScopedRoutes.PROFILE, a)
+        seenByA shouldContain "합성면허A"
+        seenByA shouldNotContain "합성면허B"
+
+        val seenByB = read(AccountScopedRoutes.PROFILE, b)
+        seenByB shouldContain "합성면허B"
+        seenByB shouldNotContain "합성면허A"
+    }
+
+    /**
+     * **격리 축 — 자격 사실 미설정은 계정마다 선다.** B 만 쓰면 A 의 조회는 「아직 설정 안 함」이고
+     * 그 값은 B 의 행을 빌려 온 값이 아니다. 위 test 의 음성 대조다: 「빌려 오지 않는다」와 「아무도
+     * 아무것도 못 읽는다」를 가른다(B 는 자기 값을 읽는다).
+     */
+    @Test
+    fun `행이 없는 계정의 자격 사실은 미설정이다 — 남의 행을 빌려 오지 않는다`() {
         val a = signIn(LOGIN_A)
         val b = signIn(LOGIN_B)
 
         write(QUALIFICATION_FACTS, qualificationBody("합성면허B"), b) shouldBe OK
 
-        read(AccountScopedRoutes.PROFILE, a) shouldContain "합성면허B"
+        read(AccountScopedRoutes.PROFILE, a) shouldContain "\"licensesDeclared\":null"
+        read(AccountScopedRoutes.PROFILE, b) shouldContain "합성면허B"
+    }
+
+    /**
+     * **격리 축 — 전략.** B 가 편집 세션으로 감시 조건을 바꿔도 A 의 전략 조회에 보이지 않는다.
+     * 전략은 쓰기 경로가 편집 세션 하나뿐이라(STR-07) 이 여정이 곧 「계정별 쓰기」의 전부다.
+     *
+     * 개정 번호도 함께 본다 — A 는 행이 없어 개정 0 이고 B 는 저장 뒤 1 이다. 두 계정이 **각자의**
+     * 개정을 갖는다는 것이 `operator_strategy_revision` 의 계정 범위 키가 뜻하는 바다.
+     */
+    @Test
+    fun `전략은 계정 경계 안이다 — B 가 저장한 감시어가 A 의 조회에 보이지 않는다`() {
+        val a = signIn(LOGIN_A)
+        val b = signIn(LOGIN_B)
+
+        confirmRequiredKeyword(b, "합성감시어B", seenRevision = 0)
+
+        val seenByB = read(AccountScopedRoutes.STRATEGY, b)
+        seenByB shouldContain "합성감시어B"
+        seenByB shouldContain "\"revision\":1"
+
+        val seenByA = read(AccountScopedRoutes.STRATEGY, a)
+        seenByA shouldNotContain "합성감시어B"
+        seenByA shouldContain "\"revision\":0"
+    }
+
+    /**
+     * **격리 축 — 편집 세션.** 서버가 만든 세션 id 를 B 가 손에 넣어도 A 의 세션은 **없는 세션**이다.
+     * 404 로 떨어지는 것이 요점이다 — 「남의 세션이 있다」를 알려 주지 않는다(7D 의 관례).
+     *
+     * 양방향으로 잰다: 자기 세션은 보이고 남의 세션은 안 보인다. 한쪽만 보면 「아무 세션도 안 보인다」
+     * 는 구현도 초록이다.
+     */
+    @Test
+    fun `편집 세션은 계정 경계 안이다 — 남의 세션 id 는 없는 세션이다`() {
+        val a = signIn(LOGIN_A)
+        val b = signIn(LOGIN_B)
+
+        val sessionOfA = beginEditSession(a)
+
+        readStatus(editSessionPath(sessionOfA), a) shouldBe OK
+        readStatus(editSessionPath(sessionOfA), b) shouldBe NOT_FOUND
+    }
+
+    /**
+     * **격리 축 — 제안 목록.** 목록은 계산이고 그 입력이 전략이므로, 계정마다 다른 전략이면 개정
+     * 헤더가 다르다. 공고를 심지 않아 둘 다 빈 목록이지만 **헤더의 개정**이 두 계정에서 갈린다 —
+     * 그 값이 「누구의 전략으로 계산했는가」의 유일한 관측점이다.
+     */
+    @Test
+    fun `제안 목록은 계정의 전략으로 계산한다 — 개정 헤더가 계정마다 다르다`() {
+        val a = signIn(LOGIN_A)
+        val b = signIn(LOGIN_B)
+
+        confirmRequiredKeyword(b, "합성감시어B", seenRevision = 0)
+
+        strategyRevisionHeaderOf(b) shouldBe "1"
+        strategyRevisionHeaderOf(a) shouldBe "0"
     }
 
     private fun detailsBody(tradeName: String): String =
@@ -186,6 +275,45 @@ class ProfileOwnershipE2ETest {
 
     private fun qualificationBody(license: String): String =
         """{"businessTypes":[],"licensesDeclared":true,"licenseNames":["$license"],"regionTerms":[]}"""
+
+    /** 전략을 바꾸는 유일한 코드 경로 — 편집 세션 begin → value → confirm(STR-07). */
+    private fun confirmRequiredKeyword(
+        session: OwnerSession,
+        term: String,
+        seenRevision: Int,
+    ) {
+        val id = beginEditSession(session)
+        write(
+            "${editSessionPath(id)}/value",
+            """{"commandId":"v-$term","field":"REQUIRED_KEYWORD","terms":["$term"]}""",
+            session,
+        ) shouldBe OK
+        write(
+            "${editSessionPath(id)}/confirm",
+            """{"commandId":"c-$term","seenRevision":$seenRevision}""",
+            session,
+        ) shouldBe OK
+    }
+
+    private fun beginEditSession(session: OwnerSession): String {
+        val headers = cookieAndStamp(session).apply { contentType = MediaType.APPLICATION_JSON }
+        val response = exchange(EDIT_SESSIONS, HttpMethod.POST, headers, """{"field":"REQUIRED_KEYWORD"}""")
+        response.statusCode.value() shouldBe CREATED
+        return requireNotNull(SESSION_ID.find(response.body.orEmpty())?.groupValues?.get(1)) { "sessionId 가 없다" }
+    }
+
+    private fun editSessionPath(sessionId: String): String = "$EDIT_SESSIONS/$sessionId"
+
+    private fun readStatus(
+        path: String,
+        session: OwnerSession,
+    ): Int = exchange(path, HttpMethod.GET, cookieOnly(session)).statusCode.value()
+
+    private fun strategyRevisionHeaderOf(session: OwnerSession): String {
+        val response = exchange(AccountScopedRoutes.SUGGESTIONS, HttpMethod.GET, cookieOnly(session))
+        response.statusCode.value() shouldBe OK
+        return requireNotNull(response.headers.getFirst(STRATEGY_REVISION_HEADER)) { "개정 헤더가 없다" }
+    }
 
     private fun write(
         path: String,

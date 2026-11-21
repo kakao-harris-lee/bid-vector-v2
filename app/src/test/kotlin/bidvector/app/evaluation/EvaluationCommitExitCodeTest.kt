@@ -43,8 +43,8 @@ class EvaluationCommitExitCodeTest {
     fun `완료 로그 줄은 계수 여섯과 하한 제외 사유 전수를 싣는다 — 공고 ID 는 싣지 않는다`() {
         val tally = tally(candidates = 4, reached = 3, notReached = 1, bidNow = 2, requested = 1, requestFailed = 1)
 
-        evaluationCommitFinishLine(tally, exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished candidates=4 reached=3 notReached=1 bidNow=2 " +
+        evaluationCommitFinishLine(tally, accounts = 1, skipped = 0, exitCode = exitCodeOf(tally)) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 candidates=4 reached=3 notReached=1 bidNow=2 " +
             "requested=1 requestFailed=1 floorImplausible=0 floorOriginNotJudged=0 exit=2"
     }
 
@@ -66,15 +66,15 @@ class EvaluationCommitExitCodeTest {
                     ),
             )
 
-        evaluationCommitFinishLine(tally, exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished candidates=3 reached=3 notReached=0 bidNow=0 " +
+        evaluationCommitFinishLine(tally, accounts = 1, skipped = 0, exitCode = exitCodeOf(tally)) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 candidates=3 reached=3 notReached=0 bidNow=0 " +
             "requested=0 requestFailed=0 floorImplausible=2 floorOriginNotJudged=1 exit=0"
     }
 
     /** 계수 이름은 Kotlin 상수 이름에서 파생되지 않는다 — DEC-10 이 `floor_implausible` 을 고정한다. */
     @Test
     fun `제외 사유 전수가 줄에 서로 다른 이름으로 나온다`() {
-        val line = evaluationCommitFinishLine(tally(), EvaluationCommitExitCode.COMPLETE)
+        val line = evaluationCommitFinishLine(tally(), accounts = 1, skipped = 0, exitCode = EvaluationCommitExitCode.COMPLETE)
         val names = PublishedFloorExclusion.entries.map { exclusion -> "$exclusion" }
 
         names.forEach { name -> line.contains(name) shouldBe false }

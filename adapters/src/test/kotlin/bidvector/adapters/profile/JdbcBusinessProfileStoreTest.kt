@@ -155,7 +155,7 @@ class JdbcBusinessProfileStoreTest : PersistenceTestSupport() {
         store.replaceDetails(owner, BusinessDetails.EMPTY, now)
 
         store.capacities(owner) shouldBe listOf(capacity("합성토목"))
-        JdbcOperatorProfileRepository(dataSource()).current() shouldBe null
+        JdbcOperatorProfileRepository(dataSource()).current(owner) shouldBe null
     }
 
     @Test

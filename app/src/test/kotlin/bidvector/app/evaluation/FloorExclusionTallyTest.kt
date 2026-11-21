@@ -27,6 +27,7 @@ import bidvector.strategy.WatchSubject
 import bidvector.strategy.assembleFullScopeText
 import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
@@ -79,8 +80,8 @@ class FloorExclusionTallyTest {
     fun `마침 줄에 두 사유가 각각 한 건으로 나온다`() {
         val tally = tallyOf(results)
 
-        evaluationCommitFinishLine(tally, exitCodeOf(tally)) shouldBe
-            "evaluation-commit finished candidates=2 reached=1 notReached=1 bidNow=1 " +
+        evaluationCommitFinishLine(tally, accounts = 1, skipped = 0, exitCode = exitCodeOf(tally)) shouldBe
+            "evaluation-commit finished accounts=1 skipped=0 candidates=2 reached=1 notReached=1 bidNow=1 " +
             "requested=1 requestFailed=0 floorImplausible=1 floorOriginNotJudged=1 exit=0"
     }
 
@@ -97,12 +98,12 @@ class FloorExclusionTallyTest {
                 strategyRepository = TestStrategyRepository(tallyStrategy()),
                 candidateSource = CandidateSourcePort { listOf(reaching, dropped) },
                 watchSubjects = WatchSubjectPort { WatchSubjectOutcome.Found(PASSING_SUBJECT) },
-                licenseGate = LicenseGatePort { LicenseVerdict.Eligible(emptySet()) },
-                mlAnalysis = MlAnalysisPort { notice, _ -> analyses.getValue(notice.id) },
+                licenseGate = LicenseGatePort { _, _ -> LicenseVerdict.Eligible(emptySet()) },
+                mlAnalysis = MlAnalysisPort { _, notice, _ -> analyses.getValue(notice.id) },
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = Clock { NOW },
             )
-        return runBlocking { factory.forRequest(currentActiveBids = 0).useCase.evaluate() }
+        return runBlocking { factory.forRequest(TALLY_ACCOUNT, currentActiveBids = 0).useCase.evaluate() }
     }
 }
 
@@ -171,3 +172,6 @@ private fun candidate(number: String): Notice {
         ),
     )
 }
+
+/** 이 집계 test 의 계정(M15/15A) — 축은 계수 사슬이지 계정이 아니다. */
+private val TALLY_ACCOUNT = AccountId(1)

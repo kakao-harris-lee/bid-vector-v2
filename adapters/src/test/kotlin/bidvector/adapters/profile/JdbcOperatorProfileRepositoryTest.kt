@@ -24,7 +24,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
 
     @Test
     fun `프로필 미설정 — 행이 없으면 current 는 null`() {
-        repository().current() shouldBe null
+        repository().current(testAccount()) shouldBe null
     }
 
     @Test
@@ -36,9 +36,9 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = listOf("서울", "경기"),
             )
 
-        writer().save(facts)
+        writer().save(testAccount(), facts)
 
-        repository().current() shouldBe facts
+        repository().current(testAccount()) shouldBe facts
     }
 
     /**
@@ -53,11 +53,11 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val declaredEmpty =
             ProfileFacts(setOf(CategoryCode("건설업")), OperatorLicenses.Declared(emptyList()), emptyList())
 
-        writer().save(notDeclared)
-        val afterNotDeclared = repository().current()
+        writer().save(testAccount(), notDeclared)
+        val afterNotDeclared = repository().current(testAccount())
 
-        writer().save(declaredEmpty)
-        val afterDeclaredEmpty = repository().current()
+        writer().save(testAccount(), declaredEmpty)
+        val afterDeclaredEmpty = repository().current(testAccount())
 
         afterNotDeclared shouldBe notDeclared
         afterDeclaredEmpty shouldBe declaredEmpty
@@ -75,10 +75,10 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
         val second =
             ProfileFacts(setOf(CategoryCode("전기공사업")), OperatorLicenses.NotDeclared, listOf("부산", "울산"))
 
-        writer().save(first)
-        writer().save(second)
+        writer().save(testAccount(), first)
+        writer().save(testAccount(), second)
 
-        repository().current() shouldBe second
+        repository().current(testAccount()) shouldBe second
     }
 
     /**
@@ -104,7 +104,7 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
      * `bidvector.strategy.CategoryCode`는 `bidvector.procurement.CategoryCode.of()`와 달리
      * 정규화가 없는 평범한 `data class`다. 이 test는 그 공백을 **닫지 않고 보이게** 고정한다.
      *
-     * **HIGH-1 시정** — `repository().current()!!.businessTypes shouldBe
+     * **HIGH-1 시정** — `repository().current(testAccount())!!.businessTypes shouldBe
      * facts.businessTypes`처럼 양변이 같은 `CategoryCode(...)` 생성자를 지나면, 그 생성자
      * 안에 멱등 정규화가 들어올 때 양변이 함께 접혀 단언이 계속 통과하는 항진명제가 된다(
      * 함수와 그 함수 본문 재계산값의 비교와 같은 결함 클래스). 이 판은 복원된
@@ -126,9 +126,9 @@ class JdbcOperatorProfileRepositoryTest : PersistenceTestSupport() {
                 regionTerms = emptyList(),
             )
 
-        writer().save(facts)
+        writer().save(testAccount(), facts)
 
-        val restoredProfile = repository().current()!!
+        val restoredProfile = repository().current(testAccount())!!
         val restoredValues = restoredProfile.businessTypes.map(CategoryCode::value).toSet()
 
         // 원소 수 — 정규화가 들어오면 두 리터럴이 생성 시점에 이미 하나로 접혀 여기서 붉어진다.

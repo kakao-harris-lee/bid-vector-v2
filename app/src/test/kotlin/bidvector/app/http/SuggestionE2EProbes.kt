@@ -1,6 +1,7 @@
 package bidvector.app.http
 
 import bidvector.strategy.OperatorStrategy
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.StrategyRepository
 import org.springframework.beans.factory.config.BeanPostProcessor
 import org.springframework.context.ApplicationContextInitializer
@@ -76,8 +77,8 @@ class MidComputationStrategyChanger(
         return loads.get()
     }
 
-    override fun load(): OperatorStrategy {
-        val loaded = delegate.load()
+    override fun load(account: AccountId): OperatorStrategy {
+        val loaded = delegate.load(account)
         val armed = plan.get()
         if (armed.isNotEmpty()) armed[loads.incrementAndGet()]?.invoke()
         return loaded

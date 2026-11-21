@@ -1,7 +1,6 @@
 package bidvector.app.evaluation
 
-import bidvector.adapters.evaluation.EvaluationCommitRun
-import bidvector.adapters.evaluation.RequestCapacityPort
+import bidvector.adapters.evaluation.EvaluationCommitRuns
 import bidvector.adapters.notificationinbox.JdbcNotificationAudience
 import bidvector.adapters.notificationinbox.JdbcNotificationInbox
 import bidvector.adapters.relay.NotificationRelayRun
@@ -113,6 +112,7 @@ class EvaluationCommitRunE2ETest {
     @BeforeEach
     fun resetRunState() {
         clearOutbox(fixture.adminDataSource())
+        clearNotificationInbox(fixture.adminDataSource())
         setStrategyRevision(fixture.dataSource(), SEEDED_REVISION)
         commitLog.clear()
     }
@@ -124,8 +124,10 @@ class EvaluationCommitRunE2ETest {
      * 성립하지 않는다는 사실의 측정이다 — 오늘 평가에는 outbox 밖 write 가 없다. 판정 기록 표가
      * 생기는 slice 가 이 단언을 다시 받는다(`OPEN-6F10-EVALUATION-DOMAIN-WRITE`).
      *
-     * **M9/ops-code — 전제는 빈 청중이다.** 이 fixture 는 계정을 심지 않아 알림함 기록이 0 건이고
-     * 그래서 이 등식이 유효하다. 실제로 쓰는가는 `EvaluationCommitInboxProductionTest` 가 든다.
+     * **M15/15A — 변한 표가 둘이다.** fixture 가 계정을 심으므로 커밋 run 이 알림함에도 실제로
+     * 쓴다(앞 판은 계정이 0 이라 청중이 비었고 그래서 등식이 한 표였다). 두 표를 **열거**하는 것이
+     * 요점이다 — 「outbox 만」으로 두면 알림함 기록이 사라져도 초록이고, 모집단을 열어 두면 새 표의
+     * write 가 조용히 지나간다. 매 test 앞의 비우기가 이 등식을 앞 test 와 독립으로 만든다.
      *
      * **M6/6E-2a PR #66 — 표 목록은 admin 연결로 읽는다.** `information_schema.tables` 는 **권한으로
      * 걸러진 뷰**다. 최소 권한 역할로 읽으면 그 역할에 GRANT 가 없는 표가 **목록에서 사라지고**,
@@ -145,7 +147,7 @@ class EvaluationCommitRunE2ETest {
         val exitCodes = runCommitRunner()
 
         val after = rowCountsByTable(fixture.adminDataSource())
-        changedTables(before, after) shouldBe setOf("outbox")
+        changedTables(before, after) shouldBe setOf("outbox", "notification_inbox")
         after.getValue("outbox") shouldBe before.getValue("outbox") + 1
         exitCodes shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
         // R-13 ⓑ — 러너의 마침 줄을 단언한다(앞 판은 로그를 모으기만 했다).
@@ -286,26 +288,62 @@ class EvaluationCommitRunE2ETest {
      */
     private fun runCommitRunner(): List<Int> {
         val termination = RecordedExitCodes()
-        val run =
-            EvaluationCommitRun(
+        val runs =
+            EvaluationCommitRuns(
                 dataSource = fixture.dataSource(),
                 strategies = fixture.bean(StrategyRepository::class.java),
                 candidateSource = fixture.bean(CandidateSourcePort::class.java),
                 watchSubjects = fixture.bean(WatchSubjectPort::class.java),
                 licenseGate = fixture.bean(LicenseGatePort::class.java),
                 mlAnalysis = AlwaysBidNowMl(),
-                capacity = RequestCapacityPort(0, MAX_ACTIVE_BIDS),
                 correlationIds = fixture.bean(CorrelationIdFactory::class.java),
                 clock = fixture.bean(Clock::class.java),
-                analysisBudget = null,
                 notificationInbox = JdbcNotificationInbox(fixture.dataSource()),
                 audience = JdbcNotificationAudience(fixture.dataSource()),
+                currentActiveBids = 0,
                 release = fixture.release,
             )
-        EvaluationCommitRunner(run, CANDIDATE_CAP, CollectionLog { commitLog += it }, termination)
+        EvaluationCommitRunner(runs, CANDIDATE_CAP, CollectionLog { commitLog += it }, termination)
             .run(DefaultApplicationArguments())
         return termination.recorded()
     }
+
+    /**
+     * **M15/15A 격리 축 ⑤ — 새 후보 알림은 평가한 계정의 알림함에만 쌓인다.**
+     *
+     * fixture 가 계정 둘을 심는다: 전략이 있는 쪽([CommitRunE2EFixture.primaryAccount])과 없는
+     * 쪽. 앞 판은 청중이 `SELECT id FROM account` 라 **둘 다** 같은 새 후보를 받았다 — 그것이 이
+     * slice 가 닫는 누출이다.
+     *
+     * 건너뛴 계정의 수가 마침 줄에 나오는지도 함께 잰다. 0 건이 「감시를 통과한 후보가 없다」인지
+     * 「평가한 계정이 없다」인지는 계수가 없으면 구별되지 않는다.
+     */
+    @Test
+    @Order(9)
+    fun `새 후보 알림은 평가한 계정의 알림함에만 쌓인다 — 전략 없는 계정은 건너뛰고 센다`() {
+        runCommitRunner() shouldBe listOf(EvaluationCommitExitCode.COMPLETE.value)
+
+        newCandidateAccounts() shouldBe listOf(fixture.primaryAccount)
+        val finishLine = commitLog.last { it.startsWith("evaluation-commit finished") }
+        finishLine shouldContain "accounts=1"
+        finishLine shouldContain "skipped=1"
+    }
+
+    /** `NEW_CANDIDATE` 항목이 실린 계정 전수 — 소유자 자격으로 읽어 역할 필터가 끼지 않게 한다. */
+    private fun newCandidateAccounts(): List<Long> =
+        fixture.adminDataSource().connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "SELECT DISTINCT account_id FROM notification_inbox " +
+                        "WHERE kind = 'NEW_CANDIDATE' ORDER BY account_id",
+                ).use { statement ->
+                    statement.executeQuery().use { rows ->
+                        val accounts = mutableListOf<Long>()
+                        while (rows.next()) accounts += rows.getLong("account_id")
+                        accounts
+                    }
+                }
+        }
 
     private val commitLog = mutableListOf<String>()
 

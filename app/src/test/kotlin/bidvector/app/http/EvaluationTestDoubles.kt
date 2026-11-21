@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.procurement.Notice
 import bidvector.qualification.LicenseVerdict
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.evaluation.WatchSubjectOutcome
@@ -20,7 +21,10 @@ internal class UnreachableWatchSubjectPort : WatchSubjectPort {
 }
 
 internal class UnreachableLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = error("빈 후보 목록에서는 불릴 수 없다")
 }
 
 /**

@@ -29,6 +29,7 @@ import bidvector.strategy.WatchSubject
 import bidvector.strategy.assembleFullScopeText
 import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.CapacityPort
@@ -116,9 +117,12 @@ private class FixedClock : Clock {
 private class FakeStrategyRepository(
     val strategy: OperatorStrategy,
 ) : StrategyRepository {
-    override fun load(): OperatorStrategy = strategy
+    override fun load(account: AccountId): OperatorStrategy = strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         error("이 test 는 전략을 저장하지 않는다")
     }
 }
@@ -134,7 +138,10 @@ private class FakeWatchSubjectPort : WatchSubjectPort {
 }
 
 private class FakeLicenseGatePort : LicenseGatePort {
-    override fun verdictFor(notice: Notice): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = LicenseVerdict.Eligible(emptySet())
 }
 
 private class FakeCapacityPort : CapacityPort {
@@ -172,6 +179,7 @@ class UnavailableMlAnalysisTest {
         val notifications = RecordingNotificationRequestPort()
         val useCase =
             EvaluateCandidatesUseCase(
+                account = AccountId(1),
                 strategies = FakeStrategyRepository(testStrategy()),
                 candidateSource = FakeCandidateSource(listOf(notice)),
                 watchSubjects = FakeWatchSubjectPort(),

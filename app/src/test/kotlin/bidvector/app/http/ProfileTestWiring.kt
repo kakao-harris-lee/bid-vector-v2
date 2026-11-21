@@ -155,9 +155,12 @@ class InMemoryOperatorProfile :
         facts = null
     }
 
-    override fun current(): ProfileFacts? = facts
+    override fun current(account: AccountId): ProfileFacts? = facts
 
-    override fun save(facts: ProfileFacts) {
+    override fun save(
+        account: AccountId,
+        facts: ProfileFacts,
+    ) {
         this.facts = facts
     }
 }

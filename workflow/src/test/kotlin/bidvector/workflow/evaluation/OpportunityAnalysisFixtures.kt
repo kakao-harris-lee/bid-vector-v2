@@ -28,6 +28,7 @@ import bidvector.sharedkernel.Rate
 import bidvector.sharedkernel.Resolution
 import bidvector.sharedkernel.VatTreatment
 import bidvector.strategy.CategoryCode
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.embedding.EmbedTextPort
 import bidvector.workflow.embedding.EmbedTextRequest
 import bidvector.workflow.embedding.EmbeddingOutcome
@@ -146,7 +147,7 @@ internal fun analysis(
 internal fun analyzeNotice(
     instance: OpportunityAnalysis,
     notice: Notice = testNoticeWithMoney(),
-): MlAnalysisOutcome = runBlocking { instance.analyze(notice, CorrelationId("corr-1")) }
+): MlAnalysisOutcome = runBlocking { instance.analyze(TEST_ACCOUNT, notice, CorrelationId("corr-1")) }
 
 internal fun MlAnalysisOutcome.shouldBeAnalyzed(): MlAnalysisOutcome.Analyzed {
     check(this is MlAnalysisOutcome.Analyzed) { "Analyzed 가 아니다: $this" }
@@ -209,7 +210,7 @@ internal class FakeBidPredictionPort(
 internal class ConfigurableProfilePort(
     var profile: ProfileFacts?,
 ) : OperatorProfilePort {
-    override fun current(): ProfileFacts? = profile
+    override fun current(account: AccountId): ProfileFacts? = profile
 }
 
 internal class FakeWorkloadPort(

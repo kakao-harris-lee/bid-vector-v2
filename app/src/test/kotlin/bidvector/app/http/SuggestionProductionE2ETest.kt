@@ -126,17 +126,23 @@ class SuggestionProductionE2ETest {
                 it.execute(
                     "TRUNCATE TABLE notice, notice_audit, raw_observation, operator_strategy, " +
                         "operator_strategy_revision, edit_session, outbox, api_request_audit, " +
-                        "notice_requirement CASCADE",
+                        "notice_requirement, browser_session, account CASCADE",
                 )
             }
         }
+        session =
+            ProductionSessionSupport(restTemplate, ::url)
+                .seedAndSignIn(adminDataSource(postgres), "suggestion-e2e-owner")
     }
 
-    private fun headers(): HttpHeaders =
-        HttpHeaders().apply {
-            set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
-            contentType = MediaType.APPLICATION_JSON
-        }
+    /**
+     * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
+     * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가
+     * `account` 까지 지우므로 세션도 함께 사라진다.
+     */
+    private lateinit var session: ProductionSessionSupport
+
+    private fun headers(): HttpHeaders = session.writeHeaders()
 
     private fun suggestions(): ResponseEntity<List<Map<String, Any?>>> =
         restTemplate.exchange(
@@ -167,9 +173,9 @@ class SuggestionProductionE2ETest {
         seenRevision: Int,
     ) {
         val begun = post(SUGGESTION_EDIT_SESSIONS, """{"field":"REQUIRED_KEYWORD"}""")
-        val session = "$SUGGESTION_EDIT_SESSIONS/${begun.body?.get("sessionId") as String}"
-        post("$session/value", """{"commandId":"v-$term","field":"REQUIRED_KEYWORD","terms":["$term"]}""")
-        val confirmed = post("$session/confirm", """{"commandId":"c-$term","seenRevision":$seenRevision}""")
+        val sessionPath = "$SUGGESTION_EDIT_SESSIONS/${begun.body?.get("sessionId") as String}"
+        post("$sessionPath/value", """{"commandId":"v-$term","field":"REQUIRED_KEYWORD","terms":["$term"]}""")
+        val confirmed = post("$sessionPath/confirm", """{"commandId":"c-$term","seenRevision":$seenRevision}""")
         confirmed.body?.get("state") shouldBe "APPLIED"
     }
 
@@ -215,7 +221,7 @@ class SuggestionProductionE2ETest {
         }
 
     private fun setRequiredKeywordBySql(term: String) {
-        adminUpdate("UPDATE operator_strategy SET required_keyword_terms = ARRAY['$term'] WHERE id = 1") shouldBe 1
+        adminUpdate("UPDATE operator_strategy SET required_keyword_terms = ARRAY['$term']") shouldBe 1
     }
 
     /** 요건 **헤더** 한 행 — 면허 게이트의 요건 조회가 행 질의를 하나 더 하게 만드는 조건(`JdbcRequirementStore.find`). */

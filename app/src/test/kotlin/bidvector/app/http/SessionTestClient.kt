@@ -74,6 +74,14 @@ internal class SessionTestClient(
         return exchange(path, method, if (body == null) headers else json(headers), body)
     }
 
+    /**
+     * 이 세션의 요청 헤더 한 벌(M15/15A) — 쿠키 + CSRF(+ JSON). REST 클라이언트를 직접 부르는
+     * test 가 **같은 세션으로** 두드릴 수 있게 하는 자리다. 계정 전용 뿌리가 넷 늘면서 자격
+     * 헤더로 두드리던 endpoint test 들이 이 헤더로 옮겨 왔다.
+     */
+    fun headers(): HttpHeaders =
+        json(cookieOnly()).apply { set(BrowserSessionAuthenticator.CSRF_HEADER, stamp) }
+
     private fun cookieOnly(): HttpHeaders =
         HttpHeaders().apply { set(HttpHeaders.COOKIE, "${SessionCookieWriter.HOST_PREFIXED_NAME}=$cookie") }
 

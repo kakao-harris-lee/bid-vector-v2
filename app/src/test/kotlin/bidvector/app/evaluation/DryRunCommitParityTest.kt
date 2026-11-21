@@ -32,6 +32,7 @@ import bidvector.strategy.WatchSubject
 import bidvector.strategy.assembleFullScopeText
 import bidvector.strategy.assembleKeywordScopeText
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateEvaluation
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.EVALUATION_LADDER_POLICY_VERSION
@@ -132,7 +133,7 @@ class DryRunCommitParityTest {
     private val candidate = openCandidate()
     private val candidateSource = CandidateSourcePort { listOf(candidate) }
     private val watchSubjects = WatchSubjectPort { WatchSubjectOutcome.Found(PASSING_SUBJECT) }
-    private val licenseGate = LicenseGatePort { LicenseVerdict.Eligible(emptySet()) }
+    private val licenseGate = LicenseGatePort { _, _ -> LicenseVerdict.Eligible(emptySet()) }
     private val clock = Clock { NOW }
 
     @Test
@@ -146,7 +147,7 @@ class DryRunCommitParityTest {
                 mlAnalysis = BidNowMlAnalysis(),
                 correlationIds = SequentialCorrelationIdFactory(),
                 clock = clock,
-            ).forRequest(CURRENT_ACTIVE_BIDS)
+            ).forRequest(PARITY_ACCOUNT, CURRENT_ACTIVE_BIDS)
         val dryRunResults = runBlocking { dryRun.useCase.evaluate() }
 
         val commitResults = runBlocking { commitRun().evaluate() }
@@ -171,28 +172,36 @@ class DryRunCommitParityTest {
         payload shouldContain EVALUATION_LADDER_POLICY_VERSION.source
     }
 
-    /** 커밋 진입점 — 일회 러너가 받는 빈을 **production 조립 메서드**가 짓는다. */
+    /**
+     * 커밋 진입점 — 일회 러너가 받는 빈을 **production 조립 메서드**가 짓는다.
+     *
+     * **M15/15A** — 그 메서드가 이제 계정별 run 공장을 내므로, 이 test 는 그 공장에서 자기 계정의
+     * run 을 받는다. 청중은 **그 계정 하나**로 run 안에서 고정되고, 쓰기 포트는 여전히 「불리면
+     * 터지는」 구현이다 — 이 test 가 재는 것은 판정 동일성이고 알림함 축은 그 등식의 입력이 아니다
+     * (기록 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로 잰다).
+     */
     private fun commitRun() =
-        EvaluationCommitWiring().evaluationCommitRun(
-            dataSource = adminDataSource(postgres),
-            strategyRepository = TestStrategyRepository(strategy),
-            candidateSourcePort = candidateSource,
-            watchSubjectPort = watchSubjects,
-            licenseGatePort = licenseGate,
-            mlAnalysisPort = BidNowMlAnalysis(),
-            correlationIdFactory = SequentialCorrelationIdFactory(),
-            clock = clock,
-            commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
-            // NOTI-01(M9/ops-code) — 이 test 가 재는 것은 **dry-run 과 커밋의 판정 동일성**이고
-            // 알림함 축은 그 등식의 입력이 아니다. 청중을 비워 두면 두 경로 비교에 알림함 상태가
-            // 끼어들지 않는다(기록 축은 `EvaluationCommitInboxProductionTest` 가 실 DB 로 잰다).
-            // 쓰기 포트는 **불리면 터지는** 구현이라 「청중이 비었는데 기록이 나간다」는 회귀가
-            // 이 자리에서도 잡힌다.
-            notificationInboxPort = { error("청중이 비었는데 알림함 쓰기가 불렸다") },
-            notificationAudiencePort = { NotificationAudience.Accounts(emptyList()) },
-            release = ReleaseIdentifier("parity-test"),
-        )
+        requireNotNull(
+            EvaluationCommitWiring()
+                .evaluationCommitRuns(
+                    dataSource = adminDataSource(postgres),
+                    strategyReader = TestStrategyRepository(strategy),
+                    candidateSourcePort = candidateSource,
+                    watchSubjectPort = watchSubjects,
+                    licenseGatePort = licenseGate,
+                    mlAnalysisPort = BidNowMlAnalysis(),
+                    correlationIdFactory = SequentialCorrelationIdFactory(),
+                    clock = clock,
+                    commitProperties = EvaluationCommitProperties(CURRENT_ACTIVE_BIDS),
+                    notificationInboxPort = { error("이 등식에 알림함 쓰기가 끼어들었다") },
+                    notificationAudiencePort = { NotificationAudience.Accounts(listOf(PARITY_ACCOUNT)) },
+                    release = ReleaseIdentifier("parity-test"),
+                ).forAccount(PARITY_ACCOUNT),
+        ) { "전략에 여력 상한이 있으므로 run 이 서야 한다" }
 }
+
+/** 이 등식의 계정(M15/15A) — 두 진입점이 **같은 계정**을 보는 것이 등식의 전제다. */
+private val PARITY_ACCOUNT = AccountId(1)
 
 /**
  * 감시 게이트를 통과하는 대역 — 규칙 하나(절대 맞지 않는 제외 키워드)만 둔 전략과 짝이다
@@ -209,6 +218,7 @@ private val PASSING_SUBJECT =
 /** 확정 `BidNow` 를 내는 분석 — 우선도가 전략의 `bidNowThreshold` 이상이다. */
 private class BidNowMlAnalysis : MlAnalysisPort {
     override suspend fun analyze(
+        account: AccountId,
         notice: Notice,
         correlationId: CorrelationId,
     ): MlAnalysisOutcome =

@@ -14,6 +14,7 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.strategy.Actor
 import bidvector.workflow.strategy.AppliedStrategy
 import bidvector.workflow.strategy.Clock
@@ -61,9 +62,12 @@ abstract class EditSessionWorkflowTestSupport : PersistenceTestSupport() {
     protected class InMemoryStrategyRepository(
         var strategy: OperatorStrategy,
     ) : StrategyRepository {
-        override fun load(): OperatorStrategy = strategy
+        override fun load(account: AccountId): OperatorStrategy = strategy
 
-        override fun save(applied: AppliedStrategy) {
+        override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
             strategy = applied.strategy
         }
     }
@@ -86,6 +90,7 @@ abstract class EditSessionWorkflowTestSupport : PersistenceTestSupport() {
         timeout: Duration = Duration.ofMinutes(15),
     ): EditStrategyWorkflow =
         EditStrategyWorkflow(
+            testAccount(),
             sessions,
             strategies,
             clock,

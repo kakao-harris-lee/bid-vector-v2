@@ -117,10 +117,10 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
     private fun unblockOutboxInserts() = execute("DROP TRIGGER IF EXISTS reject_outbox ON outbox")
 
     private fun beginAndProvideValue(transaction: JdbcStrategyEditTransaction) {
-        val started = transaction.inTransaction { it.begin(SESSION, OPERATOR, EditableField.CandidateLimit) }
+        val started = transaction.inTransaction(testAccount()) { it.begin(SESSION, OPERATOR, EditableField.CandidateLimit) }
         started.shouldBeStarted()
         val provided =
-            transaction.inTransaction { workflow ->
+            transaction.inTransaction(testAccount()) { workflow ->
                 workflow.provideValue(
                     EditCommand.ProvideValue(
                         CommandId("value-1"),
@@ -147,7 +147,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         blockOutboxInserts()
         try {
             shouldThrow<SQLException> {
-                transaction.inTransaction { workflow ->
+                transaction.inTransaction(testAccount()) { workflow ->
                     workflow.confirm(confirmCommand())
                 }
             }
@@ -166,7 +166,7 @@ class StrategyEditTransactionAtomicityTest : PersistenceTestSupport() {
         beginAndProvideValue(transaction)
 
         val confirmed =
-            transaction.inTransaction { workflow ->
+            transaction.inTransaction(testAccount()) { workflow ->
                 workflow.confirm(confirmCommand())
             }
 

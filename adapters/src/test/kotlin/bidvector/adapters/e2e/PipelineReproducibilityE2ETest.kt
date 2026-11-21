@@ -136,6 +136,7 @@ internal class PipelineReproducibilityE2ETest : PipelineE2ESupport() {
         val assembly =
             PipelineAssembly(
                 dataSource = dataSource(),
+                account = testAccount(),
                 mlChannel = server.channel,
                 at = E2E_NOW,
                 correlationPrefix = CORRELATION_PREFIX,

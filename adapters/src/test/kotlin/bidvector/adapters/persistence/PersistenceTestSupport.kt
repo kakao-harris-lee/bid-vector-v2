@@ -4,6 +4,7 @@ import bidvector.procurement.KONEPS_COLLECTION_POLICY
 import bidvector.procurement.KonepsFieldContractRegistry
 import bidvector.procurement.RawNoticeObservation
 import bidvector.sharedkernel.Resolution
+import bidvector.workflow.access.AccountId
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
@@ -77,8 +78,37 @@ abstract class PersistenceTestSupport {
     protected fun appendRawObservation(observation: RawNoticeObservation) =
         JdbcRawObservationStore(dataSource(), testFieldContracts(), TEST_RELEASE).append(observation)
 
+    /**
+     * 이 test 의 기본 계정(M15/15A) — V28 뒤 전략·프로필·편집 세션이 전부 계정을 요구한다.
+     * **처음 부를 때 심는다**: 표 비우기와 같은 `@BeforeEach` 를 하나 더 두면 둘의 순서가
+     * 정해지지 않아 비우기가 계정을 지우는 실행이 섞인다.
+     */
+    protected fun testAccount(): AccountId = cachedAccount ?: seedAccount(DEFAULT_TEST_LOGIN).also { cachedAccount = it }
+
+    /**
+     * 계정 한 행 — 격리 축 test 가 둘째 계정을 심는 자리이기도 하다. 소유자 자격으로 심는다
+     * (앱 역할에는 `account` INSERT 권한이 없다, V20).
+     */
+    protected fun seedAccount(login: String): AccountId =
+        adminDataSource.connection.use { connection ->
+            connection
+                .prepareStatement(
+                    "INSERT INTO account (login_name, passphrase_hash, created_at, updated_at, failed_attempts) " +
+                        "VALUES (?, 'fixture-hash', now(), now(), 0) RETURNING id",
+                ).use { statement ->
+                    statement.setString(1, login)
+                    statement.executeQuery().use { rows ->
+                        rows.next()
+                        AccountId(rows.getLong("id"))
+                    }
+                }
+        }
+
+    private var cachedAccount: AccountId? = null
+
     @BeforeEach
     fun truncateAllTables() {
+        cachedAccount = null
         adminDataSource.connection.use { connection ->
             connection.createStatement().use { statement ->
                 // outbox·inbox 도 매 test 전 비운다(설계 검토 (4)-⑥) — 빠뜨리면
@@ -120,6 +150,9 @@ abstract class PersistenceTestSupport {
          * 같은 이유로 `ForeignKeyEdgeIdentityTest` 도 자기 컨테이너를 쓴다(스키마 정본 밖 표를 심는다).
          */
         internal const val POSTGRES_IMAGE = "postgres:16.4"
+
+        /** 기본 계정의 로그인 이름 — 값 자체는 축이 아니고, 한 자리에만 둔다. */
+        private const val DEFAULT_TEST_LOGIN = "fixture-owner"
 
         private val container: PostgreSQLContainer =
             PostgreSQLContainer(DockerImageName.parse(POSTGRES_IMAGE))

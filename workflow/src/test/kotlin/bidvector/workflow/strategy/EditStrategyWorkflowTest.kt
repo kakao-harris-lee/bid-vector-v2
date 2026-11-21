@@ -13,6 +13,7 @@ import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.ThresholdField
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -48,13 +49,32 @@ private class FixedClock(
     override fun now(): Instant = instant
 }
 
+/**
+ * **계정별로 담는다**(M15/15A) — 계정을 버리는 fake 위에서는 「두 계정이 같은 행을 본다」가
+ * 그대로 초록이라 격리 test 가 아무것도 재지 못한다. 생성자가 받는 값은 [EDITOR_ACCOUNT] 의
+ * 초기 전략이고, 그 밖의 계정은 [missing] 을 받는다(행 없음 = 빈 전략).
+ */
 private class InMemoryStrategyRepository(
-    var strategy: OperatorStrategy,
+    strategy: OperatorStrategy,
+    private val missing: OperatorStrategy = strategy,
 ) : StrategyRepository {
-    override fun load(): OperatorStrategy = strategy
+    private val byAccount = mutableMapOf(EDITOR_ACCOUNT.value to strategy)
 
-    override fun save(applied: AppliedStrategy) {
-        this.strategy = applied.strategy
+    var strategy: OperatorStrategy
+        get() = byAccount.getValue(EDITOR_ACCOUNT.value)
+        set(value) {
+            byAccount[EDITOR_ACCOUNT.value] = value
+        }
+
+    fun strategyOf(account: AccountId): OperatorStrategy = byAccount[account.value] ?: missing
+
+    override fun load(account: AccountId): OperatorStrategy = strategyOf(account)
+
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
+        byAccount[account.value] = applied.strategy
     }
 }
 
@@ -64,12 +84,19 @@ private class InMemoryStrategyRepository(
  * 내린다 — 단언·시나리오는 그대로다.
  */
 private class InMemorySessionRepository : EditSessionRepository {
-    private val sessions = mutableMapOf<EditSessionId, EditSession>()
+    /** **키가 (계정, 세션 id) 다**(M15/15A) — 남의 계정의 세션 id 는 「없는 세션」이다. */
+    private val sessions = mutableMapOf<Pair<Long, EditSessionId>, EditSession>()
 
-    override fun load(id: EditSessionId): EditSessionSnapshot? = sessions[id]?.toSnapshot()
+    override fun load(
+        account: AccountId,
+        id: EditSessionId,
+    ): EditSessionSnapshot? = sessions[account.value to id]?.toSnapshot()
 
-    override fun save(session: EditSession) {
-        sessions[session.id] = session
+    override fun save(
+        account: AccountId,
+        session: EditSession,
+    ) {
+        sessions[account.value to session.id] = session
     }
 }
 
@@ -92,14 +119,17 @@ private class FlakyStrategyRepository(
 ) : StrategyRepository {
     var failNextSave = false
 
-    override fun load(): OperatorStrategy = delegate.load()
+    override fun load(account: AccountId): OperatorStrategy = delegate.load(account)
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         if (failNextSave) {
             failNextSave = false
             error("simulated strategy save failure")
         }
-        delegate.save(applied)
+        delegate.save(account, applied)
     }
 }
 
@@ -145,6 +175,7 @@ class EditStrategyWorkflowTest {
     ): Triple<EditStrategyWorkflow, InMemoryStrategyRepository, RecordingEventSink> {
         val workflow =
             EditStrategyWorkflow(
+                account = EDITOR_ACCOUNT,
                 sessions,
                 strategies,
                 clock,
@@ -303,6 +334,7 @@ class EditStrategyWorkflowTest {
         val events = RecordingEventSink()
         val workflow =
             EditStrategyWorkflow(
+                account = EDITOR_ACCOUNT,
                 sessions,
                 strategies,
                 FixedClock(Instant.parse("2026-09-08T00:00:00Z")),
@@ -334,15 +366,15 @@ class EditStrategyWorkflowTest {
         shouldThrow<IllegalStateException> { workflow.confirm(confirmCommand) }
 
         restoreEditSession(
-            sessions.load(sessionId)!!,
+            sessions.load(EDITOR_ACCOUNT, sessionId)!!,
         ).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
-        strategies.load().revision shouldBe StrategyRevision(1)
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(1)
         events.published.shouldBeEmpty()
 
         val retried = workflow.confirm(confirmCommand)
         retried.shouldBeInstanceOf<CommandResult.Processed>()
         retried.outcome.shouldBeInstanceOf<TransitionOutcome.Applied>()
-        strategies.load().revision shouldBe StrategyRevision(2)
+        strategies.load(EDITOR_ACCOUNT).revision shouldBe StrategyRevision(2)
         events.published.size shouldBe 1
     }
 
@@ -353,6 +385,7 @@ class EditStrategyWorkflowTest {
         val events = FlakyEventSink()
         val workflow =
             EditStrategyWorkflow(
+                account = EDITOR_ACCOUNT,
                 sessions,
                 strategies,
                 FixedClock(Instant.parse("2026-09-08T00:00:00Z")),
@@ -385,7 +418,7 @@ class EditStrategyWorkflowTest {
 
         strategies.strategy.revision shouldBe StrategyRevision(2)
         restoreEditSession(
-            sessions.load(sessionId)!!,
+            sessions.load(EDITOR_ACCOUNT, sessionId)!!,
         ).state.shouldBeInstanceOf<EditSessionState.WaitingForConfirmation>()
 
         val retried = workflow.confirm(confirmCommand)
@@ -439,6 +472,15 @@ class EditStrategyWorkflowTest {
         // sessions 참조로 확인한다 — outcome.session 자체가 Expired 라는 것만으로는
         // process() 의 저장 호출 여부를 재지 못한다(변이: sessions.save 를 조건부로 감싸도
         // outcome 필드는 그대로 Expired 라 통과했을 것이다).
-        restoreEditSession(sessions.load(sessionId)!!).state shouldBe EditSessionState.Expired
+        restoreEditSession(sessions.load(EDITOR_ACCOUNT, sessionId)!!).state shouldBe EditSessionState.Expired
     }
 }
+
+/**
+ * 편집 use case test 가 쓰는 계정(M15/15A) — 이 패키지의 **한 자리**다. 둘째 계정이 필요한
+ * test 는 [OTHER_ACCOUNT] 를 쓴다.
+ */
+internal val EDITOR_ACCOUNT: AccountId = AccountId(1)
+
+/** 격리 test 의 상대편 — 같은 세션 id·같은 전략 표를 다른 계정으로 두드린다. */
+internal val OTHER_ACCOUNT: AccountId = AccountId(2)

@@ -11,6 +11,7 @@ import bidvector.strategy.StrategyPolicyData
 import bidvector.strategy.StrategyRevision
 import bidvector.strategy.StrategyValidation
 import bidvector.strategy.validate
+import bidvector.workflow.access.AccountId
 import bidvector.workflow.evaluation.CandidateSourcePort
 import bidvector.workflow.evaluation.LicenseGatePort
 import bidvector.workflow.notice.NoticeSearchCriteria
@@ -137,9 +138,12 @@ class TestStrategyRepository(
 ) : StrategyRepository {
     @Volatile var loadFailure: (() -> Throwable)? = null
 
-    override fun load(): OperatorStrategy = loadFailure?.let { throw it() } ?: strategy
+    override fun load(account: AccountId): OperatorStrategy = loadFailure?.let { throw it() } ?: strategy
 
-    override fun save(applied: AppliedStrategy) {
+    override fun save(
+        account: AccountId,
+        applied: AppliedStrategy,
+    ) {
         strategy = applied.strategy
     }
 }
@@ -178,7 +182,10 @@ class FakeSuggestionLicenseGate : LicenseGatePort {
         LicenseVerdict.Uncertain(UncertainReason.OperatorLicensesNotDeclared)
     }
 
-    override fun verdictFor(notice: Notice): LicenseVerdict = verdictFor.invoke(notice)
+    override fun verdictFor(
+        account: AccountId,
+        notice: Notice,
+    ): LicenseVerdict = verdictFor.invoke(notice)
 }
 
 /** audit 쓰기 하나를 실패시킬 수 있는 recording sink — D-6A1-17 fail-closed 대조에 쓴다. */

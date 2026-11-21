@@ -27,7 +27,9 @@ class PinnedLicenseGate(
         account: AccountId,
         notice: Notice,
     ): LicenseVerdict {
-        check(account == this.account) {
+        // `AccountId` 는 값 비교를 제공하지 않는다(해시 검증을 비껴가는 길을 막는 규율) —
+        // 식별자 자체를 비교한다. 객체 `==` 를 쓰면 비교 구조 게이트의 허용 목록도 늘어난다.
+        check(account.value == this.account.value) {
             "고정 게이트는 고정한 계정의 판정만 돌려준다 — 고정=${this.account.value} 요청=${account.value}"
         }
         return verdict

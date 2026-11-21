@@ -123,14 +123,24 @@ class BidPriceRequestE2ETest {
                 it.execute(
                     "TRUNCATE TABLE notice, notice_audit, rejected_write, raw_observation, " +
                         "provenance_authority, operator_strategy, operator_strategy_revision, " +
-                        "outbox, api_request_audit RESTART IDENTITY CASCADE",
+                        "outbox, api_request_audit, browser_session, account RESTART IDENTITY CASCADE",
                 )
             }
         }
+        session =
+            ProductionSessionSupport(restTemplate, ::url)
+                .seedAndSignIn(adminDataSource(postgres), "bid-price-e2e-owner")
     }
 
-    private fun authorizedHeaders(): HttpHeaders =
-        HttpHeaders().apply { set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE) }
+
+    /**
+     * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
+     * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가
+     * `account` 까지 지우므로 세션도 함께 사라진다.
+     */
+    private lateinit var session: ProductionSessionSupport
+
+    private fun authorizedHeaders(): HttpHeaders = session.writeHeaders()
 
     private fun post(
         number: String,

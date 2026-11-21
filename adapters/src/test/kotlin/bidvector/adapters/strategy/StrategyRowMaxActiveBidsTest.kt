@@ -107,7 +107,7 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
     fun `maxActiveBids 있는 행이 UPSERT·SELECT 실 SQL 왕복에서 보존된다`() {
         insertStrategyRow(emptyRow(maxActiveBids = 7))
 
-        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
 
         strategy.maxActiveBids shouldBe MaxActiveBids(7)
     }
@@ -116,7 +116,7 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
     fun `maxActiveBids 없는 행은 null 로 복원된다 — 지어내지 않는다`() {
         insertStrategyRow(emptyRow(maxActiveBids = null))
 
-        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
 
         strategy.maxActiveBids shouldBe null
     }
@@ -147,7 +147,7 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
         insertStrategyRow(emptyRow(maxActiveBids = 7, revision = 1))
         insertStrategyRow(emptyRow(maxActiveBids = 3, revision = 2))
 
-        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load()
+        val strategy = JdbcStrategyRepository(dataSource(), testPolicy()).load(testAccount())
 
         strategy.maxActiveBids shouldBe MaxActiveBids(3)
     }
@@ -182,17 +182,18 @@ class StrategyRowMaxActiveBidsTest : PersistenceTestSupport() {
                 dataSource().connection.use { connection ->
                     connection
                         .prepareStatement(
-                            "INSERT INTO operator_strategy (id, revision, focus_categories, " +
+                            "INSERT INTO operator_strategy (account_id, revision, focus_categories, " +
                                 "focus_region_terms, exclude_region_terms, required_keyword_terms, " +
                                 "exclude_keyword_terms, max_active_bids) " +
-                                "VALUES (1, 1, ?, ?, ?, ?, ?, 0)",
+                                "VALUES (?, 1, ?, ?, ?, ?, ?, 0)",
                         ).use { statement ->
                             val empty = connection.createArrayOf("text", emptyArray<String>())
-                            statement.setArray(1, empty)
+                            statement.setLong(1, testAccount().value)
                             statement.setArray(2, empty)
                             statement.setArray(3, empty)
                             statement.setArray(4, empty)
                             statement.setArray(5, empty)
+                            statement.setArray(6, empty)
                             statement.executeUpdate()
                         }
                 }

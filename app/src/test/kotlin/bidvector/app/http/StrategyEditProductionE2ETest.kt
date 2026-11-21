@@ -100,17 +100,24 @@ class StrategyEditProductionE2ETest {
             connection.createStatement().use {
                 it.execute(
                     "TRUNCATE TABLE api_request_audit, edit_session, outbox, " +
-                        "operator_strategy, operator_strategy_revision",
+                        "operator_strategy, operator_strategy_revision, browser_session, account CASCADE",
                 )
             }
         }
+        session =
+            ProductionSessionSupport(restTemplate, ::url)
+                .seedAndSignIn(adminDataSource(postgres), "strategy-edit-e2e-owner")
     }
 
-    private fun headers(): HttpHeaders =
-        HttpHeaders().apply {
-            set(OperatorCredentialAuthenticator.CREDENTIAL_HEADER, TEST_CREDENTIAL_VALUE)
-            contentType = MediaType.APPLICATION_JSON
-        }
+
+    /**
+     * **M15/15A — 이 경로들은 세션으로만 닿는다.** V28 이 전략을 계정 소유로 옮기면서 자격 헤더
+     * 경로(계정이 없다)는 401 이다. 매 test 앞에서 계정을 새로 심고 로그인한다 — 표 비우기가
+     * `account` 까지 지우므로 세션도 함께 사라진다.
+     */
+    private lateinit var session: ProductionSessionSupport
+
+    private fun headers(): HttpHeaders = session.writeHeaders()
 
     private fun post(
         path: String,
