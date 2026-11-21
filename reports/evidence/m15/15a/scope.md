@@ -61,6 +61,9 @@ in_scope:
   - config/quality/gate-tests.properties   # 새 Kotlin test class 를 **만드는 커밋에서** 등재
   - config/quality/architecture-policy.properties   # 허용 뿌리 · 주입/2층 목록 · 어댑터 멤버 서술자
   - web/e2e/harness/journey-up.mjs         # 여정 하네스의 전략 심기 축(라운드 4)
+  - .github/workflows/ci.yml               # 컨테이너 스모크의 인증 축(라운드 5, 팀장 승인)
+  - tools/local-tls-smoke.sh               # 같은 사유 — 프록시 경유 /api 축
+  - tools/db-rehearsal.sh                  # 백업 리허설의 전략 질의(싱글턴 키 → 계정 키)
   - reports/evidence/m15/15a/
 out_of_scope:
   - 열린 가입(`POST /api/accounts`) · V29 · 공개 경로 집합            # 15B
@@ -69,7 +72,6 @@ out_of_scope:
   - `account_business_profile`(V22) · `account_construction_capacity` # 이미 계정 단위다
   - `notification_inbox`(V23) 의 스키마                               # 이미 계정 단위다
   - web/src/**                                                        # 화면 변경 0(아래 「web 접촉」)
-  - .github/workflows/ci.yml                                          # acceptance 는 오늘의 job 명령 그대로
 acceptance_commands:
   # ci.yml `check` job 의 Kotlin 전건.
   - ./gradlew --no-daemon check
@@ -78,6 +80,10 @@ acceptance_commands:
   - (web/) npm ci · lint · typecheck · gate:src-tree · api:types:check · test · gate:tests ·
     build · gate:boundary-canary · playwright install chromium · test:e2e ·
     ./gradlew --no-daemon :app:bootJar · test:e2e:journey
+  # ci.yml `container` job. **라운드 5 에서 들었다** — 컨테이너 스모크가 자격 헤더로 전략
+  # 왕복을 몰고 있었고 그 경로가 401 이 됐다. 이 job 은 이미지 빌드·compose 기동이 필요해
+  # 로컬 실행 비용이 크므로 판정은 PR 의 CI 가 낸다(로컬 실측 대상이 아니다).
+  - (CI) container job — 컨테이너 스모크(S-23b) · 로컬 패키징 스모크(S-26) · 백업 리허설(S-23c)
 rollback: rollback.md
 ```
 
@@ -246,3 +252,11 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
   옮기는 것이 그 변을 없애는 유일한 길이다. in_scope 가 모듈 넷의 트리로 넓어진 사유다.
 - 2026-11-21 (3) **acceptance 에 `web` job 이 들었다**(위 「web 접촉」) — 여정 하네스가 자격
   헤더로 전략을 심고 있었고 그 경로가 401 이 됐다. `web/e2e/harness/journey-up.mjs` 등재.
+- 2026-11-21 (4) **`container` job 과 그 스크립트 셋이 in_scope 에 들었다**(팀장 승인, 선택 (a)) —
+  컨테이너 스모크가 `GET /api/strategy` 와 begin→value→confirm 왕복을 **자격 헤더**로 몰고
+  있었고 V28 뒤 그 경로는 401 이다. 고친 모양은 **배포 표면을 건드리지 않는 쪽**이다:
+  `docker/compose.yaml` 에 계정·비밀을 더하지 않고, 스모크가 실행 시점에 일회 비밀 문구를
+  만들어(`openssl rand`, `::add-mask::`, 저장 안 함) **운영 runbook(m7-7f §12)과 같은 일회
+  명령**으로 계정을 만든 뒤 세션으로 왕복을 돈다. 자격 축은 아직 그 축으로 닿는 경로
+  (`/api/notices`)에 남겨 **죽지 않았음을 계속 잰다**. 같은 사유로 `tools/local-tls-smoke.sh`
+  의 `/api` 라우팅 축과 `tools/db-rehearsal.sh` 의 전략 질의(싱글턴 키 → 계정 키)도 고쳤다.

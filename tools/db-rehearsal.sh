@@ -285,7 +285,11 @@ fix_top="$(_tgt_psql restore_1 'select version from flyway_schema_history order 
 _step "(i) forward-fix — 열 사라짐·이력에 V${PROBE_ADD}·V${PROBE_FIX} 남음(top ${fix_top})·이력 밖 측정 전부 일치"
 
 # ---- 5. (ii) 데이터 손실 축 ---------------------------------------------------------
-Q_STRATEGY="select coalesce(candidate_limit::text, 'null') || '/' || revision::text from operator_strategy where id = 1"
+# M15/15A — V28 이 `operator_strategy.id`(싱글턴 키)를 DROP COLUMN 하고 그 표를 계정 소유로
+# 옮겼다. 술어를 **계정으로** 바꾼다. 「가장 작은 계정」은 V28 의 이관 규칙과 같은 규칙이고,
+# 이 job 의 DB 에는 스모크가 만든 계정 하나뿐이라 결정적이다 — 행이 둘이 되면 아래 비어 있음
+# 검사가 아니라 이 술어가 먼저 어느 행인지 말한다.
+Q_STRATEGY="select coalesce(candidate_limit::text, 'null') || '/' || revision::text from operator_strategy where account_id = (select min(id) from account)"
 source_strategy="$(_src_psql "$Q_STRATEGY")"
 [ -n "$source_strategy" ] \
   || _die "원본 operator_strategy 가 비어 있다 — 데이터 손실 축은 쓰기 왕복(S-23b) 뒤에 돌아야 한다" 1
