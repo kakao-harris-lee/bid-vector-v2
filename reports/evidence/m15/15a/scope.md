@@ -222,6 +222,43 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
 5. **`operator_strategy_revision` 의 개정 번호는 계정마다 독립이다.** 두 계정이 같은 `revision`
    값을 각자 가질 수 있고, 그것이 PK `(account_id, revision)` 의 뜻이다.
 
+## 알려진 제한 (r1 리뷰 라운드에 등재)
+
+6. **일일 평가 비용이 계정 수에 선형이다 — `OPEN-M15-EVAL-COST-PER-ACCOUNT`**(신설 id,
+   `OPEN-M15-COMMIT-CAPACITY` 와 **다른 축**이다: 그쪽은 「진행 입찰 수 값이 계정마다 없다」이고
+   이쪽은 「run 비용에 상한이 없다」).
+
+   run 이 계정마다 서고 각 run 이 **그 계정의** `candidateLimit` 까지 ML·임베딩을 부른다 —
+   계정 K 에 대해 비용이 K 배다. `bidvector.evaluation.candidate-cap` 은 전역이고 러너가
+   **로그에 싣기만** 할 뿐 run 을 묶지 않는다.
+
+   **실패 비용도 같은 모양으로 늘었다**(r1 에서 계정별 격리를 넣은 결과다). 앞 판은 첫 예외에서
+   멈춰 한 번만 실패했지만, 이제 DB 가 내려가면 계정마다 한 번씩 **K × 타임아웃**을 치른다.
+   격리 자체는 옳다(한 계정이 남의 평가를 끊지 않는다) — 비용이 그 대가라는 사실이 여기 있다.
+
+   **방아쇠: 15B 머지 전에 결정해야 한다.** 가입이 열리면 계정 수가 운영자의 손을 떠난다.
+   선택지 셋 — run 전체의 전역 상한 · 계정별 상한의 고정(clamp) · run 마감 시각(deadline).
+
+7. **운영 runbook 의 종료 코드 어휘가 낡았다** — `docs/runbook/m6-6e-operations.md` §3.4·§3.5.
+   `FAILED`(1) 은 이제 **청중을 못 읽은 경우 하나**이고, 계정 하나의 실패는 `INCOMPLETE`(2) 와
+   `evaluation-commit account-failed cause=` 줄이다. 종료 줄의 `failed=`·`suppressed=` 두 칸도
+   문서에 없다.
+
+   **이 slice 가 고치지 않는다** — runbook 은 in_scope 밖이고, **15B 가 그 파일을 어차피
+   연다**(가입이 계정 명령 절을 바꾼다). 거기서 함께 고친다. 그때까지 운영자가 읽는 문서는
+   종료 코드의 뜻을 한 갈래 좁게 말한다.
+
+8. **「평가한 계정 0 · 건너뜀 N」이 종료 코드 0 이다**(결정은 유지한다 — 갓 설치한 체계가 매일
+   운영자를 깨우지 않게 한다, 러너 KDoc). 계수(`accounts=0 skipped=N`)가 그 사실을 말하지만
+   **그 계수를 읽는 경보 규칙이 없다**. 즉 전원이 상한을 비워 둔 채 며칠이 지나도 cron 은 성공을
+   보고한다. 운영 공백으로 등재한다 — 닫는 자리는 경보 쪽이지 종료 코드가 아니다.
+
+9. **15B 로 넘긴 낮은 축 넷**(r1 리뷰). ⓐ 「채널 보유자를 **값으로** 고른다」가 측정되지 않았다 —
+   `minByOrNull` 을 `firstOrNull` 로 바꿔도 초록이다(청중이 늘 오름차순이라). `[2, 1]` 순서의
+   청중으로 한 건 재면 닫힌다. ⓑ 그 불변식을 공장 쪽에도 둘 수 있다(지금은 러너만 안다).
+   ⓒ 계정별 `catch` 가 `InterruptedException` 의 인터럽트 플래그를 되세우지 않는다.
+   ⓓ `OutboxNotificationRequestPortTest` 가 멱등 키 형식을 축어로 고정하지 않는다.
+
 ## 승인 경계
 
 - **DB 마이그레이션이 든다** — 계약이 V28 을 배정했다. 번호는 V28 하나, 기존 마이그레이션 파일은
@@ -257,10 +294,6 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
   옮기는 것이 그 변을 없애는 유일한 길이다. in_scope 가 모듈 넷의 트리로 넓어진 사유다.
 - 2026-11-21 (3) **acceptance 에 `web` job 이 들었다**(위 「web 접촉」) — 여정 하네스가 자격
   헤더로 전략을 심고 있었고 그 경로가 401 이 됐다. `web/e2e/harness/journey-up.mjs` 등재.
-- 2026-11-22 (5) **r1 리뷰 라운드** — 계약 위반 하나(전역 Telegram 채널)를 구현으로 닫고,
-  장부 밖이던 경로 셋(`AccountIdTest` · `RuleNegativeSamples` · `AccountBindingGuardTest`)을
-  이름으로 등재했다. 전역 채널 축이 `workflow.evaluation` 에 타입 둘
-  (`SuppressedNotificationChannel` · `NotificationRequestOutcome.Suppressed`)을 더한다.
 - 2026-11-21 (4) **`container` job 과 그 스크립트 셋이 in_scope 에 들었다**(팀장 승인, 선택 (a)) —
   컨테이너 스모크가 `GET /api/strategy` 와 begin→value→confirm 왕복을 **자격 헤더**로 몰고
   있었고 V28 뒤 그 경로는 401 이다. 고친 모양은 **배포 표면을 건드리지 않는 쪽**이다:
@@ -269,3 +302,7 @@ base `99f2fb25` 의 worktree 에서 쟀다. 수치와 그것을 낸 명령은 `c
   명령**으로 계정을 만든 뒤 세션으로 왕복을 돈다. 자격 축은 아직 그 축으로 닿는 경로
   (`/api/notices`)에 남겨 **죽지 않았음을 계속 잰다**. 같은 사유로 `tools/local-tls-smoke.sh`
   의 `/api` 라우팅 축과 `tools/db-rehearsal.sh` 의 전략 질의(싱글턴 키 → 계정 키)도 고쳤다.
+- 2026-11-22 (5) **r1 리뷰 라운드** — 계약 위반 하나(전역 Telegram 채널)를 구현으로 닫고,
+  장부 밖이던 경로 셋(`AccountIdTest` · `RuleNegativeSamples` · `AccountBindingGuardTest`)을
+  이름으로 등재했다. 전역 채널 축이 `workflow.evaluation` 에 타입 둘
+  (`SuppressedNotificationChannel` · `NotificationRequestOutcome.Suppressed`)을 더한다.
