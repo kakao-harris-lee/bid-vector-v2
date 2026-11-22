@@ -164,8 +164,42 @@ open class EvaluationWiring {
  * 후보 스캔 상한(D-6A3-7, `OPEN-6F2-CANDIDATE-BOUND` 닫음) — 기본값 없음. 미설정이면 Spring
  * relaxed binding 이 `BindException`으로 기동을 fail-fast 시킨다([PersistenceProperties]와
  * 같은 규율) — 조용히 무제한으로 돌지 않는다.
+ *
+ * **아래 둘은 기본값이 있다**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT` · 팀장 결정 2026-11-22).
+ * `candidateCap` 과 자격이 다르기 때문이다: 저것은 **운영자가 정해야 하는 입력**(지어내면 판정이
+ * 조용히 바뀐다)이고, 이 둘은 **상한**이다 — 값을 안 주는 것이 「무제한」을 뜻하면 안 되므로
+ * 안전한 쪽의 기본값이 서야 한다. 15B 가 가입을 열면 계정 수가 운영자의 손을 떠나므로, 그날
+ * 설정 파일을 고치지 않은 배포도 상한 아래서 돈다.
  */
 @ConfigurationProperties(prefix = "bidvector.evaluation")
 data class EvaluationProperties(
     val candidateCap: Int,
-)
+    /**
+     * run 하나가 평가하는 계정 수의 상한 — 넘는 계정은 **다음 KST 달력일의 창으로 미뤄지고**
+     * (`deferred=`) 종료 코드를 바꾸지 않는다. 창은 **보유자(가장 작은 id) 고정 + 나머지 회전**
+     * 이라, 연속한 `ceil((K-1)/(상한-1))` **달력일**이면 모든 계정이 한 번씩 돈다
+     * (`accountsForRun` KDoc). 상한이 `1` 이면 칸이 0 이라 보유자만 돈다.
+     *
+     * 기본 50 은 오늘의 비용에서 고른 수가 아니라 「손을 떠난 수를 묶는다」는 결정의 값이다 —
+     * 오늘 ML 호출이 `UnavailableMlAnalysis` 에 고정돼 있어 실제 run 비용은 0 에 가깝다.
+     */
+    val maxAccountsPerRun: Int = DEFAULT_MAX_ACCOUNTS_PER_RUN,
+    /**
+     * **끊기지 않는** 계정 실패가 이 수에 닿으면 run 이 남은 계정을 멈춘다. 흩어진 실패는 그
+     * 계정들의 일이지만 연속 실패는 **체계가 내려간 것**의 신호이고, 그때 계속 도는 것은
+     * K × 타임아웃을 치르는 일이다(15A 알려진 제한 6 의 「실패 비용도 같은 모양으로 늘었다」).
+     */
+    val maxConsecutiveAccountFailures: Int = DEFAULT_MAX_CONSECUTIVE_ACCOUNT_FAILURES,
+) {
+    init {
+        require(maxAccountsPerRun >= 1) { "bidvector.evaluation.max-accounts-per-run 은 1 이상이어야 한다" }
+        require(maxConsecutiveAccountFailures >= 1) {
+            "bidvector.evaluation.max-consecutive-account-failures 는 1 이상이어야 한다"
+        }
+    }
+
+    private companion object {
+        const val DEFAULT_MAX_ACCOUNTS_PER_RUN = 50
+        const val DEFAULT_MAX_CONSECUTIVE_ACCOUNT_FAILURES = 3
+    }
+}

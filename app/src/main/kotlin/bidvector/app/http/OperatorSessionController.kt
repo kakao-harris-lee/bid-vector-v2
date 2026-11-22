@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.app.wiring.BrowserAccessExecutor
 import bidvector.workflow.access.ClearPassphrase
+import bidvector.workflow.access.IssuedSession
 import bidvector.workflow.access.LoginName
 import bidvector.workflow.access.SessionDescription
 import bidvector.workflow.access.SignInOutcome
@@ -54,15 +55,7 @@ class OperatorSessionController(
             )
         return when (outcome) {
             is SignInOutcome.Granted -> {
-                ResponseEntity
-                    .status(HttpStatus.CREATED)
-                    .header(HttpHeaders.SET_COOKIE, cookies.issued(outcome.session.key))
-                    .body(
-                        SessionResponse(
-                            csrf = outcome.session.stamp.headerValue(),
-                            expiresAt = outcome.session.absoluteExpiresAt.toString(),
-                        ),
-                    )
+                issuedSession(outcome.session, cookies)
             }
 
             is SignInOutcome.Refused -> {
@@ -111,6 +104,25 @@ class OperatorSessionController(
             // 축에는 변화가 없다.
             .body(ErrorBody(ErrorCode.NOT_FOUND, "브라우저 세션이 없다", request.correlationIdOrUnknown()))
 }
+
+/**
+ * 발급된 세션 하나를 **201 응답으로 옮기는 자리 하나**(M15/15B) — 로그인과 가입이 같은 함수를
+ * 쓴다. 사본을 두면 쿠키 속성·본문 키가 갈리고, 그 둘이 「같은 응답」이라는 계약이 조용히
+ * 거짓이 된다(cpd 게이트가 실제로 그 사본을 잡았다).
+ */
+internal fun issuedSession(
+    session: IssuedSession,
+    cookies: SessionCookieWriter,
+): ResponseEntity<Any> =
+    ResponseEntity
+        .status(HttpStatus.CREATED)
+        .header(HttpHeaders.SET_COOKIE, cookies.issued(session.key))
+        .body(
+            SessionResponse(
+                csrf = session.stamp.headerValue(),
+                expiresAt = session.absoluteExpiresAt.toString(),
+            ),
+        )
 
 /**
  * 세션 응답 — **평탄하다**(D-6A1-20 ⓑ: 중첩 object 속성 없음). `data class` 가 **아니다**:

@@ -150,6 +150,15 @@ object ErrorCode {
     // M7/7C④ 2b — 한 계정의 시평액 행 수 상한(`ProfileInputPolicy.CAPACITY_ROWS_MAX`). 409 다:
     // 요청은 올바르고 **계정의 상태가 받지 않는다**. 상한 값은 본문에 싣지 않는다(세 필드).
     const val CAPACITY_ROWS_EXCEEDED = "CAPACITY_ROWS_EXCEEDED"
+
+    // M15/15B — 열린 가입의 거부 다섯. **사유를 나누는 것이 의도다**(로그인과 반대): 가입 화면이
+    // 어느 칸 옆에 문장을 둘지 알아야 하고, 가르는 규칙(길이·글자·중복)은 공개된 값이다.
+    // `ACCOUNT_EXISTS` 는 그 이름이 쓰인다는 사실만 말한다 — 누가 언제 만들었는지는 싣지 않는다.
+    const val LOGIN_NAME_INVALID = "LOGIN_NAME_INVALID"
+    const val PASSPHRASE_INVALID = "PASSPHRASE_INVALID"
+    const val ACCOUNT_EXISTS = "ACCOUNT_EXISTS"
+    const val SIGN_UP_RATE_LIMITED = "SIGN_UP_RATE_LIMITED"
+    const val SIGN_UP_SESSION_UNAVAILABLE = "SIGN_UP_SESSION_UNAVAILABLE"
 }
 
 /**

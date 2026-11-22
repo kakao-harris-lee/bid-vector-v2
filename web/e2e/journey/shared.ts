@@ -291,6 +291,8 @@ export const UNJUDGED_LABEL: Readonly<Record<string, string>> = {
 export const ALLOWED_ROUTES = [
   /^\/$/u,
   /^\/login$/u,
+  /** M15/15B — 가입 자리(로그인과 같은 축의 인증 자리). */
+  /^\/signup$/u,
   /^\/notices\//u,
   /^\/bids$/u,
   /^\/settings$/u,

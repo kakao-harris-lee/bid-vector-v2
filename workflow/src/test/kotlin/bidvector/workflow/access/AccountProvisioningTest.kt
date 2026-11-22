@@ -34,15 +34,30 @@ class AccountProvisioningTest {
     }
 
     @Test
-    fun `이미 계정이 있으면 거부한다 — 덮어쓰지 않는다`() {
+    fun `같은 아이디가 있으면 거부한다 — 덮어쓰지 않는다`() {
         command().create(LOGIN, ClearPassphrase.wrap(FIRST)) shouldBe ProvisionOutcome.Created
         val first = provisioning.hashOf(LOGIN)
 
-        command().create(LoginName("another"), ClearPassphrase.wrap(SECOND)) shouldBe
-            ProvisionOutcome.RefusedAccountExists
         command().create(LOGIN, ClearPassphrase.wrap(SECOND)) shouldBe ProvisionOutcome.RefusedAccountExists
 
         provisioning.hashOf(LOGIN)?.encoded shouldBe first?.encoded
+    }
+
+    /**
+     * M15/15B — **완화된 조건의 반대쪽**. 앞 판은 이 자리에서 거부했고(계정이 하나라도 있으면),
+     * 그래서 운영자가 둘째 계정을 손으로 만들 수 없었다. 가입이 열린 뒤 그 금지는 아무것도
+     * 지키지 않는다.
+     */
+    @Test
+    fun `다른 아이디는 계정이 이미 있어도 만든다 — 운영자가 둘째 계정을 손으로 만들 수 있다`() {
+        command().create(LOGIN, ClearPassphrase.wrap(FIRST)) shouldBe ProvisionOutcome.Created
+
+        command().create(LoginName("another"), ClearPassphrase.wrap(SECOND)) shouldBe ProvisionOutcome.Created
+
+        hasher.verify(ClearPassphrase.wrap(SECOND), requireNotNull(provisioning.hashOf(LoginName("another")))) shouldBe
+            true
+        // 첫 계정의 자격은 그대로다 — 둘째 생성이 앞 행을 건드리지 않는다.
+        hasher.verify(ClearPassphrase.wrap(FIRST), requireNotNull(provisioning.hashOf(LOGIN))) shouldBe true
     }
 
     @Test
@@ -59,7 +74,7 @@ class AccountProvisioningTest {
     @Test
     fun `교체 대상이 없으면 거부한다 — 교체가 계정을 만들지 않는다`() {
         command().rotate(LOGIN, ClearPassphrase.wrap(FIRST)) shouldBe ProvisionOutcome.RefusedAccountAbsent
-        provisioning.anyExists() shouldBe false
+        provisioning.isEmpty shouldBe true
     }
 
     /** 교체 전의 세션을 만들기 위한 로그인 — 저장된 해시를 그대로 쓰는 요청 경로 조립이다. */
@@ -84,6 +99,7 @@ class AccountProvisioningTest {
             accounts = accounts,
             sessions = sessions,
             completion = InMemorySignInCompletion(accounts, sessions),
+            signUps = InMemorySignUpStore(),
             hasher = hasher,
             keys = CountingKeySource(),
             clock = clock,
@@ -96,6 +112,7 @@ class AccountProvisioningTest {
                     hashCost = 12,
                     lockWait = Duration.ofMillis(500),
                 ),
+            signUpPolicy = shippedSignUpPolicy(),
         )
     }
 }

@@ -115,16 +115,25 @@ open class EvaluationCommitWiring {
             release = release,
         )
 
+    /**
+     * 러너도 **주입된 시계**를 받는다(보존 러너 선례 cr L-4) — 회전 창의 달력일을 그 시계로
+     * 고른다. 러너가 시계를 안 받고 시스템 시계로 날짜를 고르면 test 가 창을 움직일 수 없고,
+     * run 공장과 러너가 서로 다른 날을 볼 수 있다.
+     */
     @Bean
     open fun evaluationCommitRunner(
         runs: EvaluationCommitRuns,
         properties: EvaluationProperties,
+        clock: Clock,
         termination: CollectionTermination,
     ): EvaluationCommitRunner {
         val logger = LoggerFactory.getLogger(EvaluationCommitRunner::class.java)
         return EvaluationCommitRunner(
             runs = runs,
             candidateCap = properties.candidateCap,
+            maxAccountsPerRun = properties.maxAccountsPerRun,
+            maxConsecutiveAccountFailures = properties.maxConsecutiveAccountFailures,
+            clock = clock,
             log = CollectionLog { logger.info(it) },
             termination = termination,
         )

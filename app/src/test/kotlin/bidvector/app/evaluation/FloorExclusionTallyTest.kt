@@ -85,9 +85,11 @@ class FloorExclusionTallyTest {
             accounts = 1,
             skipped = 0,
             failed = 0,
+            deferred = 0,
             exitCode = exitCodeOf(tally, failedAccounts = 0),
         ) shouldBe
-            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=2 reached=1 notReached=1 bidNow=1 " +
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 deferred=0 " +
+            "candidates=2 reached=1 notReached=1 bidNow=1 " +
             "requested=1 requestFailed=0 suppressed=0 floorImplausible=1 floorOriginNotJudged=1 exit=0"
     }
 

@@ -175,9 +175,13 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
         refused.headers.getFirst(HttpHeaders.SET_COOKIE) shouldBe null
     }
 
+    /**
+     * M15/15B — **둘이 됐다.** 열린 가입(`POST /api/accounts`)이 더해졌고, 그 자리는 계정 생성
+     * 하나만 연다(그 뒤의 모든 요청은 다시 이 필터를 지난다). 등식이라 셋째가 조용히 들어오지 못한다.
+     */
     @Test
-    fun `우회 ⑦ — 무인증 허용 목록은 로그인 하나다(집합 등식)`() {
-        RequestAuthenticationFilter.OPEN_ROUTES shouldBe setOf("POST $SESSION_PATH")
+    fun `우회 ⑦ — 무인증 허용 목록은 로그인과 가입 둘이다(집합 등식)`() {
+        RequestAuthenticationFilter.OPEN_ROUTES shouldBe setOf("POST $SESSION_PATH", "POST $ACCOUNTS_PATH")
     }
 
     @Test
@@ -201,10 +205,11 @@ class BrowserSessionAuthenticationTest : HttpIntegrationTestBase() {
                 exchange(path, HttpMethod.valueOf(method), headers = HttpHeaders(), body = "{}").statusCode.value()
             }
 
-        // 로그인 하나만 401 이 아니다 — 그 하나도 통과(201)가 아니라 **본문 검증**(400)에 걸린다
-        // (빈 object 는 알려진 키를 갖지 않는다). 즉 허용 목록이 여는 것은 **그 경로 하나**이고
+        // 허용 목록의 **둘만** 401 이 아니다 — 그 둘도 통과(201)가 아니라 **본문 검증**(400)에
+        // 걸린다(빈 object 는 알려진 키를 갖지 않는다). 즉 허용 목록이 여는 것은 **그 경로 둘**이고
         // 그 경로의 인증 없는 성공이 아니다.
-        statuses.filterValues { it != 401 }.keys shouldBe setOf("POST" to SESSION_PATH)
+        statuses.filterValues { it != 401 }.keys shouldBe
+            setOf("POST" to SESSION_PATH, "POST" to ACCOUNTS_PATH)
     }
 
     /**

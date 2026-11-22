@@ -56,7 +56,20 @@ internal object AccessSql {
             "WHERE id = ? AND passphrase_hash = ? AND (locked_until IS NULL OR locked_until <= ?) " +
             "RETURNING id"
 
-    const val SELECT_ACCOUNT_EXISTS = "SELECT EXISTS (SELECT 1 FROM account)"
+    const val SELECT_ACCOUNT_EXISTS_BY_LOGIN = "SELECT EXISTS (SELECT 1 FROM account WHERE login_name = ?)"
+
+    /**
+     * 열린 가입의 **유일한 쓰기**(M15/15B) — 적는 열이 V29 의 GRANT 와 정확히 같다. 시각 세 열은
+     * 적지 않는다(권한이 없고, DEFAULT 가 DB 쪽에서 정한다) — 요청 경로는 계정이 언제 생겼는지를
+     * 고를 수 없다.
+     *
+     * `ON CONFLICT … DO NOTHING` 이라 **중복 판정이 코드가 아니라 제약**이다: 「읽어 보고 없으면
+     * 쓴다」였다면 같은 이름으로 동시에 들어온 둘이 둘 다 통과한 뒤 하나가 예외로 터진다(그리고 그
+     * 예외는 500 이 된다). 한 문장이면 둘째는 0 행이고 호출부가 그것을 `409` 로 읽는다.
+     */
+    const val INSERT_ACCOUNT_IF_ABSENT =
+        "INSERT INTO account (login_name, passphrase_hash) VALUES (?, ?) " +
+            "ON CONFLICT (login_name) DO NOTHING RETURNING id"
 
     /** 운영자 명령 전용(소유자 연결) — 생성 시각·갱신 시각을 명령의 시계가 싣는다. */
     const val INSERT_ACCOUNT =

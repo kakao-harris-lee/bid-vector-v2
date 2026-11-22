@@ -225,6 +225,47 @@ class EvaluationCommitWiringTest {
                 .forAccount(WIRING_TEST_ACCOUNT, channelHolder = WIRING_TEST_ACCOUNT) shouldBe null
         }
     }
+
+    /**
+     * **출하 기본값 둘을 잠근다**(r3 verifier L-3). 두 상한은 설정에 없어도 서야 하고(미설정이
+     * 「무제한」을 뜻하면 안 된다) 그 수가 바로 비용 상한이다 — 값이 조용히 커지면 상한이 사라진
+     * 것과 같다. 가입 상한에서 같은 구멍을 `SignUpThrottleWiringTest` 가 닫았다.
+     */
+    @Test
+    fun `평가 상한 둘은 설정이 없어도 50 과 3 이다`() {
+        withBoot(*validProperties()) { booted ->
+            val properties = booted.context.getBean(EvaluationProperties::class.java)
+            properties.maxAccountsPerRun shouldBe 50
+            properties.maxConsecutiveAccountFailures shouldBe 3
+        }
+    }
+
+    /** 접두 바인딩도 함께 잠근다 — 키 이름이 바뀌면 운영자가 준 값이 조용히 무시된다. */
+    @Test
+    fun `설정이 주어지면 그 값이 바인딩된다`() {
+        withBoot(
+            *validProperties(),
+            "bidvector.evaluation.max-accounts-per-run=7",
+            "bidvector.evaluation.max-consecutive-account-failures=2",
+        ) { booted ->
+            val properties = booted.context.getBean(EvaluationProperties::class.java)
+            properties.maxAccountsPerRun shouldBe 7
+            properties.maxConsecutiveAccountFailures shouldBe 2
+        }
+    }
+
+    /** 0 은 상한이 아니라 「아무도 평가하지 않는다」다 — 지어내지 않고 기동을 멈춘다. */
+    @Test
+    fun `평가 상한이 1 미만이면 기동에 실패한다`() {
+        withBoot(*validProperties(), "bidvector.evaluation.max-accounts-per-run=0") { booted ->
+            booted.failure shouldNotBe null
+            booted.failure!!.stackTraceToString() shouldContain "max-accounts-per-run"
+        }
+        withBoot(*validProperties(), "bidvector.evaluation.max-consecutive-account-failures=0") { booted ->
+            booted.failure shouldNotBe null
+            booted.failure!!.stackTraceToString() shouldContain "max-consecutive-account-failures"
+        }
+    }
 }
 
 private fun strategyWithCap(maxActiveBids: Int = 10) =

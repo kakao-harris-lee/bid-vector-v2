@@ -55,6 +55,8 @@ export type NoticeSearchQuery = NonNullable<operations['searchNotices']['paramet
 
 const HTTP_NOT_FOUND = 404;
 const HTTP_UNAUTHORIZED = 401;
+/** 이 아래는 **계약이 적은 거부**이고, 이 위는 화면이 고칠 수 없는 고장이다. */
+const HTTP_SERVER_ERROR = 500;
 
 interface ErrorLike {
   readonly code?: string;
@@ -114,6 +116,58 @@ export async function signIn(loginName: string, passphrase: string): Promise<Ses
     raise(response.status, error);
   }
   return data;
+}
+
+/** 가입 거부의 **칸별 사유** — 서버가 코드로 가르고 화면이 그 코드로 문장의 자리를 고른다. */
+export type SignUpRefusal =
+  | 'loginName'
+  | 'passphrase'
+  | 'duplicate'
+  | 'rateLimited'
+  | 'sessionUnavailable'
+  | 'unknown';
+
+/** 가입 결과 — 성공이면 세션, 아니면 **어느 칸의 무슨 사유**인가. */
+export type SignUpResult =
+  | { readonly kind: 'granted'; readonly session: SessionResponse }
+  | { readonly kind: 'refused'; readonly refusal: SignUpRefusal };
+
+/**
+ * 서버 코드 → 화면 사유. **표 하나**이고 화면이 상태 코드를 해석하지 않는다 — 같은 400 아래
+ * 칸이 둘이라, 상태로 가르면 화면이 본문 코드를 다시 읽어야 한다.
+ */
+const SIGN_UP_REFUSALS: Readonly<Record<string, SignUpRefusal>> = {
+  LOGIN_NAME_INVALID: 'loginName',
+  PASSPHRASE_INVALID: 'passphrase',
+  ACCOUNT_EXISTS: 'duplicate',
+  SIGN_UP_RATE_LIMITED: 'rateLimited',
+  SIGN_UP_SESSION_UNAVAILABLE: 'sessionUnavailable',
+};
+
+/**
+ * 열린 가입(M15/15B) — **무인증으로 열리는 둘째 operation**(계약 선언). 성공하면 로그인과 **같은
+ * 응답**이라 화면은 따로 로그인하지 않는다.
+ *
+ * 실패를 `null` 하나로 접지 않는 것이 로그인과 다른 점이다 — 가입 화면은 어느 칸 옆에 문장을 둘지
+ * 알아야 하고, 그 규칙(길이·글자·중복)은 공개된 값이다. 표에 없는 코드는 `unknown` 으로 **떨어뜨리고
+ * 지어내지 않는다** — 그 자리에서 화면은 일반 문장을 보인다.
+ */
+export async function signUp(loginName: string, passphrase: string): Promise<SignUpResult> {
+  const { data, error, response } = await apiClient.POST('/api/accounts', { body: { loginName, passphrase } });
+  if (data === undefined) {
+    const code = typeof error === 'object' && error !== null ? ((error as ErrorLike).code ?? null) : null;
+    const refusal = code === null ? undefined : SIGN_UP_REFUSALS[code];
+    if (refusal === undefined) {
+      // 계약 밖 상태(5xx·네트워크 계층 오류)는 **삼키지 않는다** — 화면이 그것을 「형식 오류」로
+      // 보이면 운영자가 입력을 고치며 영영 못 들어간다.
+      if (response.status >= HTTP_SERVER_ERROR) {
+        raise(response.status, error);
+      }
+      return { kind: 'refused', refusal: 'unknown' };
+    }
+    return { kind: 'refused', refusal };
+  }
+  return { kind: 'granted', session: data };
 }
 
 /**
