@@ -15,6 +15,15 @@
 - cmd: `./gradlew --no-daemon --no-build-cache :app:test --tests 'bidvector.app.evaluation.*'`
 - exit **0** · suite 6 · test **41** · 실패 0 (`EvaluationCommitRunnerTest` 가 17 → **18**)
 
+### 라운드 1 뒤 — 품질 게이트 묶음도 돌렸다
+
+표적 test 하나만 돌려 `sizeGate` 를 놓쳤다(`scope.md` 「라운드 1」). 고친 뒤:
+
+- cmd: `./gradlew --no-daemon --no-build-cache --continue :app:sizeGate :app:detekt
+  :app:ktlintMainSourceSetCheck :app:ktlintTestSourceSetCheck :app:cpdCheck
+  :app:test --tests 'bidvector.app.evaluation.*'`
+- exit **0** · `evaluateAccounts` **49 줄**(한도 50) · 평가 test 41 · 실패 0
+
 ## web 표적
 
 | 명령 | 결과 |
@@ -81,5 +90,7 @@ suite 안에서 재지 않고 있었다. 넷이 술어의 같은 수집 줄에 �
 
 ## 되돌리기
 
-`rollback.md` 가 정본이다 — 목록 **22**(A 0 · M 22 · D 0) · 복원 exit 0 · 원천 대비 diff **0 줄** ·
-④ 컴파일 · ⑤ test 40/0 · ⑥ `leakPatternGate` 전부 초록 · 내 표지 0 · 남의 표지 보존.
+`rollback.md` 가 정본이다 — **실측 HEAD `68dc7a596`**(라운드 1 이 복원 목록 안 파일을 다시
+건드려 라운드 0 의 측정을 버리고 다시 냈다) · 목록 **22**(A 0 · M 22 · D 0) · 복원 exit 0 ·
+원천 대비 diff **0 줄** · ④ 컴파일 · ⑤ test 40/0 · ⑥ `leakPatternGate` 전부 초록 ·
+내 표지 0(복원 목록 안) · 남의 표지 보존.
