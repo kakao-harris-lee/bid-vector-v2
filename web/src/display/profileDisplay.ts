@@ -170,6 +170,11 @@ export interface BusinessDetailsForm {
   readonly businessCertificateExpiresOn: string;
 }
 
+/** 그 문자열이 계약의 소재지 어휘인가 — **표의 키**로 좁힌다(CR r1 L-9, 캐스팅 없이). */
+export function isHeadquartersRegion(value: string): value is HeadquartersRegion {
+  return Object.hasOwn(REGION_DISPLAY, value);
+}
+
 /**
  * 사업 정보 요청 본문 — **절 단위 교체**다(부분 갱신이 다른 칸을 지우는 모양이 계약에 없다).
  *
@@ -181,12 +186,11 @@ export interface BusinessDetailsForm {
  *    `null` 로 보낸다(공백이 조용히 「지우기」가 되지 않게).
  *  · 사업자번호도 같다 — 빈 입력은 `null`(「비워 둠」)이고, 적힌 값은 **꼴을 건드리지 않고**
  *    간다(앞뒤 공백만 턴다 — 상호와 달리 이 칸은 턴다, r1 cr L-9).
+ *
+ * 이 블록은 **15F 까지 [isHeadquartersRegion] 위에 있었다**(15F r1 cr L-6). TSDoc 은 뒤에 둘째
+ * doc comment 가 오면 앞 블록을 그 심볼의 문서로 읽지 않으므로, 계약의 두 제약을 적은 이 문서가
+ * IDE 에서 이 함수 위에 뜨지 않았다 — 거동 0 의 자리 옮김이다.
  */
-/** 그 문자열이 계약의 소재지 어휘인가 — **표의 키**로 좁힌다(CR r1 L-9, 캐스팅 없이). */
-export function isHeadquartersRegion(value: string): value is HeadquartersRegion {
-  return Object.hasOwn(REGION_DISPLAY, value);
-}
-
 export function businessDetailsBodyOf(form: BusinessDetailsForm): BusinessDetailsRequest {
   const trimmed = form.tradeName.trim();
   // 사업자번호는 **입력 위생으로 앞뒤 공백만 턴다**(r1 cr L-9 — 앞 판 주석은 「그대로 보낸다」와

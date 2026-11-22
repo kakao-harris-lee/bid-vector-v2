@@ -405,11 +405,17 @@ deferred=…`). 넷은 서로 다른 사건이고, 종료 코드에 미치는 �
   - **`cause=consecutive-account-failures`** — 끊기지 않는 실패가 상한에 닿았다(기본 N=3,
     `bidvector.evaluation.max-consecutive-account-failures`). 그것은 그 계정들의 일이 아니라
     **체계가 내려간 것**의 신호다 — `account-failed cause=` 를 §3.5 로 먼저 읽고 고친 뒤 재실행한다.
-    그 run 은 `failed>0` 이므로 종료 코드는 이미 `INCOMPLETE`(2) 다.
+    그 run 은 `failed>0` 이므로 종료 코드는 이미 `INCOMPLETE`(2) 다. **이 사유가 중단을 덮을 수
+    있다** — 아래 `cause=interrupted` 항목의 「거꾸로는 읽지 않는다」를 함께 본다.
   - **`cause=interrupted`** — **누가 이 프로세스를 껐다**(SIGTERM · 배포 · 수동 중단). 판정은 예외
     종류가 아니라 **스레드의 인터럽트 플래그**이므로, 짝으로 서는 `account-failed cause=` 줄은
     `InterruptedException` 이 **아닐 수 있다**(출하 DB 경로에서는 connection pool 이 그것을
     `java.sql.SQLException` 으로 감싸 온다 — 두 줄이 다른 것을 말하는 것이 정상이다).
+    **거꾸로는 읽지 않는다 — 이 줄이 없다고 중단이 아니었던 것은 아니다.** 플래그는
+    `InterruptedException` 이 던져지는 순간 **지워지고**, 러너가 보는 것은 그것을 **되세운** 계층이
+    남긴 상태다(connection pool 이 그렇다). 되세우지 않고 감싸는 계층이 끼면 플래그는 꺼진 채 오고
+    그 run 은 **중단인데도** 아래 `consecutive-account-failures` 로 멈춘다. 그 줄을 보고 계정 쪽을
+    뒤지기 전에 **같은 시각의 중단 흔적**(systemd `Stopping`·배포 기록)을 먼저 맞대 본다.
     `consecutive=` 는 대개 1 이고 `failed=1` 은 **그 중단 자체**다. **고칠 자리가 계정이 아니다** —
     왜 중단됐는지(systemd · 배포 · 수동)를 보고, 계정 쪽에서 고칠 것을 찾지 않는다. 재실행하면
     **그 날의 창이 그대로 다시 돈다**(회전 축이 날짜라서다). `failed=1` 만 보는 경보에게는 이 줄이

@@ -114,8 +114,8 @@ class EvaluationCommitRunner(
         var skipped = 0
         var failed = 0
         var consecutiveFailures = 0
-        // 멈춤은 **한 값**이다(r5 CR L-2) — 자리와 사유를 따로 두면 한쪽만 세우는 변경이 줄에
-        // 틀린 사유를 찍는다. 틀린 사유를 담은 줄은 없는 줄보다 나쁘다.
+        // 멈춤은 **한 값**이다(r5 CR L-2 — **첫째 = 멈춘 자리(1-based) · 둘째 = 사유**, 15F r1
+        // CR L-9). 둘을 따로 두면 한쪽만 세우는 변경이 줄에 틀린 사유를 찍고, 그 줄은 없는 줄보다 나쁘다.
         var stopped: Pair<Int, String>? = null
         for ((index, account) in taken.withIndex()) {
             try {
@@ -161,8 +161,26 @@ class EvaluationCommitRunner(
      * 받으면 플래그를 되세운 뒤 `SQLException(…, InterruptedException)` 으로 **감싸** 던진다.
      * 타입을 열거하는 술어는 그 모양 집합을 따라잡지 못한다(`ClosedByInterruptException` ·
      * `InterruptedIOException` · 그것을 감싼 Spring `DataAccessException` · 드라이버마다 다른 사본).
-     * 플래그는 **번역을 타지 않는** 한 자리라, 감싼 예외도 **첫 건에서** 잡힌다(앞 판은 다음 계정의
-     * raw 인터럽트까지 가서 `failed` 가 둘이었다 — r5 CR L-3 의 상한 2 가 1 이 됐다).
+     * 이 술어가 잡는 것은 **플래그를 되세우는 번역 전부**다(HikariCP 가 그렇다) — 감싼 예외도
+     * **첫 건에서** 잡힌다(앞 판은 다음 계정의 raw 인터럽트까지 가서 `failed` 가 둘이었다 —
+     * r5 CR L-3 의 상한 2 가 1 이 됐다).
+     *
+     * **되세우지 않는 계층은 여전히 사각이다**(15F r1 cr L-1). `InterruptedException` 을 던지는
+     * 순간 인터럽트 상태는 **지워지므로**, 그것을 잡아 되세우지 **않고** 감싸는 계층(상류
+     * 라이브러리 · 미래의 드라이버 · `Future.get` 류를 감싼 자리)이 끼면 플래그는 꺼진 채 오고 이
+     * 술어는 앞 판과 똑같이 눈이 먼다 — 그때는 연속 상한이 다시 유일한 상한이다.
+     * [noteAccountFailure] 는 **정확히 `InterruptedException` 일 때만** 되세우므로 감싼 예외를
+     * 구제하지 못한다. 그 사각은 `reports/evidence/m15/15f/scope.md` 알려진 제한이 든다.
+     *
+     * **인터럽트가 연속 상한보다 앞이다** — 둘이 같은 실패에서 함께 참일 수 있고(상한에 닿은 그
+     * 건이 마침 인터럽트), 그때 사유를 연속 상한으로 적으면 「누가 껐다」가 어느 줄에도 남지 않는다.
+     * 연속 수는 멈춤 줄의 `consecutive=` 칸에 그대로 실리므로 이 순서는 아무 정보도 잃지 않는다.
+     *
+     * **플래그의 범위는 run 이 아니라 스레드다 — 좁히지 않는 것이 결정이다**(15F r1 cr L-2).
+     * 술어는 「이 run 중에 인터럽트가 왔는가」가 아니라 「지금 이 스레드에 플래그가 서 있는가」를
+     * 묻는다. 진입 전에 남은 플래그가 있으면 무관한 첫 실패가 `interrupted` 로 적히지만, 머리에서
+     * `Thread.interrupted()` 로 지워 범위를 좁히면 **run 시작 직전에 온 진짜 종료 신호를 삼킨다** —
+     * 일회성 `ApplicationRunner` 라 그 창이 기동 직후에 실제로 있다. 교환이 이익이 아니다.
      *
      * 호출 순서가 전제다: [noteAccountFailure] 가 raw `InterruptedException` 의 플래그를 **먼저**
      * 되세운다(`runBlocking` 의 `joinBlocking` 이 읽으면서 지우기 때문이다).
@@ -201,8 +219,10 @@ class EvaluationCommitRunner(
      * 되세운 플래그가 닿는 자리는 이제 **둘**이다 — 바로 뒤의 [stopCauseFor] 판정과, 멈춘 뒤의
      * **종료 경로**(`SpringApplication.exit` 의 context close). 멈춘 자리 뒤로 `runBlocking` 재진입이
      * 없으므로 「다음 계정의 blocking 호출」은 더 이상 이 문장의 대상이 아니다(15F A-4f).
-     * 종료 직전에 지우지 않는 것은 결정이다: 지우면 종료 훅과 context close 가 인터럽트를 보지
-     * 못해 15A r1 이 닫은 결함을 종료 경로에서 다시 연다.
+     * 종료 직전에 지우지 않는 것은 결정이다: `SpringApplication.exit` 의 context close 는 **이
+     * 스레드에서** 돌고, 지우면 그 경로가 인터럽트를 보지 못해 15A r1 이 닫은 결함을 종료
+     * 경로에서 다시 연다. **JVM 종료 훅은 이 축이 아니다**(15F r1 v F-3) — 훅은 별 스레드에서
+     * 돌아 이 플래그와 무관하다.
      */
     private fun noteAccountFailure(failure: Exception) {
         log.write(evaluationCommitAccountFailureLine(causeCodeOf(failure)))

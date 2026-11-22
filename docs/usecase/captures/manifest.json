@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-11-20T18:16:46.203Z",
-  "head": "5a8e0b853aefe86c5692bcf066a8d792b02642ac",
-  "totalBytes": 1611484,
+  "capturedAt": "2026-11-22T14:09:04.371Z",
+  "head": "6f5bfdd15e28144591c3e7c734b114cab0bb95a5",
+  "totalBytes": 1633739,
   "files": [
     {
       "path": "a-start-desktop.png",
@@ -10,9 +10,9 @@
       "viewportWidth": 1280,
       "viewportHeight": 800,
       "imageWidth": 1280,
-      "imageHeight": 1162,
-      "bytes": 124824,
-      "sha256": "3d230de8083fbe60e9f06c055094cb6295b5cde7435350a9350e3108b7d8952b"
+      "imageHeight": 1278,
+      "bytes": 133265,
+      "sha256": "51f7a1aa5ba4cd6c0edb2cc0b6da4fff51be54e808268d29f54b366abf11e1ac"
     },
     {
       "path": "b-notices-desktop.png",
@@ -44,8 +44,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 996,
-      "bytes": 110856,
-      "sha256": "e4d1e2077d8100ff134e9156de325c0d16896da51002ae5ea1186190130ff5bb"
+      "bytes": 113040,
+      "sha256": "6cf9c46ea712737dc7e3b5baf872e60478e226fba10093fc1dfd4668d24b62aa"
     },
     {
       "path": "d-bid-box-desktop.png",
@@ -55,8 +55,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 62711,
-      "sha256": "4878512ff077613310308027e77641de3e2e28de23b1246c5a24eaa0d293a975"
+      "bytes": 62769,
+      "sha256": "12182ce6cae5b4aed3798d74c328b1cf2dd474d77d815b7113eb285ed7c8d633"
     },
     {
       "path": "d2-bid-box-watching-desktop.png",
@@ -66,8 +66,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 65338,
-      "sha256": "70ad0fef7093b8de38096bb1ff73b6c75ab1e2fe84dd4c578a3f0eedc7caf425"
+      "bytes": 65487,
+      "sha256": "2d531d8f912ce353048c7b1ca28c06945af68b8b352fa4b215b1bd0948a491f6"
     },
     {
       "path": "e-results-desktop.png",
@@ -77,8 +77,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 1634,
-      "bytes": 187781,
-      "sha256": "7f71eb09dc5b6866f9fd1024cbd26c9470d4dd5b71f4fe6aa9346d4b29b6800f"
+      "bytes": 188278,
+      "sha256": "9ac552919f29bc2cb00204756ae9911fcf9ed737d63a6c07e191dfdfc29e2b71"
     },
     {
       "path": "inbox-desktop.png",
@@ -88,8 +88,8 @@
       "viewportHeight": 800,
       "imageWidth": 1280,
       "imageHeight": 800,
-      "bytes": 86764,
-      "sha256": "85db5edf2bb3064b5f2cca742505286bc6c886b912ea13bfc7370f6bc4ffe233"
+      "bytes": 87545,
+      "sha256": "45b8ea3780fa14c51f32a638ee1ad6707e6858ba1c864b123efa27c30a1e6c30"
     },
     {
       "path": "a-start-mobile.png",
@@ -98,9 +98,9 @@
       "viewportWidth": 390,
       "viewportHeight": 844,
       "imageWidth": 390,
-      "imageHeight": 2039,
-      "bytes": 112428,
-      "sha256": "8dfb48986c9300fcfb18b500eaf4d6c3b0f452aa7915062b27a431982ea61471"
+      "imageHeight": 2171,
+      "bytes": 118198,
+      "sha256": "88219914b347d0ed511d61cd3a3056481376f24e994ced4bed9a2077c8671a06"
     },
     {
       "path": "b-notices-mobile.png",
@@ -132,8 +132,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 1471,
-      "bytes": 94572,
-      "sha256": "4c9a38fcc924f54acf2e0d25647b1aeb5fcc0af2a3bfb199f61e8518091c0a5f"
+      "bytes": 96618,
+      "sha256": "4532963f957b9778dcdf974b040ff8076d3450abd1697671b8c3f12f91df796e"
     },
     {
       "path": "d-bid-box-mobile.png",
@@ -143,8 +143,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 891,
-      "bytes": 55649,
-      "sha256": "15c7c86b5f32226b118c8f146d69198f04ed1fee69e2a0c241d17d8c4b6de8fd"
+      "bytes": 55844,
+      "sha256": "83529cc20c41f18e10cb1f765dda6bb45be5366d4cb670be7cde7d108805b956"
     },
     {
       "path": "d2-bid-box-watching-mobile.png",
@@ -154,8 +154,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 1005,
-      "bytes": 57872,
-      "sha256": "7f1f72f31d2e802ac49ac575163e63fdf67fc2b271b04766c753f0fedd17a2f9"
+      "bytes": 58097,
+      "sha256": "a8eb014a6efd61073b09b3cb68ec7e589a6fc0482375ceb2614a3037569d2758"
     },
     {
       "path": "e-results-mobile.png",
@@ -165,8 +165,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 2929,
-      "bytes": 181401,
-      "sha256": "7c0140079cca37bdf7230db891e7e8e401489550b74ed40fa629410bd79adc43"
+      "bytes": 182185,
+      "sha256": "50a2a736ae3e7098c43ce636c0c788fd68324456b58c78ee0252f24d3c4379e4"
     },
     {
       "path": "inbox-mobile.png",
@@ -176,8 +176,8 @@
       "viewportHeight": 844,
       "imageWidth": 390,
       "imageHeight": 1225,
-      "bytes": 78358,
-      "sha256": "66374e1b9ae0123adcd731919a713aa97122234826cc0f32f0e07386c8533f76"
+      "bytes": 79483,
+      "sha256": "6340eec09e5f842e09d3ba48f95624ef69b11a6c68a4a9d9f76a687eedb94041"
     }
   ]
 }
