@@ -48,9 +48,11 @@ class EvaluationCommitExitCodeTest {
             accounts = 1,
             skipped = 0,
             failed = 0,
+            deferred = 0,
             exitCode = exitCodeOf(tally, failedAccounts = 0),
         ) shouldBe
-            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=4 reached=3 notReached=1 bidNow=2 " +
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 deferred=0 " +
+            "candidates=4 reached=3 notReached=1 bidNow=2 " +
             "requested=1 requestFailed=1 suppressed=0 floorImplausible=0 floorOriginNotJudged=0 exit=2"
     }
 
@@ -77,9 +79,11 @@ class EvaluationCommitExitCodeTest {
             accounts = 1,
             skipped = 0,
             failed = 0,
+            deferred = 0,
             exitCode = exitCodeOf(tally, failedAccounts = 0),
         ) shouldBe
-            "evaluation-commit finished accounts=1 skipped=0 failed=0 candidates=3 reached=3 notReached=0 bidNow=0 " +
+            "evaluation-commit finished accounts=1 skipped=0 failed=0 deferred=0 " +
+            "candidates=3 reached=3 notReached=0 bidNow=0 " +
             "requested=0 requestFailed=0 suppressed=0 floorImplausible=2 floorOriginNotJudged=1 exit=0"
     }
 
@@ -92,6 +96,7 @@ class EvaluationCommitExitCodeTest {
                 accounts = 1,
                 skipped = 0,
                 failed = 0,
+                deferred = 0,
                 exitCode = EvaluationCommitExitCode.COMPLETE,
             )
         val names = PublishedFloorExclusion.entries.map { exclusion -> "$exclusion" }

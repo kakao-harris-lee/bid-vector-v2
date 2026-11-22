@@ -3,7 +3,8 @@ import { useLocation, useNavigate } from 'react-router';
 
 import { rememberCsrf } from './api/client';
 import { signIn } from './api/queries';
-import { Button } from './components/Button';
+import { Button, LinkButton } from './components/Button';
+import { LOGIN_PATH, SIGN_UP_PATH } from './paths';
 
 /**
  * 실패 문면은 **하나**다(M7/7D) — 계정 부재·비밀 문구 불일치·연속 실패 잠금을 화면이
@@ -12,7 +13,6 @@ import { Button } from './components/Button';
 const FAILURE_MESSAGE = '로그인에 실패했습니다. 입력값을 확인하세요.';
 
 const HOME_PATH = '/';
-const LOGIN_PATH = '/login';
 
 /**
  * 로그인 뒤 **돌아갈 자리**(M13/13B). 세션이 끊겨 떠밀려 온 운영자를 홈이 아니라 하던 자리로
@@ -171,6 +171,16 @@ export function LoginScreen() {
           {FAILURE_MESSAGE}
         </p>
       ) : null}
+      {/*
+        계정 만들기(M15/15B) — **로그인 아래 한 자리**다. 초대 코드도 운영자 승인도 없으므로 이
+        링크가 가입의 유일한 입구이고, 그 자리는 폼 **뒤**다(돌아온 사람이 먼저 읽는 것은 로그인이다).
+      */}
+      <div className="mt-6 flex max-w-sm flex-col gap-2 text-sm text-ink-soft">
+        <span>아직 계정이 없으신가요?</span>
+        <LinkButton to={SIGN_UP_PATH} tone="secondary" fullWidth testId="go-signup">
+          계정 만들기
+        </LinkButton>
+      </div>
     </section>
   );
 }

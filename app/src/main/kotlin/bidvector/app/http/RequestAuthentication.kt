@@ -43,7 +43,7 @@ interface RequestAuthenticator {
  * 구성상 존재하지 않는다 — 경로를 더해도 이 필터를 지나고, 이 필터는 [OPEN_ROUTES] 밖
  * 전부를 거부한다.
  *
- * **허용 목록은 하나뿐이고 집합 등식 test 가 그것을 잠근다**(`BrowserSessionAuthenticationTest`).
+ * **허용 목록은 한 자리뿐이고 집합 등식 test 가 그것을 잠근다**(`BrowserSessionAuthenticationTest`).
  * 비교는 `(메서드, 경로)` **정확 일치**다 — 변형 표기(`/api/session/`·대소문자·경로 매개변수
  * `;a=b`·`/api/./session`)는 이 집합에 들지 못해 **거부 쪽으로** 떨어진다(fail-closed: 허용
  * 목록의 불일치는 401 이고, 그 반대 방향의 사고가 없다).
@@ -131,10 +131,15 @@ class RequestAuthenticationFilter(
         const val UNAUTHENTICATED_SUBJECT = "unauthenticated"
 
         /**
-         * **무인증으로 열리는 자리 전부**(계약 산출물 4 「로그인 endpoint 만」). 이 집합이
-         * 하나라는 것과, 그 밖 모든 등록 매핑이 401 이라는 것을 test 가 각각 잠근다.
+         * **무인증으로 열리는 자리 전부.** 이 집합이 그 둘뿐이라는 것과, 그 밖 모든 등록 매핑이
+         * 401 이라는 것을 test 가 각각 잠근다.
+         *
+         * M7/7D 의 계약은 「로그인 endpoint 만」이었다. **M15/15B 가 둘째 자리를 열었다** —
+         * 열린 가입(`POST /api/accounts`, 운영자 지시 2026-11-21 「초대 코드 + 운영자 승인 없이
+         * 바로 가입」). 그 경로가 여는 것은 **계정 생성 하나**다: 그 뒤의 모든 요청은 다시 이
+         * 필터를 지나고, 가입이 낸 세션도 쿠키 인증 경로로 판정된다.
          */
-        val OPEN_ROUTES: Set<String> = setOf("POST /api/session")
+        val OPEN_ROUTES: Set<String> = setOf("POST /api/session", "POST $ACCOUNTS_PATH")
 
         fun routeOf(request: HttpServletRequest): String = "${request.method} ${request.requestURI}"
     }

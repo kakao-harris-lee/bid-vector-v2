@@ -141,6 +141,22 @@ open class HttpTestApplication {
     open fun browserAccessExecutor(transaction: InMemoryBrowserAccessTransaction): BrowserAccessExecutor =
         BrowserAccessExecutor(transaction)
 
+    /**
+     * M15/15B — 가입의 남용 상한. **빈 하나**라 계수가 컨텍스트 하나 안에서 이어진다(출하와 같다).
+     * 시계가 `FixedClock` 이므로 test 가 창을 밀어 계수를 비울 수 있다 — 그것이 production 의
+     * 「창 밖은 잊는다」와 **같은 경로**다(test 전용 초기화 메서드를 production 에 두지 않는다).
+     */
+    @Bean
+    open fun signUpThrottle(clock: FixedClock): SignUpThrottle =
+        SignUpThrottle(
+            clock = clock,
+            attemptsPerWindow = TEST_SIGN_UP_ATTEMPTS,
+            window = TEST_SIGN_UP_WINDOW,
+            trackedAddressLimit = TEST_TRACKED_ADDRESS_LIMIT,
+            // 이 조립의 로그는 버린다 — 문면 축은 `SignUpThrottleTest` 가 직접 잡는다.
+            log = SignUpThrottleLog { },
+        )
+
     /** 출하 조립과 **같은 속성**(Secure 포함)을 쓴다 — 속성 단언이 test 전용 값을 재지 않게. */
     @Bean
     open fun sessionCookieWriter(): SessionCookieWriter =

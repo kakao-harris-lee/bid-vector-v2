@@ -17,6 +17,14 @@ import type { paths } from './generated/operator-api';
 export const APPROVED_OPERATIONS = [
   { method: 'GET', path: '/api/session' },
   { method: 'POST', path: '/api/session' },
+
+  // 열린 가입(M15/15B) — 가입 화면이 부른다. **이 쌍이 이 slice 의 유일한 증분**이고 계약
+  // `milestone-15.md` 의 15B 행이 미리 승인했다. 이 줄과 `queries.ts` 의 `signUp` 호출은
+  // **같은 커밋**에 선다(`screen-operations` 등식이 그것을 센다).
+  //
+  // 무인증으로 닿는 둘째 자리다 — 서버 쪽 허용 목록(`RequestAuthenticationFilter.OPEN_ROUTES`)과
+  // 계약 문서의 `security: []` 가 같은 집합임을 Kotlin 쪽 등식 test 둘이 든다.
+  { method: 'POST', path: '/api/accounts' },
   { method: 'GET', path: '/api/notices' },
   { method: 'GET', path: '/api/suggestions' },
   { method: 'GET', path: '/api/bid-cases' },

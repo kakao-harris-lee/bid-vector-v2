@@ -350,6 +350,7 @@ class AccessConcurrencyTest : PersistenceTestSupport() {
             keys = keys,
             clock = clock,
             policy = CONCURRENCY_POLICY,
+            signUpPolicy = shippedSignUpPolicy(),
         )
 
     private fun signIn(

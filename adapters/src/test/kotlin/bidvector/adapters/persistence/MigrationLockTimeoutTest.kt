@@ -77,7 +77,7 @@ private const val CONVENTION_FROM_VERSION = 18
  * 그 표 위에 인덱스·트리거를 만들면 이 집합이 늘고, 그때 이 줄을 고치게 된다 — 상한 선언을
  * **사람이 보는 자리**에 둔다(면제 계수 래칫과 같은 관용구).
  */
-private val VERSIONS_TOUCHING_EXISTING_TABLES = setOf(18, 19, 24, 25, 26, 27, 28)
+private val VERSIONS_TOUCHING_EXISTING_TABLES = setOf(18, 19, 24, 25, 26, 27, 28, 29)
 
 /**
  * 건드리지 않는데 **상한을 선언한** 자리 — V23 하나다. 그 파일은 새 표를 만들면서 `account` 에 FK
