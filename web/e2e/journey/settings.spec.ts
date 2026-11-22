@@ -256,19 +256,22 @@ async function clearBusinessRegistrationNumber(page: Page): Promise<string | nul
 }
 
 test.afterEach(async ({ page }) => {
+  // **되돌림을 먼저 다 돌리고 단언은 나중에 모아 한다.** `expect` 는 그 자리에서 던지므로,
+  // 되돌림과 단언을 번갈아 두면 **앞 축의 단언이 깨질 때 뒤 축의 되돌림이 통째로 건너뛴다** —
+  // 본문 ④ 를 teardown 으로 옮긴 바로 그 사유(CR r1 M-6)가 teardown 안에서 되살아난다.
   const blocked = await clearWatchCondition(page);
-  // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다).
-  expect(blocked, '설정 여정의 전역 상태를 되돌릴 수 없었다').toBeNull();
+  const numberBlocked = await clearBusinessRegistrationNumber(page);
   const after = (await (await page.request.get('/api/strategy')).json()) as {
     readonly requiredKeywordTerms: readonly string[];
   };
-  // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
-  expect(after.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
-
-  const numberBlocked = await clearBusinessRegistrationNumber(page);
-  expect(numberBlocked, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
   const profileAfter = (await (await page.request.get('/api/profile')).json()) as StoredBusinessDetails;
+
+  // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다).
+  expect(blocked, '설정 여정의 전역 상태를 되돌릴 수 없었다').toBeNull();
+  expect(numberBlocked, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
+  // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
   // **끝 상태를 단언한다** — 「되돌리는 명령을 보냈다」가 아니라 「서버가 비어 있다」가 조건이다.
+  expect(after.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
   expect(profileAfter.businessRegistrationNumber, '설정 여정이 사업자번호를 남겼다').toBeNull();
 });
 
