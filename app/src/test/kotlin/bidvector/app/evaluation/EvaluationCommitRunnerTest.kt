@@ -1,6 +1,5 @@
 package bidvector.app.evaluation
 
-import bidvector.app.collection.CollectionLog
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.sharedkernel.AccountId
 import io.kotest.matchers.shouldBe

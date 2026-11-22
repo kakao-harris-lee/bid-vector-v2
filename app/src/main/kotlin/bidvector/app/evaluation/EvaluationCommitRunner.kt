@@ -53,12 +53,10 @@ class EvaluationCommitRunner(
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
-    /**
-     * **가드의 정본은 `EvaluationProperties.init` 이다**(r4 OQ ③) — 출하 경로의 값은 거기서
-     * 바인딩 시점에 걸러지고 `EvaluationCommitWiringTest` 가 그 거부를 잰다. 여기 둘은 **test 가
-     * 러너를 직접 조립하는 경로의 방어**다(그 조립은 설정 타입을 지나지 않는다). 한쪽만 완화되면
-     * 조용해지므로 어느 쪽이 정본인지 적어 둔다.
-     */
+    // **가드의 정본은 `EvaluationProperties.init` 이다**(r4 OQ ③) — 출하 경로의 값은 거기서
+    // 바인딩 시점에 걸러지고 `EvaluationCommitWiringTest` 가 그 거부를 잰다. 여기 둘은 **test 가
+    // 러너를 직접 조립하는 경로의 방어**다(그 조립은 설정 타입을 지나지 않는다). 한쪽만 완화되면
+    // 조용해지므로 어느 쪽이 정본인지 적어 둔다.
     init {
         require(maxAccountsPerRun >= 1) { "run 당 계정 상한은 1 이상이어야 한다: $maxAccountsPerRun" }
         require(maxConsecutiveAccountFailures >= 1) {

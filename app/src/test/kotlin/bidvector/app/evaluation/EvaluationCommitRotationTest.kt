@@ -71,9 +71,11 @@ class EvaluationCommitRotationTest {
     @Test
     fun `어느 날 시작해도 한 주기면 전원이 돈다`() {
         for (start in -40L..40L) {
-            val covered = (0 until PERIOD).flatMap { offset ->
-                accountsForRun(accountIds(AUDIENCE), maxAccountsPerRun = CAP, businessDay = start + offset).values()
-            }
+            val covered =
+                (0 until PERIOD).flatMap { offset ->
+                    accountsForRun(accountIds(AUDIENCE), maxAccountsPerRun = CAP, businessDay = start + offset)
+                        .values()
+                }
             covered.toSet() shouldContainExactly (1L..AUDIENCE.toLong()).toSet()
         }
     }
