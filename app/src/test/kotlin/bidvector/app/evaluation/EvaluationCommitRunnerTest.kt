@@ -409,12 +409,69 @@ class EvaluationCommitRunnerTest {
         Thread.interrupted() shouldBe true
         attempted shouldBe listOf(1L)
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
-        log.written.single { it.startsWith("evaluation-commit account-failed") } shouldContain
-            SQLException::class.java.name
+        val failureLine = log.written.single { it.startsWith("evaluation-commit account-failed") }
+        failureLine shouldContain SQLException::class.java.name
+        // **SQL 갈래의 누출 축도 여기서 선다**(15F r1 cr L-8). `causeCodeOf` 는 갈래가 둘이고
+        // (SQL 은 클래스 이름 + SQLSTATE, 그 밖은 클래스 이름) 출하에서 실제로 도는 갈래가 이쪽이다.
+        // 심는 메시지가 접속 문자열 꼴을 담으므로 앞 test 와 **같은 두 줄**로 그 부재를 잠근다.
+        failureLine shouldNotContain "jdbc:"
+        failureLine shouldNotContain "secret-host"
         val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
         stoppedLine shouldContain "cause=interrupted"
         stoppedLine shouldContain "remaining=2"
         accountCountsOf(log.written) shouldBe listOf(0, 0, 1, 2)
+    }
+
+    /**
+     * **사유에는 우선순위가 있다 — 인터럽트가 연속 상한보다 앞이다**(15F r1 v F-1).
+     *
+     * 두 술어가 **같은 실패에서 함께 참**인 자리가 있다: 연속 실패가 상한에 닿은 바로 그 건이
+     * 마침 인터럽트일 때다(배포가 내려가는 DB 를 만난 run 의 모양이다). 그때 줄이 무엇이라고
+     * 말하는가는 **처방을 가른다** — `consecutive-account-failures` 는 「계정 쪽을 고치고 다시
+     * 돌려라」로, `interrupted` 는 「고칠 자리가 계정이 아니다」로 읽힌다(runbook §3.4).
+     *
+     * 인터럽트가 앞인 것이 맞다: 연속 수는 **멈춤 줄의 `consecutive=` 칸에 그대로 실리므로**
+     * 정보를 잃지 않지만, 사유를 연속 상한으로 적으면 「누가 껐다」는 사실이 어느 줄에도 남지 않는다.
+     *
+     * 이 test 가 잠그는 것은 `when` 두 가지의 **순서**다 — 그 둘을 바꾸면 여기서 붉는다.
+     */
+    @Test
+    fun `인터럽트와 연속 상한이 함께 서면 사유는 인터럽트다`() {
+        val log = RecordingCommitLog()
+        val termination = RecordedExitCodes()
+        val attempted = mutableListOf<Long>()
+        var failures = 0
+
+        runnerFor(
+            failingRuns(
+                listOf(1L, 2L, 3L, 4L, 5L),
+                failing = setOf(1L, 2L, 3L, 4L, 5L),
+                attempted = attempted,
+                // 셋째 실패에서만 플래그가 선다 — 그 한 건에서 두 술어가 함께 참이다.
+                failure = {
+                    failures++
+                    if (failures == 3) {
+                        InterruptedException(DEAD_STORE_MESSAGE)
+                    } else {
+                        IllegalStateException(DEAD_STORE_MESSAGE)
+                    }
+                },
+            ),
+            log,
+            termination,
+            maxConsecutiveAccountFailures = 3,
+        ).run(DefaultApplicationArguments())
+
+        // 읽으면서 **지운다** — 인터럽트된 채로 두면 같은 worker 의 뒤 test 가 그 상태를 물려받는다.
+        Thread.interrupted() shouldBe true
+        attempted shouldBe listOf(1L, 2L, 3L)
+        termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
+        val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
+        stoppedLine shouldContain "cause=interrupted"
+        // 연속 수는 **그대로 실린다** — 사유가 인터럽트여도 「셋이 연달아 터졌다」가 사라지지 않는다.
+        stoppedLine shouldContain "consecutive=3"
+        stoppedLine shouldContain "remaining=2"
+        accountCountsOf(log.written) shouldBe listOf(0, 0, 3, 2)
     }
 
     /**
