@@ -5,6 +5,8 @@ import {
   OWN_BUSINESS_REGISTRATION_NUMBER,
   PLANTED_BUSINESS_REGISTRATION_NUMBER,
   PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED,
+  PRIVATE_VALUE_PROBLEM_PLANTED,
+  PRIVATE_VALUE_PROBLEM_SHAPE,
   privateValueProblems,
 } from './privateValues';
 import { nameSourcesInPage } from './touchMeasure';
@@ -194,6 +196,65 @@ async function clearWatchCondition(page: Page): Promise<string | null> {
   return null;
 }
 
+/** 사업 정보 절이 서버에 들고 있는 값 — teardown 이 **다시 쓸** 때 필요한 칸 전부다. */
+interface StoredBusinessDetails {
+  readonly tradeName: string | null;
+  readonly businessRegistrationNumber: string | null;
+  readonly headquartersRegion: string | null;
+  readonly naraRegistration: string;
+  readonly naraRegisteredFields: readonly string[];
+  readonly businessCertificateExpiresOn: string | null;
+}
+
+/**
+ * **사업자번호를 원래 자리로 돌린다 — 성공 경로가 아니라 teardown 에서**(15C r1 CR M-6).
+ *
+ * 위 [clearWatchCondition] 이 세운 규율과 같은 자리다: 이 파일의 한 test 가 사업자번호를
+ * **서버에 실제로 쓰므로**(누출 술어의 모집단을 채우는 수단이다), 그 앞의 어느 단언이 깨지면
+ * 심은 번호가 **공유 계정의 프로필에 남는다**. 수집 순서가 바뀌거나 프로필을 보는 spec 이
+ * 뒤에 붙는 날 그 잔류가 **남의 여정을** 깨고 진단이 거기서 시작된다.
+ *
+ * 화면이 아니라 **출하 API 로** 되돌린다(실패 뒤 페이지가 어디에 있는지 알 수 없다).
+ * **멱등하다**: 이미 비어 있으면 아무것도 쓰지 않는다.
+ *
+ * 사업 정보는 **절 단위 교체**라 번호만 지울 수 없다 — 읽어 온 현재 값을 그대로 싣고
+ * 번호만 `null` 로 바꿔 다시 쓴다. 키를 빼는 것은 「그대로 두기」가 아니라 **지우기**다.
+ */
+async function clearBusinessRegistrationNumber(page: Page): Promise<string | null> {
+  const read = await page.request.get('/api/profile');
+  if (!read.ok()) {
+    return `프로필을 읽지 못해 되돌릴 수 없었다(GET /api/profile ${read.status()})`;
+  }
+  const profile = (await read.json()) as StoredBusinessDetails;
+  if (profile.businessRegistrationNumber === null) {
+    return null;
+  }
+  const session = (await (await page.request.get('/api/session')).json()) as { readonly csrf: string };
+  const base = {
+    naraRegistration: profile.naraRegistration,
+    tradeName: profile.tradeName,
+    businessRegistrationNumber: null,
+    headquartersRegion: profile.headquartersRegion,
+  };
+  const written = await page.request.post('/api/profile/business-details', {
+    headers: { 'X-Operator-Csrf': session.csrf },
+    data:
+      profile.naraRegistration === 'REGISTERED'
+        ? {
+            ...base,
+            naraRegisteredFields: [...profile.naraRegisteredFields],
+            ...(profile.businessCertificateExpiresOn === null
+              ? {}
+              : { businessCertificateExpiresOn: profile.businessCertificateExpiresOn }),
+          }
+        : base,
+  });
+  if (!written.ok()) {
+    return `되돌림 적용이 거부됐다(POST business-details ${written.status()})`;
+  }
+  return null;
+}
+
 test.afterEach(async ({ page }) => {
   const blocked = await clearWatchCondition(page);
   // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다).
@@ -203,6 +264,12 @@ test.afterEach(async ({ page }) => {
   };
   // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
   expect(after.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
+
+  const numberBlocked = await clearBusinessRegistrationNumber(page);
+  expect(numberBlocked, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
+  const profileAfter = (await (await page.request.get('/api/profile')).json()) as StoredBusinessDetails;
+  // **끝 상태를 단언한다** — 「되돌리는 명령을 보냈다」가 아니라 「서버가 비어 있다」가 조건이다.
+  expect(profileAfter.businessRegistrationNumber, '설정 여정이 사업자번호를 남겼다').toBeNull();
 });
 
 test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 되고, 지우면 빈 얼굴로 돌아온다', async ({
@@ -343,6 +410,14 @@ async function saveBusinessDetails(page: Page): Promise<{ readonly businessRegis
  * 심은 값은 **칸을 옮긴다**(r1 cr L-1) — ③ 전에 자기 칸을 비워, 그 시점에 값이 예외 **밖에만**
  * 있게 한다. 두 칸에 함께 두면 대조의 힘이 남아 있어도 주석이 참이 아니다.
  *
+ * **대조는 축마다 하나씩, 둘이다**(r1 v F1). 술어는 서로 다른 두 축을 들고 있다 — 하이픈 꼴
+ * 정규식과 **저장되는 꼴(숫자 열 자리)의 축어**. 한 쌍만 심으면 한 축이 꺼져도 다른 축이 가려
+ * 통과한다(실측: 축어 검사를 꺼도 하이픈 쌍만으로는 조용하다). 그래서 **문제 목록을 축어로**
+ * 단언한다 — 심은 꼴이 내는 문제 **하나**만 나와야 하고, 그 축을 끄면 빈 목록이 되어 붉는다.
+ *
+ * **예외의 범위도 여기서 잰다**(r1 cr L-11): 면제는 그 칸의 **`value` 하나**이지 노드 전체가
+ * 아니다. 예외 칸에 값이 아닌 속성(`title`)으로 같은 글자를 심으면 술어가 문제를 내야 한다.
+ *
  * 이 test 는 **저장하지 않는다** — 서버 상태는 아래 test 가 쥔다.
  */
 test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 같은 게이트가 붉어진다', async ({ page }) => {
@@ -363,14 +438,35 @@ test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 
   await own.fill(PLANTED_NUMBER);
   await assertNoPrivateValues(page);
 
-  // ③ **양성 대조** — 값을 예외 **밖으로 옮기면** 같은 술어가 문제를 낸다(더하기가 아니다).
+  // ③ **양성 대조 ①(꼴 축)** — 값을 예외 **밖으로 옮기면** 같은 술어가 문제를 낸다(더하기가
+  //    아니다). 하이픈 꼴은 꼴 정규식만 깨운다.
   await own.fill('');
   const tradeName = page.getByTestId('profile-trade-name-input');
   await tradeName.fill(PLANTED_NUMBER);
-  expect(await privateValueProblems(page), '예외가 화면 전체를 열었다').not.toStrictEqual([]);
+  expect(await privateValueProblems(page), '꼴 축이 예외 밖에서 붉지 않았다').toStrictEqual([
+    PRIVATE_VALUE_PROBLEM_SHAPE,
+  ]);
 
-  // ④ 되돌리면 다시 조용하다 — ③ 의 붉음이 심은 값 때문이라는 것을 이 쌍이 말한다.
+  // ④ **양성 대조 ②(축어 축)** — **저장되는 꼴**(숫자 열 자리)은 꼴 정규식이 영영 못 본다.
+  //    그 축을 끄면 이 단언이 빈 목록을 본다(r1 v F1 이 지목한 자리).
+  await tradeName.fill(PLANTED_BUSINESS_REGISTRATION_NUMBER);
+  expect(await privateValueProblems(page), '축어 축이 예외 밖에서 붉지 않았다').toStrictEqual([
+    PRIVATE_VALUE_PROBLEM_PLANTED,
+  ]);
+
+  // ⑤ **양성 대조 ③(예외의 범위)** — 면제는 그 칸의 **값**이다. 같은 글자를 예외 칸의 속성으로
+  //    심으면 모집단에 남아 붉어진다(r1 cr L-11 · 알려진 제한 8 의 속성 경로).
   await tradeName.fill('');
+  await own.evaluate(
+    (node, planted) => node.setAttribute('title', planted),
+    PLANTED_BUSINESS_REGISTRATION_NUMBER,
+  );
+  expect(await privateValueProblems(page), '예외가 그 칸의 속성까지 열었다').toStrictEqual([
+    PRIVATE_VALUE_PROBLEM_PLANTED,
+  ]);
+
+  // ⑥ 되돌리면 다시 조용하다 — 위 붉음이 심은 값 때문이라는 것을 이 쌍이 말한다.
+  await own.evaluate((node) => node.removeAttribute('title'));
   await assertNoPrivateValues(page);
 
   expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
@@ -386,8 +482,9 @@ test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 
  * 축어**도 금지하므로, 계약 값을 그대로 그리는 자리가 생기면(표시 서식을 거치지 않는 줄)
  * 여기서 붉어진다 — 꼴 정규식이 영영 못 보는 사각이다.
  *
- * **전역 상태를 되돌린다**: 끝에서 칸을 비워 저장하고 그 응답이 `null` 인 것을 단언한다. 사업
- * 정보는 계정당 한 행이고 여정들이 한 하네스를 차례로 쓰므로, 남기면 뒤 여정이 다른 전제에서 돈다.
+ * **전역 상태는 teardown 이 되돌린다**(r1 cr M-6) — 이 본문의 마지막 걸음이 아니다. 사업 정보는
+ * 계정당 한 행이고 여정들이 한 하네스를 차례로 쓰므로, 아래 어느 단언이 깨져도 심은 번호가
+ * 남아서는 안 된다. 되돌림과 **끝 상태 단언**은 [clearBusinessRegistrationNumber] 와 `afterEach` 에 있다.
  */
 test('사업자번호 — 저장한 뒤 재진입·다른 화면에서도 그 값이 서지 않는다', async ({ page }) => {
   await signIn(page);
@@ -420,12 +517,6 @@ test('사업자번호 — 저장한 뒤 재진입·다른 화면에서도 그 �
     await goToScreen(page, label, screen);
     await assertNoPrivateValues(page);
   }
-
-  // ④ 되돌린다 — 비워 저장하고 **서버의 답**이 「비워 둠」인 것을 본다.
-  await openSettings(page);
-  await page.getByTestId(OWN_BUSINESS_REGISTRATION_NUMBER).fill('');
-  expect((await saveBusinessDetails(page)).businessRegistrationNumber).toBeNull();
-  await assertNoPrivateValues(page);
 });
 
 /**
