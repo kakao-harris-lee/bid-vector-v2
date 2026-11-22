@@ -221,8 +221,10 @@ class EvaluationCommitRunner(
      * 되세운 플래그가 닿는 자리는 이제 **둘**이다 — 바로 뒤의 [stopCauseFor] 판정과, 멈춘 뒤의
      * **종료 경로**(`SpringApplication.exit` 의 context close). 멈춘 자리 뒤로 `runBlocking` 재진입이
      * 없으므로 「다음 계정의 blocking 호출」은 더 이상 이 문장의 대상이 아니다(15F A-4f).
-     * 종료 직전에 지우지 않는 것은 결정이다: 지우면 종료 훅과 context close 가 인터럽트를 보지
-     * 못해 15A r1 이 닫은 결함을 종료 경로에서 다시 연다.
+     * 종료 직전에 지우지 않는 것은 결정이다: `SpringApplication.exit` 의 context close 는 **이
+     * 스레드에서** 돌고, 지우면 그 경로가 인터럽트를 보지 못해 15A r1 이 닫은 결함을 종료
+     * 경로에서 다시 연다. **JVM 종료 훅은 이 축이 아니다**(15F r1 v F-3) — 훅은 별 스레드에서
+     * 돌아 이 플래그와 무관하다.
      */
     private fun noteAccountFailure(failure: Exception) {
         log.write(evaluationCommitAccountFailureLine(causeCodeOf(failure)))
