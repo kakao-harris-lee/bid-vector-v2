@@ -28,14 +28,6 @@ private const val ROTATION_DAYS = 3
  * 필요 없다 — `EvaluationCommitRun` 은 `DataSource` 로 질의를 돌리지 않고 조립만 한다.
  */
 class EvaluationCommitRunnerTest {
-    private class RecordingLog : CollectionLog {
-        val written = mutableListOf<String>()
-
-        override fun write(line: String) {
-            written += line
-        }
-    }
-
     /**
      * **한 계정이 던져도 run 은 끝까지 간다**(r1 리뷰 MEDIUM — 주장을 뒤집었다). 앞 판은 이
      * 자리에서 `FAILED`(1) 로 **즉시 끝났고**, 그것은 계정이 하나일 때만 옳은 거동이었다 —
@@ -46,7 +38,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `협력자가 던지면 그 계정만 실패로 세고 INCOMPLETE 2 로 끝낸다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
 
         runnerFor(deadCommitRuns(), log, termination)
@@ -68,7 +60,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `한 계정이 던져도 나머지 계정은 평가된다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
 
         runnerFor(partiallyDeadCommitRuns(), log, termination)
@@ -89,7 +81,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `청중이 비면 계수가 0 이고 종료 코드는 0 이다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
 
         runnerFor(emptyAudienceRuns(), log, termination)
@@ -109,7 +101,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `계정 실패 줄은 예외 메시지를 싣지 않는다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
 
         runnerFor(deadCommitRuns(), log, RecordedExitCodes())
             .run(DefaultApplicationArguments())
@@ -126,7 +118,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `계정 전수를 못 읽으면 평가를 시작하지 않고 FAILED 1 로 끝낸다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
 
         runnerFor(audienceUnavailableRuns(), log, termination)
@@ -144,7 +136,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `상한을 넘는 계정은 미루고 종료 코드를 바꾸지 않는다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
 
         runnerFor(healthyRuns(accounts = 5), log, termination, maxAccountsPerRun = 2)
@@ -177,7 +169,7 @@ class EvaluationCommitRunnerTest {
             val evaluated = mutableListOf<Long>()
             runnerFor(
                 recordingRuns(ROTATION_AUDIENCE, evaluated),
-                RecordingLog(),
+                RecordingCommitLog(),
                 RecordedExitCodes(),
                 maxAccountsPerRun = ROTATION_CAP,
                 date = FIXED_DATE.plusDays(offset.toLong()),
@@ -204,13 +196,13 @@ class EvaluationCommitRunnerTest {
 
         runnerFor(
             recordingRuns(ROTATION_AUDIENCE, first),
-            RecordingLog(),
+            RecordingCommitLog(),
             RecordedExitCodes(),
             maxAccountsPerRun = ROTATION_CAP,
         ).run(DefaultApplicationArguments())
         runnerFor(
             recordingRuns(ROTATION_AUDIENCE, second),
-            RecordingLog(),
+            RecordingCommitLog(),
             RecordedExitCodes(),
             maxAccountsPerRun = ROTATION_CAP,
         ).run(DefaultApplicationArguments())
@@ -221,7 +213,7 @@ class EvaluationCommitRunnerTest {
     /** 상한이 계정 수보다 크면 미룬 계정이 0 이다 — 상한이 평소에 아무것도 바꾸지 않는다. */
     @Test
     fun `상한이 넉넉하면 미룬 계정이 0 이다 — 대조`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
 
         runnerFor(healthyRuns(accounts = 3), log, RecordedExitCodes(), maxAccountsPerRun = 50)
             .run(DefaultApplicationArguments())
@@ -237,7 +229,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `상한이 1 이면 가장 작은 id 가 평가된다 — 청중 순서가 뒤섞여도`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val evaluatedAccounts = mutableListOf<Long>()
 
         runnerFor(
@@ -271,7 +263,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `연속 실패가 상한에 닿으면 남은 계정을 멈추고 미룬다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val termination = RecordedExitCodes()
         val attempted = mutableListOf<Long>()
 
@@ -301,7 +293,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `상한 밖과 멈춤이 함께 서면 두 줄의 수가 같다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val attempted = mutableListOf<Long>()
 
         runnerFor(
@@ -327,7 +319,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `건너뜀이 연속 실패를 끊는다 — 흩어진 실패로 멈추지 않는다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val attempted = mutableListOf<Long>()
 
         runnerFor(
@@ -348,28 +340,38 @@ class EvaluationCommitRunnerTest {
     }
 
     /**
-     * **인터럽트는 삼키지 않는다**(15A r1 리뷰 LOW ⓒ — r3 verifier L-2 가 「코드로만 닫혔다」고
-     * 실측했다). 플래그를 되세우지 않으면 이 스레드의 다음 blocking 호출이 인터럽트를 보지 못한다.
-     * 복원 줄을 지우는 변이에서 이 단언이 붉는다.
+     * **인터럽트는 삼키지도, 계속 돌지도 않는다.** 플래그를 되세우지 않으면 이 스레드의 다음
+     * blocking 호출이 인터럽트를 보지 못하고(15A r1 리뷰 LOW ⓒ), 순회를 계속하면 종료 신호
+     * **하나**가 `failed=1,2,3…` 으로 불어나 「체계가 내려갔다」와 같은 모양이 된다(r4 CR L-4).
+     *
+     * 그래서 첫 계정에서 멈추고, 남은 둘은 **미룬 것**으로 센다 — 실패는 하나다.
      */
     @Test
-    fun `인터럽트 예외는 플래그를 되세운다`() {
-        val log = RecordingLog()
+    fun `인터럽트 예외는 플래그를 되세우고 run 을 멈춘다`() {
+        val log = RecordingCommitLog()
+        val termination = RecordedExitCodes()
+        val attempted = mutableListOf<Long>()
 
         runnerFor(
             failingRuns(
-                listOf(1L),
-                failing = setOf(1L),
-                attempted = mutableListOf(),
+                listOf(1L, 2L, 3L),
+                failing = setOf(1L, 2L, 3L),
+                attempted = attempted,
                 failure = { InterruptedException(DEAD_STORE_MESSAGE) },
             ),
             log,
-            RecordedExitCodes(),
+            termination,
         ).run(DefaultApplicationArguments())
 
         // 읽으면서 **지운다** — 인터럽트된 채로 두면 같은 worker 의 뒤 test 가 그 상태를 물려받는다.
         Thread.interrupted() shouldBe true
+        attempted shouldBe listOf(1L)
+        termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
         log.written.count { it.startsWith("evaluation-commit account-failed") } shouldBe 1
+        val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
+        stoppedLine shouldContain "cause=interrupted"
+        stoppedLine shouldContain "remaining=2"
+        accountCountsOf(log.written) shouldBe listOf(0, 0, 1, 2)
     }
 
     /**
@@ -378,7 +380,7 @@ class EvaluationCommitRunnerTest {
      */
     @Test
     fun `연속이 아닌 실패는 run 을 멈추지 않는다`() {
-        val log = RecordingLog()
+        val log = RecordingCommitLog()
         val attempted = mutableListOf<Long>()
 
         runnerFor(

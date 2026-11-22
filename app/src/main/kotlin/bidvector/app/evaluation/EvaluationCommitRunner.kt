@@ -34,7 +34,7 @@ import java.time.ZoneId
  *
  * **상한 밖은 회전한다**([accountsForRun]) — 앞 판은 `take(n)` 고정 절단이라 상한 밖 계정이
  * **어느 run 에서도** 평가되지 않았고, 줄은 그것을 「미룸」이라 불렀다(r3 리뷰 M-1·F-1).
- * 이제 창이 **영업일마다 미끄러져** 모두가 `ceil((K-1)/(n-1))` 일 안에 한 번씩 돈다. 날짜는
+ * 이제 창이 **KST 달력일마다 미끄러져** 모두가 `ceil((K-1)/(n-1))` 달력일 안에 한 번씩 돈다. 날짜는
  * 주입된 [clock] 에서 오므로 **같은 날의 재실행은 같은 집합**이다(재실행이 공평성을 흔들지
  * 않는다 — 그래서 「더 자주 돌린다」는 처방이 없다).
  *
@@ -53,6 +53,12 @@ class EvaluationCommitRunner(
     private val log: CollectionLog,
     private val termination: CollectionTermination,
 ) : ApplicationRunner {
+    /**
+     * **가드의 정본은 `EvaluationProperties.init` 이다**(r4 OQ ③) — 출하 경로의 값은 거기서
+     * 바인딩 시점에 걸러지고 `EvaluationCommitWiringTest` 가 그 거부를 잰다. 여기 둘은 **test 가
+     * 러너를 직접 조립하는 경로의 방어**다(그 조립은 설정 타입을 지나지 않는다). 한쪽만 완화되면
+     * 조용해지므로 어느 쪽이 정본인지 적어 둔다.
+     */
     init {
         require(maxAccountsPerRun >= 1) { "run 당 계정 상한은 1 이상이어야 한다: $maxAccountsPerRun" }
         require(maxConsecutiveAccountFailures >= 1) {
@@ -111,6 +117,7 @@ class EvaluationCommitRunner(
         var failed = 0
         var consecutiveFailures = 0
         var stoppedAt = -1
+        var stopCause = STOP_CAUSE_CONSECUTIVE_FAILURES
         for ((index, account) in taken.withIndex()) {
             try {
                 if (evaluateOne(account, channelHolder, results)) {
@@ -124,7 +131,9 @@ class EvaluationCommitRunner(
                 failed++
                 consecutiveFailures++
                 noteAccountFailure(failure)
-                if (consecutiveFailures >= maxConsecutiveAccountFailures) {
+                val cause = stopCauseFor(failure, consecutiveFailures)
+                if (cause != null) {
+                    stopCause = cause
                     stoppedAt = index + 1
                     break
                 }
@@ -135,15 +144,34 @@ class EvaluationCommitRunner(
         if (stoppedAt >= 0) {
             // `remaining` 은 **run 전체의 남은 수**다(= 마침 줄의 `deferred`, r3 CR L-2) — 창
             // 안쪽만 세면 두 원천이 함께 설 때 두 줄의 수가 달라지고 그 관계가 어디에도 없다.
-            log.write(evaluationCommitStoppedLine(consecutiveFailures, deferred))
+            log.write(evaluationCommitStoppedLine(stopCause, consecutiveFailures, deferred))
         }
         finishRun(results, evaluated, skipped, failed, deferred)
     }
 
     /**
-     * 회전 창의 축이 되는 **영업일**. 구역은 KST 다 — 창이 미끄러지는 경계가 운영자의 하루와
-     * 같아야 하고, UTC 로 고르면 KST 00~09 시의 run 이 **어제 창**으로 돈다. 이 러너의 자리는
-     * 외부 cron 이고 그 시각이 그 구간에 들 수 있다(수집 레인 00:41 선례).
+     * 이 실패에서 run 을 멈춰야 하는가 — 멈추지 않으면 `null` 이다.
+     *
+     * **인터럽트는 그 계정의 일이 아니다**(r4 CR L-4). 누가 이 프로세스를 껐다는 신호이고,
+     * 인터럽트된 스레드에서는 다음 계정의 blocking 호출이 대개 **즉시** 다시 던진다 — 계속 돌면
+     * 신호 **하나**가 `failed=1,2,3…` 으로 불어나 마침 줄이 「계정 셋이 터졌다」로 읽힌다.
+     * 「체계가 내려갔다」와 「누가 나를 껐다」를 같은 모양으로 만들지 않는다.
+     */
+    private fun stopCauseFor(
+        failure: Exception,
+        consecutiveFailures: Int,
+    ): String? =
+        when {
+            failure is InterruptedException -> STOP_CAUSE_INTERRUPTED
+            consecutiveFailures >= maxConsecutiveAccountFailures -> STOP_CAUSE_CONSECUTIVE_FAILURES
+            else -> null
+        }
+
+    /**
+     * 회전 창의 축이 되는 **KST 달력일**(주말·공휴일을 포함한다 — 「영업일」이 아니다). 구역이
+     * KST 인 것은 창이 미끄러지는 경계가 운영자의 하루와 같아야 해서다. UTC 로 고르면 KST
+     * 00~09 시의 run 이 **어제 창**으로 돈다 — 이 러너의 자리는 외부 cron 이고 그 시각이 그 구간에
+     * 들 수 있다(수집 레인 00:41 선례).
      */
     private fun businessDay(): Long = LocalDate.ofInstant(clock.now(), EVALUATION_ROTATION_ZONE).toEpochDay()
 
@@ -217,12 +245,19 @@ private val EVALUATION_ROTATION_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
  *
  * [ordered] 는 id 오름차순이고 그 **첫 원소가 전역 발송 채널 보유자**다([channelHolderOf] 와 같은
  * 값) — 창이 어떻게 움직여도 보유자는 빠지지 않는다. 남은 `n-1` 칸이 나머지 `K-1` 계정 위를
- * **영업일마다 `n-1` 칸씩** 미끄러지므로, 연속한 `ceil((K-1)/(n-1))` 영업일이면 모든 계정이 적어도
- * 한 번 돈다. 앞 판은 `take(n)` 고정 절단이라 `n` 번째 뒤의 계정이 **영원히** 빠졌고 — 상한이
- * 오르거나 더 작은 id 가 사라질 때까지 — 종료 코드는 0, cron 은 성공이었다.
+ * **KST 달력일마다 `n-1` 칸씩** 미끄러지므로, 연속한 `ceil((K-1)/(n-1))` **달력일**이면 모든 계정이
+ * 적어도 한 번 돈다. 앞 판은 `take(n)` 고정 절단이라 `n` 번째 뒤의 계정이 **영원히** 빠졌고 —
+ * 상한이 오르거나 더 작은 id 가 사라질 때까지 — 종료 코드는 0, cron 은 성공이었다.
  *
- * 상한이 청중보다 크거나 같으면 창이 서지 않는다(전원 평가, `deferred=0`). `n = 1` 이면 칸이 0 이라
- * **보유자만** 돈다 — 그 설정에서는 공평성이 성립하지 않고, 위 등식의 분모가 0 인 자리다.
+ * **그 보증은 「달력일마다 한 번 이상 도는 cron」을 전제한다**(r4 리뷰 M-1·F-1). 시작 위치는
+ * `floorMod(날짜 × (n-1), K-1)` 이라 `날짜 mod P`(`P = (K-1)/gcd(n-1, K-1)`)에만 달려 있다 —
+ * 실행일이 **주기적** 부분집합이면(평일만 도는 timer 등) 그 잔여류가 `Z_P` 를 덮지 못해 **어느
+ * 창은 영원히 오지 않는다**(예: `n=4`·`K=22` 에서 블록이 요일마다 하나라, 평일만 돌면 계정 여섯이
+ * 영구히 빠진다). **일회성 결행은 해롭지 않다** — 위상만 옮기고 다음 주기에 복구된다. 처방된
+ * timer 는 매 달력일 돈다(`docs/runbook/m7-7f-production.md` §13.3 `OnCalendar=*-*-*`).
+ *
+ * 상한이 청중보다 크거나 같으면 창이 서지 않는다(전원 평가). `n = 1` 이면 칸이 0 이라 **보유자만**
+ * 돈다 — 그 설정에서는 공평성이 성립하지 않고, 위 등식의 분모가 0 인 자리다.
  *
  * 회전은 날짜의 **순수 함수**다 — 같은 날 다시 돌리면 같은 집합이고, 영속 커서를 두지 않는다
  * (그 상태를 두면 되돌림과 재실행이 서로 다른 판을 만든다).

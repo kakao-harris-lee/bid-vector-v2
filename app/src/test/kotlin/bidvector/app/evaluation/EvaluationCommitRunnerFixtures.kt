@@ -48,6 +48,7 @@ private val ROTATION_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 /** cron 이 실제로 도는 시각대(04:10 KST)를 흉내 낸다. */
 private fun clockAt(date: LocalDate): Clock = Clock { date.atTime(4, 10).atZone(ROTATION_ZONE).toInstant() }
 
+@Suppress("LongParameterList")
 internal fun runnerFor(
     runs: EvaluationCommitRuns,
     log: CollectionLog,
@@ -55,16 +56,35 @@ internal fun runnerFor(
     maxAccountsPerRun: Int = ROOMY_ACCOUNT_CAP,
     maxConsecutiveAccountFailures: Int = ROOMY_CONSECUTIVE_CAP,
     date: LocalDate = FIXED_DATE,
+    clock: Clock = clockAt(date),
 ): EvaluationCommitRunner =
     EvaluationCommitRunner(
         runs = runs,
         candidateCap = CANDIDATE_CAP,
         maxAccountsPerRun = maxAccountsPerRun,
         maxConsecutiveAccountFailures = maxConsecutiveAccountFailures,
-        clock = clockAt(date),
+        clock = clock,
         log = log,
         termination = termination,
     )
+
+/**
+ * 줄을 모으는 로그 이중체 — 러너를 돌리는 test 가 **같은 것을** 쓴다(앞 판은 class 마다 제 사본을
+ * 중첩 class 로 들고 있었다).
+ */
+internal class RecordingCommitLog : CollectionLog {
+    val written: MutableList<String> = mutableListOf()
+
+    override fun write(line: String) {
+        written += line
+    }
+}
+
+/** id 오름차순 청중 — 회전 표 test 가 쓰는 한 줄짜리 조립. */
+internal fun accountIds(count: Int): List<AccountId> = (1L..count).map { AccountId(it) }
+
+/** 선택 결과를 **값**으로 본다(`AccountId` 는 값 비교를 제공하지 않는다, 7D 규율). */
+internal fun List<AccountId>.values(): List<Long> = map { it.value }
 
 /**
  * 마침 줄의 **계정 계수 넷**(r3 CR L-8). 네 수가 청중과 닫히는지를 시나리오마다 한 줄로 본다 —
