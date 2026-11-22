@@ -262,3 +262,7 @@ scripts/screen-write-reach-inject.test.mjs
 # 그 수를 떠받친다(머지한 트리에서 실측됨). 집합이 소스에서 나오는 것과, 손으로 짠 두 단이
 # 그 집합을 조용히 줄이지 못하는 것(래칫)을 여기서 잰다. 술어의 양성·음성 대조도 같은 파일에 있다.
 scripts/rail-screens.test.mjs
+# M15/15I ⓒ — 여정 teardown 의 걸음 감싸개. 그 `catch` 는 **여정 레인의 초록 실행에서 한 번도
+# 돌지 않으므로**(되돌림이 성공하는 한) 거기서는 진단을 버리든 보존하든 같은 값이다 — 방어
+# 부재와 미측정이 같아지는 꼴이다. 등재가 그 측정이 수집에서 조용히 빠지지 않게 든다.
+e2e/harness/journey-teardown.test.mjs

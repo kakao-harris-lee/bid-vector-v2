@@ -9,8 +9,7 @@ in_scope:
   - web/e2e/journey/settings.spec.ts
   - web/e2e/journey/privateValues.ts
   - web/e2e/journey/teardown.ts
-  - web/e2e/journey/teardown.test.ts
-  - web/vite.config.ts
+  - web/e2e/harness/journey-teardown.test.mjs
   - web/config/gate-tests.txt
   - config/quality/leak-patterns.txt
   - config/quality/leak-pattern-baseline.txt
@@ -71,9 +70,13 @@ spec 의 리터럴 그대로** 두고, 그 리터럴과 술어가 실제로 훑�
 
 그 감싸개를 **spec 밖의 모듈**(`web/e2e/journey/teardown.ts`)로 옮긴다. 여정 레인에서는 teardown
 이 **던지는 경로가 초록 실행에 없어** 이 고침이 실측되지 않는다 — 단위 test 로 잠가야 그 고침이
-거동으로 선다. 그래서 `web/vite.config.ts` 의 vitest `include` 에 `e2e/journey/**/*.test.ts` 를
-더하고, 그 파일을 `web/config/gate-tests.txt` 에 등재한다(W-7 이 「그 파일이 실제로 돌았는가」를
-실행 결과로 단언한다 — 등재하지 않으면 뒷날 `exclude` 한 줄로 조용히 빠진다).
+거동으로 선다.
+
+그 단위 test 는 **`web/e2e/harness/` 에 `.mjs` 로** 둔다. 같은 디렉터리의 `exit-targets.test.mjs`
+가 이미 `../journey/` 의 술어를 그 모양으로 잠그고 있고, vitest 의 `include` 가 그 꼴을 이미
+받으므로 **설정을 바꾸지 않는다**(Playwright 쪽은 `*.spec.ts` 만 수집하므로 두 레인이 겹치지
+않는다). 그리고 `web/config/gate-tests.txt` 에 등재한다 — W-7 이 「그 파일이 실제로 돌았는가」를
+실행 결과로 단언한다(등재하지 않으면 뒷날 `exclude` 한 줄로 조용히 빠진다).
 
 ### D-15I-3 — ⓓ 는 **모아서 한 번** 단언한다
 
@@ -157,3 +160,12 @@ slice 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 
 5. **`prettier` 는 이 저장소에 없다** — 의존에도 CI 에도 없고 포맷 게이트는 `npm run lint`
    (eslint)다. 그래서 「prettier 가 아직 붉은가」에 대한 답은 「그 게이트가 이 저장소에 없다」이고,
    이 slice 는 포맷 변경을 자기 파일 밖으로 넓히지 않았다.
+
+## 계약 갱신 — 2026-11-23 #1
+
+`in_scope` 에서 `web/vite.config.ts` 를 빼고 단위 test 의 자리를
+`web/e2e/journey/teardown.test.ts` → `web/e2e/harness/journey-teardown.test.mjs` 로 옮겼다.
+사유: vitest 의 `include` 가 `e2e/harness/**/*.test.mjs` 를 이미 받고, 그 디렉터리의
+`exit-targets.test.mjs` 가 **이미 `../journey/` 의 술어를 그 꼴로 잠그는 선례**다. 설정을
+건드리지 않는 쪽이 작은 변경이고, 「게이트 설정을 바꿔야 측정이 선다」는 자리를 새로 만들지
+않는다. 구현 착수 전 갱신이라 되돌릴 산출물이 없다.

@@ -8,7 +8,9 @@ import {
   PRIVATE_VALUE_PROBLEM_PLANTED,
   PRIVATE_VALUE_PROBLEM_SHAPE,
   privateValueProblems,
+  SCANNED_ATTRIBUTES,
 } from './privateValues';
+import { teardownMessage, teardownStep } from './teardown';
 import { nameSourcesInPage } from './touchMeasure';
 
 import {
@@ -255,25 +257,6 @@ async function clearBusinessRegistrationNumber(page: Page): Promise<string | nul
   return null;
 }
 
-/**
- * teardown 의 걸음 하나 — **던지지 않는다**(15F r1 cr L-3).
- *
- * 되돌림 둘은 `!ok()` 를 사유 **문자열**로 올리지만, 그 안의 세션 읽기와 `post` 는 전송 오류를
- * 그대로 던졌다. 첫 걸음이 거기서 던지면 둘째 되돌림은 **한 줄도 돌지 않고** 심은 번호가 공유
- * 계정에 남는다 — 아래 머리 주석이 이름 붙인 꼴이 한 층 위에서 그대로 살아 있었다. 예외를
- * 사유 문자열로 바꾸면 그 주석의 주장이 **참이 된다**.
- */
-async function teardownStep<T>(
-  label: string,
-  step: () => Promise<T>,
-): Promise<{ readonly value: T | null; readonly failure: string | null }> {
-  try {
-    return { value: await step(), failure: null };
-  } catch (thrown) {
-    return { value: null, failure: `${label}: ${thrown instanceof Error ? thrown.message : String(thrown)}` };
-  }
-}
-
 test.afterEach(async ({ page }) => {
   // **되돌림을 먼저 다 돌리고 단언은 나중에 모아 한다.** `expect` 는 그 자리에서 던지므로,
   // 되돌림과 단언을 번갈아 두면 **앞 축의 단언이 깨질 때 뒤 축의 되돌림이 통째로 건너뛴다** —
@@ -297,12 +280,24 @@ test.afterEach(async ({ page }) => {
 
   // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다). 「되돌리다 던졌다」는
   // 앞쪽이고, 두 사유가 한 단언에 모이되 문면이 어느 쪽인지 말한다.
-  expect(cleared.failure ?? cleared.value, '설정 여정의 전역 상태를 되돌릴 수 없었다').toBeNull();
-  expect(numberCleared.failure ?? numberCleared.value, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
+  //
+  // 던진 경우의 **스택과 `cause` 사슬**은 [teardownMessage] 가 문면 아래에 붙인다(15I ⓒ) —
+  // 머리말은 그대로 한 줄이다.
+  expect(
+    cleared.failure ?? cleared.value,
+    teardownMessage('설정 여정의 전역 상태를 되돌릴 수 없었다', cleared),
+  ).toBeNull();
+  expect(
+    numberCleared.failure ?? numberCleared.value,
+    teardownMessage('설정 여정의 사업자번호를 되돌릴 수 없었다', numberCleared),
+  ).toBeNull();
   // 끝 상태를 **읽지 못한 것**은 또 다른 진단이다 — 아래 두 단언이 `undefined` 를 보고 엉뚱한
   // 문면으로 붉지 않게 먼저 가른다.
-  expect(after.failure, '끝 상태의 전역 전략을 읽지 못했다').toBeNull();
-  expect(profileAfter.failure, '끝 상태의 프로필을 읽지 못했다').toBeNull();
+  expect(after.failure, teardownMessage('끝 상태의 전역 전략을 읽지 못했다', after)).toBeNull();
+  expect(
+    profileAfter.failure,
+    teardownMessage('끝 상태의 프로필을 읽지 못했다', profileAfter),
+  ).toBeNull();
   // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
   // **끝 상태를 단언한다** — 「되돌리는 명령을 보냈다」가 아니라 「서버가 비어 있다」가 조건이다.
   expect(after.value?.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
@@ -420,8 +415,29 @@ const PLANTED_NUMBER = PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED;
  * 한 값을 공유하면, 거기서 한 속성이 빠지는 변이가 **대조의 모집단에서도 함께** 빠져 대조가
  * 조용히 통과한다 — 양성 대조가 자기가 재려는 것을 따라 움직이면 재는 것이 없다. 여기 적힌
  * 넷이 술어의 수집 줄과 갈리는 날 **이 대조가 그 자리에서 붉는 것**이 설계된 동작이다.
+ *
+ * **그래도 한 방향은 비어 있었다**(M15/15I ⓑ): 술어가 속성을 **잃으면** 아래 심기가 붉지만
+ * 다섯째를 **얻으면** 아무것도 붉지 않았다 — 늘어난 속성은 이 목록에 없으니 심기지 않고,
+ * 심지 않은 축은 측정되지 않는다. 그 자리는 **순회가 아니라 등식**으로 닫는다: 심는 것은
+ * 여전히 이 리터럴이고, [assertExemptScanPopulationMatches] 가 이 리터럴과 술어의 모집단을
+ * 집합으로 맞댄다. 그러면 양쪽 어긋남이 둘 다 붉는다.
  */
 const EXEMPT_FIELD_SCANNED_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-label'] as const;
+
+/**
+ * 위 리터럴과 술어의 **훑는 속성 모집단**이 같은 집합인가 — ⓑ 의 「얻는 쪽」을 드는 단언이다.
+ *
+ * 등식이지 순회가 아니다: 심기 루프는 이 spec 의 리터럴만 쓰므로, 술어의 목록을 가져와
+ * 대조가 그것을 따라 움직이는 꼴(공허해지는 꼴)이 되지 않는다.
+ */
+function assertExemptScanPopulationMatches(): void {
+  const control = [...EXEMPT_FIELD_SCANNED_ATTRIBUTES].sort();
+  const predicate = [...SCANNED_ATTRIBUTES].sort();
+  expect(
+    predicate,
+    '술어가 훑는 속성 모집단이 이 대조의 목록과 갈렸다 — 심지 않는 속성은 측정되지 않는다',
+  ).toStrictEqual(control);
+}
 
 /**
  * 셸의 전역 탐색으로 한 화면 간다 — 주소를 손으로 적지 않는다(`openSettings` 와 같은 관례).
@@ -506,16 +522,21 @@ test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 
   //    빼는 변이가 **생존했다**(verifier 실측). 넷이 술어의 같은 수집 줄에 서는 것은 사실이지만
   //    그것은 구조 추론이지 측정이 아니다 — 한 줄이 넷으로 갈리는 날 조용해지는 것이 그 차이다.
   //    ⑥ 의 되돌림 쌍도 속성마다 둔다(붉음이 심은 값 때문임을 넷 각각이 말한다).
+  //
+  //    **넷을 다 재고 한 번에 단언한다**(15I ⓓ). 앞 판은 속성마다 그 자리에서 `expect` 했고,
+  //    `expect` 는 던지므로 **둘째가 붉으면 셋째·넷째가 그 실행에서 미측정**이었다 — 한 라운드가
+  //    한 속성만 알려 주면 진단이 속성 수만큼 걸린다. 쌍(심음·되돌림)을 모아 마지막에 전체
+  //    목록으로 맞대면 어긋난 속성이 **한 번에 전부** 문면에 선다.
+  assertExemptScanPopulationMatches();
   await tradeName.fill('');
+  const exemptionScope: { attribute: string; planted: string[]; restored: string[] }[] = [];
   for (const attribute of EXEMPT_FIELD_SCANNED_ATTRIBUTES) {
     const original = await own.evaluate((node, name) => node.getAttribute(name), attribute);
     await own.evaluate(
       (node, [name, planted]) => node.setAttribute(name, planted),
       [attribute, PLANTED_BUSINESS_REGISTRATION_NUMBER] as const,
     );
-    expect(await privateValueProblems(page), `예외가 그 칸의 ${attribute} 까지 열었다`).toStrictEqual([
-      PRIVATE_VALUE_PROBLEM_PLANTED,
-    ]);
+    const planted = await privateValueProblems(page);
 
     // ⑥ 되돌리면 다시 조용하다 — 들어올 때의 값으로 돌린다(오늘 넷 다 없지만, 생기는 날
     //    이 대조가 그 칸을 지우고 가지 않는다).
@@ -529,8 +550,15 @@ test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 
       },
       [attribute, original] as const,
     );
-    await assertNoPrivateValues(page);
+    exemptionScope.push({ attribute, planted, restored: await privateValueProblems(page) });
   }
+  expect(exemptionScope, '예외의 범위가 그 칸의 값을 넘었거나, 되돌림이 조용해지지 않았다').toStrictEqual(
+    EXEMPT_FIELD_SCANNED_ATTRIBUTES.map((attribute) => ({
+      attribute,
+      planted: [PRIVATE_VALUE_PROBLEM_PLANTED],
+      restored: [],
+    })),
+  );
 
   expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
 });

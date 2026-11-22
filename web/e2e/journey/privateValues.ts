@@ -49,6 +49,18 @@ export const PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED = businessRegistrationNu
 export const OWN_BUSINESS_REGISTRATION_NUMBER = BUSINESS_REGISTRATION_NUMBER_TEST_ID;
 
 /**
+ * 술어가 **값 밖에서** 훑는 속성 모집단 — **한 자리다**. 아래 `querySelectorAll` 의 선택자와
+ * 수집 줄이 둘 다 이 값의 **구성**이라, 속성을 더하거나 빼는 길이 이 상수 하나다(두 자리에
+ * 열거하면 한쪽만 고치는 변이가 조용하다).
+ *
+ * **밖으로 내는 이유는 대조가 등식으로 재기 위해서다**(M15/15I ⓑ). 양성 대조는 자기 리터럴을
+ * 그대로 들고 심고, 그 리터럴과 이 값의 **집합 등식**을 따로 단언한다 — 대조가 이 값을
+ * 순회하면 속성이 **느는** 변이가 대조의 모집단도 함께 늘려 아무것도 붉지 않는다(그것이 그
+ * 목록을 일부러 두 번 적어 온 사유다). 등식은 **잃는 쪽과 얻는 쪽을 둘 다** 붉힌다.
+ */
+export const SCANNED_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-label'] as const;
+
+/**
  * 두 축이 내는 **문면** — 양성 대조가 「어느 축이 붉었는가」를 축어로 단언하기 위해 밖으로
  * 낸다(r1 v F1). 한 축을 꺼도 다른 축이 가리는 것을 「문제가 있다」만으로는 가를 수 없다.
  */
@@ -67,27 +79,29 @@ export const PRIVATE_VALUE_PROBLEM_PLANTED = '저장한 사업자등록번호(�
  */
 export async function privateValueProblems(page: Page): Promise<string[]> {
   const body = await page.locator('body').innerText();
-  const scanned = await page.evaluate((allowedTestId: string) => {
-    const nodes = [
-      ...document.querySelectorAll('input, textarea, select, [title], [alt], [aria-label], [placeholder]'),
-    ];
-    const exempted = nodes.filter((element) => element.getAttribute('data-testid') === allowedTestId);
-    const text = nodes
-      .flatMap((element) => [
-        // **면제는 그 칸의 `value` 하나다**(r1 cr L-11). 노드 전체를 빼면 계약의 예외(「자기
-        // 칸의 자기 값」)보다 술어의 예외가 넓어지고, 뒷날 그 칸에 `title={번호}` 류가 붙는 날
-        // 예외가 **조용히** 함께 넓어진다. 속성 넷은 예외 칸에서도 모집단에 남는다.
-        element.getAttribute('data-testid') === allowedTestId
-          ? ''
-          : ((element as Partial<HTMLInputElement>).value ?? ''),
-        element.getAttribute('placeholder') ?? '',
-        element.getAttribute('title') ?? '',
-        element.getAttribute('alt') ?? '',
-        element.getAttribute('aria-label') ?? '',
-      ])
-      .join('\n');
-    return { text, exempted: exempted.length };
-  }, OWN_BUSINESS_REGISTRATION_NUMBER);
+  const scanned = await page.evaluate(
+    (input: { readonly allowedTestId: string; readonly attributes: readonly string[] }) => {
+      const { allowedTestId, attributes } = input;
+      // 선택자도 **같은 목록의 구성**이다 — 훑는 속성과 고르는 속성이 갈리면 모집단이 조용히
+      // 비는 자리가 생긴다.
+      const selector = ['input', 'textarea', 'select', ...attributes.map((name) => `[${name}]`)].join(', ');
+      const nodes = [...document.querySelectorAll(selector)];
+      const exempted = nodes.filter((element) => element.getAttribute('data-testid') === allowedTestId);
+      const text = nodes
+        .flatMap((element) => [
+          // **면제는 그 칸의 `value` 하나다**(r1 cr L-11). 노드 전체를 빼면 계약의 예외(「자기
+          // 칸의 자기 값」)보다 술어의 예외가 넓어지고, 뒷날 그 칸에 `title={번호}` 류가 붙는 날
+          // 예외가 **조용히** 함께 넓어진다. 속성 넷은 예외 칸에서도 모집단에 남는다.
+          element.getAttribute('data-testid') === allowedTestId
+            ? ''
+            : ((element as Partial<HTMLInputElement>).value ?? ''),
+          ...attributes.map((name) => element.getAttribute(name) ?? ''),
+        ])
+        .join('\n');
+      return { text, exempted: exempted.length };
+    },
+    { allowedTestId: OWN_BUSINESS_REGISTRATION_NUMBER, attributes: [...SCANNED_ATTRIBUTES] },
+  );
 
   const shown = `${body}\n${scanned.text}`;
   const problems: string[] = [];
