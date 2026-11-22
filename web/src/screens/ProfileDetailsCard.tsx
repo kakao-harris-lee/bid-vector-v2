@@ -141,10 +141,16 @@ export function ProfileDetailsCard({
               적은 값이 받는 두 꼴 어느 쪽도 아니면 **안내**가 그 자리를 대신한다. 판정이 아니다
               (보내는 값은 그대로이고 서버가 정한다) — 서버의 거부가 어느 칸인지 말하지 않으므로
               운영자에게 고칠 자리를 말해 주는 것이 이 한 줄의 전부다.
+
+              `aria-live` 는 **`polite`** 다(r1 cr L-10): `aria-describedby` 는 포커스 시점에 한 번
+              읽히는 설명이라, 치는 중에 이 문단의 글자가 안내에서 교정으로 바뀌어도 스크린 리더가
+              알리지 않는다. `assertive` 가 아닌 이유는 이 문단이 **판정이 아니기** 때문이다 —
+              오류처럼 끼어들면 안 된다.
             */}
             <p
               id={BUSINESS_REGISTRATION_NUMBER_HELP_ID}
               data-testid="profile-business-registration-number-help"
+              aria-live="polite"
               className="text-xs text-ink-soft"
             >
               {businessRegistrationNumberHint(form.businessRegistrationNumber) ??
