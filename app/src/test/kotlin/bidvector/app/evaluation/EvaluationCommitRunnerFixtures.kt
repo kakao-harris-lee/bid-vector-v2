@@ -93,10 +93,28 @@ internal fun List<AccountId>.values(): List<Long> = map { it.value }
  * 마침 줄의 **계정 계수 넷**(r3 CR L-8). 네 수가 청중과 닫히는지를 시나리오마다 한 줄로 본다 —
  * 개별 값만 단언하면 `deferred` 산술이 한 칸 밀리는 변경이 한 test 에서만 붉는다.
  */
-internal fun accountCountsOf(written: List<String>): List<Int> {
-    val line = written.single { it.startsWith("evaluation-commit finished") }
-    return listOf("accounts", "skipped", "failed", "deferred").map { field ->
-        requireNotNull(Regex("""\b$field=(\d+)""").find(line)) { "$field 가 마침 줄에 없다: $line" }
+internal fun accountCountsOf(written: List<String>): List<Int> = countsOf(written, "finished", FINISH_COUNT_FIELDS)
+
+/**
+ * 멈춤 줄의 **계수 둘** — `[consecutive, remaining]`(M15/15H, `OPEN-M15-TEST-RESIDUE` ⓐ).
+ *
+ * 문자열 포함(`shouldContain "consecutive=3"`)으로 읽지 않는다. 이 slice 가 잠그는 것은
+ * **그 칸에 어느 값이 실리는가**이고, 포함 단언은 고정물이 두 수를 같게 만든 판에서 아무것도
+ * 가르지 못한다 — 수로 읽어야 「연속 수」와 「누적 실패 수」가 갈린 판에서 변이가 붉는다.
+ */
+internal fun stopLineCountsOf(written: List<String>): List<Int> = countsOf(written, "stopped", STOP_COUNT_FIELDS)
+
+private val FINISH_COUNT_FIELDS = listOf("accounts", "skipped", "failed", "deferred")
+private val STOP_COUNT_FIELDS = listOf("consecutive", "remaining")
+
+private fun countsOf(
+    written: List<String>,
+    lineKind: String,
+    fields: List<String>,
+): List<Int> {
+    val line = written.single { it.startsWith("evaluation-commit $lineKind") }
+    return fields.map { field ->
+        requireNotNull(Regex("""\b$field=(\d+)""").find(line)) { "$field 가 $lineKind 줄에 없다: $line" }
             .groupValues[1]
             .toInt()
     }
