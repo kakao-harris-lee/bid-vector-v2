@@ -110,6 +110,9 @@ const BUSINESS_REGISTRATION_NUMBER_TYPED_SHAPE = /^[0-9]{3}-[0-9]{2}-[0-9]{5}$/u
  * 무관하게 적힌 값 그대로이고, 받을지 말지는 서버가 정한다. 여기서 하는 일은 **운영자에게
  * 고칠 자리를 말해 주는 것**뿐이다.
  *
+ * 「적힌 값 그대로」는 **꼴을 두고 하는 말이다** — 보내는 본문은 앞뒤 공백만 털린다
+ * ([businessDetailsBodyOf]). 이 함수도 같은 자리에서 털고 보므로 두 층의 답이 갈리지 않는다.
+ *
  * 왜 필요한가: 서버의 거부는 `{"code":"INVALID_REQUEST","message":"요청 값이 유효하지 않다"}`
  * 하나이고 **어느 칸인지 말하지 않는다**(그 오류 계약은 이 slice 의 것이 아니다). 사업 정보 폼의
  * 다섯 칸 가운데 꼴 거부가 실제로 일어나는 칸은 여기뿐이라, 안내가 없으면 운영자의 복구 수단이
@@ -176,7 +179,8 @@ export interface BusinessDetailsForm {
  *  · `REGISTERED` 이면 `naraRegisteredFields` 는 **필수**다(빈 배열 가능).
  *  · 상호는 **공백뿐이면 400** 이다 — 「미설정」은 키를 빼거나 `null` 이다. 그래서 빈 입력은
  *    `null` 로 보낸다(공백이 조용히 「지우기」가 되지 않게).
- *  · 사업자번호도 같다 — 빈 입력은 `null`(「비워 둠」)이고, 적힌 값은 **그대로** 간다.
+ *  · 사업자번호도 같다 — 빈 입력은 `null`(「비워 둠」)이고, 적힌 값은 **꼴을 건드리지 않고**
+ *    간다(앞뒤 공백만 턴다 — 상호와 달리 이 칸은 턴다, r1 cr L-9).
  */
 /** 그 문자열이 계약의 소재지 어휘인가 — **표의 키**로 좁힌다(CR r1 L-9, 캐스팅 없이). */
 export function isHeadquartersRegion(value: string): value is HeadquartersRegion {
