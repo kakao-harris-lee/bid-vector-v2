@@ -7,7 +7,9 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * 회전 창 자체를 **직접** 재는 자리(M15/15B r4, CR L-2 · verifier F-2). 앞 판의 회전 단언은 전부
@@ -95,6 +97,35 @@ class EvaluationCommitRotationTest {
         earlyOnTheTwentyThird shouldBe lateOnTheTwentyThird
     }
 
+    /**
+     * **평일만 도는 timer 에서도 전원이 돈다**(`OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ).
+     *
+     * 앞 판의 보폭은 `n-1` 이라 시작 위치가 `날짜 mod P`(`P = span / gcd(n-1, span)`)에만 달려
+     * 있었고, `K=22 · n=4` 에서 그 `P` 가 **정확히 7** 이었다 — 실행일이 평일뿐이면 잔여류 다섯만
+     * 돌아 **나머지 둘에 든 계정 여섯이 영원히** 평가되지 않았다. 종료 코드는 0, cron 은 성공이다.
+     *
+     * 보폭이 1 이면 그 거칢이 `gcd(c, span)`(cron 자신의 공차에만 달린 값)으로 줄고, 창이 하루에
+     * 한 칸 미끄러지므로 **간격이 창 칸 수 이하인 어떤 실행일 집합도** 끊기지 않고 이어 덮는다.
+     * 평일 timer 의 최대 간격은 3(금→월)이고 여기 칸은 셋이다.
+     *
+     * 시작 요일 일곱 **전부**에서 잰다 — 한 요일에 묶으면 위상 하나만 보는 앞 판의 실수를 되풀이한다.
+     */
+    @Test
+    fun `평일만 도는 timer 에서도 전원이 돈다`() {
+        for (offset in 0L until DAYS_IN_WEEK) {
+            val covered =
+                weekdaysFrom(WEEKDAY_PROBE_START.plusDays(offset), WEEKDAY_RUNS).flatMap { day ->
+                    accountsForRun(
+                        accountIds(STARVED_AUDIENCE),
+                        maxAccountsPerRun = STARVED_CAP,
+                        businessDay = day.toEpochDay(),
+                    ).values()
+                }
+
+            covered.distinct() shouldContainExactlyInAnyOrder (1L..STARVED_AUDIENCE.toLong()).toList()
+        }
+    }
+
     /** 러너를 그 시각에 한 번 돌려 **실제로 평가된 계정**을 받는다(선택이 러너까지 닿는 축이다). */
     private fun selectionAt(instant: String): List<Long> {
         val evaluated = mutableListOf<Long>()
@@ -108,10 +139,37 @@ class EvaluationCommitRotationTest {
         return evaluated
     }
 
+    /** [start] 부터의 평일 [count] 개 — 토·일을 건너뛴다(평일만 거는 timer 의 실행일 집합이다). */
+    private fun weekdaysFrom(
+        start: LocalDate,
+        count: Int,
+    ): List<LocalDate> {
+        val weekdays = mutableListOf<LocalDate>()
+        var day = start
+        while (weekdays.size < count) {
+            if (day.dayOfWeek != DayOfWeek.SATURDAY && day.dayOfWeek != DayOfWeek.SUNDAY) {
+                weekdays += day
+            }
+            day = day.plusDays(1)
+        }
+        return weekdays
+    }
+
     private companion object {
         /** 청중 10 · 상한 4 → 칸 셋 · 나머지 아홉 · 주기 `9 / gcd(3, 9) = 3` 일. */
         const val AUDIENCE = 10
         const val CAP = 4
         const val PERIOD = 3
+
+        /** `OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ 가 든 판 그대로 — 그 행이 센 기아 계정이 여섯이다. */
+        const val STARVED_AUDIENCE = 22
+        const val STARVED_CAP = 4
+
+        /** 시작 요일 일곱 전부를 훑는다. */
+        const val DAYS_IN_WEEK = 7L
+
+        /** 평일 run 의 상한 — 이 수 안에 전원이 돈다(실측 최대 15, 시작 요일 월요일). */
+        const val WEEKDAY_RUNS = 15
+        val WEEKDAY_PROBE_START: LocalDate = LocalDate.of(2026, 11, 23)
     }
 }
