@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 
 import { assertNoPrivateValues } from './privateValues';
+import { teardownMessage, teardownStep } from './teardown';
 import {
   ABSENT,
   assertOnlyAllowedOperations,
@@ -260,15 +261,37 @@ async function clearOneBudget(
 }
 
 test.afterEach(async ({ page }) => {
+  // **되돌림 둘을 예외가 끊지 못하게 한다**(15I r1 cr M-3 — 설정 여정이 15F 에서 받은 것과 같은
+  // 꼴이다). 둘 다 `!ok()` 를 사유 문자열로 올리지만 그 안의 `request.get`·`post` 는 전송 오류를
+  // 그대로 던지고, 첫 걸음이 거기서 던지면 **둘째 되돌림이 한 줄도 돌지 않는다**.
+  //
   // 금액대도 **전역 전략**이다 — 본문의 되돌림이 지나지 못한 실행에서 여기가 받는다.
-  const budgetLeft = await clearBudgetIfSet(page);
+  const budget = await teardownStep('여정 ① 의 전역 금액대를 되돌리다', () => clearBudgetIfSet(page));
   // 감시 관심 업종은 **전역 전략**이고 제안 목록의 빈 얼굴을 바꾼다 — 남겨 두면 뒤 여정이
   // 남의 잔류로 깨진다(그 실패가 가장 비싼 꼴이다).
-  const outcome = await clearStrategyTerms(
-    page,
-    'FOCUS_CATEGORY',
-    (strategy) => (strategy.focusCategories as readonly string[] | undefined) ?? [],
+  const reverted = await teardownStep('여정 ① 의 전역 감시 조건을 되돌리다', () =>
+    clearStrategyTerms(
+      page,
+      'FOCUS_CATEGORY',
+      (strategy) => (strategy.focusCategories as readonly string[] | undefined) ?? [],
+    ),
   );
+  // **던진 것이 먼저 선다** — 던졌으면 `outcome` 이 없어 아래 갈래가 전부 거짓이 되고, 그러면
+  // 「되돌릴 수 없었다」가 아니라 「남겼다」로 진단이 옮겨 간다.
+  expect(
+    budget.failure,
+    teardownMessage('여정 ① 의 전역 금액대 되돌림이 던졌다', budget),
+  ).toBeNull();
+  expect(
+    reverted.failure,
+    teardownMessage('여정 ① 의 전역 감시 조건 되돌림이 던졌다', reverted),
+  ).toBeNull();
+  const budgetLeft = budget.value;
+  const outcome = reverted.value;
+  // 위 단언이 이미 던졌을 자리다 — 타입을 좁히기 위한 갈래이고 런타임에 닿지 않는다.
+  if (outcome === null) {
+    return;
+  }
   if (outcome.kind === 'no-session') {
     // **원래 실패를 덮지 않는다**(CR r1 LOW): 로그인 전에 죽었으면 전역 상태를 바꿀 기회도
     // 없었으므로 되돌릴 것이 없다. 여기서 또 실패하면 진단이 teardown 으로 옮겨 간다.

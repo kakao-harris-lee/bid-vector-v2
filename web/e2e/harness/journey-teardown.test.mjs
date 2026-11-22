@@ -38,6 +38,21 @@ describe('teardown 걸음 감싸개', () => {
     expect(outcome.failure).not.toContain('journey-teardown.test');
   });
 
+  /**
+   * **여러 줄 메시지도 머리말은 한 줄이다**(r1 v L-3). Playwright 의 요청 오류는 `Call log:`
+   * 여러 줄을 담으므로 이것이 흔한 경우다 — 메시지를 그대로 실으면 「한 줄」 주장이 거짓이 된다.
+   * 잘린 꼬리는 버리지 않고 진단이 든다.
+   */
+  it('메시지가 여러 줄이어도 머리말은 첫 줄 + 잘림 표지다', async () => {
+    const outcome = await teardownStep('되돌리다', async () => {
+      throw new Error('요청이 실패했다\nCall log:\n  - navigating to …');
+    });
+    expect(outcome.failure).not.toContain('\n');
+    expect(outcome.failure).toBe('되돌리다: 요청이 실패했다 …(진단 참조)');
+    expect(outcome.detail).toContain('Call log:');
+    expect(outcome.detail).toContain('navigating to');
+  });
+
   it('진단에 스택이 남는다', async () => {
     const outcome = await teardownStep('되돌리다', async () => {
       throw new Error('전송이 끊겼다');
@@ -67,6 +82,42 @@ describe('teardown 걸음 감싸개', () => {
     expect(outcome.failure).toBe('되돌리다: 문자열을 던졌다');
     expect(outcome.detail).toBe('문자열을 던졌다');
   });
+
+  /**
+   * **남길 진단이 없으면 `detail` 은 `null` 이다**(r1 cr L-a). 빈 문자열이면
+   * [teardownMessage] 가 머리말 뒤에 **빈 줄 하나**를 붙인다 — 「진단이 없다」와 「진단이 비었다」가
+   * 같은 모양이 되고, 읽는 사람은 잘린 출력을 의심한다.
+   */
+  it('undefined 를 던지면 진단이 null 이다', async () => {
+    const outcome = await teardownStep('되돌리다', async () => {
+      throw undefined;
+    });
+    expect(outcome.failure).toBe('되돌리다: undefined');
+    expect(outcome.detail).toBeNull();
+    expect(teardownMessage('머리말', outcome)).toBe('머리말');
+  });
+
+  it('null 을 던져도 진단이 null 이다', async () => {
+    const outcome = await teardownStep('되돌리다', async () => {
+      throw null;
+    });
+    expect(outcome.failure).toBe('되돌리다: null');
+    expect(outcome.detail).toBeNull();
+  });
+
+  /**
+   * **catch 안에서 다시 던지지 않는다**(r1 cr L-b). `String(x)` 는 `toString` 이 없는 값에서
+   * `TypeError` 다 — 그 한 줄이 「이 함수는 던지지 않는다」는 계약 전체를 깨고, 깨지는 자리가
+   * 하필 teardown 이라 **다음 되돌림이 통째로 건너뛴다**(ⓒ 가 고치려던 바로 그 꼴).
+   */
+  it('문자열로 바꿀 수 없는 값을 던져도 던지지 않는다', async () => {
+    const outcome = await teardownStep('되돌리다', async () => {
+      throw Object.create(null);
+    });
+    expect(outcome.value).toBeNull();
+    expect(outcome.failure).toContain('문자열로 바꿀 수 없는 값');
+    expect(outcome.detail).toContain('문자열로 바꿀 수 없는 값');
+  });
 });
 
 describe('cause 사슬 가드', () => {
@@ -75,6 +126,13 @@ describe('cause 사슬 가드', () => {
     looping.cause = looping;
     const detail = thrownDiagnostic(looping);
     expect(detail).toContain('cause 사슬이 이미 지난 것을 가리킨다');
+    /**
+     * **같은 것을 두 번 싣지 않는다**(r1 v L-2). 가드를 지워도 깊이 상한(8)이 루프를 끝내고 뒤
+     * 문구가 같은 부분 문자열을 내므로, `toContain` 만으로는 **가드 제거 변이가 산다**(실측:
+     * 10/10 GREEN). 그때 달라지는 것은 **같은 스택이 일곱 번 반복되는 것**이고, 그 차이를
+     * 보려면 「사슬 칸이 하나도 없다」를 재야 한다.
+     */
+    expect(detail).not.toContain('cause[1]');
   });
 
   it('사슬이 길면 상한에서 잘렸다고 말한다', () => {

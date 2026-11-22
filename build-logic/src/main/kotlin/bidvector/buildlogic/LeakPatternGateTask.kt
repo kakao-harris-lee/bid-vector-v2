@@ -40,6 +40,15 @@ import java.io.File
  * 것이다(`DomainSourceReferenceGateTask`의 허용 목록과 같은 관례 — 몰라서 통과가 아니라
  * 알고 받아들인 것). 게이트는 baseline **밖의 새 매치만** 실패시킨다 — 회귀는 막되
  * 이미 승인된 evidence 를 소급 편집(codex 리뷰 JSON은 append-only)하지 않는다.
+ *
+ * **정책 파일에는 `#` 주석 줄을 두지 않는다**(M15/15I). [parseLeakPatterns] 는 `#` 줄을
+ * 무시하지만 **이 파일의 둘째 독자**인 `tools/db-rehearsal.sh` 는 같은 파일을 `grep -f` 로
+ * 읽고 거기서는 모든 줄이 패턴이다 — 설명 한 줄이 「`#` 를 담은 모든 줄」에 매치해 백업 스캔을
+ * 영구히 붉힌다. 패턴의 사유는 이 KDoc 과 slice evidence 가 든다.
+ *
+ * **같은 이유로 꼴 경계는 `\b` 가 아니라 명시적 비숫자(`[^0-9]`)로 적는다**: Java 의 `\b` 는
+ * 기본이 ASCII 기준이고 GNU grep 의 `\b` 는 로캘의 낱말 문자를 따르므로, 한글이 바로 붙은
+ * 번호를 **Java 는 잡고 grep 은 놓친다**(r1 cr M-1 실측). 두 독자가 같은 답을 내야 한다.
  */
 abstract class LeakPatternGateTask : DefaultTask() {
     @get:InputFile

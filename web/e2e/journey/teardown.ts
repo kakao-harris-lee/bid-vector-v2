@@ -11,15 +11,21 @@
  * 스택과 사슬은 [TeardownOutcome.detail] 로 보존해 문면 아래에 붙인다([teardownMessage]).
  *
  * 이 모듈이 spec 밖에 있는 이유: 여정 레인의 **초록 실행에는 teardown 이 던지는 경로가 없어**
- * 이 고침이 거기서 측정되지 않는다. 단위 test(`teardown.test.ts`, vitest)가 그 자리를 든다.
+ * 이 고침이 거기서 측정되지 않는다. 단위 test(`e2e/harness/journey-teardown.test.mjs`, vitest)가
+ * 그 자리를 든다.
  */
 
 /** 걸음 하나의 결과 — 값·짧은 문면·진단 셋을 따로 든다. */
 export interface TeardownOutcome<T> {
   readonly value: T | null;
-  /** 실패 문면 — **한 줄**이다(라벨 + 던진 것의 메시지). 단언의 머리말로 간다. */
+  /**
+   * 실패 문면 — **한 줄이다**(라벨 + 메시지의 **첫 줄**). 단언의 머리말로 간다.
+   *
+   * 「첫 줄」인 것이 요점이다(r1 v L-3): Playwright 의 요청 오류 메시지는 `Call log:` 여러 줄을
+   * 담으므로, 메시지를 그대로 실으면 머리말이 리포트를 덮는다. 잘린 뒷부분은 [detail] 이 든다.
+   */
   readonly failure: string | null;
-  /** 스택과 `cause` 사슬 — 문면을 짧게 두고 진단은 여기 남는다. 성공이면 `null`. */
+  /** 스택과 `cause` 사슬 — 문면을 짧게 두고 진단은 여기 남는다. 남길 것이 없으면 `null`. */
   readonly detail: string | null;
 }
 
@@ -29,26 +35,48 @@ export interface TeardownOutcome<T> {
  */
 const MAX_CAUSE_DEPTH = 8;
 
-/** 던진 것의 한 줄 요약 — 머리말에 싣는 값이라 스택을 담지 않는다. */
-export function thrownHeadline(thrown: unknown): string {
-  return thrown instanceof Error ? thrown.message : String(thrown);
+/** 잘린 꼬리를 알리는 표지 — 머리말이 전부가 아님을 그 자리에서 말한다. */
+const TRUNCATED_MARK = ' …(진단 참조)';
+
+/**
+ * **아무것도 던지지 않고** 값을 문자열로 — `String(x)` 가 던질 수 있다(r1 cr L-b 실측:
+ * `Object.create(null)` 은 `toString` 이 없어 `TypeError` 다). 이 모듈의 계약이 「던지지
+ * 않는다」이므로, 그 계약을 지키는 자리는 여기 한 곳이다.
+ */
+function safeString(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return `[문자열로 바꿀 수 없는 값: ${typeof value}]`;
+  }
+}
+
+/**
+ * 던진 것의 한 줄 요약 — 머리말에 싣는 값이라 스택도, **둘째 줄 이후도** 담지 않는다
+ * (r1 v L-3). 잘렸으면 그 사실을 표지로 남긴다.
+ */
+function thrownHeadline(thrown: unknown): string {
+  const message = thrown instanceof Error ? safeString(thrown.message) : safeString(thrown);
+  const firstBreak = message.indexOf('\n');
+  return firstBreak === -1 ? message : `${message.slice(0, firstBreak)}${TRUNCATED_MARK}`;
 }
 
 /** 던진 것 하나의 서술 — `Error` 면 스택(없으면 이름+메시지), 그 밖은 문자열화. */
 function describeThrown(thrown: unknown): string {
   if (thrown instanceof Error) {
-    return thrown.stack ?? `${thrown.name}: ${thrown.message}`;
+    return thrown.stack ?? `${safeString(thrown.name)}: ${safeString(thrown.message)}`;
   }
-  return String(thrown);
+  return safeString(thrown);
 }
 
 /**
- * 던진 것의 **스택과 `cause` 사슬** — 한 문자열로.
+ * 던진 것의 **스택과 `cause` 사슬** — 한 문자열로. 남길 것이 없으면 **`null`** 이다
+ * (r1 cr L-a: `throw undefined` 에서 빈 문자열을 내면 머리말 뒤에 빈 줄만 붙는다).
  *
  * `cause` 는 `Error` 가 아닐 수 있다(아무 값이나 실을 수 있는 칸이다). 사슬이 자기를 가리키면
  * 그 사실을 적고 멈춘다 — 조용히 끊으면 「사슬이 거기서 끝났다」와 구별되지 않는다.
  */
-export function thrownDiagnostic(thrown: unknown): string {
+export function thrownDiagnostic(thrown: unknown): string | null {
   const lines: string[] = [];
   const seen = new Set<unknown>();
   let current: unknown = thrown;
@@ -67,7 +95,7 @@ export function thrownDiagnostic(thrown: unknown): string {
         : `cause 사슬이 ${MAX_CAUSE_DEPTH} 걸음에서 잘렸다`,
     );
   }
-  return lines.join('\n');
+  return lines.length === 0 ? null : lines.join('\n');
 }
 
 /**

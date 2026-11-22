@@ -162,6 +162,12 @@ _tgt_psql() {
 # 없거나(exit 2) 읽기 오류가 나도 「0건」으로 읽혔다. 0·1 만 정상이고 그 밖은 스캔이 돌지 않은
 # 것이다. `-a` 로 바이너리 덤프도 텍스트로 훑는다 — 그러지 않으면 매치가 stderr 의 한 줄로만
 # 나와 셈에 들어오지 않는다(PR #61 리뷰 C).
+# **그 파일에 `#` 주석 줄을 두지 않는다**(M15/15I): `grep -f` 는 모든 줄을 패턴으로 읽으므로
+# `#` 로 시작하는 설명 한 줄이 「`#` 를 담은 모든 줄」에 매치하는 패턴이 된다 — 그 순간 이
+# 스캔이 백업 전체를 잡고 리허설이 영구히 붉는다. 패턴의 사유는 정책 파일이 아니라
+# `LeakPatternGateTask` KDoc 과 slice evidence 가 든다. 같은 이유로 꼴 경계는 `\b` 가 아니라
+# 명시적 비숫자(`[^0-9]`)로 적는다 — `\b` 는 이 grep(로캘 의존)과 Java 게이트(ASCII)에서 뜻이
+# 달라져 같은 줄을 한쪽만 잡는다(r1 cr M-1 실측).
 LEAK_PATTERNS="$REPO_ROOT/config/quality/leak-patterns.txt"
 [ -r "$LEAK_PATTERNS" ] || _die "누출 패턴 파일을 읽을 수 없다: $LEAK_PATTERNS" 2
 leak_scan="$(grep -rniEa -f "$LEAK_PATTERNS" "$WORK/backup")" && leak_rc=0 || leak_rc=$?

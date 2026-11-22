@@ -9,7 +9,10 @@ in_scope:
   - web/e2e/journey/settings.spec.ts
   - web/e2e/journey/privateValues.ts
   - web/e2e/journey/teardown.ts
+  - web/e2e/journey/onboarding.spec.ts        # 수정 라운드 1 (cr M-3)
   - web/e2e/harness/journey-teardown.test.mjs
+  - build-logic/src/main/kotlin/bidvector/buildlogic/LeakPatternGateTask.kt  # 주석만 (cr L-d)
+  - tools/db-rehearsal.sh                     # 주석만 (cr L-d)
   - web/config/gate-tests.txt
   - config/quality/leak-patterns.txt
   - config/quality/leak-pattern-baseline.txt
@@ -52,7 +55,7 @@ spec 의 리터럴 그대로** 두고, 그 리터럴과 술어가 실제로 훑�
 
 ### D-15I-2 — ⓒ 는 문면과 진단을 **가른다**
 
-실패 머리말(`failure`)은 한 줄로 두고(라벨 + 메시지), 스택과 `cause` 사슬은 **별도 칸**
+실패 머리말(`failure`)은 한 줄로 두고(라벨 + 메시지의 **첫 줄**), 스택과 `cause` 사슬은 **별도 칸**
 (`detail`)으로 보존해 단언 문면 아래에 붙인다. 사슬은 깊이 상한과 순환 가드를 갖는다.
 
 그 감싸개를 **spec 밖의 모듈**(`web/e2e/journey/teardown.ts`)로 옮긴다. 여정 레인의 **초록
@@ -129,7 +132,12 @@ slice 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 
    행은 ⓐ 를 열린 채로 남긴다.
 2. **ⓑ 의 등식은 「술어가 그 상수를 쓴다」를 전제한다** — 상수를 두고 속성 하나를
    `getAttribute` 로 직접 더 읽으면 등식은 조용하다. 수집 줄을 늘리는 것은 리뷰 소관이다.
-3. **ⓔ 의 패턴은 자리 구분이 있는 꼴만 본다**(위 (3)).
+3. **ⓔ 의 패턴이 보는 것은 하이픈 꼴 하나다**(r1 v L-1 실측). 못 보는 꼴: 공백 구분 · 점 구분 ·
+   en-dash 구분 · 전각 숫자 · **자리 구분이 없는 저장 꼴(숫자 열 자리)**. 저장 꼴을 넣지 않는
+   이유는 금액·공고번호와 구별되지 않아 오탐이 트리를 덮기 때문이고, 그 축은 화면 쪽 술어의
+   축어 축이 든다. 숫자·영문·`_` 가 바로 앞뒤에 붙은 꼴은 **설계대로** 걸리지 않는다.
+   한글이 바로 붙은 꼴은 **두 독자가 모두 잡는다** — r1 에서 경계를 `\b` 에서 명시적
+   비숫자(`[^0-9]`)로 바꾼 뒤의 상태다(그 전에는 Java 만 잡고 GNU grep 은 로캘에 따라 놓쳤다).
 4. **`tools/db-rehearsal.sh`(CI `container` job S-23c)도 이 패턴 파일을 읽는다.** 그 job 은 로컬에서
    돌리지 않았다(도커 이미지 빌드·trivy·compose 전건). 영향이 0 인 근거: DB 가 사업자번호를
    **자리 구분 없는 열 자리**로 저장하고(계약 값 타입), 그 job 이 백업 전에 쓰는 행은
@@ -142,3 +150,26 @@ slice 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 
 
 `in_scope` 에서 `web/vite.config.ts` 를 빼고 단위 test 의 자리를 `web/e2e/harness/` 로 옮겼다
 (사유는 D-15I-2). 구현 착수 전 갱신이라 되돌릴 산출물이 없다.
+
+## 알려진 제한 — 수정 라운드 1 에서 더한 것
+
+6. **spec 이 `teardownMessage` 를 단언 문면에 배선했는지는 어느 test 도 재지 않는다**(r1 v L-4).
+   여정 초록 실행에서 그 `catch` 가 돌지 않기 때문이다 — 단위 test 는 **모듈**을 잠그고 **배선**은
+   리뷰 소관이다. 문면을 옛 문자열로 되돌려도 typecheck·vitest·여정이 모두 초록이다.
+7. **술어의 선택자 쪽 구성은 등식으로도 심기 루프로도 재지 않는다**(r1 v L-5). 심기는 늘 예외
+   칸(`input`)에 하고 `input` 은 속성과 무관하게 선택되므로, 선택자를 `'input, textarea, select'`
+   로 줄이는 변이는 살아남는다(그때 input 이 아닌 노드의 `title`·`aria-label` 이 모집단에서
+   빠진다). ⓑ 의 계약 문면(속성 목록 drift)에는 들지 않고 **옛 리터럴 선택자에서도 같았다** —
+   기존 부채로 등재한다.
+8. **`tools/db-rehearsal.sh` 에는 allowlist 가 없다**(r1 cr 열린 질문). 그 스캔은 매치 1 건이면
+   그대로 멈추므로, CI 밖 실 DB 백업에서 이 꼴의 **오탐**이 나오면 우회 경로가 없다(값을 지우거나
+   패턴을 되돌리는 것뿐). CI 의 `container` job 에서는 백업이 `pg_dump --format=custom`(압축)이라
+   행 데이터가 평문으로 나오지 않고, 저장 꼴(구분 없는 열 자리)은 이 패턴이 보지 않는다 — 그래서
+   오늘은 발화하지 않는다. 허용 목록을 그 스캔에도 붙일지는 **이 slice 가 결정하지 않는다**.
+
+## 계약 갱신 — 2026-11-23 #2 (수정 라운드 1)
+
+리뷰 둘(verifier ready-for-review · code-reviewer 차단 0)의 지적을 한 라운드로 받으면서
+`in_scope` 에 셋을 더했다 — `web/e2e/journey/onboarding.spec.ts`(cr M-3: 같은 teardown 꼴이
+그 여정에도 있다) 와 주석만 바뀌는 둘(`LeakPatternGateTask.kt` · `tools/db-rehearsal.sh`,
+cr L-d: `#` 주석 금지 규칙이 evidence 에만 있었다). rollback 목록을 다시 기계 산출했다.
