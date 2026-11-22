@@ -178,8 +178,9 @@ verifier `ready-for-review` 와 code-reviewer `APPROVE` 가 났다 — 식별자
    되세우지 **않고** 감싸는 계층(상류 라이브러리 · 미래의 드라이버 · `Future.get` 류를 감싼
    자리)이 끼면 플래그는 꺼진 채 오고 술어는 앞 판과 똑같이 눈이 먼다. `noteAccountFailure` 는
    **정확히 `InterruptedException` 일 때만** 되세우므로 감싼 예외를 구제하지 못한다. 그때 run 은
-   중단인데도 연속 상한으로 멈추고 `cause=consecutive-account-failures` 를 적는다 — 운영자가 그
-   줄을 계정 장애로 읽지 않도록 runbook §3.4 가 「거꾸로는 읽지 않는다」를 든다(15G).
+   그 실패를 여느 계정 실패로 센다 — 연속 상한에 닿으면 `cause=consecutive-account-failures` 로
+   멈추고, 닿지 않으면 멈춤 줄 없이 `failed=` 에만 남는다. 운영자가 어느 쪽이든 계정 장애로 읽지
+   않도록 runbook §3.4 가 「거꾸로는 읽지 않는다」를 든다(15G · M15 종결에서 문면 정정).
 
 ## 승인 경계
 

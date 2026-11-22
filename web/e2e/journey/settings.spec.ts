@@ -463,7 +463,7 @@ async function saveBusinessDetails(page: Page): Promise<{ readonly businessRegis
  * 단언한다 — 심은 꼴이 내는 문제 **하나**만 나와야 하고, 그 축을 끄면 빈 목록이 되어 붉는다.
  *
  * **예외의 범위도 여기서 잰다**(r1 cr L-11): 면제는 그 칸의 **`value` 하나**이지 노드 전체가
- * 아니다. 예외 칸에 값이 아닌 속성(`title`)으로 같은 글자를 심으면 술어가 문제를 내야 한다.
+ * 아니다. 예외 칸에 값이 아닌 속성 넷(`placeholder`·`title`·`alt`·`aria-label`) 각각에 같은 글자를 심으면 술어가 문제를 내야 한다.
  *
  * 이 test 는 **저장하지 않는다** — 서버 상태는 아래 test 가 쥔다.
  */
