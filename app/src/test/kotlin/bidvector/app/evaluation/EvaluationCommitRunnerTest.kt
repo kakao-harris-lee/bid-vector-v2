@@ -9,11 +9,11 @@ import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
 import java.sql.SQLException
 
-// 회전 축을 재는 판 — 청중 K=10 · 상한 n=4 라 칸이 셋이고, ceil((K-1)/(n-1)) = ceil(9/3) = 3 일이면
-// 전원이 한 번씩 돈다. 세 수가 함께 움직여야 하므로 한자리에 둔다.
+// 회전 축을 재는 판 — 청중 K=10 · 상한 n=4 라 칸이 셋이고, 창이 하루에 한 칸씩 미끄러져
+// K - n + 1 = 7 달력일이면 전원이 한 번씩 돈다. 세 수가 함께 움직여야 하므로 한자리에 둔다.
 private val ROTATION_AUDIENCE: List<Long> = (1L..10L).toList()
 private const val ROTATION_CAP = 4
-private const val ROTATION_DAYS = 3
+private const val ROTATION_DAYS = 7
 
 /**
  * 커밋 러너의 **예외 경로**(R2-L-2, cr R-6) — 협력자가 던지면 러너가 Spring 에 넘기지 않고
@@ -155,8 +155,8 @@ class EvaluationCommitRunnerTest {
     /**
      * **상한 밖은 회전한다**(r3 리뷰 M-1·F-1, 팀장 결정 2026-11-22). 앞 판은 `take(n)` 고정
      * 절단이라 `n` 번째 뒤의 계정이 **어느 run 에서도** 평가되지 않았다 — 줄은 그것을 「미룸」이라
-     * 불렀고 cron 은 성공을 적었다. 이제 창이 **KST 달력일**마다 `n-1` 칸씩 미끄러져
-     * `ceil((K-1)/(n-1))` 달력일이면 전원이 한 번씩 돈다(K=10 · n=4 → 3 일). 축이 「영업일」이
+     * 불렀고 cron 은 성공을 적었다. 이제 창이 **KST 달력일**마다 한 칸씩 미끄러져 `K-n+1`
+     * 달력일이면 전원이 한 번씩 돈다(K=10 · n=4 → 7 일). 축이 「영업일」이
      * **아닌** 것이 요점이다 — 주말·공휴일을 포함한다(15B r5 CR L-1 · `accountsForRun` KDoc).
      *
      * 오프셋을 0 으로 고정하는 변이는 세 날의 집합을 같게 만들어 **두 단언 모두** 붉는다.
