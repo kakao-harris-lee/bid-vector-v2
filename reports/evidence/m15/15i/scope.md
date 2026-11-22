@@ -20,29 +20,22 @@ out_of_scope:
   - 가입 경화(signup hardening)
   - 그 밖의 M15 잔여·신설 OPEN
 acceptance_commands:
-  - cd web && npm ci                       # W-1
-  - cd web && npm run lint                 # W-2
-  - cd web && npm run typecheck            # W-3
-  - cd web && npm run gate:src-tree        # W-4
-  - cd web && npm run api:types:check      # W-5
-  - cd web && npm run test                 # W-6
-  - cd web && npm run gate:tests           # W-7
-  - cd web && npm run build                # W-8
-  - cd web && npm run gate:boundary-canary # W-9
-  - cd web && npx playwright install chromium  # W-10
-  - cd web && npm run test:e2e             # W-11
-  - ./gradlew --no-daemon :app:bootJar     # W-12
-  - cd web && npm run test:e2e:journey     # W-13
-  - ./gradlew --no-daemon check --continue # check job (leakPatternGate 가 이 job 에 걸린다)
+  # CI 의 `web` job 전건(W-1~W-13) — 명령은 `.github/workflows/ci.yml` 그대로이고
+  # 종료 코드와 핵심 결과는 commands.md 의 acceptance 절이 싣는다.
+  - cd web && npm ci && npm run lint && npm run typecheck && npm run gate:src-tree
+  - cd web && npm run api:types:check && npm run test && npm run gate:tests
+  - cd web && npm run build && npm run gate:boundary-canary
+  - cd web && npx playwright install chromium && npm run test:e2e
+  - ./gradlew --no-daemon :app:bootJar && cd web && npm run test:e2e:journey
+  # `check` job — leakPatternGate 가 이 job 에 걸린다(알려진 빨강이 없으므로 --continue 는 보수적)
+  - ./gradlew --no-daemon check --continue
 rollback: reports/evidence/m15/15i/rollback.md (in_scope 경로 한정 restore — range revert 가 아니다)
 ```
 
 ## 무엇을 닫는가
 
-`docs/discovery/capability-map.md` 의 `OPEN-M15-TEST-RESIDUE` 행이 든 다섯 중 **넷**이다
-(ⓐ 는 out_of_scope — 위 표). 요지의 정본은 그 행이고 여기서 다시 적지 않는다: ⓑ 예외 칸
-양성 대조의 「얻는 쪽」이 비어 있다 · ⓒ teardown 감싸개가 스택·`cause` 를 버린다 · ⓓ ⑤ 의
-네 속성 루프가 첫 붉음에서 멈춘다 · ⓔ 비밀값 스캔 정책에 사업자등록번호 꼴이 없다.
+`docs/discovery/capability-map.md` 의 `OPEN-M15-TEST-RESIDUE` 가 든 다섯 중 **넷**(ⓑⓒⓓⓔ)이다.
+ⓐ 는 out_of_scope 다(위 표). **요지의 정본은 그 행이고 여기서 다시 적지 않는다.**
 
 ## 설계 결정
 
@@ -89,16 +82,15 @@ spec 의 리터럴 그대로** 두고, 그 리터럴과 술어가 실제로 훑�
 ⓔ 만 게이트 술어를 바꾼다. ⓑ·ⓒ·ⓓ 는 test 층이다.
 
 **(0) 위협 모델 경계.** 이 게이트가 방어하는 것은 **`reports/evidence/` 아래 문서에 비밀값·raw
-식별자가 새로 등장하는 것**이다(스캔 루트가 그 트리이고 `scope.md` 는 육안 리뷰 대상으로
-제외된다 — `LeakPatternGateTask` KDoc 이 그 선택의 정본이다). 방어하지 않는 것: 소스 트리, 저장소
-밖, 실행 중 로그, 그리고 **이미 등재된 매치**. 이 slice 는 그 경계를 **넓히지도 좁히지도 않고**
-어휘 축 하나를 더한다.
+식별자가 새로 등장하는 것**이다(스캔 루트가 그 트리이고 `scope.md` 는 육안 리뷰 대상으로 제외된다
+— `LeakPatternGateTask` KDoc 이 그 선택의 정본이다). 방어하지 않는 것: 소스 트리 · 저장소 밖 ·
+실행 중 로그 · 이미 등재된 매치. 이 slice 는 그 경계를 **넓히지도 좁히지도 않고** 어휘 축 하나를
+더한다.
 
-**(1) 열거인가 구성인가.** 패턴 파일 자체는 어휘 열거다 — 그 성질은 이 slice 가 바꾸지 않는다
-(`leak-patterns.txt` 는 2026-09 부터 열거였고, 이 slice 는 그 열거에 한 줄을 더한다). 구성으로
-닫히는 것은 **적용 범위**다: 스캔 대상은 트리 전수이고 제외는 파일 이름 집합 하나이며, 허용은
-내용 해시 키다. 그래서 「패턴을 피해 가는 표기」는 열려 있고(경계 밖), 「등재되지 않은 새 매치가
-조용히 통과하는 것」은 닫혀 있다.
+**(1) 열거인가 구성인가.** 패턴 파일 자체는 어휘 열거이고 그 성질은 이 slice 가 바꾸지 않는다.
+구성으로 닫히는 것은 **적용 범위**다 — 스캔 대상은 트리 전수, 제외는 파일 이름 집합 하나, 허용은
+**내용 해시 키**다. 그래서 「패턴을 피해 가는 표기」는 열려 있고(경계 밖), 「등재되지 않은 새
+매치가 조용히 통과하는 것」은 닫혀 있다.
 
 **(2) 우회 다섯.** ① 꼴을 바꿔 적는다(자리 구분을 빼면 저장 꼴이고 금액·공고번호와 구별되지
 않아 오탐이 트리를 덮는다) → 막지 않는다, 경계 밖 ② 계약 문서에 적는다 → 막지 않는다(4E 관례로
@@ -135,10 +127,8 @@ slice 산출물이 아니며 in_scope 밖이고, 운영자 승인 하에 같은 
 
 1. **ⓐ 는 닫지 않는다** — 다른 레인이 같은 시각에 `EvaluationCommitRunnerTest` 를 편집한다. OPEN
    행은 ⓐ 를 열린 채로 남긴다.
-2. **ⓑ 의 등식은 「술어가 그 상수를 쓴다」를 전제한다.** 뒷날 누가 상수를 두고 속성 하나를
-   `getAttribute` 로 **직접** 더 읽으면 등식은 조용하다. 그 자리를 구조로 닫으려면 수집 줄이
-   상수 순회 하나뿐이어야 하고, 이 slice 는 그 모양으로 두되 **열거가 아니라는 주장을 하지
-   않는다**(수집 줄을 늘리는 것은 리뷰 소관이다).
+2. **ⓑ 의 등식은 「술어가 그 상수를 쓴다」를 전제한다** — 상수를 두고 속성 하나를
+   `getAttribute` 로 직접 더 읽으면 등식은 조용하다. 수집 줄을 늘리는 것은 리뷰 소관이다.
 3. **ⓔ 의 패턴은 자리 구분이 있는 꼴만 본다**(위 (3)).
 4. **`tools/db-rehearsal.sh`(CI `container` job S-23c)도 이 패턴 파일을 읽는다.** 그 job 은 로컬에서
    돌리지 않았다(도커 이미지 빌드·trivy·compose 전건). 영향이 0 인 근거: DB 가 사업자번호를
