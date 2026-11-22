@@ -4,7 +4,7 @@
 있고, 그때 range revert 는 남의 것을 함께 지운다.
 
 - **복원 원천**: `5a2f98ba7402971facacdabbe98f8782b5268ab0`(착수 base · 현재 `main` 의 머리였다).
-- **실측 HEAD**: `2e28cdc8b69a9893de69d475ab8e5cbdf970db32`(이 slice 의 **마지막 산출물 커밋** —
+- **실측 HEAD**: `7f85497ecdc40a06172488a2ff598219134c5e7a`(이 slice 의 **마지막 산출물 커밋** —
   뒤따르는 커밋은 `reports/evidence/m15/15f/` 전용이고 복원 목록 밖이다).
 
 ## 명령
@@ -81,8 +81,8 @@ PR head `e2e61a57` 와 **바이트로 같다**. 그 SHA 의 CI(run `44985593752`
 ## 이 실측이 유효한가 — verifier 가 재는 술어
 
 ```
-git diff --name-only 2e28cdc8b..<판정 SHA> -- <위 복원 목록의 17 경로>
-git rev-list --merges 2e28cdc8b..<판정 SHA>
+git diff --name-only 7f85497ec..<판정 SHA> -- <위 복원 목록의 17 경로>
+git rev-list --merges 7f85497ec..<판정 SHA>
 ```
 
 둘 다 **빈 출력**이면 유효하다. 실측 HEAD 뒤의 커밋은 `reports/evidence/m15/15f/` 전용이고 복원
