@@ -12,7 +12,7 @@ base `99f2fb25` · 실측 자리는 라운드마다 움직인다 — **그 SHA �
 
 | 명령 | 결과 |
 | --- | --- |
-| `./gradlew --no-daemon check --continue` | **exit 0 — 실패 task 0**(라운드 4, 32분 37초). 라운드 3 의 같은 명령도 exit 0 이었다(34분 37초) — 아래 「낡은 산출물」을 먼저 읽는다 |
+| `./gradlew --no-daemon check --continue` | **exit 0 — 실패 task 0**(라운드 5, 32분 48초). 라운드 3·4 의 같은 명령도 exit 0 이었다 — 아래 「낡은 산출물」을 먼저 읽는다 |
 
 수정 라운드 1 이 닫은 숨은 실패 아홉(모두 이 slice 가 낸 것): ktlint 넷(import 순서 둘 ·
 체인 줄바꿈 · `when` 중괄호 · KDoc 겹침 둘) · `sizeGate`(512줄) · `cpdCheck`(controller 둘의
