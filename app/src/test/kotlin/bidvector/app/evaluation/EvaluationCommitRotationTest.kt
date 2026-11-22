@@ -2,7 +2,7 @@ package bidvector.app.evaluation
 
 import bidvector.app.wiring.RecordedExitCodes
 import bidvector.workflow.strategy.Clock
-import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
@@ -76,7 +76,8 @@ class EvaluationCommitRotationTest {
                     accountsForRun(accountIds(AUDIENCE), maxAccountsPerRun = CAP, businessDay = start + offset)
                         .values()
                 }
-            covered.toSet() shouldContainExactly (1L..AUDIENCE.toLong()).toSet()
+            // 순서는 위상마다 다르다 — **집합으로** 비교한다(15B r5 CR L-6, 저장소 관례).
+            covered.distinct() shouldContainExactlyInAnyOrder (1L..AUDIENCE.toLong()).toList()
         }
     }
 
