@@ -2,6 +2,7 @@ package bidvector.app.http
 
 import bidvector.workflow.evaluation.UnjudgedQualificationAxis
 import bidvector.workflow.profile.BusinessDetails
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ProfileView
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -29,6 +30,28 @@ class ProfileResponseTest {
             )
 
         ProfileResponse.from(view).unjudgedAxes shouldBe listOf("QUAL_10_PERFORMANCE")
+    }
+
+    /**
+     * M15/15C — 사업자번호가 **정규화된 꼴로 wire 에 닿는다.** 비워 둔 계정은 `null` 이고 그것이
+     * 「비워 둠」이다(빈 문자열을 지어내지 않는다).
+     */
+    @Test
+    fun `응답의 사업자번호는 숫자 10자리이고 비워 두면 null 이다`() {
+        fun responseFor(details: BusinessDetails) =
+            ProfileResponse.from(
+                ProfileView(
+                    qualification = null,
+                    details = details,
+                    capacities = emptyList(),
+                    unjudgedAxes = emptyList(),
+                ),
+            )
+
+        responseFor(BusinessDetails.EMPTY).businessRegistrationNumber shouldBe null
+        responseFor(
+            BusinessDetails.EMPTY.copy(businessRegistrationNumber = BusinessRegistrationNumber("1234567890")),
+        ).businessRegistrationNumber shouldBe "1234567890"
     }
 
     /** 빈 목록도 **값**이다 — 「판정 대기 축이 없다」를 응답이 말할 수 있어야 한다. */

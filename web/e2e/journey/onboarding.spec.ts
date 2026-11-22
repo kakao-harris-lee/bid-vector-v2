@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 
+import { assertNoPrivateValues } from './privateValues';
 import {
   ABSENT,
   assertOnlyAllowedOperations,
@@ -293,12 +294,6 @@ test.afterEach(async ({ page }) => {
   }
 });
 
-/** D-7E-6 — 지금 화면에 비밀 문구도 사업자번호 꼴도 없다. 두 자리에서 부른다(채운 뒤·비운 뒤). */
-async function assertNoPrivateValues(page: Page): Promise<void> {
-  const shown = await page.locator('body').innerText();
-  expect(shown).not.toContain(journeyContext().passphrase);
-  expect(shown).not.toMatch(/\b\d{3}-\d{2}-\d{5}\b/u);
-}
 
 /** 시평액 행 지우기의 쓰기 — ⑦ 의 기준점이고 경합 대조도 같은 자리를 쓴다. */
 const CAPACITY_REMOVE = '/api/profile/construction-capacities/remove';

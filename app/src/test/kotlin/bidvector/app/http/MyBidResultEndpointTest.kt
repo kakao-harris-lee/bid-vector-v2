@@ -133,7 +133,7 @@ class MyBidResultEndpointTest : HttpIntegrationTestBase() {
     private fun declareTradeName(raw: String) {
         profiles.replaceDetails(
             AccountId(TEST_ACCOUNT_ID),
-            BusinessDetails(TradeName(raw), null, NaraReadiness.Unanswered),
+            BusinessDetails(TradeName(raw), null, null, NaraReadiness.Unanswered),
             Instant.parse("2026-09-19T00:00:00Z"),
         )
     }

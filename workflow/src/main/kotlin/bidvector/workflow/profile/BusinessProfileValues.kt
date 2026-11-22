@@ -27,6 +27,44 @@ data class TradeName(
 }
 
 /**
+ * 사업자등록번호 — **숫자 10자리 하나**다(M15/15C). 저장(V30 CHECK)과 wire 가 이 꼴을 쓰고,
+ * 화면의 `3-2-5` 는 보여 주는 **서식**이지 다른 값이 아니다(금액의 자리 구분과 같은 축).
+ *
+ * **검증번호(체크섬)를 걸지 않는다** — M15 계약의 완화 지시다. 국세청 진위 확인도 범위 밖이라
+ * 저장된 값이 실제 사업자의 것인지는 아무도 모른다. 자릿수만 본다.
+ *
+ * `toString()` 을 가린다 — 상호와 같은 규율(P4): 사업자 식별자는 로그·예외 문면에 실리면 안 된다.
+ */
+data class BusinessRegistrationNumber(
+    val digits: String,
+) {
+    init {
+        require(DIGITS.matches(digits)) { "사업자등록번호는 숫자 10자리여야 한다" }
+    }
+
+    override fun toString(): String = "BusinessRegistrationNumber(***)"
+
+    companion object {
+        /**
+         * 운영자 입력 → 값. 받는 꼴은 **둘뿐**이다 — 숫자 10자리와 `3-2-5` 하이픈 표기. 그 밖은
+         * `IllegalArgumentException` 이고, HTTP 층이 그것을 400 으로 옮긴다.
+         *
+         * 「하이픈을 전부 지우고 남은 숫자가 10 이면 받는다」로 열지 않는 이유: 지우는 규칙에는
+         * 끝이 없고(`1-2-3-4-5-6-7-8-9-0` · 앞뒤 하이픈 · 공백 섞임), 그 관용이 곧 「운영자가 적은
+         * 것과 저장된 것이 다르다」가 된다. 꼴이 둘이면 정규화가 **한 번**이고 되돌릴 수 있다.
+         *
+         * 거부는 **한 자리**다 — 이 함수는 하이픈 표기만 접고, 받을지 말지는 위 `init` 이 정한다.
+         */
+        fun of(raw: String): BusinessRegistrationNumber =
+            BusinessRegistrationNumber(if (HYPHENATED.matches(raw)) raw.replace("-", "") else raw)
+
+        /** `[0-9]` 로 적는다 — `\d` 와 달리 다른 문자 집합의 숫자(전각 · 아랍-인도)를 받지 않는다. */
+        private val DIGITS = Regex("[0-9]{10}")
+        private val HYPHENATED = Regex("[0-9]{3}-[0-9]{2}-[0-9]{5}")
+    }
+}
+
+/**
  * 본사 소재지 시·도(QUAL-08 의 **입력**) — 닫힌 어휘 17. 판정은 아직 없다([UnjudgedQualificationAxis]).
  *
  * V12 `region_terms` 를 재사용하지 않는 이유: 그 값은 텍스트 합성용 자유 어휘이고, QUAL-08 의
@@ -121,20 +159,25 @@ sealed interface NaraReadiness {
 }
 
 /**
- * 계정의 사업 정보 한 절 — 상호 · 본사 소재지 · 나라장터 준비. 이 절은 **통째로 교체**된다
- * (D-7C4-1 P5): 다른 절(V12 자격 사실 · 시평액)에 닿는 쓰기 경로가 이 타입에 없다.
+ * 계정의 사업 정보 한 절 — 상호 · 사업자번호 · 본사 소재지 · 나라장터 준비. 이 절은 **통째로
+ * 교체**된다(D-7C4-1 P5): 다른 절(V12 자격 사실 · 시평액)에 닿는 쓰기 경로가 이 타입에 없다.
  *
  * `null` 은 각각 「미설정」이다. 행이 없는 계정의 값은 [EMPTY] 이고, 그 값은 「아무것도 신고하지
  * 않았다」를 필드마다 명시한 것이다(빈 값을 지어낸 것이 아니다 — 어느 필드도 기본값으로 「신고됨」
  * 이 되지 않는다).
+ *
+ * **[businessRegistrationNumber] 에 기본값을 주지 않는다**(M15/15C). 절 단위 교체라, 기본값이 있으면
+ * 그 칸을 잊은 조립이 **저장된 번호를 조용히 지우고** 아무것도 붉지 않는다. 없으면 컴파일이 실어야
+ * 할 자리를 전부 가리킨다.
  */
 data class BusinessDetails(
     val tradeName: TradeName?,
+    val businessRegistrationNumber: BusinessRegistrationNumber?,
     val headquartersRegion: HeadquartersRegion?,
     val naraReadiness: NaraReadiness,
 ) {
     companion object {
-        val EMPTY: BusinessDetails = BusinessDetails(null, null, NaraReadiness.Unanswered)
+        val EMPTY: BusinessDetails = BusinessDetails(null, null, null, NaraReadiness.Unanswered)
     }
 }
 

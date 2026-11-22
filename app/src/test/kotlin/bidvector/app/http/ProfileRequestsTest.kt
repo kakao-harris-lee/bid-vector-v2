@@ -1,11 +1,14 @@
 package bidvector.app.http
 
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.TradeName
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
 
 /**
  * 이름 거부 규칙의 **코드포인트 축**(M7/7C④ 2b r3) — 짝을 이룬 대리는 통과하고 짝 없는 대리는 400 이다.
@@ -22,7 +25,7 @@ class ProfileRequestsTest {
     private val mapper = JsonMapper.builder().build()
 
     /** 상호 하나만 담은 사업 정보 본문 — JSON 문면을 거치지 않고 값을 그대로 싣는다. */
-    private fun detailsWith(tradeName: String): JsonNode =
+    private fun detailsWith(tradeName: String): ObjectNode =
         mapper.createObjectNode().apply {
             put("tradeName", tradeName)
             putNull("headquartersRegion")
@@ -51,5 +54,73 @@ class ProfileRequestsTest {
         shouldThrow<InvalidEditRequestException> {
             ProfileRequests.businessDetails(detailsWith("​​"))
         }
+    }
+
+    /** 사업자번호만 바꾼 사업 정보 본문 — 키를 **싣지 않는** 경우는 [detailsWith] 가 맡는다. */
+    private fun detailsWithNumber(raw: String?): JsonNode =
+        detailsWith("합성상호").apply {
+            if (raw == null) putNull("businessRegistrationNumber") else put("businessRegistrationNumber", raw)
+        }
+
+    /**
+     * M15/15C — **받는 꼴 둘이 같은 값으로 들어온다.** 요청 판독이 스스로 하이픈을 지우면
+     * 정규화가 두 자리가 되므로, 여기서는 「값 타입이 낸 것을 그대로 싣는가」만 잰다.
+     */
+    @Test
+    fun `사업자번호 — 숫자 10자리와 3-2-5 표기가 같은 값으로 들어온다`() {
+        val expected = BusinessRegistrationNumber("1234567890")
+
+        ProfileRequests.businessDetails(detailsWithNumber("1234567890")).businessRegistrationNumber shouldBe expected
+        ProfileRequests.businessDetails(detailsWithNumber("123-45-67890")).businessRegistrationNumber shouldBe expected
+    }
+
+    /** 키가 없거나 `null` 이면 「비워 둠」 — 선택 칸이므로 그 부재가 400 이 아니다. */
+    @Test
+    fun `사업자번호 — 키가 없거나 null 이면 미설정이다`() {
+        ProfileRequests.businessDetails(detailsWith("합성상호")).businessRegistrationNumber shouldBe null
+        ProfileRequests.businessDetails(detailsWithNumber(null)).businessRegistrationNumber shouldBe null
+    }
+
+    /**
+     * 꼴이 어긋나면 **400** 이다(500 이 아니다) — 값 타입의 `require` 가 `requestValue` 를 지나
+     * 요청 오류로 옮겨지는지를 잰다. 공백뿐인 값도 「지우기」로 접지 않는다(상호와 같은 규율).
+     *
+     * 표본은 **길이 상한(12) 안쪽**도 담는다(r1 v F2). `1-2-3-4-5-6-7-8-9-0` 류는 19자라 길이에서
+     * 먼저 거부되므로, 그것만 담으면 이 층은 「꼴」 축을 한 번도 재지 못한다 — `12-345-67890` ·
+     * `123-456-7890` 은 열두 자 이하라 값 타입까지 내려가 **꼴로** 거부된다.
+     */
+    @Test
+    fun `사업자번호 — 꼴이 어긋나거나 공백뿐이면 400 이다`() {
+        listOf(
+            "123456789",
+            "12345678901",
+            "12-345-67890",
+            "123-456-7890",
+            "1-2-3-4-5-6-7-8-9-0",
+            "123456789O",
+            "   ",
+            "",
+        ).forEach { raw ->
+            shouldThrow<InvalidEditRequestException> {
+                ProfileRequests.businessDetails(detailsWithNumber(raw))
+            }
+        }
+    }
+
+    /**
+     * 거부 문면에 입력값이 실리지 않는다 — 400 본문·로그 어느 쪽으로도 새지 않게(P4).
+     *
+     * 심는 값은 **거부되는 꼴**이어야 한다(실측으로 고친 자리): `777-77-77777` 은 3-2-5 를 지켜
+     * **받아들여지므로** 그 값으로는 이 단언이 아무것도 재지 못했다. 열한 자리는 길이 상한 안이라
+     * 값 타입까지 내려가 거부되고, 그 경로의 문면을 재는 것이 이 test 의 목적이다.
+     */
+    @Test
+    fun `사업자번호 — 거부 문면이 입력값을 싣지 않는다`() {
+        val failure =
+            shouldThrow<InvalidEditRequestException> {
+                ProfileRequests.businessDetails(detailsWithNumber("77777777777"))
+            }
+
+        failure.message.orEmpty() shouldNotContain "7777777"
     }
 }

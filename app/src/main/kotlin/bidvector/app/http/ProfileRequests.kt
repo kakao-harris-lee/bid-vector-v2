@@ -5,6 +5,7 @@ import bidvector.qualification.OperatorLicenses
 import bidvector.strategy.CategoryCode
 import bidvector.workflow.evaluation.ProfileFacts
 import bidvector.workflow.profile.BusinessDetails
+import bidvector.workflow.profile.BusinessRegistrationNumber
 import bidvector.workflow.profile.ConstructionCapacity
 import bidvector.workflow.profile.HeadquartersRegion
 import bidvector.workflow.profile.NaraReadiness
@@ -22,14 +23,18 @@ import java.time.LocalDate
  *  · `accountId` — **자리가 없다.** 주체는 인증 필터가 적은 값에서만 온다(7B 가드가 타입 층에서도
  *    막는다: 요청 바인딩은 `AccountId` 를 짓지 못한다).
  *  · `updatedAt` — 자리가 없다. 시각은 use case 가 쥔 시계에서 온다.
- *  · 사업자번호 · 대표자명 · 인증서 원문 — 자리가 없다(V22 에 열이 없다, scope P4).
+ *  · 대표자명 · 인증서 원문 — 자리가 없다(표에 열이 없다).
  *  · 「미등록인데 등록분야가 있다」 — **표현할 수 없다**: 분야 · 만료일은 등록 상태에서만 읽는다.
+ *
+ * 사업자번호는 **선택 칸**이다(M15/15C — V30 이 열을 두면서 자리가 생겼다). 받는 꼴은 둘이고
+ * 저장되는 꼴은 하나이며, 그 판정은 [BusinessRegistrationNumber] 가 혼자 진다.
  */
 internal object ProfileRequests {
     private val QUALIFICATION_KEYS = setOf("businessTypes", "licensesDeclared", "licenseNames", "regionTerms")
     private val DETAILS_KEYS =
         setOf(
             "tradeName",
+            "businessRegistrationNumber",
             "headquartersRegion",
             "naraRegistration",
             "naraRegisteredFields",
@@ -65,6 +70,14 @@ internal object ProfileRequests {
                 payload
                     .declaredText("tradeName", ProfileInputPolicy.TRADE_NAME_MAX_CODE_POINTS)
                     ?.let { requestValue("tradeName") { TradeName(it) } },
+            // 키가 없거나 `null` 이면 「비워 둠」이다 — 공백뿐인 값은 `declaredText` 가 400 으로 가른다
+            // (상호와 같은 규율: 공백을 「지우기」로 조용히 접지 않는다).
+            businessRegistrationNumber =
+                payload
+                    .declaredText(
+                        "businessRegistrationNumber",
+                        ProfileInputPolicy.BUSINESS_REGISTRATION_NUMBER_MAX_CODE_POINTS,
+                    )?.let { requestValue("businessRegistrationNumber") { BusinessRegistrationNumber.of(it) } },
             headquartersRegion = payload.optionalEnum("headquartersRegion", HeadquartersRegion.entries),
             naraReadiness = payload.naraReadiness(),
         )
