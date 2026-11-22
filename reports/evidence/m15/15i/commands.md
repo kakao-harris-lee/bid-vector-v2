@@ -103,5 +103,5 @@ job 의 S-23c(`tools/db-rehearsal.sh`)는 같은 패턴 파일을 읽지만 로�
 ## 2026-11-23T06:46+09:00
 - cmd: `pgrep -af GradleDaemon` · `pgrep -af 'agent-a9ab6e9023fcafcd3'`
 - exit: 0
-- 핵심 결과: 이 레인의 잔존 프로세스 **0**. 남은 daemon 둘은 cwd·기동 시각이 **다른 레인**의
-  것이라 멈추지 않았다(`./gradlew --stop` 은 쓰지 않는다).
+- 핵심 결과: 이 레인의 잔존 프로세스 **0**. 남은 daemon 둘은 하나가 다른 레인의 worktree cwd 이고
+  하나는 **레인 사이 재사용되는 계약 게이트 daemon** 이라 멈추지 않았다(`--stop` 은 쓰지 않는다).
