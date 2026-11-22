@@ -255,24 +255,58 @@ async function clearBusinessRegistrationNumber(page: Page): Promise<string | nul
   return null;
 }
 
+/**
+ * teardown 의 걸음 하나 — **던지지 않는다**(15F r1 cr L-3).
+ *
+ * 되돌림 둘은 `!ok()` 를 사유 **문자열**로 올리지만, 그 안의 세션 읽기와 `post` 는 전송 오류를
+ * 그대로 던졌다. 첫 걸음이 거기서 던지면 둘째 되돌림은 **한 줄도 돌지 않고** 심은 번호가 공유
+ * 계정에 남는다 — 아래 머리 주석이 이름 붙인 꼴이 한 층 위에서 그대로 살아 있었다. 예외를
+ * 사유 문자열로 바꾸면 그 주석의 주장이 **참이 된다**.
+ */
+async function teardownStep<T>(
+  label: string,
+  step: () => Promise<T>,
+): Promise<{ readonly value: T | null; readonly failure: string | null }> {
+  try {
+    return { value: await step(), failure: null };
+  } catch (thrown) {
+    return { value: null, failure: `${label}: ${thrown instanceof Error ? thrown.message : String(thrown)}` };
+  }
+}
+
 test.afterEach(async ({ page }) => {
   // **되돌림을 먼저 다 돌리고 단언은 나중에 모아 한다.** `expect` 는 그 자리에서 던지므로,
   // 되돌림과 단언을 번갈아 두면 **앞 축의 단언이 깨질 때 뒤 축의 되돌림이 통째로 건너뛴다** —
   // 본문 ④ 를 teardown 으로 옮긴 바로 그 사유(CR r1 M-6)가 teardown 안에서 되살아난다.
-  const blocked = await clearWatchCondition(page);
-  const numberBlocked = await clearBusinessRegistrationNumber(page);
-  const after = (await (await page.request.get('/api/strategy')).json()) as {
-    readonly requiredKeywordTerms: readonly string[];
-  };
-  const profileAfter = (await (await page.request.get('/api/profile')).json()) as StoredBusinessDetails;
+  // 네 걸음 모두 [teardownStep] 을 지나므로 **예외도 그 순서를 깨지 못한다**.
+  const cleared = await teardownStep('전역 감시 조건을 되돌리다', () => clearWatchCondition(page));
+  const numberCleared = await teardownStep('사업자번호를 되돌리다', () =>
+    clearBusinessRegistrationNumber(page),
+  );
+  const after = await teardownStep(
+    '끝 상태의 전역 전략을 읽다',
+    async () =>
+      (await (await page.request.get('/api/strategy')).json()) as {
+        readonly requiredKeywordTerms: readonly string[];
+      },
+  );
+  const profileAfter = await teardownStep(
+    '끝 상태의 프로필을 읽다',
+    async () => (await (await page.request.get('/api/profile')).json()) as StoredBusinessDetails,
+  );
 
-  // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다).
-  expect(blocked, '설정 여정의 전역 상태를 되돌릴 수 없었다').toBeNull();
-  expect(numberBlocked, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
+  // **되돌릴 수 없었던 것**과 **남긴 것**을 가른다(둘은 다른 진단이다). 「되돌리다 던졌다」는
+  // 앞쪽이고, 두 사유가 한 단언에 모이되 문면이 어느 쪽인지 말한다.
+  expect(cleared.failure ?? cleared.value, '설정 여정의 전역 상태를 되돌릴 수 없었다').toBeNull();
+  expect(numberCleared.failure ?? numberCleared.value, '설정 여정의 사업자번호를 되돌릴 수 없었다').toBeNull();
+  // 끝 상태를 **읽지 못한 것**은 또 다른 진단이다 — 아래 두 단언이 `undefined` 를 보고 엉뚱한
+  // 문면으로 붉지 않게 먼저 가른다.
+  expect(after.failure, '끝 상태의 전역 전략을 읽지 못했다').toBeNull();
+  expect(profileAfter.failure, '끝 상태의 프로필을 읽지 못했다').toBeNull();
   // 이 단언이 깨지면 **이 여정이** 붉어진다 — 뒤 여정이 남의 잔류로 깨지는 것보다 낫다.
   // **끝 상태를 단언한다** — 「되돌리는 명령을 보냈다」가 아니라 「서버가 비어 있다」가 조건이다.
-  expect(after.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
-  expect(profileAfter.businessRegistrationNumber, '설정 여정이 사업자번호를 남겼다').toBeNull();
+  expect(after.value?.requiredKeywordTerms, '설정 여정이 전역 감시 조건을 남겼다').toStrictEqual([]);
+  expect(profileAfter.value?.businessRegistrationNumber, '설정 여정이 사업자번호를 남겼다').toBeNull();
 });
 
 test('설정 여정 — 감시 조건을 세우면 제안 목록이 MATCHED 가 되고, 지우면 빈 얼굴로 돌아온다', async ({
@@ -380,6 +414,16 @@ test('설정 — 쉼표 금액은 보내지 않고, 보낸 값은 본문의 값�
 const PLANTED_NUMBER = PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED;
 
 /**
+ * 예외 칸에서도 모집단에 남아야 하는 속성 넷 — 아래 ⑤ 의 양성 대조가 **하나씩** 심는 축이다.
+ *
+ * **이 목록을 `privateValues.ts` 에서 가져오지 않는다**(일부러 두 번 적는다). 술어의 수집 줄과
+ * 한 값을 공유하면, 거기서 한 속성이 빠지는 변이가 **대조의 모집단에서도 함께** 빠져 대조가
+ * 조용히 통과한다 — 양성 대조가 자기가 재려는 것을 따라 움직이면 재는 것이 없다. 여기 적힌
+ * 넷이 술어의 수집 줄과 갈리는 날 **이 대조가 그 자리에서 붉는 것**이 설계된 동작이다.
+ */
+const EXEMPT_FIELD_SCANNED_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-label'] as const;
+
+/**
  * 셸의 전역 탐색으로 한 화면 간다 — 주소를 손으로 적지 않는다(`openSettings` 와 같은 관례).
  *
  * **이름을 정확히 맞추지 않는다**: 배지를 다는 자리는 접근성 이름이 「내 입찰함 3」처럼 **수를
@@ -457,20 +501,36 @@ test('사업자번호 — 자기 설정 칸만 예외이고 다른 칸에서는 
     PRIVATE_VALUE_PROBLEM_PLANTED,
   ]);
 
-  // ⑤ **양성 대조 ③(예외의 범위)** — 면제는 그 칸의 **값**이다. 같은 글자를 예외 칸의 속성으로
-  //    심으면 모집단에 남아 붉어진다(r1 cr L-11 · 알려진 제한 8 의 속성 경로).
+  // ⑤ **양성 대조 ③(예외의 범위) — 속성 넷을 각각**(15F r1 v F-2). 면제는 그 칸의 **값**이다.
+  //    앞 판은 `title` 하나만 심었고, 나머지 셋(`placeholder`·`alt`·`aria-label`)을 모집단에서
+  //    빼는 변이가 **생존했다**(verifier 실측). 넷이 술어의 같은 수집 줄에 서는 것은 사실이지만
+  //    그것은 구조 추론이지 측정이 아니다 — 한 줄이 넷으로 갈리는 날 조용해지는 것이 그 차이다.
+  //    ⑥ 의 되돌림 쌍도 속성마다 둔다(붉음이 심은 값 때문임을 넷 각각이 말한다).
   await tradeName.fill('');
-  await own.evaluate(
-    (node, planted) => node.setAttribute('title', planted),
-    PLANTED_BUSINESS_REGISTRATION_NUMBER,
-  );
-  expect(await privateValueProblems(page), '예외가 그 칸의 속성까지 열었다').toStrictEqual([
-    PRIVATE_VALUE_PROBLEM_PLANTED,
-  ]);
+  for (const attribute of EXEMPT_FIELD_SCANNED_ATTRIBUTES) {
+    const original = await own.evaluate((node, name) => node.getAttribute(name), attribute);
+    await own.evaluate(
+      (node, [name, planted]) => node.setAttribute(name, planted),
+      [attribute, PLANTED_BUSINESS_REGISTRATION_NUMBER] as const,
+    );
+    expect(await privateValueProblems(page), `예외가 그 칸의 ${attribute} 까지 열었다`).toStrictEqual([
+      PRIVATE_VALUE_PROBLEM_PLANTED,
+    ]);
 
-  // ⑥ 되돌리면 다시 조용하다 — 위 붉음이 심은 값 때문이라는 것을 이 쌍이 말한다.
-  await own.evaluate((node) => node.removeAttribute('title'));
-  await assertNoPrivateValues(page);
+    // ⑥ 되돌리면 다시 조용하다 — 들어올 때의 값으로 돌린다(오늘 넷 다 없지만, 생기는 날
+    //    이 대조가 그 칸을 지우고 가지 않는다).
+    await own.evaluate(
+      (node, [name, value]) => {
+        if (value === null) {
+          node.removeAttribute(name);
+        } else {
+          node.setAttribute(name, value);
+        }
+      },
+      [attribute, original] as const,
+    );
+    await assertNoPrivateValues(page);
+  }
 
   expect(consoleLines.join('\n')).not.toContain(journeyContext().passphrase);
 });
