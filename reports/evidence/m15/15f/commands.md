@@ -60,6 +60,25 @@
 **G1·EX·TD 는 여정 하네스(출하 jar · 버릴 Postgres · fake KONEPS)에서 실제로 돌았다** — 각 실행이
 서버에 값을 저장하고 다섯 화면을 쓸었다.
 
+## 더하지 않은 방어 하나 — 실측이 공허하다고 말했다
+
+A-1 이 멈춤 판정을 **스레드 전역 상태**로 옮겼으므로 「앞 test 가 플래그를 남기면 아무 실패도
+없는 run 이 첫 계정에서 멈추지 않는가」를 물었다. `@BeforeEach` 로 「플래그가 꺼진 채
+들어온다」를 단언하는 가드를 **써 보고 실측한 뒤 지웠다**.
+
+| 단계 | 결과 |
+| --- | --- |
+| 가드를 넣고 표적 실행 | 17 passed(가드가 test 수를 늘리지 않는다) |
+| **누출을 심는다** — 어느 test 끝에 `Thread.currentThread().interrupt()` 한 줄(`numstat` 으로 적용 확인) | 그 test 는 실행 순서 **12/17** 이라 뒤에 다섯이 남는다 |
+| 심은 채 표적 실행(`--rerun-tasks` 로 UP-TO-DATE 배제, XML mtime 으로 실행 확인) | **17 passed — 가드가 붉지 않았다** |
+
+**누출이 다음 test 로 전파되지 않는다**(기작은 재지 않았다 — test 실행기가 test 사이에 플래그를
+소비하는 것으로 보인다). 그러면 그 가드는 **붉을 수 있는 입력이 없는 단언**이고, 그런 줄은
+방어가 아니라 방어의 외양이다. 그래서 넣지 않았다 — 이 표가 그 결정의 근거다.
+
+한 test **안**의 누출은 다른 축이다: 인터럽트를 쓰는 test 둘 다 `Thread.interrupted()` 를
+**첫 단언**으로 두어 읽으면서 지운다(run 이 던지지 않는 한 그 줄에 반드시 닿는다).
+
 ## 비밀값 스캔
 
 - cmd: `grep -rniE -f config/quality/leak-patterns.txt reports/evidence/m15/15f/ reports/evidence/m15/15c/ reports/evidence/m15/15b/`
