@@ -4,7 +4,7 @@
 있고, 그때 range revert 는 남의 것을 함께 지운다.
 
 - **복원 원천**: `5a2f98ba7402971facacdabbe98f8782b5268ab0`(착수 base · 현재 `main` 의 머리였다).
-- **실측 HEAD**: `6f04af0b2ee6ef401c3cca6b61b648cb208df3e1`(이 slice 의 **마지막 산출물 커밋** —
+- **실측 HEAD**: `2e28cdc8b69a9893de69d475ab8e5cbdf970db32`(이 slice 의 **마지막 산출물 커밋** —
   뒤따르는 커밋은 `reports/evidence/m15/15f/` 전용이고 복원 목록 밖이다).
 
 ## 명령
@@ -58,7 +58,7 @@ HEAD 를 체크아웃하고(`git status --porcelain` 빈 출력 확인) 위 명�
 | ③ | 복원 경로의 **원천 대비** diff | **빈 출력**(0 줄) |
 | ③b | **전 트리** 원천 대비 diff(`':!reports/evidence/m15/15f'`) | **빈 출력**(0 줄) — 되돌린 트리가 내 evidence 밖에서 원천과 **같은 트리**다 |
 | ③c | **내 표지 0** | 이 slice 전용 어휘 여섯(`clearBusinessRegistrationNumber` · `PRIVATE_VALUE_PROBLEM_PLANTED` · 새 test 이름 둘 · runbook 의 인터럽트 처방 문장 · 새 `stopCauseFor` 시그니처)이 **전부 0 파일** |
-| ③d | **남의 표지 보존** | 15A `SignUpRequest` **4 파일** · 15C `BusinessRegistrationNumber` **13 파일** · V30 마이그레이션 **2 파일** · 15B `STOP_CAUSE_INTERRUPTED` **2 파일** |
+| ③d | **남의 표지 보존** | 15A `SignUpRequest` **4 파일** · 15C `BusinessRegistrationNumber` **13 파일** · V30 마이그레이션 **2 파일** · 15B `STOP_CAUSE_INTERRUPTED` **2 파일**(넷 다 `reports/evidence/m15/15f/` 를 제외한 계수다 — 남아 있는 내 evidence 가 그 어휘를 담아 계수를 부풀린다) |
 | ④⑤⑥ | 컴파일 · test · 게이트 | **트리 동일성으로 갈음한다**(아래) |
 
 **③c 의 표지는 상류 어휘 밖에서 골랐다** — 처음 쓴 `cause=interrupted` 는 15B 가 이미 쓰는 값이라
@@ -81,8 +81,8 @@ PR head `e2e61a57` 와 **바이트로 같다**. 그 SHA 의 CI(run `44985593752`
 ## 이 실측이 유효한가 — verifier 가 재는 술어
 
 ```
-git diff --name-only 6f04af0b2..<판정 SHA> -- <위 복원 목록의 17 경로>
-git rev-list --merges 6f04af0b2..<판정 SHA>
+git diff --name-only 2e28cdc8b..<판정 SHA> -- <위 복원 목록의 17 경로>
+git rev-list --merges 2e28cdc8b..<판정 SHA>
 ```
 
 둘 다 **빈 출력**이면 유효하다. 실측 HEAD 뒤의 커밋은 `reports/evidence/m15/15f/` 전용이고 복원

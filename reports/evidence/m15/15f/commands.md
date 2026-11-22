@@ -30,7 +30,7 @@
 | `npm run lint` | 0 | `--max-warnings 0` |
 | `npm run build` | 0 | 여정 하네스의 preview 입력 |
 | `npx vitest run` (설정 · 시작하기 · 표시층 셋) | 0 | 3 파일 · **133 test**(새 test 하나 포함) |
-| `CI=1 npm run test:e2e:journey` **전건** | 0 | **33 passed** · 건너뜀 0(`check-journey-results.mjs` 가 판정) |
+| `CI=1 npm run test:e2e:journey` **전건** | 0 | **33 passed** · 건너뜀 0(`check-journey-results.mjs` 가 판정). teardown 순서를 고친 뒤 **다시 돌려 같은 33 passed** 다 |
 
 여정 전건을 돌린 이유: 새 `afterEach` teardown 은 **이 파일 밖의 여정**에도 영향을 줄 수 있는
 자리다(공유 계정 하나를 차례로 쓴다). 표적 실행만으로는 그 축이 측정되지 않는다.
@@ -49,6 +49,13 @@
 | **AL** | `aria-live="polite"` → `"off"` | `6 0` | **RED** — 같은 test |
 | **HT** | 안내 함수가 `trim()` 을 그만둔다 | `5 2` | **RED** — 표시층 test 2 failed / 32 passed(새 단언과 기존 공백 단언이 **함께** 붉는다) |
 | **통제** | 위 변이를 전부 되돌린 뒤 | — | GREEN — 설정 화면 37 passed · 여정 2 passed |
+
+**TO(teardown 순서)는 변이가 아니라 구조로 닫았다 — 측정이 아니라 배치다.** 첫 판의 `afterEach` 는
+「되돌림 A → 단언 A → 되돌림 B → 단언 B」였고, `expect` 가 그 자리에서 던지므로 **단언 A 가 깨지면
+되돌림 B 가 통째로 건너뛴다** — 본문 ④ 를 teardown 으로 옮긴 바로 그 사유(CR r1 M-6)가 teardown
+안에서 되살아나는 배치였다. 되돌림 둘과 읽기 둘을 **먼저 다 돌리고** 단언 넷을 모아 하는 것으로
+그 의존을 **없앴다**. 「단언이 던진다」는 언어 사실이라 변이로 재는 대신 의존 자체를 지운 쪽이고,
+그 뒤 여정 전건이 다시 33 passed 다.
 
 **G1·EX·TD 는 여정 하네스(출하 jar · 버릴 Postgres · fake KONEPS)에서 실제로 돌았다** — 각 실행이
 서버에 값을 저장하고 다섯 화면을 쓸었다.

@@ -76,7 +76,7 @@ raw `InterruptedException` 은 `noteAccountFailure` 가 플래그를 되세우�
 | --- | --- | --- | --- |
 | A-1 | [medium, v F-1] 감싼 인터럽트를 `stopCauseFor` 가 못 알아본다 | **(a) 수정** | 술어를 스레드 인터럽트 플래그에 걸었다. 회귀 test 「감싼 예외 + 플래그 선 상태」가 구판에서 RED 인 것을 실측했다(`commands.md`) |
 | A-2 | [CR M-1 / v F-3] runbook §3.4 가 멈춤 사유 하나만 열거한다 | **(a) 수정** | §3.4 의 그 bullet 을 둘로 갈랐다 — `consecutive-account-failures` 는 그대로, `interrupted` 는 「고칠 자리가 계정이 아니다」로 처방이 다르다 |
-| A-3 | [CR L-1 / v F-2] test 이름·KDoc 의 「영업일」 · `15b/commands.md` M-A 행 괄호 | **(a) 수정** | test 이름과 KDoc 을 「KST 달력일」로 바꾸고, 그 이름을 가리키는 M-A 행을 새 이름으로 갱신했다(괄호의 주장이 참이 됐다) |
+| A-3 | [CR L-1 / v F-2] test 이름·KDoc 의 「영업일」 · `15b/commands.md` M-A 행 괄호 | **(a) 수정** | test 이름과 KDoc 을 「KST 달력일」로 바꾸고, 그 이름을 가리키는 M-A 행을 새 이름으로 갱신했다(괄호의 주장이 참이 됐다). **식별자 `businessDay` 는 바꾸지 않았다** — 아래 「A-3 가 바꾸지 않은 것」 |
 | A-4a | [CR L-2] `stopCause` 기본값이 의미 있는 값이다 | **(a) 수정** | 멈춤을 **한 값**으로 만들었다 — 자리와 사유가 따로 살지 않는다 |
 | A-4b | [CR L-5] `runnerFor` 의 `date`/`clock` 이중 인자 | **(a) 수정** | `date` 를 지우고 날짜 축을 재는 호출자가 `clock = clockAt(…)` 을 준다. 파라미터가 여섯으로 줄어 `@Suppress("LongParameterList")` 도 함께 사라졌다 |
 | A-4c | [CR L-6] 집합 비교에 `shouldContainExactly` | **(a) 수정** | `shouldContainExactlyInAnyOrder` + `toSet()` 제거(`List` 를 그대로 넘긴다) |
@@ -123,6 +123,21 @@ raw `InterruptedException` 은 `noteAccountFailure` 가 플래그를 되세우�
 **다만 KDoc 의 지시 대상을 고쳤다** — `noteAccountFailure` 가 말하던 「이 스레드의 다음
 blocking 호출」은 A-1 뒤로 **루프가 아니라 종료 경로**를 가리킨다(멈춘 뒤 `runBlocking` 재진입이
 없다). 그 문장을 지금 가리키는 것으로 바꿨다.
+
+## A-3 가 바꾸지 않은 것 — 식별자 `businessDay`
+
+회전 축의 날짜를 나르는 이름은 여전히 `businessDay` 다(`accountsForRun` 의 인자 · 러너의 private
+함수). 「영업일」의 영어 대응이라 KDoc 의 「KST 달력일」과 어긋나 보인다.
+
+**바꾸지 않은 이유**: 15B r5 가 이 축을 **「문면만 바로잡고 코드 0줄」**로 처분했고, 그 판에서
+verifier `ready-for-review` 와 code-reviewer `APPROVE` 가 났다 — 식별자는 두 레인이 본 뒤 받아들인
+상태이지 이 라운드가 새로 발견한 누락이 아니다. CR L-1 이 지목한 것도 **한국어 문면 둘**(test
+이름 · KDoc)이고 둘 다 닫혔다. 이름을 바꾸면 `internal` 시그니처와 명명 인자 호출이 함께 움직여
+이 「거동 0」 PR 에 **유일하게 거동과 무관한 넓은 diff** 가 생긴다.
+
+**다음 레인에 주는 신호**: KDoc 이 「**KST 달력일**(주말·공휴일을 포함한다 — 「영업일」이 아니다)」을
+그 함수 머리에 적고 있으므로 어휘를 베끼는 자리는 그 문장이다. 이름을 고칠 값이 있다고 보면
+회전 축을 다시 여는 slice(`OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ)가 같은 커밋에서 한다.
 
 ## B-8d 거부 사유 — 심는 축어를 난수로 바꾸지 않는다
 
