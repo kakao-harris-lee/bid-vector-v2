@@ -123,13 +123,15 @@ git checkout "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.m
 추적되지 않는 파일은 세지 않는다(§2 의 release 와 같은 규칙) — 재현 가능한 provenance 가 필요하면 §2 처럼
 깨끗한 clone 에서 release 를 만든다.
 
-**반입 뒤 — `<저장소>` 를 그 release 커밋에 둔다.** 알림 훑기 러너(§9.1)는 `<저장소>` 에서 직접 돌고, 시작 전에
+**반입 뒤 — `<저장소>` 를 그 release 커밋에 둔다.** **§1.4b 대로면 이 단계는 없다** — release·반입은 `<저장소>` 에서
+돈다. 아래는 그것을 어겼을 때의 복구다. 알림 훑기 러너(§9.1)는 `<저장소>` 에서 직접 돌고, 시작 전에
 「HEAD == 현재 release 의 `git_sha` · 추적 파일 변경 0」을 단언한다. release·반입을 `<저장소>` 가 아닌 트리(개발
-checkout 등)에서 돌렸다면 반입 직후 `<저장소>` 도 같은 커밋으로 옮긴다 — 안 옮기면 **다음 주기부터 훑기가 멈춘다**.
+checkout 등)에서 돌렸다면 반입이 **성공한 뒤**(`pending` 이 남아 있으면 반입부터 마친다) `<저장소>` 도 같은 커밋으로
+옮긴다 — 안 옮기면 **다음 주기부터 훑기가 멈춘다**.
 
 ```bash
 git -C <저장소> fetch origin
-git -C <저장소> checkout --detach "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/$(cat /var/lib/bidvector-v2/current).manifest")"
+git -C <저장소> checkout --detach "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
 ```
 
 _2026-11-22 사건: rel-99f2fb259890 과 rel-5a2f98ba7402 를 개발 checkout 에서 만들고 반입하는 동안 `<저장소>`
