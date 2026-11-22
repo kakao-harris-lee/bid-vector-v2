@@ -7,6 +7,7 @@ import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 import org.springframework.boot.DefaultApplicationArguments
+import java.sql.SQLException
 
 // 회전 축을 재는 판 — 청중 K=10 · 상한 n=4 라 칸이 셋이고, ceil((K-1)/(n-1)) = ceil(9/3) = 3 일이면
 // 전원이 한 번씩 돈다. 세 수가 함께 움직여야 하므로 한자리에 둔다.
@@ -154,13 +155,14 @@ class EvaluationCommitRunnerTest {
     /**
      * **상한 밖은 회전한다**(r3 리뷰 M-1·F-1, 팀장 결정 2026-11-22). 앞 판은 `take(n)` 고정
      * 절단이라 `n` 번째 뒤의 계정이 **어느 run 에서도** 평가되지 않았다 — 줄은 그것을 「미룸」이라
-     * 불렀고 cron 은 성공을 적었다. 이제 창이 영업일마다 `n-1` 칸씩 미끄러져
-     * `ceil((K-1)/(n-1))` 일이면 전원이 한 번씩 돈다(K=10 · n=4 → 3 일).
+     * 불렀고 cron 은 성공을 적었다. 이제 창이 **KST 달력일**마다 `n-1` 칸씩 미끄러져
+     * `ceil((K-1)/(n-1))` 달력일이면 전원이 한 번씩 돈다(K=10 · n=4 → 3 일). 축이 「영업일」이
+     * **아닌** 것이 요점이다 — 주말·공휴일을 포함한다(15B r5 CR L-1 · `accountsForRun` KDoc).
      *
      * 오프셋을 0 으로 고정하는 변이는 세 날의 집합을 같게 만들어 **두 단언 모두** 붉는다.
      */
     @Test
-    fun `연속한 영업일이면 모든 계정이 한 번씩 돈다 — 보유자는 매일 든다`() {
+    fun `연속한 KST 달력일이면 모든 계정이 한 번씩 돈다 — 보유자는 매일 든다`() {
         val coverage = mutableSetOf<Long>()
         val perDay = mutableListOf<List<Long>>()
 
@@ -171,7 +173,7 @@ class EvaluationCommitRunnerTest {
                 RecordingCommitLog(),
                 RecordedExitCodes(),
                 maxAccountsPerRun = ROTATION_CAP,
-                date = FIXED_DATE.plusDays(offset.toLong()),
+                clock = clockAt(FIXED_DATE.plusDays(offset.toLong())),
             ).run(DefaultApplicationArguments())
 
             evaluated.size shouldBe ROTATION_CAP
@@ -367,6 +369,48 @@ class EvaluationCommitRunnerTest {
         attempted shouldBe listOf(1L)
         termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
         log.written.count { it.startsWith("evaluation-commit account-failed") } shouldBe 1
+        val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
+        stoppedLine shouldContain "cause=interrupted"
+        stoppedLine shouldContain "remaining=2"
+        accountCountsOf(log.written) shouldBe listOf(0, 0, 1, 2)
+    }
+
+    /**
+     * **출하 DB 경로의 인터럽트는 이 모양으로 온다**(15B r5 v F-1). HikariCP 는 연결 획득 중
+     * 인터럽트를 받으면 **플래그를 되세운 뒤** `SQLException(…, InterruptedException)` 으로 감싸
+     * 던진다 — 예외 **타입**만 보는 술어는 그 예외에 `null`(계속 돈다)을 내고, 종료 신호 하나가
+     * 남은 계정마다 타임아웃을 치르며 `failed` 를 불린다.
+     *
+     * 그래서 재는 것은 타입이 아니라 **플래그**다. 실패 줄은 여전히 `SQLException` 이라고 말하고
+     * (그것이 사실이다) 멈춤 줄만 `interrupted` 라고 말한다 — 두 줄이 다른 것을 보고한다.
+     */
+    @Test
+    fun `감싼 인터럽트도 플래그가 서 있으면 첫 건에서 멈춘다`() {
+        val log = RecordingCommitLog()
+        val termination = RecordedExitCodes()
+        val attempted = mutableListOf<Long>()
+
+        runnerFor(
+            failingRuns(
+                listOf(1L, 2L, 3L),
+                failing = setOf(1L, 2L, 3L),
+                attempted = attempted,
+                // HikariCP 의 모양 그대로 — **플래그를 먼저 세우고** 감싼다.
+                failure = {
+                    Thread.currentThread().interrupt()
+                    SQLException(DEAD_STORE_MESSAGE, InterruptedException())
+                },
+            ),
+            log,
+            termination,
+        ).run(DefaultApplicationArguments())
+
+        // 읽으면서 **지운다** — 인터럽트된 채로 두면 같은 worker 의 뒤 test 가 그 상태를 물려받는다.
+        Thread.interrupted() shouldBe true
+        attempted shouldBe listOf(1L)
+        termination.recorded() shouldBe listOf(EvaluationCommitExitCode.INCOMPLETE.value)
+        log.written.single { it.startsWith("evaluation-commit account-failed") } shouldContain
+            SQLException::class.java.name
         val stoppedLine = log.written.single { it.startsWith("evaluation-commit stopped") }
         stoppedLine shouldContain "cause=interrupted"
         stoppedLine shouldContain "remaining=2"

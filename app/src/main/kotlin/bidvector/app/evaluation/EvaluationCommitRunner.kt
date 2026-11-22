@@ -114,8 +114,9 @@ class EvaluationCommitRunner(
         var skipped = 0
         var failed = 0
         var consecutiveFailures = 0
-        var stoppedAt = -1
-        var stopCause = STOP_CAUSE_CONSECUTIVE_FAILURES
+        // 멈춤은 **한 값**이다(r5 CR L-2) — 자리와 사유를 따로 두면 한쪽만 세우는 변경이 줄에
+        // 틀린 사유를 찍는다. 틀린 사유를 담은 줄은 없는 줄보다 나쁘다.
+        var stopped: Pair<Int, String>? = null
         for ((index, account) in taken.withIndex()) {
             try {
                 if (evaluateOne(account, channelHolder, results)) {
@@ -128,21 +129,21 @@ class EvaluationCommitRunner(
             } catch (failure: Exception) {
                 failed++
                 consecutiveFailures++
+                // **플래그를 되세우는 것이 먼저다** — 멈춤 판정이 그 플래그를 읽는다.
                 noteAccountFailure(failure)
-                val cause = stopCauseFor(failure, consecutiveFailures)
+                val cause = stopCauseFor(consecutiveFailures)
                 if (cause != null) {
-                    stopCause = cause
-                    stoppedAt = index + 1
+                    stopped = (index + 1) to cause
                     break
                 }
             }
         }
-        val stoppedRemainder = if (stoppedAt < 0) 0 else taken.size - stoppedAt
+        val stoppedRemainder = stopped?.let { (at, _) -> taken.size - at } ?: 0
         val deferred = (ordered.size - taken.size) + stoppedRemainder
-        if (stoppedAt >= 0) {
+        stopped?.let { (_, cause) ->
             // `remaining` 은 **run 전체의 남은 수**다(= 마침 줄의 `deferred`, r3 CR L-2) — 창
             // 안쪽만 세면 두 원천이 함께 설 때 두 줄의 수가 달라지고 그 관계가 어디에도 없다.
-            log.write(evaluationCommitStoppedLine(stopCause, consecutiveFailures, deferred))
+            log.write(evaluationCommitStoppedLine(cause, consecutiveFailures, deferred))
         }
         finishRun(results, evaluated, skipped, failed, deferred)
     }
@@ -154,13 +155,21 @@ class EvaluationCommitRunner(
      * 인터럽트된 스레드에서는 다음 계정의 blocking 호출이 대개 **즉시** 다시 던진다 — 계속 돌면
      * 신호 **하나**가 `failed=1,2,3…` 으로 불어나 마침 줄이 「계정 셋이 터졌다」로 읽힌다.
      * 「체계가 내려갔다」와 「누가 나를 껐다」를 같은 모양으로 만들지 않는다.
+     *
+     * **그 신호는 예외 타입이 아니라 스레드의 인터럽트 플래그다**(15B r5 v F-1). 출하 DB 경로의
+     * 인터럽트는 `InterruptedException` 으로 오지 않는다 — HikariCP 는 연결 획득 중 인터럽트를
+     * 받으면 플래그를 되세운 뒤 `SQLException(…, InterruptedException)` 으로 **감싸** 던진다.
+     * 타입을 열거하는 술어는 그 모양 집합을 따라잡지 못한다(`ClosedByInterruptException` ·
+     * `InterruptedIOException` · 그것을 감싼 Spring `DataAccessException` · 드라이버마다 다른 사본).
+     * 플래그는 **번역을 타지 않는** 한 자리라, 감싼 예외도 **첫 건에서** 잡힌다(앞 판은 다음 계정의
+     * raw 인터럽트까지 가서 `failed` 가 둘이었다 — r5 CR L-3 의 상한 2 가 1 이 됐다).
+     *
+     * 호출 순서가 전제다: [noteAccountFailure] 가 raw `InterruptedException` 의 플래그를 **먼저**
+     * 되세운다(`runBlocking` 의 `joinBlocking` 이 읽으면서 지우기 때문이다).
      */
-    private fun stopCauseFor(
-        failure: Exception,
-        consecutiveFailures: Int,
-    ): String? =
+    private fun stopCauseFor(consecutiveFailures: Int): String? =
         when {
-            failure is InterruptedException -> STOP_CAUSE_INTERRUPTED
+            Thread.currentThread().isInterrupted -> STOP_CAUSE_INTERRUPTED
             consecutiveFailures >= maxConsecutiveAccountFailures -> STOP_CAUSE_CONSECUTIVE_FAILURES
             else -> null
         }
@@ -186,7 +195,14 @@ class EvaluationCommitRunner(
 
     /**
      * 실패 한 건을 줄로 남긴다. `InterruptedException` 은 **플래그를 되세우고** 흘린다
-     * (15A r1 리뷰 LOW ⓒ) — 삼키면 이 스레드의 다음 blocking 호출이 인터럽트를 보지 못한다.
+     * (15A r1 리뷰 LOW ⓒ) — `runBlocking` 의 `joinBlocking` 이 그 플래그를 **읽으면서 지우므로**
+     * 되세우지 않으면 신호가 여기서 끝난다.
+     *
+     * 되세운 플래그가 닿는 자리는 이제 **둘**이다 — 바로 뒤의 [stopCauseFor] 판정과, 멈춘 뒤의
+     * **종료 경로**(`SpringApplication.exit` 의 context close). 멈춘 자리 뒤로 `runBlocking` 재진입이
+     * 없으므로 「다음 계정의 blocking 호출」은 더 이상 이 문장의 대상이 아니다(15F A-4f).
+     * 종료 직전에 지우지 않는 것은 결정이다: 지우면 종료 훅과 context close 가 인터럽트를 보지
+     * 못해 15A r1 이 닫은 결함을 종료 경로에서 다시 연다.
      */
     private fun noteAccountFailure(failure: Exception) {
         log.write(evaluationCommitAccountFailureLine(causeCodeOf(failure)))

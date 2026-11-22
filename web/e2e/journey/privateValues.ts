@@ -13,7 +13,8 @@ import { journeyContext } from './shared';
  * 앞 판은 여정 세 spec 이 각자 `body.innerText()` 에 정규식을 걸었다. 그 술어는 **입력칸의
  * `value` 를 담지 않는다** — 그래서 사업자번호 입력칸이 생기는 순간, 예외를 하나도 주지 않아도
  * 게이트는 조용했다(방어 부재와 미측정이 같은 값이 된다). 여기서는 **보이는 글 + 폼 값·속성**을
- * 한 문자열로 묶어 같은 질문을 던지고, 그 넓힌 모집단에서 **testId 하나**만 뺀다.
+ * 한 문자열로 묶어 같은 질문을 던지고, 그 넓힌 모집단에서 **testId 하나의 `value`** 만 뺀다
+ * (노드 전체가 아니다 — r1 cr L-11).
  *
  * 예외가 한 자리인 것이 요점이다: 부르는 spec 이 예외를 고르지 않으므로 「어느 화면에서만
  * 열려 있다」가 생기지 않고, 「무엇이 예외인가」가 이 파일의 한 줄로 읽힌다. 캡처 하네스는 이
@@ -48,6 +49,13 @@ export const PLANTED_BUSINESS_REGISTRATION_NUMBER_TYPED = businessRegistrationNu
 export const OWN_BUSINESS_REGISTRATION_NUMBER = BUSINESS_REGISTRATION_NUMBER_TEST_ID;
 
 /**
+ * 두 축이 내는 **문면** — 양성 대조가 「어느 축이 붉었는가」를 축어로 단언하기 위해 밖으로
+ * 낸다(r1 v F1). 한 축을 꺼도 다른 축이 가리는 것을 「문제가 있다」만으로는 가를 수 없다.
+ */
+export const PRIVATE_VALUE_PROBLEM_SHAPE = '사업자등록번호 꼴(3-2-5)이 자기 입력칸 밖에 있다';
+export const PRIVATE_VALUE_PROBLEM_PLANTED = '저장한 사업자등록번호(숫자 열 자리)가 자기 입력칸 밖에 있다';
+
+/**
  * 지금 그려진 화면이 개인정보를 들고 있는가 — **문제 목록**을 낸다(빈 목록이 통과다).
  *
  * 값을 내는 것은 양성 대조를 위해서다: 같은 값을 예외 밖 칸에 두면 이 함수가 **문제를 내야**
@@ -65,9 +73,13 @@ export async function privateValueProblems(page: Page): Promise<string[]> {
     ];
     const exempted = nodes.filter((element) => element.getAttribute('data-testid') === allowedTestId);
     const text = nodes
-      .filter((element) => element.getAttribute('data-testid') !== allowedTestId)
       .flatMap((element) => [
-        (element as Partial<HTMLInputElement>).value ?? '',
+        // **면제는 그 칸의 `value` 하나다**(r1 cr L-11). 노드 전체를 빼면 계약의 예외(「자기
+        // 칸의 자기 값」)보다 술어의 예외가 넓어지고, 뒷날 그 칸에 `title={번호}` 류가 붙는 날
+        // 예외가 **조용히** 함께 넓어진다. 속성 넷은 예외 칸에서도 모집단에 남는다.
+        element.getAttribute('data-testid') === allowedTestId
+          ? ''
+          : ((element as Partial<HTMLInputElement>).value ?? ''),
         element.getAttribute('placeholder') ?? '',
         element.getAttribute('title') ?? '',
         element.getAttribute('alt') ?? '',
@@ -80,10 +92,10 @@ export async function privateValueProblems(page: Page): Promise<string[]> {
   const shown = `${body}\n${scanned.text}`;
   const problems: string[] = [];
   if (BUSINESS_REGISTRATION_NUMBER_SHAPE.test(shown)) {
-    problems.push('사업자등록번호 꼴(3-2-5)이 자기 입력칸 밖에 있다');
+    problems.push(PRIVATE_VALUE_PROBLEM_SHAPE);
   }
   if (shown.includes(PLANTED_BUSINESS_REGISTRATION_NUMBER)) {
-    problems.push('저장한 사업자등록번호(숫자 열 자리)가 자기 입력칸 밖에 있다');
+    problems.push(PRIVATE_VALUE_PROBLEM_PLANTED);
   }
   if (shown.includes(journeyContext().passphrase)) {
     problems.push('실행 비밀 문구가 화면에 있다');

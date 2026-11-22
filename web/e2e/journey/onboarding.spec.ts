@@ -294,7 +294,6 @@ test.afterEach(async ({ page }) => {
   }
 });
 
-
 /** 시평액 행 지우기의 쓰기 — ⑦ 의 기준점이고 경합 대조도 같은 자리를 쓴다. */
 const CAPACITY_REMOVE = '/api/profile/construction-capacities/remove';
 

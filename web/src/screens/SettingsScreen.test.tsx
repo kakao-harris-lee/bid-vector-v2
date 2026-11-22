@@ -579,6 +579,24 @@ describe('설정 — 범위 밖 자리', () => {
     expect(screen.getByTestId('profile-business-registration-number-help').textContent).toContain('숫자 열 자리');
   });
 
+  /**
+   * **키패드와 알림 방식이 잠긴다**(r1 v F2 · cr L-10). 둘 다 「고쳤다」로 끝나고 test 가 없었다 —
+   * `inputMode` 를 `numeric` 으로 되돌리는 변이도, `aria-live` 를 지우는 변이도 초록이었다.
+   *
+   * `tel` 인 이유: `numeric` 키패드에는 `-` 가 없는데 화면은 저장된 값을 하이픈 꼴로 채우므로
+   * 모바일 운영자가 **방금 본 값을 다시 칠 수 없다**. `polite` 인 이유: 이 문단은 판정이 아니라
+   * 안내라 오류처럼 끼어들면 안 된다.
+   */
+  it('사업자번호 칸은 tel 키패드를 쓰고 안내 문단은 바뀔 때 알려진다', async () => {
+    renderScreen();
+
+    const input = await screen.findByTestId<HTMLInputElement>(BUSINESS_REGISTRATION_NUMBER_TEST_ID);
+    expect(input.getAttribute('inputmode')).toBe('tel');
+    expect(
+      screen.getByTestId('profile-business-registration-number-help').getAttribute('aria-live'),
+    ).toBe('polite');
+  });
+
   /** 안내는 **판정이 아니다** — 꼴이 어긋나도 보내는 값은 그대로이고 고칠 자리만 말한다. */
   it('꼴이 어긋나면 고칠 자리를 말하고 그 값을 그대로 보낸다', async () => {
     mocked.replaceBusinessDetails.mockResolvedValue(await mocked.readProfile());

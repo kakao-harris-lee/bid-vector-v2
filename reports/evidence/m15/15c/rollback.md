@@ -65,7 +65,7 @@ git diff --name-status 036fbda914bab0d30a3720f3a075ec1fc419495b..<실측 HEAD> -
 ## 이 실측이 유효한가 — verifier 가 재는 술어
 
 ```
-git diff --name-only c4aa73d65 ..<판정 SHA> -- <위 복원 목록의 35 경로>
+git diff --name-only c4aa73d65..<판정 SHA> -- <위 복원 목록의 35 경로>
 git rev-list --merges c4aa73d65..<판정 SHA>
 ```
 

@@ -397,12 +397,24 @@ deferred=…`). 넷은 서로 다른 사건이고, 종료 코드에 미치는 �
 > 하나씩 일곱 개라, 평일만 도는 timer 는 계정 여섯을 영구히 뺀다). **일회성 결행은 해롭지 않다** —
 > 위상만 옮기고 다음 주기에 복구된다. 처방된 timer 는 매 달력일 돈다
 > (`docs/runbook/m7-7f-production.md` §13.3 의 `OnCalendar=*-*-*`) — 그 형태를 유지한다.
-- **연속 실패로 멈췄다.** `evaluation-commit stopped cause=consecutive-account-failures consecutive=N
-  remaining=M` 줄이 **있으면** 그 run 은 끝까지 돌지 않았다(기본 N=3,
-  `bidvector.evaluation.max-consecutive-account-failures`). 끊기지 않는 실패는 그 계정들의 일이 아니라
-  **체계가 내려간 것**의 신호다 — `account-failed cause=` 를 먼저 고치고 재실행한다. 그 run 은 `failed>0`
-  이므로 종료 코드는 이미 `INCOMPLETE`(2) 다. **`remaining=` 은 run 전체의 남은 수**이고 마침 줄의
-  `deferred=` 와 **같은 값**이다 — 두 수를 더하지 않는다.
+- **멈췄다.** `evaluation-commit stopped cause=<사유> consecutive=N remaining=M` 줄이 **있으면** 그
+  run 은 끝까지 돌지 않았다. 줄의 **모양은 하나**이고 `cause=` 의 값이 **둘**이다 — 처방이 서로
+  다르므로 그 값을 먼저 읽는다. 어느 쪽이든 **`remaining=` 은 run 전체의 남은 수**이고 마침 줄의
+  `deferred=` 와 **같은 값**이다(두 수를 더하지 않는다).
+
+  - **`cause=consecutive-account-failures`** — 끊기지 않는 실패가 상한에 닿았다(기본 N=3,
+    `bidvector.evaluation.max-consecutive-account-failures`). 그것은 그 계정들의 일이 아니라
+    **체계가 내려간 것**의 신호다 — `account-failed cause=` 를 §3.5 로 먼저 읽고 고친 뒤 재실행한다.
+    그 run 은 `failed>0` 이므로 종료 코드는 이미 `INCOMPLETE`(2) 다.
+  - **`cause=interrupted`** — **누가 이 프로세스를 껐다**(SIGTERM · 배포 · 수동 중단). 판정은 예외
+    종류가 아니라 **스레드의 인터럽트 플래그**이므로, 짝으로 서는 `account-failed cause=` 줄은
+    `InterruptedException` 이 **아닐 수 있다**(출하 DB 경로에서는 connection pool 이 그것을
+    `java.sql.SQLException` 으로 감싸 온다 — 두 줄이 다른 것을 말하는 것이 정상이다).
+    `consecutive=` 는 대개 1 이고 `failed=1` 은 **그 중단 자체**다. **고칠 자리가 계정이 아니다** —
+    왜 중단됐는지(systemd · 배포 · 수동)를 보고, 계정 쪽에서 고칠 것을 찾지 않는다. 재실행하면
+    **그 날의 창이 그대로 다시 돈다**(회전 축이 날짜라서다). `failed=1` 만 보는 경보에게는 이 줄이
+    DB 장애와 같은 값이라, 둘을 가르는 정보는 **이 `cause=` 하나**다
+    (`OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓑ).
 
 **`suppressed=` 는 계정 계수가 아니다**(요청 계수다, 마침 줄의 `requested`·`requestFailed` 옆).
 전역 발송 채널을 쥐지 않은 계정의 `BidNow` 판정 수이고 — 오늘 그 채널은 가장 작은 id 하나가 쥔다 —

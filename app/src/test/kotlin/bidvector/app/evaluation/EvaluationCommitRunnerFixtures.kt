@@ -46,17 +46,20 @@ internal val FIXED_DATE: LocalDate = LocalDate.of(2026, 11, 22)
 private val ROTATION_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
 
 /** cron 이 실제로 도는 시각대(04:10 KST)를 흉내 낸다. */
-private fun clockAt(date: LocalDate): Clock = Clock { date.atTime(4, 10).atZone(ROTATION_ZONE).toInstant() }
+internal fun clockAt(date: LocalDate): Clock = Clock { date.atTime(4, 10).atZone(ROTATION_ZONE).toInstant() }
 
-@Suppress("LongParameterList")
+/**
+ * 날짜 축은 **시계 하나**로만 준다(15B r5 CR L-5). 앞 판은 `date` 와 `clock` 을 함께 받았고
+ * 기본 인자가 앞 인자를 참조하므로 **둘을 함께 주면 `date` 가 조용히 무시됐다** — 경고도
+ * 없었다. 날짜를 재는 호출자는 `clock = clockAt(날짜)` 를 준다.
+ */
 internal fun runnerFor(
     runs: EvaluationCommitRuns,
     log: CollectionLog,
     termination: CollectionTermination,
     maxAccountsPerRun: Int = ROOMY_ACCOUNT_CAP,
     maxConsecutiveAccountFailures: Int = ROOMY_CONSECUTIVE_CAP,
-    date: LocalDate = FIXED_DATE,
-    clock: Clock = clockAt(date),
+    clock: Clock = clockAt(FIXED_DATE),
 ): EvaluationCommitRunner =
     EvaluationCommitRunner(
         runs = runs,
