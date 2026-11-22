@@ -114,8 +114,8 @@ class EvaluationCommitRunner(
         var skipped = 0
         var failed = 0
         var consecutiveFailures = 0
-        // 멈춤은 **한 값**이다(r5 CR L-2) — 자리와 사유를 따로 두면 한쪽만 세우는 변경이 줄에
-        // 틀린 사유를 찍는다. 틀린 사유를 담은 줄은 없는 줄보다 나쁘다.
+        // 멈춤은 **한 값**이다(r5 CR L-2 — **첫째 = 멈춘 자리(1-based) · 둘째 = 사유**, 15F r1
+        // CR L-9). 둘을 따로 두면 한쪽만 세우는 변경이 줄에 틀린 사유를 찍고, 그 줄은 없는 줄보다 나쁘다.
         var stopped: Pair<Int, String>? = null
         for ((index, account) in taken.withIndex()) {
             try {
@@ -133,8 +133,6 @@ class EvaluationCommitRunner(
                 noteAccountFailure(failure)
                 val cause = stopCauseFor(consecutiveFailures)
                 if (cause != null) {
-                    // **첫째 = 멈춘 자리(1-based) · 둘째 = 사유** — `Pair` 는 위치로만 읽히고 두
-                    // 사용처가 각각 반대쪽을 버리므로(r5 CR L-9) 그 뜻이 사는 자리는 이 줄 하나다.
                     stopped = (index + 1) to cause
                     break
                 }
