@@ -2,7 +2,7 @@
 milestone: M15
 slice: 15h
 base_sha: ff8e0cad42c5c114ee30b42ca4318252bbf35c5f
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: f9bd13cf915e46beb5387576c8c229139aaf8d96   # 마지막 **산출물** 커밋. evidence 커밋이 뒤에 붙으므로 판정 SHA 는 PR head 다
 in_scope:
   - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitRunner.kt
   - app/src/main/kotlin/bidvector/app/wiring/EvaluationWiring.kt
@@ -93,7 +93,16 @@ cron 에 대해서도 가장 거칢이 작은」 선택이고, 특정 요일 패
 ## 하네스 레인 변경
 
 `git log --oneline ff8e0cad42c5c114ee30b42ca4318252bbf35c5f..HEAD -- CLAUDE.md .claude/` —
-**없음**. 이 slice 의 range 에 하네스 레인 커밋이 없다. (리뷰 요청 시점에 재산출한다.)
+**없음**. 이 slice 의 range 에 하네스 레인 커밋이 없고, 그래서 rollback 목록도 그 경로를 담지
+않는다. (리뷰 요청 시점에 재산출한다 — 목록이 비면 「없음」으로 적는다.)
+
+## 인계 — 이 slice 가 만지지 않은 자리
+
+**`milestone-15.md` 의 요약 두 줄이 두 OPEN 의 ⓐ 를 아직 열린 것으로 적는다**(「회전의 「매 달력일
+cron」 전제」·「멈춤 줄 `consecutive=` 의미 잠금」). 그 문서는 **팀장 레인 소유**이고
+(`CLAUDE.md` 운영자 지시 — 목표·마일스톤·로드맵은 세션 모델이 단독으로 쓴다) 이 slice 의 in_scope
+가 아니라 고치지 않았다. OPEN 행의 정본은 `docs/discovery/capability-map.md` §14.3 이고 그쪽은
+갱신했다. 요약을 맞추는 일은 팀장 레인에 넘긴다.
 
 ## 알려진 제한
 
