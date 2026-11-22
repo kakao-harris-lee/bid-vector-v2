@@ -185,8 +185,11 @@ export function isHeadquartersRegion(value: string): value is HeadquartersRegion
 
 export function businessDetailsBodyOf(form: BusinessDetailsForm): BusinessDetailsRequest {
   const trimmed = form.tradeName.trim();
-  // 사업자번호는 **적힌 그대로** 보낸다(앞뒤 공백만 턴다) — 꼴 판정은 서버 한 자리다. 화면이 같은
+  // 사업자번호는 **입력 위생으로 앞뒤 공백만 턴다**(r1 cr L-9 — 앞 판 주석은 「그대로 보낸다」와
+  // 「턴다」를 함께 주장했다). **꼴 판정은 하지 않는다** — 그것은 서버 한 자리다. 화면이 같은
   // 정규식을 사본으로 들면 두 자리가 갈리고, 그때 운영자는 「화면은 받았는데 서버는 거부」를 본다.
+  // 안내([businessRegistrationNumberHint])도 **턴 값**을 보므로 화면의 두 층이 같은 답을 낸다 —
+  // 어긋나는 것은 서버뿐이고(서버는 공백을 거부한다) 화면이 그 값을 보내는 일이 없다.
   const registrationNumber = form.businessRegistrationNumber.trim();
   const base: BusinessDetailsRequest = {
     naraRegistration: form.naraRegistration,

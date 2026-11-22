@@ -143,14 +143,19 @@ describe('사업자번호 — 서식과 상태(M15/15C)', () => {
   });
 
   /**
-   * 폼의 값은 **적힌 그대로** 간다(앞뒤 공백만 턴다) — 화면이 꼴을 판정하지 않는다. 빈 입력은
-   * `null`(「비워 둠」)이고, 그 자리에 빈 문자열을 보내면 서버가 400 으로 거부한다.
+   * 폼의 값은 **앞뒤 공백만 털려** 간다 — 화면이 꼴을 **판정하지** 않는다(r1 cr L-9: 앞 판
+   * 주석은 「그대로 보낸다」와 「턴다」를 함께 주장했다). 빈 입력은 `null`(「비워 둠」)이고, 그
+   * 자리에 빈 문자열을 보내면 서버가 400 으로 거부한다.
+   *
+   * **화면의 두 층이 같은 답을 낸다**: 안내도 턴 값을 보므로 「안내는 조용한데 본문은 거부되는
+   * 값」이 생기지 않는다. 서버는 공백을 거부하지만 화면이 그 값을 보내는 일이 없다.
    */
-  it('본문은 적힌 그대로 보내고 빈 입력은 비워 둠이다', () => {
+  it('본문은 앞뒤 공백만 털어 보내고 빈 입력은 비워 둠이다', () => {
     expect(businessDetailsBodyOf(form({ businessRegistrationNumber: '123-45-67890' })).businessRegistrationNumber)
       .toBe('123-45-67890');
     expect(businessDetailsBodyOf(form({ businessRegistrationNumber: ' 1234567890 ' })).businessRegistrationNumber)
       .toBe('1234567890');
+    expect(businessRegistrationNumberHint(' 1234567890 ')).toBeNull();
     expect(businessDetailsBodyOf(form({ businessRegistrationNumber: '   ' })).businessRegistrationNumber).toBeNull();
     expect(businessDetailsBodyOf(form()).businessRegistrationNumber).toBeNull();
   });
