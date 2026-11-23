@@ -1,6 +1,6 @@
 # M15 / 15M — rollback
 
-**실측 HEAD: `9ac20f1d372922ec60f353f0510ccc0d517b4f05`**(이 slice 의 마지막 산출물 커밋 — 수정 라운드 4
+**실측 HEAD: `33ac4b7ea0e3227f95cb59cbf5f8d8f62b0094cc`**(이 slice 의 마지막 산출물 커밋 — 수정 라운드 5
 evidence). 앞 라운드의 실측을 옮기지 않고 다시 돌렸다.
 
 ## 전제
@@ -36,8 +36,8 @@ git rm -rq reports/evidence/m15/15m tools/prod-alert-check.sh tools/prod-alert-t
 - 명령 exit: restore 0 · rm 0 · 스테이징된 변경 **M 7 · D 5**
 - `git diff --cached <base>` **빈 출력** — 복원 뒤 트리가 base 와 같다.
 - 트리 동일성을 해시로도 쟀다: 복원 뒤 `git write-tree` == `<base>^{tree}` == `ef782ade29c8…`.
-- **양성 대조**(비파괴 절삭 — 버릴 clone 에서만): 복원 뒤 `tools/prod-guards-check.sh` 에 한 줄을 더하자
-  등식이 깨졌다(`M tools/prod-guards-check.sh` · 트리 `80a2fe8d…`). 빈 등식이 건전성의 증거가 아님을
+- **양성 대조**(비파괴 절삭 — 버릴 clone 에서만): 복원 뒤 `tools/prod-notification-sweep.sh` 에 한 줄을 더하자
+  등식이 깨졌다(`M tools/prod-notification-sweep.sh` · 트리 `50d8437a…`). 빈 등식이 건전성의 증거가 아님을
   그 한 줄로 가른다.
 - ④ compile · ⑤ test · ⑥ 게이트는 **트리 동일성으로 갈음**한다(복원 뒤 트리가 base 의 트리와 같은
   객체다 — base 는 PR #199 머지 시점에 CI 다섯 job 초록).
