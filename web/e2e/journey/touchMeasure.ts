@@ -354,7 +354,8 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
   for (const control of container.querySelectorAll('input, select, textarea')) {
     const name = control.getAttribute('name') ?? '';
     if ((control.getAttribute('aria-label') ?? '').trim() !== '' || (control.getAttribute('aria-labelledby') ?? '').trim() !== '') {
-      found.push({ control: name, from: 'aria', width: 0, height: 0, clipped: false });
+      // 그려지는 라벨이 없다 — `shown` 은 「모른다를 보인다로 접지 않는다」와 같은 쪽(false)이다.
+      found.push({ control: name, from: 'aria', width: 0, height: 0, clipped: false, shown: false });
       continue;
     }
     // 이름을 **주는 노드**를 찾는다 — 명시 연결이 먼저이고 그다음이 감싼 레이블이다.
@@ -364,7 +365,7 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
       label = control.closest('label');
     }
     if (label === null || (label.textContent ?? '').trim() === '') {
-      found.push({ control: name, from: 'none', width: 0, height: 0, clipped: false });
+      found.push({ control: name, from: 'none', width: 0, height: 0, clipped: false, shown: false });
       continue;
     }
     /**
