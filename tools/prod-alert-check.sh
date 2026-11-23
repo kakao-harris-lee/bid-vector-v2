@@ -42,7 +42,7 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=48
+EXPECTED_CHECKS=49
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
@@ -146,8 +146,15 @@ def strip_comments(source):
     """bash 규칙으로 주석만 걷는다 — **낱말 첫머리의** `#` 부터 줄 끝까지.
 
     `shlex` 의 기본 `commenters='#'` 은 낱말 **중간**의 `#` 에서도 그 줄의 나머지를 버린다(v R3-1).
-    그래서 `n=${#CONFIG}; … > /tmp/x` 한 줄이 술어 전체를 조용히 열었다 — `${#x}`·`${s#…}`·`$#` 는
-    흔한 관용구이고 이 스크립트도 `_trim` 에서 쓴다. 여기서 걷고 `commenters` 는 비워 둔다.
+    그래서 `n=${#CONFIG}; … > /tmp/x` 한 줄이 술어를 통째로 비껴갔다 — `${#x}`·`${s#…}`·`$#` 는
+    흔한 관용구이고 경보 스크립트도 `_trim` 에서 쓴다.
+
+    인용 상태는 셋이다: `'…'` · `"…"` · **`$'…'`**(ANSI-C 인용 — 그 안에서는 `\\` 가 다음 글자를
+    이스케이프한다). 셋째를 몰랐던 앞 판은 `$'\\' # '` 의 `\\'` 에서 인용이 닫혔다고 보고 뒤의 ` # `
+    를 주석으로 걷어, **살아 있는 꼬리**를 지웠다(v R4-1).
+
+    **이 함수가 틀려도 술어는 느슨해지지 않는다** — 아래가 걷은 보기와 **원문 보기 둘 다**에서 돌기
+    때문이다. 걷개의 오독은 검사를 더 엄하게 만들 뿐이다(fail-closed).
     """
     out = []
     quote = ""
@@ -157,11 +164,11 @@ def strip_comments(source):
         char = source[index]
         if quote:
             out.append(char)
-            if char == "\\" and quote == '"' and index + 1 < len(source):
+            if char == "\\" and quote in ('"', "$'") and index + 1 < len(source):
                 out.append(source[index + 1])
                 index += 2
                 continue
-            if char == quote:
+            if char == quote[-1]:
                 quote = ""
             boundary = False
             index += 1
@@ -169,6 +176,13 @@ def strip_comments(source):
         if char == "\\" and index + 1 < len(source):
             out.append(char)
             out.append(source[index + 1])
+            boundary = False
+            index += 2
+            continue
+        if char == "$" and index + 1 < len(source) and source[index + 1] in "'\"":
+            out.append(char)
+            out.append(source[index + 1])
+            quote = "$" + source[index + 1] if source[index + 1] == "'" else source[index + 1]
             boundary = False
             index += 2
             continue
@@ -192,26 +206,40 @@ def redirection(piece):
     return ">" in piece and set(piece) <= set("<>&|();0123456789-")
 
 
-findings = []
-# `whitespace_split` 은 낱말을 한 토큰으로 묶고, `punctuation_chars` 는 `<>&|();` 를 따로 뗀다.
-# `commenters` 는 **비운다** — 주석은 위에서 bash 규칙으로 이미 걷었다.
-lex = shlex.shlex(strip_comments(open(sys.argv[1], encoding="utf-8").read()), posix=False, punctuation_chars=True)
-lex.commenters = ""
-lex.whitespace_split = True
-pieces = list(lex)
+def findings_for(source, view):
+    """한 보기의 위반 목록. `whitespace_split` 은 낱말을 한 토큰으로 묶고 `punctuation_chars` 는
+    `<>&|();` 를 따로 뗀다. `commenters` 는 비운다 — 걷기는 호출자가 정한다."""
+    lex = shlex.shlex(source, posix=False, punctuation_chars=True)
+    lex.commenters = ""
+    lex.whitespace_split = True
+    try:
+        pieces = list(lex)
+    except ValueError as failure:
+        # **토큰화 실패도 위반이다**(fail-closed). 닫히지 않은 인용은 사람이 읽을 수 없는 코드이거나
+        # 술어를 깨뜨리려는 꼴이고, 둘 다 통과시킬 이유가 없다. 삼키면 「술어가 터져서 초록」이 된다.
+        return [view + " 토큰화 실패 — " + str(failure)]
+    found = []
+    for index, piece in enumerate(pieces):
+        if piece in FORBIDDEN_WORDS:
+            found.append(view + " 파일을 만드는 낱말: " + piece)
+            continue
+        if not redirection(piece):
+            continue
+        target = pieces[index + 1] if index + 1 < len(pieces) else "<EOF>"
+        if piece.endswith("&") and (target.isdigit() or target == "-"):
+            continue
+        if target in ALLOWED_TARGETS or target.startswith("/dev/fd/"):
+            continue
+        found.append(view + " 출력 리다이렉션 대상: " + piece + " " + target)
+    return found
 
-for index, piece in enumerate(pieces):
-    if piece in FORBIDDEN_WORDS:
-        findings.append("파일을 만드는 낱말: " + piece)
-        continue
-    if not redirection(piece):
-        continue
-    target = pieces[index + 1] if index + 1 < len(pieces) else "<EOF>"
-    if piece.endswith("&") and (target.isdigit() or target == "-"):
-        continue
-    if target in ALLOWED_TARGETS or target.startswith("/dev/fd/"):
-        continue
-    findings.append("출력 리다이렉션 대상: " + piece + " " + target)
+
+raw = open(sys.argv[1], encoding="utf-8").read()
+# **두 보기의 합집합**(v R4-1). 걷개를 한 꼴씩 고쳐 나가는 대신, 걷지 않은 원문에서도 같은 술어를
+# 돌린다 — 걷개가 **살아 있는 꼬리를 주석으로 오독**해도 그 꼬리가 원문 보기에 그대로 남는다.
+# 대가는 거짓 RED 다: 주석·문자열이 꺾쇠 짝이나 금지 낱말을 담으면 원문 보기가 잡는다. 그래서
+# 경보 스크립트의 주석은 꺾쇠 짝을 쓰지 않는다(그 파일 머리에 적었다).
+findings = findings_for(strip_comments(raw), "[걷은 보기]") + findings_for(raw, "[원문 보기]")
 
 print(len(findings))
 for one in findings:
@@ -726,6 +754,20 @@ _planted_hash_case() { # <이름> <쓰기 앞에 둘 bash 관용구>
 _planted_hash_case '${#x}' 'n=${#CONFIG};'
 _planted_hash_case '$#' 'n=$#;'
 _planted_hash_case 'a#b' 'n=a#b;'
+
+# **ANSI-C 인용으로 주석 걷개를 속이는 꼴**(v R4-1). bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그
+# 뒤의 명령은 **실행된다** — 걷개가 그 줄의 꼬리를 주석으로 지우면 쓰기가 보이지 않는다. 지금은
+# 걷개에 `$'…'` 상태가 있고, 그것이 틀리더라도 **원문 보기**가 같은 줄을 본다.
+cat > "$T/planted-ansic.sh" <<'PLANT'
+#!/usr/bin/env bash
+CONFIG=x
+x=$'\' # '; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"
+PLANT
+if [ "$(python3 -I "$T/no-file-writes.py" "$T/planted-ansic.sh" | head -n1)" != 0 ]; then
+  _ok "ANSI-C 인용으로 걷개를 속인 줄의 파일 쓰기도 보인다"
+else
+  _bad "ANSI-C 인용 한 꼴로 술어가 열린다 — 그 줄의 쓰기를 못 봤다"
+fi
 
 
 # ── 합계 ──────────────────────────────────────────────────────────────────────
