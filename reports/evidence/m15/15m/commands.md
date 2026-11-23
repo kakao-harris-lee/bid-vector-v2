@@ -5,33 +5,45 @@ base `a189e8c58c8a438e2685c8daae8f83b835b925ba` · 브랜치 `feat/m15m-sweep-fa
 환경: WSL2 Ubuntu · `python3 3.12.3` · `curl` · 실 Telegram 과 운영 host 에 닿는 명령은 **하나도 없다**
 (가짜 서버는 `127.0.0.1` 의 임의 포트, 거부 대조는 예약 대역 `192.0.2.1`).
 
-## 로컬 실측 (수정 라운드 2 뒤)
+## 로컬 실측 (수정 라운드 3 뒤)
 
 | 명령 | 결과 |
 |---|---|
 | `bash -n` — `prod-alert-telegram.sh`·`prod-alert-check.sh`·`prod-notification-sweep.sh`·`prod-guards-check.sh`·`prod-env.sh` | exit 0 |
-| `./tools/prod-alert-check.sh` | exit 0 — **42 건 전부 통과**(21 → 38 → 42) |
-| `./tools/prod-guards-check.sh` | exit 0 — **통과 70 · 어긋남 0**(61 → 65 → 70 — 미룸 축 아홉) |
-| `flock` 종료 코드 실측(util-linux 2.39.3, 버릴 디렉터리) | 경합 **70**(`-E 70`) · 획득 **0** · EBADF **65** · PATH 부재 **127** · 모르는 옵션 **64** — 갈림을 이 표에 건다 |
+| `./tools/prod-alert-check.sh` | exit 0 — **44 건 전부 통과**(21 → 38 → 42 → 44) |
+| `./tools/prod-guards-check.sh` | exit 0 — **통과 73 · 어긋남 0**(61 → 65 → 70 → 73 — 미룸 축 열둘) |
+| `flock` 종료 코드 실측(util-linux 2.39.3, 버릴 디렉터리) | 경합 = **`-E` 로 준 코드** · 획득 **0** · EBADF **65** · PATH 부재 **127** · 모르는 옵션 **64** — 갈림을 이 표에 건다 |
+| 경합 코드 자리 실측(라운드 3) | `-E 200` → 경합 **200** · 획득 0 · `( exit 200 )` → `$?=200`. sysexits(64~78) 밖이고 셸이 특별히 보는 자리(126·127·128+n)도 아니다 |
 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · `steps.<id>` 참조 18 · 매달린 참조 0 |
 | `python3 -I -c "yaml.safe_load(ci.yml)"` 로 `container` job 의 step 이름 열거 | 끝 네 개가 S-27b · S-27c · S-27d · **S-27e** |
 | `systemd-analyze verify`(임시 디렉터리 · 설치 0) — **runbook 에서 그대로 떠낸** 경보 템플릿 + `10-defer.conf` + `20-alert.conf` | 남는 지적은 **「스크립트가 아직 그 자리에 없다」 하나**뿐 — `EnvironmentFile=-`·`SuccessExitStatus=4`·`OnFailure=…@%n.service` 에 지적 0. **음성 대조**: `10-defer.conf` 에 `BogusKey=` 를 넣으면 그 줄을 집어 경고한다(= drop-in 을 실제로 읽었다) |
 | `stat` — `/etc/bidvector-v2/relay.env` | `deploy:deploy 0600`(메타데이터만 봤다 — **값은 읽지 않았다**). §9.5 의 소유 전제를 이 현물에 맞췄다 |
 | `command grep -rniE -f config/quality/leak-patterns.txt <신설 둘>` · 고친 다섯의 **더한 줄** · evidence 셋 | 매치 0 |
 
-`prod-alert-check.sh` 42 건(요약): 성공 갈래 아홉(종료 0 · 호출 1 · **경로 양성 대조** · chat id 등식 ·
+`prod-alert-check.sh` 44 건(요약): 성공 갈래 아홉(종료 0 · 호출 1 · **경로 양성 대조** · chat id 등식 ·
 문면 넷 · 문면에 자격 0) · 출력 훑개 양성 대조와 자격 부재 · **argv 축 넷**(미끼 양성 대조 · 창 증인
 둘 · 부재) · **디스크 축 둘**(훑개 양성 대조 · `TMPDIR`·cwd 부재) · 느린 갈래 종료 0 · 403 갈래 ·
 전제 거부 넷(chat id 부재 · unit 이름 · 기준 URL 경로 · **루프백 밖 평문 http**) · **끝 슬래시 수용** ·
 환경 경로 · **curl 실패 갈래 둘** · **해석기 비실행 둘**(표지 부재 · `source` 양성 대조) ·
 **`_safe` 셋** · **chat id 출력 부재 둘** · **env 해석 변종 넷** · **공유 임시 자리 셋**(전후 차이 · 그 훑개의 양성 대조 · 창 안 curl 의 `fd`) ·
-**이름 `localhost` 거절**.
+**이름 `localhost` 거절** · **정적 술어 둘**(파일로 쓰는 자리 0 · 그 술어의 양성 대조).
 
-`prod-guards-check.sh` 의 미룸 축 **아홉**: 프로젝트 잠금·상태 잠금을 각각 쥔 채 러너가 **`4`** 로
-끝나는가(둘, 각각 「일회 컨테이너 앞에서 끝난다」를 함께 본다 — 넷) · **음성 대조 셋**(잠금 파일을
-열지 못함 → 3 · 가짜 `flock` 65 → 3 · 127 → 3) · **잠금 자리 술어 둘**(정상 자리 양성 대조 · group
-쓰기가 열린 자리는 거절하되 busy 가 서지 않는다) · `ExecStopPost` 조건식 전문(`exit 4` 조항 포함) ·
-`SuccessExitStatus=…4` 가 **`10-defer.conf` 블록 안**에 있는가(개수 등식).
+`prod-guards-check.sh` 의 미룸 축 **열둘**: 프로젝트 잠금·상태 잠금을 각각 쥔 채 러너가 **`4`** 로
+끝나는가(둘, 각각 「일회 컨테이너 앞에서 끝난다」를 함께 본다 — 넷) · **음성 대조 여섯**(잠금 파일을
+열지 못함 → 3 · 가짜 `flock` **1·64·65·70·127** → 3 다섯) · **잠금 자리 술어 둘**(정상 자리 양성 대조 ·
+group 쓰기가 열린 자리는 거절하되 busy 가 서지 않는다) · `ExecStopPost` 조건식 전문(`exit 4` 조항
+포함) · `SuccessExitStatus=…4` 가 **`10-defer.conf` 블록 안**에 있는가(개수 등식).
+
+## 수정 라운드 3 의 변이 — 셋
+
+| 변이 | 바꾼 것 | 결과 |
+|---|---|---|
+| ㉑ 「쓰고 → 읽히고 → 지움」 | 고정 `/tmp/.bvc$$` 에 설정을 쓰고 curl 이 읽은 뒤 종료 코드를 보존한 채 지운다 | **라운드 2 에서는 42/42 초록**(v R2-1) → 지금 `BAD 경보 스크립트에 파일로 쓰는 자리가 있다: 출력 리다이렉션 대상: > "$CFGFILE"` · 43/44 |
+| ㉒ 열거형 회귀 | `_prod_lock` 의 갈림을 「65·127 이 아니면 busy」로 | `BAD flock 종료 1·64·70 … exit 4 ≠ 3` **셋** · 통과 70(라운드 2 의 음성 대조 둘로는 **초록**이었다 — v R2-3) |
+| ㉓ fd 축 되돌리기(검사 쪽) | 「부모가 경보 스크립트인 curl」 제한을 걷는다 | `BAD curl 의 fd 가 공유 임시 파일을 쥔다: /tmp/bv-alert-check-curldecoy-…` · 43/44 — **거짓 RED 가 실재함**을 미끼가 보인다. 좁힌 판은 같은 미끼를 띄운 채 44/44 초록 |
+
+㉓ 은 거동 회귀가 아니라 **검사 자신의 거짓 RED** 를 재는 변이다. 미끼(cmdline 에 `curl` 이 들고
+`/tmp` 아래 파일을 쥔 남의 프로세스)는 이제 검사 안에 상주하므로, 축이 다시 넓어지면 바로 붉어진다.
 
 ## 수정 라운드 2 의 변이 — 다섯 전부 붉다
 
@@ -87,7 +99,7 @@ probe 둘을 더했다.
 ⑬ 과 ⑭ 가 **둘 다 필요한 이유**: 거동이 갈리는 자리가 스크립트와 systemd 둘이라, 한쪽만 고친 판은
 다른 쪽의 단언이 없으면 조용히 통과한다.
 
-## 음성 대조 — 바늘이 진짜다 · 미룸은 경합뿐이다
+## 음성 대조 — 바늘이 진짜다 · 미룸은 경합뿐이다 · 거짓 RED 가 없다
 
 부재 단언이 「보내지 않았다」와 구별되는 근거는 검사 안의 양성 대조 **다섯**이다(전부 `ok`):
 가짜 서버가 **자격을 경로에서 실제로 받는다** · 출력 훑개가 심은 바늘을 찾는다 · **디스크 훑개**가
@@ -97,7 +109,10 @@ probe 둘을 더했다.
 
 미룸 축에는 **반대쪽 대조**가 붙는다(cr N-1): 경합이면 `4`(둘) · 경합이 아니면 `3`(잠금 파일 열기 실패 ·
 flock 65 · flock 127) · 잠금 **자리**가 어긋나면 거절하되 busy 가 아님(+ 정상 자리의 양성 대조).
-「잠금 관련이면 조용히」로 가지 않았음을 그 다섯이 잰다.
+「잠금 관련이면 조용히」로 가지 않았음을 그 여섯이 잰다(라운드 3 에서 가짜 `flock` 이 둘 → 다섯).
+
+라운드 3 이 일곱째 양성 대조와 **거짓 RED 대조**를 더했다: 정적 술어가 심은 파일 쓰기를 찾아낸다 ·
+cmdline 에 `curl` 이 든 남의 프로세스가 `/tmp` 파일을 쥐어도 fd 축이 그것을 세지 않는다.
 
 ## 누출 어휘 스캔
 
@@ -116,7 +131,8 @@ command grep -rniE -f config/quality/leak-patterns.txt \
 S-27e)을 건드린다. 둘 다 로컬에서 축어로 돌았다. 나머지 step 은 이미지 빌드·trivy·compose 기동이
 필요해 전건 판정은 **PR head 의 CI** 가 낸다(15A 라운드 5 와 같은 자리). `check`·`ml-engine`·`web`·
 `mutation` 네 job 은 이 slice 가 건드리지 않는다 — 바뀐 파일은 `tools/*.sh` 다섯 · `ci.yml` · 문서 둘 ·
-evidence 다(라운드 2 는 거기에 `docs/runbook/m7-7c3b-notification-sweep.md` 하나를 더한다).
+evidence 다(라운드 2 는 거기에 `docs/runbook/m7-7c3b-notification-sweep.md` 하나를 더하고, 라운드 3 은
+새 파일 없이 `tools/*.sh` 셋만 고친다).
 
 ## 운영 host 에 하지 않은 것
 
