@@ -22,7 +22,8 @@ evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다.
 | G-2 | 같은 명령(분할 뒤) | 0 | 클래스 **일곱** · test 44 · 실패 0(러너 5 · 회전 11 · 멈춤 9) |
 | G-3 | `check --continue` | **1** | 실패 **하나** — `:app:unusedImportGate` 가 분할이 남긴 미사용 import 를 잡았다. 나머지 432 task 통과 |
 | G-4 | `check --continue`(import 제거 뒤) | **0** | 424 task · BUILD SUCCESSFUL. acceptance 통과 |
-| G-5 | `check --continue`(**main 병합 뒤** — PR #196/M15/15I 를 들였다) | — | **정본은 PR 조치 코멘트다**(evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다). 병합이 바꾼 것은 `capability-map.md` 의 행 하나와 15I 의 산출물이고, 그중 Kotlin `check` 에 닿는 것은 `leak-patterns.txt`·`LeakPatternGateTask.kt` 다 — 그 확장된 패턴으로 이 slice 의 evidence 를 다시 훑어 **매치 0** 임을 먼저 쟀다(L-3) |
+| G-5 | `check --continue`(**main 병합 뒤** — PR #196/M15/15I 를 들였다) | **0** | 433 task · BUILD SUCCESSFUL (35m14s) |
+| G-6 | `check --continue`(**수정 라운드 1** — 경계 문면 정정 뒤) | — | **정본은 PR 조치 코멘트다**(evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다). 이 라운드가 바꾼 것은 주석뿐이고 그 사실을 C-1·C-2 가 바이트코드로 잰다 |
 
 ## M — 변이 실측
 
@@ -40,6 +41,17 @@ evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다.
 **M-A 의 통제군은 같은 run 안에 있다** — 멈춤 줄을 내는 **기존 일곱이 그 run 에서 초록**이다.
 그래서 「방어가 없었다」와 「재지 않았다」가 갈리고, 그 초록이 `OPEN-M15-TEST-RESIDUE` ⓐ 가 말한
 잔여의 실측이다(착수 시점 다섯 + 분할로 함께 옮긴 둘).
+
+## C — 수정 라운드 1 의 거동 0 대조
+
+경계 문면 정정(`K-n+1` → `K-n+g`)은 **주석만** 바꾼다. 「거동 0」은 해시가 아니라 **바이트코드**로
+잰다(주석은 상수 풀에 들어가지 않으므로 해시 비교는 축이 아니다).
+
+| # | 명령 | 결과 |
+|---|---|---|
+| C-1 | `javap -p -c` — `EvaluationCommitRunner` · `…Kt` · `evaluateOne$1` · `EvaluationProperties` · `EvaluationWiring` 다섯 클래스, 편집 전/후 | **다섯 전부 동일** — 명령 흐름이 한 바이트도 안 바뀌었다 |
+| C-2 | **통제군** `javap -p -l`(같은 다섯) | **넷이 다르다**(줄 번호 이동) · `EvaluationWiring` 만 동일 — 그 클래스는 편집 지점(`EvaluationProperties` 의 속성 KDoc)보다 **앞에** 선언돼 줄이 밀리지 않는다. 통제군이 비지 않았으므로 C-1 의 동일성이 공허하지 않다 |
+| C-3 | `K-n+g` 경계의 수치 재확인(순수 산술, 빌드 밖) | 간격 `g` 의 일정에서 최악 달력일이 `K-n+g` 이하임을 `(K,n,g)` 여덟 조합에서 확인 · **평일 일정**은 시작 요일 일곱 전수로 `K=22·n=4` **21 일**(화요일 시작) · `K=200·n=50` **153 일**(수요일 시작) — 둘 다 경계와 **같다**(딱 맞는 경계) |
 
 ## L — 비밀값 스캔
 
