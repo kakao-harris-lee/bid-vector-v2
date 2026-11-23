@@ -99,7 +99,7 @@
 | `bidvector.persistence` | `jdbc-url` · `username` · `credential` |
 | `bidvector.access` | `cookie-secure` (기본 `true`) |
 | `bidvector.notification` | `site-base-url` · `telegram.{bot-credential,chat-id,route-key,base-url,connect-timeout,response-timeout}` — `telegram.bot-credential` 은 **위 문단의 자격 값과 같은 취급**이다 |
-| `bidvector.evaluation` | `candidate-cap` · `mode` · `max-accounts-per-run` (기본 `50`) · `max-consecutive-account-failures` (기본 `3`) — 뒤 둘은 **run 당 계정 상한**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`)이고 읽는 법은 §3.4 다. 상한 밖은 **KST 달력일마다 회전**하므로 `ceil((K-1)/(상한-1))` 달력일이면 전원이 한 번씩 돈다 — 그 보증은 **매 달력일 도는 timer** 를 전제한다(§3.4 의 인용 블록). 둘 다 **1 미만이면 기동 실패**(0 은 「아무도 평가하지 않는다」라 상한이 아니다) |
+| `bidvector.evaluation` | `candidate-cap` · `mode` · `max-accounts-per-run` (기본 `50`) · `max-consecutive-account-failures` (기본 `3`) — 뒤 둘은 **run 당 계정 상한**(M15/15B, `OPEN-M15-EVAL-COST-PER-ACCOUNT`)이고 읽는 법은 §3.4 다. 상한 밖은 **KST 달력일마다 한 칸씩 회전**하므로 run 사이의 최대 간격 `g` 가 `상한-1` 일 이하이면 `K-상한+g` 달력일에 전원이 한 번씩 돈다 — 처방된 매 달력일 timer 는 `g=1` 이라 `K-상한+1` 이고, **평일만 거는 timer 는 `g=3` 이라 그만큼 는다**(§3.4 의 인용 블록 — 보폭이 1 인 사유와 그 교환). 둘 다 **1 미만이면 기동 실패**(0 은 「아무도 평가하지 않는다」라 상한이 아니다) |
 | `bidvector.evaluation.commit` | `current-active-bids` |
 | `bidvector.collection` | `mode` · `from` · `to` · `categories` · `calls-per-day` · `calls-total` · `run-state-dir` |
 | `bidvector.koneps` | `base-url` · `service-key` · `operations.<업종>.path` · `operations.<업종>.division` |
@@ -383,20 +383,29 @@ deferred=…`). 넷은 서로 다른 사건이고, 종료 코드에 미치는 �
 
 - **run 당 계정 상한 밖**(`bidvector.evaluation.max-accounts-per-run`, 기본 50). 시작 줄의
   `maxAccountsPerRun=` 과 맞대 본다. 창은 **보유자 고정 + 나머지 회전**이다 — 가장 작은 id(운영
-  계정)는 **매일** 들고, 남은 `n-1` 칸이 나머지 계정 위를 **KST 달력일마다 `n-1` 칸씩** 미끄러진다.
-  그래서 계정이 `K` 명이면 연속한 **`ceil((K-1)/(n-1))` 달력일**에 전원이 한 번씩 돈다(예: K=200 ·
-  n=50 → 5 일). **같은 날 다시 돌려도 같은 계정이 돈다** — 회전 축이 날짜라서다. 상한 밖 계정을
+  계정)는 **매일** 들고, 남은 `n-1` 칸이 나머지 계정 위를 **KST 달력일마다 한 칸씩** 미끄러진다.
+  그래서 계정이 `K` 명이고 run 사이의 **최대 간격이 `g` 일**이면 **`K-n+g` 달력일**에 전원이 한
+  번씩 돈다 — 처방된 매 달력일 timer 는 `g=1` 이라 `K-n+1` 이다(예: K=200 · n=50 → **151 일**).
+  **평일만 거는 timer 는 `g=3`** 이라 같은 판이 **153 일**이 된다(아래 인용 블록).
+  **같은 날 다시 돌려도 같은 계정이 돈다** — 회전 축이 날짜라서다. 상한 밖 계정을
   **오늘** 보려면 길은 하나, **상한을 올리는 것**이다(그 전에 비용을 본다: 계정 수 × 평가 1회).
   상한이 `1` 이면 칸이 0 이라 **보유자만** 돌고 회전이 서지 않는다.
 
-> **이 보증은 「달력일마다 한 번 이상 도는 cron」을 전제한다 — timer 를 평일만으로 걸지 않는다.**
-> 축은 **주말·공휴일을 포함한 KST 달력일**이다(「영업일」이 아니다). 시작 위치는
-> `floorMod(날짜 × (n-1), K-1)` 이라 `날짜 mod P`(`P = (K-1)/gcd(n-1, K-1)`)에만 달려 있고,
-> 실행일이 **주기적** 부분집합이면 그 잔여류가 덮지 못하는 창이 생겨 **거기 든 계정은 영원히
-> 평가되지 않는다** — 종료 코드는 0 이고 cron 은 성공을 적는다(예: `n=4`·`K=22` 면 블록이 요일마다
-> 하나씩 일곱 개라, 평일만 도는 timer 는 계정 여섯을 영구히 뺀다). **일회성 결행은 해롭지 않다** —
-> 위상만 옮기고 다음 주기에 복구된다. 처방된 timer 는 매 달력일 돈다
-> (`docs/runbook/m7-7f-production.md` §13.3 의 `OnCalendar=*-*-*`) — 그 형태를 유지한다.
+> **한 바퀴가 길어진 것은 의도다 — 그 대신 결행에 강하다**(M15/15H,
+> `OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓐ). 보폭이 `n-1` 이던 앞 판은 한 바퀴가
+> `ceil((K-1)/(n-1))` 달력일(K=200·n=50 이면 5 일)로 짧았지만, 시작 위치가
+> `날짜 mod P`(`P = (K-1)/gcd(n-1, K-1)`)에만 달려 있어 **실행일이 주기적 부분집합이면 어떤 창은
+> 영원히 오지 않았다** — `n=4`·`K=22` 에서 그 `P` 가 정확히 7 이라, 평일만 도는 timer 는 계정
+> 여섯을 **영구히** 뺐고 종료 코드는 0, cron 은 성공을 적었다. 보폭이 1 이 된 지금은 run 사이의
+> 간격이 `n-1` 일 이하이기만 하면(평일 timer 의 최대 간격은 금→월의 3 이다) 덮개가 끊기지 않는다 —
+> **다만 공짜는 아니다**: 간격 `g` 는 경계에 그대로 실려 한 바퀴가 `K-n+g` 달력일이 된다
+> (평일 timer 의 `n=4`·`K=22` 는 **21 일**, `n=50`·`K=200` 은 **153 일** — 실측으로 딱 맞는 경계다).
+>
+> **그래도 축은 주말·공휴일을 포함한 KST 달력일이고**(「영업일」이 아니다), **처방된 timer 는
+> 여전히 매 달력일 돈다**(`docs/runbook/m7-7f-production.md` §13.3 의 `OnCalendar=*-*-*`) — 그
+> 형태를 유지한다. 날짜의 순수 함수로는 어떤 보폭도 전칭이 될 수 없어서다: 실행일 집합이 그
+> 함수의 주기와 같은 주기를 가지면 창 하나가 오지 않는다. 보폭 1 이 남기는 사각은 `n` 이 2·3
+> 이면서 `K-1` 이 7 의 배수인 조합이고, 출하 기본값 `n=50` 은 그 밖이다.
 - **멈췄다.** `evaluation-commit stopped cause=<사유> consecutive=N remaining=M` 줄이 **있으면** 그
   run 은 끝까지 돌지 않았다. 줄의 **모양은 하나**이고 `cause=` 의 값이 **둘**이다 — 처방이 서로
   다르므로 그 값을 먼저 읽는다. 어느 쪽이든 **`remaining=` 은 run 전체의 남은 수**이고 마침 줄의
