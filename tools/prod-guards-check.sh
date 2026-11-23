@@ -36,6 +36,10 @@ _die() { echo "prod-guards-check: $1" >&2; exit "${2:-1}"; }
 for t in jq git flock mktemp setsid ps sed awk; do
   command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2
 done
+# 아래에서 `$T/bin` 을 PATH 앞에 꽂으므로 **그 전에** 진짜 `flock` 의 자리를 잡아 둔다(가짜 flock 이
+# 평소에는 이것으로 exec 한다 — 변이를 켜지 않은 동안 검사가 진짜 잠금으로 돈다).
+REAL_FLOCK="$(command -v flock)"
+
 
 # shellcheck source=tools/prod-env.sh
 . "$REPO_ROOT/tools/prod-env.sh"
@@ -233,8 +237,17 @@ case "${1:-}" in
 esac
 exit 0
 SHIM
-chmod +x "$T/bin/docker" "$T/bin/git"
+# **가짜 `flock`** — `SHIM_FLOCK_RC` 가 있을 때만 그 코드로 끝난다(v F1 의 회귀 단언용). 없으면 진짜
+# flock 으로 exec 하므로 나머지 단언은 실제 잠금으로 돈다(가짜가 켜져 있지 않다는 증인은 아래
+# 신호 경로 둘이다 — 그 갈래는 잠금을 실제로 잡아야 끝까지 간다).
+cat > "$T/bin/flock" <<'SHIM'
+#!/bin/sh
+[ -z "${SHIM_FLOCK_RC:-}" ] || exit "${SHIM_FLOCK_RC}"
+exec "$SHIM_REAL_FLOCK" "$@"
+SHIM
+chmod +x "$T/bin/docker" "$T/bin/git" "$T/bin/flock"
 export PATH="$T/bin:$PATH"
+export SHIM_REAL_FLOCK="$REAL_FLOCK" SHIM_FLOCK_RC=""
 
 SHIM_LOG="$T/shim.log"
 export SHIM_LOG SHIM_STATE="$T/state" SHIM_GIT_EXPECT_C="$REPO_ROOT"
@@ -415,7 +428,29 @@ _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 4 "상태 디렉터리 잠금이 잡혀 있어도 **미룬다**(4)"
 _expect_no_log ' run ' "그 미룸도 일회 컨테이너 앞에서 끝난다"
 _release_lock
-rm -f "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+# 공유 잠금 **파일은 지우지 않는다**(cr N-5) — 놓은 직후 남이 잡으면 그 inode 를 지워 상호배제가
+# 깨지는 좁은 창이 있다. `_prod_project_lock` 이 보는 것은 **디렉터리**의 소유자·권한이므로 검사
+# 전용 이름의 파일이 남아도 무해하다(끝의 `_cleanup` 이 정리한다).
+
+# **음성 대조 — 「경합일 때만 4」의 반대쪽**(cr N-1 · v F1). 양성만 재면
+# `_PROD_LOCK_BUSY=1` 을 함수 진입부에 놓는 변이가 통째로 초록이다(실측: 라운드 1 에서 65/65).
+# 위의 `_expect_rc 3` 들은 잠금 경로에 들어가지도 않으므로 그 축을 가르지 못한다.
+#
+# ⓐ **잠금 파일을 열지 못한다** — 상태 디렉터리는 이 검사가 소유하므로 안전하게 쓰기를 막는다.
+# 기존 `.lock` 이 있으면 append 가 열리므로 **먼저 지우고** 디렉터리를 r-x 로 바꾼다(그래야 생성이
+# 막힌다). 읽기는 열려 있어 `current`·manifest 는 그대로 읽힌다.
+rm -f "$T/state/.lock"
+chmod 500 "$T/state"
+_run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 3 "잠금 **파일을 열지 못하면** 전제 실패(3)다 — 미룸(4)이 아니다"
+chmod 700 "$T/state"
+
+# ⓑ **경합이 아닌 `flock` 실패** — 0 이 아닌 종료를 전부 경합으로 보면 `SuccessExitStatus=4` 가
+# 그 실패를 영구히 삼킨다. EBADF(65)와 부재(127) 둘을 가짜 flock 으로 민다.
+SHIM_FLOCK_RC=65 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 3 "flock 이 EBADF(65)로 깨지면 전제 실패(3) — 경합으로 접지 않는다"
+SHIM_FLOCK_RC=127 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 3 "flock 이 PATH 에 없으면(127) 전제 실패(3)"
 
 # 신호 경로 — trap 이 **자기 일회 컨테이너만** 치운다.
 _signal_case() { # <신호> <기대 종료 코드>
@@ -471,10 +506,18 @@ fi
 # M15/15M(cr H-1) — **`SuccessExitStatus=4` 가 drop-in 에 있어야** 미룸이 `OnFailure` 를 끌지 않는다.
 # 스크립트 쪽만 고치면 종료 코드는 갈렸는데 systemd 는 여전히 둘 다 실패로 보고, 경보는 그대로 울린다
 # (거동이 갈리는 자리가 둘이다 — 한쪽만 고친 판이 조용히 통과하지 않게 여기서 함께 본다).
-if grep -qE '^SuccessExitStatus=([^#]*[^0-9])?4([^0-9]|$)' "$RB"; then
-  _ok "runbook 의 경보 drop-in 이 SuccessExitStatus 로 4 를 실패에서 뺀다"
+#
+# **자리까지 묻는다**(cr N-4 · N-2): 그 줄은 `10-defer.conf` 블록 안에 있어야 한다. 경보 drop-in
+# (`20-alert.conf`)에 있으면 경보를 끄는 `rm` 한 줄이 **미룸 의미까지** 되돌린다 — 그 host 에서는
+# 반입과 겹친 미룸이 다시 unit failed 로 찍힌다. `ExecStopPost` 단언과 같은 모양으로 **개수 등식**을
+# 건다(문서 어디에 있어도 초록이던 앞 판의 느슨함을 없앤다). 숫자 경계는 `14`·`40` 을 배제한다.
+defer_block="$(awk '/^# \/etc\/systemd\/system\/bidvector-notification-sweep\.service\.d\/10-defer\.conf$/ {inb = 1} inb && /^```$/ {exit} inb {print}' "$RB")"
+ses_total="$(grep -cE '^SuccessExitStatus=' "$RB" || true)"
+ses_in="$(printf '%s\n' "$defer_block" | grep -cE '^SuccessExitStatus=([^#]*[^0-9])?4([^0-9]|$)' || true)"
+if [ "$ses_total" -ge 1 ] && [ "$ses_total" = "$ses_in" ]; then
+  _ok "runbook 의 SuccessExitStatus ${ses_total} 줄이 모두 10-defer.conf 블록 안에서 4 를 뺀다"
 else
-  _bad "runbook 에 SuccessExitStatus=…4 가 없다 — 미룸(exit 4)이 그대로 OnFailure 를 끌어 경보가 울린다"
+  _bad "SuccessExitStatus 줄 ${ses_total} 중 10-defer.conf 블록 안의 4 는 ${ses_in} 이다 — 자리가 경보 drop-in 이면 경보를 끄는 rm 이 미룸 의미까지 되돌린다"
 fi
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"

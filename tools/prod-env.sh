@@ -282,17 +282,30 @@ BIDVECTOR_PROD_LOCK_DIR=/run/lock/bidvector-v2
 # 미룬다」고 적는 **설계된 정상**이라 경보를 울리면 안 된다. 호출자가 그 둘을 **문면으로** 가르면
 # 스타일 하나로 열리므로 여기서 `_PROD_LOCK_BUSY` 로 넘긴다(경합일 때만 `1`). 읽지 않는 호출자는
 # 지금까지와 같다.
+#
+# **경합을 종료 코드로 못박는다**(v F1). `flock -n` 의 실패를 전부 경합으로 보면 **경합이 아닌 실패**
+# (EBADF 65 · `flock` 부재 127 · 사용법 64)까지 busy 로 올라가고, 그러면 훑기가 `4` 로 끝나 운영의
+# `SuccessExitStatus=4` 가 그것을 **영구히 삼킨다**(실측: `PATH=/nonexistent` 로 부르면 busy 가 섰다).
+# `-E <코드>` 는 **경합일 때만** 그 코드를 돌려주므로(util-linux 2.39.3 실측: 경합 70 · 획득 0 ·
+# EBADF 65 · 부재 127 · 모르는 옵션 64) 갈림이 열거가 아니라 **구성**으로 닫힌다. `-E` 를 모르는
+# util-linux 는 64 를 내므로 그 host 에서는 전부 전제 실패(`3`)다 — fail-closed 다.
+_PROD_LOCK_BUSY_CODE=70
 _prod_lock() {
-  local f="$1" what="$2" fd
+  local f="$1" what="$2" fd rc=0
   _PROD_LOCK_ERR=""
   _PROD_LOCK_BUSY=""
   exec {fd}>>"$f" || { _PROD_LOCK_ERR="${what} 잠금 파일을 열지 못했다: $f"; return 1; }
-  flock -n "$fd" || {
-    _PROD_LOCK_ERR="다른 반입·되돌림·훑기가 ${what}에서 돌고 있다($f) — 끝난 뒤 다시"
-    _PROD_LOCK_BUSY=1
+  flock -n -E "$_PROD_LOCK_BUSY_CODE" "$fd" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    if [ "$rc" -eq "$_PROD_LOCK_BUSY_CODE" ]; then
+      _PROD_LOCK_ERR="다른 반입·되돌림·훑기가 ${what}에서 돌고 있다($f) — 끝난 뒤 다시"
+      _PROD_LOCK_BUSY=1
+    else
+      _PROD_LOCK_ERR="${what} 잠금을 시험하지 못했다 — flock 종료 ${rc}(경합이 아니다): $f"
+    fi
     eval "exec ${fd}>&-" 2>/dev/null || true
     return 1
-  }
+  fi
   BIDVECTOR_LOCK_FDS="${BIDVECTOR_LOCK_FDS:-} $fd"
 }
 

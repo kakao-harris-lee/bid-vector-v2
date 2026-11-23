@@ -503,9 +503,11 @@ TimeoutStopSec=1m
 #
 # **조건 없이 두면 남의 run 을 지운다.** 이 unit 밖에서 같은 이름으로 도는 run 이 있으면(§9.1 의 손
 # 실행) 타이머 run 은 잠금에서 `exit 4` 로 끝나는데, 조건 없는 ExecStopPost 는 그때도 돌아 **진행
-# 중인 남의 컨테이너를 rm -f** 한다. 그래서 ⓐ 성공 종료(`--rm` 이 이미 지웠다) · ⓑ `exit 3`(전제 실패) ·
-# ⓒ `exit 4`(미뤘다 — 남의 실행이 있다는 뜻이고, 자기 일회 컨테이너를 띄우지도 않았다)에서는
-# **아무것도 하지 않는다.** 남는 것은 timeout·신호·그 밖의 실패뿐이다.
+# 중인 남의 컨테이너를 rm -f** 한다. 그래서 셋에서는 **아무것도 하지 않는다**:
+# ⓐ 성공 종료(`--rm` 이 이미 지웠다) · ⓑ `exit 3`(전제 실패 — 그중 「일회 컨테이너 이름이 전역에서 이미
+# 쓰임」은 **그 이름의 컨테이너가 남의 것**이라는 뜻이라, 조건이 없으면 바로 그것을 지운다) ·
+# ⓒ `exit 4`(미뤘다 — 남의 실행이 있다는 뜻이고, 자기 일회 컨테이너를 띄우지도 않았다).
+# 남는 것은 timeout·신호·그 밖의 실패뿐이다.
 # `$$` 는 systemd 가 아니라 `sh` 가 펼치라는 뜻이고, stderr 를 버려 정상 경로의 「No such container」가
 # journal 에 쌓이지 않게 한다(journal 이 유일한 창구다 — 무해한 오류 줄이 사람을 길들인다).
 # **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
@@ -567,7 +569,10 @@ group/other 쓰기가 열렸다 · 잠금 파일을 열지 못했다)는 미룸�
 ```bash
 # 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가
 journalctl -u bidvector-notification-sweep --since -2d | grep -c 'exit=COMPLETE(0)'
-# 0 이면: 타이머가 꺼졌거나(§9.3 의 list-timers) 매 run 이 실패했다(같은 로그의 cause=)
+# 0 이면 셋 중 하나다: ① 타이머가 꺼졌다(§9.3 의 list-timers) ② 매 run 이 실패했다(같은 로그의 cause=)
+# ③ **매 run 이 미뤘다**(`exit 4` — 잠금을 쥔 프로세스가 매달려 있다. `4` 는 경보를 부르지 않으므로
+#    이 계수가 그 경우의 **유일한** 창구다. 로그의 마지막 줄이 「… 돌고 있다」면 그 쥔 쪽을 찾는다).
+journalctl -u bidvector-notification-sweep --since -2d | grep -c '돌고 있다'
 systemctl list-timers bidvector-notification-sweep.timer
 # **감시자를 감시한다** — 경보가 못 나가면(자격 만료·봇 차단·DNS·TLS) 이 unit 이 failed 에 남을 뿐
 # 아무도 모른다(경보에는 OnFailure 가 없다 — §9.5 ②). 비어 있어야 한다.
@@ -612,6 +617,11 @@ sudo install -d -m 755 /usr/local/lib/bidvector-v2
 sudo install -m 755 -o root -g root tools/prod-alert-telegram.sh /usr/local/lib/bidvector-v2/prod-alert-telegram.sh
 ```
 
+**순서 단서 — `exit 4` 는 반입 뒤에 선다.** 미룸의 종료 코드를 담은 release 를 **반입하기 전까지는**
+`<저장소>` 의 러너가 여전히 미룸도 `3` 으로 끝낸다. 그래서 그 사이에는 반입·되돌림·손 실행이 타이머
+창과 겹칠 때마다 경보가 한 통 온다 — **문서가 틀린 것이 아니라 아직 그 판이 안 깔린 것**이고, 반입과
+함께 저절로 바뀐다. 아래 drop-in 둘은 **먼저 깔아도 해가 없다**(없는 코드를 성공으로 보는 것뿐이다).
+
 **② 경보 unit 템플릿** — `@` 템플릿 하나를 모든 unit 이 나눠 쓴다:
 
 ```ini
@@ -626,25 +636,32 @@ User=deploy
 # 자격 두 값은 §13.2 의 파일에서 온다. systemd 는 이 파일을 **manager 권한으로** 읽어 환경으로 넘기므로,
 # 파일을 root 0600 으로 두어도 `User=` 가 읽을 필요가 없다. **다만 이 host 의 현물은 `deploy:deploy
 # 0600` 이다**(2026-11-23 `stat` — 값은 보지 않았다) — 그 경우 스크립트가 파일을 직접 읽는 갈래도
-# 선다. 두 갈래는 같은 값을 내야 하므로 스크립트의 해석기는 systemd 의 `EnvironmentFile` 규칙(값 앞뒤
-# 공백·CR 절삭, 따옴표 벗기기)을 따른다. `-` 접두는 파일 부재를 스크립트의 exit 2 로 넘긴다(위 「R-4 와의 자리」).
+# 선다. 두 갈래가 같은 값을 내야 하므로 스크립트의 해석기는 **손으로 고칠 때 생기는 artifact 넷**
+# (CRLF · 값 뒤 공백·탭 · `=` 뒤 공백 · 따옴표 뒤 CR·공백)에서 systemd 와 같은 값을 낸다. 전수 동치는
+# 아니다 — 따옴표 **안**의 C 이스케이프·줄 잇기·여러 줄 값은 풀지 않고, 세 키의 모양 검사가 그런 값을
+# 거부한다(fail-closed). `-` 접두는 파일 부재를 스크립트의 exit 2 로 넘긴다(위 「R-4 와의 자리」).
 EnvironmentFile=-/etc/bidvector-v2/relay.env
 ExecStart=/usr/local/lib/bidvector-v2/prod-alert-telegram.sh %i
 # 경보가 매달려 자리를 쥐지 않게 한다 — 스크립트 자신도 connect 5s · 전체 15s 로 끊는다.
 TimeoutStartSec=2m
 ```
 
-**③ 훑기 unit 에 drop-in** — §9.2 의 unit 파일은 **고치지 않는다**:
+**③ 훑기 unit 에 drop-in 둘** — §9.2 의 unit 파일은 **고치지 않는다**. **둘로 나누는 것이 설계다**:
+「미룸은 실패가 아니다」는 경보와 **독립인 러너의 계약**이고, 한 파일에 담으면 경보를 끄는 `rm` 한 줄이
+그 계약까지 되돌려 반입과 겹친 미룸이 다시 unit failed 로 찍힌다.
 
 ```ini
-# /etc/systemd/system/bidvector-notification-sweep.service.d/alert.conf
-[Unit]
-OnFailure=bidvector-alert@%n.service
-
+# /etc/systemd/system/bidvector-notification-sweep.service.d/10-defer.conf
 [Service]
 # **미룸은 실패가 아니다**(§9.4 의 `4`). 이 줄이 없으면 반입·되돌림·손 실행이 타이머 창과 겹칠 때마다
-# 진짜 사건과 같은 문면의 경보가 한 통씩 온다.
+# 진짜 사건과 같은 문면의 경보가 한 통씩 온다. 경보를 끄더라도 **이 파일은 남긴다.**
 SuccessExitStatus=4
+```
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.service.d/20-alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
 ```
 
 `%n` 은 그 unit 의 전체 이름이라 인스턴스는 `bidvector-alert@bidvector-notification-sweep.service.service`
@@ -663,19 +680,23 @@ sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.servi
 journalctl -u 'bidvector-alert@bidvector-notification-sweep.service.service' -n 20
 ```
 
-**끄는 법**: `sudo rm /etc/systemd/system/bidvector-notification-sweep.service.d/alert.conf` 뒤
-`sudo systemctl daemon-reload`. 그리고 **끈 것도 실측한다** — ④ 가 「걸렸음」을 재는 것과 같은 줄로
-「비었음」을 본다:
+**끄는 법**: **`20-alert.conf` 만** 지운다 — `10-defer.conf` 는 남긴다(위 ③ 의 사유: 미룸 의미는 경보와
+독립이고, 지우면 반입과 겹친 미룸이 다시 unit failed 로 찍힌다).
 
 ```bash
-systemctl show -p OnFailure bidvector-notification-sweep.service   # 이번에는 비어 있어야 한다
+sudo rm /etc/systemd/system/bidvector-notification-sweep.service.d/20-alert.conf
+sudo systemctl daemon-reload
+# **끈 것도 실측한다** — ④ 가 「걸렸음」을 재는 것과 같은 줄로 「비었음」을 본다.
+systemctl show -p OnFailure bidvector-notification-sweep.service          # 이번에는 비어 있어야 한다
+systemctl show -p SuccessExitStatus bidvector-notification-sweep.service  # 4 는 **그대로** 있어야 한다
 ```
 
 템플릿과 스크립트 사본은 남겨도 아무 일도 하지 않는다.
 
-**인증서 감시에도 같은 drop-in 을 걸 수 있다**(선택):
-`/etc/systemd/system/bidvector-cert-check.service.d/alert.conf` 에 같은 두 줄(`%n` 그대로). 그 검사는 하루
-한 번이고 `exit 1` 이 곧 「갱신이 아흐레째 실패」라 경보 가치가 있다(§4.5).
+**인증서 감시에도 경보를 걸 수 있다**(선택): `/etc/systemd/system/bidvector-cert-check.service.d/20-alert.conf`
+에 위 **`20-alert.conf` 블록 하나만** 넣는다(`%n` 그대로). `10-defer.conf` 는 **거기에 두지 않는다** —
+`prod-cert-check.sh` 에 `4` 코드가 없으므로 아무것도 하지 않는 줄이고, 뒷사람이 「이 검사에도 미룸이
+있나」로 읽는다. 그 검사는 하루 한 번이고 `exit 1` 이 곧 「갱신이 아흐레째 실패」라 경보 가치가 있다(§4.5).
 
 ## 10. 메모리
 

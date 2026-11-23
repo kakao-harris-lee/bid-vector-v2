@@ -42,7 +42,7 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=38
+EXPECTED_CHECKS=42
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
@@ -221,6 +221,11 @@ rc=0
 # 임시 파일로 쓰는 변이는 argv 를 비운 채로도 디스크에 자격을 남긴다 — 앞 판이 그 변이를 놓쳤다.
 rm -rf "$T/tmpscan" "$T/cwdscan" "$T/tmpctl"
 mkdir -p "$T/tmpscan" "$T/cwdscan" "$T/tmpctl"
+# **뿌리를 넓힌다**(v F2) — `TMPDIR`·cwd 만 보면 **고정 절대경로**(`/tmp/<이름>`)에 쓰는 변이가 초록으로
+# 지나간다(앞 라운드 실측). 공유 임시 자리 셋의 **전후 차이**를 잡아 새로 생긴 것만 바늘로 훑는다.
+# `find` 는 읽지 못하는 디렉터리에서 1 을 낸다(남의 자리) — `pipefail` 아래서 그 1 이 검사를 조용히
+# 끝내므로 삼킨다. 판정은 아래 훑개와 그 양성 대조가 한다.
+command find /tmp /var/tmp /dev/shm -maxdepth 2 2>/dev/null | sort > "$T/shared-before" || true
 ( cd "$T/cwdscan" && TMPDIR="$T/tmpscan" "$ALERT" "$UNIT" --env-file "$T/relay-slow.env" > "$T/out-slow.txt" 2>&1 ) &
 ALERT_PID=$!
 # 미끼 — 바늘을 **argv 에** 담은 프로세스. `$0` 자리에 둔다(`sleep` 은 남는 인자를 받지 않는다).
@@ -230,7 +235,7 @@ DECOY_PID=$!
 # **창이 닫힐 때까지 멈추지 않는다.** 앞 판은 증인 셋이 모이면 `break` 했고, 그 조건은 호출자가
 # 띄우기도 **전에** 남의 `curl` 로 채워질 수 있었다 — 변이 ①(자격을 argv 로 올린 판)이 그 틈으로
 # 초록이 됐다(실측). 증인도 「어딘가의 curl」이 아니라 **이 경보 스크립트의 자식 curl** 이다.
-ALERT_PIDS=" " CURL_PPIDS=" " seen_decoy=0 leaked_pids="" disk_leak=""
+ALERT_PIDS=" " CURL_PPIDS=" " seen_decoy=0 leaked_pids="" disk_leak="" fd_leak=""
 for ((i = 0; i < 200; i++)); do
   # 창 **안**의 디스크 — 설정이 임시 파일로 지나가면 여기서 잡힌다(창 뒤에 지워져도 잡는다).
   if command grep -rlF -- "$FAKE_CREDENTIAL" "$T/tmpscan" "$T/cwdscan" >/dev/null 2>&1; then
@@ -254,6 +259,15 @@ for ((i = 0; i < 200; i++)); do
       *curl*)
         ppid="$(sed -n 's/^PPid:[[:space:]]*//p' "$d/status" 2>/dev/null || true)"
         [ -z "$ppid" ] || case "$CURL_PPIDS" in *" ${ppid} "*) ;; *) CURL_PPIDS="${CURL_PPIDS}${ppid} " ;; esac
+        # 그 curl 이 **공유 임시 자리의 파일을 열고 있는가** — 쓰고 바로 지우는 변이는 전후 차이로는
+        # 안 잡히고 이 축에서 잡힌다(`$T` 아래는 이 검사 자신의 자리라 뺀다).
+        for fdl in "$d"/fd/*; do
+          tgt="$(readlink "$fdl" 2>/dev/null || true)"
+          case "$tgt" in
+            "$T"/*) ;;
+            /tmp/*|/var/tmp/*|/dev/shm/*) fd_leak="${fd_leak:+${fd_leak} }${tgt}" ;;
+          esac
+        done
         ;;
     esac
     case "$cmd" in
@@ -299,6 +313,33 @@ if command grep -rlF -- "$FAKE_CREDENTIAL" "$T/tmpscan" "$T/cwdscan" >/dev/null 
   disk_leak="${disk_leak:+${disk_leak}·}창 뒤"
 fi
 [ -z "$disk_leak" ] && _ok "TMPDIR·cwd 어디에도 설정이 파일로 남지 않는다" || _bad "자격이 디스크에 있다(${disk_leak})"
+
+# 공유 임시 자리 셋 — 창 **뒤**에 새로 생긴 것만 훑는다(남의 파일을 뒤지지 않는다).
+command find /tmp /var/tmp /dev/shm -maxdepth 2 2>/dev/null | sort > "$T/shared-after" || true
+_scan_new_shared() { # → 바늘을 담은 새 파일 경로들
+  local f hit=""
+  while IFS= read -r f; do
+    [ -f "$f" ] && [ -r "$f" ] || continue
+    case "$f" in "$T"/*) continue ;; esac
+    command grep -qF -- "$FAKE_CREDENTIAL" "$f" 2>/dev/null && hit="${hit} ${f}"
+  done < <(comm -13 "$T/shared-before" "$T/shared-after")
+  printf '%s' "$hit"
+}
+shared_leak="$(_scan_new_shared)"
+[ -z "$shared_leak" ] && _ok "/tmp·/var/tmp·/dev/shm 에 새로 생긴 파일 어디에도 자격이 없다" || _bad "공유 임시 자리에 자격이 있다:${shared_leak}"
+
+# 그 훑개의 **양성 대조** — 같은 자리에 바늘을 심으면 찾아낸다(심자마자 지운다).
+planted="/tmp/bv-alert-check-planted-$$-${RANDOM}"
+printf '%s\n' "$FAKE_CREDENTIAL" > "$planted"
+command find /tmp /var/tmp /dev/shm -maxdepth 2 2>/dev/null | sort > "$T/shared-after" || true
+if [ -n "$(_scan_new_shared)" ]; then
+  _ok "공유 임시 자리 훑개의 양성 대조 — 심은 바늘은 찾는다"
+else
+  _bad "공유 임시 자리 훑개가 심은 바늘도 못 찾는다(판정 공허)"
+fi
+rm -f "$planted"
+
+[ -z "$fd_leak" ] && _ok "창 안에서 curl 이 공유 임시 자리의 파일을 쥐지 않았다" || _bad "curl 의 fd 가 공유 임시 파일을 쥔다:${fd_leak}"
 [ "$rc" -eq 0 ] && _ok "느린 응답도 끝까지 간다" || _bad "느린 갈래의 종료 코드가 ${rc} 다"
 
 # ── ⑤ 2xx 아님 ────────────────────────────────────────────────────────────────
@@ -363,6 +404,18 @@ else
   _bad "평문 http 거부가 전제 실패(2)로 서지 않았다(종료 ${rc} · 요청 $(_call_count))"
 fi
 
+# **루프백 예외는 리터럴 주소뿐**(cr N-8) — `localhost` 는 `/etc/hosts`·resolver 가 정하므로, 그 이름을
+# 받으면 자격을 경로에 싣는 URL 의 평문 예외가 **환경에 달리게** 된다. 거절을 거동으로 잠근다.
+_write_env "$T/relay-localhost.env" yes yes
+printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BASE_URL=%s\n' 'http://localhost:8080' >> "$T/relay-localhost.env"
+_forget_calls
+rc=0; _run_alert "$T/out-localhost.txt" "$UNIT" --env-file "$T/relay-localhost.env" || rc=$?
+if [ "$rc" -eq 2 ] && [ "$(_call_count)" -eq 0 ]; then
+  _ok "평문 예외는 리터럴 루프백뿐 — 이름 localhost 는 전제 실패(2)로 거절한다"
+else
+  _bad "localhost 평문 거부가 전제 실패(2)로 서지 않았다(종료 ${rc} · 요청 $(_call_count))"
+fi
+
 # **끝 `/` 하나는 받아들인다**(cr M-3 · v L1). §13.2 는 이 키를 relay 와 공유하면서 「끝에 `/` 없이」를
 # 다른 키에만 적는다 — relay 에서 도는 값으로 경보만 조용히 서면 안 된다.
 _write_env "$T/relay-slash.env" yes yes
@@ -421,10 +474,11 @@ rm -f "$T/marker-cred" "$T/marker-chat" "$T/marker-url" "$T/marker-src"
   printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BASE_URL=$(touch %s)\n' "$T/marker-url"
 } > "$T/relay-hostile.env"
 rc=0; _run_alert "$T/out-hostile.txt" "$UNIT" --env-file "$T/relay-hostile.env" || rc=$?
-if [ "$rc" -ne 0 ] && [ ! -e "$T/marker-cred" ] && [ ! -e "$T/marker-chat" ] && [ ! -e "$T/marker-url" ]; then
+# 종료 **2** 까지 본다 — 위 네 갈래와 같은 축이다(거절과 접속 실패를 가른다).
+if [ "$rc" -eq 2 ] && [ ! -e "$T/marker-cred" ] && [ ! -e "$T/marker-chat" ] && [ ! -e "$T/marker-url" ]; then
   _ok "값 안의 명령 치환이 돌지 않는다 — 해석기는 파일을 실행하지 않는다"
 else
-  _bad "적대적 값이 실행됐거나 거절되지 않았다(종료 ${rc})"
+  _bad "적대적 값이 실행됐거나 전제 실패(2)로 거절되지 않았다(종료 ${rc})"
 fi
 # **양성 대조** — 같은 모양을 `source` 하면 표지가 생긴다(부재 단언이 「그 값이 원래 아무것도 안 한다」
 # 와 구별된다). 버릴 서브셸에서 한 번만 돌린다.
