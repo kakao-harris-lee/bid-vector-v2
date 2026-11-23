@@ -42,7 +42,7 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=44
+EXPECTED_CHECKS=48
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
@@ -139,6 +139,53 @@ import sys
 
 ALLOWED_TARGETS = ("/dev/null", "/dev/stdout", "/dev/stderr")
 FORBIDDEN_WORDS = {"mktemp", "tee", "touch", "dd", "cp", "mv", "install", "truncate"}
+WORD_BOUNDARY = ";|&()<>"
+
+
+def strip_comments(source):
+    """bash 규칙으로 주석만 걷는다 — **낱말 첫머리의** `#` 부터 줄 끝까지.
+
+    `shlex` 의 기본 `commenters='#'` 은 낱말 **중간**의 `#` 에서도 그 줄의 나머지를 버린다(v R3-1).
+    그래서 `n=${#CONFIG}; … > /tmp/x` 한 줄이 술어 전체를 조용히 열었다 — `${#x}`·`${s#…}`·`$#` 는
+    흔한 관용구이고 이 스크립트도 `_trim` 에서 쓴다. 여기서 걷고 `commenters` 는 비워 둔다.
+    """
+    out = []
+    quote = ""
+    boundary = True
+    index = 0
+    while index < len(source):
+        char = source[index]
+        if quote:
+            out.append(char)
+            if char == "\\" and quote == '"' and index + 1 < len(source):
+                out.append(source[index + 1])
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+            boundary = False
+            index += 1
+            continue
+        if char == "\\" and index + 1 < len(source):
+            out.append(char)
+            out.append(source[index + 1])
+            boundary = False
+            index += 2
+            continue
+        if char in "'\"":
+            quote = char
+            out.append(char)
+            boundary = False
+            index += 1
+            continue
+        if char == "#" and boundary:
+            while index < len(source) and source[index] != "\n":
+                index += 1
+            continue
+        out.append(char)
+        boundary = char.isspace() or char in WORD_BOUNDARY
+        index += 1
+    return "".join(out)
 
 
 def redirection(piece):
@@ -147,7 +194,9 @@ def redirection(piece):
 
 findings = []
 # `whitespace_split` 은 낱말을 한 토큰으로 묶고, `punctuation_chars` 는 `<>&|();` 를 따로 뗀다.
-lex = shlex.shlex(open(sys.argv[1], encoding="utf-8").read(), posix=False, punctuation_chars=True)
+# `commenters` 는 **비운다** — 주석은 위에서 bash 규칙으로 이미 걷었다.
+lex = shlex.shlex(strip_comments(open(sys.argv[1], encoding="utf-8").read()), posix=False, punctuation_chars=True)
+lex.commenters = ""
 lex.whitespace_split = True
 pieces = list(lex)
 
@@ -409,6 +458,16 @@ fi
 rm -f "$planted"
 
 [ -z "$fd_leak" ] && _ok "창 안에서 **이 스크립트의** curl 이 공유 임시 자리의 파일을 쥐지 않았다(남의 curl 은 세지 않는다)" || _bad "curl 의 fd 가 공유 임시 파일을 쥔다:${fd_leak}"
+
+# **거르기가 일을 했는가**(v R3-4) — 미끼를 후보로 **보았고** 판정에서 **뺐다**. 둘을 함께 재지 않으면
+# 「거짓 RED 가 없다」가 「훑개가 아무것도 못 봤다」와 같은 값이 된다.
+if ! printf '%s' "$FD_CAND" | command grep -qF -- "$CURL_DECOY_FILE"; then
+  _bad "미끼를 후보로도 보지 못했다 — 거짓 RED 부재가 공허하다(훑개가 아무것도 못 봤다)"
+elif printf '%s' "$fd_leak" | command grep -qF -- "$CURL_DECOY_FILE"; then
+  _bad "미끼를 걸러내지 못했다 — 거르기가 서지 않는다"
+else
+  _ok "미끼를 후보로 보았고 판정에서 걸러냈다 — 거르기가 비공허하다"
+fi
 [ "$rc" -eq 0 ] && _ok "느린 응답도 끝까지 간다" || _bad "느린 갈래의 종료 코드가 ${rc} 다"
 
 # ── ⑤ 2xx 아님 ────────────────────────────────────────────────────────────────
@@ -647,6 +706,27 @@ if [ "$(python3 -I "$T/no-file-writes.py" "$T/planted-writer.sh" | head -n1)" !=
 else
   _bad "정적 술어가 심은 파일 쓰기도 못 찾는다(판정 공허)"
 fi
+
+# **`#` 관용구를 앞에 둔 쓰기도 보인다**(v R3-1). `shlex` 의 기본 주석 규칙은 낱말 **중간**의 `#` 에서
+# 그 줄의 나머지를 버리므로, 그 한 글자로 술어 전체가 열렸다(실측: 그 꼴의 변이가 3/3 초록). 관용구
+# 셋을 각각 **같은 줄에서** 쓰기 앞에 두고 전부 보이는지 잰다.
+_planted_hash_case() { # <이름> <쓰기 앞에 둘 bash 관용구>
+  local name="$1" idiom="$2" file="$T/planted-hash.sh"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'CONFIG=x\n'
+    printf '%s CF=/dev/shm/.bvc$$; printf "%%s" "$CONFIG" > "$CF"\n' "$idiom"
+  } > "$file"
+  if [ "$(python3 -I "$T/no-file-writes.py" "$file" | head -n1)" != 0 ]; then
+    _ok "${name} 를 앞에 둔 파일 쓰기도 보인다"
+  else
+    _bad "${name} 한 글자로 술어가 열린다 — 그 줄의 쓰기를 못 봤다"
+  fi
+}
+_planted_hash_case '${#x}' 'n=${#CONFIG};'
+_planted_hash_case '$#' 'n=$#;'
+_planted_hash_case 'a#b' 'n=a#b;'
+
 
 # ── 합계 ──────────────────────────────────────────────────────────────────────
 total=$((PASS + FAIL))
