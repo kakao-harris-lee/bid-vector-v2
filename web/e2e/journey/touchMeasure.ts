@@ -350,12 +350,18 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
           : false,
     };
   };
+  /**
+   * 라벨 상자를 **재지 않는** 가지(`aria`·`none`)의 자리표시자 — 넷을 한 자리에 묶는다.
+   * `aria-labelledby` 가 가리키는 요소는 그려져 있을 수 있지만 이 helper 는 그 상자를 재지 않는다.
+   * 그래서 `shown` 은 「모른다를 보인다로 접지 않는다」(`boxOf` 와 같은 쪽)로 `false` 다. 두 가지는
+   * `from` 이 `label` 이 아니라 소비자의 앞 단언에서 이미 위반으로 잡힌다.
+   */
+  const NO_LABEL_BOX = { width: 0, height: 0, clipped: false, shown: false } as const;
   const found: NameSource[] = [];
   for (const control of container.querySelectorAll('input, select, textarea')) {
     const name = control.getAttribute('name') ?? '';
     if ((control.getAttribute('aria-label') ?? '').trim() !== '' || (control.getAttribute('aria-labelledby') ?? '').trim() !== '') {
-      // 그려지는 라벨이 없다 — `shown` 은 「모른다를 보인다로 접지 않는다」와 같은 쪽(false)이다.
-      found.push({ control: name, from: 'aria', width: 0, height: 0, clipped: false, shown: false });
+      found.push({ control: name, from: 'aria', ...NO_LABEL_BOX });
       continue;
     }
     // 이름을 **주는 노드**를 찾는다 — 명시 연결이 먼저이고 그다음이 감싼 레이블이다.
@@ -365,7 +371,7 @@ export function nameSourcesInPage(containerTestId: string): readonly NameSource[
       label = control.closest('label');
     }
     if (label === null || (label.textContent ?? '').trim() === '') {
-      found.push({ control: name, from: 'none', width: 0, height: 0, clipped: false, shown: false });
+      found.push({ control: name, from: 'none', ...NO_LABEL_BOX });
       continue;
     }
     /**
