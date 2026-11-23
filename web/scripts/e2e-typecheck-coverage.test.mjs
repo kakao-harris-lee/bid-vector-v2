@@ -57,17 +57,25 @@ const OPTION_EXEMPT = new Set([
   'types', //         e2e 만 `node` 를 더한다
 ]);
 
-/** strict 메타 플래그가 접지 않는 하위 축 — `options[f] ?? options.strict` 로 평가해야 한다. */
-const STRICT_FAMILY = [
-  'alwaysStrict',
-  'noImplicitAny',
-  'noImplicitThis',
-  'strictBindCallApply',
-  'strictFunctionTypes',
-  'strictNullChecks',
-  'strictPropertyInitialization',
-  'useUnknownInCatchVariables',
-];
+/**
+ * strict 메타 플래그가 접지 않는 하위 축 — `options[f] ?? options.strict` 로 평가해야 한다.
+ *
+ * **열거하지 않는다**(r2 cr N-1). 손으로 적은 여덟은 컴파일러가 strict 계열이라고 말하는 아홉에서
+ * `strictBuiltinIteratorReturn` 하나가 빠져 있었고, **양쪽을 함께** 끄면 등식도 못박기도 초록이었다
+ * (실측). 그 꼴은 이 파일이 고치려던 바로 그 열거 결함이다 — 컴파일러 자신에게 묻는다.
+ */
+const STRICT_FAMILY = ts.optionDeclarations
+  .filter((declaration) => declaration.strictFlag === true)
+  .map((declaration) => declaration.name)
+  .sort();
+
+/**
+ * 컴파일러에게 **조용히 하라고 말하는** 주석의 이름. e2e 레인의 파일에 이것이 있으면 타입 층이
+ * 그 자리를 보지 않는다 — 그리고 그 억제는 `eslint-disable-next-line` 과 짝지으면 lint 층도
+ * 지나간다(r2 verifier M-2 실측: lint 0 · typecheck 0 · 덮개 0). 그래서 **eslint 주석으로 끌 수
+ * 없는 층**에서 같은 것을 본다.
+ */
+const TS_SILENCING_DIRECTIVE = /@ts-(?:nocheck|ignore|expect-error)\b/u;
 
 const pkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
 
@@ -194,6 +202,41 @@ function requiredFiles() {
   return found.sort();
 }
 
+/**
+ * 한 원문이 담은 **억제 지시** 전수. 그물은 둘이고 둘 다 「본문에 정규식」이 아니다.
+ *
+ *   ⓐ **컴파일러 자신의 파스 결과** — `checkJsDirective`(`@ts-nocheck`)와
+ *      `commentDirectives`(`@ts-ignore`·`@ts-expect-error`). 이것이 **실제로 먹는** 억제의 정의다.
+ *   ⓑ **렉서로 뽑은 주석 토큰** — `ts.createScanner` 가 낸 주석 토큰만 본다(문자열 리터럴·식별자는
+ *      애초에 토큰이 다르므로 들어오지 않는다). 오늘 컴파일러가 무시하지만 자리만 옮기면 먹는 꼴과,
+ *      앞으로 늘어날 꼴을 받는다 — 막는 쪽이므로 넓은 편이 안전한 방향이다.
+ */
+function silencingDirectivesIn(sourceFile) {
+  const found = [];
+  if (sourceFile.checkJsDirective !== undefined && sourceFile.checkJsDirective.enabled === false) {
+    found.push('@ts-nocheck');
+  }
+  for (const directive of sourceFile.commentDirectives ?? []) {
+    found.push(directive.type === ts.CommentDirectiveType.ExpectError ? '@ts-expect-error' : '@ts-ignore');
+  }
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    sourceFile.fileName.endsWith('x') ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard,
+    sourceFile.text,
+  );
+  for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+    if (kind !== ts.SyntaxKind.SingleLineCommentTrivia && kind !== ts.SyntaxKind.MultiLineCommentTrivia) {
+      continue;
+    }
+    const matched = TS_SILENCING_DIRECTIVE.exec(scanner.getTokenText());
+    if (matched !== null) {
+      found.push(matched[0]);
+    }
+  }
+  return [...new Set(found)].sort();
+}
+
 /** strict 하위 축이 접히도록 푼 유효 옵션 — 비교 가능한 꼴로. */
 function comparableOptions(options) {
   const out = {};
@@ -259,6 +302,31 @@ describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리', () => {
     ]);
     const planted = ts.getPreEmitDiagnostics(programOf(parsed, overlay));
     expect(planted.map((diagnostic) => diagnostic.code)).toContain(2322);
+  });
+
+  it('e2e 레인의 원문에 억제 지시가 0 이다', () => {
+    // **진단 0 만으로는 모자란다**(r2 v M-2). `// @ts-nocheck` 한 줄이면 그 파일의 진단이 사라지고,
+    // 그 주석을 막는 eslint 규칙은 `// eslint-disable-next-line <규칙 이름>` 으로 꺼진다 —
+    // 세 층이 모두 지나간다(실측 0/0/0). 그 꼴을 **eslint 주석으로 끌 수 없는 자리**에서 받는다.
+    const program = PROGRAMS.get(E2E_PROJECT);
+    const owned = new Set(REQUIRED);
+    const offenders = [];
+    for (const sourceFile of program.getSourceFiles()) {
+      let realPath;
+      try {
+        realPath = realpathSync(sourceFile.fileName);
+      } catch {
+        continue;
+      }
+      if (!owned.has(realPath)) {
+        continue;
+      }
+      const directives = silencingDirectivesIn(sourceFile);
+      if (directives.length > 0) {
+        offenders.push(`${show(realPath)}: ${directives.join(' ')}`);
+      }
+    }
+    expect(offenders, 'e2e 레인의 억제 지시').toEqual([]);
   });
 
   it('두 프로젝트의 유효 옵션이 면제 집합 밖에서 같다', () => {

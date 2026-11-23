@@ -285,7 +285,25 @@ for (const sourceFile of programFiles) {
     continue;
   }
   if (realPath.startsWith(srcReal + sep)) {
-    inSrcFiles.push({ sourceFile, name: `src/${relative(srcReal, realPath).split(sep).join('/')}` });
+    const name = `src/${relative(srcReal, realPath).split(sep).join('/')}`;
+    inSrcFiles.push({ sourceFile, name });
+    // ④b **`/// <reference types="…" />` 0**(M15/15L r2 · cr N-2).
+    //
+    // ② 의 `types` 술어는 전역 선언 표면을 여는 **두 자리 중 하나**만 잠근다. 같은 효과를
+    // `types` 목록을 **건드리지 않고** 내는 길이 이것이다 — 화면 파일 한 줄로 `@types/node` 가
+    // 프로그램에 들어오고, 그 `.d.ts` 는 `web/node_modules` 안이라 ④ 전수 술어도 초록이다
+    // (실측: 그 줄이 있으면 `process.env` 의 TS2591 과 `node:fs` 의 TS2307 이 **사라진다**).
+    // 15L 이 `@types/node` 를 들이면서 물리적 장벽(TS2688)이 사라졌으므로 두 자리를 함께 잠근다.
+    //
+    // 오늘 `web/src` 의 이 지시는 **0 건**이라 오탐이 없다. `path`·`lib` 참조는 이 술어 밖이고,
+    // 그쪽이 끌어오는 파일은 ④ 의 경계 술어가 받는다.
+    if (sourceFile.typeReferenceDirectives.length > 0) {
+      fail(
+        `${name} 에 타입 참조 지시가 있다: ` +
+          `${sourceFile.typeReferenceDirectives.map((reference) => reference.fileName).join(', ')} ` +
+          '— 전역 선언 표면은 tsconfig 의 types 한 자리에서만 연다',
+      );
+    }
   }
 }
 
@@ -1125,7 +1143,7 @@ if (finishIfFailed()) return;
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · src 안 타입 참조 지시 0 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **TS 가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export **선언 종류**가 전부 허용 집합 {FunctionDeclaration, TypeAlias, Interface} 안(TypeChecker — 모르는 종류는 기본 위반) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );

@@ -286,7 +286,19 @@ export default tseslint.config(
     // **형제 블록이고 옵션은 같은 상수다** — 블록을 더하면서 옵션을 다시 적으면 둘이 조용히
     // 갈린다(저장소가 이미 지불한 교훈: 뒤 블록이 앞 블록의 같은 규칙 옵션을 덮는다).
     // `languageOptions` 를 두지 않는 것도 그 사유다 — e2e 의 전역은 아래 Node 블록이 정한다.
-    files: ['e2e/**/*.ts', 'e2e/**/*.tsx', 'e2e/**/*.mts', 'e2e/**/*.cts', 'playwright*.config.ts'],
+    // 뿌리 설정의 확장자도 **네 개 전부**다(r2 cr N-3) — `include` 와 덮개 게이트는 넷을 받는데
+    // 여기만 `.ts` 였다. 그러면 `playwright.*.config.mts` 한 파일에서 이 금지만 상속 기본값
+    // (`ts-expect-error: allow-with-description`)으로 되돌아간다.
+    files: [
+      'e2e/**/*.ts',
+      'e2e/**/*.tsx',
+      'e2e/**/*.mts',
+      'e2e/**/*.cts',
+      'playwright*.config.ts',
+      'playwright*.config.tsx',
+      'playwright*.config.mts',
+      'playwright*.config.cts',
+    ],
     rules: {
       '@typescript-eslint/ban-ts-comment': BAN_TS_COMMENT,
     },
