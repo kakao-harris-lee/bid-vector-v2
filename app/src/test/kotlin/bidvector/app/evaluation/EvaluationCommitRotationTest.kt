@@ -80,6 +80,9 @@ class EvaluationCommitRotationTest {
      * **연속한 `K-n+1` 달력일이면 전원이 한 번씩 돈다** — 그 보증을 한 위상이 아니라 **모든 시작
      * 위상**에서 잰다(verifier F-2: 앞 판은 기준일 하나에 묶여 있었다). 보폭이 1 이 되면서 한
      * 바퀴가 `ceil((K-1)/(n-1))` 에서 이 수로 길어졌다(M15/15H 의 교환).
+     *
+     * **`+1` 은 연속한 날(`g=1`)의 수이지 일반 경계가 아니다** — 일반 경계는 `K-n+g`(`g` = run
+     * 사이의 최대 간격)이고, 간격이 벌어진 일정은 아래 평일 timer test 가 따로 잰다.
      */
     @Test
     fun `어느 날 시작해도 한 주기면 전원이 돈다`() {
@@ -307,7 +310,10 @@ class EvaluationCommitRotationTest {
         /** 시작 요일 일곱 전부를 훑는다. */
         const val DAYS_IN_WEEK = 7L
 
-        /** 평일 run 의 상한 — 이 수 안에 전원이 돈다(실측 최대 15, 시작 요일 월요일). */
+        /**
+         * 평일 run 의 상한 — 이 수 안에 전원이 돈다. 실측 최악은 **15 run**(시작 요일 월·화·토·일)
+         * 이고 달력으로는 **21 일**(화요일 시작) — 경계 `K-n+g = 22-4+3` 과 같다.
+         */
         const val WEEKDAY_RUNS = 15
         val WEEKDAY_PROBE_START: LocalDate = LocalDate.of(2026, 11, 23)
     }
