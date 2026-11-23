@@ -193,7 +193,7 @@ pass) → 반입 dry-run 깨끗 → apply(운영자가 직접 실행 — 세션�
   지시(2026-11-23)로 **15I(#196)가 더했다** — 추적 파일 전수 실측의 매치 20 이 전부 합성이었고 기존 baseline 에 한 줄만
   등재했다. 자리 구분 하이픈 꼴만 보고(공백·점·전각·구분 없는 저장 꼴은 못 본다), 비숫자 경계로 써서 게이트(Java)와
   `tools/db-rehearsal.sh`(GNU grep)가 모든 로캘에서 같은 줄을 잡는다. `db-rehearsal.sh` 에는 allowlist 가 없다(15I 제한 8).
-- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 여전히 없다.
+- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 **15M 이 닫았다** — `tools/prod-alert-telegram.sh` + systemd `OnFailure=` drop-in(runbook §9.5), 거동은 `tools/prod-alert-check.sh` 가 CI 매 PR 에서 잰다. **설치는 운영자 몫으로 남는다**(반입 뒤 사본 복사 + drop-in + `daemon-reload`).
 - `rel-5a2f98ba7402` 에 없는 15F·15H 거동은 다음 release 에 실린다(반입 apply 는 운영자).
 
 ### 이 마일스톤에서 배운 것
@@ -202,4 +202,4 @@ pass) → 반입 dry-run 깨끗 → apply(운영자가 직접 실행 — 세션�
 - **공유 Gradle build cache 도 낡는다.** 15A 가 `AccountId` 를 옮긴 뒤 다른 레인의 첫 전건이 **새 clone 에서도** `AbstractMethodError` 로 붉었다. worktree 의 `build/` 가 아니라 공유 cache 였고 `--no-build-cache` 가 갈랐다. CI 는 cache 가 비어 해당이 없다.
 - **`check` 는 첫 빨강에서 멈춘다.** 알려진 빨강 하나를 안은 acceptance 의 「그 밖은 통과」는 미측정이었다(15B 숨은 실패 아홉). `--continue` 로만 잰다.
 - **상한은 잘라 내는 것이 아니라 돌리는 것이어야 한다.** 15B 의 첫 상한 `take(n)` 은 51번째 계정부터를 영원히 빼 놓았다. 회전으로 바꾼 뒤에도 「영업일」 한 낱말이 평일 timer 를 부르면 같은 기아가 돌아온다 — 문면도 거동이다.
-- **반입은 `<저장소>` 에서 돈다(runbook §1.4b) — 어기면 러너가 다른 커밋으로 뜬다.** release·반입을 개발 checkout 에서 하는 동안 `/srv/bidvector-v2` 가 옛 커밋에 남아 알림 훑기가 세 번 연달아 기동에서 실패했다. 아무도 경보를 받지 않았다 — runbook §3 에 그 위반의 복구 단계(반입 뒤 `<저장소>` 이동)를 넣었고, 훑기 실패 경보 자체는 아직 없다.
+- **반입은 `<저장소>` 에서 돈다(runbook §1.4b) — 어기면 러너가 다른 커밋으로 뜬다.** release·반입을 개발 checkout 에서 하는 동안 `/srv/bidvector-v2` 가 옛 커밋에 남아 알림 훑기가 세 번 연달아 기동에서 실패했다. 아무도 경보를 받지 않았다 — runbook §3 에 그 위반의 복구 단계(반입 뒤 `<저장소>` 이동)를 넣었고, 훑기 실패 경보 자체는 **15M 이 세웠다**(runbook §9.5, 설치는 운영자).

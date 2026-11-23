@@ -138,12 +138,12 @@ _2026-11-22 사건: rel-99f2fb259890 과 rel-5a2f98ba7402 를 개발 checkout �
 (`/srv/bidvector-v2`)는 0479e1ff 에 멈춰 있었다. 옛 트리의 compose 가 새 이미지에 release 설정을 넘기지 않아
 2026-11-21 13:30 부터 훑기가 세 번 연달아 기동에서 실패했다(`ReleaseProperties` NPE). 위 두 줄로 옮겨 닫았다._
 
-**반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh` 나 알림 훑기 호출이 바뀌었으면
-`/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서 감시 · §「주기 실행」). 사본은
-자동으로 따라오지 않는다.
+**반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh`·`tools/prod-alert-telegram.sh` 나
+알림 훑기 호출이 바뀌었으면 `/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서
+감시 · §「주기 실행」의 실패 경보). 사본은 자동으로 따라오지 않는다.
 
 ```bash
-git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh
+git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh tools/prod-alert-telegram.sh
 ```
 
 ## 4. host nginx 조각 (운영 effect)
@@ -433,7 +433,8 @@ sudo nginx -t && sudo systemctl reload nginx
 여기에는 **운영 반입된 스택에서 그것을 어떻게 거는가**만 적는다.
 
 **운영자 승인 항목**: 이 타이머를 켜는 것은 「시간 기반 알림을 실제로 쓰기 시작한다」는 뜻이다 — 반입 승인과 별개로
-한 번 확인한다. 외부 발송은 없다(R-4) · 결과는 알림함과 journal 에만 남는다.
+한 번 확인한다. 러너의 외부 발송은 없다(R-4) · 결과는 알림함과 journal 에만 남는다. **실패했다는 사실**만
+systemd 가 §9.5 의 경보로 내보낸다(운영자 설치 · 내용은 unit 이름과 종료 상태까지다).
 
 ### 9.1 거는 법
 
@@ -550,7 +551,10 @@ journalctl -u bidvector-notification-sweep -n 50
 **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
 신호로 끝난 run 은 `3` 이 아니라 **그 신호**로 끝난다(journal 의 `signal=TERM`) — 그 경로에서 이 run 의
 일회 컨테이너는 스스로 치운다.
-외부 발송이 없으므로 **journal 이 유일한 창구**다. 주기 확인:
+**실패했다는 사실은 §9.5 의 `OnFailure` 경보가 밀어 준다**(운영자가 설치한 뒤부터 — 그 전에는 journal 이
+유일한 창구다). 경보가 나르는 것은 「무엇이 깨졌는가」까지이고, **왜**의 정본은 여전히 이 절의 journal 이다.
+아래 주기 확인은 경보를 걸었더라도 그대로 둔다 — 경보는 **실패한 run** 을 알리고, 이 확인은 **아예 돌지
+않은 타이머**를 잡는다(발화하지 않는 것은 실패하지 않는다):
 
 ```bash
 # 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가
@@ -560,6 +564,82 @@ systemctl list-timers bidvector-notification-sweep.timer
 ```
 
 「안 도는 것처럼 보일 때」의 진단은 러너 runbook §6 이다.
+
+### 9.5 실패 경보 — OnFailure (운영자 설치, M15/15M)
+
+§9.4 의 주기 확인은 **사람이 journal 을 본다**는 전제에 기댄다. 2026-11-21 의 세 번 연달은 실패(반입 트리가
+release 커밋이 아니어서 `exit 3` — §3 의 사건)가 며칠 동안 아무에게도 닿지 않은 것이 그 전제의 값이다.
+systemd 가 실패를 **아는** 자리는 `OnFailure=` 이고, 거기에 한 줄짜리 Telegram 경보를 건다.
+
+**보내는 것**: unit 이름 · host 이름 · `Result`/`ExecMainStatus` · KST 시각 · `journalctl -u <unit> -n 50`
+안내. **journal 본문은 보내지 않는다** — 훑기 로그에는 공고·계정 식별자가 들어갈 수 있고, 그것을 외부
+채널로 옮기는 자리를 두지 않는다. 채널은 「무엇이 깨졌는가」만 알고 **왜**는 §9.4 가 진다.
+
+**R-4 와의 자리**: 이것은 사용자 알림의 채널 발송이 아니라 **운영 경보**다. 자격·chat 은 §13.2 의
+`relay.env` 를 그대로 쓰므로, §13 을 켜지 않았으면 두 값이 없어 경보도 서지 않는다 — 그때는 ④ 의 직접
+실행이 `exit 2` 로 그 사실을 말한다(조용히 서는 길이 없다).
+
+**자격은 argv 에 올라가지 않는다.** Bot API 는 자격을 URL 경로에 두므로 `curl <url>` 로 부르면 그 값이
+같은 host 의 `/proc/<pid>/cmdline` 에 올라간다. 스크립트는 URL 을 **설정으로** 넘기고, 응답 본문과 curl
+의 글자는 어느 출력으로도 건너오지 않는다(그래서 journal 에도 남지 않는다). 그 거동은
+`tools/prod-alert-check.sh` 가 가짜 Telegram 서버 앞에서 매 PR 에 잰다.
+
+**① 스크립트를 운영 자리로 복사한다** — §4.5 의 인증서 감시와 같은 이유다(작업 트리를 가리키면 거기에
+쓸 수 있는 누구나 이 unit 이 실행하는 내용을 바꾼다). 바뀌면 다시 깐다(§3 의 「반입 뒤 — 운영 자리 사본 갱신」).
+
+```bash
+sudo install -d -m 755 /usr/local/lib/bidvector-v2
+sudo install -m 755 -o root -g root tools/prod-alert-telegram.sh /usr/local/lib/bidvector-v2/prod-alert-telegram.sh
+```
+
+**② 경보 unit 템플릿** — `@` 템플릿 하나를 모든 unit 이 나눠 쓴다:
+
+```ini
+# /etc/systemd/system/bidvector-alert@.service
+[Unit]
+Description=bidvector 운영 경보 — %i 실패
+# **여기에는 OnFailure 를 달지 않는다** — 경보가 실패하면 경보가 경보를 부른다.
+
+[Service]
+Type=oneshot
+User=deploy
+# 자격 두 값은 §13.2 의 파일에서 온다. systemd 가 **root 로** 읽어 환경으로 넘기므로 파일은 root 0600
+# 그대로 두고 이 unit 의 사용자에게 읽기 권한을 주지 않는다(스크립트는 환경에서 찾는다).
+EnvironmentFile=/etc/bidvector-v2/relay.env
+ExecStart=/usr/local/lib/bidvector-v2/prod-alert-telegram.sh %i
+# 경보가 매달려 자리를 쥐지 않게 한다 — 스크립트 자신도 connect 5s · 전체 15s 로 끊는다.
+TimeoutStartSec=2m
+```
+
+**③ 훑기 unit 에 drop-in** — §9.2 의 unit 파일은 **고치지 않는다**:
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.service.d/alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
+```
+
+`%n` 은 그 unit 의 전체 이름이라 인스턴스는 `bidvector-alert@bidvector-notification-sweep.service.service`
+가 된다 — `.service` 로 두 번 끝나는 것이 맞다(앞은 인스턴스 이름, 뒤는 템플릿의 확장자다).
+
+**④ 켜고 한 번 보낸다.** 배선과 경보 경로를 **나눠** 잰다 — 훑기를 일부러 깨는 것은 운영 스택을 건드리므로
+하지 않는다:
+
+```bash
+sudo systemctl daemon-reload
+systemctl show -p OnFailure bidvector-notification-sweep.service   # 비어 있지 않아야 한다(배선)
+# 아래 줄은 **실제로 메시지를 보낸다.** 받는 쪽에 「설치 확인용 한 통」이라고 미리 말해 둔다.
+# 훑기를 돌리는 것이 아니라 경보만 한 번 돌린다(잠금도 잡지 않는다).
+sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'
+journalctl -u 'bidvector-alert@bidvector-notification-sweep.service.service' -n 20
+```
+
+**끄는 법**: `sudo rm /etc/systemd/system/bidvector-notification-sweep.service.d/alert.conf` 뒤
+`sudo systemctl daemon-reload`. 템플릿과 스크립트 사본은 남겨도 아무 일도 하지 않는다.
+
+**인증서 감시에도 같은 drop-in 을 걸 수 있다**(선택):
+`/etc/systemd/system/bidvector-cert-check.service.d/alert.conf` 에 같은 두 줄(`%n` 그대로). 그 검사는 하루
+한 번이고 `exit 1` 이 곧 「갱신이 아흐레째 실패」라 경보 가치가 있다(§4.5).
 
 ## 10. 메모리
 
@@ -624,7 +704,8 @@ app 여유를 더하는 문면.
    (예: 다른 worktree)은 구별되지 않는다 — 러너가 `<저장소>` 하나에서 돈다는 §9.1 의 전제가 그 자리를 지킨다.
 13. **일회 컨테이너가 남으면 다음 주기부터 훑기가 멈춘다**(§9.1 의 `exit 3`). 러너는 자기 것만 치우고 남의
    것은 손대지 않으므로, KILL 로 죽거나 docker 쪽이 실패해 남은 컨테이너는 사람이 `docker rm -f` 로 치워야
-   한다 — 그때까지 시간 기반 알림이 발화하지 않는다(외부 발송이 없어 journal 이 유일한 창구다, §9.4).
+   한다 — 그때까지 시간 기반 알림이 발화하지 않는다. 그 run 의 `exit 3` 은 §9.5 의 경보가 밀어 주고(설치한
+   뒤부터), 걸지 않았으면 journal 이 유일한 창구다(§9.4).
    잔존 검사의 경계는 **이 프로젝트의 `app` 서비스 일회 컨테이너**다: 같은 프로젝트의 `compose run postgres`·
    `run ml-serving` 잔존과 compose 밖에서 손으로 띄운 컨테이너는 세지 않는다. 반입(`prod-deploy.sh`)도 이
    검사를 하지 않는다 — 계약이 주기 러너로 좁힌 선택이고, 남은 일회 컨테이너는 잠금의 대상이 아니라
