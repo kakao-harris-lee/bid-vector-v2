@@ -1,8 +1,9 @@
 # M15 / 15L — rollback
 
-**실측 HEAD: `45768529fba11e9859ffbcbaaa5e14dcb4167bbb`**(수정 라운드 2 — 이 slice 가 복원 목록 안의
-파일을 건드리는 마지막 커밋. 이 뒤로는 이 문서 자신만 들어온다). 앞 두 라운드의 실측을 옮기지 않고
-다시 돌렸다.
+**실측 HEAD: `6aadb244e43dd5043963145b5239a6ab2086e864`**(수정 라운드 3 — 이 slice 가 복원 목록 안의
+파일을 건드리는 마지막 커밋. 이 뒤로는 이 문서 자신만 들어온다). 앞 세 라운드의 실측을 옮기지 않고
+다시 돌렸다 — 라운드 3 이 만진 것은 **이미 목록 안인 장부·evidence 파일 셋뿐**이지만, 규율은
+「목록 안 파일을 또 커밋하면 재측정」이다.
 
 ## 전제
 
@@ -28,7 +29,8 @@ git rm -rq reports/evidence/m15/15l web/scripts/e2e-typecheck-coverage.test.mjs 
 `package.json` 을 되돌리면 `typecheck` 가 다시 프로젝트 하나를 돌고 `@types/node` 선언이 사라진다 —
 `package-lock.json` 을 같은 명령으로 함께 되돌리므로 `npm ci` 가 어긋나지 않는다. `eslint.config.js` 와
 `check-src-tree.mjs` 는 수정 라운드 1·2 가 각각 e2e 억제 주석 금지(+ 뿌리 glob 네 확장자)와
-`types`·타입 참조 지시 술어를 더한 자리이고, 같은 복원으로 base 문면으로 돌아간다.
+`types`·타입 참조 지시 술어를 더한 자리이고, 같은 복원으로 base 문면으로 돌아간다. 라운드 3 은
+**코드 무편집**이라 복원 목록이 늘지 않았다.
 
 ## 임시 clone 실측(실측 HEAD 에서)
 
