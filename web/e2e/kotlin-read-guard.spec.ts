@@ -30,8 +30,14 @@ const shippedKotlinFile = (): string => {
   })
     .split('\n')
     .filter((line) => isKotlinSourcePath(line));
-  expect(tracked.length, 'Kotlin 정본을 찾지 못했다 — 이 대조가 공허하다').toBeGreaterThan(0);
-  return resolve(repoRoot, tracked[0]);
+  // 공허를 **값 자체**로 가른다(M15/15L). `noUncheckedIndexedAccess` 아래 첨자는
+  // `string | undefined` 이고 `expect(tracked.length)` 는 그 타입을 좁히지 않는다. 폴백을 두면
+  // 「정본을 못 찾았다」가 **다른 파일을 읽는 통과**로 접히므로 없으면 던진다.
+  const [firstTracked] = tracked;
+  if (firstTracked === undefined) {
+    throw new Error('Kotlin 정본을 찾지 못했다 — 이 대조가 공허하다');
+  }
+  return resolve(repoRoot, firstTracked);
 };
 
 test('spec 프로세스에서 Kotlin 원문을 직접 열면 던진다', () => {
