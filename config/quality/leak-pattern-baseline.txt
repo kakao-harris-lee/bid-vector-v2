@@ -13,6 +13,12 @@
 # 줄을 삽입해도(문서를 고칠 때마다 일어난다) 좌표가 밀릴 뿐 키는 그대로다. 경로는 키에
 # 남는다 — 내용만으로 키를 잡으면 한 파일에서 승인한 문자열이 모든 파일에서 승인된다.
 # 옛 형식(경로:줄번호)이 남아 있으면 게이트가 명시적으로 실패한다(조용한 stale 금지).
+#
+# M15/15I ⓔ — 사업자등록번호 꼴 축이 `leak-patterns.txt` 에 들어오면서 생긴 등재는 **하나**다
+# (`reports/evidence/m0/0c/commands.md`). 착수 실측: 추적 파일 전수에서 그 꼴의 매치 20 건이
+# 전부 합성 표본(test 고정물·거부 꼴 표본·문서의 꼴 대조표)이고, 그중 이 게이트의 스캔 루트
+# 안은 둘 — 하나는 `scope.md`(파일 이름 제외), 나머지 하나가 아래 키다. 근거는
+# `reports/evidence/m15/15i/commands.md` 의 ⓔ 절.
 reports/evidence/harness/test-discovery-guard/checklist.md#d94f19d52d99c6143cd01b8d36ef4a95ec48b4b9945f7e1c7b987983ffa21684
 reports/evidence/harness/test-discovery-guard/checklist.md#f62df1e561c27df73ccfaf1282f0805b397abd5ada95680a4590a5c70f46bc2c
 reports/evidence/harness/test-discovery-guard/commands.md#6a34dd267627f8541cbc8b23a8988728db999188312d580c7b1fe3a9a354e0a6
@@ -98,6 +104,7 @@ reports/evidence/m0/0c/commands.md#1e98787d8d2bc7dc349d5f83f0245f2f904880e8dc040
 reports/evidence/m0/0c/commands.md#43bed27a44c694220ed851945aca6e6709e6c918dd3e5de9438bc34e7b5b5902
 reports/evidence/m0/0c/commands.md#55ff7b59f1051b280c358c7e8d94021cacd3835220a4f09d68e966be2156a401
 reports/evidence/m0/0c/commands.md#7239b4ede51f117dde535b74fdfef66f20fe3a0aed7060ff751868c556284922
+reports/evidence/m0/0c/commands.md#75fb09f56aa2184403e959b643ace3bb028909bde131370763754dd8fd8bb57d
 reports/evidence/m0/0c/commands.md#7aa2ea17aa13195224a9ec6ac4ebca82437885523065dc482d503e21544792a6
 reports/evidence/m0/0c/commands.md#8b192f7c7f06958e85526808c3190b2b63d10d11d97b7e4b6af85800b82c1df2
 reports/evidence/m0/0c/commands.md#92c68a1182040dc9106a09aaec6871905397a60fa5dc24fd44c6680280f9ff02
