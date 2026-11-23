@@ -52,8 +52,21 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true
   },
-  // 뿌리의 playwright 설정 둘과 `e2e/**` 의 모든 `.ts`. **이 목록이 좁아지면 조용하다** —
-  // 하나도 못 맞히면 tsc 가 TS18003 으로 떨어지지만(실측), 일부만 맞히는 좁힘은 exit 0 이다.
-  // 그 자리를 `scripts/e2e-typecheck-coverage.test.mjs` 가 **파일 전수 ⊆ 프로그램 전수**로 받는다.
-  "include": ["e2e/**/*.ts", "playwright*.config.ts"]
+  // 뿌리의 playwright 설정과 `e2e/**` 의 모든 TS. **확장자 집합은 덮개 게이트의 디스크 훑기와
+  // 같다**(`.ts`·`.tsx`·`.mts`·`.cts`) — 한쪽만 넓으면 그 차이만큼 조용하거나 사유를 말하지 못하는
+  // RED 가 난다(r1 cr L-1 · v L-1: 단독 `.mts` 가 양쪽 모두의 밖이라 typecheck exit 0 이었다).
+  //
+  // **이 목록이 좁아지면 조용하다** — 하나도 못 맞히면 tsc 가 TS18003 으로 떨어지지만(실측),
+  // 일부만 맞히는 좁힘은 exit 0 이다. 그 자리를 `scripts/e2e-typecheck-coverage.test.mjs` 가
+  // **파일 전수 ⊆ 프로그램 전수**로 받는다.
+  "include": [
+    "e2e/**/*.ts",
+    "e2e/**/*.tsx",
+    "e2e/**/*.mts",
+    "e2e/**/*.cts",
+    "playwright*.config.ts",
+    "playwright*.config.tsx",
+    "playwright*.config.mts",
+    "playwright*.config.cts"
+  ]
 }

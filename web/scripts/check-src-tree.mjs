@@ -169,6 +169,32 @@ if (parsed.options.paths !== undefined && Object.keys(parsed.options.paths).leng
   fail(`paths 별칭이 있다: ${Object.keys(parsed.options.paths).join(', ')}`);
 }
 
+// **M15/15L — `types` 가 `["vite/client"]` 하나인가**(r1 cr M-3).
+//
+// 이 전제는 **15L 이 비로소 하중을 걸었다**. 그 전까지는 저장소에 `@types/node` 가 아예 없어
+// 화면 프로젝트의 `types` 에 `"node"` 를 적어도 TS2688 로 떨어졌다 — **물리적 장벽**이 이 줄을
+// 대신 지켰다. 15L 이 e2e 레인을 위해 그 패키지를 들이면서 그 장벽이 사라졌고, 이제 화면 코드에서
+// `process`·`node:fs` 가 서지 못하게 막는 구조는 `tsconfig.json` 의 이 한 줄뿐이다(eslint 에는
+// `src/**` 의 node builtin 금지가 없다). 위 네 값과 **정확히 같은 꼴**의 전제다 — 하나만 바꾸면
+// 막을 자리가 사라지는데 typecheck 는 자기 전제의 소실을 보지 못한다.
+//
+// **생략은 「비어 있음」이 아니다**: 적지 않으면 설치된 `@types/*` 가 **전부** 자동으로 실린다.
+// 그래서 술어는 「`node` 가 없다」가 아니라 **「목록이 정확히 `["vite/client"]`」** 다.
+// 이 게이트는 `tsconfig.json` 한 파일만 읽으므로 `tsconfig.e2e.json` 의 `["vite/client","node"]`
+// 와 충돌하지 않는다.
+const EXPECTED_TYPES = ['vite/client'];
+const declaredTypes = parsed.options.types;
+if (
+  !Array.isArray(declaredTypes) ||
+  declaredTypes.length !== EXPECTED_TYPES.length ||
+  declaredTypes.some((name, index) => name !== EXPECTED_TYPES[index])
+) {
+  fail(
+    `tsconfig 의 compilerOptions.types 가 ${JSON.stringify(EXPECTED_TYPES)} 가 아니다 ` +
+      `(지금: ${JSON.stringify(declaredTypes)}) — 생략은 설치된 @types/* 전부를 싣는다`,
+  );
+}
+
 // ③ `web/` 안의 심볼릭 링크 0 — `src` 만이 아니라 `public/`·진입 문서까지 본다(verifier r1 L-3).
 // 건너뛰는 자리(설치본·빌드·실행 산출물)는 아래 집합이고, 성공 문면도 그 예외를 적는다
 // (code-review r2 G-3 — `node_modules` 안에는 `.bin/*` 링크가 실제로 여럿 있다).
@@ -1099,7 +1125,7 @@ if (finishIfFailed()) return;
 
 console.log(
   `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · resolveJsonModule=false 명시 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+    `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **TS 가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export **선언 종류**가 전부 허용 집합 {FunctionDeclaration, TypeAlias, Interface} 안(TypeChecker — 모르는 종류는 기본 위반) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );

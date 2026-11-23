@@ -38,6 +38,19 @@ const NETWORK_GLOBALS = ['fetch', 'XMLHttpRequest', 'EventSource', 'WebSocket'];
 const restrictedMessage =
   '서버 호출은 src/api/client.ts 의 생성 타입 클라이언트(openapi-fetch)로만 한다 — ADR 0011 D-2.';
 
+// 억제 주석 세 형태 금지의 **옵션 한 자리**(M15/15L r1). 이 값을 싣는 블록이 둘이고(화면 · e2e),
+// 블록마다 옵션을 다시 적으면 뒤 블록이 앞을 덮으면서 둘이 조용히 갈린다 — 그 꼴을 이 저장소가
+// 이미 겪었다. 상수로 두고 두 자리가 **같은 객체**를 싣는다.
+const BAN_TS_COMMENT = [
+  'error',
+  {
+    'ts-ignore': true,
+    'ts-expect-error': true,
+    'ts-nocheck': true,
+    'ts-check': false,
+  },
+];
+
 // ── M9/screen-display D-1·D-4 ─────────────────────────────────────────────────
 // 벽시계를 읽는 자리는 **한 파일**이다(`OPEN-7E-GATE-RESIDUAL` ⑨ 처방 — 7E-2 checklist §3.1).
 // 그 잔여의 실측은 「지남/남음 잠금이 **문면 두 낱말**에 걸려 있다」였다: 카드에 브라우저 시계
@@ -260,15 +273,22 @@ export default tseslint.config(
       // `@ts-expect-error` 는 억제한 뒤 「쓰이지 않은 지시」로 다시 RED 가 되지만, 그 RED 는
       // 같은 줄에 다른 오류가 없다는 우연에 달려 있다. 그래서 세 형태를 **전부** 여기서 막고,
       // 기본값 상속에 맡기지 않는다(상위 preset 이 바뀌면 조용히 열린다).
-      '@typescript-eslint/ban-ts-comment': [
-        'error',
-        {
-          'ts-ignore': true,
-          'ts-expect-error': true,
-          'ts-nocheck': true,
-          'ts-check': false,
-        },
-      ],
+      '@typescript-eslint/ban-ts-comment': BAN_TS_COMMENT,
+    },
+  },
+  {
+    // M15/15L 수정 라운드 1(cr M-4 · v M-1) — **같은 금지를 e2e 레인에도 건다.** 15L 이 그
+    // 파일들을 비로소 타입 검사 아래로 넣었고, 그 순간 위 사유가 그대로 그 자리에도 적용된다.
+    // 상속 기본값은 `ts-expect-error: 'allow-with-description'` 이라 **`// @ts-expect-error:
+    // <설명>` 한 줄이면 새 층이 줄 단위로 비워졌다**(실측: 15K 가 산 그 TS2345 자리에 그 주석을
+    // 얹으면 typecheck 0 · eslint 0).
+    //
+    // **형제 블록이고 옵션은 같은 상수다** — 블록을 더하면서 옵션을 다시 적으면 둘이 조용히
+    // 갈린다(저장소가 이미 지불한 교훈: 뒤 블록이 앞 블록의 같은 규칙 옵션을 덮는다).
+    // `languageOptions` 를 두지 않는 것도 그 사유다 — e2e 의 전역은 아래 Node 블록이 정한다.
+    files: ['e2e/**/*.ts', 'e2e/**/*.tsx', 'e2e/**/*.mts', 'e2e/**/*.cts', 'playwright*.config.ts'],
+    rules: {
+      '@typescript-eslint/ban-ts-comment': BAN_TS_COMMENT,
     },
   },
   {
