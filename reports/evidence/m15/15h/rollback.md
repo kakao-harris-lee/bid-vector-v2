@@ -1,7 +1,7 @@
 # M15/15H — rollback
 
-실측 HEAD: `7fc13c2eb642982ac11538cab4997e8e172b3077` (**main 병합 커밋** — 이 slice 의 마지막
-산출물 커밋 뒤에 병합이 왔으므로 실측 자리는 그 병합 커밋이다)
+실측 HEAD: `d3710afc30e7946b86e967acb46e26146344a3a1` (**수정 라운드 1 의 산출물 커밋** — 그 라운드가
+복원 목록 안의 파일 넷을 고쳤으므로 실측 자리가 병합 커밋에서 여기로 옮겼다)
 
 되돌림은 **range revert 가 아니라 in_scope 경로 한정 복원**이다 — `git revert <base>..HEAD` 는 같은
 range 의 하네스 레인 커밋과 **병합해 들어온 다른 slice** 까지 되돌린다.
@@ -19,7 +19,7 @@ range 의 하네스 레인 커밋과 **병합해 들어온 다른 slice** 까지
 
 | # | 단언 | 결과 |
 |---|---|---|
-| 1 | 새 원천이 실측 HEAD 의 조상 | `git merge-base --is-ancestor` **참**(병합 커밋의 부모다) |
+| 1 | 새 원천이 실측 HEAD 의 조상 | `git merge-base --is-ancestor` **참**(병합 커밋의 부모이고, 실측 HEAD 는 그 뒤 커밋이다) |
 | 2 | 새 원천에 이 slice 의 **첫 산출물 커밋**(`4ed36b3c5`)이 없다 | **참** — main 은 이 브랜치를 담은 적이 없다 |
 | 3 | 복원 대상 blob 이 착수 base 와 새 원천에서 같은가 | **`docs/discovery/capability-map.md` 하나가 다르다**(15I 가 그 행을 다시 썼다). 그래서 **①~⑥ 전부를 새 원천 기준으로 다시 냈다** — 착수 base 기준의 앞 실측(`970be49d…` 트리)을 옮기지 않았다 |
 
@@ -40,7 +40,8 @@ range 의 하네스 레인 커밋과 **병합해 들어온 다른 slice** 까지
 ## 복원 목록 — 기계 산출
 
 `git diff --name-status 717a00a7f4661064b7e929d9f46c209550d82051..HEAD` 에서 낸다(A = 복원이 삭제 ·
-M = 원천 내용으로 되돌림). **라운드마다 파일이 늘면 이 절차를 다시 돌린다.**
+M = 원천 내용으로 되돌림). **라운드마다 파일이 늘면 이 절차를 다시 돌린다** — 수정 라운드 1 에서
+다시 돌렸고 **목록은 그대로**였다(그 라운드가 고친 넷이 이미 목록 안이다).
 
 - `app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitRunner.kt` (M)
 - `app/src/main/kotlin/bidvector/app/wiring/EvaluationWiring.kt` (M)
@@ -90,7 +91,8 @@ git restore --source=717a00a7f4661064b7e929d9f46c209550d82051 --staged --worktre
   ⓑⓒⓓⓔ 닫힘과 ⓕ 는 **그대로 선다**(ⓕ 는 15I 의 리뷰가 낳은 것이라 이 slice 의 줄이 아니다…
   **다만 그 행에 ⓕ 를 적은 것은 이 slice 의 병합 해소다** — 되돌리면 ⓕ 서술이 함께 사라진다.
   그 사실을 아래 ⑦ 이 계수로 보인다. ⓕ 를 남기려면 복원 뒤 그 행에 다시 적는다).
-- `runbook` 의 문면이 옛 식(`ceil((K-1)/(n-1))`)으로 돌아간다.
+- `runbook` 의 문면이 옛 식(`ceil((K-1)/(n-1))`)으로 돌아가고, 수정 라운드 1 이 바로잡은 덮개 경계
+  (`K-n+g`)도 함께 사라진다 — 되돌린 트리에 `K-n+g` 가 **0 건**이다(아래 ⑦).
 
 **예상 복구 시간**: 복원 명령 1 분 + 전건 `check` 재실행(실측 아래 ⑥).
 
@@ -105,7 +107,7 @@ git restore --source=717a00a7f4661064b7e929d9f46c209550d82051 --staged --worktre
 | ③ | 복원 경로의 `git diff <새 원천>` | **빈 출력**(0 줄) |
 | ④ | 되돌린 트리의 compile | **통과** — ⑥ 의 전건이 포함한다 |
 | ⑤ | 되돌린 트리의 test | **통과** — 같은 run |
-| ⑥ | 되돌린 트리의 게이트 — `check --continue` | **exit 0** · 433 task 전수 실행(`UP-TO-DATE` 0 · cache 0) |
+| ⑥ | 되돌린 트리의 게이트 — `check --continue` | **exit 0** · 433 task **전수 실행**(`UP-TO-DATE` 0 · cache 0) |
 | ⑦ | **내 표지 0 · 남의 표지 보존** | 아래 계수 |
 
 ### ⑦ 표지 계수 — 종료 코드가 아니라 **수**로 판정한다
@@ -116,7 +118,7 @@ git restore --source=717a00a7f4661064b7e929d9f46c209550d82051 --staged --worktre
 |---|---|---|---|
 | `PR #195` · `M15/15H` · `m15/15h` | `capability-map.md` | **0 · 0 · 0** | 이 slice 의 줄이 남지 않았다 |
 | `EvaluationCommitStopLineTest` | `config/quality/gate-tests.properties` | **0** | 등록부 줄이 걷혔다 |
-| 「한 칸씩」 | `docs/runbook/m6-6e-operations.md` | **0** | 처방 문면이 옛 식으로 돌아갔다 |
+| `K-n+g` | `docs/runbook/m6-6e-operations.md` | **0** | 수정 라운드 1 의 경계 정정까지 함께 걷혔다 |
 | `PR #196` · `M15/15I` · `m15/15i` | `capability-map.md` | **2 · 1 · 2** | **남의 줄이 보존됐다** — 착수 base 에서 복원했다면 0 이 됐을 자리다 |
 
 **정직하게 적는 한 가지**: `L-r1-1`·`new Set` 계수가 **0** 이다 — ⓕ 서술은 이 slice 의 **병합 해소**가
@@ -124,6 +126,12 @@ git restore --source=717a00a7f4661064b7e929d9f46c209550d82051 --staged --worktre
 사람은 **복원 뒤 그 행에 ⓕ 를 다시 적어야 한다**(사실 자체는 PR #196 verifier 판정 코멘트가 든다).
 `ⓕ` 글자만으로는 세지 않는다 — 그 글자는 이 문서의 다른 행 열아홉 자리에 이미 있어 표지가 못 된다.
 
-되돌린 트리의 `git write-tree` 는 `0ab2f1bc51fb450505795f693de3ffd07aa58bfc` 다. **앞 라운드의
-트리(`970be49d…`)와 다르다** — 15I 가 들어왔기 때문이고, 그래서 트리 동일성 갈음을 쓰지 않고
-④⑤⑥ 을 **다시 실행했다**.
+되돌린 트리의 `git write-tree` 는 `b303ea058f0f52d1f71e777da6494a5a66cca5ea` 다. 라운드마다 달랐다
+(병합 전 `970be49d…` → 병합 뒤 `0ab2f1bc…` → 수정 라운드 1 `b303ea05…`)라 **트리 동일성 갈음을 한
+번도 쓰지 않고 ④⑤⑥ 을 매번 다시 실행했다**.
+
+수정 라운드 1 의 트리가 앞 라운드와 다른 이유는 **복원 대상 밖**에 있다 —
+`git diff --name-only <앞 실측 HEAD>..<이번 실측 HEAD>` 에서 복원 목록을 뺀 나머지가
+**이 slice 의 evidence 셋뿐**이다(복원하지 않기로 한 것). 복원된 산출물 자체는 같은 원천에서 오므로
+두 라운드가 바이트 동일하다(③ 이 양쪽에서 0 줄). **그래도 ⑥ 은 다시 돌려야 한다** — `leakPatternGate`
+의 scanRoot 가 `reports/evidence` 라 그 차이가 게이트 입력이다.
