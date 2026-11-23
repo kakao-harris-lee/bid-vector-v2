@@ -94,7 +94,11 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
 | ⓒ′ `noUncheckedIndexedAccess` 를 끈다 | 2 | **1** | **닫힘** — 같은 등식 |
 | ⓓ `tsconfig.e2e.json` 에 `"noCheck": true` 한 줄 | 0 | **1** | **닫힘** — 덮개가 `noCheck` 를 강제로 끈 채 진단을 잰다 |
 | ⓓ′ 명령에 `--noCheck` | 0 | **1** | **닫힘** — 같은 자리 |
-| ⓔ e2e 에 `// @ts-expect-error: <설명>` 한 줄 | **0** | 0 | **닫힘 — eslint exit 1**(`ban-ts-comment` 를 e2e 레인으로 넓혔다). 타입 층은 이 꼴을 **못 본다**(설계상 억제다) — 받는 층이 다르다 |
+| ⓔ e2e 에 `// @ts-expect-error: <설명>` 한 줄 | **0** | **1** | **닫힘 — eslint exit 1 과 덮개 exit 1 둘**. 타입 층은 이 꼴을 **못 본다**(설계상 억제다). r1 은 eslint 하나로 받았고, r2 가 **덮개 게이트에도** 「억제 지시 0」 칸을 세웠다 — 그 이유가 ⓔ′ 다 |
+| ⓔ′ `// eslint-disable-next-line @typescript-eslint/ban-ts-comment` + `// @ts-nocheck` | **0** | **1** | **닫힘 — 덮개 exit 1 만**. lint **0**(이름을 단 disable 이 규칙을 끈다) · typecheck **0**(pragma 를 컴파일러가 존중한다) — r1 에서 **세 층이 모두 지나갔다**(v M-2). r2 의 칸은 **eslint 주석으로 끌 수 없는 자리**다: 컴파일러 자신의 파스 결과(`checkJsDirective`·`commentDirectives`)와 렉서가 낸 주석 토큰 둘로 센다. **`src` 의 같은 구멍은 이 slice 밖** — `OPEN-M15-SRC-TS-COMMENT-DISABLE` |
+| ⓚ strict 하위 축을 **양쪽 함께** 끈다(`strictBuiltinIteratorReturn`) | 0 | **1** | **닫힘** — r1 의 손 목록은 컴파일러가 strict 계열이라 말하는 아홉 중 여덟이었고 양쪽을 함께 끄면 등식도 못박기도 초록이었다(r2 cr N-1). r2 가 `ts.optionDeclarations(strictFlag)` 로 바꿔 **열거를 없앴다** |
+| ⓛ `src` 에 `/// <reference types="node" />` 한 줄 | **0** | — | **닫힘 — `gate:src-tree` exit 1**. 그 줄은 `types` 목록을 **건드리지 않고** 같은 전역 표면을 연다(실측: `process.env` 의 TS2591 과 `node:fs` 의 TS2307 이 **사라진다**). r2 가 W-4 ④ 의 프로그램에서 `src` 원문의 타입 참조 지시 0 을 단언한다. **통제군**: 그 줄 없이 같은 코드면 typecheck **2** · `gate:src-tree` 0 |
+| ⓜ 뿌리에 `playwright.*.config.mts` + 억제 주석 | — | **1** | **닫힘 — eslint exit 1 과 덮개 exit 1**. r1 은 eslint 뿌리 glob 만 `.ts` 였다(비대칭이 뒤집혀 남음, r2 cr N-3) |
 | ⓕ 전수를 `git ls-files` 로 센다 | — | — | **닫힘** — **디스크 훑기**로 센다(추적 전 신설 파일도 본다) |
 | ⓖ 게이트 test 자신이 수집에서 빠진다 | — | — | **닫힘** — `web/config/gate-tests.txt` 등재로 W-7 이 **실행 결과**를 단언한다 |
 | ⓗ 전수가 0 이면 포함 단언이 무엇이든 통과한다 | — | — | **닫힘** — 전수 > 0 · 프로젝트 > 0 · **음성 대조**(화면 프로그램 하나로는 못 덮는다) · **양성 대조**(메모리로 심은 오류를 같은 함수가 TS2322 로 보고한다) |
@@ -106,6 +110,9 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
 
 **남는 것**: `vite.config.ts`·`scripts/**/*.mjs`·`eslint.config.js` 는 여전히 어느 TS 프로그램에도
 없다(알려진 제한 ①). 이 slice 의 술어는 「e2e 레인」이고 그 셋은 그 레인이 아니다.
+
+**열린 채로 등재한 것**: 이름을 단 `eslint-disable` 은 **화면 레인**에서 여전히 억제 주석 금지를 끄고,
+`ban-ts-comment` 가 미치는 범위를 재는 측정이 어느 레인에도 없다 — `OPEN-M15-SRC-TS-COMMENT-DISABLE`.
 
 ## 알려진 제한
 
@@ -126,6 +133,12 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
    관측되지 않는다(typecheck exit 0). 그 날은 e2e 가 `fetch` 를 직접 쓰기 시작할 때다.
 6. 덮개 게이트는 `typecheck` 명령이 `tsc [--noEmit] -p <project>` 조각들이라고 본다. `tsc -b` 같은 다른
    꼴로 바꾸면 **RED 로** 드러난다(조용히 통과하지 않는다) — 그때 이 술어를 함께 고쳐야 한다.
+7. **덮개 게이트의 비용이 다섯 배가 됐다**(r2 cr N-5): 2.0s → 5~10s(호스트에 따라). 설계상 당연하다 —
+   e2e 타입 검사를 이 자리가 직접 들기 때문이다. 한 `web` job 에서 e2e 프로그램이 **세 번** 선다
+   (`typecheck` · 덮개의 모듈 적재 · 양성 대조). 줄일 길은 양성 대조를 단일 파일 프로그램으로 세우는
+   것이고, 지금 값은 수용 가능하므로 **등재만** 한다.
+8. **환경 주입은 이 slice 의 술어 밖이다**(r2 verifier 참고): `web/.npmrc` 의 `node-options`·`script-shell`
+   은 npm 이 띄우는 프로세스 **전체**를 바꾸고 W-6 자신도 거기 포함된다. 그 층을 이 게이트로 닫을 수 없다.
 
 ## 거동 변화
 
@@ -151,3 +164,19 @@ PR #200 verifier **not-ready**(H-1) · code-reviewer **COMMENT**(medium 4 · low
 - **cr L-2**: `-p` 경로를 절대 경로로 풀어 비교한다(거짓 RED 제거, 실측 0/0).
 - **cr L-3**: e2e 프로그램 전수의 **상한**(⊆ `web/`) 칸을 더했다.
 - **cr L-4·L-5 · 열린 질문**: 위 「알려진 제한」 ③④⑤ 로 등재했다.
+
+## 수정 라운드 2
+
+PR #200 verifier **ready-for-review**(`625c29d36`, M-2 하나) · code-reviewer **COMMENT**(medium 1 · low 4) 처리.
+
+- **cr N-1**: `STRICT_FAMILY` 를 손 목록에서 `ts.optionDeclarations(strictFlag)` 로 바꿨다. 손 목록은
+  아홉 중 여덟이었고 빠진 축을 **양쪽 함께** 끄면 초록이었다 — 열거 자체를 없앴다(표 ⓚ).
+- **cr N-2**: W-4 ④ 의 프로그램에서 `src` 원문의 `typeReferenceDirectives` 가 비었는지 본다(표 ⓛ).
+  `types` 목록과 함께 **전역 선언 표면을 여는 두 자리**가 모두 잠긴다.
+- **cr N-3**: eslint 형제 블록의 뿌리 glob 을 네 확장자로(표 ⓜ).
+- **v M-2**: 덮개 게이트에 「e2e 레인의 억제 지시 0」 칸을 세웠다(표 ⓔ′). **`src` 의 같은 구멍은
+  고치지 않는다** — 저장소 규약이 `eslint-disable-next-line` 을 리뷰로 가는 탈출구로 두므로 그 규약과의
+  관계를 먼저 정해야 한다. `OPEN-M15-SRC-TS-COMMENT-DISABLE` 로 등재했다.
+- **cr N-4**(`ban-ts-comment` 범위를 재는 측정 부재): 같은 OPEN 의 둘째 축으로 접었다 — test 하나가
+  화면·e2e 양쪽을 함께 잴 수 있다.
+- **cr N-5**(비용) · **verifier 참고**(`.npmrc` 환경 주입): 위 「알려진 제한」 ⑦⑧ 로 등재했다.
