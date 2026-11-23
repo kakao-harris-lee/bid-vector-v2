@@ -19,11 +19,13 @@
 # 옮겼거나 태그가 로컬에 없으면 **훑지 않는다**(v V4-2).
 #
 # 종료 코드: 러너의 것을 그대로 돌려준다(0 완료 · 1 예외 · 2 적지 못한 알림) · 3 이 스크립트의 전제
-# 실패(env 파일 · compose 판 · 잠금 · 반입 기록 없음·손상 · 끝나지 않은 반입 · manifest 부재 ·
-# 태그 ID 불일치 · **반입 트리가 그 release 의 커밋이 아님·추적 파일 더티** · app 설정 통로 ·
-# **해석된 프로젝트 이름이 잠금과 다름** · **지난 run 의 일회 컨테이너 잔존** · **일회 컨테이너 이름이
-# 전역에서 이미 쓰임**). runbook §9.4 가 같은 목록을 갖는다. 신호(TERM·INT·HUP)로 끝나면 그 신호로
-# 죽는다(128+n) — 그 경로에서 이 run 의 일회 컨테이너는 trap 이 치운다.
+# 실패(env 파일 · compose 판 · **잠금 자리·권한** · 반입 기록 없음·손상 · 끝나지 않은 반입 ·
+# manifest 부재 · 태그 ID 불일치 · **반입 트리가 그 release 의 커밋이 아님·추적 파일 더티** ·
+# app 설정 통로 · **해석된 프로젝트 이름이 잠금과 다름** · **지난 run 의 일회 컨테이너 잔존** ·
+# **일회 컨테이너 이름이 전역에서 이미 쓰임**) · **4 미뤘다**(잠금 경합 — 반입·되돌림·다른 훑기·손
+# 실행이 도는 중이다. 설계된 정상이고 다음 주기에 저절로 낫는다 — §9.1·§9.5. `SuccessExitStatus=4`
+# 가 그 코드를 실패로 보지 않게 한다). runbook §9.4 가 같은 목록을 갖는다. 신호(TERM·INT·HUP)로
+# 끝나면 그 신호로 죽는다(128+n) — 그 경로에서 이 run 의 일회 컨테이너는 trap 이 치운다.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -52,9 +54,16 @@ _prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 3
 # 앞 판은, 반입이 백업 중이라 아직 `pending` 을 쓰기 전이면 **옛 `current` 로 일회 컨테이너를 띄웠고**
 # 그 뒤 새 release 가 같은 DB 를 썼다(v V4-7). 훑기는 멱등이고 주기 실행이라, 겹치면 **돌지 않고**
 # 다음 주기로 미루는 것이 맞다 — 기다리지 않는다.
+#
+# **경합은 `4`, 전제 실패는 `3`**(M15/15M, cr H-1). 잠금을 못 잡은 것은 「미뤘다」이지 「깨졌다」가
+# 아니다 — 같은 종료 코드를 쓰면 §9.5 의 실패 경보가 반입·되돌림·손 실행 때마다 진짜 사건과 **글자
+# 하나 다르지 않은** 한 통을 보내고, 받는 사람이 길들여진다(§9.2 의 「무해한 오류 줄이 사람을
+# 길들인다」와 같은 축). 가르는 값은 문면이 아니라 `_PROD_LOCK_BUSY` 다 — 자리·권한이 어긋난 경우는
+# 경합이 아니므로 `3` 에 남는다.
+_deferred_or_precondition() { [ -n "${_PROD_LOCK_BUSY:-}" ] && echo 4 || echo 3; }
 PROJ_FOR_LOCK="${PROJECT:-$BIDVECTOR_PROD_PROJECT}"
-_prod_project_lock "$PROJ_FOR_LOCK" || _die "$_PROD_LOCK_ERR" 3
-_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" 3
+_prod_project_lock "$PROJ_FOR_LOCK" || _die "$_PROD_LOCK_ERR" "$(_deferred_or_precondition)"
+_prod_lock "$STATE/.lock" "이 상태 디렉터리" || _die "$_PROD_LOCK_ERR" "$(_deferred_or_precondition)"
 
 rel="$(cat "$STATE/current" 2>/dev/null || true)"
 [ -n "$rel" ] || _die "반입 기록이 없다($STATE/current) — 반입 전에는 훑을 스택이 없다" 3

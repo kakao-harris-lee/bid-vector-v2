@@ -138,12 +138,12 @@ _2026-11-22 사건: rel-99f2fb259890 과 rel-5a2f98ba7402 를 개발 checkout �
 (`/srv/bidvector-v2`)는 0479e1ff 에 멈춰 있었다. 옛 트리의 compose 가 새 이미지에 release 설정을 넘기지 않아
 2026-11-21 13:30 부터 훑기가 세 번 연달아 기동에서 실패했다(`ReleaseProperties` NPE). 위 두 줄로 옮겨 닫았다._
 
-**반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh` 나 알림 훑기 호출이 바뀌었으면
-`/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서 감시 · §「주기 실행」). 사본은
-자동으로 따라오지 않는다.
+**반입 뒤 — 운영 자리 사본 갱신.** 이 release 에서 `tools/prod-cert-check.sh`·`tools/prod-alert-telegram.sh` 나
+알림 훑기 호출이 바뀌었으면 `/usr/local/lib/bidvector-v2/` 의 사본을 다시 깐다(§「host nginx 조각」의 인증서
+감시 · §「주기 실행」의 실패 경보). 사본은 자동으로 따라오지 않는다.
 
 ```bash
-git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh
+git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh tools/prod-alert-telegram.sh
 ```
 
 ## 4. host nginx 조각 (운영 effect)
@@ -433,7 +433,8 @@ sudo nginx -t && sudo systemctl reload nginx
 여기에는 **운영 반입된 스택에서 그것을 어떻게 거는가**만 적는다.
 
 **운영자 승인 항목**: 이 타이머를 켜는 것은 「시간 기반 알림을 실제로 쓰기 시작한다」는 뜻이다 — 반입 승인과 별개로
-한 번 확인한다. 외부 발송은 없다(R-4) · 결과는 알림함과 journal 에만 남는다.
+한 번 확인한다. 러너의 외부 발송은 없다(R-4) · 결과는 알림함과 journal 에만 남는다. **실패했다는 사실**만
+systemd 가 §9.5 의 경보로 내보낸다(운영자 설치 · 내용은 unit 이름과 종료 상태까지다).
 
 ### 9.1 거는 법
 
@@ -501,13 +502,16 @@ TimeoutStopSec=1m
 # 남는 경우(KILL 로 trap 이 못 돈 경우)를 위한 겹이고 **조건이 반드시 붙는다.**
 #
 # **조건 없이 두면 남의 run 을 지운다.** 이 unit 밖에서 같은 이름으로 도는 run 이 있으면(§9.1 의 손
-# 실행) 타이머 run 은 잠금에서 `exit 3` 으로 끝나는데, 조건 없는 ExecStopPost 는 그때도 돌아 **진행
-# 중인 남의 컨테이너를 rm -f** 한다. 그래서 ⓐ 성공 종료(`--rm` 이 이미 지웠다)와 ⓑ `exit 3`(전제 실패 —
-# 남의 실행이 있다는 뜻이다)에서는 **아무것도 하지 않는다.** 남는 것은 timeout·신호·그 밖의 실패뿐이다.
+# 실행) 타이머 run 은 잠금에서 `exit 4` 로 끝나는데, 조건 없는 ExecStopPost 는 그때도 돌아 **진행
+# 중인 남의 컨테이너를 rm -f** 한다. 그래서 셋에서는 **아무것도 하지 않는다**:
+# ⓐ 성공 종료(`--rm` 이 이미 지웠다) · ⓑ `exit 3`(전제 실패 — 그중 「일회 컨테이너 이름이 전역에서 이미
+# 쓰임」은 **그 이름의 컨테이너가 남의 것**이라는 뜻이라, 조건이 없으면 바로 그것을 지운다) ·
+# ⓒ `exit 4`(미뤘다 — 남의 실행이 있다는 뜻이고, 자기 일회 컨테이너를 띄우지도 않았다).
+# 남는 것은 timeout·신호·그 밖의 실패뿐이다.
 # `$$` 는 systemd 가 아니라 `sh` 가 펼치라는 뜻이고, stderr 를 버려 정상 경로의 「No such container」가
 # journal 에 쌓이지 않게 한다(journal 이 유일한 창구다 — 무해한 오류 줄이 사람을 길들인다).
 # **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
-ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep >/dev/null 2>&1 || true'
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-sweep >/dev/null 2>&1 || true'
 ```
 
 ```ini
@@ -540,8 +544,15 @@ journalctl -u bidvector-notification-sweep -n 50
 ### 9.4 실패 감지
 
 종료 코드는 러너 runbook §4 가 정본이다 — `0` 완료 · `1` 예외 · `2` 적지 못한 알림(`failed>0`). 여기에
-`tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**가 더해진다: env 파일을 읽지 못했다 · compose 판이
-하한 미만이다 · 잠금을 열지 못했거나 반입·되돌림·다른 훑기가 도는 중이다 · 반입 기록이 없거나 손상됐다 ·
+`tools/prod-notification-sweep.sh` 자신의 **`3` 전제 실패**와 **`4` 미룸**이 더해진다.
+
+**`4` 는 실패가 아니다**(M15/15M). 반입·되돌림·다른 훑기·§9.1 의 손 실행이 도는 중이면 잠금을 잡지 못하고
+**훑지 않고 다음 주기로 미룬다** — 훑기는 멱등이라 그래도 된다. 그래서 §9.5 의 경보 drop-in 은
+`SuccessExitStatus=4` 로 그 코드를 실패에서 뺀다. 잠금 **자리·권한**이 어긋난 경우(소유자가 남이다 ·
+group/other 쓰기가 열렸다 · 잠금 파일을 열지 못했다)는 미룸이 아니라 전제 실패라 `3` 에 남는다.
+
+`3` 전제 실패: env 파일을 읽지 못했다 · compose 판이
+하한 미만이다 · 잠금 자리의 소유자·권한이 어긋났다 · 반입 기록이 없거나 손상됐다 ·
 끝나지 않은 반입이 있다 · release manifest 가 없다 · 태그 ID 가 manifest 와 다르다 · **트리가 그 release 의
 커밋이 아니거나 추적 파일이 더럽다**(§9.1 — `git checkout` 뒤 다시) · app 설정 통로가 기대와 다르다 ·
 **해석된 프로젝트 이름이 잠금을 잡은 이름과 다르다**(`--project` 에 정규화 전 글자를 준 경우) ·
@@ -550,16 +561,142 @@ journalctl -u bidvector-notification-sweep -n 50
 **`3` 은 앱 장애가 아니라 스택·설정 상태의 문제**이고, 원인은 그 run 의 마지막 줄에 그대로 적힌다.
 신호로 끝난 run 은 `3` 이 아니라 **그 신호**로 끝난다(journal 의 `signal=TERM`) — 그 경로에서 이 run 의
 일회 컨테이너는 스스로 치운다.
-외부 발송이 없으므로 **journal 이 유일한 창구**다. 주기 확인:
+**실패했다는 사실은 §9.5 의 `OnFailure` 경보가 밀어 준다**(운영자가 설치한 뒤부터 — 그 전에는 journal 이
+유일한 창구다). 경보가 나르는 것은 「무엇이 깨졌는가」까지이고, **왜**의 정본은 여전히 이 절의 journal 이다.
+아래 주기 확인은 경보를 걸었더라도 그대로 둔다 — 경보는 **실패한 run** 을 알리고, 이 확인은 **아예 돌지
+않은 타이머**를 잡는다(발화하지 않는 것은 실패하지 않는다):
 
 ```bash
 # 최근 이틀 안에 COMPLETE(0) 로 끝난 run 이 있는가
 journalctl -u bidvector-notification-sweep --since -2d | grep -c 'exit=COMPLETE(0)'
-# 0 이면: 타이머가 꺼졌거나(§9.3 의 list-timers) 매 run 이 실패했다(같은 로그의 cause=)
+# 0 이면 셋 중 하나다: ① 타이머가 꺼졌다(§9.3 의 list-timers) ② 매 run 이 실패했다(같은 로그의 cause=)
+# ③ **매 run 이 미뤘다**(`exit 4` — 잠금을 쥔 프로세스가 매달려 있다. `4` 는 경보를 부르지 않으므로
+#    이 계수가 그 경우의 **유일한** 창구다. 로그의 마지막 줄이 「… 돌고 있다」면 그 쥔 쪽을 찾는다).
+journalctl -u bidvector-notification-sweep --since -2d | grep -c '돌고 있다'
 systemctl list-timers bidvector-notification-sweep.timer
+# **감시자를 감시한다** — 경보가 못 나가면(자격 만료·봇 차단·DNS·TLS) 이 unit 이 failed 에 남을 뿐
+# 아무도 모른다(경보에는 OnFailure 가 없다 — §9.5 ②). 비어 있어야 한다.
+systemctl list-units 'bidvector-alert@*' --state=failed
 ```
 
 「안 도는 것처럼 보일 때」의 진단은 러너 runbook §6 이다.
+
+### 9.5 실패 경보 — OnFailure (운영자 설치, M15/15M)
+
+§9.4 의 주기 확인은 **사람이 journal 을 본다**는 전제에 기댄다. 2026-11-21 의 세 번 연달은 실패(반입 트리가
+release 커밋이 아니어서 `exit 3` — §3 의 사건)가 며칠 동안 아무에게도 닿지 않은 것이 그 전제의 값이다.
+systemd 가 실패를 **아는** 자리는 `OnFailure=` 이고, 거기에 한 줄짜리 Telegram 경보를 건다.
+
+**보내는 것**: unit 이름 · host 이름 · `Result`/`ExecMainStatus` · KST 시각 · `journalctl -u <unit> -n 50`
+안내. **journal 본문은 보내지 않는다** — 훑기 로그에는 공고·계정 식별자가 들어갈 수 있고, 그것을 외부
+채널로 옮기는 자리를 두지 않는다. 채널은 「무엇이 깨졌는가」만 알고 **왜**는 §9.4 가 진다.
+
+**R-4 와의 자리**: 이것은 사용자 알림의 채널 발송이 아니라 **운영 경보**다. 자격·chat 은 §13.2 의
+`relay.env` 를 그대로 쓰므로, §13 을 켜지 않았으면 두 값이 없어 경보도 서지 않는다 — 그때는 ④ 의 직접
+실행이 `exit 2` 로 그 사실을 말한다(조용히 서는 길이 없다). 그래서 ② 의 `EnvironmentFile=` 에는 **`-`
+접두를 붙인다** — 없으면 파일이 **아예 없는** host 에서 systemd 가 기동에서 끊고 스크립트의 그 진단이
+돌지 않는다. `-` 는 두 갈래(파일 없음 · 값 비었음)를 **한 창구**로 모은다.
+
+**울리지 않아야 할 것 — 미룸(`exit 4`)**. 반입·되돌림·손 실행이 타이머 창과 겹치면 훑기는 잠금을 잡지
+못하고 **다음 주기로 미룬다**. 그 자리는 §9.1 이 「설계된 정상」이라고 적는 갈래이고, 2026-11-21 의 진짜
+사건(`exit 3`)과 **문면이 같으면 받는 사람이 둘을 가를 수 없다** — §9.2 의 「무해한 오류 줄이 사람을
+길들인다」와 같은 축이다. 그래서 미룸은 **자기 종료 코드 `4`** 를 갖고(§9.4), drop-in 이
+`SuccessExitStatus=4` 로 그것을 실패에서 뺀다. 갈림은 글자가 아니라 잠금 경합 여부로 선다
+(`tools/prod-env.sh` 의 `_PROD_LOCK_BUSY`) — 잠금 **자리·권한**이 어긋난 경우는 여전히 `3` 이고 경보가 운다.
+
+**자격은 argv 에 올라가지 않는다.** Bot API 는 자격을 URL 경로에 두므로 `curl <url>` 로 부르면 그 값이
+같은 host 의 `/proc/<pid>/cmdline` 에 올라간다. 스크립트는 URL 을 **설정으로** 넘기고, 응답 본문과 curl
+의 글자는 어느 출력으로도 건너오지 않는다(그래서 journal 에도 남지 않는다). 그 거동은
+`tools/prod-alert-check.sh` 가 가짜 Telegram 서버 앞에서 매 PR 에 잰다.
+
+**① 스크립트를 운영 자리로 복사한다** — §4.5 의 인증서 감시와 같은 이유다(작업 트리를 가리키면 거기에
+쓸 수 있는 누구나 이 unit 이 실행하는 내용을 바꾼다). 바뀌면 다시 깐다(§3 의 「반입 뒤 — 운영 자리 사본 갱신」).
+
+```bash
+sudo install -d -m 755 /usr/local/lib/bidvector-v2
+sudo install -m 755 -o root -g root tools/prod-alert-telegram.sh /usr/local/lib/bidvector-v2/prod-alert-telegram.sh
+```
+
+**순서 단서 — `exit 4` 는 반입 뒤에 선다.** 미룸의 종료 코드를 담은 release 를 **반입하기 전까지는**
+`<저장소>` 의 러너가 여전히 미룸도 `3` 으로 끝낸다. 그래서 그 사이에는 반입·되돌림·손 실행이 타이머
+창과 겹칠 때마다 경보가 한 통 온다 — **문서가 틀린 것이 아니라 아직 그 판이 안 깔린 것**이고, 반입과
+함께 저절로 바뀐다. 아래 drop-in 둘은 **먼저 깔아도 해가 없다**(없는 코드를 성공으로 보는 것뿐이다).
+
+**② 경보 unit 템플릿** — `@` 템플릿 하나를 모든 unit 이 나눠 쓴다:
+
+```ini
+# /etc/systemd/system/bidvector-alert@.service
+[Unit]
+Description=bidvector 운영 경보 — %i 실패
+# **여기에는 OnFailure 를 달지 않는다** — 경보가 실패하면 경보가 경보를 부른다.
+
+[Service]
+Type=oneshot
+User=deploy
+# 자격 두 값은 §13.2 의 파일에서 온다. systemd 는 이 파일을 **manager 권한으로** 읽어 환경으로 넘기므로,
+# 파일을 root 0600 으로 두어도 `User=` 가 읽을 필요가 없다. **다만 이 host 의 현물은 `deploy:deploy
+# 0600` 이다**(2026-11-23 `stat` — 값은 보지 않았다) — 그 경우 스크립트가 파일을 직접 읽는 갈래도
+# 선다. 두 갈래가 같은 값을 내야 하므로 스크립트의 해석기는 **손으로 고칠 때 생기는 artifact 넷**
+# (CRLF · 값 뒤 공백·탭 · `=` 뒤 공백 · 따옴표 뒤 CR·공백)에서 systemd 와 같은 값을 낸다. 전수 동치는
+# 아니다 — 따옴표 **안**의 C 이스케이프·줄 잇기·여러 줄 값은 풀지 않고, 세 키의 모양 검사가 그런 값을
+# 거부한다(fail-closed). `-` 접두는 파일 부재를 스크립트의 exit 2 로 넘긴다(위 「R-4 와의 자리」).
+EnvironmentFile=-/etc/bidvector-v2/relay.env
+ExecStart=/usr/local/lib/bidvector-v2/prod-alert-telegram.sh %i
+# 경보가 매달려 자리를 쥐지 않게 한다 — 스크립트 자신도 connect 5s · 전체 15s 로 끊는다.
+TimeoutStartSec=2m
+```
+
+**③ 훑기 unit 에 drop-in 둘** — §9.2 의 unit 파일은 **고치지 않는다**. **둘로 나누는 것이 설계다**:
+「미룸은 실패가 아니다」는 경보와 **독립인 러너의 계약**이고, 한 파일에 담으면 경보를 끄는 `rm` 한 줄이
+그 계약까지 되돌려 반입과 겹친 미룸이 다시 unit failed 로 찍힌다.
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.service.d/10-defer.conf
+[Service]
+# **미룸은 실패가 아니다**(§9.4 의 `4`). 이 줄이 없으면 반입·되돌림·손 실행이 타이머 창과 겹칠 때마다
+# 진짜 사건과 같은 문면의 경보가 한 통씩 온다. 경보를 끄더라도 **이 파일은 남긴다.**
+SuccessExitStatus=4
+```
+
+```ini
+# /etc/systemd/system/bidvector-notification-sweep.service.d/20-alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
+```
+
+`%n` 은 그 unit 의 전체 이름이라 인스턴스는 `bidvector-alert@bidvector-notification-sweep.service.service`
+가 된다 — `.service` 로 두 번 끝나는 것이 맞다(앞은 인스턴스 이름, 뒤는 템플릿의 확장자다).
+
+**④ 켜고 한 번 보낸다.** 배선과 경보 경로를 **나눠** 잰다 — 훑기를 일부러 깨는 것은 운영 스택을 건드리므로
+하지 않는다:
+
+```bash
+sudo systemctl daemon-reload
+systemctl show -p OnFailure bidvector-notification-sweep.service       # 비어 있지 않아야 한다(배선)
+systemctl show -p SuccessExitStatus bidvector-notification-sweep.service  # 4 가 보여야 한다(미룸 제외)
+# 아래 줄은 **실제로 메시지를 보낸다.** 받는 쪽에 「설치 확인용 한 통」이라고 미리 말해 둔다.
+# 훑기를 돌리는 것이 아니라 경보만 한 번 돌린다(잠금도 잡지 않는다).
+sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'
+journalctl -u 'bidvector-alert@bidvector-notification-sweep.service.service' -n 20
+```
+
+**끄는 법**: **`20-alert.conf` 만** 지운다 — `10-defer.conf` 는 남긴다(위 ③ 의 사유: 미룸 의미는 경보와
+독립이고, 지우면 반입과 겹친 미룸이 다시 unit failed 로 찍힌다).
+
+```bash
+sudo rm /etc/systemd/system/bidvector-notification-sweep.service.d/20-alert.conf
+sudo systemctl daemon-reload
+# **끈 것도 실측한다** — ④ 가 「걸렸음」을 재는 것과 같은 줄로 「비었음」을 본다.
+systemctl show -p OnFailure bidvector-notification-sweep.service          # 이번에는 비어 있어야 한다
+systemctl show -p SuccessExitStatus bidvector-notification-sweep.service  # 4 는 **그대로** 있어야 한다
+```
+
+템플릿과 스크립트 사본은 남겨도 아무 일도 하지 않는다.
+
+**인증서 감시에도 경보를 걸 수 있다**(선택): `/etc/systemd/system/bidvector-cert-check.service.d/20-alert.conf`
+에 위 **`20-alert.conf` 블록 하나만** 넣는다(`%n` 그대로). `10-defer.conf` 는 **거기에 두지 않는다** —
+`prod-cert-check.sh` 에 `4` 코드가 없으므로 아무것도 하지 않는 줄이고, 뒷사람이 「이 검사에도 미룸이
+있나」로 읽는다. 그 검사는 하루 한 번이고 `exit 1` 이 곧 「갱신이 아흐레째 실패」라 경보 가치가 있다(§4.5).
 
 ## 10. 메모리
 
@@ -624,7 +761,8 @@ app 여유를 더하는 문면.
    (예: 다른 worktree)은 구별되지 않는다 — 러너가 `<저장소>` 하나에서 돈다는 §9.1 의 전제가 그 자리를 지킨다.
 13. **일회 컨테이너가 남으면 다음 주기부터 훑기가 멈춘다**(§9.1 의 `exit 3`). 러너는 자기 것만 치우고 남의
    것은 손대지 않으므로, KILL 로 죽거나 docker 쪽이 실패해 남은 컨테이너는 사람이 `docker rm -f` 로 치워야
-   한다 — 그때까지 시간 기반 알림이 발화하지 않는다(외부 발송이 없어 journal 이 유일한 창구다, §9.4).
+   한다 — 그때까지 시간 기반 알림이 발화하지 않는다. 그 run 의 `exit 3` 은 §9.5 의 경보가 밀어 주고(설치한
+   뒤부터), 걸지 않았으면 journal 이 유일한 창구다(§9.4).
    잔존 검사의 경계는 **이 프로젝트의 `app` 서비스 일회 컨테이너**다: 같은 프로젝트의 `compose run postgres`·
    `run ml-serving` 잔존과 compose 밖에서 손으로 띄운 컨테이너는 세지 않는다. 반입(`prod-deploy.sh`)도 이
    검사를 하지 않는다 — 계약이 주기 러너로 좁힌 선택이고, 남은 일회 컨테이너는 잠금의 대상이 아니라
@@ -754,7 +892,8 @@ BIDVECTOR_NOTIFICATION_SITE_BASE_URL=             # 예: https://<운영 도메�
 compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay 는 compose 서비스가 아니라 일회
 러너다 — 템플릿에 넣으면 compose 가 요구하지 않는 죽은 키가 되어 그 검사가 붉어진다.
 
-바꿀 수 있는 나머지 넷은 기본이 있다(건드릴 이유가 거의 없다):
+바꿀 수 있는 나머지 넷은 기본이 있다(건드릴 이유가 거의 없다). **`…_TELEGRAM_BASE_URL` 은 §9.5 의 경보도
+같은 파일에서 읽는다** — 끝에 `/` 를 붙여도 되지만(경보가 하나 떼어 낸다) 경로는 붙이지 않는다:
 `…_TELEGRAM_BASE_URL`(기본 `https://api.telegram.org`) · `…_TELEGRAM_ROUTE_KEY`(기본
 `telegram-primary`) · `…_TELEGRAM_CONNECT_TIMEOUT`(기본 `5s`) · `…_TELEGRAM_RESPONSE_TIMEOUT`(기본 `10s`).
 

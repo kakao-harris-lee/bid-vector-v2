@@ -1102,6 +1102,17 @@ jobs:
           sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" /run/lock/bidvector-v2
           ./tools/prod-guards-check.sh
 
+      # M15/15M — 실패 경보 스크립트(`tools/prod-alert-telegram.sh`)의 **거동 검사**. 가짜 Telegram
+      # 서버를 `127.0.0.1` 의 임의 포트에 띄우고 그 앞에서 실제로 돌린다 — 실 Telegram·운영 host 에
+      # 닿지 않고 컨테이너도 만들지 않으므로 이 job 에서 가장 싸다(러너에 이미 있는 `python3`·`curl`
+      # 만 쓴다). 자리가 S-27d 뒤인 이유는 위와 같다(앞선 판정이 먼저 다 나온다 · 기존 번호를
+      # 재배치하지 않는다).
+      #
+      # **매 PR 에서 돈다.** 재는 축이 「자격이 argv·출력·메시지 어디에도 없다」라서, 한 번만 로컬에서
+      # 돌린 검사는 뒤따르는 편집을 아무것도 막지 못한다.
+      - name: 운영 실패 경보 — 자격 누출 0 · 전제 거부 (S-27e)
+        run: ./tools/prod-alert-check.sh
+
   # M9/adr07-pitest — mutation 래칫(ADR 0007 `OPEN-ADR-07`). **기존 job 을 건드리지 않는다**:
   # `check` 는 무편집이고 pitest 는 그 job 의 task 그래프에 없다(`check --dry-run` 474 task 중
   # pitest·mutation 0 건 · `mutationCheck --dry-run` 87 중 16 건 — 양쪽을 재서 확인했다).

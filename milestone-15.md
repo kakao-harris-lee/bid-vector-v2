@@ -189,12 +189,13 @@ pass) → 반입 dry-run 깨끗 → apply(운영자가 직접 실행 — 세션�
 - `OPEN-M15-TEST-RESIDUE`(이 종결에서 신설) — ⓐ 는 **15H(#195)**, ⓑⓒⓓⓔ 는 **15I(#196)**, ⓕ(속성 모집단 하한이 `length` 를 세던 자리 — #196 verifier r1 low)는 **15J(#198)** 가 닫았다. 여섯 전부 닫혔다.
 - `OPEN-M15-E2E-TYPECHECK`(15K #199 에서 신설) — **15L 이 닫았다.** `web/e2e/**` 를 타입 검사하는 게이트가 없어 15K 가 고친 `NameSource.shown` 누락이 CI 초록 아래 살던 자리다. `tsconfig.json` 은 그대로 두고(그 네 값은 어댑터 금지 경계 자신의 전제다) `tsconfig.e2e.json` 을 두어 `typecheck` 가 두 프로젝트를 돈다 — 선행 조건이던 `@types/node` 는 Node major 에 맞춘 정확 버전으로 선언했다. 그 층을 조용히 비우는 길은 게이트 test 가 받는다 — **지목을 세는 것으로는 닫히지 않아**(검사를 끄는 길이 지목을 건드리지 않는다) 수정 라운드 1 에서 **진단 자체 · 유효 옵션 전체 등식 · 명령의 꼴** 셋으로 바꿨다. 타입 층이 설계상 못 보는 억제 주석은 eslint 가 받고(금지를 e2e 레인으로 넓혔다), `@types/node` 를 들이면서 비로소 하중을 받는 전제(화면 프로젝트의 `types`·`/// <reference types>`)는 W-4 가 받는다. 수정 라운드 2 가 축 목록을 컴파일러에게 묻도록 바꾸고(열거가 하나 모자랐다), 이름을 단 `eslint-disable` 로도 끌 수 없게 **억제 지시 0** 을 e2e 레인에서 직접 센다.
 - `OPEN-M15-SRC-TS-COMMENT-DISABLE`(15L r2 에서 신설 · r3 에서 세 축으로 넓힘, ID 고정) — **타입 검사를 조용히 끄는 자리 셋.** (a) 이름을 단 `eslint-disable` 한 줄이 **화면 레인**의 억제 주석 금지를 끈다(lint 0 · typecheck 0). (b) 그 금지가 미치는 범위를 재는 측정이 없다. (c) 15L 이 닫은 경계는 `e2e/` 전수와 뿌리 playwright 설정이라, e2e 프로그램이 끌어들이는 **`e2e/` 밖의 `.ts`** 는 두 층 모두 밖이고(거기서는 `@ts-expect-error: <설명>` 이 disable 없이도 통과한다), W-4 ④ 는 `referencedFiles`·`libReferenceDirectives` 를 보지 않아 `/// <reference path=…@types/node…>` 한 줄이 그 술어를 지나간다(받는 것은 eslint `triple-slash-reference` 하나뿐이고 그 lint 는 (a) 로 열린다).
+- `OPEN-M15-ALERT-STATIC-GUARD-AST`(15M #201 r5 에서 신설) — 경보 스크립트의 「파일로 쓰지 않는다」를 토큰이 아니라 **구조**로 세야 한다. 지금 술어는 `shlex` 토큰을 두 보기(걷은 보기·원문 보기)의 합집합으로 세어 걷개의 오독이 우회가 되지 않게 했지만, **here-doc 본문의 따옴표로 위상을 뒤집는 꼴**은 두 보기가 함께 열린다(짝이 맞아 토큰화 실패도 없다). `shfmt --to-json` AST 또는 사건 기반 관찰이 처방이고 둘 다 러너에 없는 도구를 요구한다. 오늘의 실해는 0(그 스크립트는 디스크에 쓰지 않는다) — 회귀 게이트의 빈틈이다.
 - 15C 알려진 제한 7·9(키 생략 = 지우기의 옛 번들 창 · 응답 DTO `toString`)는 `reports/evidence/m15/15c/scope.md` 에 그대로 있다.
 - 15C 제한 10(사업자번호 꼴이 누출 패턴에 없음)은 종결 때 「지금은 더하지 않는다」로 두었다가, 운영자의 「열린 작업 완료」
   지시(2026-11-23)로 **15I(#196)가 더했다** — 추적 파일 전수 실측의 매치 20 이 전부 합성이었고 기존 baseline 에 한 줄만
   등재했다. 자리 구분 하이픈 꼴만 보고(공백·점·전각·구분 없는 저장 꼴은 못 본다), 비숫자 경계로 써서 게이트(Java)와
   `tools/db-rehearsal.sh`(GNU grep)가 모든 로캘에서 같은 줄을 잡는다. `db-rehearsal.sh` 에는 allowlist 가 없다(15I 제한 8).
-- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 여전히 없다.
+- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 **15M 이 닫았다** — `tools/prod-alert-telegram.sh` + systemd `OnFailure=` drop-in(runbook §9.5), 거동은 `tools/prod-alert-check.sh` 가 CI 매 PR 에서 잰다. 같은 slice 에서 **미룸(잠금 경합)을 `exit 4` 로 갈라** 설계된 정상이 경보를 울리지 않게 했다(drop-in 의 `SuccessExitStatus=4` · 리뷰 라운드 1). **설치는 운영자 몫으로 남는다**(반입 뒤 사본 복사 + drop-in + `daemon-reload`).
 - `rel-5a2f98ba7402` 에 없는 15F·15H 거동은 다음 release 에 실린다(반입 apply 는 운영자).
 
 ### 이 마일스톤에서 배운 것
@@ -203,4 +204,4 @@ pass) → 반입 dry-run 깨끗 → apply(운영자가 직접 실행 — 세션�
 - **공유 Gradle build cache 도 낡는다.** 15A 가 `AccountId` 를 옮긴 뒤 다른 레인의 첫 전건이 **새 clone 에서도** `AbstractMethodError` 로 붉었다. worktree 의 `build/` 가 아니라 공유 cache 였고 `--no-build-cache` 가 갈랐다. CI 는 cache 가 비어 해당이 없다.
 - **`check` 는 첫 빨강에서 멈춘다.** 알려진 빨강 하나를 안은 acceptance 의 「그 밖은 통과」는 미측정이었다(15B 숨은 실패 아홉). `--continue` 로만 잰다.
 - **상한은 잘라 내는 것이 아니라 돌리는 것이어야 한다.** 15B 의 첫 상한 `take(n)` 은 51번째 계정부터를 영원히 빼 놓았다. 회전으로 바꾼 뒤에도 「영업일」 한 낱말이 평일 timer 를 부르면 같은 기아가 돌아온다 — 문면도 거동이다.
-- **반입은 `<저장소>` 에서 돈다(runbook §1.4b) — 어기면 러너가 다른 커밋으로 뜬다.** release·반입을 개발 checkout 에서 하는 동안 `/srv/bidvector-v2` 가 옛 커밋에 남아 알림 훑기가 세 번 연달아 기동에서 실패했다. 아무도 경보를 받지 않았다 — runbook §3 에 그 위반의 복구 단계(반입 뒤 `<저장소>` 이동)를 넣었고, 훑기 실패 경보 자체는 아직 없다.
+- **반입은 `<저장소>` 에서 돈다(runbook §1.4b) — 어기면 러너가 다른 커밋으로 뜬다.** release·반입을 개발 checkout 에서 하는 동안 `/srv/bidvector-v2` 가 옛 커밋에 남아 알림 훑기가 세 번 연달아 기동에서 실패했다. 아무도 경보를 받지 않았다 — runbook §3 에 그 위반의 복구 단계(반입 뒤 `<저장소>` 이동)를 넣었고, 훑기 실패 경보 자체는 **15M 이 세웠다**(runbook §9.5, 설치는 운영자).
