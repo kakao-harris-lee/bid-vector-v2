@@ -15,6 +15,8 @@ in_scope:
   - tools/prod-env.sh                         # 잠금 경합을 전제 실패와 가르는 `_PROD_LOCK_BUSY`
   - tools/prod-notification-sweep.sh          # 미룸 = exit 4
   - tools/prod-guards-check.sh                # 그 갈림과 drop-in 두 줄을 재는 단언 아홉
+  # ── 수정 라운드 6 에서 들어온 하나(v REG-1 — OPEN 신설) ──────────────────────
+  - docs/discovery/capability-map.md          # `OPEN-M15-ALERT-STATIC-GUARD-AST` 행
   # ── 수정 라운드 2 에서 들어온 하나(v F5 — 러너 코드 표에 `4` 는 래퍼의 것이라고 적는다) ──
   - docs/runbook/m7-7c3b-notification-sweep.md
   - reports/evidence/m15/15m/
@@ -22,10 +24,12 @@ out_of_scope:
   - /etc · systemd · 운영 host 의 실제 설치 — **운영자 몫**이다(runbook §9.5 ①~④). 이 slice 는 저장소
     파일만 만든다.
   - 실 Telegram 으로의 발송 — 로컬 실측은 전부 `127.0.0.1` 의 가짜 서버 앞에서 돌았다.
-  - docs/discovery/capability-map.md — **훑기 실패 경보를 든 행이 없다**(「훑기」 매치 전수를 봤다:
-    7F 장부 L-2 · 화면 카드 모집단 · `STR-09`/`OPS-11` 주기 트리거 · 게이트 AST 훑기 · 필수 키 census).
+  - docs/discovery/capability-map.md 의 **훑기 실패 경보 「충족」 행** — 그런 행이 없다(「훑기」 매치 전수를
+    봤다: 7F 장부 L-2 · 화면 카드 모집단 · `STR-09`/`OPS-11` 주기 트리거 · 게이트 AST 훑기 · 필수 키 census).
     가장 가까운 `STR-09`/`OPS-11` 행은 **두 번째 트리거의 존재**를 묻는 축이고 이 slice 가 닫는 것은
     **그 트리거가 실패했을 때의 통보**다. 없는 행을 지어내지 않는다 — 장부는 milestone-15 가 진다.
+    (**수정 라운드 6 에서 그 파일이 `in_scope` 로 들어왔다** — 더한 것은 「충족」 행이 아니라 남은 사각의
+    **OPEN 행** `OPEN-M15-ALERT-STATIC-GUARD-AST` 하나다.)
   - 평가 커밋의 `deferred`·인터럽트를 가르는 경보(`OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓑ) — 채널은 같지만
     술어가 다르다(종료 코드가 아니라 로그 줄을 읽어야 한다). 그 행은 그대로 열려 있다.
   - runbook §13.3 이 가리키는 `tools/prod-notification-relay.sh` 가 저장소에 없다 — **이 slice 보다 앞선
@@ -386,6 +390,19 @@ bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그 뒤의 명령은 **실행
 
 `prod-alert-check.sh` **48 → 49**(ANSI-C 양성 대조). `prod-guards-check.sh` 는 **74 로 그대로**다.
 
+## 수정 라운드 6 — base 따라잡기와 등재
+
+PR 머지가 「head branch is not up to date」로 막혀 `origin/main`(PR #200 머지 커밋 `8cc202195`,
+M15/15L)을 **머지 커밋으로** 들였다(rebase 하지 않는다 — 판정 SHA 들의 이력을 그대로 둔다).
+겹치는 파일은 `milestone-15.md` 하나이고 자동 병합이 충돌 없이 끝났다. 「충돌 0 자동 병합이 같은
+본문을 접는다」는 함정이 있어 **양쪽을 따로 쟀다**: 병합 결과 대 15M 쪽 = 15L 의 두 줄, 병합 결과 대
+main = 15M 의 두 줄, 줄 수 205/205/206/**206** — 잃거나 겹친 줄 0.
+
+같은 라운드에서 v REG-1·REG-2 를 등재했다(알려진 제한 16·17). REG-1 은 **거동이 남은 사각**이라
+OPEN 행도 만들었다 — `OPEN-M15-ALERT-STATIC-GUARD-AST`(capability-map · milestone-15). 처방이
+`shfmt` AST 나 `inotify`·`strace` 처럼 **러너에 없는 도구**를 요구해서, 이 slice 가 아니라 CI 규율과
+함께 정할 일이기 때문이다.
+
 ## 하네스 레인 변경
 
 없음. `.claude/` 아래를 건드리지 않았다. CI 워크플로의 새 step(S-27e)은 하네스가 아니라 이 slice 의
@@ -396,6 +413,8 @@ bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그 뒤의 명령은 **실행
 `tools/prod-guards-check.sh`·`tools/prod-alert-check.sh`). **수정 라운드 4 도 새 파일 0** 이고 바꾼 것은
 `tools/prod-alert-check.sh`·`tools/prod-guards-check.sh` 둘뿐이다. **수정 라운드 5 도 새 파일 0** 이고
 바꾼 것은 `tools/prod-alert-check.sh`·`tools/prod-alert-telegram.sh`(주석 문면만) 둘이다.
+**수정 라운드 6**(base 따라잡기 · 등재)은 새 파일 0 이고 `docs/discovery/capability-map.md` 하나를
+`in_scope` 로 들였다 — 그 파일은 main 쪽 15L 도 만지므로 **복원 원천이 병합한 main SHA** 다(rollback.md).
 
 ## 알려진 제한
 
@@ -459,6 +478,17 @@ bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그 뒤의 명령은 **실행
    쓰기**는 정적 술어가 리다이렉션으로 잡는다(제한 13 ⓑ 의 따옴표 예외에 걸리지 않는 한). `logger`
    를 닫으려면 제한 13 과 같은 처방(사건 기반 관찰)이 필요하다 — 억지 변이라 이 slice 에서는 등재만
    한다.
+16. **here-doc 본문의 따옴표로 위상을 뒤집는 꼴은 두 보기가 함께 열린다**(v REG-1 — `OPEN-M15-ALERT-STATIC-GUARD-AST`
+   으로 등재했다). 본문에 `"` 하나만 든 here-doc 두 개 사이에 쓰기 줄을 두면 `shlex` 는 그 사이를 **큰따옴표
+   토큰 하나**로 묶는다. bash 에게 here-doc 본문은 **데이터**이므로 그 줄은 코드로 실행된다 — 짝이 맞으니
+   토큰화 실패도 나지 않아 fail-closed 가 서지 않는다. 실측: `bash -n` ok · 술어 0 건 · 검사 49/49 초록인데
+   설정이 `/dev/shm` 에 쓰였다 지워진다. **토큰 단위로는 열거로 닫히지 않는다** — here-doc 은 문법 구조이고,
+   닫으려면 구조 파서(`shfmt --to-json` AST 의 `Redirect` 노드 계수)나 사건 기반 관찰로 **층을 옮겨야** 한다.
+   둘 다 러너에 없는 도구를 요구하므로 CI 규율과 함께 정할 일이고, 그래서 이 slice 가 아니라 OPEN 이다.
+   오늘의 실해는 0 이다 — 경보 스크립트 자체는 디스크에 쓰지 않는다(라운드마다 재확인했다).
+17. **원문 보기는 주석 속 `>` 도 리다이렉션으로 센다**(v REG-2). 그래서 앞으로 그 파일의 주석에 `a > b`·`->`·
+   꺾쇠 짝을 쓰면 거짓 RED 다. 이 라운드가 주석을 `「…」` 로 바꾼 것이 **그 비용을 치른 자리**이고, 규약은
+   경보 스크립트 머리에 적혀 있다. 「걷개가 틀려도 통과하지 않는다」를 얻는 대가이고, 고치는 비용은 한 줄이다.
 15. **잠금 경합 코드 `200` 은 이 저장소의 약속이지 표준이 아니다.** `flock -E` 가 받는 값이면 무엇이든
    되고, 고른 이유는 sysexits(64~78) 밖이면서 셸이 특별히 보지 않는 수라는 것뿐이다. 바꿀 일이 생기면
    `tools/prod-env.sh` 의 `_PROD_LOCK_BUSY_CODE` 한 자리와 guards 의 가짜 `flock` 목록을 함께 본다.
