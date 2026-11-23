@@ -99,6 +99,8 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
 | ⓚ strict 하위 축을 **양쪽 함께** 끈다(`strictBuiltinIteratorReturn`) | 0 | **1** | **닫힘** — r1 의 손 목록은 컴파일러가 strict 계열이라 말하는 아홉 중 여덟이었고 양쪽을 함께 끄면 등식도 못박기도 초록이었다(r2 cr N-1). r2 가 `ts.optionDeclarations(strictFlag)` 로 바꿔 **열거를 없앴다** |
 | ⓛ `src` 에 `/// <reference types="node" />` 한 줄 | **0** | — | **닫힘 — `gate:src-tree` exit 1**. 그 줄은 `types` 목록을 **건드리지 않고** 같은 전역 표면을 연다(실측: `process.env` 의 TS2591 과 `node:fs` 의 TS2307 이 **사라진다**). r2 가 W-4 ④ 의 프로그램에서 `src` 원문의 타입 참조 지시 0 을 단언한다. **통제군**: 그 줄 없이 같은 코드면 typecheck **2** · `gate:src-tree` 0 |
 | ⓜ 뿌리에 `playwright.*.config.mts` + 억제 주석 | — | **1** | **닫힘 — eslint exit 1 과 덮개 exit 1**. r1 은 eslint 뿌리 glob 만 `.ts` 였다(비대칭이 뒤집혀 남음, r2 cr N-3) |
+| ⓝ e2e 프로그램이 끌어들이는 **`e2e/` 밖의 `.ts`**(예: `web/e2elib/helper.ts`)에 억제 주석 + 타입 오류 | **0** | **0** | **열림 — `OPEN-M15-SRC-TS-COMMENT-DISABLE` (c)ⓘ**(r3 v M-3). 억제 지시 칸의 대상은 `e2e/` 디스크 전수 + 뿌리 설정이고 eslint 금지 블록의 glob 도 같다 — 그 밖에서는 tseslint 기본값이 `@ts-expect-error: <설명>` 을 **disable 없이도** 통과시킨다. **대조**: 지시 없이 같은 helper 면 typecheck 2 · 덮개 1(그 파일이 e2e 프로그램 안이라는 확인). 길이 「e2e 코드를 `e2e/` 밖으로 옮긴다」라 diff 에 보인다 |
+| ⓞ `src` 에 `/// <reference path="…/@types/node/index.d.ts" />` | **0** | — | **열림 — 같은 OPEN (c)ⓙ**(r3 v L-5). r2 가 더한 술어는 `typeReferenceDirectives` 축만 닫는다 — `path` 참조는 `gate:src-tree` **0** 이고 받는 것은 eslint `triple-slash-reference` 하나뿐이다(`.ts`·`.d.ts` 양쪽 같음). 그 lint 는 (a) 의 이름 단 disable 로 열린다 |
 | ⓕ 전수를 `git ls-files` 로 센다 | — | — | **닫힘** — **디스크 훑기**로 센다(추적 전 신설 파일도 본다) |
 | ⓖ 게이트 test 자신이 수집에서 빠진다 | — | — | **닫힘** — `web/config/gate-tests.txt` 등재로 W-7 이 **실행 결과**를 단언한다 |
 | ⓗ 전수가 0 이면 포함 단언이 무엇이든 통과한다 | — | — | **닫힘** — 전수 > 0 · 프로젝트 > 0 · **음성 대조**(화면 프로그램 하나로는 못 덮는다) · **양성 대조**(메모리로 심은 오류를 같은 함수가 TS2322 로 보고한다) |
@@ -111,8 +113,12 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
 **남는 것**: `vite.config.ts`·`scripts/**/*.mjs`·`eslint.config.js` 는 여전히 어느 TS 프로그램에도
 없다(알려진 제한 ①). 이 slice 의 술어는 「e2e 레인」이고 그 셋은 그 레인이 아니다.
 
-**열린 채로 등재한 것**: 이름을 단 `eslint-disable` 은 **화면 레인**에서 여전히 억제 주석 금지를 끄고,
-`ban-ts-comment` 가 미치는 범위를 재는 측정이 어느 레인에도 없다 — `OPEN-M15-SRC-TS-COMMENT-DISABLE`.
+**열린 채로 등재한 것** — `OPEN-M15-SRC-TS-COMMENT-DISABLE` 의 세 축(ID 고정, r3 에서 넓혔다):
+(a) 이름을 단 `eslint-disable` 이 **화면 레인**의 억제 주석 금지를 끈다 · (b) `ban-ts-comment` 가 미치는
+범위를 재는 측정이 어느 레인에도 없다 · (c) **이 slice 가 닫은 경계 밖의 두 자리** — e2e 프로그램이
+끌어들이는 `e2e/` 밖 `.ts`(표 ⓝ)와 W-4 ④ 가 보지 않는 `referencedFiles`·`libReferenceDirectives`(표 ⓞ).
+셋을 한 행에 둔 이유는 처방이 겹치기 때문이다 — test 하나가 (a)·(b) 를 함께 재고, (c)ⓘ 는 그 test 의
+**대상 집합**을 넓히는 같은 편집이며, (c)ⓙ 는 (a) 가 여는 lint 에 기대고 있다.
 
 ## 알려진 제한
 
@@ -139,6 +145,11 @@ e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단
    것이고, 지금 값은 수용 가능하므로 **등재만** 한다.
 8. **환경 주입은 이 slice 의 술어 밖이다**(r2 verifier 참고): `web/.npmrc` 의 `node-options`·`script-shell`
    은 npm 이 띄우는 프로세스 **전체**를 바꾸고 W-6 자신도 거기 포함된다. 그 층을 이 게이트로 닫을 수 없다.
+9. **억제 지시 칸의 렉서 그물에 거짓 RED 가 하나 있다**(r3 cr/verifier L-4): 치환이 있는 템플릿 문자열
+   뒤에 그 문구가 오면(`` `a${x} // @ts-ignore` ``) 문맥 없는 스캐너가 `}` 뒤를 주석으로 읽어 **test 가
+   붉는다**. 치환이 없는 같은 문자열은 통과한다(실측). **닫힌 쪽 실패**라 차단이 아니고, 파서 그물
+   (`commentDirectives`)이 반대로 스캐너가 오판하는 꼴을 받아 준다 — 두 그물이 서로의 사각을 메운다.
+   걸리면 그 줄을 다시 쓰는 쪽이 맞다(막는 게이트이므로 넓은 편이 안전한 방향이다).
 
 ## 거동 변화
 
@@ -180,3 +191,16 @@ PR #200 verifier **ready-for-review**(`625c29d36`, M-2 하나) · code-reviewer 
 - **cr N-4**(`ban-ts-comment` 범위를 재는 측정 부재): 같은 OPEN 의 둘째 축으로 접었다 — test 하나가
   화면·e2e 양쪽을 함께 잴 수 있다.
 - **cr N-5**(비용) · **verifier 참고**(`.npmrc` 환경 주입): 위 「알려진 제한」 ⑦⑧ 로 등재했다.
+
+## 수정 라운드 3 — 장부만
+
+PR #200 verifier **ready-for-review**(`89eca51e4`) · CI 다섯 job pass(run 45174872730). **코드·test 무편집.**
+팀장 결정: 라운드마다 찾는 모서리가 좁아지므로 게이트를 다시 열지 않고 남은 지적을 **등재**한다.
+
+- **v M-3**(e2e 프로그램이 끌어들이는 `e2e/` 밖 `.ts`) · **v L-5**(W-4 ④ 가 `referencedFiles`·
+  `libReferenceDirectives` 를 안 본다): 「조용히 비우는 길」 표의 **ⓝ·ⓞ** 로 세우고 **열림**으로 적었다.
+  둘 다 `OPEN-M15-SRC-TS-COMMENT-DISABLE` 의 **(c) 축**이다 — 그 OPEN 을 세 축으로 넓히고 **ID 는
+  고정**했다(바깥 인용이 있다). 처방도 행에 적었다.
+- **v L-4**(템플릿 문자열 치환 뒤 지시 문구의 거짓 RED): 「알려진 제한」 **⑨**. 닫힌 쪽 실패다.
+- 닫힘 행의 문면에 **억제 지시 칸의 대상 범위**(`e2e/` 디스크 전수 + 뿌리 설정)를 못박았다 — 그 경계 밖은
+  (a)·(c) 라고 같은 자리에서 가리킨다. 「고치지 않는 항목은 문면을 실제 술어 범위에 맞게 좁혀 적는다」.
