@@ -13,7 +13,7 @@ base `a189e8c58c8a438e2685c8daae8f83b835b925ba` · 브랜치 `fix/m15l-e2e-typec
 | 같은 명령 — `@types/node` + `types`·`jsx`·`allowJs` 처방 뒤 | **오류 1** — `e2e/kotlin-read-guard.spec.ts` TS2345(`noUncheckedIndexedAccess` 아래 첨자). 나머지 23 은 처방으로 사라졌다 |
 | 같은 명령 — 그 한 자리를 고친 뒤 | **오류 0** |
 
-## acceptance — `web` job 전건(로컬, Gradle 절 제외)
+## acceptance — `web` job 전건(로컬, Gradle 절 제외) · 수정 라운드 1 뒤 재실행
 
 | step | 명령 | exit |
 |---|---|---|
@@ -22,13 +22,18 @@ base `a189e8c58c8a438e2685c8daae8f83b835b925ba` · 브랜치 `fix/m15l-e2e-typec
 | W-3 | `npm run typecheck` | 0 |
 | W-4 | `npm run gate:src-tree` | 0 |
 | W-5 | `npm run api:types:check` | 0 |
-| W-6 | `npm run test` | 0 — 파일 77 · test 2046 전부 통과 |
+| W-6 | `npm run test` | 0 — 파일 77 · test 2050 전부 통과 |
 | W-7 | `npm run gate:tests` | 0 — 등록부 기준 수집 확인(skipped/todo 0) |
 | W-8 | `npm run build` | 0 |
 | W-9 | `npm run gate:boundary-canary` | 0 |
 
-W-4 는 `tsconfig.e2e.json` 이 생긴 뒤에도 같은 문면으로 통과한다 — 그 게이트가 읽는 것은
-`tsconfig.json` 한 파일이고, 프로그램 전수·링크·집합 등식의 수가 base 와 같다.
+W-4 는 `tsconfig.e2e.json` 이 생긴 뒤에도 통과한다 — 그 게이트가 읽는 것은 `tsconfig.json` 한
+파일이고, 프로그램 전수·링크·집합 등식의 수가 base 와 같다(문면에는 수정 라운드 1 이 더한
+`types` 술어 한 항이 늘었다).
+
+덮개 게이트는 수정 라운드 1 에서 칸 넷 → **여덟**이 됐고(진단 · 양성 대조 · 명령의 꼴 · 유효 옵션
+등식 · 덮는 자리 · 음성 대조 · 상한 · 공허 가드) 소요는 2.0s → **8.0s** 다 — e2e 프로그램의
+타입 검사를 이 자리가 직접 들기 때문이다.
 
 여정·스모크 레인(W-10~W-13)과 `check`·`ml-engine`·`container` job 은 **PR head 의 CI** 가 든다
 (로컬은 docker·브라우저 시스템 패키지 전제가 필요하고 이 slice 는 그 레인의 코드를 바꾸지 않는다).
@@ -44,18 +49,42 @@ W-4 는 `tsconfig.e2e.json` 이 생긴 뒤에도 같은 문면으로 통과한�
 | **head(15L)** | `npm run typecheck` | **exit 2** — `TS2345: Property 'shown' is missing … but required in type 'NameSource'` |
 | **통제군: base `a189e8c58`** (임시 clone, `npm ci` 뒤 같은 변이) | `npm run typecheck` | **exit 0** — 이 OPEN 이 적은 사각 그 자체. base 의 `typecheck` 는 프로젝트가 하나다 |
 
-## 변이 실측 — 층을 조용히 비우는 길 셋
+## 변이 실측 — 층을 조용히 비우는 길 (수정 라운드 1 뒤)
 
-세 변이 모두 **tsc 는 아무 말도 하지 않는다**. 그 자리를 게이트 test 가 받는 것을 잰다.
+각 행은 **「15K 가 고친 칸을 다시 뺀 상태」**(= 잡아야 할 오류가 실제로 거기 있는 판)에서 그 변이를
+더해 쟀다. 덮개 게이트는 `npx vitest run scripts/e2e-typecheck-coverage.test.mjs`.
 
-| 변이 | `npm run typecheck` | 게이트 test |
-|---|---|---|
-| ⓐ `typecheck` 에서 둘째 프로젝트를 뺀다 | exit **0** | **exit 1** — 덮이지 않은 e2e 파일 23 을 열거하고, strict 축 대조도 함께 붉는다 |
-| ⓑ `include` 를 `e2e/journey/**` 로 좁힌다(일부만 맞힌다) | exit **0** | **exit 1** — 덮이지 않은 파일 7 |
-| ⓑ′ `include` 가 **하나도** 못 맞힌다 | exit **2** — `TS18003: No inputs were found in config file` | (tsc 가 먼저 떨어진다) |
-| ⓒ `noUncheckedIndexedAccess` 를 끈다 | exit **0** | **exit 1** — 두 프로젝트의 유효 옵션 대조가 붉는다 |
+| 변이 | typecheck | 덮개 | 판정 |
+|---|---|---|---|
+| (통제군) 변이 없음 | 2 | 1 | 잡힘 |
+| `tsconfig.e2e.json` 에 `"noCheck": true` | 0 | **1** | 잡힘 |
+| 명령에 `--noCheck` | 0 | **1** | 잡힘 |
+| 명령 끝에 `\|\| true` | 0 | **1** | 잡힘 |
+| 명령에 ` ; true`(띄운 꼴) | 0 | **1** | 잡힘 |
+| `strict` 아래 `strictNullChecks`·`noImplicitAny` 끄기 | 2 | **1** | 잡힘 |
+| 둘째 프로젝트 제거 | 0 | **1** | 잡힘 |
+| `include` 를 `e2e/journey` 로 좁힘 | 2 | **1** | 잡힘 |
+| `noUncheckedIndexedAccess` 끄기 | 2 | **1** | 잡힘 |
 
-양성 쪽 통제군: 변이 없는 head 에서 같은 게이트 test 는 **exit 0 · 칸 넷 통과**다(2.0s).
+앞 판에서는 위 넷(`noCheck` 둘 · `|| true` · strict 하위)이 전부 **typecheck 0 · 덮개 0** 이었다
+(verifier H-1 · cr M-1·M-2). 「`include` 가 하나도 못 맞힌다」는 여전히 tsc 가 `TS18003` 으로 먼저
+떨어진다(exit 2).
+
+## 변이 실측 — 다른 층이 받는 자리
+
+| 변이 | 결과 |
+|---|---|
+| e2e 에서 필수 칸을 빼고 그 자리에 `// @ts-expect-error: <설명>` | `typecheck` **0**(설계상 억제) · `eslint` **1**(`ban-ts-comment`) — 받는 층이 다르다 |
+| 단독 `.mts` 에 타입 오류를 둔다 | `typecheck` **2** · 덮개 **1**. 앞 판은 `include` 와 훑기 둘 다 밖이라 exit 0 이었다 |
+| 화면 프로젝트(`tsconfig.json`)의 `types` 에 `node` 추가 | `gate:src-tree` **1**. 앞 판은 exit 0 |
+
+## 거짓 RED 가 아닌 것 (닫힌 쪽 실패도 비용이다)
+
+| 꼴 | 결과 |
+|---|---|
+| `-p ./tsconfig.e2e.json`(같은 뜻의 글자) | typecheck **0** · 덮개 **0** |
+| `--project` 장형 | typecheck **0** · 덮개 **0** |
+| 무변이 head(양성 통제군) | typecheck **0** · 덮개 **0** · eslint **0** |
 
 ## 개인정보·비밀값
 

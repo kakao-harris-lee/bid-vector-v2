@@ -10,8 +10,10 @@ in_scope:
   - web/package.json                          # @types/node · typecheck 가 두 프로젝트를 돈다
   - web/package-lock.json
   - web/e2e/kotlin-read-guard.spec.ts         # strict 가 드러낸 실제 오류 하나
-  - web/scripts/e2e-typecheck-coverage.test.mjs  # 신설 — 층을 비우는 길 셋을 받는 게이트 test
+  - web/scripts/e2e-typecheck-coverage.test.mjs  # 신설 — e2e 진단·기준·덮는 자리를 재는 게이트 test
   - web/config/gate-tests.txt                 # 그 test 의 수집 등재(W-7)
+  - web/eslint.config.js                      # 수정 라운드 1 — ban-ts-comment 를 e2e 레인으로
+  - web/scripts/check-src-tree.mjs            # 수정 라운드 1 — W-4 ② 에 `types` 술어
   - docs/discovery/capability-map.md          # `OPEN-M15-E2E-TYPECHECK` 닫힘
   - milestone-15.md                           # 같은 OPEN 의 요약 줄
   - reports/evidence/m15/15l/
@@ -19,7 +21,7 @@ out_of_scope:
   - web/tsconfig.json — **건드리지 않는다.** 그 파일의 `rootDir`·`include`·`allowJs`·`paths` 와
     `resolveJsonModule` 은 어댑터 금지 경계(ADR 0011 D-3) 자신의 전제이고 `scripts/check-src-tree.mjs`(W-4)가
     그것을 단언한다 — e2e 를 거기에 끼우면 경계가 사라진다
-  - vite.config.ts · eslint.config.js · scripts/**/*.mjs — 여전히 어느 TS 프로그램에도 없다(알려진 제한 ①)
+  - vite.config.ts · scripts/**/*.mjs · eslint.config.js — 여전히 어느 TS 프로그램에도 없다(알려진 제한 ①)
   - .github/workflows/ci.yml · tools/one-command-check.sh — 둘 다 이미 `npm run typecheck` 를 부른다.
     명령이 그대로이므로 워크플로는 무편집이다
 acceptance_commands:
@@ -69,19 +71,61 @@ CI 다섯 job 초록 아래 살았다(15K 가 값을 고쳤지만 재발을 막�
 ## 설계 검토 — 이 게이트를 조용히 비우는 길
 
 새 층은 둘이다: `tsconfig.e2e.json` 과 「`typecheck` 가 그 프로젝트도 돈다」. **둘 다 tsc 를 초록으로
-둔 채 비울 수 있다** — 아래 넷을 실측했고, ⓐⓑⓒ 는 `scripts/e2e-typecheck-coverage.test.mjs` 로 닫았다.
+둔 채 비울 수 있다.**
 
-| 길 | 실측 | 처리 |
-|---|---|---|
-| ⓐ `typecheck` 에서 둘째 프로젝트가 빠진다 | tsc 는 한 마디도 하지 않는다(명령이 성공한다) | **닫힘** — 게이트 test 가 `package.json` 의 그 명령이 **실제로 지목하는** 프로젝트들을 열어 프로그램 전수를 얻는다. 지목이 줄면 덮이지 않는 파일이 열거되며 RED |
-| ⓑ `include` 가 좁아진다 | 하나도 못 맞히면 TS18003 으로 **떨어진다**(실측 exit 2). **일부만** 맞히는 좁힘은 exit 0 이다 — 15K 가 산 자리가 그 꼴이다 | **닫힘** — 같은 test 가 디스크의 e2e `.ts` 전수 ⊆ 프로그램 전수를 단언한다 |
-| ⓒ strict 축이 약해진다 | e2e 가 「검사받는다」는 말만 서고 기준이 달라진다. tsc 는 당연히 초록이다 | **닫힘** — 같은 test 가 두 프로젝트의 **유효 옵션**을 여섯 축에서 대조하고, 두 쪽이 함께 꺼지는 꼴을 막으려 값까지 못박는다 |
-| ⓓ 전수를 `git ls-files` 로 세면 **아직 추적되지 않은** 새 spec 이 술어 밖이다 | 저장소가 이미 겪은 꼴이다(「게이트는 추적 전엔 눈이 없다」) | **닫힘** — 전수를 **디스크 훑기**로 센다 |
-| ⓔ 게이트 test 자신이 수집에서 빠진다 | Playwright·vitest 둘 다 수집에서 빠진 파일을 말하지 않는다 | **닫힘** — `web/config/gate-tests.txt` 에 등재해 W-7 이 **실행 결과**로 단언한다(같은 커밋에서 등재) |
-| ⓕ 전수가 0 이면 포함 단언이 무엇이든 통과한다 | 공허 | **닫힘** — 전수 > 0 · 프로젝트 수 > 0 을 먼저 단언하고, **음성 대조**(화면 프로그램 하나로는 그 전수를 못 덮는다)가 술어가 실제로 가르는 것을 잰다 |
+**수정 라운드 1 이 이 절을 다시 썼다.** 앞 판의 술어는 **지목**(`-p` 뒤 이름)과 **축 여섯**에
+걸려 있었고, verifier(H-1)·code-reviewer(M-1·M-2)가 그 술어를 지나가는 길 다섯을 실측했다 —
+검사를 끄는 길은 **지목을 건드리지 않기 때문**이다. 그래서 재는 것을 바꿨다: 덮개 게이트가
+e2e 프로그램을 **직접 세워**(`noCheck` 강제 off) **진단 0** 을 단언하고, 옵션은 축이 아니라
+**유효 옵션 전체**를 면제 집합 밖에서 대조하며, 명령은 **꼴까지** 본다.
 
-**남는 것**: `vite.config.ts`·`eslint.config.js`·`scripts/**/*.mjs` 는 여전히 어느 TS 프로그램에도 없다
-(알려진 제한 ①). 이 slice 의 술어는 「e2e 레인」이고 그 셋은 그 레인이 아니다.
+아래는 **수정 뒤의 실측**이다. 각 행은 「15K 가 고친 칸(`NameSource` 의 필수 칸)을 다시 뺀 상태」에서
+그 변이를 더해 쟀다 — 즉 **잡아야 할 오류가 실제로 거기 있는** 판이다.
+
+| 길 | typecheck | 덮개 게이트 | 판정 |
+|---|---|---|---|
+| (통제군) 변이 없음 — 심은 오류만 | 2 | 1 | 잡힘 |
+| ⓐ `typecheck` 에서 둘째 프로젝트가 빠진다 | 0 | **1** | **닫힘** — 덮개가 e2e 전수의 미포함을 열거한다 |
+| ⓐ′ 명령 끝에 `\|\| true` | 0 | **1** | **닫힘** — 명령의 꼴 술어(조각 ≠ `tsc [--noEmit] -p <p>`) |
+| ⓐ″ 명령에 ` ; true`(띄운 꼴) | 0 | **1** | **닫힘** — 같은 술어 |
+| ⓑ `include` 가 일부만 맞히도록 좁아진다 | 2 | **1** | **닫힘** — 전수 ⊆ 프로그램 |
+| ⓑ′ `include` 가 하나도 못 맞힌다 | **2**(`TS18003`) | — | tsc 가 먼저 떨어진다 |
+| ⓒ `strict` 아래 `strictNullChecks`·`noImplicitAny` 를 끈다 | 2 | **1** | **닫힘** — 유효 옵션 전체 등식(strict 계열은 `getStrictOptionValue` 로 푼다). 앞 판은 **선언값 여섯**만 봐서 초록이었다 |
+| ⓒ′ `noUncheckedIndexedAccess` 를 끈다 | 2 | **1** | **닫힘** — 같은 등식 |
+| ⓓ `tsconfig.e2e.json` 에 `"noCheck": true` 한 줄 | 0 | **1** | **닫힘** — 덮개가 `noCheck` 를 강제로 끈 채 진단을 잰다 |
+| ⓓ′ 명령에 `--noCheck` | 0 | **1** | **닫힘** — 같은 자리 |
+| ⓔ e2e 에 `// @ts-expect-error: <설명>` 한 줄 | **0** | 0 | **닫힘 — eslint exit 1**(`ban-ts-comment` 를 e2e 레인으로 넓혔다). 타입 층은 이 꼴을 **못 본다**(설계상 억제다) — 받는 층이 다르다 |
+| ⓕ 전수를 `git ls-files` 로 센다 | — | — | **닫힘** — **디스크 훑기**로 센다(추적 전 신설 파일도 본다) |
+| ⓖ 게이트 test 자신이 수집에서 빠진다 | — | — | **닫힘** — `web/config/gate-tests.txt` 등재로 W-7 이 **실행 결과**를 단언한다 |
+| ⓗ 전수가 0 이면 포함 단언이 무엇이든 통과한다 | — | — | **닫힘** — 전수 > 0 · 프로젝트 > 0 · **음성 대조**(화면 프로그램 하나로는 못 덮는다) · **양성 대조**(메모리로 심은 오류를 같은 함수가 TS2322 로 보고한다) |
+| ⓘ 화면 프로젝트의 `types` 에 `node` 를 더한다 | 0 | 0 | **닫힘 — `gate:src-tree` exit 1**. 이 전제는 15L 이 `@types/node` 를 들이면서 **비로소 하중을 받는다**(그 전엔 TS2688 이라는 물리적 장벽이 대신 지켰다) |
+| ⓙ e2e 프로그램이 `web/` 밖으로 넓어진다 | 0 | **상한 칸이 받는다** | **닫힘** — 이 프로젝트에는 `rootDir` 이 없고 `allowJs` 가 켜져 있어 TS6059 가 날 자리가 없다 |
+
+**거짓 RED 가 아닌 것도 쟀다**(닫힌 쪽 실패는 그 자체로 비용이다): `-p ./tsconfig.e2e.json` 과
+`--project` 장형은 심은 오류가 없을 때 **typecheck 0 · 덮개 0** 이다(경로를 절대 경로로 풀어 비교).
+
+**남는 것**: `vite.config.ts`·`scripts/**/*.mjs`·`eslint.config.js` 는 여전히 어느 TS 프로그램에도
+없다(알려진 제한 ①). 이 slice 의 술어는 「e2e 레인」이고 그 셋은 그 레인이 아니다.
+
+## 알려진 제한
+
+1. `vite.config.ts`·`eslint.config.js`·`scripts/**/*.mjs` 는 어느 TS 프로그램에도 없다 — 타입 검사
+   사각이 그만큼 남는다.
+2. `checkJs: false` 라 `scripts/**`·`e2e/harness/**` 의 `.mjs` **자체의** 타입 오류는 보고되지 않는다
+   — 그 파일들을 새 검사 표면으로 들이지 않으려는 의도한 경계다.
+3. **그 `.mjs` 가 만드는 새 결합**(r1 cr L-4): 진단은 안 나오지만 그 파일들은 이제 프로그램 안에
+   **들어오고 추론된 타입이 e2e `.ts` 로 흘러나간다**. 타입 규율이 없는 `.mjs` 의 모양이 바뀌면
+   `npm run typecheck` 가 붉어질 수 있다 — 손으로 쓴 선언을 고르지 않은 이유의 뒷면이다.
+4. **`moduleResolution: "bundler"` 로 Node 실행 코드를 모형한다**(r1 cr L-5): e2e 와 playwright 설정은
+   Node 가 돌리는데 해석 규칙은 번들러다 — 확장자 없는 지정자가 타입 검사를 지나고 런타임에만 깨진다.
+   `nodenext` 로 바꾸면 e2e 가 끌어오는 `src/**` 의 확장자 없는 import 가 전부 깨지므로 오늘의 선택을
+   유지한다.
+5. **`@types/node` × DOM lib 선언 충돌이 `skipLibCheck: true` 아래 가려져 있다**(r1 cr 열린 질문):
+   `types: ["vite/client","node"]` + `lib: [… "DOM"]` 은 `fetch`·`Response`·`Headers`·`AbortController`
+   에서 선언이 겹치고 어느 쪽이 이기는지 문면으로 서지 않는다. 오늘 e2e 가 그 전역을 쓰지 않아 실해가
+   관측되지 않는다(typecheck exit 0). 그 날은 e2e 가 `fetch` 를 직접 쓰기 시작할 때다.
+6. 덮개 게이트는 `typecheck` 명령이 `tsc [--noEmit] -p <project>` 조각들이라고 본다. `tsc -b` 같은 다른
+   꼴로 바꾸면 **RED 로** 드러난다(조용히 통과하지 않는다) — 그때 이 술어를 함께 고쳐야 한다.
 
 ## 거동 변화
 
@@ -91,3 +135,19 @@ CI 다섯 job 초록 아래 살았다(15K 가 값을 고쳤지만 재발을 막�
 ## 하네스 레인 변경
 
 없음.
+
+## 수정 라운드 1
+
+PR #200 verifier **not-ready**(H-1) · code-reviewer **COMMENT**(medium 4 · low 5) 처리.
+판정 SHA `342b414e0`.
+
+- **H-1 / cr M-1·M-2**: 덮개 게이트가 **지목과 축 여섯**이 아니라 **진단·유효 옵션 전체·명령의 꼴**을
+  재도록 바꿨다. 위 「조용히 비우는 길」 표가 수정 뒤 실측이다.
+- **cr M-3**: W-4 ② 에 `types == ["vite/client"]` 술어를 더했다. 그 전제는 이 slice 가 `@types/node` 를
+  들이면서 비로소 하중을 받는다.
+- **cr M-4 / v M-1**: eslint `ban-ts-comment` 세 형태 금지를 e2e 레인으로 넓혔다. 옵션은 상수 한 자리로
+  두 블록이 나눠 싣는다(뒤 블록이 앞 블록의 같은 규칙 옵션을 덮는 꼴을 이 저장소가 이미 겪었다).
+- **cr L-1 / v L-1**: `include` 와 디스크 훑기의 확장자 집합을 `.ts`·`.tsx`·`.mts`·`.cts` 로 맞췄다.
+- **cr L-2**: `-p` 경로를 절대 경로로 풀어 비교한다(거짓 RED 제거, 실측 0/0).
+- **cr L-3**: e2e 프로그램 전수의 **상한**(⊆ `web/`) 칸을 더했다.
+- **cr L-4·L-5 · 열린 질문**: 위 「알려진 제한」 ③④⑤ 로 등재했다.
