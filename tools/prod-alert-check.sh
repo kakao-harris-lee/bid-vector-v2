@@ -42,14 +42,18 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=42
+EXPECTED_CHECKS=44
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
 DECOY_PID=""
+CURL_DECOY_PID=""
+CURL_DECOY_FILE=""
 _cleanup() {
   [ -z "$SERVER_PID" ] || kill "$SERVER_PID" 2>/dev/null || true
   [ -z "$DECOY_PID" ] || kill "$DECOY_PID" 2>/dev/null || true
+  [ -z "$CURL_DECOY_PID" ] || kill "$CURL_DECOY_PID" 2>/dev/null || true
+  [ -z "$CURL_DECOY_FILE" ] || rm -f "$CURL_DECOY_FILE"
   rm -rf "$T"
 }
 trap _cleanup EXIT
@@ -116,6 +120,53 @@ with open(port_path + ".tmp", "w", encoding="utf-8") as handle:
     handle.write(str(server.server_address[1]))
 os.replace(port_path + ".tmp", port_path)   # 부분 기록이 보이지 않는다(cr L-3)
 server.serve_forever()
+PY
+
+# ── 정적 술어 — **파일로 쓰는 자리가 없다** ────────────────────────────────────
+# 실행 중 관찰로는 못 보는 꼴이 하나 남는다(v R2-1): 고정 경로에 설정을 쓰고 → curl 이 읽고 →
+# 종료 전에 지우는 변이. curl 은 설정을 열자마자 닫으므로 0.05초 폴링이 그 순간을 거의 못 잡고,
+# 전후 차이는 지워진 파일을 못 본다. 그래서 **거동이 아니라 글자 구조**로 한 겹 더 막는다 —
+# 경보 스크립트에 **파일로 쓰는 자리 자체가 없음**을 토큰 수준에서 단언한다.
+#
+# grep 이 아니라 `shlex` 토큰화다(주석·따옴표 안 문자열은 토큰 하나로 묶이므로 설정 문자열의
+# `output = "/dev/null"` 같은 글자가 리다이렉션으로 오독되지 않는다). 술어는 둘이다:
+#   ① 출력 리다이렉션(`>`·`>>`)의 대상은 `/dev/null`·`/dev/fd/*`·`&<숫자>` 뿐이다.
+#   ② 파일을 만드는 낱말(`mktemp`·`tee`·`touch`·`dd`·`cp`·`mv`·`install`·`truncate`)이 없다.
+# 한계는 알려진 제한에 적는다 — 이것은 **이 파일의 글자**에 대한 단언이고 런타임 보증이 아니다.
+cat > "$T/no-file-writes.py" <<'PY'
+import shlex
+import sys
+
+ALLOWED_TARGETS = ("/dev/null", "/dev/stdout", "/dev/stderr")
+FORBIDDEN_WORDS = {"mktemp", "tee", "touch", "dd", "cp", "mv", "install", "truncate"}
+
+
+def redirection(piece):
+    return ">" in piece and set(piece) <= set("<>&|();0123456789-")
+
+
+findings = []
+# `whitespace_split` 은 낱말을 한 토큰으로 묶고, `punctuation_chars` 는 `<>&|();` 를 따로 뗀다.
+lex = shlex.shlex(open(sys.argv[1], encoding="utf-8").read(), posix=False, punctuation_chars=True)
+lex.whitespace_split = True
+pieces = list(lex)
+
+for index, piece in enumerate(pieces):
+    if piece in FORBIDDEN_WORDS:
+        findings.append("파일을 만드는 낱말: " + piece)
+        continue
+    if not redirection(piece):
+        continue
+    target = pieces[index + 1] if index + 1 < len(pieces) else "<EOF>"
+    if piece.endswith("&") and (target.isdigit() or target == "-"):
+        continue
+    if target in ALLOWED_TARGETS or target.startswith("/dev/fd/"):
+        continue
+    findings.append("출력 리다이렉션 대상: " + piece + " " + target)
+
+print(len(findings))
+for one in findings:
+    print(one)
 PY
 
 LOG="" BASE_URL=""
@@ -231,11 +282,17 @@ ALERT_PID=$!
 # 미끼 — 바늘을 **argv 에** 담은 프로세스. `$0` 자리에 둔다(`sleep` 은 남는 인자를 받지 않는다).
 /bin/sh -c 'sleep 3' "$FAKE_CREDENTIAL" &
 DECOY_PID=$!
+# **거짓 RED 의 음성 대조**(v R2-2): cmdline 에 `curl` 글자가 들고 `/tmp` 아래 일반 파일을 쥔 **남의**
+# 프로세스. 아래 fd 축이 이것을 집으면 안 된다 — 같은 host 의 다른 레인이 그런 모양이고, 앞 판은
+# 변이 결과를 통째로 오염시켰다.
+CURL_DECOY_FILE="/tmp/bv-alert-check-curldecoy-$$-${RANDOM}"
+/bin/sh -c 'sleep 3' "curl-decoy" > "$CURL_DECOY_FILE" 2>&1 &
+CURL_DECOY_PID=$!
 
 # **창이 닫힐 때까지 멈추지 않는다.** 앞 판은 증인 셋이 모이면 `break` 했고, 그 조건은 호출자가
 # 띄우기도 **전에** 남의 `curl` 로 채워질 수 있었다 — 변이 ①(자격을 argv 로 올린 판)이 그 틈으로
 # 초록이 됐다(실측). 증인도 「어딘가의 curl」이 아니라 **이 경보 스크립트의 자식 curl** 이다.
-ALERT_PIDS=" " CURL_PPIDS=" " seen_decoy=0 leaked_pids="" disk_leak="" fd_leak=""
+ALERT_PIDS=" " CURL_PPIDS=" " seen_decoy=0 leaked_pids="" disk_leak="" FD_CAND=""
 for ((i = 0; i < 200; i++)); do
   # 창 **안**의 디스크 — 설정이 임시 파일로 지나가면 여기서 잡힌다(창 뒤에 지워져도 잡는다).
   if command grep -rlF -- "$FAKE_CREDENTIAL" "$T/tmpscan" "$T/cwdscan" >/dev/null 2>&1; then
@@ -259,13 +316,15 @@ for ((i = 0; i < 200; i++)); do
       *curl*)
         ppid="$(sed -n 's/^PPid:[[:space:]]*//p' "$d/status" 2>/dev/null || true)"
         [ -z "$ppid" ] || case "$CURL_PPIDS" in *" ${ppid} "*) ;; *) CURL_PPIDS="${CURL_PPIDS}${ppid} " ;; esac
-        # 그 curl 이 **공유 임시 자리의 파일을 열고 있는가** — 쓰고 바로 지우는 변이는 전후 차이로는
-        # 안 잡히고 이 축에서 잡힌다(`$T` 아래는 이 검사 자신의 자리라 뺀다).
+        # 그 curl 이 **공유 임시 자리의 파일을 열고 있는가**. 판정은 **부모가 경보 스크립트인 curl**
+        # 에만 건다(v R2-2) — 앞 판은 cmdline 에 `curl` 글자가 든 **아무 프로세스**나 봐서, 같은 host
+        # 의 다른 셸이 `/tmp` 아래로 출력을 내보내는 동안 변이 결과가 통째로 거짓 RED 가 됐다.
+        # 부모는 한 바퀴 안에서 아직 모를 수 있으므로 **후보로 모아 두고** 창이 닫힌 뒤에 거른다.
         for fdl in "$d"/fd/*; do
           tgt="$(readlink "$fdl" 2>/dev/null || true)"
           case "$tgt" in
             "$T"/*) ;;
-            /tmp/*|/var/tmp/*|/dev/shm/*) fd_leak="${fd_leak:+${fd_leak} }${tgt}" ;;
+            /tmp/*|/var/tmp/*|/dev/shm/*) FD_CAND="${FD_CAND}${ppid} ${tgt}"$'\n' ;;
           esac
         done
         ;;
@@ -294,6 +353,16 @@ wait "$ALERT_PID" || rc=$?
 kill "$DECOY_PID" 2>/dev/null || true
 wait "$DECOY_PID" 2>/dev/null || true
 DECOY_PID=""
+kill "$CURL_DECOY_PID" 2>/dev/null || true
+wait "$CURL_DECOY_PID" 2>/dev/null || true
+rm -f "$CURL_DECOY_FILE"
+
+# 후보 중 **부모가 경보 스크립트인 것**만 판정에 쓴다.
+fd_leak=""
+while IFS=' ' read -r cand_ppid cand_tgt; do
+  [ -n "$cand_ppid" ] || continue
+  case "$ALERT_PIDS" in *" ${cand_ppid} "*) fd_leak="${fd_leak:+${fd_leak} }${cand_tgt}" ;; esac
+done <<< "$FD_CAND"
 _stop_server
 
 [ "$seen_decoy" = 1 ] && _ok "argv 훑개의 양성 대조 — 미끼의 argv 에서 바늘을 찾았다" || _bad "argv 훑개가 미끼도 못 찾는다(판정 공허)"
@@ -339,7 +408,7 @@ else
 fi
 rm -f "$planted"
 
-[ -z "$fd_leak" ] && _ok "창 안에서 curl 이 공유 임시 자리의 파일을 쥐지 않았다" || _bad "curl 의 fd 가 공유 임시 파일을 쥔다:${fd_leak}"
+[ -z "$fd_leak" ] && _ok "창 안에서 **이 스크립트의** curl 이 공유 임시 자리의 파일을 쥐지 않았다(남의 curl 은 세지 않는다)" || _bad "curl 의 fd 가 공유 임시 파일을 쥔다:${fd_leak}"
 [ "$rc" -eq 0 ] && _ok "느린 응답도 끝까지 간다" || _bad "느린 갈래의 종료 코드가 ${rc} 다"
 
 # ── ⑤ 2xx 아님 ────────────────────────────────────────────────────────────────
@@ -560,6 +629,24 @@ _env_variant_ok "= 뒤 공백" \
 _env_variant_ok "따옴표 뒤 CR·공백" \
   'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL="%s" \r\nBIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID="%s"\r\n'
 _stop_server
+
+# ── ⑬ 정적 술어 — 경보 스크립트에 파일로 쓰는 자리가 없다 ────────────────────
+static_out="$(python3 -I "$T/no-file-writes.py" "$ALERT")"
+if [ "$(printf '%s' "$static_out" | head -n1)" = 0 ]; then
+  _ok "경보 스크립트에 파일로 쓰는 자리가 없다(출력 리다이렉션은 /dev/null·fd 뿐 · 파일 생성 낱말 0)"
+else
+  _bad "경보 스크립트에 파일로 쓰는 자리가 있다: $(printf '%s' "$static_out" | tail -n +2 | tr '\n' ' ')"
+fi
+
+# **양성 대조** — 같은 술어가 심은 자리를 찾아낸다(없으면 위 단언이 「술어가 아무것도 안 본다」와
+# 구별되지 않는다). 버릴 사본에 고정 경로 쓰기를 심는다.
+sed 's|^HTTP="$(curl --config.*|CFG=/tmp/x; printf "%s" "$CONFIG" > "$CFG"; HTTP="$(curl --config "$CFG")"|' \
+  "$ALERT" > "$T/planted-writer.sh"
+if [ "$(python3 -I "$T/no-file-writes.py" "$T/planted-writer.sh" | head -n1)" != 0 ]; then
+  _ok "정적 술어의 양성 대조 — 심은 파일 쓰기를 찾는다"
+else
+  _bad "정적 술어가 심은 파일 쓰기도 못 찾는다(판정 공허)"
+fi
 
 # ── 합계 ──────────────────────────────────────────────────────────────────────
 total=$((PASS + FAIL))

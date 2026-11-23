@@ -286,10 +286,14 @@ BIDVECTOR_PROD_LOCK_DIR=/run/lock/bidvector-v2
 # **경합을 종료 코드로 못박는다**(v F1). `flock -n` 의 실패를 전부 경합으로 보면 **경합이 아닌 실패**
 # (EBADF 65 · `flock` 부재 127 · 사용법 64)까지 busy 로 올라가고, 그러면 훑기가 `4` 로 끝나 운영의
 # `SuccessExitStatus=4` 가 그것을 **영구히 삼킨다**(실측: `PATH=/nonexistent` 로 부르면 busy 가 섰다).
-# `-E <코드>` 는 **경합일 때만** 그 코드를 돌려주므로(util-linux 2.39.3 실측: 경합 70 · 획득 0 ·
+# `-E <코드>` 는 **경합일 때만** 그 코드를 돌려주므로(util-linux 2.39.3 실측: 경합 = 준 코드 · 획득 0 ·
 # EBADF 65 · 부재 127 · 모르는 옵션 64) 갈림이 열거가 아니라 **구성**으로 닫힌다. `-E` 를 모르는
 # util-linux 는 64 를 내므로 그 host 에서는 전부 전제 실패(`3`)다 — fail-closed 다.
-_PROD_LOCK_BUSY_CODE=70
+#
+# **코드는 sysexits(64~78) 밖에서 고른다**(v R2-3). util-linux 는 자기 오류에 그 범위를 쓰므로(실측
+# 64·65), 범위 안의 값을 쓰면 「경합」과 「도구 오류」가 언젠가 같은 수로 만날 수 있다. 200 은 그
+# 범위 밖이고 셸이 특별히 보는 자리(126·127·128+n)도 아니다 — `( exit 200 )` 이 200 으로 돌아옴을 쟀다.
+_PROD_LOCK_BUSY_CODE=200
 _prod_lock() {
   local f="$1" what="$2" fd rc=0
   _PROD_LOCK_ERR=""

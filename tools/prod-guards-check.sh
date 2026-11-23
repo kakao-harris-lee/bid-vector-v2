@@ -446,11 +446,14 @@ _expect_rc 3 "잠금 **파일을 열지 못하면** 전제 실패(3)다 — 미�
 chmod 700 "$T/state"
 
 # ⓑ **경합이 아닌 `flock` 실패** — 0 이 아닌 종료를 전부 경합으로 보면 `SuccessExitStatus=4` 가
-# 그 실패를 영구히 삼킨다. EBADF(65)와 부재(127) 둘을 가짜 flock 으로 민다.
-SHIM_FLOCK_RC=65 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
-_expect_rc 3 "flock 이 EBADF(65)로 깨지면 전제 실패(3) — 경합으로 접지 않는다"
-SHIM_FLOCK_RC=127 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
-_expect_rc 3 "flock 이 PATH 에 없으면(127) 전제 실패(3)"
+# 그 실패를 영구히 삼킨다. 가짜 flock 으로 **다섯 꼴**을 민다. 둘(65·127)만 재던 앞 판은
+# 「65·127 이 아니면 busy」 같은 **열거형 회귀**가 초록이었다(v R2-3 실측) — 그래서 옛 기본 경합 코드
+# `1`, 사용법·`-E` 미지원의 `64`, 그리고 **앞 판이 경합 코드로 쓰던 `70`** 을 더한다. 마지막 하나가
+# 중요하다: 코드를 sysexits 밖으로 옮긴 뒤에도 옛 값이 busy 로 서면 그 이사가 헛되다.
+for frc in 1 64 65 70 127; do
+  SHIM_FLOCK_RC="$frc" _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+  _expect_rc 3 "flock 종료 ${frc} 는 전제 실패(3) — 경합으로 접지 않는다"
+done
 
 # ⓒ **`_prod_project_lock` 의 이른 return 갈래** — 잠금 **자리**의 소유자·권한이 어긋난 경우다. 그 갈래는
 # `_prod_lock` 을 부르기도 전에 돌아서므로 위 ⓐ·ⓑ 로는 가를 수 없다. 실측: `_PROD_LOCK_BUSY=1` 을
