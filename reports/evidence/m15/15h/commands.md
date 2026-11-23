@@ -22,6 +22,7 @@ evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다.
 | G-2 | 같은 명령(분할 뒤) | 0 | 클래스 **일곱** · test 44 · 실패 0(러너 5 · 회전 11 · 멈춤 9) |
 | G-3 | `check --continue` | **1** | 실패 **하나** — `:app:unusedImportGate` 가 분할이 남긴 미사용 import 를 잡았다. 나머지 432 task 통과 |
 | G-4 | `check --continue`(import 제거 뒤) | **0** | 424 task · BUILD SUCCESSFUL. acceptance 통과 |
+| G-5 | `check --continue`(**main 병합 뒤** — PR #196/M15/15I 를 들였다) | — | **정본은 PR 조치 코멘트다**(evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다). 병합이 바꾼 것은 `capability-map.md` 의 행 하나와 15I 의 산출물이고, 그중 Kotlin `check` 에 닿는 것은 `leak-patterns.txt`·`LeakPatternGateTask.kt` 다 — 그 확장된 패턴으로 이 slice 의 evidence 를 다시 훑어 **매치 0** 임을 먼저 쟀다(L-3) |
 
 ## M — 변이 실측
 
@@ -46,6 +47,7 @@ evidence 는 자기 마지막 커밋의 post-state 를 담을 수 없다.
 |---|---|---|---|
 | L-1 | `grep -rniE -f config/quality/leak-patterns.txt <in_scope 경로들> reports/evidence/m15/15h/` | 0 | **evidence 디렉터리 매치 0.** 산출물 쪽 매치는 전부 **착수 전부터 있던 줄**이다(심은 가짜 메시지와 그 부재를 단언하는 두 줄 · 컨테이너 test 의 공개 test 자격). 개수 불변 실측: 평가 test 디렉터리의 해당 어휘 줄이 base 3 · head 3 이고 **분할로 자리만 옮겼다** |
 | L-2 | 육안 — Telegram id·사업자 정보 | — | 이 slice 의 변경에 그 축의 값이 **없다**(계정 id 는 test 의 `1L`~`22L` 합성값) |
+| L-3 | 같은 명령 — **main 병합 뒤의 확장된 패턴 파일로** 다시(15I 가 사업자등록번호 꼴을 더했다) | 0 | evidence 디렉터리 **매치 0** 그대로. 산출물 쪽도 새 꼴 매치 0 이고, 앞서 센 기존 매치만 남는다 |
 
 루트 `leakPatternGate` 의 scanRoot 는 `reports/evidence` 이고, 그 아래 이 slice 의 신규 파일은
 매치가 0 이라 baseline 등재가 필요 없다 — G-4 와 rollback ⑥ 이 그 게이트를 초록으로 지났다.

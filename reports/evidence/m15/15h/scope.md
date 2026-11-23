@@ -2,7 +2,7 @@
 milestone: M15
 slice: 15h
 base_sha: ff8e0cad42c5c114ee30b42ca4318252bbf35c5f
-head_sha: f9bd13cf915e46beb5387576c8c229139aaf8d96   # 마지막 **산출물** 커밋. evidence 커밋이 뒤에 붙으므로 판정 SHA 는 PR head 다
+head_sha: 7fc13c2eb642982ac11538cab4997e8e172b3077   # main(PR #196) 병합 커밋 = 마지막 **산출물** 커밋. evidence 커밋이 뒤에 붙으므로 판정 SHA 는 PR head 다
 in_scope:
   - app/src/main/kotlin/bidvector/app/evaluation/EvaluationCommitRunner.kt
   - app/src/main/kotlin/bidvector/app/wiring/EvaluationWiring.kt
@@ -95,6 +95,21 @@ cron 에 대해서도 가장 거칢이 작은」 선택이고, 특정 요일 패
 `git log --oneline ff8e0cad42c5c114ee30b42ca4318252bbf35c5f..HEAD -- CLAUDE.md .claude/` —
 **없음**. 이 slice 의 range 에 하네스 레인 커밋이 없고, 그래서 rollback 목록도 그 경로를 담지
 않는다. (리뷰 요청 시점에 재산출한다 — 목록이 비면 「없음」으로 적는다.)
+
+## 계약 갱신 — 2026-11-23, main 병합
+
+PR #196(M15/15I)이 머지돼 `docs/discovery/capability-map.md` 가 **공유 파일이 됐다**(두 레인이 같은
+`OPEN-M15-TEST-RESIDUE` 행을 다시 썼다). 이 브랜치에 main 을 **병합**했고(rebase 아님), 해소는
+합집합이다 — ⓐ 는 PR #195, ⓑⓒⓓⓔ 는 PR #196 이 닫은 것으로 적고 **ⓕ 를 새로 세웠다**
+(PR #196 verifier L-r1-1 — 설정 여정의 속성 채움 하한이 이름의 가짓수가 아니라 `length` 를 세어,
+두 목록을 같은 속성 네 벌로 바꿔도 초록이다. 닫는 자리는 `new Set(...).size`).
+
+그 결과 **rollback 의 복원 원천이 착수 base 에서 병합한 main SHA 로 옮겨간다** — 착수 base 에서
+복원하면 15I 의 줄까지 지운다. 셋째 단언을 재서 `capability-map.md` 하나가 두 원천에서 다름을
+확인했고, 그래서 ①~⑥ 을 **새 원천 기준으로 전부 다시 냈다**(rollback.md).
+
+in_scope 는 바뀌지 않는다 — 병합으로 들어온 15I 의 산출물은 이 slice 의 것이 아니고 복원 목록
+밖이다.
 
 ## 인계 — 이 slice 가 만지지 않은 자리
 
