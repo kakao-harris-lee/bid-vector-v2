@@ -276,12 +276,20 @@ BIDVECTOR_PROD_LOCK_DIR=/run/lock/bidvector-v2
 
 # <잠금 파일> <무엇> → `flock -n` 으로 잡는다(기다리지 않는다). 실패하면 1 과 `_PROD_LOCK_ERR` 를
 # 남긴다 — 문면의 접두는 호출자마다 다르므로 끊는 것은 호출자가 한다.
+#
+# **경합과 전제 실패를 가른다**(M15/15M, cr H-1). 이 함수가 1 을 돌려주는 사유는 두 부류다: 자리·권한이
+# 어긋난 **전제 실패**와, 남이 쥐고 있어 **이번만 못 잡은 경합**이다. 뒤엣것은 §9.1 이 「다음 주기로
+# 미룬다」고 적는 **설계된 정상**이라 경보를 울리면 안 된다. 호출자가 그 둘을 **문면으로** 가르면
+# 스타일 하나로 열리므로 여기서 `_PROD_LOCK_BUSY` 로 넘긴다(경합일 때만 `1`). 읽지 않는 호출자는
+# 지금까지와 같다.
 _prod_lock() {
   local f="$1" what="$2" fd
   _PROD_LOCK_ERR=""
+  _PROD_LOCK_BUSY=""
   exec {fd}>>"$f" || { _PROD_LOCK_ERR="${what} 잠금 파일을 열지 못했다: $f"; return 1; }
   flock -n "$fd" || {
     _PROD_LOCK_ERR="다른 반입·되돌림·훑기가 ${what}에서 돌고 있다($f) — 끝난 뒤 다시"
+    _PROD_LOCK_BUSY=1
     eval "exec ${fd}>&-" 2>/dev/null || true
     return 1
   }
@@ -293,6 +301,7 @@ _prod_lock() {
 _prod_project_lock() {
   local proj="$1" owner mode
   _PROD_LOCK_ERR=""
+  _PROD_LOCK_BUSY=""
   mkdir -p "$BIDVECTOR_PROD_LOCK_DIR" 2>/dev/null \
     || { _PROD_LOCK_ERR="잠금 디렉터리를 만들지 못했다: ${BIDVECTOR_PROD_LOCK_DIR}"; return 1; }
   # **자리의 소유자와 권한을 본다.** `/run/lock` 은 sticky·world-writable(1777)이고 tmpfs 라 재부팅마다

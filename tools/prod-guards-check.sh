@@ -394,6 +394,29 @@ _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 0 "양성 — 잔존 0 · 같은 커밋 · 같은 프로젝트면 훑는다"
 _expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-sweep" "일회 컨테이너 이름을 고정해 띄운다"
 
+# M15/15M(cr H-1) — **미룸은 4, 전제 실패는 3.** 둘이 같은 코드면 §9.5 의 실패 경보가 반입·되돌림·손
+# 실행 때마다 진짜 사건과 같은 문면으로 울린다. 위 양성 대조(`_expect_rc 0`)가 **잠금이 비어 있을 때**
+# 를 이미 쟀으므로, 아래 둘은 「잡혀 있을 때만 4」를 가른다. 위의 `_expect_rc 3` 들이 음성 대조다 —
+# 전제 실패는 여전히 3 이다.
+_hold_lock() { # <잠금 파일> — 이 검사 셸이 쥐고, 호출자가 `_release_lock` 으로 놓는다
+  exec {HOLD_FD}>>"$1" || _die "경합 대조의 잠금 파일을 열지 못했다: $1 — 판정 불가" 2
+  flock -n "$HOLD_FD" || _die "경합 대조의 잠금을 잡지 못했다: $1(남이 쥐고 있다) — 판정 불가" 2
+}
+_release_lock() { eval "exec ${HOLD_FD}>&-" 2>/dev/null || true; }
+
+_hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+_run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 4 "프로젝트 잠금이 잡혀 있으면 **미룬다**(4) — 전제 실패(3)가 아니다"
+_expect_no_log ' run ' "미룸이 일회 컨테이너 앞에서 끝난다"
+_release_lock
+
+_hold_lock "$T/state/.lock"
+_run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
+_expect_rc 4 "상태 디렉터리 잠금이 잡혀 있어도 **미룬다**(4)"
+_expect_no_log ' run ' "그 미룸도 일회 컨테이너 앞에서 끝난다"
+_release_lock
+rm -f "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+
 # 신호 경로 — trap 이 **자기 일회 컨테이너만** 치운다.
 _signal_case() { # <신호> <기대 종료 코드>
   local sig="$1" want="$2" pid pg i n
@@ -428,18 +451,30 @@ echo "== runbook — ExecStopPost 가 조건 없이 돌지 않는가"
 # `ExecStopPost=…docker rm -f <고정 이름>` 은 수동 run 이 도는 중에 타이머가 발화하면(그 run 은 잠금에서
 # exit 3) **남의 컨테이너**를 지운다.
 #
-# **글자 하나가 아니라 조건식 전문을 잠근다**(v r2 F-1): 조항 셋(성공 건너뜀 · `exit 3` 건너뜀 · 그 뒤의
-# `docker rm -f <…-app-run-sweep>`)과 **`$$` 형태**까지 본다. `SERVICE_RESULT` 글자만 보던 앞 판은
-# 「`|| [ "$$EXIT_STATUS" = 3 ]` 삭제」와 「`${SERVICE_RESULT}`(systemd 가 미리 빈 값으로 펼친다)」가
-# 둘 다 초록이었다 — exit 3 조항은 v M-1 시나리오를 막는 바로 그 조항이다.
+# **글자 하나가 아니라 조건식 전문을 잠근다**(v r2 F-1): 조항 넷(성공 건너뜀 · `exit 3` 건너뜀 ·
+# **`exit 4` 건너뜀** · 그 뒤의 `docker rm -f <…-app-run-sweep>`)과 **`$$` 형태**까지 본다.
+# `SERVICE_RESULT` 글자만 보던 앞 판은 「`|| [ "$$EXIT_STATUS" = 3 ]` 삭제」와
+# 「`${SERVICE_RESULT}`(systemd 가 미리 빈 값으로 펼친다)」가 둘 다 초록이었다 — exit 3 조항은
+# v M-1 시나리오를 막는 바로 그 조항이다. **`4` 조항은 M15/15M 이 더했다**: 미룸은 자기 일회
+# 컨테이너를 띄우지도 않으므로(위 `_expect_no_log ' run '`) 지울 것이 없고, 조건이 없으면 그때도
+# 돌아 **남의 컨테이너**를 지운다(exit 3 조항과 같은 사유).
 RB=docs/runbook/m7-7f-production.md
-ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| .*docker rm -f [^ ]*-app-run-sweep'
+ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| \[ "\$\$EXIT_STATUS" = 4 \] \|\| .*docker rm -f [^ ]*-app-run-sweep'
 esp_n="$(grep -cE '^ExecStopPost=' "$RB" || true)"
 esp_cond="$(grep -cE "$ESP_WANT" "$RB" || true)"
 if [ "$esp_n" -ge 1 ] && [ "$esp_n" = "$esp_cond" ]; then
-  _ok "runbook 의 ExecStopPost ${esp_n} 줄이 모두 조건식 전문과 같다(성공·exit 3 건너뜀 · \$\$ 형태)"
+  _ok "runbook 의 ExecStopPost ${esp_n} 줄이 모두 조건식 전문과 같다(성공·exit 3·exit 4 건너뜀 · \$\$ 형태)"
 else
   _bad "runbook 의 ExecStopPost ${esp_n} 줄 중 ${esp_cond} 만 조건식 전문과 같다 — 조항이 빠지거나 \$\$ 형태가 아니면 남의 run 을 지우는 길이 다시 열린다"
+fi
+
+# M15/15M(cr H-1) — **`SuccessExitStatus=4` 가 drop-in 에 있어야** 미룸이 `OnFailure` 를 끌지 않는다.
+# 스크립트 쪽만 고치면 종료 코드는 갈렸는데 systemd 는 여전히 둘 다 실패로 보고, 경보는 그대로 울린다
+# (거동이 갈리는 자리가 둘이다 — 한쪽만 고친 판이 조용히 통과하지 않게 여기서 함께 본다).
+if grep -qE '^SuccessExitStatus=([^#]*[^0-9])?4([^0-9]|$)' "$RB"; then
+  _ok "runbook 의 경보 drop-in 이 SuccessExitStatus 로 4 를 실패에서 뺀다"
+else
+  _bad "runbook 에 SuccessExitStatus=…4 가 없다 — 미룸(exit 4)이 그대로 OnFailure 를 끌어 경보가 울린다"
 fi
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"

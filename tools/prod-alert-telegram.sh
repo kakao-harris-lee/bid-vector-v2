@@ -35,6 +35,9 @@
 set -euo pipefail
 # 자격이 trace 로 새지 않게 한다 — 부모가 `SHELLOPTS=xtrace` 를 물려줄 수 있다.
 set +x
+# 아래의 글자 범위 술어(`[A-Za-z0-9…]`)가 로캘 collation 을 타지 않게 한다 — 15I 가 꼴 경계에서 같은
+# 이유로 고른 것과 같은 자리다. 축이 로캘과 무관해야 두 host 가 같은 답을 낸다.
+export LC_ALL=C
 
 DEFAULT_ENV_FILE=/etc/bidvector-v2/relay.env
 DEFAULT_BASE_URL=https://api.telegram.org
@@ -62,15 +65,32 @@ done
   || _die "unit 이름 모양이 아니다 — [A-Za-z0-9@:._-] 128자 이하 · .service·.timer 따위로 끝난다" 2
 
 # env 파일에서 한 키의 값을 읽는다. **파일을 실행하지 않는다** — `KEY=VALUE` 줄만 본다(마지막이
-# 이긴다, systemd 와 같다). 값을 찍지 않는다. 파일을 읽지 못하면 빈 값으로 돌아가고 호출자가 환경을 본다.
+# 이긴다). 값을 찍지 않는다. 파일을 읽지 못하면 빈 값으로 돌아가고 호출자가 환경을 본다.
+#
+# **systemd 의 `EnvironmentFile` 과 같은 값을 내야 한다**(v M1 · cr M-8). 이 host 의
+# `/etc/bidvector-v2/relay.env` 는 `deploy:deploy 0600` 이라 **이 해석기가 운영에서 쓰인다**. 두 갈래가
+# 다른 값을 내면 같은 파일이 relay 에서는 돌고 경보에서는 「Bot API 모양이 아니다」로 선다 — 운영자는
+# 파일을 열어 **멀쩡해 보이는** 값을 보게 된다. 그래서 앞뒤 공백·탭·CR 을 따옴표 **밖에서** 버리고,
+# 그 뒤에 따옴표를 벗긴다(벗긴 뒤 한 번 더 버리지 않는다 — 따옴표 **안**의 공백은 값이다).
+# 손으로 고치는 파일에서 가장 흔한 artifact 가 끝 공백과 CRLF 다.
+_trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"   # 앞
+  s="${s%"${s##*[![:space:]]}"}"   # 뒤 (`\r` 은 [:space:] 다)
+  printf '%s' "$s"
+}
+
 _env_file_value() {
   local key="$1" line value=""
   [ -r "$ENVF" ] || { printf '%s' ''; return 0; }
   while IFS= read -r line || [ -n "$line" ]; do
+    # `=` 앞 공백은 **받지 않는다** — systemd 도 그 줄의 키를 이름으로 보지 않는다(더 너그러우면 그것도
+    # 두 갈래가 갈리는 자리다). 줄 **앞** 공백은 systemd 처럼 버린다.
     if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] && [ "${BASH_REMATCH[1]}" = "$key" ]; then
       value="${BASH_REMATCH[2]}"
     fi
   done < "$ENVF"
+  value="$(_trim "$value")"
   if [[ "$value" =~ ^\"(.*)\"$ ]] || [[ "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
   printf '%s' "$value"
 }
@@ -93,6 +113,9 @@ CREDENTIAL="$(_value_of "$KEY_CREDENTIAL")"
 CHAT_ID="$(_value_of "$KEY_CHAT_ID")"
 BASE_URL="$(_value_of "$KEY_BASE_URL")"
 [ -n "$BASE_URL" ] || BASE_URL="$DEFAULT_BASE_URL"
+# 끝 `/` 하나는 떼고 본다(cr M-3 · v L1). 이 키는 §13.2 가 relay 와 **공유**하는 손잡이이고, 그 절은
+# 「끝에 `/` 없이」를 다른 키에만 적는다 — relay 에서 도는 값으로 경보만 조용히 서는 자리를 없앤다.
+BASE_URL="${BASE_URL%/}"
 
 [ -n "$CREDENTIAL" ] || _die "${KEY_CREDENTIAL} 이 비어 있다 — ${ENVF} 또는 unit 의 EnvironmentFile 을 본다(runbook §13.2)" 2
 [ -n "$CHAT_ID" ] || _die "${KEY_CHAT_ID} 가 비어 있다 — ${ENVF} 또는 unit 의 EnvironmentFile 을 본다(runbook §13.2)" 2
@@ -101,7 +124,14 @@ BASE_URL="$(_value_of "$KEY_BASE_URL")"
 [[ "$CREDENTIAL" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || _die "${KEY_CREDENTIAL} 이 Bot API 모양이 아니다" 2
 [[ "$CHAT_ID" =~ ^(-?[0-9]{1,32}|@[A-Za-z0-9_]{5,32})$ ]] || _die "${KEY_CHAT_ID} 가 chat id 모양이 아니다" 2
 # 경로를 받지 않는다 — 스킴·호스트·포트까지다. 뒤에서 이 값이 URL 의 앞머리가 되므로 모양이 곧 경계다.
-[[ "$BASE_URL" =~ ^https?://[A-Za-z0-9._-]+(:[0-9]{1,5})?$ ]] || _die "${KEY_BASE_URL} 모양이 아니다 — 스킴·호스트·포트까지만 적는다" 2
+#
+# **평문은 루프백에만 연다**(cr M-2). Bot API 는 자격을 **경로**에 싣는다 — `http://` 한 줄이면 이
+# 스크립트가 argv 에서 막은 바로 그 값이 선로에 평문으로 오른다. `http` 가 필요한 자리는
+# `tools/prod-alert-check.sh` 의 `127.0.0.1` 하나뿐이고, 그 예외를 **호스트로** 못박는다.
+if ! [[ "$BASE_URL" =~ ^https://[A-Za-z0-9._-]+(:[0-9]{1,5})?$ ]] \
+   && ! [[ "$BASE_URL" =~ ^http://(127\.0\.0\.1|\[::1\]|localhost)(:[0-9]{1,5})?$ ]]; then
+  _die "${KEY_BASE_URL} 모양이 아니다 — https 의 스킴·호스트·포트까지만 적는다(평문 http 는 루프백만)" 2
+fi
 
 command -v curl >/dev/null 2>&1 || _die "curl 이 필요하다" 2
 

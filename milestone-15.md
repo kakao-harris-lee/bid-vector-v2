@@ -193,7 +193,7 @@ pass) → 반입 dry-run 깨끗 → apply(운영자가 직접 실행 — 세션�
   지시(2026-11-23)로 **15I(#196)가 더했다** — 추적 파일 전수 실측의 매치 20 이 전부 합성이었고 기존 baseline 에 한 줄만
   등재했다. 자리 구분 하이픈 꼴만 보고(공백·점·전각·구분 없는 저장 꼴은 못 본다), 비숫자 경계로 써서 게이트(Java)와
   `tools/db-rehearsal.sh`(GNU grep)가 모든 로캘에서 같은 줄을 잡는다. `db-rehearsal.sh` 에는 allowlist 가 없다(15I 제한 8).
-- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 **15M 이 닫았다** — `tools/prod-alert-telegram.sh` + systemd `OnFailure=` drop-in(runbook §9.5), 거동은 `tools/prod-alert-check.sh` 가 CI 매 PR 에서 잰다. **설치는 운영자 몫으로 남는다**(반입 뒤 사본 복사 + drop-in + `daemon-reload`).
+- 알림 훑기: `<저장소>` 를 release 커밋으로 옮긴 뒤 첫 run(2026-11-23 07:30)이 `exit=COMPLETE(0)` 으로 성공했다. 훑기 실패 경보는 **15M 이 닫았다** — `tools/prod-alert-telegram.sh` + systemd `OnFailure=` drop-in(runbook §9.5), 거동은 `tools/prod-alert-check.sh` 가 CI 매 PR 에서 잰다. 같은 slice 에서 **미룸(잠금 경합)을 `exit 4` 로 갈라** 설계된 정상이 경보를 울리지 않게 했다(drop-in 의 `SuccessExitStatus=4` · 리뷰 라운드 1). **설치는 운영자 몫으로 남는다**(반입 뒤 사본 복사 + drop-in + `daemon-reload`).
 - `rel-5a2f98ba7402` 에 없는 15F·15H 거동은 다음 release 에 실린다(반입 apply 는 운영자).
 
 ### 이 마일스톤에서 배운 것
