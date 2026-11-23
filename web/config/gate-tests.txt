@@ -266,3 +266,8 @@ scripts/rail-screens.test.mjs
 # 돌지 않으므로**(되돌림이 성공하는 한) 거기서는 진단을 버리든 보존하든 같은 값이다 — 방어
 # 부재와 미측정이 같아지는 꼴이다. 등재가 그 측정이 수집에서 조용히 빠지지 않게 든다.
 e2e/harness/journey-teardown.test.mjs
+# M15/15L — e2e 타입 검사 층(`OPEN-M15-E2E-TYPECHECK`)이 **덮는 자리와 그 기준**. 그 층을 조용히
+# 비우는 길 셋(typecheck 에서 둘째 프로젝트가 빠짐 · `include` 가 일부만 맞히도록 좁아짐 ·
+# strict 축이 약해짐)은 전부 tsc 를 초록으로 둔 채 지나간다 — 그 자리를 이 test 가 받으므로
+# 수집에서 빠지면 층이 말만 남는다. 음성 대조가 같은 파일에 있다(화면 프로그램 하나로는 못 덮는다).
+scripts/e2e-typecheck-coverage.test.mjs
