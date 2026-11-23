@@ -434,6 +434,10 @@ const EXEMPT_FIELD_SCANNED_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-la
  * `[] == []` 이고, 아래 심기 루프는 한 번도 돌지 않으며, 나머지 양성 대조 둘(③④)은 입력칸의
  * `value` 로 심으므로 속성 축이 꺼진 줄 모르고 초록이다. 그래서 **크기 하한**을 먼저 잰다:
  * 계약이 말하는 속성 넷이 모집단의 하한이고, 느는 것은 등식이 받는다.
+ *
+ * 하한은 **원소 수가 아니라 구별되는 이름 수**로 센다(PR #196 verifier L-r1-1). `length` 로
+ * 세면 두 목록을 같은 속성 네 벌로 바꿔도 하한과 등식이 함께 초록이다 — 정렬한 두 배열이
+ * 같고 길이도 넷이기 때문이다.
  */
 const EXEMPT_FIELD_SCANNED_ATTRIBUTE_FLOOR = 4;
 
@@ -441,11 +445,11 @@ function assertExemptScanPopulationMatches(): void {
   const control = [...EXEMPT_FIELD_SCANNED_ATTRIBUTES].sort();
   const predicate = [...SCANNED_ATTRIBUTES].sort();
   expect(
-    predicate.length,
+    new Set(predicate).size,
     '술어가 훑는 속성 모집단이 계약의 하한 아래다 — 빈 목록 둘은 등식으로 가려진다',
   ).toBeGreaterThanOrEqual(EXEMPT_FIELD_SCANNED_ATTRIBUTE_FLOOR);
   expect(
-    control.length,
+    new Set(control).size,
     '이 대조의 목록이 계약의 하한 아래다 — 심지 않으면 재는 것이 없다',
   ).toBeGreaterThanOrEqual(EXEMPT_FIELD_SCANNED_ATTRIBUTE_FLOOR);
   expect(
