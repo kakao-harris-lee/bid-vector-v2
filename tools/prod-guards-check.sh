@@ -452,6 +452,30 @@ _expect_rc 3 "flock 이 EBADF(65)로 깨지면 전제 실패(3) — 경합으로
 SHIM_FLOCK_RC=127 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 3 "flock 이 PATH 에 없으면(127) 전제 실패(3)"
 
+# ⓒ **`_prod_project_lock` 의 이른 return 갈래** — 잠금 **자리**의 소유자·권한이 어긋난 경우다. 그 갈래는
+# `_prod_lock` 을 부르기도 전에 돌아서므로 위 ⓐ·ⓑ 로는 가를 수 없다. 실측: `_PROD_LOCK_BUSY=1` 을
+# 그 함수 진입부에 놓는 변이가 ⓐ·ⓑ 를 포함한 68 건을 **그대로 초록**으로 통과한다.
+#
+# 운영 자리(`/run/lock/bidvector-v2`)는 **건드리지 않는다**(이 파일의 머리말 — 모드를 잠깐 바꾸는 것도
+# 같은 자리를 쓰는 반입·되돌림과 겹친다). 대신 **술어를 직접 몰아** 버릴 자리에서 잰다: 호출 경로의
+# 종료 코드 매핑(`_deferred_or_precondition`)은 ⓐ·ⓑ 와 위 경합 둘이 이미 잠갔으므로, 여기서 닫을 것은
+# 「이 갈래에서 busy 가 서지 않는다」 하나다.
+_probe_lock_dir() { # <자리> → 0 획득 · 8 거절인데 busy 가 섰다 · 9 거절이고 busy 가 아니다
+  (
+    BIDVECTOR_PROD_LOCK_DIR="$1"
+    _prod_project_lock "${PROJ}-probe2" >/dev/null 2>&1 && exit 0
+    [ -n "${_PROD_LOCK_BUSY:-}" ] && exit 8
+    exit 9
+  )
+}
+mkdir -p "$T/lockdir-ok" "$T/lockdir-gw"
+chmod 755 "$T/lockdir-ok"
+chmod 775 "$T/lockdir-gw"   # group 쓰기 — 잠금 파일을 지워 우회할 수 있는 자리다
+RUN_RC=0; _probe_lock_dir "$T/lockdir-ok" || RUN_RC=$?
+_expect_rc 0 "양성 — 소유·권한이 맞는 자리에서는 잠금을 잡는다(술어가 전부 거절하지 않는다)"
+RUN_RC=0; _probe_lock_dir "$T/lockdir-gw" || RUN_RC=$?
+_expect_rc 9 "잠금 **자리**의 group 쓰기가 열려 있으면 거절하고 **미룸이 아니다**(busy 가 서지 않는다)"
+
 # 신호 경로 — trap 이 **자기 일회 컨테이너만** 치운다.
 _signal_case() { # <신호> <기대 종료 코드>
   local sig="$1" want="$2" pid pg i n
