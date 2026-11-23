@@ -8,6 +8,7 @@ head_sha: <리뷰 요청 시점에 기입>
 in_scope:
   - web/e2e/journey/settings.spec.ts
   - docs/discovery/capability-map.md
+  - milestone-15.md                          # 수정 라운드 1 (cr M-3)
   - reports/evidence/m15/15j/
 out_of_scope:
   - 술어(privateValues.ts)와 그 밖의 여정 spec — 하한이 세는 방식만 바꾼다
@@ -43,3 +44,16 @@ rollback: reports/evidence/m15/15j/rollback.md
 
 - 술어 대조는 판정식을 옮겨 적은 사본으로 쟀다. 실물 spec 의 「네 벌」 변이 RED 는 여정 실행이
   필요하고 그 실측은 verifier 몫이다.
+
+## 하네스 레인 변경
+
+없음 — `<base>..HEAD` 에 `CLAUDE.md`·`.claude/**` 커밋이 없다.
+
+## 수정 라운드 1 (장부층만 — spec 무편집)
+
+PR #198 code-reviewer 지적 처리. 반영: M-3(`milestone-15.md` 의 ⓕ 줄) · M-4(`commands.md` 신설) ·
+M-5(위 절) · L-2(rollback 유효성 술어에 evidence 경로). 합리적 거부: M-1(양쪽 목록 동시 치환) 과
+verifier L-1(대소문자 변형 네 벌) — 둘 다 리터럴(= 계약 문면) 자체를 바꾸는 변이라 이 대조의 위협
+모델 밖이다. 같은 리터럴을 둘째 상수로 복제해도 같은 꼴의 사본일 뿐이다. 보류: L-1(head_sha
+자리표시자 — 15I 관례) · L-3(실패 문면 — spec 을 다시 열 가치가 없다) · L-4(touchMeasure.ts 타입
+누락 — 범위 밖, 오늘 거동 불변).
