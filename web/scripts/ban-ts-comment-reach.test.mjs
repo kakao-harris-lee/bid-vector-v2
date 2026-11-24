@@ -52,6 +52,9 @@ await eslint.calculateConfigForFile(resolve(webRoot, 'src/display/warm.ts'));
 const STRICT_PLACES = [
   'src/x.ts',
   'src/x.tsx',
+  // r1 cr L1 — 화면 블록의 확장자가 둘이던 동안 이 두 자리는 상속 기본값(`[2]`)이었다.
+  'src/x.mts',
+  'src/x.cts',
   'src/deep/nested/x.ts',
   'e2e/x.ts',
   'e2e/x.tsx',
@@ -97,6 +100,11 @@ describe('ban-ts-comment 가 미치는 범위 (OPEN-M15-SRC-TS-COMMENT-DISABLE (
    * 그 자리들이 **방어가 없다는 뜻은 아니다** — `vite.config.ts`·`scripts/**` 는 어느 TS
    * 프로그램에도 없고(15L 알려진 제한 ①), e2e 프로그램이 끌어들이는 `.ts`·`.mjs` 는
    * `scripts/e2e-typecheck-coverage.test.mjs` 의 두 프로그램 전수 칸이 받는다.
+   *
+   * **이 칸은 강화 방향에서 뒤집힌다 — 의도한 구조 래칫이다**(r1 cr L3). 금지를 뿌리 블록
+   * (모든 `.ts` 를 받는 glob)으로 옮기는 **더 엄격한** 편집이면 이 칸이 RED 가 된다. 그때 고칠 것은
+   * 금지가 아니라 이 칸이다: 위 등식이 「두 블록의 glob 에서 온다」는 주장을 잃지 않으려면 다시
+   * 적어야 하고, 그 편집이 **조용히** 지나가지 않는 것이 이 칸의 값이다.
    */
   it('두 블록 밖은 상속 기본값이다 — 금지가 뿌리에서 오지 않는다', async () => {
     const outside = await eslint.calculateConfigForFile(resolve(webRoot, 'vite.config.ts'));

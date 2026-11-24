@@ -144,6 +144,21 @@ if (include === undefined || include.length !== 1 || include[0] !== 'src') {
   fail(`include 가 ["src"] 가 아니다: ${JSON.stringify(config.include)}`);
 }
 
+// **`exclude` 는 없어야 한다**(M15/15O r1 — cr H1). `include` 를 못박는 것만으로는 프로그램의 전수가
+// 서지 않는다: `"exclude": ["src/**/*.test.ts"]` 같은 **저장소 밖에서 흔한 관용구** 한 줄이면 화면
+// 파일이 프로그램에서 빠지는데 `include` 는 `["src"]` 그대로라 위 술어가 초록이다(실측: 그 한 줄에
+// src 안 113 → 93, 두 줄이면 68). 빠진 파일은 어느 TS 프로그램에도 없으므로 억제 주석 금지의
+// 모집단에서도 함께 빠진다 — `OPEN-M15-SRC-TS-COMMENT-DISABLE` (a) 축을 받던 유일한 층이다.
+//
+// 값을 고정하는 쪽이 아니라 **부재**를 단언한다. 오늘 이 파일에 그 키가 없고, 생겨야 할 사유가
+// 있다면 그때 이 술어를 함께 고치는 것이 맞다(조용히 지나가지 않는다).
+if (config.exclude !== undefined) {
+  fail(
+    `tsconfig.json 에 exclude 가 있다: ${JSON.stringify(config.exclude)} — include=["src"] 를 ` +
+      '못박아도 exclude 한 줄이 프로그램 전수를 줄인다(억제 주석 금지의 모집단이 함께 줄어든다)',
+  );
+}
+
 if (parsed.options.allowJs === true) {
   fail('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다');
 }
@@ -1181,7 +1196,7 @@ if (!existsSync(viteConfigPath)) {
 if (finishIfFailed()) return;
 
 console.log(
-  `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
+  `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · exclude 없음 · allowJs 꺼짐 · ` +
     `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · src 안 타입 참조 지시 0 · src 안 파일 참조 지시가 src 밖을 가리키지 않음 · src 안 lib 참조 지시 0 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **TS 가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export **선언 종류**가 전부 허용 집합 {FunctionDeclaration, TypeAlias, Interface} 안(TypeChecker — 모르는 종류는 기본 위반) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,

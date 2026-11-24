@@ -44,6 +44,8 @@ const webRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '.
 
 /** 이 층이 덮어야 하는 자리 — e2e 레인의 TS 전수와 뿌리의 playwright 설정. */
 const E2E_DIR = 'e2e';
+/** 화면 레인의 디스크 전수 뿌리 — 래칫이 여기를 훑는다(r1 cr H1). */
+const SRC_DIR = 'src';
 /** `.ts`·`.tsx`·`.mts`·`.cts` — `include` 와 **같은 확장자 집합**이다(비대칭이면 한쪽이 조용하다). */
 const TS_FILE = /\.[cm]?tsx?$/;
 const ROOT_CONFIG = /^playwright.*\.config\.[cm]?tsx?$/;
@@ -83,22 +85,28 @@ const STRICT_FAMILY = ts.optionDeclarations
  * (r2 verifier M-2 실측: lint 0 · typecheck 0 · 덮개 0). 그래서 **eslint 주석으로 끌 수 없는
  * 층**에서 같은 것을 본다.
  *
- * **M15/15O — 주석 본문의 줄머리에서만 센다.** 15L 의 그물은 주석 토큰 **어디에나** 이 꼴이
- * 있으면 셌고, 그 판으로 화면 레인까지 넓히면 **산문이 붉는다**(실측: `src` 전수에 실해 0 ·
- * 산문 언급 하나). 줄머리는 임의의 좁힘이 아니라 **컴파일러가 지시를 알아보는 자리 그
- * 자체**이고(TS 의 pragma·directive 정규식이 모두 `^`), 거기에 오늘 컴파일러가 무시하지만
- * 자리만 옮기면 먹는 꼴(블록 주석 · JSDoc 줄)을 더해 **막는 쪽으로 넓다**. 열 꼴 전부 RED ·
- * 산문 언급 둘 green 은 아래 양성·음성 대조가 잰다.
+ * **M15/15O — 보조 그물 ⓑ 는 주석 본문의 줄머리에서만 센다.** 15L 판은 주석 토큰 **어디에나** 이
+ * 꼴이 있으면 셌고, 그대로 화면 레인까지 넓히면 **산문이 붉는다**(실측: `src` 전수에 실해 0 ·
+ * 산문 언급 하나).
+ *
+ * **ⓐ 가 정의이고 ⓑ 는 그 바깥을 더 받는다**(r1 cr M1·M3). ⓑ 는 ⓐ 의 **상위집합이 아니다** —
+ * 둘은 서로의 사각을 메우는 관계이고, ⓐ 를 「중복」이라며 걷어내면 실제 구멍이 열린다. 실측으로
+ * 양쪽을 적는다.
+ *
+ *   **ⓐ 만 잡는 꼴**: 슬래시와 별표가 섞인 머리. TS 의 다줄 지시 정규식은 그 둘의 **임의 교차**를
+ *   허용한다(`^\s*(?:\/|\*)*\s*@…`). 15O 첫 판의 걷개는 슬래시 한 번 · 별표 한 번이라 그 꼴을
+ *   놓쳤다 — 지금은 같은 꼴 한 번으로 걷어 **둘 다** 잡는다.
+ *   **ⓑ 만 잡는 꼴**: 파일 머리의 블록 주석 `nocheck` 와 JSDoc 줄의 세 이름. 컴파일러는 오늘
+ *   이것을 **인지하지 않지만** 자리만 옮기면 먹는다(막는 쪽이므로 넓은 편이 안전한 방향이다).
+ *
+ * **「블록 주석은 컴파일러가 무시한다」는 틀렸다**(r1 cr M3) — 블록 주석의 `ignore`·`expect-error`
+ * 는 인지되고 실제로 억제한다. ⓑ 를 **홀로** 재는 칸과 산문 음성 대조가 아래 대조 묶음에 있다.
  */
 const TS_SILENCING_DIRECTIVE = /^@ts-(?:nocheck|ignore|expect-error)\b/u;
 
 /** 주석 한 줄에서 주석 표지(`//`·`/*`·JSDoc 의 `*`)와 BOM·여백을 걷어 **본문의 줄머리**를 낸다. */
 function commentLineBody(line) {
-  return line
-    .replace(/^[\s\uFEFF]*/u, '')
-    .replace(/^\/+/u, '')
-    .replace(/^\*+/u, '')
-    .replace(/^\s*/u, '');
+  return line.replace(/^[\s\uFEFF/*]*/u, '');
 }
 
 const pkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
@@ -235,7 +243,7 @@ function requiredFiles() {
  *      애초에 토큰이 다르므로 들어오지 않는다). 오늘 컴파일러가 무시하지만 자리만 옮기면 먹는 꼴과,
  *      앞으로 늘어날 꼴을 받는다 — 막는 쪽이므로 넓은 편이 안전한 방향이다.
  */
-function silencingDirectivesIn(sourceFile) {
+function compilerDirectivesIn(sourceFile) {
   const found = [];
   if (sourceFile.checkJsDirective !== undefined && sourceFile.checkJsDirective.enabled === false) {
     found.push('@ts-nocheck');
@@ -243,6 +251,16 @@ function silencingDirectivesIn(sourceFile) {
   for (const directive of sourceFile.commentDirectives ?? []) {
     found.push(directive.type === ts.CommentDirectiveType.ExpectError ? '@ts-expect-error' : '@ts-ignore');
   }
+  return [...new Set(found)].sort();
+}
+
+/**
+ * ⓑ **홀로**. 대조가 ⓐ 와 섞인 합집합만 보면 ⓑ 가 죽어도 초록이다 — 실측으로 확인된 함정이다
+ * (r1 cr M2: 첫 판의 양성 대조 여덟 가운데 여섯이 ⓐ 로 통과해서, 그물에서 이름 둘을 지우는 변이가
+ * 조용했다). 아래 대조 묶음이 이 함수를 **직접** 부른다.
+ */
+function lexerDirectivesIn(sourceFile) {
+  const found = [];
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     false,
@@ -261,6 +279,11 @@ function silencingDirectivesIn(sourceFile) {
     }
   }
   return [...new Set(found)].sort();
+}
+
+/** 두 그물의 합집합 — 모집단 전수를 세는 자리가 쓴다. */
+function silencingDirectivesIn(sourceFile) {
+  return [...new Set([...compilerDirectivesIn(sourceFile), ...lexerDirectivesIn(sourceFile)])].sort();
 }
 
 /** strict 하위 축이 접히도록 푼 유효 옵션 — 비교 가능한 꼴로. */
@@ -306,9 +329,30 @@ const show = (absolute) => relative(webRoot, absolute).split(sep).join('/');
  * disable 없이도 통과시킨다, 실측 0/0/0).
  *
  * 둘을 한 술어로 닫는다 — **디스크 glob 이 아니라 두 프로그램의 전수**다. 그러면 「파일을 다른
- * 디렉터리로 옮긴다」가 길이 되지 않는다(프로그램이 끌어들이는 한 모집단 안이다). `node_modules`
- * 는 우리 원문이 아니므로 뺀다.
+ * 디렉터리로 옮긴다」가 길이 되지 않는다(프로그램이 끌어들이는 한 모집단 안이다).
+ *
+ * **차감은 설치본 하나다 — 경로 성분 이름이 아니다**(r1 verifier H-1). 첫 판은 `node_modules` 라는
+ * **경로 성분**을 가진 파일을 전부 뺐는데, `.gitignore` 가 무시하는 것은 `web/node_modules/` 뿐이라
+ * `web/src/node_modules/helper.ts` 나 `web/e2elib/node_modules/helper.ts` 는 **추적·커밋할 수 있고**
+ * TS 는 그것을 검사한다. 그 자리는 eslint 기본 ignore 대상이기도 해서, 지시 한 줄이면 네 층이 모두
+ * 초록이었다(실측 — 대조로 지시를 빼면 typecheck 2 다. 즉 실제로 검사받는 원문이다).
+ *
+ * 그래서 차감을 **`web/node_modules/` 의 realpath 접두**로 못박는다. 그 밖의 `node_modules` 성분은
+ * 차감이 아니라 **위반**이고, 아래 전용 칸이 그것을 따로 센다(지시가 없어도 붉는다 — 그 자리는
+ * eslint 가 보지 않는 곳에 우리 원문을 두는 것 자체가 길이다).
  */
+const INSTALLED_DEPENDENCIES = realpathSync(resolve(webRoot, 'node_modules'));
+
+/** 설치본 안인가 — 접두 비교다. 중첩 설치(`node_modules/a/node_modules/b`)도 이 접두 아래다. */
+function isInstalledDependency(realPath) {
+  return realPath === INSTALLED_DEPENDENCIES || realPath.startsWith(INSTALLED_DEPENDENCIES + sep);
+}
+
+/** 설치본 **밖**인데 `node_modules` 성분을 가진 자리 — eslint 가 기본으로 보지 않는 자리다. */
+function hidesUnderNodeModules(realPath) {
+  return !isInstalledDependency(realPath) && realPath.split(sep).includes('node_modules');
+}
+
 const BANNED_POPULATION = new Map();
 for (const projectPath of BANNED_PROJECTS) {
   for (const sourceFile of PROGRAMS.get(projectPath).getSourceFiles()) {
@@ -318,12 +362,43 @@ for (const projectPath of BANNED_PROJECTS) {
     } catch {
       continue;
     }
-    if (realPath.split(sep).includes('node_modules')) {
+    if (isInstalledDependency(realPath)) {
       continue;
     }
     BANNED_POPULATION.set(realPath, sourceFile);
   }
 }
+
+/**
+ * **화면 쪽 래칫**(r1 cr H1). e2e 쪽은 `REQUIRED` 대비 「빠진 파일 0」이라는 래칫인데 화면 쪽은
+ * 「≥ 1」 하나뿐이었다 — 그래서 `tsconfig.json` 에 `exclude` 한 줄(테스트 파일을 제외하는 흔한
+ * 관용구)을 더하면 그 파일들이 모집단에서 **조용히** 빠졌다. `include` 는 `["src"]` 그대로라 W-4 ②
+ * 초록 · 화면 계수가 여전히 크니 비공허 칸 초록 · 검사 대상이 줄었으니 typecheck 초록이다. 그리고
+ * 빠진 파일들은 eslint 가 여전히 린트하므로 거기서 억제 주석을 쓰려면 이름 단 disable 이 필요한데 —
+ * **그것이 이 slice 가 닫았다고 적은 (a) 축이고, 그 축을 받던 유일한 층이 방금 빠졌다.**
+ *
+ * 그래서 `requiredFiles()` 와 **같은 꼴**로 `web/src` 를 디스크 훑어 전수가 모집단 안인지 본다.
+ * 확장자 집합도 같다 — 한쪽만 넓으면 그 차이만큼 조용하다.
+ */
+function srcFiles() {
+  const found = [];
+  const walk = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (entry.isFile() && TS_FILE.test(entry.name)) {
+        found.push(realpathSync(full));
+      }
+    }
+  };
+  walk(join(webRoot, SRC_DIR));
+  return found.sort();
+}
+
+const SRC_REQUIRED = srcFiles();
 
 describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리 · 두 프로그램의 억제 지시 0', () => {
   it('재는 대상이 비어 있지 않다', () => {
@@ -388,7 +463,7 @@ describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리 · 두 프
 
   it('그 모집단이 공허하지 않다 — 화면·e2e·15L 이 들던 자리를 함께 든다', () => {
     // 모집단이 0 이면 위 칸은 **무엇이든 통과한다**. 그리고 모집단이 **줄어드는** 변이(한 프로그램을
-    // 빼거나 `node_modules` 차감을 넓히는 것)도 거기서는 조용하다 — 세 갈래를 각각 센다.
+    // 빼거나 차감을 넓히는 것)도 거기서는 조용하다 — 세 갈래를 각각 센다.
     const names = [...BANNED_POPULATION.keys()].map(show);
     expect(names.filter((name) => name.startsWith('src/')).length, '화면 레인').toBeGreaterThan(0);
     expect(names.filter((name) => name.startsWith('e2e/')).length, 'e2e 레인').toBeGreaterThan(0);
@@ -396,6 +471,50 @@ describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리 · 두 프
     // 그 자리를 조용히 반납하지 못한다.
     const dropped = REQUIRED.filter((file) => !BANNED_POPULATION.has(file)).map(show);
     expect(dropped, '15L 이 들던 자리가 모집단에서 빠졌다').toEqual([]);
+  });
+
+  it('화면 래칫 — web/src 디스크 전수가 모집단 안이다', () => {
+    // **「≥ 1」은 래칫이 아니다**(r1 cr H1). `tsconfig.json` 의 `exclude` 한 줄이 화면 파일을 모집단에서
+    // 조용히 빼는데, 계수가 여전히 크니 비공허 칸은 초록이다. e2e 쪽과 **같은 꼴**의 전수 단언을 둔다.
+    expect(SRC_REQUIRED.length, '화면 디스크 전수').toBeGreaterThan(0);
+    const dropped = SRC_REQUIRED.filter((file) => !BANNED_POPULATION.has(file)).map(show);
+    expect(dropped, 'web/src 의 원문이 모집단에서 빠졌다').toEqual([]);
+  });
+
+  it('차감은 설치본 하나다 — 그 밖의 node_modules 자리는 위반이다', () => {
+    // **r1 verifier H-1.** 첫 판은 `node_modules` 라는 **경로 성분**으로 차감했다. `.gitignore` 가
+    // 무시하는 것은 `web/node_modules/` 뿐이라 `web/src/node_modules/` · `web/e2elib/node_modules/` 는
+    // 추적·커밋할 수 있고 TS 가 검사하며 eslint 는 기본으로 보지 않는다 — 지시 한 줄이면 네 층이 모두
+    // 초록이었다(실측). 지금 그 파일들은 **모집단 안**이고(위 칸이 지시를 센다), 지시가 없어도 이 칸이
+    // 따로 붉는다: eslint 가 보지 않는 자리에 우리 원문을 두는 것 자체가 길이기 때문이다.
+    const hidden = [];
+    for (const projectPath of BANNED_PROJECTS) {
+      for (const sourceFile of PROGRAMS.get(projectPath).getSourceFiles()) {
+        let realPath;
+        try {
+          realPath = realpathSync(sourceFile.fileName);
+        } catch {
+          continue;
+        }
+        if (hidesUnderNodeModules(realPath)) {
+          hidden.push(show(realPath));
+        }
+      }
+    }
+    expect([...new Set(hidden)].sort(), '설치본 밖의 node_modules 자리에 있는 프로그램 파일').toEqual([]);
+  });
+
+  it.each([
+    [`${webRoot}${sep}node_modules${sep}react${sep}index.d.ts`, true],
+    [`${webRoot}${sep}node_modules${sep}a${sep}node_modules${sep}b${sep}index.d.ts`, true],
+    [`${webRoot}${sep}src${sep}node_modules${sep}helper.ts`, false],
+    [`${webRoot}${sep}e2elib${sep}node_modules${sep}helper.ts`, false],
+    [`${webRoot}${sep}src${sep}paths.ts`, false],
+  ])('차감 술어 — %s 의 설치본 여부가 접두로 갈린다', (candidate, installed) => {
+    // 술어 자신을 **합성 경로**로 잠근다. 위 칸은 오늘 디스크에 그 자리가 없어 공허에 가까우므로,
+    // H-1 의 두 재현을 여기서 직접 든다 — 차감이 다시 성분 이름으로 돌아가면 이 칸이 붉는다.
+    expect(isInstalledDependency(candidate)).toBe(installed);
+    expect(hidesUnderNodeModules(candidate)).toBe(!installed && candidate.split(sep).includes('node_modules'));
   });
 
   it.each([
@@ -407,11 +526,34 @@ describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리 · 두 프
     ['설명 단 expect-error', '// @ts-expect-error: 설명\nexport const a = 1;\n'],
     ['들여쓴 줄', '    // @ts-ignore\nexport const a = 1;\n'],
     ['BOM 뒤', '\uFEFF// @ts-nocheck\nexport const a = 1;\n'],
+    ['슬래시·별표 교차', '/*/@ts-ignore*/\nexport const a = 1;\n'],
+    ['슬래시·별표 교차 + 여백', '/*/ @ts-ignore */\nexport const a = 1;\n'],
   ])('양성 대조 — %s 은 지시로 센다', (_label, text) => {
-    // 이 그물의 좁힘(줄머리)이 **막아야 할 꼴을 놓치지 않는가**. 블록 주석·JSDoc 꼴은 오늘
-    // 컴파일러가 무시하지만 자리만 옮기면 먹으므로 함께 센다(막는 쪽이므로 넓은 편이 안전하다).
+    // **합집합이 막아야 할 꼴을 놓치지 않는가.** 어느 그물이 받는지는 아래 ⓑ 전용 칸이 따로 가른다 —
+    // 여기서 `length > 0` 만 보면 ⓑ 가 죽어도 ⓐ 가 떠받친다(r1 cr M2 의 실측).
     const sourceFile = ts.createSourceFile('planted.ts', text, ts.ScriptTarget.Latest, true);
     expect(silencingDirectivesIn(sourceFile).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['@ts-nocheck', '/* @ts-nocheck */\nexport const a = 1;\n'],
+    ['@ts-ignore', '/**\n * @ts-ignore\n */\nexport const a = 1;\n'],
+    ['@ts-expect-error', '/**\n * @ts-expect-error\n */\nexport const a = 1;\n'],
+  ])('ⓑ 전용 — %s 는 컴파일러가 인지하지 않는 자리에서 렉서 그물이 받는다', (name, text) => {
+    // **대조가 ⓐ 와 섞인 합집합만 보면 ⓑ 는 측정되지 않는다**(r1 cr M2). 세 이름 각각에 대해
+    // **컴파일러가 인지하지 않는 꼴**을 하나씩 두어, 그물에서 그 이름을 지우는 변이가 조용하지 않게
+    // 한다. ⓐ 가 빈 것을 같은 칸에서 단언하는 것이 요점이다.
+    const sourceFile = ts.createSourceFile('planted.ts', text, ts.ScriptTarget.Latest, true);
+    expect(compilerDirectivesIn(sourceFile), 'ⓐ 가 이 꼴을 인지한다면 이 칸은 ⓑ 를 재지 않는다').toEqual([]);
+    expect(lexerDirectivesIn(sourceFile)).toEqual([name]);
+  });
+
+  it('ⓐ 전용 — 슬래시·별표 교차는 컴파일러가 인지한다', () => {
+    // 반대 방향의 비대칭(r1 cr M1). ⓑ 는 ⓐ 의 **상위집합이 아니다** — 이 꼴은 ⓐ 가 정의로 받는다.
+    // 첫 판의 걷개는 이것을 놓쳤고, 지금은 둘 다 잡는다(그래서 아래 두 단언이 함께 선다).
+    const sourceFile = ts.createSourceFile('planted.ts', '/*/@ts-ignore*/\nexport const a = 1;\n', ts.ScriptTarget.Latest, true);
+    expect(compilerDirectivesIn(sourceFile)).toEqual(['@ts-ignore']);
+    expect(lexerDirectivesIn(sourceFile)).toEqual(['@ts-ignore']);
   });
 
   it.each([
