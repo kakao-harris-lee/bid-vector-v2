@@ -801,6 +801,16 @@ else
     _bad "relay — 해석 중 TERM 이 stub 임시 자리를 남겼다: $(ls -A "$T/stubtmp" | tr '\n' ' ')"
   fi
 fi
+# **정상 경로도 치운다** — 신호 갈래만 재면 「끝까지 돈 run 이 자리를 쌓는다」가 열린 채다(실측:
+# 이 단언이 없으면 호출 직후의 정리를 걷는 변이가 **초록**이다). 양성 run 뒤에 자리가 비어야 한다.
+rm -rf "${T:?}/stubtmp/"*
+TMPDIR="$T/stubtmp" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 0 "relay — 양성: 임시 자리를 따로 줘도 돈다"
+if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+  _ok "relay — 끝까지 돈 run 도 stub 임시 자리를 남기지 않는다"
+else
+  _bad "relay — 끝까지 돈 run 이 stub 임시 자리를 남겼다: $(ls -A "$T/stubtmp" | tr '\n' ' ')"
+fi
 rm -rf "${T:?}/stubtmp"
 
 # ── cr R-1 — 도구가 깨진 것을 「채널 env 가 깨졌다」로 읽지 않는다 ───────────────
