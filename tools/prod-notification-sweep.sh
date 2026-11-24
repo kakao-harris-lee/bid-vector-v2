@@ -35,12 +35,18 @@ cd "$REPO_ROOT"
 
 _die() { echo "prod-notification-sweep: $1" >&2; exit "${2:-3}"; }
 
+# **값 없는 플래그는 전제 실패(3)다**(M15/15Q cr H-1). `$# == 1` 인데 `shift 2` 를 하면 bash 가 비-0 을
+# 내고 `set -e` 아래에서 스크립트가 **그 자리에서 1 로, 아무 말 없이** 죽는다 — 그 `1` 은 러너의
+# 「예외」와 같은 값이라 §9.5 의 경보가 틀린 이야기를 하고 journal 에 단서가 한 줄도 없다.
+# 러너 셋이 같은 가드를 쓴다(`prod-evaluation-commit.sh`·`prod-notification-relay.sh`).
+_need() { [ "$#" -ge 2 ] || _die "$1 에 값이 없다 — 플래그 뒤에 값을 둔다" 3; }
+
 ENVF="" STATE="" PROJECT=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --env-file) ENVF="${2:-}"; shift 2 ;;
-    --state-dir) STATE="${2:-}"; shift 2 ;;
-    --project) PROJECT="${2:-}"; shift 2 ;;
+    --env-file) _need "$@"; ENVF="$2"; shift 2 ;;
+    --state-dir) _need "$@"; STATE="$2"; shift 2 ;;
+    --project) _need "$@"; PROJECT="$2"; shift 2 ;;
     *) _die "알 수 없는 인자: $1" 3 ;;
   esac
 done

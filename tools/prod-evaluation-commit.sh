@@ -41,13 +41,18 @@ cd "$REPO_ROOT"
 
 _die() { echo "prod-evaluation-commit: $1" >&2; exit "${2:-3}"; }
 
+# **값 없는 플래그는 전제 실패(3)다**(cr H-1) — `$# == 1` 인데 `shift 2` 를 하면 `set -e` 아래에서
+# 스크립트가 **1 로, 아무 말 없이** 죽고 그 `1` 은 러너의 「계정 전수를 못 읽었다」와 같은 값이다.
+# 도달 경로는 §13.3 의 `ExecStart=` 자신이다(`--current-active-bids <자리표시자>` 를 지운 운영자).
+_need() { [ "$#" -ge 2 ] || _die "$1 에 값이 없다 — 플래그 뒤에 값을 둔다" 3; }
+
 ENVF="" STATE="" PROJECT="" ACTIVE_BIDS=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --env-file) ENVF="${2:-}"; shift 2 ;;
-    --state-dir) STATE="${2:-}"; shift 2 ;;
-    --project) PROJECT="${2:-}"; shift 2 ;;
-    --current-active-bids) ACTIVE_BIDS="${2:-}"; shift 2 ;;
+    --env-file) _need "$@"; ENVF="$2"; shift 2 ;;
+    --state-dir) _need "$@"; STATE="$2"; shift 2 ;;
+    --project) _need "$@"; PROJECT="$2"; shift 2 ;;
+    --current-active-bids) _need "$@"; ACTIVE_BIDS="$2"; shift 2 ;;
     *) _die "알 수 없는 인자: $1" 3 ;;
   esac
 done
