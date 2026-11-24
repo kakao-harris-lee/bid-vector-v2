@@ -733,7 +733,32 @@ _expect_text 'BIDVECTOR_PERSISTENCE_JDBCURL' "relay — 그 파일의 우회 키
 _relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${HOME:?x}'
 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
 _expect_rc 3 "relay — 값의 \${VAR} 는 거절한다(두 통로가 서로 다른 env 로 푼다)"
+_expect_text "'\\\$' 가 있다" "relay — 그 거절이 **보간 축**의 것이다(「통째로 버렸다」가 아니다)"
 _expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(보간 축)"
+# **`env -i` 만으로는 닫히지 않는 한 칸** — `config` 에 남긴 유일한 이름이 `PATH` 라 `${PATH:?x}` 는
+# 좁힌 env 에서도 **통과한다**(실측: rc 0 · 키 3). 그 한 칸을 닫는 것이 위의 좁히는 전제이고,
+# 이 입력이 그 전제를 **단독으로** 잰다(앞의 `${HOME:?x}` 는 두 기제가 겹쳐 가르지 못한다).
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${PATH:?x}'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — \${PATH:?…} 도 거절한다(좁힌 env 가 못 보는 한 칸)"
+_expect_no_log ' run --rm' "relay — 그 거절도 compose run 앞에서 끝난다"
+
+# ── cr R-2 — 재는 경로와 넘기는 경로가 **같은가**(심볼릭 링크로 가른다) ──────────
+# 둘 다 같은 문자열이면 이 축은 미측정이다. 링크를 주면 원문과 해석된 경로가 **다른 글자**가 된다.
+_relay_env
+ln -sfn "$RELAYENV" "$T/env/relay-link.env"
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$T/env/relay-link.env" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 0 "relay — 링크로 준 채널 env 도 돈다"
+_expect_log "--env-from-file $(readlink -f "$RELAYENV")" "relay — 컨테이너에 **해석된** 경로를 넘긴다(재는 것과 같은 파일)"
+_expect_no_log "--env-from-file $T/env/relay-link.env" "relay — 원문 경로를 그대로 넘기지 않는다"
+
+# ── cr R-1 — 도구 어긋남은 compose 거절과 **다른 코드**로 돌아온다 ───────────────
+# `mktemp` 축이 그 갈래를 단독으로 잰다(`jq` 는 위 문턱이 먼저 잡아 가르지 못한다).
+_relay_env
+TMPDIR="$T/no-such-tmpdir" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 임시 자리를 만들지 못하면 멈춘다"
+_expect_text '도구.*가 어긋났다' "relay — 그 문면이 **도구**를 가리킨다"
+_expect_no_text '통째로 버렸다' "relay — 도구 어긋남을 「채널 env 가 깨졌다」로 읽지 않는다"
 
 # ── cr R-1 — 도구가 깨진 것을 「채널 env 가 깨졌다」로 읽지 않는다 ───────────────
 mkdir -p "$T/badbin"
