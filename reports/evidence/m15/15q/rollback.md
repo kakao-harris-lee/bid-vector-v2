@@ -1,7 +1,8 @@
 # M15 / 15Q — rollback
 
-**실측 HEAD: `14d87c1421a2464a532e24a51e216a281560644b`**(이 slice 의 마지막 산출물 커밋 — evidence 의
-scope·commands 커밋). 이 파일을 담는 커밋은 그 뒤에 온다.
+**실측 HEAD: `3cbd4c6cd`**(이 slice 의 마지막 산출물 커밋 — commands 갱신 커밋). 이 파일을 담는 커밋은
+그 뒤에 온다. **앞 라운드의 실측을 옮기지 않고 다시 돌렸다** — 자기 검토가 `tools/prod-notification-
+relay.sh` 를 한 번 더 고쳤으므로(pipefail·SIGPIPE 꼴), 그 전에 잰 값은 되돌림 대상이 움직인 뒤의 것이다.
 
 ## 전제 — 복원 원천은 착수 base 그대로다
 
@@ -22,8 +23,8 @@ bidvector-notification-relay.timer`) unit·drop-in 여섯을 지운 뒤 `daemon-
 
 ## 목록과 명령
 
-`git diff --name-status 71b1ad3a7..<실측 HEAD>` — **M 여섯 · A 넷**(목록은 기계 산출이고 라운드마다
-다시 낸다).
+`git diff --name-status 71b1ad3a7..<실측 HEAD>` — **M 여섯 · A 다섯**(목록은 기계 산출이고 라운드마다
+다시 낸다. 앞 라운드의 「A 넷」은 이 문서가 아직 커밋되기 전의 수였다).
 
 ```
 git restore --source=71b1ad3a7 --staged --worktree -- \
@@ -33,15 +34,15 @@ git restore --source=71b1ad3a7 --staged --worktree -- \
 git rm -rq reports/evidence/m15/15q tools/prod-evaluation-commit.sh tools/prod-notification-relay.sh
 ```
 
-신설 넷(`tools/prod-notification-relay.sh` · `tools/prod-evaluation-commit.sh` ·
-`reports/evidence/m15/15q/` 의 둘)은 base 에 **없다** — 복원이 아니라 삭제다.
+신설 다섯(`tools/prod-notification-relay.sh` · `tools/prod-evaluation-commit.sh` ·
+`reports/evidence/m15/15q/` 의 셋)은 base 에 **없다** — 복원이 아니라 삭제다.
 
 ## 임시 clone 실측(실측 HEAD 에서)
 
 버릴 clone 에서 ①~⑥ 을 쟀다. 저장소 트리는 건드리지 않았다.
 
 - ① 명령 exit: `restore` **0** · `rm` **0**
-- ② 스테이징된 변경: **D 4 · M 6**(위 목록과 같은 수다)
+- ② 스테이징된 변경: **D 5 · M 6**(위 목록과 같은 수다)
 - ③ `git diff --cached 71b1ad3a7` **빈 출력** — 복원 뒤 트리가 base 와 같다
 - 트리 동일성을 해시로도 쟀다: 복원 뒤 `git write-tree` == `71b1ad3a7^{tree}` ==
   **`c78d93dd51448aee4ca928be692e5405c64e5839`**
