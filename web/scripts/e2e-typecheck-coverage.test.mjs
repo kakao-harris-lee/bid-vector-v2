@@ -30,6 +30,14 @@ import { describe, expect, it } from 'vitest';
  *
  * 덮는 자리(전수 ⊆ 프로그램)와 **상한**(프로그램 ⊆ `web/`)도 함께 본다. 전수는 `git ls-files` 가
  * 아니라 **디스크 훑기**로 센다 — 아직 추적되지 않은 새 spec 이 술어 밖이면 그 커밋이 조용하다.
+ *
+ * **M15/15O — 넷째 칸이 두 프로그램에 걸린다**(`OPEN-M15-SRC-TS-COMMENT-DISABLE` (a)·(c)ⓘ).
+ * 「타입 억제 지시 0」의 대상이 15L 에서는 `e2e/` 디스크 전수 + 뿌리 설정이었고, 그 경계 밖의
+ * 둘(화면 레인의 `src/**` · e2e 프로그램이 끌어들이는 `e2e/` 밖 `.ts`)이 **네 층을 모두 지났다**.
+ * 지금 그 칸은 **화면·e2e 두 프로그램의 `node_modules` 밖 전수**를 본다 — 디스크 glob 이 아니라
+ * 프로그램 집합이므로 「파일을 옆 디렉터리로 옮긴다」가 길이 되지 않는다. 같은 OPEN 의 (b)
+ * (eslint 규칙이 미치는 범위)는 `scripts/ban-ts-comment-reach.test.mjs` 가, (c)ⓙ
+ * (`referencedFiles`·`libReferenceDirectives`)는 W-4 ④ 가 받는다.
  */
 
 const webRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
@@ -70,12 +78,28 @@ const STRICT_FAMILY = ts.optionDeclarations
   .sort();
 
 /**
- * 컴파일러에게 **조용히 하라고 말하는** 주석의 이름. e2e 레인의 파일에 이것이 있으면 타입 층이
- * 그 자리를 보지 않는다 — 그리고 그 억제는 `eslint-disable-next-line` 과 짝지으면 lint 층도
- * 지나간다(r2 verifier M-2 실측: lint 0 · typecheck 0 · 덮개 0). 그래서 **eslint 주석으로 끌 수
- * 없는 층**에서 같은 것을 본다.
+ * 컴파일러에게 **조용히 하라고 말하는** 주석의 이름. 파일에 이것이 있으면 타입 층이 그 자리를
+ * 보지 않는다 — 그리고 그 억제는 `eslint-disable-next-line` 과 짝지으면 lint 층도 지나간다
+ * (r2 verifier M-2 실측: lint 0 · typecheck 0 · 덮개 0). 그래서 **eslint 주석으로 끌 수 없는
+ * 층**에서 같은 것을 본다.
+ *
+ * **M15/15O — 주석 본문의 줄머리에서만 센다.** 15L 의 그물은 주석 토큰 **어디에나** 이 꼴이
+ * 있으면 셌고, 그 판으로 화면 레인까지 넓히면 **산문이 붉는다**(실측: `src` 전수에 실해 0 ·
+ * 산문 언급 하나). 줄머리는 임의의 좁힘이 아니라 **컴파일러가 지시를 알아보는 자리 그
+ * 자체**이고(TS 의 pragma·directive 정규식이 모두 `^`), 거기에 오늘 컴파일러가 무시하지만
+ * 자리만 옮기면 먹는 꼴(블록 주석 · JSDoc 줄)을 더해 **막는 쪽으로 넓다**. 열 꼴 전부 RED ·
+ * 산문 언급 둘 green 은 아래 양성·음성 대조가 잰다.
  */
-const TS_SILENCING_DIRECTIVE = /@ts-(?:nocheck|ignore|expect-error)\b/u;
+const TS_SILENCING_DIRECTIVE = /^@ts-(?:nocheck|ignore|expect-error)\b/u;
+
+/** 주석 한 줄에서 주석 표지(`//`·`/*`·JSDoc 의 `*`)와 BOM·여백을 걷어 **본문의 줄머리**를 낸다. */
+function commentLineBody(line) {
+  return line
+    .replace(/^[\s\uFEFF]*/u, '')
+    .replace(/^\/+/u, '')
+    .replace(/^\*+/u, '')
+    .replace(/^\s*/u, '');
+}
 
 const pkg = JSON.parse(readFileSync(join(webRoot, 'package.json'), 'utf8'));
 
@@ -229,9 +253,11 @@ function silencingDirectivesIn(sourceFile) {
     if (kind !== ts.SyntaxKind.SingleLineCommentTrivia && kind !== ts.SyntaxKind.MultiLineCommentTrivia) {
       continue;
     }
-    const matched = TS_SILENCING_DIRECTIVE.exec(scanner.getTokenText());
-    if (matched !== null) {
-      found.push(matched[0]);
+    for (const line of scanner.getTokenText().split(/\r?\n/u)) {
+      const matched = TS_SILENCING_DIRECTIVE.exec(commentLineBody(line));
+      if (matched !== null) {
+        found.push(matched[0]);
+      }
     }
   }
   return [...new Set(found)].sort();
@@ -257,12 +283,49 @@ const SCRIPT = parseTypecheckScript();
 const REQUIRED = requiredFiles();
 const SCREEN_PROJECT = resolve(webRoot, 'tsconfig.json');
 const E2E_PROJECT = resolve(webRoot, 'tsconfig.e2e.json');
-const PARSED = new Map(SCRIPT.projects.map((projectPath) => [projectPath, openProject(projectPath)]));
+/**
+ * **억제 지시 금지의 모집단은 `typecheck` 명령이 아니라 두 프로젝트 자신이다**(M15/15O).
+ * 명령에서 프로젝트를 빼는 변이는 위 「명령의 꼴」 칸이 받지만, 같은 편집이 금지의 **대상까지**
+ * 줄이면 한 변이가 두 칸을 함께 끄는 꼴이 된다. 그래서 프로젝트 둘을 **이름으로** 연다.
+ */
+const BANNED_PROJECTS = [...new Set([SCREEN_PROJECT, E2E_PROJECT, ...SCRIPT.projects])];
+const PARSED = new Map(BANNED_PROJECTS.map((projectPath) => [projectPath, openProject(projectPath)]));
 const PROGRAMS = new Map([...PARSED].map(([projectPath, parsed]) => [projectPath, programOf(parsed)]));
-const COVERED = new Set([...PROGRAMS.values()].flatMap((program) => [...filesOf(program)]));
+const COVERED = new Set(
+  SCRIPT.projects.flatMap((projectPath) => [...filesOf(PROGRAMS.get(projectPath))]),
+);
 const show = (absolute) => relative(webRoot, absolute).split(sep).join('/');
 
-describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리', () => {
+/**
+ * **타입 억제 지시 금지가 서는 자리**(M15/15O — `OPEN-M15-SRC-TS-COMMENT-DISABLE` (a)·(c)ⓘ).
+ *
+ * 15L 의 대상은 `REQUIRED`(= `e2e/` 디스크 전수 + 뿌리 playwright 설정)였고, 그 경계 밖에 둘이
+ * 남았다: **화면 레인의 `src/**`**(이름을 단 `eslint-disable` 한 줄로 lint·typecheck 가 함께
+ * 조용해진다 — 실측 0/0/0/0)과 **e2e 프로그램이 끌어들이는 `e2e/` 밖의 `.ts`**(예:
+ * `web/e2elib/helper.ts` — eslint glob 밖이라 tseslint 기본값이 `@ts-expect-error: <설명>` 을
+ * disable 없이도 통과시킨다, 실측 0/0/0).
+ *
+ * 둘을 한 술어로 닫는다 — **디스크 glob 이 아니라 두 프로그램의 전수**다. 그러면 「파일을 다른
+ * 디렉터리로 옮긴다」가 길이 되지 않는다(프로그램이 끌어들이는 한 모집단 안이다). `node_modules`
+ * 는 우리 원문이 아니므로 뺀다.
+ */
+const BANNED_POPULATION = new Map();
+for (const projectPath of BANNED_PROJECTS) {
+  for (const sourceFile of PROGRAMS.get(projectPath).getSourceFiles()) {
+    let realPath;
+    try {
+      realPath = realpathSync(sourceFile.fileName);
+    } catch {
+      continue;
+    }
+    if (realPath.split(sep).includes('node_modules')) {
+      continue;
+    }
+    BANNED_POPULATION.set(realPath, sourceFile);
+  }
+}
+
+describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리 · 두 프로그램의 억제 지시 0', () => {
   it('재는 대상이 비어 있지 않다', () => {
     // 전수가 0 이면 아래 포함 단언은 **무엇이든 통과한다**. 공허를 먼저 가른다.
     expect(REQUIRED.length).toBeGreaterThan(0);
@@ -304,29 +367,61 @@ describe('e2e 타입 검사 층 — 진단 · 기준 · 덮는 자리', () => {
     expect(planted.map((diagnostic) => diagnostic.code)).toContain(2322);
   });
 
-  it('e2e 레인의 원문에 억제 지시가 0 이다', () => {
+  it('두 프로그램의 원문에 타입 억제 지시가 0 이다', () => {
     // **진단 0 만으로는 모자란다**(r2 v M-2). `// @ts-nocheck` 한 줄이면 그 파일의 진단이 사라지고,
     // 그 주석을 막는 eslint 규칙은 `// eslint-disable-next-line <규칙 이름>` 으로 꺼진다 —
     // 세 층이 모두 지나간다(실측 0/0/0). 그 꼴을 **eslint 주석으로 끌 수 없는 자리**에서 받는다.
-    const program = PROGRAMS.get(E2E_PROJECT);
-    const owned = new Set(REQUIRED);
+    //
+    // **M15/15O — 대상이 두 프로그램 전수다.** 저장소 규약은 `eslint-disable-next-line` 을
+    // 리뷰로 가는 명시적 탈출구로 **그대로 둔다**; 그래서 「그 disable 을 금지」하는 쪽을 고르지
+    // 않고, 타입 검사를 끄는 지시만 **eslint 가 아닌 층**에서 금지한다. 두 규율이 서로를 침범하지
+    // 않는다.
     const offenders = [];
-    for (const sourceFile of program.getSourceFiles()) {
-      let realPath;
-      try {
-        realPath = realpathSync(sourceFile.fileName);
-      } catch {
-        continue;
-      }
-      if (!owned.has(realPath)) {
-        continue;
-      }
+    for (const [realPath, sourceFile] of BANNED_POPULATION) {
       const directives = silencingDirectivesIn(sourceFile);
       if (directives.length > 0) {
         offenders.push(`${show(realPath)}: ${directives.join(' ')}`);
       }
     }
-    expect(offenders, 'e2e 레인의 억제 지시').toEqual([]);
+    expect(offenders, '화면·e2e 프로그램의 타입 억제 지시').toEqual([]);
+  });
+
+  it('그 모집단이 공허하지 않다 — 화면·e2e·15L 이 들던 자리를 함께 든다', () => {
+    // 모집단이 0 이면 위 칸은 **무엇이든 통과한다**. 그리고 모집단이 **줄어드는** 변이(한 프로그램을
+    // 빼거나 `node_modules` 차감을 넓히는 것)도 거기서는 조용하다 — 세 갈래를 각각 센다.
+    const names = [...BANNED_POPULATION.keys()].map(show);
+    expect(names.filter((name) => name.startsWith('src/')).length, '화면 레인').toBeGreaterThan(0);
+    expect(names.filter((name) => name.startsWith('e2e/')).length, 'e2e 레인').toBeGreaterThan(0);
+    // 15L 이 들던 자리(`e2e/` 디스크 전수 + 뿌리 playwright 설정)는 **래칫**이다 — 넓히는 편집이
+    // 그 자리를 조용히 반납하지 못한다.
+    const dropped = REQUIRED.filter((file) => !BANNED_POPULATION.has(file)).map(show);
+    expect(dropped, '15L 이 들던 자리가 모집단에서 빠졌다').toEqual([]);
+  });
+
+  it.each([
+    ['한 줄 주석', '// @ts-ignore\nexport const a = 1;\n'],
+    ['삼중 사선', '/// @ts-nocheck\nexport const a = 1;\n'],
+    ['블록 주석', '/* @ts-nocheck */\nexport const a = 1;\n'],
+    ['블록 주석 ignore', '/* @ts-ignore */\nexport const a = 1;\n'],
+    ['JSDoc 줄', '/**\n * @ts-nocheck\n */\nexport const a = 1;\n'],
+    ['설명 단 expect-error', '// @ts-expect-error: 설명\nexport const a = 1;\n'],
+    ['들여쓴 줄', '    // @ts-ignore\nexport const a = 1;\n'],
+    ['BOM 뒤', '\uFEFF// @ts-nocheck\nexport const a = 1;\n'],
+  ])('양성 대조 — %s 은 지시로 센다', (_label, text) => {
+    // 이 그물의 좁힘(줄머리)이 **막아야 할 꼴을 놓치지 않는가**. 블록 주석·JSDoc 꼴은 오늘
+    // 컴파일러가 무시하지만 자리만 옮기면 먹으므로 함께 센다(막는 쪽이므로 넓은 편이 안전하다).
+    const sourceFile = ts.createSourceFile('planted.ts', text, ts.ScriptTarget.Latest, true);
+    expect(silencingDirectivesIn(sourceFile).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['한 줄 산문', '// 그 꼴(`@ts-nocheck`)은 막는다\nexport const a = 1;\n'],
+    ['JSDoc 산문', '/**\n * `@ts-expect-error` 로는 쓸 수 없다\n */\nexport const a = 1;\n'],
+  ])('음성 대조 — %s 속 언급은 지시가 아니다', (_label, text) => {
+    // **거짓 RED 는 그 자체로 비용이다.** `src` 전수에 실해 0 · 산문 언급 하나인데(실측),
+    // 15L 의 「토큰 어디에나」 그물은 그 산문을 붉혔다. 좁힘이 바로 이 칸을 위한 것이다.
+    const sourceFile = ts.createSourceFile('prose.ts', text, ts.ScriptTarget.Latest, true);
+    expect(silencingDirectivesIn(sourceFile)).toEqual([]);
   });
 
   it('두 프로젝트의 유효 옵션이 면제 집합 밖에서 같다', () => {
