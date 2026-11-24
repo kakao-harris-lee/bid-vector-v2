@@ -33,9 +33,12 @@ cd "$REPO_ROOT"
 
 _die() { echo "prod-guards-check: $1" >&2; exit "${2:-1}"; }
 
-for t in jq git flock mktemp setsid ps sed awk; do
+for t in jq git flock mktemp setsid ps sed awk docker; do
   command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2
 done
+# 가짜 `docker` 를 PATH 앞에 꽂기 **전에** 진짜 자리를 잡아 둔다 — 채널 env 해석만은 그것으로
+# 넘긴다(M15/15Q 수정 라운드 1: 소비자와 같은 해석기로 재야 우회 줄의 거절이 측정이 된다).
+REAL_DOCKER="$(command -v docker)"
 # 아래에서 `$T/bin` 을 PATH 앞에 꽂으므로 **그 전에** 진짜 `flock` 의 자리를 잡아 둔다(가짜 flock 이
 # 평소에는 이것으로 exec 한다 — 변이를 켜지 않은 동안 검사가 진짜 잠금으로 돈다).
 REAL_FLOCK="$(command -v flock)"
@@ -140,12 +143,14 @@ cat > "$T/bin/docker" <<'SHIM'
 #!/usr/bin/env bash
 # 가짜 docker — argv 를 기록하고 fixture 로 답한다(tools/prod-guards-check.sh 전용).
 printf 'docker %s\n' "$*" >> "${SHIM_LOG:-/dev/null}"
+ORIG=("$@")
 if [ "${1:-}" = compose ]; then
   shift
-  sub=""
+  sub="" ffile=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      -f|-p|--env-file|--profile|--project-name) shift 2 ;;
+      -f) ffile="${2:-}"; shift 2 ;;
+      -p|--env-file|--profile|--project-name) shift 2 ;;
       -*) shift ;;
       *) sub="$1"; shift; break ;;
     esac
@@ -153,9 +158,32 @@ if [ "${1:-}" = compose ]; then
   case "$sub" in
     version) printf 'v%s\n' "${SHIM_COMPOSE_VER:-2.29.0}" ;;
     config)
+      # **채널 env 해석만은 진짜 compose 에 맡긴다**(M15/15Q 수정 라운드 1, v H-1). 래퍼는 relay.env 의
+      # 키 집합을 **소비자와 같은 해석기**로 뽑는데, 그 해석을 여기서 흉내 내면 단언이 재는 것은
+      # compose 가 아니라 **이 가짜의 셋째 문법**이 된다 — 우회 줄이 거절되는지는 그러면 영영 미측정이다.
+      # 그 호출은 stub 파일 하나를 읽는 client-side 렌더링이라 운영 스택·데몬에 닿지 않는다.
+      # 진짜 자리는 환경에서 읽는다 — 래퍼가 평소 env 로 부르므로 그대로 건너온다(cr N-1 로
+      # `env -i` 가 걷히면서 파일 우회도 함께 사라졌다).
+      if [ -n "$ffile" ] && grep -q 'bidvector-relay-envcheck' "$ffile" 2>/dev/null; then
+        [ -n "${SHIM_REAL_DOCKER:-}" ] || { echo "SHIM: 진짜 docker 자리를 찾지 못했다" >&2; exit 97; }
+        # 신호 경로 단언용 — 해석이 도는 **창**을 연다(cr N-2).
+        [ -z "${SHIM_CONFIG_SLEEP:-}" ] || sleep "$SHIM_CONFIG_SLEEP"
+        exec "$SHIM_REAL_DOCKER" "${ORIG[@]}"
+      fi
       [ -n "${SHIM_CONFIG_FILE:-}" ] && [ -r "${SHIM_CONFIG_FILE:-}" ] || exit 1
       cat "$SHIM_CONFIG_FILE" ;;
     run)
+      # `run --help` — **플래그 지원 질의**(M15/15Q). relay 래퍼는 `--env-from-file` 을 판 번호가
+      # 아니라 도구에게 직접 묻는다. `SHIM_NO_ENV_FROM_FILE` 이 그 음성 대조다(모르는 판 흉내).
+      case " $* " in
+        *" --help "*)
+          # `SHIM_EMPTY_RUN_HELP` — 도움말을 **한 줄도** 못 받는 경우(cr L-6). 「플래그가 없다」와
+          # 고칠 자리가 다르므로 래퍼가 다른 문면을 내야 한다.
+          [ -z "${SHIM_EMPTY_RUN_HELP:-}" ] || exit 0
+          [ -n "${SHIM_NO_ENV_FROM_FILE:-}" ] \
+            || printf '      --env-from-file stringArray   Set environment variables from file\n'
+          exit 0 ;;
+      esac
       [ -z "${SHIM_RUN_MARKER:-}" ] || : > "$SHIM_RUN_MARKER"
       [ -z "${SHIM_RUN_SLEEP:-}" ] || sleep "$SHIM_RUN_SLEEP"
       exit "${SHIM_RUN_RC:-0}" ;;
@@ -247,13 +275,13 @@ exec "$SHIM_REAL_FLOCK" "$@"
 SHIM
 chmod +x "$T/bin/docker" "$T/bin/git" "$T/bin/flock"
 export PATH="$T/bin:$PATH"
-export SHIM_REAL_FLOCK="$REAL_FLOCK" SHIM_FLOCK_RC=""
+export SHIM_REAL_FLOCK="$REAL_FLOCK" SHIM_FLOCK_RC="" SHIM_REAL_DOCKER="$REAL_DOCKER"
 
 SHIM_LOG="$T/shim.log"
 export SHIM_LOG SHIM_STATE="$T/state" SHIM_GIT_EXPECT_C="$REPO_ROOT"
 export SHIM_GIT_HEAD="$REL_SHA" SHIM_GIT_DIRTY="" SHIM_GIT_STATUS_RC=0
 export SHIM_PS_FILE="" SHIM_PS_RC=0 SHIM_PS_NAME_HIT="" SHIM_CONFIG_FILE="" SHIM_IMAGE_IDS_OK=1
-export SHIM_RUN_MARKER="" SHIM_RUN_SLEEP="" SHIM_RUN_RC=0
+export SHIM_RUN_MARKER="" SHIM_RUN_SLEEP="" SHIM_RUN_RC=0 SHIM_NO_ENV_FROM_FILE="" SHIM_EMPTY_RUN_HELP="" SHIM_CONFIG_SLEEP=""
 
 # ── 공통 단언 ──────────────────────────────────────────────────────────────────
 RUN_RC=0
@@ -406,6 +434,12 @@ _expect_no_log ' run ' "그 거절도 compose run 앞에서 끝난다"
 _run ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}"
 _expect_rc 0 "양성 — 잔존 0 · 같은 커밋 · 같은 프로젝트면 훑는다"
 _expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-sweep" "일회 컨테이너 이름을 고정해 띄운다"
+# M15/15Q cr H-1 — **값 없는 플래그**는 전제 실패(3)다. 앞 판은 `shift 2` 가 `set -e` 아래에서 스크립트를
+# **1 로, 아무 말 없이** 죽였고 그 `1` 은 러너의 「예외」와 같은 값이라 경보가 틀린 이야기를 했다.
+# 도달 경로는 runbook 의 `ExecStart=` 자신이다(자리표시자를 바꾸지 않고 **지운** 운영자).
+_run ./tools/prod-notification-sweep.sh --env-file
+_expect_rc 3 "훑기 — 값 없는 플래그는 전제 실패(3)다 — 러너의 1 과 섞이지 않는다"
+_expect_text '값이 없다' "훑기 — 그 거절이 문면을 남긴다(앞 판은 조용히 죽었다)"
 
 # M15/15M(cr H-1) — **미룸은 4, 전제 실패는 3.** 둘이 같은 코드면 §9.5 의 실패 경보가 반입·되돌림·손
 # 실행 때마다 진짜 사건과 같은 문면으로 울린다. 위 양성 대조(`_expect_rc 0`)가 **잠금이 비어 있을 때**
@@ -483,13 +517,16 @@ RUN_RC=0; _probe_lock_dir "$T/lockdir-gw" || RUN_RC=$?
 _expect_rc 9 "잠금 **자리**의 group 쓰기가 열려 있으면 거절하고 **미룸이 아니다**(busy 가 서지 않는다)"
 
 # 신호 경로 — trap 이 **자기 일회 컨테이너만** 치운다.
+# 스크립트·인자·일회 이름은 전역으로 받는다(M15/15Q 에서 러너 셋이 같은 갈래를 쓴다 — 배열을 인자로
+# 넘기지 않고 호출 전에 세운다). 호출 직전에 셋을 세운다(cr L-5: 정의 앞에도 두면 뒤의 같은 대입에
+# 곧바로 덮여, 함수가 정의 시점에 묶는 것처럼 읽힌다).
 _signal_case() { # <신호> <기대 종료 코드>
-  local sig="$1" want="$2" pid pg i n
+  local sig="$1" want="$2" pid pg i n oneoff="${PROJ}-app-run-${SIG_ONEOFF_SUFFIX}"
   : > "$SHIM_LOG"
   rm -f "$T/marker"
   RUN_RC=0
   SHIM_RUN_MARKER="$T/marker" SHIM_RUN_SLEEP=20 \
-    setsid ./tools/prod-notification-sweep.sh "${SWEEP_ARGS[@]}" > "$T/out" 2> "$T/err" &
+    setsid "$SIG_SCRIPT" "${SIG_ARGS[@]}" > "$T/out" 2> "$T/err" &
   pid=$!
   for i in $(seq 1 200); do [ -e "$T/marker" ] && break; sleep 0.1; done
   [ -e "$T/marker" ] || { kill -9 "$pid" 2>/dev/null || true; _die "가짜 일회 컨테이너가 시작되지 않았다 — 판정 불가" 2; }
@@ -500,14 +537,382 @@ _signal_case() { # <신호> <기대 종료 코드>
   # `wait` 의 stderr 를 버린다 — 신호로 죽은 배경 작업의 셸 알림(`… Hangup …`)이 검사 출력에 섞이면
   # CI 로그에서 그것이 결함처럼 보인다. 판정은 아래 `RUN_RC` 와 단언이 한다.
   wait "$pid" 2>/dev/null || RUN_RC=$?
-  _expect_rc "$want" "${sig} 으로 끝나면 그 신호로 죽는다(128+n — 종료 코드를 꾸미지 않는다)"
-  _expect_text "일회 컨테이너 ${PROJ}-app-run-sweep 를 치웠다" "${sig} — trap 이 치운 것을 문면에 보인다"
-  _expect_log "docker rm -f ${PROJ}-app-run-sweep\$" "${sig} — trap 이 자기 컨테이너 이름 하나만 지운다"
-  _expect_no_log 'rm .*other-proj' "${sig} — trap 이 남의 컨테이너를 지우지 않는다"
-  _expect_no_log 'rm .*(--filter|\*)' "${sig} — trap 이 접두·필터로 지우지 않는다"
+  _expect_rc "$want" "${SIG_ONEOFF_SUFFIX} ${sig} 으로 끝나면 그 신호로 죽는다(128+n — 종료 코드를 꾸미지 않는다)"
+  _expect_text "일회 컨테이너 ${oneoff} 를 치웠다" "${SIG_ONEOFF_SUFFIX} ${sig} — trap 이 치운 것을 문면에 보인다"
+  _expect_log "docker rm -f ${oneoff}\$" "${SIG_ONEOFF_SUFFIX} ${sig} — trap 이 자기 컨테이너 이름 하나만 지운다"
+  _expect_no_log 'rm .*other-proj' "${SIG_ONEOFF_SUFFIX} ${sig} — trap 이 남의 컨테이너를 지우지 않는다"
+  _expect_no_log 'rm .*(--filter|\*)' "${SIG_ONEOFF_SUFFIX} ${sig} — trap 이 접두·필터로 지우지 않는다"
   n="$(grep -cE '^docker rm ' "$SHIM_LOG" || true)"
-  if [ "$n" = 1 ]; then _ok "${sig} — 삭제 호출이 하나다 (${n})"; else _bad "${sig} — 삭제 호출이 ${n} 개다"; fi
+  if [ "$n" = 1 ]; then _ok "${SIG_ONEOFF_SUFFIX} ${sig} — 삭제 호출이 하나다 (${n})"; else _bad "${SIG_ONEOFF_SUFFIX} ${sig} — 삭제 호출이 ${n} 개다"; fi
 }
+SIG_SCRIPT=./tools/prod-notification-sweep.sh
+SIG_ONEOFF_SUFFIX=sweep
+SIG_ARGS=("${SWEEP_ARGS[@]}")
+_signal_case TERM 143
+_signal_case HUP 129
+
+echo "== 평가 커밋 러너(prod-evaluation-commit.sh) — 훑기와 같은 전제 + run 당 여력 인자"
+# M15/15Q. 훑기가 받는 단언을 **같은 모양으로** 받는다 — 트리 축 · 프로젝트 이름 · 잔존 · 이름 충돌 ·
+# 미룸(4) ↔ 전제 실패(3) · 금지 JVM 옵션. 더해지는 축은 **여력 인자**(기본값을 지어내지 않는다)와
+# **run 당 계정 상한에 플래그를 열지 않는다**(M15/15B·15H 의 회전 계약).
+EVAL_ARGS=(--env-file "$T/env/prod.env" --state-dir "$T/state" --current-active-bids 7 --project "$PROJ")
+SHIM_GIT_HEAD="$OTHER_SHA" _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — 다른 커밋의 트리에서는 돌지 않는다"
+_expect_no_log ' run ' "평가 — 그 거절이 일회 컨테이너 앞에서 끝난다"
+SHIM_CONFIG_FILE="$T/cfg-othername.json" _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — 해석된 프로젝트 이름이 잠금과 다르면 돌지 않는다"
+_expect_no_log 'docker ps' "평가 — 그 거절이 잔존 조회 앞에서 끝난다"
+SHIM_PS_FILE="$T/ps-residue" _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — 지난 run 의 (멈춘) 일회 컨테이너가 남아 있으면 돌지 않는다"
+_expect_text "${PROJ}-app-run-abc" "평가 — 거절 문면이 남은 이름을 보인다"
+SHIM_PS_NAME_HIT="deadbeefcafe" _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — 일회 컨테이너 이름이 전역에서 이미 쓰이면 돌지 않는다"
+_expect_no_log ' run ' "평가 — 그 거절이 compose run 앞에서 끝난다"
+# cr L-2 — **멈춘** 동명 컨테이너도 이름을 쥔다. 훑기·relay 에만 있던 갈래를 여기도 둔다
+# (이 slice 의 주장이 「훑기와 **같은 모양**」이라 그 집합에서 하나가 비면 안 된다).
+SHIM_PS_NAME_HIT="deadbeefcafe" SHIM_PS_NAME_STATE=exited _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — **멈춘** 동명 컨테이너가 있어도 돌지 않는다(docker ps -aq)"
+_expect_no_log ' run ' "평가 — 그 거절도 compose run 앞에서 끝난다"
+# cr H-1 — 값 없는 플래그는 전제 실패(3)다(러너의 「계정 전수를 못 읽었다」와 같은 1 이 되지 않는다).
+_run ./tools/prod-evaluation-commit.sh --current-active-bids
+_expect_rc 3 "평가 — 값 없는 플래그는 전제 실패(3)다"
+_expect_text '값이 없다' "평가 — 그 거절이 문면을 남긴다"
+_run ./tools/prod-evaluation-commit.sh --env-file "$T/env/prod.env" --state-dir "$T/state" --project "$PROJ"
+_expect_rc 3 "평가 — --current-active-bids 가 없으면 돌지 않는다(여력을 0 으로 지어내지 않는다)"
+_expect_no_log ' run ' "평가 — 그 거절이 compose run 앞에서 끝난다(여력 축)"
+_run ./tools/prod-evaluation-commit.sh --env-file "$T/env/prod.env" --state-dir "$T/state" --current-active-bids -1 --project "$PROJ"
+_expect_rc 3 "평가 — --current-active-bids 가 0 이상의 정수가 아니면 돌지 않는다"
+JAVA_TOOL_OPTIONS='-Djdk.httpclient.HttpClient.log=all' _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — JAVA_TOOL_OPTIONS 에 JDK HttpClient 내부 로그 속성이 있으면 돌지 않는다"
+_expect_text 'jdk\.httpclient\.HttpClient\.log' "평가 — 문면이 지워야 할 속성 이름을 보인다"
+_expect_no_log ' run ' "평가 — 그 거절이 compose run 앞에서 끝난다(JVM 옵션 축)"
+_run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 0 "평가 — 양성: 잔존 0 · 같은 커밋 · 같은 프로젝트면 돈다"
+_expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-evaluation" "평가 — 자기 일회 컨테이너 이름을 고정해 띄운다"
+_expect_log "--env-file $T/env/prod.env" "평가 — 운영 env 파일이 compose 에 간다"
+_expect_log "--bidvector.evaluation.mode=once" "평가 — 러너 스위치를 준다"
+_expect_log "--bidvector.evaluation.commit.current-active-bids=7" "평가 — 여력 값을 그대로 넘긴다"
+_expect_log "-e SPRING_MAIN_WEB_APPLICATION_TYPE=none" "평가 — 러너 run 은 HTTP 표면을 끈다"
+_expect_no_log 'max-accounts-per-run|max-consecutive-account-failures' \
+  "평가 — run 당 계정 상한·멈춤 줄에 플래그를 열지 않는다(출하 기본값 그대로 — M15/15B·15H 의 회전 계약)"
+
+_hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+_run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 4 "평가 — 프로젝트 잠금이 잡혀 있으면 **미룬다**(4) — 전제 실패(3)가 아니다"
+_expect_no_log ' run ' "평가 — 그 미룸이 일회 컨테이너 앞에서 끝난다"
+_release_lock
+_hold_lock "$T/state/.lock"
+_run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 4 "평가 — 상태 디렉터리 잠금이 잡혀 있어도 **미룬다**(4)"
+_release_lock
+rm -f "$T/state/.lock"
+chmod 500 "$T/state"
+_run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+_expect_rc 3 "평가 — 잠금 **파일을 열지 못하면** 전제 실패(3)다"
+chmod 700 "$T/state"
+for frc in 1 64 65 70 127 137; do
+  SHIM_FLOCK_RC="$frc" _run ./tools/prod-evaluation-commit.sh "${EVAL_ARGS[@]}"
+  _expect_rc 3 "평가 — flock 종료 ${frc} 는 전제 실패(3) — 경합으로 접지 않는다"
+done
+
+echo "== relay 러너(prod-notification-relay.sh) — 훑기와 같은 전제 + 채널 env · 금지 JVM 옵션 · 코드 옮김"
+RELAYENV="$T/env/relay.env"
+_relay_env() { # [추가 줄…] — §13.2 의 필수 셋 + 인자. **값은 전부 자리값**이다(자격이 아니다).
+  { printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=fixture\n'
+    printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n'
+    printf 'BIDVECTOR_NOTIFICATION_SITE_BASE_URL=https://example.invalid\n'
+    [ "$#" -eq 0 ] || printf '%s\n' "$@"
+  } > "$RELAYENV"
+  chmod 600 "$RELAYENV"
+}
+_relay_env
+RELAY_ARGS=(--env-file "$T/env/prod.env" --relay-env-file "$RELAYENV" --state-dir "$T/state" --owner op-fixture --project "$PROJ")
+SHIM_GIT_HEAD="$OTHER_SHA" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 다른 커밋의 트리에서는 보내지 않는다"
+_expect_no_log ' run --rm' "relay — 그 거절이 일회 컨테이너 앞에서 끝난다"
+SHIM_CONFIG_FILE="$T/cfg-othername.json" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 해석된 프로젝트 이름이 잠금과 다르면 보내지 않는다"
+_expect_no_log 'docker ps' "relay — 그 거절이 잔존 조회 앞에서 끝난다"
+SHIM_PS_FILE="$T/ps-residue" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 지난 run 의 (멈춘) 일회 컨테이너가 남아 있으면 보내지 않는다"
+_expect_text "${PROJ}-app-run-abc" "relay — 거절 문면이 남은 이름을 보인다"
+SHIM_PS_NAME_HIT="deadbeefcafe" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 일회 컨테이너 이름이 전역에서 이미 쓰이면 보내지 않는다"
+SHIM_PS_NAME_HIT="deadbeefcafe" SHIM_PS_NAME_STATE=exited _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — **멈춘** 동명 컨테이너가 있어도 보내지 않는다(docker ps -aq)"
+
+# ── 둘째 env 파일 축 — 이 러너가 훑기에 더하는 자리 ─────────────────────────────
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 3 "relay — --relay-env-file 이 없으면 보내지 않는다"
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$RELAYENV" --state-dir "$T/state" --project "$PROJ"
+_expect_rc 3 "relay — --owner 가 없으면 보내지 않는다(기본값 없는 키를 지어내지 않는다)"
+# cr H-1 — 값 없는 플래그는 전제 실패(3)다(러너의 `FAILED`(1)와 같은 값이 되지 않는다).
+_run ./tools/prod-notification-relay.sh --owner
+_expect_rc 3 "relay — 값 없는 플래그는 전제 실패(3)다"
+_expect_text '값이 없다' "relay — 그 거절이 문면을 남긴다(앞 판은 조용히 1 로 죽었다)"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}" --environment development
+_expect_rc 3 "relay — 운영 스택에서 받는 환경은 production·staging 둘뿐이다"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}" --claim-limit 0
+_expect_rc 3 "relay — claim-limit 0 은 거절한다(러너가 1 미만을 기동 실패로 본다)"
+printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n' > "$RELAYENV"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 채널 env 에 필수 키가 없으면 보내지 않는다"
+_expect_text 'bot-credential' "relay — 문면이 빠진 속성 이름을 보인다"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(필수 키 축)"
+# **덮어쓰기 축** — `--env-from-file` 은 서비스가 선언한 env 를 **이긴다**(실측). §13.2 밖의 이름 하나가
+# 반입 가드를 거치지 않고 compose 가 준 값을 바꾸는 자리라, 키 집합을 등식으로 닫는다.
+_relay_env 'JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=50'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 채널 env 에 §13.2 밖의 키가 있으면 보내지 않는다(컨테이너 env 를 덮는 자리다)"
+_expect_text 'JAVA_TOOL_OPTIONS' "relay — 문면이 지워야 할 키 이름을 보인다"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(키 집합 축)"
+_relay_env 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://elsewhere/x'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — DB 자격 통로 이름도 같은 등식이 막는다(열거가 아니라 집합이다)"
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTE_KEY=-Djdk.internal.httpclient.debug=true'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 허용된 키의 **값**에 숨은 JDK HttpClient 로그 속성도 막는다"
+_expect_text 'jdk\.internal\.httpclient\.debug' "relay — 문면이 그 속성 이름을 보인다"
+_relay_env 'this line is not KEY=value'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 채널 env 에 'KEY=값' 도 주석도 아닌 줄이 있으면 보내지 않는다"
+_expect_no_text 'this line is not' "relay — 그 문면이 줄 내용을 옮기지 않는다(이 파일은 자격을 담는다)"
+
+# ── v H-1 — **소비자의 해석기가 보는 키**로 재는가 ──────────────────────────────
+# compose 의 dotenv 해석기는 **따옴표로 닫힌 값 뒤의 둘째 대입을 새 변수로** 읽는다. 앞 판의 술어는
+# 줄마다 첫 `KEY=` 만 sed 로 뽑아 아래 넷을 전부 통과시켰고, 컨테이너에는 DB 자격 통로·
+# `SPRING_APPLICATION_JSON`·`JAVA_TOOL_OPTIONS` 가 들어갔다(verifier 실측). 지금은 키 집합을
+# **compose 자신에게** 묻는다 — 이 가짜 docker 는 그 호출만 진짜로 넘긴다(위 shim 의 `config` 갈래).
+# 그래서 아래 넷은 「우리 문법이 막는다」가 아니라 **「소비자가 보는 키가 허용 집합 밖이다」**를 잰다.
+_relay_bypass() { # <이름> <덧붙일 줄>
+  _relay_env "$2"
+  _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+  _expect_rc 3 "relay — 우회 ${1}: 따옴표 뒤 둘째 대입도 키 집합이 본다"
+  _expect_no_log ' run --rm' "relay — 우회 ${1}: 그 거절이 compose run 앞에서 끝난다"
+}
+_relay_bypass '쌍따옴표+공백' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil'
+_relay_bypass '홑따옴표' "BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY='rk' BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil"
+_relay_bypass '공백 없음' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk"SPRING_APPLICATION_JSON={}'
+_relay_bypass 'JVM 통로' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=9'
+_expect_text 'JAVA_TOOL_OPTIONS' "relay — 우회 JVM 통로: 문면이 그 키 이름을 보인다"
+
+# ── v L-1 — compose 가 파일을 **통째로 버리는** 입력 ────────────────────────────
+# 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나 진단이 엉뚱한 곳을 가리킨다. 키가 0 인데
+# 내용 줄이 있으면 **그 사실을 말하고** 멈춘다 — 「필수 키가 없다」와 고칠 자리가 다르다.
+_relay_dropped() { # <이름> <덧붙일 줄>
+  _relay_env "$2"
+  _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+  _expect_rc 3 "relay — 버려짐 ${1}: compose 가 파일을 통째로 버리면 보내지 않는다"
+  _expect_text '통째로 버렸다' "relay — 버려짐 ${1}: 문면이 「필수 키가 없다」가 아니라 그 사실을 말한다"
+}
+_relay_dropped '안 닫힌 따옴표' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="v'
+_relay_dropped '값 뒤 !!' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="v" !!x'
+# `${VAR:?…}` 도 compose 가 파일을 버리게 하는 꼴이지만, 이제는 **그 앞의 좁히는 전제**(값에 `$` 를
+# 쓰지 않는다, v L-3)가 먼저 끊는다 — 아래 「보간 축」 단언이 그 자리를 잰다. 같은 입력을 두 문면으로
+# 기대하지 않는다.
+
+# ── v L-2 — 검사한 파일과 **컨테이너가 받는 파일**이 같은가 ─────────────────────
+# stub YAML 에 경로를 따옴표 없이 넣으면 경로의 ` #' 이 YAML 주석이 되어 `config` 가 **다른 파일**을
+# 읽는다. 그러면 우회 줄을 담은 파일이 깨끗한 이웃으로 검사되고 `--env-from-file` 로는 그 파일이 간다.
+RELAY_HASH_ENV="$T/env/relay.env #x"
+{ printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_SITE_BASE_URL=https://example.invalid\n'
+  printf 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil\n'; } > "$RELAY_HASH_ENV"
+chmod 600 "$RELAY_HASH_ENV"
+_relay_env   # 이웃의 깨끗한 relay.env — 따옴표가 없으면 이쪽이 읽힌다
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$RELAY_HASH_ENV" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 3 "relay — 경로에 ' #' 이 있어도 **그 파일**을 검사한다(이웃의 깨끗한 파일이 아니라)"
+_expect_text 'BIDVECTOR_PERSISTENCE_JDBCURL' "relay — 그 파일의 우회 키를 문면이 보인다"
+
+# ── v M-1 — 경로의 `$` 는 compose 가 stub 의 **값**에서 보간한다 ────────────────
+# JSON 인용은 YAML 파싱만 닫고 보간은 닫지 않는다. 그래서 `…/${NOPE:-relay.env}` 는 `config` 가
+# **이웃**을 읽고 `--env-from-file` 은 **그 파일**을 읽게 만든다 — L-2 와 같은 계열의 다른 통로다.
+RELAY_DOLLAR_ENV="$T/env/\${NOPE:-relay.env}"
+{ printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_SITE_BASE_URL=https://example.invalid\n'
+  printf 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil\n'; } > "$RELAY_DOLLAR_ENV"
+chmod 600 "$RELAY_DOLLAR_ENV"
+_relay_env   # 이웃의 깨끗한 relay.env — 보간이 열려 있으면 이쪽이 읽힌다
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$RELAY_DOLLAR_ENV" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 3 "relay — 경로에 '\$' 가 있으면 보내지 않는다(검사한 파일과 받는 파일이 갈린다)"
+_expect_text '경로에' "relay — 그 거절이 **경로** 축의 것이다(값 축이 아니라)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(경로 보간 축)"
+
+# ── v L-3 — 두 해석기의 `${VAR}` 조회 집합이 다르다 ─────────────────────────────
+# `config` 는 래퍼 프로세스의 env 로, `run --env-from-file` 은 컨테이너에 주는 env 로 푼다. 그래서
+# `…=${HOME:?x}` 는 `config` 를 통과하고 run 에서는 파일이 **통째로** 버려진다. 좁히는 전제로 닫는다.
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${HOME:?x}'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 값의 \${VAR} 는 거절한다(두 통로가 서로 다른 env 로 푼다)"
+_expect_text "'\\\$' 가 있다" "relay — 그 거절이 **보간 축**의 것이다(「통째로 버렸다」가 아니다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(보간 축)"
+# **`env -i` 만으로는 닫히지 않는 한 칸** — `config` 에 남긴 유일한 이름이 `PATH` 라 `${PATH:?x}` 는
+# 좁힌 env 에서도 **통과한다**(실측: rc 0 · 키 3). 그 한 칸을 닫는 것이 위의 좁히는 전제이고,
+# 이 입력이 그 전제를 **단독으로** 잰다(앞의 `${HOME:?x}` 는 두 기제가 겹쳐 가르지 못한다).
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${PATH:?x}'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — \${PATH:?…} 도 거절한다(좁힌 env 가 못 보는 한 칸)"
+_expect_no_log ' run --rm' "relay — 그 거절도 compose run 앞에서 끝난다"
+
+# ── cr R-2 — 재는 경로와 넘기는 경로가 **같은가**(심볼릭 링크로 가른다) ──────────
+# 둘 다 같은 문자열이면 이 축은 미측정이다. 링크를 주면 원문과 해석된 경로가 **다른 글자**가 된다.
+_relay_env
+ln -sfn "$RELAYENV" "$T/env/relay-link.env"
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$T/env/relay-link.env" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 0 "relay — 링크로 준 채널 env 도 돈다"
+_expect_log "--env-from-file $(readlink -f "$RELAYENV")" "relay — 컨테이너에 **해석된** 경로를 넘긴다(재는 것과 같은 파일)"
+_expect_no_log "--env-from-file $T/env/relay-link.env" "relay — 원문 경로를 그대로 넘기지 않는다"
+
+# ── cr R-1 — 도구 어긋남은 compose 거절과 **다른 코드**로 돌아온다 ───────────────
+# `mktemp` 축이 그 갈래를 단독으로 잰다(`jq` 는 위 문턱이 먼저 잡아 가르지 못한다).
+_relay_env
+TMPDIR="$T/no-such-tmpdir" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 임시 자리를 만들지 못하면 멈춘다"
+_expect_text '도구.*가 어긋났다' "relay — 그 문면이 **도구**를 가리킨다"
+_expect_no_text '통째로 버렸다' "relay — 도구 어긋남을 「채널 env 가 깨졌다」로 읽지 않는다"
+
+# ── cr N-2 — 해석 **도중에** 신호를 받아도 stub 임시 자리를 남기지 않는다 ────────
+# `RETURN` trap 은 함수가 스스로 끝날 때만 돈다 — 신호에는 돌지 않는다. 그래서 신호 trap 을 해석
+# 앞에 걸었고, 여기서 **그 창 안에서** TERM 을 보내 남는 것이 없음을 센다. 가짜 docker 가
+# `SHIM_CONFIG_SLEEP` 으로 창을 연다(그 갈래는 진짜 compose 로 넘어가기 직전이다).
+_relay_env
+mkdir -p "$T/stubtmp"
+rm -rf "${T:?}/stubtmp/"*
+RUN_RC=0
+: > "$SHIM_LOG"
+TMPDIR="$T/stubtmp" SHIM_CONFIG_SLEEP=10 \
+  setsid ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}" > "$T/out" 2> "$T/err" &
+stub_pid=$!
+for i in $(seq 1 200); do [ -n "$(ls -A "$T/stubtmp" 2>/dev/null)" ] && break; sleep 0.1; done
+if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+  kill -9 "$stub_pid" 2>/dev/null || true
+  _bad "stub 임시 자리가 만들어지지 않았다 — 신호 갈래를 잴 수 없다"
+else
+  _ok "stub 임시 자리가 해석 중에 실제로 있다(이 단언이 공허하지 않다)"
+  stub_pg="$(ps -o pgid= -p "$stub_pid" 2>/dev/null | tr -d ' ')"
+  kill -s TERM -"${stub_pg:-$stub_pid}" 2>/dev/null || kill -s TERM "$stub_pid" 2>/dev/null || true
+  wait "$stub_pid" 2>/dev/null || RUN_RC=$?
+  _expect_rc 143 "relay — 해석 중 TERM 이면 그 신호로 죽는다(128+15)"
+  if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+    _ok "relay — 해석 중 TERM 이어도 stub 임시 자리를 남기지 않는다"
+  else
+    _bad "relay — 해석 중 TERM 이 stub 임시 자리를 남겼다: $(ls -A "$T/stubtmp" | tr '\n' ' ')"
+  fi
+fi
+# **정상 경로도 치운다** — 신호 갈래만 재면 「끝까지 돈 run 이 자리를 쌓는다」가 열린 채다(실측:
+# 이 단언이 없으면 호출 직후의 정리를 걷는 변이가 **초록**이다). 양성 run 뒤에 자리가 비어야 한다.
+rm -rf "${T:?}/stubtmp/"*
+TMPDIR="$T/stubtmp" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 0 "relay — 양성: 임시 자리를 따로 줘도 돈다"
+if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+  _ok "relay — 끝까지 돈 run 도 stub 임시 자리를 남기지 않는다"
+else
+  _bad "relay — 끝까지 돈 run 이 stub 임시 자리를 남겼다: $(ls -A "$T/stubtmp" | tr '\n' ' ')"
+fi
+rm -rf "${T:?}/stubtmp"
+
+# ── cr R-1 — 도구가 깨진 것을 「채널 env 가 깨졌다」로 읽지 않는다 ───────────────
+mkdir -p "$T/badbin"
+printf '#!/bin/sh\nexit 127\n' > "$T/badbin/jq"
+chmod +x "$T/badbin/jq"
+_relay_env
+PATH="$T/badbin:$PATH" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — jq 가 깨지면 멈춘다"
+# **제 문면을 잰다**(cr N-5) — 「jq 문턱」과 「해석 뒤 도구 어긋남」은 고칠 자리가 같아 보이지만
+# 서는 자리가 다르다. 문턱이 먼저 잡는다는 것을 그 글자로 못박는다.
+_expect_text '가장 단순한 JSON' "relay — 그 문면이 **jq 문턱**의 것이다(해석 뒤 갈래가 아니라)"
+_expect_no_text '도구.*가 어긋났다' "relay — 문턱이 먼저 잡으므로 해석 뒤 문면이 나오지 않는다"
+_expect_no_text '통째로 버렸다' "relay — 깨진 도구를 「채널 env 가 깨졌다」로 읽지 않는다"
+
+# ── cr H-2 — 이 파일은 **부르는 사용자**가 읽는다. other 에 열리면 거절한다 ──────
+_relay_env
+chmod 644 "$RELAYENV"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 채널 env 가 other 에 열려 있으면 보내지 않는다(이 파일은 봇 자격을 담는다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(권한 축)"
+_relay_env
+JAVA_TOOL_OPTIONS='-Djdk.internal.httpclient.debug=' _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — JAVA_TOOL_OPTIONS 의 로그 속성은 **빈 값이어도** 거절이다(존재만 본다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(JVM 옵션 축)"
+SHIM_NO_ENV_FROM_FILE=1 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — compose 가 run --env-from-file 을 모르면 보내지 않는다(채널 env 가 컨테이너에 닿지 않는다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(플래그 지원 축)"
+# cr L-6 — **빈 도움말은 따로 말한다.** 「플래그가 없다」와 「도움말을 못 받았다」는 고칠 자리가 다르다.
+SHIM_EMPTY_RUN_HELP=1 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — run --help 이 빈 출력이어도 멈춘다"
+_expect_text '아무것도 내지 않았다' "relay — 빈 출력은 「플래그를 모른다」와 **다른 문면**이다"
+
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 0 "relay — 양성: 잔존 0 · 같은 커밋 · 같은 프로젝트 · 채널 env 가 §13.2 면 보낸다"
+_expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-relay" "relay — 자기 일회 컨테이너 이름을 고정해 띄운다"
+_expect_log "--env-from-file $RELAYENV" "relay — 둘째 env 파일이 **일회 컨테이너까지** 간다(§13.3)"
+_expect_log "--env-file $T/env/prod.env" "relay — 스택 env 파일은 그대로 compose 에 간다(파일이 둘이다)"
+_expect_log "--bidvector.relay.mode=once" "relay — 러너 스위치를 준다"
+_expect_log "--bidvector.relay.environment=production" "relay — 기본 환경은 production 이다"
+_expect_log "--bidvector.relay.owner=op-fixture" "relay — owner 를 그대로 넘긴다"
+_expect_log "--bidvector.relay.channel=telegram" "relay — 채널은 telegram 으로 고정이다"
+_expect_log "--bidvector.relay.claim-limit=50" "relay — claim-limit 기본은 50 이다(§13.3)"
+_expect_log "-e SPRING_MAIN_WEB_APPLICATION_TYPE=none" "relay — 러너 run 은 HTTP 표면을 끈다"
+# cr L-3 — `_expect_no_log ' run --rm'` 은 훑기·평가의 `' run '` 보다 **느슨하다**(첫 플래그가 다른
+# `run` 이 생기면 지나간다). 느슨해진 사유는 플래그 지원 질의(`run --help`) 하나뿐이므로 그 **수**를
+# 세어 원래 세기를 되찾는다: 양성 run 에서 ` run ` 이 든 줄은 **정확히 둘**(질의 하나 + 진짜 run 하나).
+relay_run_n="$(grep -cE '^docker .* run ' "$SHIM_LOG" || true)"
+if [ "$relay_run_n" = 2 ]; then
+  _ok "relay — 양성 run 에서 ' run ' 줄은 둘이다(도움말 질의 하나 + 일회 컨테이너 하나)"
+else
+  _bad "relay — ' run ' 줄이 ${relay_run_n} 개다(둘이어야 한다 — 거절 갈래의 ' run --rm' 단언이 그만큼 느슨해진다)"
+fi
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}" --environment staging --claim-limit 1
+_expect_rc 0 "relay — §13.4 의 단계 실행(staging · claim-limit 1)이 선다"
+_expect_log "--bidvector.relay.environment=staging" "relay — staging 을 그대로 넘긴다"
+_expect_log "--bidvector.relay.claim-limit=1" "relay — 첫 실발송의 상한 1 을 그대로 넘긴다"
+
+# **러너의 다섯과 래퍼의 둘이 겹치지 않는가**(M15/15Q). 러너 3(`LEASE_BUSY` — 기다리면 풀린다)과
+# 래퍼 3(전제 실패 — 고쳐야 한다), 러너 4(`ENV_SUPPRESSED` — 고쳐야 한다)와 래퍼 4(미룸 — 기다리면
+# 풀린다)는 **뜻이 정확히 반대**다. 겹치면 §9.5 의 경보가 거꾸로 운다.
+SHIM_RUN_RC=3 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 5 "relay — 러너의 LEASE_BUSY(3)는 **5** 로 나온다(래퍼의 전제 실패 3 과 겹치지 않는다)"
+_expect_text 'LEASE_BUSY' "relay — 그 줄이 옮긴 코드의 원래 이름을 보인다"
+SHIM_RUN_RC=4 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 6 "relay — 러너의 ENV_SUPPRESSED(4)는 **6** 으로 나온다(래퍼의 미룸 4 와 겹치지 않는다)"
+_expect_text 'ENV_SUPPRESSED' "relay — 그 줄이 옮긴 코드의 원래 이름을 보인다"
+SHIM_RUN_RC=1 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 1 "relay — 러너의 FAILED(1)는 그대로 1 이다"
+SHIM_RUN_RC=2 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 2 "relay — 러너의 INCOMPLETE(2)는 그대로 2 다"
+
+_hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 4 "relay — 프로젝트 잠금이 잡혀 있으면 **미룬다**(4) — 전제 실패(3)가 아니다"
+_expect_no_log ' run --rm' "relay — 그 미룸이 일회 컨테이너 앞에서 끝난다"
+_release_lock
+_hold_lock "$T/state/.lock"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 4 "relay — 상태 디렉터리 잠금이 잡혀 있어도 **미룬다**(4)"
+_release_lock
+rm -f "$T/state/.lock"
+chmod 500 "$T/state"
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 잠금 **파일을 열지 못하면** 전제 실패(3)다"
+chmod 700 "$T/state"
+for frc in 1 64 65 70 127 137; do
+  SHIM_FLOCK_RC="$frc" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+  _expect_rc 3 "relay — flock 종료 ${frc} 는 전제 실패(3) — 경합으로 접지 않는다"
+done
+
+# 신호 경로 — 러너 셋이 **각자의** 일회 컨테이너만 치운다. **HUP 도 건다**(cr L-1): §9.2 가 끊긴
+# ssh 세션·`KillSignal=` 을 바꾼 unit 에 돌리는 갈래이고, trap 이 어긋나면 **운영 DB 자격을 받은 일회
+# 컨테이너가 남는** 바로 그 경로다. 훑기에만 있던 것을 셋 모두에 둔다.
+SIG_SCRIPT=./tools/prod-evaluation-commit.sh
+SIG_ONEOFF_SUFFIX=evaluation
+SIG_ARGS=("${EVAL_ARGS[@]}")
+_signal_case TERM 143
+_signal_case HUP 129
+SIG_SCRIPT=./tools/prod-notification-relay.sh
+SIG_ONEOFF_SUFFIX=relay
+SIG_ARGS=("${RELAY_ARGS[@]}")
 _signal_case TERM 143
 _signal_case HUP 129
 
@@ -523,14 +928,29 @@ echo "== runbook — ExecStopPost 가 조건 없이 돌지 않는가"
 # v M-1 시나리오를 막는 바로 그 조항이다. **`4` 조항은 M15/15M 이 더했다**: 미룸은 자기 일회
 # 컨테이너를 띄우지도 않으므로(위 `_expect_no_log ' run '`) 지울 것이 없고, 조건이 없으면 그때도
 # 돌아 **남의 컨테이너**를 지운다(exit 3 조항과 같은 사유).
+#
+# **M15/15Q — 러너가 셋이 됐다**(훑기·평가 커밋·relay). 이름 하나를 박던 꼬리를 `-app-run-<이름>` 으로
+# 넓히고 **개수 등식은 그대로** 둔다 — 새 unit 이 조건 없는 줄을 들고 들어오면 그 등식이 깨진다.
+# 러너 이름 집합도 함께 센다(꼬리를 `.*` 로 열면 아무 이름이나 통과해 등식이 공허해진다).
 RB=docs/runbook/m7-7f-production.md
-ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| \[ "\$\$EXIT_STATUS" = 4 \] \|\| .*docker rm -f [^ ]*-app-run-sweep'
+ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| \[ "\$\$EXIT_STATUS" = 4 \] \|\| .*docker rm -f [^ ]*-app-run-(sweep|evaluation|relay)'
 esp_n="$(grep -cE '^ExecStopPost=' "$RB" || true)"
 esp_cond="$(grep -cE "$ESP_WANT" "$RB" || true)"
 if [ "$esp_n" -ge 1 ] && [ "$esp_n" = "$esp_cond" ]; then
   _ok "runbook 의 ExecStopPost ${esp_n} 줄이 모두 조건식 전문과 같다(성공·exit 3·exit 4 건너뜀 · \$\$ 형태)"
 else
   _bad "runbook 의 ExecStopPost ${esp_n} 줄 중 ${esp_cond} 만 조건식 전문과 같다 — 조항이 빠지거나 \$\$ 형태가 아니면 남의 run 을 지우는 길이 다시 열린다"
+fi
+# **러너 셋이 각자의 이름을 지운다** — 한 unit 의 줄이 남의 일회 컨테이너 이름을 들면 그 unit 의 실패가
+# 남의 run 을 지운다. 이름 집합의 크기로 센다(같은 이름 셋이면 1 이다).
+# **추출을 `^ExecStopPost=` 줄에 묶는다**(cr L-4): 문서 전체에서 긁으면 §9.4 의 **산문** 줄
+# (`docker rm -f <프로젝트>-app-run-sweep`)도 집어, unit 의 그 줄을 지우고 산문만 남겨도 집합 등식이
+# 초록이었다. 이제 세는 모집단은 `esp_n` 이 세는 바로 그 줄들이다.
+esp_names="$(grep -E '^ExecStopPost=' "$RB" | grep -oE 'docker rm -f [^ ]*-app-run-[a-z]+' | sed 's/.*-app-run-//' | sort -u | tr '\n' ' ')"
+if [ "$esp_names" = "evaluation relay sweep " ]; then
+  _ok "runbook 의 ExecStopPost 가 러너 셋의 **서로 다른** 일회 이름을 지운다(${esp_names})"
+else
+  _bad "runbook 의 ExecStopPost 가 지우는 이름 집합이 {evaluation, relay, sweep} 가 아니다: ${esp_names}"
 fi
 
 # M15/15M(cr H-1) — **`SuccessExitStatus=4` 가 drop-in 에 있어야** 미룸이 `OnFailure` 를 끌지 않는다.
@@ -541,13 +961,36 @@ fi
 # (`20-alert.conf`)에 있으면 경보를 끄는 `rm` 한 줄이 **미룸 의미까지** 되돌린다 — 그 host 에서는
 # 반입과 겹친 미룸이 다시 unit failed 로 찍힌다. `ExecStopPost` 단언과 같은 모양으로 **개수 등식**을
 # 건다(문서 어디에 있어도 초록이던 앞 판의 느슨함을 없앤다). 숫자 경계는 `14`·`40` 을 배제한다.
-defer_block="$(awk '/^# \/etc\/systemd\/system\/bidvector-notification-sweep\.service\.d\/10-defer\.conf$/ {inb = 1} inb && /^```$/ {exit} inb {print}' "$RB")"
+#
+# **M15/15Q — drop-in 이 셋이 됐다.** 블록 이름을 하나 박던 자리를 `*/10-defer.conf` 전수로 넓히고
+# 개수 등식은 그대로 둔다. awk 는 그 주석 줄에서 켜지고 닫는 울타리에서 **꺼진다**(`exit` 가 아니다 —
+# 블록이 여럿이라 첫 블록에서 멈추면 나머지가 안 보이고, 그 느슨함이 「어디에 있어도 초록」을 되살린다).
+defer_block="$(awk '/^# \/etc\/systemd\/system\/[a-z-]+\.service\.d\/10-defer\.conf$/ {inb = 1; next} inb && /^```$/ {inb = 0; next} inb {print}' "$RB")"
 ses_total="$(grep -cE '^SuccessExitStatus=' "$RB" || true)"
 ses_in="$(printf '%s\n' "$defer_block" | grep -cE '^SuccessExitStatus=([^#]*[^0-9])?4([^0-9]|$)' || true)"
 if [ "$ses_total" -ge 1 ] && [ "$ses_total" = "$ses_in" ]; then
   _ok "runbook 의 SuccessExitStatus ${ses_total} 줄이 모두 10-defer.conf 블록 안에서 4 를 뺀다"
 else
   _bad "SuccessExitStatus 줄 ${ses_total} 중 10-defer.conf 블록 안의 4 는 ${ses_in} 이다 — 자리가 경보 drop-in 이면 경보를 끄는 rm 이 미룸 의미까지 되돌린다"
+fi
+# **relay 의 drop-in 은 `5` 도 빼야 한다**(M15/15Q). 러너의 `LEASE_BUSY` 를 옮긴 코드이고 「기다리면
+# 풀린다」라 미룸과 같은 갈래다 — 빼지 않으면 임대가 겹칠 때마다 경보가 한 통 온다. 반대로 `6`
+# (`ENV_SUPPRESSED`, 옛 4)은 **빼면 안 된다**: 기다려도 풀리지 않는 설정 오류다. 둘을 함께 센다.
+# **relay unit 이 평가 커밋 뒤에 선다**(cr M-3). 타이머 셋이 `Persistent=true` 라 창을 놓친 뒤 부팅하면
+# systemd 가 밀린 run 들을 거의 동시에 띄우고, 잠금 둘은 **직렬화는 하지만 순서를 정하지 않는다** —
+# relay 가 먼저 잡으면 그 catch-up run 은 평가 커밋의 행 없이 돌고 끝난다. 그 한 줄이 그 순서를 세운다.
+relay_after="$(awk '/^# \/etc\/systemd\/system\/bidvector-notification-relay\.service$/ {inb = 1; next} inb && /^```$/ {exit} inb {print}' "$RB" | grep -cE '^After=bidvector-evaluation-commit\.service$' || true)"
+if [ "$relay_after" = 1 ]; then
+  _ok "runbook 의 relay unit 이 평가 커밋 뒤에 선다(After=)"
+else
+  _bad "relay unit 블록에 'After=bidvector-evaluation-commit.service' 가 ${relay_after} 줄이다(1 이어야 한다) — Persistent=true 의 catch-up 에서 순서가 뒤집힌다"
+fi
+relay_defer="$(printf '%s\n' "$defer_block" | grep -E '^SuccessExitStatus=.*5' | grep -c '' || true)"
+relay_six="$(printf '%s\n' "$defer_block" | grep -cE '^SuccessExitStatus=([^#]*[^0-9])?6([^0-9]|$)' || true)"
+if [ "$relay_defer" = 1 ] && [ "$relay_six" = 0 ]; then
+  _ok "relay 의 10-defer.conf 가 5(LEASE_BUSY)는 빼고 6(ENV_SUPPRESSED)은 빼지 않는다"
+else
+  _bad "relay drop-in 의 제외 목록이 어긋났다 — 5 를 빼는 줄 ${relay_defer}(1 이어야 한다) · 6 을 빼는 줄 ${relay_six}(0 이어야 한다)"
 fi
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"
