@@ -1,8 +1,8 @@
 # M15 / 15P — rollback
 
-**실측 HEAD: `58172b62e82c471b1d94e3f8de7c5d9be4ef0e6d`**(= main 병합 커밋). 앞 라운드의 실측을 옮기지
-않고 다시 돌렸다. 이 slice 의 마지막 산출물 커밋(`efe27a857`, 알려진 제한 11~14 등재) **뒤에 main 병합이
-오므로 실측 자리는 그 병합 커밋**이다(하네스 규율). 이 문서를 담는 커밋은 그 뒤에 온다.
+**실측 HEAD: `36c78be6ae763cde97a990d601cc32df27323e5c`**(이 slice 의 마지막 산출물 커밋 — evidence
+압축). 앞 라운드의 실측을 옮기지 않고 다시 돌렸다. main 병합 커밋(`58172b62e`)은 그보다 **앞**에 있어
+실측 자리는 규율대로 마지막 산출물 커밋이다. 이 문서를 담는 커밋은 그 뒤에 온다.
 
 ## 복원 원천 — 바뀌었다
 
@@ -57,4 +57,5 @@ docs/discovery/capability-map.md milestone-15.md tools/prod-alert-check.sh
 tools/prod-alert-telegram.sh config/quality/shell-guard-policy.properties
 reports/evidence/m15/15p/` 가 빈 출력이고 `git rev-list --merges <실측 HEAD>..<판정 SHA>` 가 빈
 출력이면 유효하다. 나온 경로가 **전부 원천에 없는 신설 파일**이면 예외로 유효하다 — 열거와 원천 부재
-확인은 verifier 가 한다. **머지 커밋은 실측 HEAD 자신이므로** 그 뒤 구간에는 머지가 없다.
+확인은 verifier 가 한다. **main 병합 커밋은 실측 HEAD 보다 앞에 있으므로**(`58172b62e` → `36c78be6a`)
+그 뒤 구간에는 머지가 없다.
