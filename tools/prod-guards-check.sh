@@ -162,8 +162,14 @@ if [ "${1:-}" = compose ]; then
       # 키 집합을 **소비자와 같은 해석기**로 뽑는데, 그 해석을 여기서 흉내 내면 단언이 재는 것은
       # compose 가 아니라 **이 가짜의 셋째 문법**이 된다 — 우회 줄이 거절되는지는 그러면 영영 미측정이다.
       # 그 호출은 stub 파일 하나를 읽는 client-side 렌더링이라 운영 스택·데몬에 닿지 않는다.
+      # 진짜 자리는 **파일**에서 읽는다 — 래퍼가 이 호출을 `env -i` 로 돌리므로(v L-3: 보간 조회
+      # 집합을 좁힌다) 환경 변수로는 건너오지 않는다. 그 좁힘은 산출물의 성질이고 하네스가 거기
+      # 맞춘다(반대로 하면 검사를 위해 산출물을 넓히는 꼴이다).
       if [ -n "$ffile" ] && grep -q 'bidvector-relay-envcheck' "$ffile" 2>/dev/null; then
-        exec "$SHIM_REAL_DOCKER" "${ORIG[@]}"
+        real="${SHIM_REAL_DOCKER:-}"
+        [ -n "$real" ] || real="$(cat "${0%/*}/.real-docker" 2>/dev/null || true)"
+        [ -n "$real" ] || { echo "SHIM: 진짜 docker 자리를 찾지 못했다" >&2; exit 97; }
+        exec "$real" "${ORIG[@]}"
       fi
       [ -n "${SHIM_CONFIG_FILE:-}" ] && [ -r "${SHIM_CONFIG_FILE:-}" ] || exit 1
       cat "$SHIM_CONFIG_FILE" ;;
@@ -268,6 +274,7 @@ cat > "$T/bin/flock" <<'SHIM'
 [ -z "${SHIM_FLOCK_RC:-}" ] || exit "${SHIM_FLOCK_RC}"
 exec "$SHIM_REAL_FLOCK" "$@"
 SHIM
+printf '%s\n' "$REAL_DOCKER" > "$T/bin/.real-docker"
 chmod +x "$T/bin/docker" "$T/bin/git" "$T/bin/flock"
 export PATH="$T/bin:$PATH"
 export SHIM_REAL_FLOCK="$REAL_FLOCK" SHIM_FLOCK_RC="" SHIM_REAL_DOCKER="$REAL_DOCKER"
@@ -702,7 +709,41 @@ _relay_dropped() { # <이름> <덧붙일 줄>
 }
 _relay_dropped '안 닫힌 따옴표' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="v'
 _relay_dropped '값 뒤 !!' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="v" !!x'
-_relay_dropped '${X:?m}' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${BVQ_NO_SUCH_VAR:?m}'
+# `${VAR:?…}` 도 compose 가 파일을 버리게 하는 꼴이지만, 이제는 **그 앞의 좁히는 전제**(값에 `$` 를
+# 쓰지 않는다, v L-3)가 먼저 끊는다 — 아래 「보간 축」 단언이 그 자리를 잰다. 같은 입력을 두 문면으로
+# 기대하지 않는다.
+
+# ── v L-2 — 검사한 파일과 **컨테이너가 받는 파일**이 같은가 ─────────────────────
+# stub YAML 에 경로를 따옴표 없이 넣으면 경로의 ` #' 이 YAML 주석이 되어 `config` 가 **다른 파일**을
+# 읽는다. 그러면 우회 줄을 담은 파일이 깨끗한 이웃으로 검사되고 `--env-from-file` 로는 그 파일이 간다.
+RELAY_HASH_ENV="$T/env/relay.env #x"
+{ printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_SITE_BASE_URL=https://example.invalid\n'
+  printf 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil\n'; } > "$RELAY_HASH_ENV"
+chmod 600 "$RELAY_HASH_ENV"
+_relay_env   # 이웃의 깨끗한 relay.env — 따옴표가 없으면 이쪽이 읽힌다
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$RELAY_HASH_ENV" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 3 "relay — 경로에 ' #' 이 있어도 **그 파일**을 검사한다(이웃의 깨끗한 파일이 아니라)"
+_expect_text 'BIDVECTOR_PERSISTENCE_JDBCURL' "relay — 그 파일의 우회 키를 문면이 보인다"
+
+# ── v L-3 — 두 해석기의 `${VAR}` 조회 집합이 다르다 ─────────────────────────────
+# `config` 는 래퍼 프로세스의 env 로, `run --env-from-file` 은 컨테이너에 주는 env 로 푼다. 그래서
+# `…=${HOME:?x}` 는 `config` 를 통과하고 run 에서는 파일이 **통째로** 버려진다. 좁히는 전제로 닫는다.
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY=${HOME:?x}'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 값의 \${VAR} 는 거절한다(두 통로가 서로 다른 env 로 푼다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(보간 축)"
+
+# ── cr R-1 — 도구가 깨진 것을 「채널 env 가 깨졌다」로 읽지 않는다 ───────────────
+mkdir -p "$T/badbin"
+printf '#!/bin/sh\nexit 127\n' > "$T/badbin/jq"
+chmod +x "$T/badbin/jq"
+_relay_env
+PATH="$T/badbin:$PATH" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — jq 가 깨지면 멈춘다"
+_expect_text 'jq' "relay — 그 문면이 **도구**를 가리킨다"
+_expect_no_text '통째로 버렸다' "relay — 깨진 도구를 「채널 env 가 깨졌다」로 읽지 않는다"
 
 # ── cr H-2 — 이 파일은 **부르는 사용자**가 읽는다. other 에 열리면 거절한다 ──────
 _relay_env

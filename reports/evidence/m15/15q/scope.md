@@ -35,8 +35,11 @@ acceptance_commands:
   # 이 slice 의 검사가 도는 자리는 CI `container` job 의 S-27d 하나다(새 step 을 만들지 않았다 —
   # 새 단언은 기존 검사 안으로 들어간다). 그 명령은 축어로 로컬에서 돌았다.
   - ./tools/prod-guards-check.sh
-  # 전제: 잠금 자리가 있어야 한다 —
-  #   sudo install -d -m 0755 -o $(id -un) -g $(id -gn) /run/lock/bidvector-v2
+  # 전제 둘(cr R-4):
+  #  ① 잠금 자리 — sudo install -d -m 0755 -o $(id -un) -g $(id -gn) /run/lock/bidvector-v2
+  #  ② **진짜 docker CLI** — 채널 env 의 키 집합 단언은 가짜가 아니라 **그 host 의 compose** 가 내는
+  #     답을 잰다(그래서 값이 있다). 그러므로 compose 를 올린 날 답이 바뀌면 그것은 게이트가 흔들린
+  #     것이 아니라 **측정이 옮겨간 것**이다 — 바뀐 답이 §13.2 의 일곱 밖이면 그때 멈추는 것이 맞다.
   - bash -n tools/prod-notification-relay.sh tools/prod-evaluation-commit.sh tools/prod-env.sh tools/prod-guards-check.sh
   # (CI) container job 전건 — S-20z · S-21~S-22f · S-23~S-25 · S-26 · S-27 · S-27b · S-27c ·
   #   **S-27d** · S-27e. 나머지 step 은 이미지 빌드·trivy·compose 기동이 필요해 판정은 PR head 의 CI 다.
@@ -76,6 +79,7 @@ rollback: reports/evidence/m15/15q/rollback.md
 | **둘째 env 파일의 키** | `run --env-from-file` 로 들어온 값은 서비스가 선언한 env 에 더해지고 **같은 이름이면 이긴다**(실측). `JAVA_TOOL_OPTIONS` 나 `BIDVECTOR_PERSISTENCE_JDBCURL` 한 줄이면 반입 가드를 거치지 않고 운영 app 의 DB·JVM 통로를 바꾼다 — 설정 통로 등식은 **해석된 compose 만** 보므로 이 파일은 그 밖이다 | 키 집합을 **§13.2 의 일곱으로 닫는다**(열거가 아니라 집합). 허용 이름은 Spring 의 두 사상으로 속성 이름에서 만든다 |
 | **JVM 의 JDK HttpClient 내부 로그 속성** | 요청 URL 이 stderr → journald 로 나가고 그 URL 은 **경로에 봇 자격**을 싣는다. 어댑터가 로거를 쥐지 않는다는 보증 **밖**의 축이다(JDK 자신의 로그) | 래퍼가 **기동 전에** 끊는다(`exit 3`). 보는 자리는 compose 가 못 보는 둘 — 자기 프로세스의 JVM 옵션 통로 셋과 `relay.env`. 판정은 **존재만** 본다 |
 | **env 파일의 값** | 래퍼가 값을 문면에 옮기면 journal 에 남는다 | 이 래퍼의 어느 문면도 값을 나르지 않는다 — 키 이름 · 속성 이름 · 줄 **개수**뿐이다(모양 거부 줄도 내용을 옮기지 않는다) |
+| **래퍼 프로세스의 셸 변수**(cr R-3 — 수정 라운드 1 이 한 칸 넓혔다) | `config --format json` 의 출력은 **값을 담는다**. 앞 판의 sed 술어는 값을 한 번도 쥐지 않았다 | 그 출력은 `_relay_parsed_keys` 안의 **`local` 변수** 하나에만 들어가고 함수가 끝나면 풀린다. `jq` 가 **키만** 뽑고 stderr 는 버리므로 **어느 출력 통로로도 나가지 않는다**. argv 에 오르는 것은 여전히 경로뿐이다(`jq -Rn --arg` 로도 값이 아니라 **경로**만 넘긴다) |
 | **종료 코드** | relay 러너의 다섯과 래퍼의 둘이 겹치면, 뜻이 **정확히 반대**인 둘이 같은 수로 만나 §9.5 의 경보가 **거꾸로** 운다(기다리면 풀리는 것에 경보가 울고, 고쳐야 하는 것이 조용하다) | 래퍼가 러너의 `3`·`4` 를 **5·6 으로 옮긴다.** drop-in 의 제외 목록은 `4 5` 이고 `6` 은 빼지 않는다 |
 | **반입 불변식** | 래퍼가 훑기의 전제를 하나라도 건너뛰면, 반입이 막는 상태(옮겨진 태그 · 다른 커밋의 트리 · 끝나지 않은 반입)에서 **운영 DB 자격을 받은 컨테이너**가 뜬다 | 훑기와 **같은 술어**를 같은 순서로 쓴다. 술어의 단일 출처는 `tools/prod-env.sh` 이고, 거동은 `prod-guards-check.sh` 가 러너 셋에 **같은 모양으로** 건다 |
 
@@ -215,6 +219,29 @@ BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc
 | **cr L-9** 두 소비자의 키 집합이 다르다 | §13.2 에 「이 일곱은 relay·경보 **두 소비자의 합집합**」을 박았다 — 경보가 자기 키를 들이면 relay 가 거절하기 시작한다 |
 | cr 덧붙임 — `delivered=0` | ③ 에 「중복으로 접히면 0 일 수 있다」 한 줄 |
 
+## 최종 라운드 (PR #204 verifier ready-for-review + code-reviewer approve)
+
+판정 SHA `152536234` 기준. **차단 0** — verifier `ready-for-review` · code-reviewer `approve`.
+등재로 넘겨도 되는 **low 9**(v L-2·L-3 · cr R-1~R-7)를 승인 전에 일괄 처리했다. 자격 경로라 **코드
+고침은 각각 실측**했다.
+
+| 지적 | 조치 | 실측 |
+|---|---|---|
+| **v L-2** stub YAML 의 경로가 따옴표 없이 들어간다 — 경로의 ` #` 이 YAML 주석이 되어 `config` 가 **다른 파일**을 읽는다 | 경로를 `jq -Rn --arg` 로 **JSON 문자열**로 넣는다 | 같은 디렉터리의 `relay.env`(깨끗) 옆 `relay.env #x`(우회 줄 포함): 따옴표 없으면 키 **3**(이웃을 읽었다) · JSON 따옴표면 키 **4**(그 파일을 읽었다). guards 단언 둘 |
+| **v L-3** 두 해석기의 `${VAR}` 조회 집합이 다르다 — `…=${HOME:?x}` 가 `config` 를 통과하고 run 에서는 파일이 통째로 버려진다 | ⓐ `config` 를 `env -i PATH=…` 로 돌려 조회 집합을 좁히고 ⓑ **값에 `$` 를 쓰지 않는다**는 좁히는 전제를 앞에 둔다(키 집합을 뽑는 문법이 아니다 — 거절만 더할 수 있다) | `${HOME:?x}`: 평소 env 에서 rc 0·키 3 → `env -i PATH` 에서 **rc 1·키 0**. `${PATH:?x}` 는 `env -i PATH` 에서도 통과하므로 ⓑ 가 그 한 칸을 닫는다(`env -i` 에 아무것도 안 주면 그것도 rc 1 이지만, 하네스의 가짜 docker 가 `#!/usr/bin/env` 라 PATH 를 남긴다) |
+| **cr R-1** 깨진 `jq` 가 「채널 env 가 깨졌다」로 읽힌다 | 도구 문턱을 **도구 자리**에 둔다(`jq` 존재 + 가장 단순한 JSON 왕복) · `_relay_parsed_keys` 가 **compose 거절(1)** 과 **도구 어긋남(2)** 을 다른 코드로 돌려주고 호출자가 다른 문면을 낸다 | `jq` 를 `exit 127` 로 바꿔 끼운 PATH 에서 `exit 3` · 문면이 **`jq`** 를 가리키고 「통째로 버렸다」가 **없다** |
+| **cr R-2** 재는 경로와 넘기는 경로가 다르다 | `readlink -f` 를 **한 번** 풀고 권한 검사 · 금지 속성 스캔 · `--env-from-file` 셋이 그것만 본다 | guards 의 `--env-from-file` 단언이 해석된 경로를 본다 |
+| **cr R-7** `config` 가 신호로 끊기면 stub 임시 자리가 남는다 | 함수 안 `trap 'rm -rf "$stub"' RETURN` | — |
+| **cr R-3** 자격이 이제 래퍼의 셸 변수를 지난다 | 위협 모델 표에 행 하나(값이 `local` 변수 하나에만 들어가고 함수 끝에 풀린다는 것까지) | — |
+| **cr R-4** 가드가 이제 **진짜 docker CLI** 를 요구한다 | acceptance 전제를 둘로(잠금 자리 · docker). 「측정하는 것은 그 host 의 compose」라는 성질을 적었다 | — |
+| **cr R-5** 「두 해석기가 같다」가 알려진 제한에 없다 | 제한 11 신설 — **보장이 아니라 관찰**이다 | — |
+| **cr R-6** 권한 단언이 `other` 만 본다 | §13.2 에 「group 은 그 사용자의 전용 group 으로 둔다」 + 잠금 자리 술어와 축이 다르다는 사유 | — |
+
+**main 을 들였다**(verifier 참고 사항). `origin/main` 의 `6eb904c02`(PR #203·#202)를 **머지 커밋**으로
+들이고 `milestone-15.md`·`docs/discovery/capability-map.md` 의 충돌을 **ID 로** 풀었다(줄을 잃거나
+겹치지 않는다). 그래서 **복원 원천이 착수 base 가 아니라 병합한 main 의 고정 SHA** 다 — rollback.md 가
+셋째 단언과 함께 다시 잰다.
+
 ## 하네스 레인 변경
 
 없음. `.claude/` 아래를 건드리지 않았다. `tools/prod-guards-check.sh` 는 하네스가 아니라 이 저장소의
@@ -224,6 +251,9 @@ BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc
 
 **수정 라운드 1 도 새 파일 0** 이다. 들여온 기존 파일 하나(`tools/prod-notification-sweep.sh` —
 cr H-1 의 같은 결함)를 `in_scope` 에 등재했다(「수정 라운드 새 파일 ↔ in_scope」 대조).
+**최종 라운드도 새 파일 0** 이고 `in_scope` 밖의 파일을 건드리지 않았다(바꾼 것은 relay 래퍼 ·
+guards · runbook · evidence 넷). main 머지가 들여온 변경은 **남의 slice 의 것**이고 이 slice 의
+`in_scope` 를 넓히지 않는다 — 충돌 둘은 장부 파일이고 ID 로 합쳤다.
 
 ## 알려진 제한
 
@@ -262,7 +292,13 @@ cr H-1 의 같은 결함)를 `in_scope` 에 등재했다(「수정 라운드 새
 10. **허용 키 집합은 두 소비자의 합집합이다**(cr L-9). 더 엄한 쪽이 relay 의 등식이라, §9.5 의 경보가
    뒤에 자기 키를 들이면 **relay 가 그 파일을 거절하기 시작한다.** 오늘은 충돌이 없고(§13.2 에 그
    사실을 적었다), 그 날이 오면 §13.3 의 허용 집합을 함께 넓혀야 한다 — 게이트가 그것을 잡아 준다.
-11. **relay unit 의 `After=` 는 「함께 뜬다면 그 뒤에」다.** 평가 커밋이 **안 뜨는** 주기에는 아무
+11. **「두 해석기가 같다」는 보장이 아니라 관찰이다**(cr R-5). 이제 키 집합 게이트 **전체가** 그 등식
+   위에 선다 — `config` 의 `env_file:` 처리와 `run --env-from-file` 이 같은 dotenv 로더를 쓴다는 것은
+   compose 가 선언한 계약이 아니라 **아홉 입력에서 잰 결과**다. 그 둘이 갈라지는 날 게이트는 조용히
+   **다른 해석기**를 재게 된다(제한 4 가 compose 종료 코드에 대해 쓰는 것과 같은 문장이다). 보간
+   조회 집합은 이미 완전히 같지 않다 — `config` 는 `PATH` 하나를, `run` 은 컨테이너에 주는 `-e`
+   이름을 본다. 그 한 칸은 「값에 `$` 를 쓰지 않는다」가 닫는다(좁히는 전제라 통과를 만들 수 없다).
+12. **relay unit 의 `After=` 는 「함께 뜬다면 그 뒤에」다.** 평가 커밋이 **안 뜨는** 주기에는 아무
    일도 하지 않고, 두 타이머가 서로 다른 시각에 발화하는 정상 경로에서도 아무 일도 하지 않는다.
    그 줄이 지키는 것은 `Persistent=true` 의 catch-up 한 경우뿐이다.
 

@@ -98,10 +98,15 @@ esac
 # §13.2 가 그 꼴(`install -m 600 -o "$USER"`)로 만들라고 적는다.
 [ -r "$RELAYENVF" ] \
   || _die "채널 env 파일을 읽지 못했다: $RELAYENVF — 이 파일은 **이 스크립트를 돌리는 사용자**($(id -un))가 직접 읽는다(§13.2 의 'install -m 600 -o \$USER'). root 전용으로 조이면 매 run 이 여기서 멈춘다" 3
+# **경로를 한 번만 풀고 그 뒤로는 그것만 쓴다**(cr R-2). 해석·권한·금지 속성 스캔·컨테이너 전달이
+# **같은 것을 보아야** 이 slice 의 규율(「술어와 소비자가 같은 것을 본다」)이 경로 축에서도 참이 된다.
+RELAY_ABS="$(readlink -f "$RELAYENVF" 2>/dev/null || true)"
+[ -n "$RELAY_ABS" ] || _die "채널 env 의 절대 경로를 구하지 못했다: $RELAYENVF" 3
 # **other 에 한 비트라도 열려 있으면 거절한다.** 이 파일은 봇 자격과 chat id 를 담는다(§13.1) —
 # 잠금 자리의 권한을 보는 `_prod_project_lock` 과 같은 축이다. 소유자 **등식**은 걸지 않는다:
 # root:<내 group> 0640 처럼 읽을 수 있고 좁은 배치가 있고, 그것까지 거절하면 도는 host 를 멈춘다.
-_relay_mode="$(stat -c '%a' "$RELAYENVF" 2>/dev/null || true)"
+# group 은 잠금 자리 술어(`& 022`)보다 느슨하다 — 그 틈은 §13.2 가 「그 사용자의 전용 group」으로 닫는다.
+_relay_mode="$(stat -c '%a' "$RELAY_ABS" 2>/dev/null || true)"
 [ -n "$_relay_mode" ] && [ "$(( 8#${_relay_mode: -3} & 8#007 ))" -eq 0 ] \
   || _die "채널 env 의 권한을 읽지 못했거나 other 에 열려 있다($RELAYENVF mode=${_relay_mode:-?}) — 이 파일은 봇 자격을 담는다(§13.2). 'chmod 600' 뒤에 다시" 3
 unset _relay_mode
@@ -125,6 +130,13 @@ case "$_relay_run_help" in
   *) _die "이 docker compose 는 'run --env-from-file' 을 모른다 — 채널 env 가 일회 컨테이너에 닿지 않는다(§13.3). compose 를 올린다" 3 ;;
 esac
 unset _relay_run_help
+# **`jq` 도 같은 문턱을 받는다**(cr R-1). 아래 키 집합 조회는 compose 와 `jq` 두 도구를 지나는데,
+# `jq` 가 깨진 것을 「채널 env 가 깨졌다」로 읽으면 운영자가 엉뚱한 파일을 들여다본다. 도구 문턱은
+# 도구 자리에 둔다 — 아래 해석 실패는 그때 **채널 env 의 일**만 뜻하게 된다.
+command -v jq >/dev/null 2>&1 \
+  || _die "jq 가 필요하다 — 채널 env 의 키 집합을 compose 출력에서 뽑는 데 쓴다" 3
+printf '{}' | jq -e . >/dev/null 2>&1 \
+  || _die "jq 가 가장 단순한 JSON 도 읽지 못한다 — 도구가 깨졌다(채널 env 의 일이 아니다)" 3
 
 # ── relay.env — 키 집합과 JVM 옵션 축 ────────────────────────────────────────────
 # **값은 어느 출력에도 옮기지 않는다** — 이 파일은 봇 자격과 chat id 를 담는다(§13.1). 아래 문면이
@@ -167,32 +179,51 @@ _relay_allowed_names() {
 #
 # **값은 어디로도 나가지 않는다** — `config` 출력은 변수로 받아 `jq` 가 **키만** 낸다(argv·화면·로그
 # 어디에도 값이 없다). stderr 는 버린다.
+# 돌려주는 코드: 0 해석함 · 1 **compose 가 거절했다**(채널 env 의 일) · 2 그 밖의 도구가 어긋났다
+# (`mktemp`·`jq` — 채널 env 의 일이 **아니다**, cr R-1). 호출자가 둘을 다른 문면으로 낸다.
 _relay_parsed_keys() { # <채널 env 절대 경로>
-  local f="$1" stub out rc=0
-  stub="$(mktemp -d)" || return 1
+  local f="$1" stub out keys rc=0
+  stub="$(mktemp -d)" || return 2
+  # **신호로 끊겨도 임시 자리를 남기지 않는다**(cr R-7) — 아래 trap 은 함수가 어떻게 끝나든 돈다.
+  trap 'rm -rf "$stub"' RETURN
+  # **경로를 JSON 문자열로 넣는다**(v L-2). 따옴표 없이 넣으면 경로의 ` #` 이 YAML 주석이 되어
+  # `config` 가 **다른 파일**을 읽는다 — 그러면 검사한 파일과 컨테이너가 받는 파일이 갈린다(실측).
   {
     printf 'name: bidvector-relay-envcheck\n'
     printf 'services:\n'
     printf '  probe:\n'
     printf '    image: bidvector-relay-envcheck:none\n'
     printf '    env_file:\n'
-    printf '      - %s\n' "$f"
-  } > "$stub/compose.yaml"
-  out="$(docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
-  rm -rf "$stub"
+    printf '      - %s\n' "$(jq -Rn --arg p "$f" '$p')"
+  } > "$stub/compose.yaml" || return 2
+  # **좁은 환경으로 부른다**(v L-3). `config` 는 **이 프로세스의 env** 로 `${VAR}` 를 풀고
+  # `run --env-from-file` 은 **컨테이너에 주는 env** 로만 푼다 — 그대로 두면 `…=${HOME:?x}` 가
+  # `config` 를 통과하고 run 에서는 파일이 통째로 버려져 `RefusedMissingChannelConfig` 로 끝난다.
+  # `PATH` 하나만 남긴다(docker 자신이 쓴다). 남는 비대칭은 `PATH` 한 이름이고, 위의 「값에 `$` 를
+  # 쓰지 않는다」가 그 한 칸까지 닫는다.
+  out="$(env -i "PATH=$PATH" docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
   [ "$rc" -eq 0 ] || return 1
-  printf '%s' "$out" | jq -r '.services.probe.environment // {} | keys[]' 2>/dev/null | sort -u
+  keys="$(printf '%s' "$out" | jq -r '.services.probe.environment // {} | keys[]' 2>/dev/null)" || return 2
+  printf '%s' "$keys" | sort -u
 }
 # 주석·빈 줄이 아닌 줄의 수 — **해석기가 파일을 통째로 버렸는가**를 가르는 데만 쓴다(v L-1). 닫히지
 # 않은 따옴표·`"v" !!x`·`${X:?m}` 같은 줄이 있으면 compose 는 rc 0 으로 **파일 전체를 무시한다** —
 # 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나 진단이 엉뚱한 곳을 가리킨다.
 _relay_content_lines() { sed -n '/^[[:space:]]*$/d; /^[[:space:]]*#/d; p' "$1" | grep -c '' || true; }
 
-RELAY_ABS="$(readlink -f "$RELAYENVF" 2>/dev/null || true)"
-[ -n "$RELAY_ABS" ] || _die "채널 env 의 절대 경로를 구하지 못했다: $RELAYENVF" 3
+# **값에 `$` 를 쓰지 않는다**(v L-3 의 나머지 한 칸). 두 해석기의 `${VAR}` 조회 집합은 좁혀도 완전히
+# 같아지지 않는다 — `config` 는 이 프로세스의 env 로, `run` 은 컨테이너에 주는 env 로 푼다. `$` 가
+# **한 글자도 없으면** 조회가 일어날 수 없어 둘이 같은 파일을 같게 읽는다. 이것은 키 집합을 뽑는
+# 문법이 아니라 **좁히는 전제**다(거절만 더할 수 있고 통과를 만들 수 없다). §13.2 의 일곱 값 가운데
+# `$` 가 필요한 것은 없다.
+if grep -q '\$' "$RELAY_ABS"; then
+  _die "채널 env 에 '\$' 가 있다($RELAYENVF) — 값의 \${VAR} 는 compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다(§13.2 의 일곱 값에는 '\$' 가 필요 없다). 그 글자를 지운다(문면은 줄 내용을 옮기지 않는다)" 3
+fi
 RELAY_KEYS=""; _relay_parse_rc=0
 RELAY_KEYS="$(_relay_parsed_keys "$RELAY_ABS")" || _relay_parse_rc=$?
-RELAY_CONTENT_N="$(_relay_content_lines "$RELAYENVF")"
+[ "$_relay_parse_rc" -ne 2 ] \
+  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(mktemp·jq) — 채널 env 의 일이 아니다. 임시 자리와 jq 를 본다" 3
+RELAY_CONTENT_N="$(_relay_content_lines "$RELAY_ABS")"
 # **읽지 못했거나 키가 0 인데 내용 줄이 있다 = 해석기가 이 파일을 통째로 버렸다.**
 # 두 갈래를 한 문면으로 모으는 이유: `config` 는 그런 입력에 **rc 1 로 말하지만**(실측)
 # `run --env-from-file` 은 **rc 0 으로 조용히 버린다**(verifier 실측). 소비자 쪽이 조용하므로 여기서
@@ -225,7 +256,7 @@ unset _p
 # **금지 속성 둘** — 술어는 `tools/prod-env.sh` 에 하나로 둔다(평가 커밋 래퍼도 같은 판단을 한다).
 # 보는 자리는 **해석된 compose 가 못 보는 둘**이다: 이 프로세스의 JVM 옵션 통로와 `relay.env`.
 _prod_jvm_env_log_free || _die "${_PROD_HTTPCLIENT_LOG_ERR}(§13.3)" 3
-_prod_httpclient_log_free_file "$RELAYENVF" || _die "${_PROD_HTTPCLIENT_LOG_ERR}" 3
+_prod_httpclient_log_free_file "$RELAY_ABS" || _die "${_PROD_HTTPCLIENT_LOG_ERR}" 3
 
 # **반입·되돌림·훑기와 같은 잠금 둘을 같은 순서로 잡는다**(`tools/prod-env.sh`). relay 는 멱등이 아니지만
 # (집은 행은 종단으로 간다) **겹치면 돌지 않는 쪽**이 맞다 — 임대가 배타를 지더라도 반입 중에 옛
@@ -290,7 +321,7 @@ trap '_relay_on_signal HUP' HUP
 # `enabled=false`), 고를 수 있게 두면 `RefusedChannelWithoutActiveRoute` 를 운영자가 만들 수 있다(§13.6).
 rc=0
 "${COMPOSE[@]}" run --rm --no-deps --pull never --name "$ONEOFF_NAME" \
-  --env-from-file "$RELAYENVF" \
+  --env-from-file "$RELAY_ABS" \
   -e SPRING_MAIN_WEB_APPLICATION_TYPE=none \
   app \
   --bidvector.relay.mode=once \

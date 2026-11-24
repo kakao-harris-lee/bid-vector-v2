@@ -902,6 +902,9 @@ sudo -e /etc/bidvector-v2/relay.env   # 또는 평소 쓰는 편집기로 — �
 
 래퍼는 **other 에 한 비트라도 열려 있으면 거절한다**(`exit 3`) — 이 파일은 봇 자격을 담는다. 소유자
 **등식**은 걸지 않는다: `root:<그 사용자의 group> 0640` 처럼 읽을 수 있고 좁은 배치도 있어서다.
+**그래서 group 은 그 사용자의 전용 group 으로 둔다**(위 `install` 의 `-g "$USER"`). 잠금 자리 술어는
+group 쓰기까지 거절하는데(`_prod_project_lock`) 이 자리는 그러지 않으므로, `docker` 처럼 **사람이 여럿
+든 group** 을 주면 그만큼이 자격을 읽는다.
 
 **이 일곱 키는 두 소비자의 합집합이다**(cr L-9). `relay` 는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
 `…SITE_BASE_URL` 을, §9.5 의 **경보**(`prod-alert-telegram.sh`)는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
