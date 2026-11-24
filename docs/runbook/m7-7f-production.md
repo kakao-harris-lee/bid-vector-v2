@@ -881,12 +881,33 @@ M9/STR12 가 발송 채널을 들였다. **이 문서를 쓴 slice 는 아래를
 세 값이 **전부 있어야** `Live` 모드 환경의 러너가 뜬다(없으면 기동 실패, 메시지가 빈 칸 이름을 말한다).
 
 ```ini
-# relay 러너 unit 의 env 파일 — root 소유 0600, **저장소 밖**
+# relay 러너가 읽는 env 파일 — **저장소 밖** · 0600 · 소유자는 **러너를 돌리는 사용자**
 # 예: /etc/bidvector-v2/relay.env
 BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=   # §13.1 ①
 BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=          # §13.1 ③
 BIDVECTOR_NOTIFICATION_SITE_BASE_URL=             # 예: https://<운영 도메인> — 끝에 `/` 없이
 ```
+
+**소유자는 `root` 가 아니라 `User=` 다**(M15/15Q 가 고친 자리). 앞 판은 이 파일을 unit 의
+`EnvironmentFile=` 로 읽었고 그것은 **systemd manager(root)** 가 읽어 환경으로 넘기므로 root 0600 이
+성립했다. §13.3 의 relay 는 그 통로를 쓰지 않는다 — **스크립트와 docker CLI 가 `User=` 로 직접 읽는다.**
+root:root 0600 으로 두면 매 run 이 「채널 env 파일을 읽지 못했다」로 `exit 3` 이 되고 §13.4 ② 에서 활성화가
+멈춘다. §1 ③ 의 운영 env 와 **같은 꼴**로 만든다(파일을 만드는 자리가 여기다):
+
+```bash
+sudo install -d -m 755 /etc/bidvector-v2
+sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env
+sudo -e /etc/bidvector-v2/relay.env   # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
+```
+
+래퍼는 **other 에 한 비트라도 열려 있으면 거절한다**(`exit 3`) — 이 파일은 봇 자격을 담는다. 소유자
+**등식**은 걸지 않는다: `root:<그 사용자의 group> 0640` 처럼 읽을 수 있고 좁은 배치도 있어서다.
+
+**이 일곱 키는 두 소비자의 합집합이다**(cr L-9). `relay` 는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
+`…SITE_BASE_URL` 을, §9.5 의 **경보**(`prod-alert-telegram.sh`)는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
+`…TELEGRAM_BASE_URL` 을 읽는다. 둘 중 **더 엄한 쪽이 relay 의 키 집합 등식**이므로, 경보가 뒤에 자기
+키(예: 별도 경보 chat id)를 들이면 **relay 가 이 파일을 거절하기 시작한다.** 새 키를 들일 때는 §13.3 의
+허용 집합을 함께 넓힌다.
 
 **`docker/prod.env.template` 에는 넣지 않는다.** 그 파일의 키 집합은 `tools/prod-env-keys-check.sh` 가
 compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay 는 compose 서비스가 아니라 일회
@@ -977,6 +998,12 @@ OnFailure=bidvector-alert@%n.service
 # /etc/systemd/system/bidvector-notification-relay.service
 [Unit]
 Description=bidvector 알림 relay (일회 러너)
+# **순서 — 평가 커밋이 먼저다.** 타이머 셋 모두 `Persistent=true` 라, 창을 놓친 뒤 부팅하면 systemd 가
+# 밀린 run 들을 거의 동시에 띄운다. 잠금 둘은 **직렬화는 하지만 순서를 정하지 않으므로** relay 가 먼저
+# 잠금을 쥐면 그 catch-up run 은 평가 커밋의 행 없이 돌고 끝난다(잃는 것은 없다 — 행은 `PENDING` 으로
+# 남는다). 이 줄은 **systemd 가 함께 띄우는 run 들**의 순서를 세운다. `After=` 는 「그 unit 도 이번에
+# 함께 뜬다면 그 뒤에」이지 「먼저 띄워라」가 아니다 — 평가 커밋이 안 뜨는 주기에는 아무 일도 하지 않는다.
+After=bidvector-evaluation-commit.service
 
 [Service]
 Type=oneshot
@@ -1027,6 +1054,10 @@ OnFailure=bidvector-alert@%n.service
 쓴다. unit 이 파일 경로만 넘기면 되므로 `EnvironmentFile=` 은 필요 없다 — **값이 이 스크립트
 프로세스의 환경에 올라가지 않는 쪽**이 좁기도 하다(`/proc/<pid>/environ` 축).
 
+**그 대신 이 파일은 `User=` 가 직접 읽을 수 있어야 한다.** 읽는 주체가 systemd manager(root)에서
+**스크립트와 docker CLI** 로 바뀌었기 때문이다 — §13.2 가 그 꼴(`install -m 600 -o "$USER"`)로 만들라고
+적는다. root 전용으로 조이면 매 run 이 `exit 3` 으로 멈춘다.
+
 **env 파일이 둘인 것은 그대로다.** `--env-file` 은 **스택 설정**(§1 ③ 의 `prod.env` — compose 가
 요구하는 키 집합이고 `prod-env-keys-check.sh` 가 등식으로 잰다)이고, `--relay-env-file` 은 **알림 채널
 설정**(§13.2 의 `relay.env` — compose 가 모르는 키라 템플릿에 넣지 않는다)이다. 둘을 한 파일로 합치면
@@ -1040,6 +1071,20 @@ OnFailure=bidvector-alert@%n.service
 멈춘다. 허용 이름은 손으로 열거하지 않고 Spring 의 두 사상(dash 제거 · dash→`_`)으로 속성 이름에서
 만든다 — 그래서 §13.2 의 철자와 바인딩되는 철자가 갈리지 않는다. **값은 보지 않는다**: 세 값이
 비었는지는 러너가 `RefusedMissingChannelConfig` 로 말한다(§13.6).
+
+**그 키 집합은 compose 자신에게 묻는다 — 우리 문법으로 읽지 않는다.** 첫 판은 줄마다 **첫 `KEY=` 를**
+뽑았는데, compose 의 dotenv 해석기는 **따옴표로 닫힌 값 뒤의 둘째 대입을 새 변수로** 읽는다. 그래서
+`…ROUTE_KEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:…` 한 줄이 모든 검사를 통과하고 **DB 자격 통로가
+컨테이너에 들어갔다**(M15/15Q 수정 라운드 1). 술어가 소비자와 **다른 문법**에 걸려 있으면 꼴을 하나씩
+막는 처방은 다음 꼴에서 다시 열린다 — 그래서 문법을 늘리지 않고 **해석기를 바꿨다**: `env_file:` 로 그
+파일을 받는 stub 하나에 `docker compose config` 를 돌려 **그 서비스의 environment 키 집합**을 읽는다.
+값은 어디로도 나가지 않는다(키만 뽑는다).
+
+**해석기가 파일을 통째로 버리는 입력도 여기서 끊는다.** 닫히지 않은 따옴표 · 값 뒤의 `!!` ·
+`${VAR:?…}` · `KEY=` 모양이 아닌 줄이 있으면 `run --env-from-file` 은 **rc 0 으로 파일 전체를 조용히
+무시한다**. 그러면 §13.2 를 채웠는데도 러너가 `RefusedMissingChannelConfig` 로 끝나 진단이 엉뚱한 곳을
+가리킨다. 같은 입력에서 `config` 쪽은 **오류로 말하므로**, 래퍼가 그것을 받아 「통째로 버렸다」로
+`exit 3` 을 낸다(문면은 줄 내용을 옮기지 않는다).
 
 **금지되는 JVM 옵션 — 전제이고 선택이 아니다.** 이 러너의 JVM 에 JDK HttpClient 의 내부 로그 속성
 (`jdk.httpclient.HttpClient.log` · `jdk.internal.httpclient.debug`)을 **지정하지 않는다**. 켜면 요청
@@ -1100,7 +1145,12 @@ systemctl show -p OnFailure bidvector-notification-relay.service           # 비
 
 **② 억제 환경으로 relay 를 한 번** — 보내지 않는다. 정책표가 `staging` 에 `DryRun` 을 붙이므로
 claim 0 이고, 래퍼가 옮긴 코드 **`6`**(`ENV_SUPPRESSED`)으로 끝난다. 여기서 확인하는 것은 「러너가
-뜨고 DB·잠금·채널 설정에 닿는다」뿐이다(발송 0).
+뜨고 **DB·잠금**에 닿는다」와 「래퍼의 전제 여덟을 지난다」뿐이다(발송 0).
+
+**이 단계는 §13.2 의 *값*을 보지 않는다.** 배선이 `Live` 판정을 **먼저** 묻고 그때만 설정 값 객체를
+짓기 때문에(§5.2), 억제 환경에서는 `RefusedMissingChannelConfig` 도 `RefusedChannelWithoutActiveRoute`
+도 **발화할 수 없다.** 래퍼가 보는 것은 **키 이름**뿐이다 — 자격이 Bot API 모양인지, chat id 가 맞는지,
+링크 도메인이 URI 인지는 **③ 에서 처음 하중을 받는다.** ② 의 초록을 「§13.2 가 맞다」로 읽지 않는다.
 
 ```bash
 cd <저장소>
@@ -1111,8 +1161,17 @@ echo "exit=$?"   # 6 이면 정상이다(ENV_SUPPRESSED — 억제 환경). 3 �
 ```
 
 **③ `production` 으로 한 번 — 단, `--claim-limit 1`.** 첫 실발송은 **한 건만** 보낸다: 설정이 틀렸을
-때(chat id 오타 · 봇 차단) 거부가 전 행을 태우는 것을 한 건으로 막는다. 그 전에 평가 커밋을 한 번
-돌려 `outbox` 에 행을 만든다(없으면 relay 가 집을 것이 없다).
+때(chat id 오타 · 봇 차단) 거부가 전 행을 태우는 것을 한 건으로 막는다. **§13.2 의 값이 처음 하중을
+받는 자리가 여기다**(② 가 아니다).
+
+**①~⑤ 는 전부 `User=` 로 지정한 그 사용자로 민다** — 이 host 에서는 `deploy` 다(§1.3·§1.4 의 `$USER`).
+다른 계정으로 밟으면 잠금 자리의 소유자 단언에 걸려 relay 이야기가 아니라 **잠금 자리 이야기**로
+`exit 3` 이 난다(§9.4). `sudo` 가 붙는 것은 `systemctl` 줄뿐이다.
+
+**행이 없으면 relay 가 집을 것이 없다 — 그 전에 평가 커밋을 한 번 돌린다.** 다만 그 run 은 상한까지
+(기본 50 계정) 돌아 **`outbox` 에 행을 여럿 남긴다.** ④ 가 어긋나면 그 나머지는 `PENDING` 으로 쌓였다가
+고친 뒤 **첫 타이머 run 에서 한꺼번에** 나간다 — 시의성 있는 내용이면 그때는 낡았다. 급하지 않다면
+**이미 `outbox` 에 있는 행으로 ③ 을 먼저 치고**, 평가 커밋은 ⑤ 뒤에 타이머에 맡기는 쪽이 조용하다.
 
 ```bash
 cd <저장소>
@@ -1126,6 +1185,9 @@ echo "exit=$?"   # 0 이면 완료. 마침 줄의 accounts·skipped·failed·def
   --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 1
 echo "exit=$?"   # 0 과 마침 줄의 delivered=1 을 본다
 ```
+
+`delivered=0` 인데 종료가 `0` 이면 **집은 행이 멱등 키로 접힌 것**이다(`skippedDuplicates`) — 실패가
+아니고 메시지도 가지 않는다. 그때는 ④ 로 가지 말고 한 번 더 친다. 그 밖의 계수는 §13.6 이 읽는다.
 
 **④ Telegram 앱에서 눈으로 본다.** 장부는 발송을 선언하지만 **읽음을 알지 못한다** — 도착을 아는
 자리는 앱뿐이다. 어긋나면 §13.6 으로 가고, **타이머를 켜지 않은 채** 고친다.
@@ -1146,6 +1208,10 @@ journalctl -u bidvector-evaluation-commit -u bidvector-notification-relay -n 80
 journalctl -u bidvector-notification-relay --since -2d | grep -c 'relay finished'
 journalctl -u bidvector-evaluation-commit --since -2d | grep -c 'evaluation-commit finished'
 systemctl list-timers bidvector-evaluation-commit.timer bidvector-notification-relay.timer
+# 미룸은 **래퍼의 문면**으로 센다 — unit 종료 상태는 `SuccessExitStatus` 가 가린다(아래 측정 표).
+journalctl -u bidvector-notification-relay --since -2d | grep -c '돌고 있다'      # exit 4 — 잠금 경합
+journalctl -u bidvector-notification-relay --since -2d | grep -c 'LEASE_BUSY'     # exit 5 — 임대 경합
+journalctl -u bidvector-evaluation-commit  --since -2d | grep -c '돌고 있다'      # exit 4
 ```
 
 **다섯 분 간격의 뜻**: 세 러너가 같은 프로젝트·상태 잠금을 쥔다. 앞 run 이 5 분을 넘기면 뒤 run 은
@@ -1165,7 +1231,7 @@ systemctl list-timers bidvector-evaluation-commit.timer bidvector-notification-r
 | 멈춤 줄의 유무와 `cause=` | `evaluation-commit stopped cause=…` | **ⓑ 의 핵심.** `failed=1` 은 DB 장애와 **배포 중 SIGTERM** 에서 같은 값이다 — 둘을 가르는 정보는 `cause=interrupted` 줄 하나뿐이다. 경보 술어는 「`failed>0` **이고** 그 줄이 없다」여야 한다 |
 | run 하나의 벽시계 시간 | `journalctl -u bidvector-evaluation-commit` 의 run 시작·끝 | **ⓒ 의 입력.** 오늘 ML 은 `UnavailableMlAnalysis` 에 고정돼 실비가 0 에 가깝다 — 그 수는 **ML 배선이 서기 전의 바닥값**이고, 바닥값조차 5 분을 넘기면 §13.3 의 간격이 먼저 틀린 것이다 |
 | relay 마침 줄의 `delivered` · `failed` · `isolated` · `skippedDuplicates` | `relay finished …` | `isolated>0` 은 **받았는지 모른다**는 뜻이라 재발송하지 않는다(§13.6). 첫 며칠에 그 수가 0 이 아니면 Telegram 쪽 흔들림이지 설정이 아니다 |
-| 미룸 계수 — `exit 4`·`exit 5` 의 빈도 | `journalctl` 의 unit 종료 상태 | 위 「다섯 분 간격의 뜻」. 쌓이면 간격을 넓힌다 |
+| 미룸 계수 — `exit 4`(잠금 경합)·`exit 5`(임대) 의 빈도 | **래퍼가 남긴 stderr 한 줄**을 센다 — `4` 는 `돌고 있다`, `5` 는 `LEASE_BUSY`. 또는 `journalctl -u <unit> -o json --output-fields=_EXIT_STATUS` | **unit 종료 상태로는 셀 수 없다.** `10-defer.conf` 가 그 코드를 **깨끗한 종료**로 만들면 systemd 는 `status=4` 를 debug 로만 내고 기본 `journalctl -u …` 에는 「Deactivated successfully」만 남는다 — 그 계수는 미룸이 0 건이든 20 건이든 **같은 값**이 된다. 래퍼의 두 문면은 서로 달라 **둘을 갈라** 셀 수 있다 |
 
 ⓐ(회전 보폭)는 M15/15H 가 이미 닫았다 — 여기서 다시 재지 않는다.
 
