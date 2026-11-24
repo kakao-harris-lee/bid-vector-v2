@@ -61,7 +61,7 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=74
+EXPECTED_CHECKS=87
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
@@ -155,33 +155,41 @@ PY
 # 구조이므로 토큰 단위의 열거로는 닫히지 않는다** — 하네스의 「게이트 술어는 문자열이 아니라 구조로
 # 닫는다」가 가리키는 바로 그 자리다.
 #
-# 그래서 층을 옮긴다. `shfmt --to-json` 이 bash 를 **파싱해** 내놓는 트리에서 세는 것은 넷이다:
-#   ① 리다이렉션 노드(`Redirs`) 중 **쓰기로 여는** 연산자(`>`·`>>`·`>|`·`&>`·`&>>`·`>&`·`<>`)의
-#      대상은 `/dev/null` · `/dev/fd/<숫자>` · fd 복제(`>&<숫자>`·`>&-`) 뿐이다. 대상이 **상수가
-#      아니면**(확장·치환이 하나라도 들면) 위반이다 — 「`$CF` 가 무엇인지 모른다」는 통과 사유가
+# 그래서 층을 옮긴다. `shfmt --to-json` 이 bash 를 **파싱해** 내놓는 트리를 보고, 판정의 뼈대는 하나다
+# — **이 파일을 실측한 census 를 allowlist 로 두고 그 밖이면 위반**이다. 여섯 자리에 같은 규율을 건다:
+#   ① **구문 노드 종류**(census 18 종). 목록 밖 종류가 나오면 위반이다. 이것 하나가 `let`·C 꼴 `for`·
+#      `(( ))`·`$(( ))`·`Subshell`·`BraceExp`·`ExtGlob`·`UnaryTest` 처럼 **아직 이 파일에 없는 문법
+#      전부**를 닫는다 — 「아직 안 본 꼴」마다 가지를 더하는 것이 아니라 한 술어로.
+#   ② **쓰기 리다이렉션 대상**(`>`·`>>`·`>|`·`&>`·`&>>`·`>&`·`<>`)은 `/dev/null`·`/dev/fd/<숫자>`·
+#      fd 복제뿐이다. 대상이 **상수가 아니면** 위반이다 — 「`$CF` 가 무엇인지 모른다」는 통과 사유가
 #      아니다(fail-closed).
-#   ② 호출 노드(`CallExpr`)의 **명령어 자리**(`Args[0]`)는 **allowlist 안의 상수 낱말**이어야 한다.
-#      상수가 아니어도, 역슬래시가 섞여도, 목록 밖이어도 위반이다.
-#   ③ 선언 노드(`DeclClause`)의 종류는 `local`·`export` 뿐이고 **옵션 인자를 받지 않는다**.
-#   ④ 값을 코드로 되돌리는 두 자리 — 확장 연산자 `@`(`${x@P}`)와 **산술 평가**(`(( … ))`·`$(( … ))`:
-#      첨자·값이 명령 치환을 담으면 그것이 돈다) — 는 그 자체가 위반이다.
-# 파싱 실패도 위반이다(읽지 못하는 코드를 통과시키지 않는다).
+#   ③ **명령어 자리**(`CallExpr.Args[0]`)는 census 20 종. 상수가 아니어도, 역슬래시가 섞여도, 목록
+#      밖이어도 위반이다. 허용 명령의 **인자**도 census 다(`curl --config` · `command -v` ·
+#      `systemctl show` · `printf` 는 플래그 0 …). **접두 대입**도 census(`IFS`·`TZ`, 상수 값)라
+#      `PATH=/tmp/x curl …` 가 이름만 빌려 다른 바이너리를 부르지 못한다.
+#   ④ **선언**(`DeclClause`)은 `local`·`export` 뿐이고 **옵션 인자를 받지 않는다**(`declare -n`·
+#      `local -n` 이 변수 하나로 명령어를 바꾼다).
+#   ⑤ **산술 평가 자리**. bash 는 배열 첨자·slice·`[[ -eq ]]` 에서 값을 **산술로 다시 읽고**, 그때
+#      값 안의 `$(…)` 가 **돈다**(실측). 그래서 `Assign.Index`·`ParamExp.Index`·`ParamExp.Slice` 는
+#      **상수 ASCII 숫자**만 받고, `[[ … ]]` 의 이항 연산자는 census(`=~`)만 받는다. **`[` 쪽은 제약
+#      하지 않는다** — `[ "$x" -eq 0 ]` 은 산술 평가를 하지 **않는다**(실측). 재지 않고 좁히면 그
+#      파일이 쓰는 `[ "$#" -ge 1 ]` 넷이 거짓 RED 가 된다.
+#   ⑥ **확장 연산자 `@`**(`${x@P}`)는 값을 프롬프트 문자열로 다시 해석해 그 안의 `$(…)` 를 돌린다.
+# 파싱 실패도 위반이고 **사유를 따로 적는다** — 양성 대조가 「술어가 잡았다」와 「파싱이 깨졌다」를
+# 가를 수 있어야 한다.
 #
-# **②가 denylist 가 아니라 allowlist 인 것이 r1 의 수정이다**(v H-1 · cr HIGH). 앞 판은 금지 낱말 집합과
-# 문자열이 같은지만 봤고, 그래서 **형식을 지킨 변이**가 전부 지나갔다 — `/usr/bin/tee`(경로를 붙이면 다른
-# 문자열) · `\tee`·`te\e`(`Lit.Value` 는 이스케이프를 원문 그대로 담는다) · `c=tee; "$c"`(상수가 아니면
-# 집합에 없다) · `declare -n` · alias · `trap` · `source` · `.` · `/bin/bash -c` · `dash -c` · `sort -o` ·
-# `ln -s` · `history -w`. 리다이렉션 칸에는 「상수가 아니면 위반」을 세웠는데 낱말 칸은 상수가 아니면
-# **통과**였다 — 같은 파일 안에서 한쪽만 구성적이었다. allowlist 는 그 열일곱을 **한 술어로** 닫는다.
+# **열거를 allowlist 로 뒤집은 것이 r1·r2 의 수정이다**(v H-1·M-1 · cr HIGH·N-1). 첫 판의 낱말 칸은
+# 금지 집합과 문자열이 같은지만 봐서 `/usr/bin/tee`·`\tee`·`c=tee; "$c"`·`declare -n`·`trap`·`source`·
+# `/bin/bash -c`·`sort -o` 가 전부 지나갔고(열일곱 꼴), 둘째 판의 산술 검사는 `ArithmCmd`/`ArithmExp`
+# **두 노드의 denylist** 라 `let`·`a[x]=1`·`${a[x]}`·`${y:x}`·`[[ -eq ]]`·`printf -v`·`read "a[$x]"` 가
+# 지나갔다(일곱 꼴). 같은 실패를 두 번 했으므로 **모든 자리를 census 로 통일**했다.
 #
-# 목록은 이 파일의 **실측 census** 다(`Args[0]` 상수 20 종 · 비상수 0 · `DeclClause` 는 `local`·`export`).
-# 새 명령을 들이는 편집은 이 목록을 함께 고쳐야 지나간다 — 하네스의 「우회하려면 게이트 자체를 바꿔야
-# 하는 층」이 뜻하는 바가 그것이고, 두 자리 등재의 비용은 알고 치른다.
+# 새 명령·새 문법·새 플래그를 들이는 편집은 이 목록들을 함께 고쳐야 지나간다 — 하네스의 「우회하려면
+# 게이트 자체를 바꿔야 하는 층」이 뜻하는 바가 그것이고, 두 자리 등재의 비용은 알고 치른다.
 #
 # **이 층에서 사라지는 것들**: 주석 걷개 · 원문 보기 합집합 · `$'…'` 상태 · `${#x}`·`$#`·`a#b` 특례가
 # 전부 필요 없어진다(파서가 주석과 인용을 정본으로 안다). 15M 이 그 합집합의 대가로 치르던 거짓 RED —
-# 주석 속 `a > b`·`->`·꺾쇠 짝(v REG-2) — 도 사라진다. `[[ b > a ]]` 도 더는 리다이렉션이 아니다.
-# **`(( a > b ))` 는 다르다** — 리다이렉션으로 오독되지 않지만 ④ 가 **의도적으로** 위반으로 센다.
+# 주석 속 `a > b`·`->`·꺾쇠 짝(v REG-2) — 도 사라진다.
 #
 # 한계는 알려진 제한에 적는다 — 이것은 **이 파일의 구조**에 대한 단언이고 런타임 보증이 아니다.
 cat > "$T/no-file-writes.py" <<'PY'
@@ -193,41 +201,73 @@ import sys
 # 쓰기로 **여는** 연산자. 입력(`<`·`<<`·`<<-`·`<<<`)은 파일을 만들지 않으므로 보지 않는다 —
 # here-doc 본문은 bash 에게도 파서에게도 데이터다. `<>` 는 읽기·쓰기로 열고 없으면 만든다.
 # zsh 전용 쓰기 연산자(`>>|`·`&>|`·`&>>|`)는 **여기 없어도 된다** — `-ln bash` 에서 파싱이 실패하고
-# 파싱 실패는 아래에서 위반이다(실측: 「`>>|` redirects are a zsh feature」로 비-0, r1 cr 열린 질문).
+# 파싱 실패는 아래에서 위반이다(실측: 「`>>|` redirects are a zsh feature」로 비-0).
 WRITE_OPS = {">", ">>", ">|", "&>", "&>>", ">&", "<>"}
 ALLOWED_TARGET = "/dev/null"
 FD_PREFIX = "/dev/fd/"
 
-# **명령어 자리의 allowlist** — 이 파일의 `Args[0]` 실측 census(상수 20 종 · 비상수 0).
-# 목록 밖이면 위반이므로 새 명령을 들이는 편집은 여기도 함께 고쳐야 한다(의도한 두 자리 등재).
+# ── census allowlist 넷 — 전부 이 파일을 **실측해서** 만들었다 ───────────────────
+# ① 구문 노드 종류. 목록 밖 종류가 나오면 위반이다. 이것 하나가 `let`·C 꼴 `for`·`(( ))`·`$(( ))`·
+#    `Subshell`·`BraceExp`·`ExtGlob`·`UnaryTest` 처럼 **이 파일에 아직 없는 문법 전부**를 닫는다.
+ALLOWED_NODE_TYPES = {
+    "File", "FuncDecl", "Block", "IfClause", "WhileClause", "CaseClause",
+    "BinaryCmd", "CallExpr", "DeclClause", "TestClause", "BinaryTest",
+    "Word", "Lit", "SglQuoted", "DblQuoted", "ParamExp", "CmdSubst", "ProcSubst",
+}
+# ② 명령어 자리(`CallExpr.Args[0]`) — 상수 20 종 · 비상수 0.
 ALLOWED_COMMANDS = {
-    # 셸 빌트인·제어
     "[", "echo", "exit", "printf", "read", "return", "set", "shift", "true",
-    # 외부 명령 — `command` 와 `curl` 은 아래에서 인자까지 좁힌다
     "command", "curl", "date", "systemctl", "uname",
-    # 이 파일이 정의하는 함수(`FuncDecl` 여섯과 같은 집합)
     "_curl_reason", "_die", "_env_file_value", "_safe", "_trim", "_value_of",
 }
-# `declare`·`typeset`·`readonly` 는 없다 — `declare -n`(nameref)이 변수 하나로 명령어를 바꾼다.
+# ③ 선언. `declare`·`typeset`·`readonly` 는 없다 — `declare -n`(nameref)이 변수 하나로 명령어를 바꾼다.
 ALLOWED_DECL_VARIANTS = {"local", "export"}
-# **허용 명령의 쓰기 인자**를 닫는다(v M-2 · cr MEDIUM): `curl -o`·`-O`·`-D`·`--trace*`·`--output*`·
-# `--dump-header`·`-c`·`--cookie-jar`·`--stderr` 가 전부 파일을 만든다. 열거하지 않고 **반대로** —
-# 이 파일이 실제로 쓰는 플래그만 허용한다(실측: `curl --config <(…)` 하나 · `command -v <이름>` 둘).
-ARG_ALLOWED_FLAGS = {"curl": {"--config"}, "command": {"-v"}}
-REQUIRED_FIRST_FLAG = {"command": "-v"}
+# ④ `[[ … ]]` 의 이항 연산자. 이 파일은 `=~` 뿐이다 — 산술 평가하는 `-eq`·`-lt` 따위가 닫힌다
+#    (실측: `[[ $x -eq 0 ]]` 는 값 안의 `$(…)` 를 **돌린다**. 반면 `[ "$x" -eq 0 ]` 는 돌지 않는다 —
+#    그래서 `[` 쪽에는 피연산자 제약을 두지 않는다).
+ALLOWED_TEST_OPS = {"=~"}
+# 접두 대입(`IFS= read …` · `TZ=… date …`) — 이름과 **상수 값**까지 census 다. 이것이 없으면
+# `PATH=/tmp/x curl …` 가 allowlist 안의 이름으로 **다른 바이너리**를 부른다.
+ALLOWED_PREFIX_ASSIGNS = {"IFS", "TZ"}
+# 허용 명령의 인자. **상수이면서 `-` 로 시작하는** 인자만 본다(열거가 아니라 census — 빈 집합은
+# 「이 명령은 플래그를 쓰지 않는다」는 실측이다). 이 파일이 정의하는 함수 여섯은 여기 없다 —
+# 그 본문은 같은 술어가 전수로 보고, 인자는 메시지 문자열이라 `-` 로 시작하는 것도 있다.
+ARG_ALLOWED_FLAGS = {
+    "[": {"-n", "-r", "-eq", "-ge", "-gt"},
+    "command": {"-v"},
+    "curl": {"--config"},
+    "date": set(),
+    "echo": set(),
+    "exit": set(),
+    "printf": set(),          # `printf -v "a[$x]"` 가 첨자를 산술 평가한다(실측)
+    "read": {"-r"},           # `read -r "a[$x]"` 도 같다(실측)
+    "return": set(),
+    "set": {"-e", "-euo"},
+    "shift": set(),
+    "systemctl": {"-p", "--"},
+    "true": set(),
+    "uname": {"-n"},
+}
+REQUIRED_FIRST_FLAG = {"command": "-v", "systemctl": "show"}
+# `read` 가 값을 넣는 자리는 **평범한 이름**이어야 한다 — `a[$x]` 꼴이면 첨자가 산술 평가된다.
+NAME_ARG_COMMANDS = {"read"}
 SHFMT_TIMEOUT_S = 30
 
 
 def ascii_digits(text):
-    """`str.isdigit()` 는 `'²'`·`'٣'` 에도 참이다 — fd 번호는 ASCII 숫자뿐이다(r1 cr LOW)."""
-    return text.isascii() and text.isdigit()
+    """`str.isdigit()` 는 `'²'`·`'٣'` 에도 참이다 — fd 번호·첨자는 ASCII 숫자뿐이다."""
+    return bool(text) and text.isascii() and text.isdigit()
+
+
+def plain_name(text):
+    return bool(text) and text.isascii() and (text[0].isalpha() or text[0] == "_") \
+        and all(c.isalnum() or c == "_" for c in text)
 
 
 def literal(word):
     """확장이 하나도 없는 Word 의 **상수 값**. 하나라도 들면 None(= 상수가 아니다).
 
-    `$'…'`(ANSI-C 인용)은 **상수가 아니다** — `Value` 가 원문(`t\\145e`)이라 그 글자와 실행되는 값이
-    다르다. 알 수 없는 것을 아는 척하지 않는다(fail-closed).
+    `$'…'`(ANSI-C 인용)은 상수가 아니다 — `Value` 가 원문이라 그 글자와 실행되는 값이 다르다.
     """
     if not isinstance(word, dict):
         return None
@@ -268,20 +308,28 @@ def redirect_findings(node):
 
 
 def call_findings(node):
-    """명령어 자리는 **allowlist** 다. 인자만 있는 대입 노드(`Args` 0)는 명령이 아니다."""
+    """명령어 자리는 allowlist · 접두 대입은 이름과 상수 값까지 · 허용 명령은 인자까지."""
+    found = []
+    for assign in node.get("Assigns") or []:
+        if not (node.get("Args") or []):
+            continue                      # 명령 없는 평범한 대입 — 접두가 아니다
+        name = (assign.get("Name") or {}).get("Value") or "(이름 없음)"
+        if name not in ALLOWED_PREFIX_ASSIGNS:
+            found.append("census 밖의 접두 대입: " + name)
+        elif assign.get("Value") is not None and literal(assign.get("Value")) is None:
+            found.append("접두 대입 " + name + " 의 값이 상수가 아니다")
     args = node.get("Args") or []
     if not args:
-        return []
+        return found
     name = literal(args[0])
     if name is None:
-        return ["명령어가 상수가 아니다 — 무엇이 도는지 모른다"]
+        return found + ["명령어가 상수가 아니다 — 무엇이 도는지 모른다"]
     if "\\" in name:
-        # `Lit.Value` 는 이스케이프를 원문 그대로 담으므로 `\tee` 는 목록에 없어 이미 붉지만,
-        # 사유를 따로 적는다 — 다음 사람이 「오타」로 읽지 않게.
-        return ["명령어에 역슬래시가 있다: " + name]
+        found.append("명령어에 역슬래시가 있다: " + name)
+        return found
     if name not in ALLOWED_COMMANDS:
-        return ["allowlist 밖의 명령어: " + name]
-    found = []
+        found.append("allowlist 밖의 명령어: " + name)
+        return found
     required = REQUIRED_FIRST_FLAG.get(name)
     if required is not None and literal(args[1] if len(args) > 1 else None) != required:
         found.append("명령어 " + name + " 는 " + required + " 꼴만 허용한다")
@@ -291,6 +339,13 @@ def call_findings(node):
             value = literal(arg)
             if value is not None and value.startswith("-") and value not in allowed_flags:
                 found.append("명령어 " + name + " 의 허용 밖 인자: " + value)
+    if name in NAME_ARG_COMMANDS:
+        for arg in args[1:]:
+            value = literal(arg)
+            if value is None:
+                found.append("명령어 " + name + " 의 변수 이름이 상수가 아니다")
+            elif not value.startswith("-") and not plain_name(value):
+                found.append("명령어 " + name + " 의 변수 이름이 평범한 이름이 아니다: " + value)
     return found
 
 
@@ -306,23 +361,45 @@ def decl_findings(node):
     return found
 
 
+def subscript_findings(node, kind):
+    """첨자·slice 는 **상수 ASCII 숫자**만 받는다 — 그 자리는 bash 의 산술 문맥이고, 변수의 값 안에
+    든 `$(…)` 가 거기서 돈다(실측: `a[x]=1` · `${a[x]}` · `${y:x}` 셋 다 돈다)."""
+    found = []
+    index = node.get("Index")
+    if index is not None and not ascii_digits(literal(index) or ""):
+        found.append("첨자가 상수 숫자가 아니다 — 산술 평가 자리다")
+    if kind == "ParamExp":
+        piece = node.get("Slice")
+        if piece is not None:
+            for label, word in (("offset", piece.get("Offset")), ("length", piece.get("Length"))):
+                if word is not None and not ascii_digits(literal(word) or ""):
+                    found.append("slice 의 " + label + " 이 상수 숫자가 아니다 — 산술 평가 자리다")
+    return found
+
+
 def walk(node, found):
     """트리 전수. 명령 치환·here-doc 본문 안의 치환도 그 안에 **노드로** 있으므로 같은 술어가 닿는다."""
     if isinstance(node, dict):
         kind = node.get("Type")
+        if kind is not None and kind not in ALLOWED_NODE_TYPES:
+            found.append("census 밖의 구문 노드: " + kind)
         if isinstance(node.get("Redirs"), list):
             found.extend(redirect_findings(node))
         if kind == "CallExpr":
             found.extend(call_findings(node))
         elif kind == "DeclClause":
             found.extend(decl_findings(node))
-        elif kind == "ParamExp" and (node.get("Exp") or {}).get("Op") == "@":
-            # `${x@P}` 는 값을 **프롬프트 문자열로 다시 해석**해 그 안의 `$(…)` 를 돌린다.
-            # 이 파일이 쓰는 연산자는 `:-`·`#`·`##`·`%`·`%%`·`-` 뿐이다(실측) — `@` 는 0 이다.
-            found.append("확장 연산자 @ — 값을 코드로 되돌린다")
-        elif kind in ("ArithmCmd", "ArithmExp"):
-            # `(( x ))` 에서 `x` 가 `a[$(…)]` 면 그 치환이 **돈다**. 이 파일에 산술은 0 이다(실측).
-            found.append("산술 평가 — 첨자·값이 명령 치환을 담을 수 있다")
+        elif kind == "BinaryTest":
+            if node.get("Op") not in ALLOWED_TEST_OPS:
+                found.append("census 밖의 test 연산자: " + str(node.get("Op")))
+        elif kind == "ParamExp":
+            if (node.get("Exp") or {}).get("Op") == "@":
+                # `${x@P}` 는 값을 프롬프트 문자열로 **다시 해석**해 그 안의 `$(…)` 를 돌린다.
+                found.append("확장 연산자 @ — 값을 코드로 되돌린다")
+            found.extend(subscript_findings(node, "ParamExp"))
+        # Assign 은 Type 이 없다 — 첨자(`a[x]=1`)는 같은 산술 문맥이다.
+        if kind is None and isinstance(node.get("Name"), dict) and node.get("Index") is not None:
+            found.extend(subscript_findings(node, "Assign"))
         for value in node.values():
             walk(value, found)
     elif isinstance(node, list):
@@ -351,14 +428,14 @@ if shfmt is None:
 probe = _run([shfmt, "--version"])
 found_version = probe.stdout.decode("utf-8", "replace").strip()
 if probe.returncode != 0 or found_version != "v" + pinned_version:
-    # 판이 다르면 같은 파일에 다른 답이 나올 수 있다 — 그 답은 측정이 아니다.
     _unavailable("shfmt 판이 핀과 다르다: " + (found_version or "(판을 읽지 못했다)") + " != v" + pinned_version)
 
 with open(target_path, "rb") as handle:
     source = handle.read()
 done = _run([shfmt, "-ln", "bash", "--to-json"], source)
 if done.returncode != 0:
-    # 구문을 읽지 못하는 것은 통과가 아니다(fail-closed).
+    # 구문을 읽지 못하는 것은 통과가 아니다(fail-closed). **사유를 따로 적는다** — 양성 대조가
+    # 「술어가 잡았다」와 「파싱이 깨졌다」를 가를 수 있어야 한다.
     detail = (done.stderr.decode("utf-8", "replace").strip() or "사유 없음").splitlines()[0]
     print(1)
     print("bash 구문을 읽지 못했다: " + detail)
@@ -852,118 +929,142 @@ _static() { # <파일> → 위반 수(첫 줄) + 위반 목록
 }
 static_out="$(_static "$ALERT")"
 if [ "$(printf '%s' "$static_out" | head -n1)" = 0 ]; then
-  _ok "경보 스크립트에 파일로 쓰는 자리가 없다(쓰기 리다이렉션은 /dev/null·fd 뿐 · 파일 생성 낱말 0)"
+  _ok "경보 스크립트에 파일로 쓰는 자리가 없다(census allowlist 여섯 자리 전부 통과)"
 else
   _bad "경보 스크립트에 파일로 쓰는 자리가 있다: $(printf '%s' "$static_out" | tail -n +2 | tr '\n' ' ')"
 fi
 
-# **양성 대조** — 같은 술어가 심은 자리를 찾아낸다(없으면 위 단언이 「술어가 아무것도 안 본다」와
-# 구별되지 않는다). 버릴 사본에 고정 경로 쓰기를 심는다. 이 꼴이 ⑬ 이 있는 **이유**다(v R2-1):
-# 고정 경로에 설정을 쓰고 → curl 이 읽고 → 종료 전에 지우는 변이는 런타임 관찰이 거의 못 잡는다.
-sed 's|^HTTP="$(curl --config.*|CFG=/tmp/x; printf "%s" "$CONFIG" > "$CFG"; HTTP="$(curl --config "$CFG")"|' \
-  "$ALERT" > "$T/planted-writer.sh"
-
-# **붉음은 「0 이 아님」이 아니라 「셋 이상 0 보다 큰 수」다**(r1 cr MEDIUM). 술어가 판정 불가(2)나
-# 예외(1)로 서면 stdout 이 비고, 빈 문자열은 `!= 0` 을 만족해 **공허하게 초록**이 된다. 파이프가
-# 종료 코드를 가리고 `if` 조건이라 `set -e` 도 듣지 않는다 — 그래서 종료 코드와 첫 줄의 **꼴**을
-# 함께 본다. 이 slice 의 미덕이 「위반 0」과 「판정 불가」를 가른 것인데 대조만 예외일 수 없다.
-_assert_red() { # <이름> <파일>
+# **붉음은 「0 이 아님」이 아니라 「그 사유로 0 보다 큼」이다**(r1 cr MEDIUM · r2 cr N-2·N-5).
+# 셋을 함께 본다 — ① 종료 코드 0(판정 불가·예외가 아니다) ② 첫 줄이 0 보다 큰 정수 ③ **기대한 사유가
+# 위반 목록에 있다**. ③ 이 없으면 대조가 **다른 가지 때문에** 붉어도 초록이고(가지 격리), 씨앗이
+# 파싱되지 않아 붉어도 초록이다(파싱 실패는 사유가 다르다). 이 slice 의 미덕이 「위반 0」과 「판정
+# 불가」를 가른 것인데 대조만 예외일 수 없다.
+_assert_red() { # <이름> <파일> <기대 사유 조각>
   local out n rc=0
   out="$(_static "$2")" || rc=$?
   n="$(printf '%s' "$out" | head -n1)"
-  case "$n" in ''|*[!0-9]*) n=-1 ;; esac
-  if [ "$rc" -eq 0 ] && [ "$n" -gt 0 ]; then
-    _ok "$1 — 파일 쓰기가 보인다"
-  else
+  case "$n" in '' | *[!0-9]*) n=-1 ;; esac
+  if [ "$rc" -ne 0 ] || [ "$n" -le 0 ]; then
     _bad "$1 — 붉지 않거나 판정 불가다(종료 ${rc} · 첫 줄 '${n}')"
+  elif ! printf '%s' "$out" | tail -n +2 | command grep -qF -- "$3"; then
+    _bad "$1 — 붉지만 사유가 다르다(기대 '$3' · 실제 '$(printf '%s' "$out" | tail -n +2 | tr '\n' ' ')')"
+  else
+    _ok "$1 — 그 가지가 잡는다"
   fi
 }
-_assert_red '정적 술어의 양성 대조 — 심은 고정 경로 쓰기' "$T/planted-writer.sh"
-
-# **15M 의 다섯 라운드가 찾은 우회를 전부 다시 잰다**(15P). 층을 옮기면 앞 층이 한 꼴씩 닫아 온 것이
-# 조용히 열릴 수 있다 — 그래서 새 술어의 양성 대조 모집단은 **옛 술어가 붉게 만든 변이 전부 + 그
-# 술어가 끝내 못 잡은 하나(REG-1)**다. 각 변이는 `bash -n` 이 통과하고 실제로 디스크에 쓴다.
-_planted_case() { # <이름> <심을 줄…>
-  local name="$1"; shift
+_planted_case() { # <이름> <기대 사유 조각> <심을 줄…>
+  local name="$1" reason="$2"; shift 2
   local file="$T/planted-case.sh"
   {
     printf '#!/usr/bin/env bash\n'
     printf 'CONFIG=x\n'
     printf '%s\n' "$@"
   } > "$file"
-  _assert_red "$name" "$file"
+  _assert_red "$name" "$file" "$reason"
 }
+
+# **양성 대조** — 같은 술어가 심은 자리를 찾아낸다(없으면 위 단언이 「술어가 아무것도 안 본다」와
+# 구별되지 않는다). 버릴 사본에 고정 경로 쓰기를 심는다. 이 꼴이 ⑬ 이 있는 **이유**다(v R2-1):
+# 고정 경로에 설정을 쓰고 → curl 이 읽고 → 종료 전에 지우는 변이는 런타임 관찰이 거의 못 잡는다.
+sed 's|^HTTP="$(curl --config.*|CFG=/tmp/x; printf "%s" "$CONFIG" > "$CFG"; HTTP="$(curl --config "$CFG")"|' \
+  "$ALERT" > "$T/planted-writer.sh"
+_assert_red '정적 술어의 양성 대조 — 심은 고정 경로 쓰기' "$T/planted-writer.sh" '쓰기 리다이렉션 대상'
+
+# **15M 의 다섯 라운드가 찾은 우회를 전부 다시 잰다**(15P). 층을 옮기면 앞 층이 한 꼴씩 닫아 온 것이
+# 조용히 열릴 수 있다 — 그래서 양성 대조 모집단은 **옛 술어가 붉게 만든 변이 전부 + 그 술어가 끝내
+# 못 잡은 하나(REG-1)**로 시작한다. 각 변이는 `bash -n` 이 통과하고 실제로 디스크에 쓴다.
 # `#` 관용구(v R3-1) — `shlex` 의 주석 규칙이 낱말 **중간**의 `#` 에서 줄의 나머지를 버려 열리던 셋.
 # 파서는 `#` 의 뜻을 정본으로 알므로 특례가 필요 없다.
-_planted_case '${#x} 관용구' 'n=${#CONFIG}; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
-_planted_case '$# 관용구'    'n=$#; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
-_planted_case 'a#b 관용구'   'n=a#b; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+_planted_case '${#x} 관용구' '쓰기 리다이렉션 대상' 'n=${#CONFIG}; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+_planted_case '$# 관용구' '쓰기 리다이렉션 대상' 'n=$#; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+_planted_case 'a#b 관용구' '쓰기 리다이렉션 대상' 'n=a#b; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
 # ANSI-C 인용(v R4-1) — bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그 뒤의 명령은 **실행된다**.
 cat > "$T/planted-ansic.sh" <<'PLANT'
 #!/usr/bin/env bash
 CONFIG=x
 x=$'\' # '; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"
 PLANT
-_assert_red 'ANSI-C 인용' "$T/planted-ansic.sh"
+_assert_red 'ANSI-C 인용' "$T/planted-ansic.sh" '쓰기 리다이렉션 대상'
 # **REG-1 — 15M 이 끝내 못 잡은 꼴**(`OPEN-M15-ALERT-STATIC-GUARD-AST` 가 선 자리). 본문에 `"` 하나만
 # 든 here-doc 두 개 사이에 쓰기 줄을 두면 `shlex` 는 그 사이를 큰따옴표 토큰 하나로 묶었다. 파서에게
 # here-doc 본문은 데이터이고 그 사이의 줄은 **코드**다 — 실측으로 `/dev/shm` 에 쓰이던 그 변이다.
-_planted_case 'REG-1 here-doc 짝' \
+_planted_case 'REG-1 here-doc 짝' '쓰기 리다이렉션 대상' \
   'cat <<A >/dev/null' '"' 'A' \
   'CF=/dev/shm/.bvc$$; printf %s $CONFIG > $CF' \
   'cat <<B >/dev/null' '"' 'B'
 # 파일을 만드는 낱말 — 리다이렉션을 하나도 쓰지 않는 갈래다.
-_planted_case 'tee 로 쓰기'    'printf "%s" "$CONFIG" | tee /dev/shm/.bvc$$ >/dev/null'
-_planted_case 'mktemp 로 쓰기' 'CF="$(mktemp)"; printf "%s" "$CONFIG" >"$CF"'
-# **간접 실행** — 파서에게 따옴표 안의 프로그램은 데이터라 그 리다이렉션은 트리에 없다. 낱말 층이
-# 받는다(옛 술어도 이 꼴은 못 잡았다 — 실측).
+_planted_case 'tee 로 쓰기' 'allowlist 밖의 명령어: tee' 'printf "%s" "$CONFIG" | tee /dev/shm/.bvc$$ >/dev/null'
+_planted_case 'mktemp 로 쓰기' 'allowlist 밖의 명령어: mktemp' 'CF="$(mktemp)"; printf "%s" "$CONFIG" >"$CF"'
+# **간접 실행** — 파서에게 따옴표 안의 프로그램은 데이터라 그 리다이렉션은 트리에 없다. 낱말 층이 받는다.
 cat > "$T/planted-eval.sh" <<'PLANT'
 #!/usr/bin/env bash
 CONFIG=x
 eval 'printf "%s" "$CONFIG" > /dev/shm/.bvc$$'
 PLANT
-_assert_red 'eval 로 쓰기' "$T/planted-eval.sh"
+_assert_red 'eval 로 쓰기' "$T/planted-eval.sh" 'allowlist 밖의 명령어: eval'
 
-# **r1 verifier 가 찾은 열일곱 꼴**(v H-1 · M-1 · cr HIGH). 앞 판의 denylist 는 금지 낱말과 문자열이
-# **같은지만** 봐서 형식을 지킨 변이에 전부 초록이었다. 모집단은 verifier 의 44 꼴 중 **놓쳤던 것
-# 전부**이고, 열일곱 모두 `bash -n` 이 통과하고 게이트 밖에서 실제로 디스크 항목을 만든다(실측).
-# 이 열일곱이 붉은 것은 allowlist 한 술어의 결과다 — 꼴마다 예외를 더한 것이 아니다.
-_planted_case '역슬래시 명령어 \tee'   'printf "%s" "$CONFIG" | \tee /dev/shm/.bvc$$ >/dev/null'
-_planted_case '낱말 속 역슬래시 te\e'  'printf "%s" "$CONFIG" | te\e /dev/shm/.bvc$$ >/dev/null'
-_planted_case '경로 한정 /usr/bin/tee' 'printf "%s" "$CONFIG" | /usr/bin/tee /dev/shm/.bvc$$ >/dev/null'
-_planted_case '비상수 명령어 "$c"'     'c=tee; printf "%s" "$CONFIG" | "$c" /dev/shm/.bvc$$ >/dev/null'
-_planted_case 'nameref declare -n'     'declare -n r=y; y=tee; printf "%s" "$CONFIG" | $r /dev/shm/.bvc$$ >/dev/null'
-_planted_case 'alias 로 이름 바꾸기'   'shopt -s expand_aliases' 'alias t=tee' 'printf "%s" "$CONFIG" | t /dev/shm/.bvc$$ >/dev/null'
-_planted_case '/bin/bash -c'           '/bin/bash -c '"'"'printf "%s" "$CONFIG" > /dev/shm/.bvc$$'"'"''
-_planted_case 'dash -c'                'dash -c '"'"'printf x > /dev/shm/.bvc$$'"'"''
-_planted_case 'trap 본문'              'trap '"'"'printf x > /dev/shm/.bvc$$'"'"' EXIT'
-_planted_case 'source /dev/stdin'      'source /dev/stdin <<<'"'"'printf x > /dev/shm/.bvc$$'"'"''
-_planted_case '. /dev/stdin here-doc'  '. /dev/stdin <<X' 'printf x > /dev/shm/.bvc$$' 'X'
-_planted_case '확장 연산자 ${x@P}'     'x='"'"'$(printf x > /dev/shm/.bvc$$)'"'"'; : "${x@P}"'
-_planted_case '산술 첨자의 명령 치환'  'x='"'"'a[$(printf x > /dev/shm/.bvc$$)]'"'"'; (( x )) || true'
-_planted_case 'sort -o'                'printf "%s" "$CONFIG" | sort -o /dev/shm/.bvc$$'
-_planted_case 'ln -s'                  'ln -s /etc/hostname /dev/shm/.bvc$$'
-_planted_case 'history -w'             'set -o history; history -s a; history -w /dev/shm/.bvc$$'
+# **r1 verifier 가 찾은 열일곱 꼴**(v H-1 · cr HIGH). 앞 판의 denylist 는 금지 낱말과 문자열이 **같은
+# 지만** 봐서 형식을 지킨 변이에 전부 초록이었다. 열일곱 모두 `bash -n` 이 통과하고 게이트 밖에서
+# 실제로 디스크 항목을 만든다(실측). 이 열일곱이 붉은 것은 allowlist 한 술어의 결과다.
+_planted_case '역슬래시 명령어 \tee' '명령어에 역슬래시가 있다' 'printf "%s" "$CONFIG" | \tee /dev/shm/.bvc$$ >/dev/null'
+_planted_case '낱말 속 역슬래시 te\e' '명령어에 역슬래시가 있다' 'printf "%s" "$CONFIG" | te\e /dev/shm/.bvc$$ >/dev/null'
+_planted_case '경로 한정 /usr/bin/tee' 'allowlist 밖의 명령어: /usr/bin/tee' 'printf "%s" "$CONFIG" | /usr/bin/tee /dev/shm/.bvc$$ >/dev/null'
+_planted_case '비상수 명령어 "$c"' '명령어가 상수가 아니다' 'c=tee; printf "%s" "$CONFIG" | "$c" /dev/shm/.bvc$$ >/dev/null'
+_planted_case 'nameref declare -n' 'allowlist 밖의 선언: declare' 'declare -n r=y; y=tee; printf "%s" "$CONFIG" | $r /dev/shm/.bvc$$ >/dev/null'
+_planted_case 'alias 로 이름 바꾸기' 'allowlist 밖의 명령어: shopt' 'shopt -s expand_aliases' 'alias t=tee' 'printf "%s" "$CONFIG" | t /dev/shm/.bvc$$ >/dev/null'
+_planted_case '/bin/bash -c' 'allowlist 밖의 명령어: /bin/bash' '/bin/bash -c '"'"'printf "%s" "$CONFIG" > /dev/shm/.bvc$$'"'"''
+_planted_case 'dash -c' 'allowlist 밖의 명령어: dash' 'dash -c '"'"'printf x > /dev/shm/.bvc$$'"'"''
+_planted_case 'trap 본문' 'allowlist 밖의 명령어: trap' 'trap '"'"'printf x > /dev/shm/.bvc$$'"'"' EXIT'
+_planted_case 'source /dev/stdin' 'allowlist 밖의 명령어: source' 'source /dev/stdin <<<'"'"'printf x > /dev/shm/.bvc$$'"'"''
+_planted_case '. /dev/stdin here-doc' 'allowlist 밖의 명령어: .' '. /dev/stdin <<X' 'printf x > /dev/shm/.bvc$$' 'X'
+_planted_case 'sort -o' 'allowlist 밖의 명령어: sort' 'printf "%s" "$CONFIG" | sort -o /dev/shm/.bvc$$'
+_planted_case 'ln -s' 'allowlist 밖의 명령어: ln' 'ln -s /etc/hostname /dev/shm/.bvc$$'
+_planted_case 'history -w' 'allowlist 밖의 명령어: history' 'set -o history; history -s a; history -w /dev/shm/.bvc$$'
 # 허용 명령의 **쓰기 인자**(v M-2) — `curl` 은 이 파일이 쓰는 도구라 목록에서 뺄 수 없다. 인자를 좁힌다.
-_planted_case 'curl -o'                'curl -s -o /dev/shm/.bvc$$ file:///etc/hostname'
+_planted_case 'curl -o' '명령어 curl 의 허용 밖 인자: -o' 'curl -o /dev/shm/.bvc$$ file:///etc/hostname'
 # `command` 는 `-v` 꼴만 허용한다 — 그 제약이 없으면 한 낱말로 allowlist 를 우회한다.
-_planted_case 'command tee'            'printf "%s" "$CONFIG" | command tee /dev/shm/.bvc$$ >/dev/null'
+_planted_case 'command tee' '명령어 command 는 -v 꼴만 허용한다' 'printf "%s" "$CONFIG" | command tee /dev/shm/.bvc$$ >/dev/null'
 
-# **음성 대조 — 거짓 RED 가 사라졌다.** 15M 의 원문 보기는 주석 속 `>`·꺾쇠 짝(v REG-2)과
-# `[[ b > a ]]`(제한 13 ⓒ)를 리다이렉션으로 셌고, 그 대가로 경보 스크립트의 주석에 꺾쇠 짝 금지라는
-# 규약을 물렸다. 파서는 주석과 test 를 리다이렉션과 가른다. 이 단언이 없으면 그 규약을 거둔 근거가
-# 문면뿐이다. **`(( a > b ))` 는 여기 없다** — 리다이렉션으로 오독되지는 않지만 위 ④ 가 의도적으로
-# 위반으로 세기 때문이고, 그 꼴은 바로 위의 양성 대조가 든다.
+# **r2 verifier·code-reviewer 가 찾은 산술 문맥 일곱 + 노드 종류 둘**(v M-1 · cr N-1). bash 는 배열
+# 첨자·slice·`[[ -eq ]]`·`printf -v`·`read <이름>`·`[ -v ]` 에서 값을 **산술로 다시 읽고**, 그때 값
+# 안의 `$(…)` 가 돈다 — 실측으로 전부 파일이 생긴다. 앞 판은 `ArithmCmd`/`ArithmExp` 두 노드만 봐서
+# 이 일곱이 트리에 **노드 없이** 지나갔다. 씨앗은 전부 「값에 코드 문자열을 담고 그 자리에 넣는」 꼴이다.
+_ARITH_SEED='x='"'"'a[$(printf x > /dev/shm/.bvc$$)]'"'"';'
+_planted_case '산술 첨자 (( x ))' 'census 밖의 구문 노드: ArithmCmd' "$_ARITH_SEED"' (( x )) || true'
+_planted_case 'let x' 'census 밖의 구문 노드: LetClause' "$_ARITH_SEED"' let x || true'
+_planted_case 'C 꼴 for' 'census 밖의 구문 노드: CStyleLoop' "$_ARITH_SEED"' for ((i = x; 0; )); do :; done'
+_planted_case '대입 첨자 a[x]=1' '첨자가 상수 숫자가 아니다' "$_ARITH_SEED"' a[x]=1'
+_planted_case '확장 첨자 ${a[x]}' '첨자가 상수 숫자가 아니다' "$_ARITH_SEED"' echo "${a[x]}" >/dev/null'
+_planted_case 'slice offset ${y:x}' 'slice 의 offset 이 상수 숫자가 아니다' "$_ARITH_SEED"' y=abc; echo "${y:x}" >/dev/null'
+_planted_case '[[ $x -eq 0 ]]' 'census 밖의 test 연산자: -eq' "$_ARITH_SEED"' [[ $x -eq 0 ]] || true'
+_planted_case 'printf -v "a[$x]"' '명령어 printf 의 허용 밖 인자: -v' "$_ARITH_SEED"' printf -v "a[$x]" %s v'
+_planted_case 'read -r "a[$x]"' '명령어 read 의 변수 이름이 상수가 아니다' "$_ARITH_SEED"' read -r "a[$x]" <<<v'
+_planted_case '[ -v "a[$x]" ]' '명령어 [ 의 허용 밖 인자: -v' "$_ARITH_SEED"' [ -v "a[$x]" ] || true'
+
+# **가지 격리 대조 넷**(cr N-2·N-3·N-4·N-6). 위 씨앗들과 달리 이 넷은 **쓰기 변이가 아니라 가지
+# 대조**다 — 그 가지를 지우면 검사가 초록이 되는지를 재는 것이 목적이고, 그래서 다른 가지가 함께
+# 붉어지지 않게 씨앗을 깎았다(기대 사유 단언이 그것을 강제한다). `systemctl enable` 은 **돌리지
+# 않는다** — 이 host 의 `/etc/systemd/system` 에 링크를 만드는 명령이고, 술어는 글자만 본다.
+_planted_case '확장 연산자 ${x@P}' '확장 연산자 @' 'x='"'"'$(printf x > /dev/shm/.bvc$$)'"'"'; printf "%s" "${x@P}" >/dev/null'
+_planted_case '선언 옵션 local -n' '선언 local 의 옵션 인자: -n' 'local -n r=y; printf "%s" "$r" >/dev/null'
+_planted_case 'systemctl enable' '명령어 systemctl 는 show 꼴만 허용한다' 'systemctl enable x'
+_planted_case '접두 대입 PATH=' 'census 밖의 접두 대입: PATH' 'PATH=/tmp/x curl --config /dev/null'
+_planted_case '접두 대입 SSLKEYLOGFILE=' 'census 밖의 접두 대입: SSLKEYLOGFILE' 'SSLKEYLOGFILE=/dev/shm/.bvc$$ curl --config /dev/null'
+
+# **음성 대조 — 거짓 RED 가 사라졌다.** 15M 의 원문 보기는 주석 속 `>`·꺾쇠 짝(v REG-2)을 리다이렉션
+# 으로 셌고, 그 대가로 경보 스크립트의 주석에 꺾쇠 짝 금지라는 규약을 물렸다. 파서는 주석을 리다이렉션
+# 과 가른다. 이 단언이 없으면 그 규약을 거둔 근거가 문면뿐이다. **`(( a > b ))`·`[[ b > a ]]` 는 여기
+# 없다** — 리다이렉션으로 오독되지는 않지만 census 가 둘 다 위반으로 세기 때문이고(알려진 제한 7),
+# 앞의 산술 대조가 그 꼴을 든다.
 cat > "$T/negative-noise.sh" <<'PLANT'
 #!/usr/bin/env bash
 # 주석에 a > b 와 -> 와 <꺾쇠 짝> 을 쓴다
 a=2 b=1
-if [[ b > a ]]; then echo no >/dev/null; fi
 printf '%s' "output = \"/dev/null\"" >/dev/null
 echo "$a" >&2
 PLANT
 if [ "$(_static "$T/negative-noise.sh" | head -n1)" = 0 ]; then
-  _ok "주석의 꺾쇠 짝·test 비교·문자열 속 설정 지시는 리다이렉션이 아니다 — 거짓 RED 0"
+  _ok "주석의 꺾쇠 짝·문자열 속 설정 지시는 리다이렉션이 아니다 — 거짓 RED 0"
 else
   _bad "거짓 RED 가 남아 있다: $(_static "$T/negative-noise.sh" | tail -n +2 | tr '\n' ' ')"
 fi
@@ -985,7 +1086,6 @@ if [ "$rc" -eq 2 ] && command grep -q '판정 불가' "$T/out-badver.txt"; then
 else
   _bad "shfmt 판 어긋남이 판정 불가(2)로 서지 않았다(종료 ${rc})"
 fi
-
 
 # ── 합계 ──────────────────────────────────────────────────────────────────────
 total=$((PASS + FAIL))
