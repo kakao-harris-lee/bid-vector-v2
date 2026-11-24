@@ -1,8 +1,10 @@
 # M15 / 15Q — rollback
 
-**실측 HEAD: `3cbd4c6cd`**(이 slice 의 마지막 산출물 커밋 — commands 갱신 커밋). 이 파일을 담는 커밋은
-그 뒤에 온다. **앞 라운드의 실측을 옮기지 않고 다시 돌렸다** — 자기 검토가 `tools/prod-notification-
-relay.sh` 를 한 번 더 고쳤으므로(pipefail·SIGPIPE 꼴), 그 전에 잰 값은 되돌림 대상이 움직인 뒤의 것이다.
+**실측 HEAD: `011ffcfe5`**(이 slice 의 마지막 산출물 커밋 — commands 의 unit 실측 커밋). 이 파일을 담는
+커밋은 그 뒤에 온다. **앞 두 라운드의 실측을 옮기지 않고 그때마다 다시 돌렸다** — 자기 검토가
+`tools/prod-notification-relay.sh` 를(pipefail·SIGPIPE 꼴), 그 뒤 unit 실측이 `commands.md` 를 또
+움직였고, 둘 다 아래 복원 목록 **안**의 파일이다. 「측정 뒤 복원 목록 안 파일을 또 커밋하면
+재측정이다」를 그대로 따랐다(세 번 쟀고, 트리 해시는 세 번 다 같았다).
 
 ## 전제 — 복원 원천은 착수 base 그대로다
 
