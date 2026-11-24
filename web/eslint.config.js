@@ -265,7 +265,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    // M15/15O 수정 라운드 1(cr L1) — 확장자 **넷**이다. e2e 형제 블록과 `tsconfig.json` 의 프로그램은
+    // `.mts`·`.cts` 를 받는데 이 블록만 둘이었다 — **15L r2 N-3 과 같은 종류의 비대칭**이고, 그 자리에서
+    // 금지가 상속 기본값(`ts-expect-error: allow-with-description`)으로 되돌아갔다(실측: `src/x.mts` 의
+    // 유효 설정이 `[2]`). 오늘 실해는 없다(`ALLOWED_SRC_FILE` 이 `src` 안 그 확장자를 디스크 훑기에서
+    // 거부한다) — 그 교차 의존에 기대지 않으려고 대칭을 맞춘다. 범위 test 가 네 자리를 모두 든다.
+    files: ['src/**/*.ts', 'src/**/*.tsx', 'src/**/*.mts', 'src/**/*.cts'],
     languageOptions: { globals: globals.browser },
     rules: {
       // 실측(설계 검토 U-4): `// @ts-ignore` 와 `// @ts-nocheck` 는 rootDir 진단(TS6059)을
