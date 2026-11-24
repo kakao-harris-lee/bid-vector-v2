@@ -33,6 +33,20 @@ _die() { echo "prod-alert-check: $1" >&2; exit "${2:-1}"; }
 for t in python3 curl mktemp tr; do
   command -v "$t" >/dev/null 2>&1 || _die "$t 가 필요하다" 2
 done
+# `shfmt` 는 아래 ⑬ 의 정적 술어가 드는 **구문 파서**다. 없으면 그 술어가 조용히 비는 것이 아니라
+# **검사 전체가 판정 불가로 선다** — 「안 돌린 게이트는 아무것도 막지 못한다」. CI 는 `container`
+# job 의 `install shfmt` step 이 핀한 판을 깔고, 로컬은 사람이 깐다(evidence 의 설치 한 줄).
+command -v shfmt >/dev/null 2>&1 \
+  || _die "shfmt 가 PATH 에 없다 — 정적 술어의 구문 파서다(ci.yml 의 install shfmt 와 같은 판을 깐다) · 판정 불가" 2
+
+# 파서의 **판**도 술어의 일부다 — 러너와 로컬이 다른 판을 쓰면 같은 파일에 다른 답이 나온다.
+# 숫자는 정책 파일 한 자리에 있고 워크플로와 이 검사가 함께 읽는다(`install buf` 선례).
+SHFMT_POLICY="$REPO_ROOT/config/quality/shell-guard-policy.properties"
+[ -r "$SHFMT_POLICY" ] || _die "config/quality/shell-guard-policy.properties 를 읽지 못했다 — 판정 불가" 2
+SHFMT_PIN="$(sed -n 's/^tool\.shfmt\.version=//p' "$SHFMT_POLICY")"
+[ -n "$SHFMT_PIN" ] || _die "config/quality/shell-guard-policy.properties 에서 tool.shfmt.version 을 읽지 못했다 — 판정 불가" 2
+# 아래 「부재·판 어긋남」 대조가 PATH 를 비운 채 돌므로 해석기 자리를 먼저 절대 경로로 잡아 둔다.
+PYBIN="$(command -v python3)"
 
 ALERT="$REPO_ROOT/tools/prod-alert-telegram.sh"
 [ -x "$ALERT" ] || _die "tools/prod-alert-telegram.sh 가 실행 가능하지 않다" 2
@@ -42,7 +56,7 @@ _ok()  { PASS=$((PASS + 1)); echo "  ok   — $1"; }
 _bad() { FAIL=$((FAIL + 1)); echo "  BAD  — $1" >&2; }
 
 # 검사 수의 하한이자 상한 — 「전수」가 조용히 줄어드는 것을 막는다(공허한 전수 금지).
-EXPECTED_CHECKS=49
+EXPECTED_CHECKS=56
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 SERVER_PID=""
@@ -125,122 +139,144 @@ PY
 # ── 정적 술어 — **파일로 쓰는 자리가 없다** ────────────────────────────────────
 # 실행 중 관찰로는 못 보는 꼴이 하나 남는다(v R2-1): 고정 경로에 설정을 쓰고 → curl 이 읽고 →
 # 종료 전에 지우는 변이. curl 은 설정을 열자마자 닫으므로 0.05초 폴링이 그 순간을 거의 못 잡고,
-# 전후 차이는 지워진 파일을 못 본다. 그래서 **거동이 아니라 글자 구조**로 한 겹 더 막는다 —
-# 경보 스크립트에 **파일로 쓰는 자리 자체가 없음**을 토큰 수준에서 단언한다.
+# 전후 차이는 지워진 파일을 못 본다. 그래서 **거동이 아니라 구문 구조**로 한 겹 더 막는다 —
+# 경보 스크립트에 **파일로 쓰는 자리 자체가 없음**을 구문 트리 수준에서 단언한다.
 #
-# grep 이 아니라 `shlex` 토큰화다(주석·따옴표 안 문자열은 토큰 하나로 묶이므로 설정 문자열의
-# `output = "/dev/null"` 같은 글자가 리다이렉션으로 오독되지 않는다). 술어는 둘이다:
-#   ① 출력 리다이렉션(`>`·`>>`)의 대상은 `/dev/null`·`/dev/fd/*`·`&<숫자>` 뿐이다.
-#   ② 파일을 만드는 낱말(`mktemp`·`tee`·`touch`·`dd`·`cp`·`mv`·`install`·`truncate`)이 없다.
-# 한계는 알려진 제한에 적는다 — 이것은 **이 파일의 글자**에 대한 단언이고 런타임 보증이 아니다.
+# **술어는 토큰이 아니라 구문 트리를 센다**(15P — `OPEN-M15-ALERT-STATIC-GUARD-AST`). 15M 은 `shlex`
+# 토큰을 두 보기(주석을 걷은 보기 · 원문 보기)의 합집합으로 셌고, 다섯 라운드가 그 층의 우회를 한 꼴씩
+# 닫았다. 마지막 하나는 닫히지 않았다(v REG-1): 본문에 `"` 하나만 든 here-doc 두 개 사이에 쓰기 줄을
+# 두면 `shlex` 는 그 사이를 큰따옴표 토큰 하나로 묶고, bash 에게 here-doc 본문은 **데이터**라 그 줄은
+# 코드로 실행된다. 짝이 맞아 토큰화 실패도 나지 않으니 두 보기가 함께 열렸다. **here-doc 은 문법
+# 구조이므로 토큰 단위의 열거로는 닫히지 않는다** — 하네스의 「게이트 술어는 문자열이 아니라 구조로
+# 닫는다」가 가리키는 바로 그 자리다.
+#
+# 그래서 층을 옮긴다. `shfmt --to-json` 이 bash 를 **파싱해** 내놓는 트리에서 세는 것은 둘이다:
+#   ① 리다이렉션 노드(`Redirs`) 중 **쓰기로 여는** 연산자(`>`·`>>`·`>|`·`&>`·`&>>`·`>&`·`<>`)의
+#      대상은 `/dev/null` · `/dev/fd/<숫자>` · fd 복제(`>&<숫자>`·`>&-`) 뿐이다. 대상이 **상수가
+#      아니면**(확장·치환이 하나라도 들면) 위반이다 — 「`$CF` 가 무엇인지 모른다」는 통과 사유가
+#      아니다(fail-closed).
+#   ② 호출 노드(`CallExpr`)의 인자 중 상수 낱말이 금지 목록에 들면 위반이다.
+# 파싱 실패도 위반이다(읽지 못하는 코드를 통과시키지 않는다).
+#
+# **이 층에서 사라지는 것들**: 주석 걷개 · 원문 보기 합집합 · `$'…'` 상태 · `${#x}`·`$#`·`a#b` 특례가
+# 전부 필요 없어진다(파서가 주석과 인용을 정본으로 안다). 15M 이 그 합집합의 대가로 치르던 거짓 RED
+# — 주석 속 `a > b`·`->`·꺾쇠 짝(v REG-2)과 `(( a > b ))`·`[[ b > a ]]`(제한 13 ⓒ) — 도 함께 사라진다.
+#
+# **금지 낱말에 `eval`·`bash`·`sh` 를 더한다.** 파서에게 따옴표 안의 프로그램은 데이터이므로
+# `eval '… > /tmp/x'` 의 리다이렉션은 트리에 **없다**. 그 자리를 낱말 층에서 받는다 — 데이터를 코드로
+# 바꾸는 호출 자체를 금지하는 쪽이, 문자열 안의 `>` 를 찾는 것보다 닫힌다. 경보 스크립트는 셋 중
+# 어느 것도 쓰지 않는다.
+#
+# 한계는 알려진 제한에 적는다 — 이것은 **이 파일의 구조**에 대한 단언이고 런타임 보증이 아니다.
 cat > "$T/no-file-writes.py" <<'PY'
-import shlex
+import json
+import shutil
+import subprocess
 import sys
 
-ALLOWED_TARGETS = ("/dev/null", "/dev/stdout", "/dev/stderr")
-FORBIDDEN_WORDS = {"mktemp", "tee", "touch", "dd", "cp", "mv", "install", "truncate"}
-WORD_BOUNDARY = ";|&()<>"
+# 쓰기로 **여는** 연산자. 입력(`<`·`<<`·`<<-`·`<<<`)은 파일을 만들지 않으므로 보지 않는다 —
+# here-doc 본문은 bash 에게도 파서에게도 데이터다. `<>` 는 읽기·쓰기로 열고 없으면 만든다.
+WRITE_OPS = {">", ">>", ">|", "&>", "&>>", ">&", "<>"}
+ALLOWED_TARGET = "/dev/null"
+FD_PREFIX = "/dev/fd/"
+FORBIDDEN_WORDS = {
+    "mktemp", "tee", "touch", "dd", "cp", "mv", "install", "truncate",
+    # 데이터를 코드로 바꾸는 호출 — 그 안의 리다이렉션은 트리에 없다(위 머리 주석).
+    "eval", "bash", "sh",
+}
 
 
-def strip_comments(source):
-    """bash 규칙으로 주석만 걷는다 — **낱말 첫머리의** `#` 부터 줄 끝까지.
-
-    `shlex` 의 기본 `commenters='#'` 은 낱말 **중간**의 `#` 에서도 그 줄의 나머지를 버린다(v R3-1).
-    그래서 `n=${#CONFIG}; … > /tmp/x` 한 줄이 술어를 통째로 비껴갔다 — `${#x}`·`${s#…}`·`$#` 는
-    흔한 관용구이고 경보 스크립트도 `_trim` 에서 쓴다.
-
-    인용 상태는 셋이다: `'…'` · `"…"` · **`$'…'`**(ANSI-C 인용 — 그 안에서는 `\\` 가 다음 글자를
-    이스케이프한다). 셋째를 몰랐던 앞 판은 `$'\\' # '` 의 `\\'` 에서 인용이 닫혔다고 보고 뒤의 ` # `
-    를 주석으로 걷어, **살아 있는 꼬리**를 지웠다(v R4-1).
-
-    **이 함수가 틀려도 술어는 느슨해지지 않는다** — 아래가 걷은 보기와 **원문 보기 둘 다**에서 돌기
-    때문이다. 걷개의 오독은 검사를 더 엄하게 만들 뿐이다(fail-closed).
-    """
-    out = []
-    quote = ""
-    boundary = True
-    index = 0
-    while index < len(source):
-        char = source[index]
-        if quote:
-            out.append(char)
-            if char == "\\" and quote in ('"', "$'") and index + 1 < len(source):
-                out.append(source[index + 1])
-                index += 2
-                continue
-            if char == quote[-1]:
-                quote = ""
-            boundary = False
-            index += 1
-            continue
-        if char == "\\" and index + 1 < len(source):
-            out.append(char)
-            out.append(source[index + 1])
-            boundary = False
-            index += 2
-            continue
-        if char == "$" and index + 1 < len(source) and source[index + 1] in "'\"":
-            out.append(char)
-            out.append(source[index + 1])
-            quote = "$" + source[index + 1] if source[index + 1] == "'" else source[index + 1]
-            boundary = False
-            index += 2
-            continue
-        if char in "'\"":
-            quote = char
-            out.append(char)
-            boundary = False
-            index += 1
-            continue
-        if char == "#" and boundary:
-            while index < len(source) and source[index] != "\n":
-                index += 1
-            continue
-        out.append(char)
-        boundary = char.isspace() or char in WORD_BOUNDARY
-        index += 1
-    return "".join(out)
+def literal(word):
+    """확장이 하나도 없는 Word 의 **상수 값**. 하나라도 들면 None(= 상수가 아니다)."""
+    if not isinstance(word, dict):
+        return None
+    pieces = []
+    for part in word.get("Parts") or []:
+        kind = part.get("Type")
+        if kind in ("Lit", "SglQuoted"):
+            pieces.append(part.get("Value") or "")
+        elif kind == "DblQuoted":
+            inner = literal(part)
+            if inner is None:
+                return None
+            pieces.append(inner)
+        else:
+            return None
+    return "".join(pieces)
 
 
-def redirection(piece):
-    return ">" in piece and set(piece) <= set("<>&|();0123456789-")
-
-
-def findings_for(source, view):
-    """한 보기의 위반 목록. `whitespace_split` 은 낱말을 한 토큰으로 묶고 `punctuation_chars` 는
-    `<>&|();` 를 따로 뗀다. `commenters` 는 비운다 — 걷기는 호출자가 정한다."""
-    lex = shlex.shlex(source, posix=False, punctuation_chars=True)
-    lex.commenters = ""
-    lex.whitespace_split = True
-    try:
-        pieces = list(lex)
-    except ValueError as failure:
-        # **토큰화 실패도 위반이다**(fail-closed). 닫히지 않은 인용은 사람이 읽을 수 없는 코드이거나
-        # 술어를 깨뜨리려는 꼴이고, 둘 다 통과시킬 이유가 없다. 삼키면 「술어가 터져서 초록」이 된다.
-        return [view + " 토큰화 실패 — " + str(failure)]
+def redirect_findings(node):
     found = []
-    for index, piece in enumerate(pieces):
-        if piece in FORBIDDEN_WORDS:
-            found.append(view + " 파일을 만드는 낱말: " + piece)
+    for red in node.get("Redirs") or []:
+        op = red.get("Op") or ""
+        if op not in WRITE_OPS:
             continue
-        if not redirection(piece):
+        target = literal(red.get("Word"))
+        if op == ">&" and target is not None and (target.isdigit() or target == "-"):
             continue
-        target = pieces[index + 1] if index + 1 < len(pieces) else "<EOF>"
-        if piece.endswith("&") and (target.isdigit() or target == "-"):
+        if target == ALLOWED_TARGET:
             continue
-        if target in ALLOWED_TARGETS or target.startswith("/dev/fd/"):
+        if target is not None and target.startswith(FD_PREFIX) and target[len(FD_PREFIX):].isdigit():
             continue
-        found.append(view + " 출력 리다이렉션 대상: " + piece + " " + target)
+        found.append("출력 리다이렉션 대상: " + op + " " + (target if target is not None else "(상수가 아니다)"))
     return found
 
 
-raw = open(sys.argv[1], encoding="utf-8").read()
-# **두 보기의 합집합**(v R4-1). 걷개를 한 꼴씩 고쳐 나가는 대신, 걷지 않은 원문에서도 같은 술어를
-# 돌린다 — 걷개가 **살아 있는 꼬리를 주석으로 오독**해도 그 꼬리가 원문 보기에 그대로 남는다.
-# 대가는 거짓 RED 다: 주석·문자열이 꺾쇠 짝이나 금지 낱말을 담으면 원문 보기가 잡는다. 그래서
-# 경보 스크립트의 주석은 꺾쇠 짝을 쓰지 않는다(그 파일 머리에 적었다).
-findings = findings_for(strip_comments(raw), "[걷은 보기]") + findings_for(raw, "[원문 보기]")
+def walk(node, found):
+    """트리 전수. 명령 치환·here-doc 본문 안의 치환도 그 안에 **노드로** 있으므로 같은 술어가 닿는다."""
+    if isinstance(node, dict):
+        if isinstance(node.get("Redirs"), list):
+            found.extend(redirect_findings(node))
+        if node.get("Type") == "CallExpr":
+            for arg in node.get("Args") or []:
+                value = literal(arg)
+                if value in FORBIDDEN_WORDS:
+                    found.append("파일을 만드는 낱말: " + value)
+        for value in node.values():
+            walk(value, found)
+    elif isinstance(node, list):
+        for item in node:
+            walk(item, found)
 
+
+def _unavailable(reason):
+    """**판정 불가(2)** — 「위반 0」과 구별된다. 삼키면 「파서가 없어서 초록」이 된다."""
+    sys.stderr.write("no-file-writes: " + reason + " — 판정 불가\n")
+    raise SystemExit(2)
+
+
+target_path, pinned_version = sys.argv[1], sys.argv[2]
+shfmt = shutil.which("shfmt")
+if shfmt is None:
+    _unavailable("shfmt 가 PATH 에 없다")
+try:
+    probe = subprocess.run([shfmt, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+except OSError as failure:
+    _unavailable("shfmt 를 돌리지 못했다: " + str(failure))
+found_version = probe.stdout.decode("utf-8", "replace").strip()
+if probe.returncode != 0 or found_version != "v" + pinned_version:
+    # 판이 다르면 같은 파일에 다른 답이 나올 수 있다 — 그 답은 측정이 아니다.
+    _unavailable("shfmt 판이 핀과 다르다: " + (found_version or "(판을 읽지 못했다)") + " != v" + pinned_version)
+
+with open(target_path, "rb") as handle:
+    source = handle.read()
+done = subprocess.run(
+    [shfmt, "-ln", "bash", "--to-json"],
+    input=source, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+)
+if done.returncode != 0:
+    # 구문을 읽지 못하는 것은 통과가 아니다(fail-closed).
+    detail = (done.stderr.decode("utf-8", "replace").strip() or "사유 없음").splitlines()[0]
+    print(1)
+    print("bash 구문을 읽지 못했다: " + detail)
+    raise SystemExit(0)
+try:
+    tree = json.loads(done.stdout.decode("utf-8"))
+except ValueError as failure:
+    _unavailable("shfmt 가 낸 것이 JSON 이 아니다: " + str(failure))
+
+findings = []
+walk(tree, findings)
 print(len(findings))
 for one in findings:
     print(one)
@@ -718,55 +754,112 @@ _env_variant_ok "따옴표 뒤 CR·공백" \
 _stop_server
 
 # ── ⑬ 정적 술어 — 경보 스크립트에 파일로 쓰는 자리가 없다 ────────────────────
-static_out="$(python3 -I "$T/no-file-writes.py" "$ALERT")"
+_static() { # <파일> → 위반 수(첫 줄) + 위반 목록
+  python3 -I "$T/no-file-writes.py" "$1" "$SHFMT_PIN"
+}
+static_out="$(_static "$ALERT")"
 if [ "$(printf '%s' "$static_out" | head -n1)" = 0 ]; then
-  _ok "경보 스크립트에 파일로 쓰는 자리가 없다(출력 리다이렉션은 /dev/null·fd 뿐 · 파일 생성 낱말 0)"
+  _ok "경보 스크립트에 파일로 쓰는 자리가 없다(쓰기 리다이렉션은 /dev/null·fd 뿐 · 파일 생성 낱말 0)"
 else
   _bad "경보 스크립트에 파일로 쓰는 자리가 있다: $(printf '%s' "$static_out" | tail -n +2 | tr '\n' ' ')"
 fi
 
 # **양성 대조** — 같은 술어가 심은 자리를 찾아낸다(없으면 위 단언이 「술어가 아무것도 안 본다」와
-# 구별되지 않는다). 버릴 사본에 고정 경로 쓰기를 심는다.
+# 구별되지 않는다). 버릴 사본에 고정 경로 쓰기를 심는다. 이 꼴이 ⑬ 이 있는 **이유**다(v R2-1):
+# 고정 경로에 설정을 쓰고 → curl 이 읽고 → 종료 전에 지우는 변이는 런타임 관찰이 거의 못 잡는다.
 sed 's|^HTTP="$(curl --config.*|CFG=/tmp/x; printf "%s" "$CONFIG" > "$CFG"; HTTP="$(curl --config "$CFG")"|' \
   "$ALERT" > "$T/planted-writer.sh"
-if [ "$(python3 -I "$T/no-file-writes.py" "$T/planted-writer.sh" | head -n1)" != 0 ]; then
+if [ "$(_static "$T/planted-writer.sh" | head -n1)" != 0 ]; then
   _ok "정적 술어의 양성 대조 — 심은 파일 쓰기를 찾는다"
 else
   _bad "정적 술어가 심은 파일 쓰기도 못 찾는다(판정 공허)"
 fi
 
-# **`#` 관용구를 앞에 둔 쓰기도 보인다**(v R3-1). `shlex` 의 기본 주석 규칙은 낱말 **중간**의 `#` 에서
-# 그 줄의 나머지를 버리므로, 그 한 글자로 술어 전체가 열렸다(실측: 그 꼴의 변이가 3/3 초록). 관용구
-# 셋을 각각 **같은 줄에서** 쓰기 앞에 두고 전부 보이는지 잰다.
-_planted_hash_case() { # <이름> <쓰기 앞에 둘 bash 관용구>
-  local name="$1" idiom="$2" file="$T/planted-hash.sh"
+# **15M 의 다섯 라운드가 찾은 우회를 전부 다시 잰다**(15P). 층을 옮기면 앞 층이 한 꼴씩 닫아 온 것이
+# 조용히 열릴 수 있다 — 그래서 새 술어의 양성 대조 모집단은 **옛 술어가 붉게 만든 변이 전부 + 그
+# 술어가 끝내 못 잡은 하나(REG-1)**다. 각 변이는 `bash -n` 이 통과하고 실제로 디스크에 쓴다.
+_assert_red() { # <이름> <파일>
+  if [ "$(_static "$2" | head -n1)" != 0 ]; then
+    _ok "$1 — 파일 쓰기가 보인다"
+  else
+    _bad "$1 — 그 줄의 쓰기를 못 봤다(술어가 열린다)"
+  fi
+}
+_planted_case() { # <이름> <심을 줄…>
+  local name="$1"; shift
+  local file="$T/planted-case.sh"
   {
     printf '#!/usr/bin/env bash\n'
     printf 'CONFIG=x\n'
-    printf '%s CF=/dev/shm/.bvc$$; printf "%%s" "$CONFIG" > "$CF"\n' "$idiom"
+    printf '%s\n' "$@"
   } > "$file"
-  if [ "$(python3 -I "$T/no-file-writes.py" "$file" | head -n1)" != 0 ]; then
-    _ok "${name} 를 앞에 둔 파일 쓰기도 보인다"
-  else
-    _bad "${name} 한 글자로 술어가 열린다 — 그 줄의 쓰기를 못 봤다"
-  fi
+  _assert_red "$name" "$file"
 }
-_planted_hash_case '${#x}' 'n=${#CONFIG};'
-_planted_hash_case '$#' 'n=$#;'
-_planted_hash_case 'a#b' 'n=a#b;'
-
-# **ANSI-C 인용으로 주석 걷개를 속이는 꼴**(v R4-1). bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그
-# 뒤의 명령은 **실행된다** — 걷개가 그 줄의 꼬리를 주석으로 지우면 쓰기가 보이지 않는다. 지금은
-# 걷개에 `$'…'` 상태가 있고, 그것이 틀리더라도 **원문 보기**가 같은 줄을 본다.
+# `#` 관용구(v R3-1) — `shlex` 의 주석 규칙이 낱말 **중간**의 `#` 에서 줄의 나머지를 버려 열리던 셋.
+# 파서는 `#` 의 뜻을 정본으로 알므로 특례가 필요 없다.
+_planted_case '${#x} 관용구' 'n=${#CONFIG}; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+_planted_case '$# 관용구'    'n=$#; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+_planted_case 'a#b 관용구'   'n=a#b; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"'
+# ANSI-C 인용(v R4-1) — bash 에서 `$'\' # '` 는 문자열 `' # ` 이고 그 뒤의 명령은 **실행된다**.
 cat > "$T/planted-ansic.sh" <<'PLANT'
 #!/usr/bin/env bash
 CONFIG=x
 x=$'\' # '; CF=/dev/shm/.bvc$$; printf "%s" "$CONFIG" > "$CF"
 PLANT
-if [ "$(python3 -I "$T/no-file-writes.py" "$T/planted-ansic.sh" | head -n1)" != 0 ]; then
-  _ok "ANSI-C 인용으로 걷개를 속인 줄의 파일 쓰기도 보인다"
+_assert_red 'ANSI-C 인용' "$T/planted-ansic.sh"
+# **REG-1 — 15M 이 끝내 못 잡은 꼴**(`OPEN-M15-ALERT-STATIC-GUARD-AST` 가 선 자리). 본문에 `"` 하나만
+# 든 here-doc 두 개 사이에 쓰기 줄을 두면 `shlex` 는 그 사이를 큰따옴표 토큰 하나로 묶었다. 파서에게
+# here-doc 본문은 데이터이고 그 사이의 줄은 **코드**다 — 실측으로 `/dev/shm` 에 쓰이던 그 변이다.
+_planted_case 'REG-1 here-doc 짝' \
+  'cat <<A >/dev/null' '"' 'A' \
+  'CF=/dev/shm/.bvc$$; printf %s $CONFIG > $CF' \
+  'cat <<B >/dev/null' '"' 'B'
+# 파일을 만드는 낱말 — 리다이렉션을 하나도 쓰지 않는 갈래다.
+_planted_case 'tee 로 쓰기'    'printf "%s" "$CONFIG" | tee /dev/shm/.bvc$$ >/dev/null'
+_planted_case 'mktemp 로 쓰기' 'CF="$(mktemp)"; printf "%s" "$CONFIG" >"$CF"'
+# **간접 실행** — 파서에게 따옴표 안의 프로그램은 데이터라 그 리다이렉션은 트리에 없다. 낱말 층이
+# 받는다(옛 술어도 이 꼴은 못 잡았다 — 실측).
+cat > "$T/planted-eval.sh" <<'PLANT'
+#!/usr/bin/env bash
+CONFIG=x
+eval 'printf "%s" "$CONFIG" > /dev/shm/.bvc$$'
+PLANT
+_assert_red 'eval 로 쓰기' "$T/planted-eval.sh"
+
+# **음성 대조 — 거짓 RED 가 사라졌다.** 15M 의 원문 보기는 주석 속 `>`·꺾쇠 짝(v REG-2)과
+# `(( a > b ))`·`[[ b > a ]]`(제한 13 ⓒ)를 리다이렉션으로 셌고, 그 대가로 경보 스크립트의 주석에
+# 꺾쇠 짝 금지라는 규약을 물렸다. 파서는 주석과 산술·test 를 리다이렉션과 가른다. 이 단언이 없으면
+# 그 규약을 거둔 근거가 문면뿐이다.
+cat > "$T/negative-noise.sh" <<'PLANT'
+#!/usr/bin/env bash
+# 주석에 a > b 와 -> 와 <꺾쇠 짝> 을 쓴다
+a=2 b=1
+if ((a > b)); then echo yes >&2; fi
+if [[ b > a ]]; then echo no >/dev/null; fi
+printf '%s' "output = \"/dev/null\"" >/dev/null
+PLANT
+if [ "$(_static "$T/negative-noise.sh" | head -n1)" = 0 ]; then
+  _ok "주석의 꺾쇠 짝·산술 비교·문자열 속 설정 지시는 리다이렉션이 아니다 — 거짓 RED 0"
 else
-  _bad "ANSI-C 인용 한 꼴로 술어가 열린다 — 그 줄의 쓰기를 못 봤다"
+  _bad "거짓 RED 가 남아 있다: $(_static "$T/negative-noise.sh" | tail -n +2 | tr '\n' ' ')"
+fi
+
+# **파서가 없거나 판이 다르면 「위반 0」이 아니라 판정 불가(2)다.** 이 둘이 없으면 술어의 fail-closed
+# 가 문면뿐이고, 러너에서 설치가 조용히 깨지는 날 검사가 초록으로 지나간다.
+mkdir -p "$T/noshfmt" "$T/badver"
+rc=0; ( PATH="$T/noshfmt" "$PYBIN" -I "$T/no-file-writes.py" "$ALERT" "$SHFMT_PIN" ) > "$T/out-noshfmt.txt" 2>&1 || rc=$?
+if [ "$rc" -eq 2 ] && command grep -q '판정 불가' "$T/out-noshfmt.txt"; then
+  _ok "shfmt 가 없으면 판정 불가(2)로 선다 — 위반 0 과 구별된다"
+else
+  _bad "shfmt 부재가 판정 불가(2)로 서지 않았다(종료 ${rc})"
+fi
+printf '#!/bin/sh\necho v0.0.0-not-the-pin\n' > "$T/badver/shfmt"
+chmod 755 "$T/badver/shfmt"
+rc=0; ( PATH="$T/badver" "$PYBIN" -I "$T/no-file-writes.py" "$ALERT" "$SHFMT_PIN" ) > "$T/out-badver.txt" 2>&1 || rc=$?
+if [ "$rc" -eq 2 ] && command grep -q '판정 불가' "$T/out-badver.txt"; then
+  _ok "shfmt 판이 핀과 다르면 판정 불가(2)로 선다 — 다른 파서의 답을 측정으로 세지 않는다"
+else
+  _bad "shfmt 판 어긋남이 판정 불가(2)로 서지 않았다(종료 ${rc})"
 fi
 
 
