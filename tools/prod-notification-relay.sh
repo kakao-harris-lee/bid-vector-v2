@@ -127,7 +127,18 @@ junk_n="$(_relay_env_junk "$RELAYENVF" | grep -c '' || true)"
 stray="$(comm -23 <(_relay_env_keys "$RELAYENVF" | sort -u) <(_relay_allowed_names | sort -u) | tr '\n' ' ')"
 [ -z "${stray// /}" ] \
   || _die "채널 env 에 §13.2 밖의 키가 있다: ${stray}— 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다" 3
-_relay_env_has() { _relay_env_keys "$RELAYENVF" | grep -qxF -f <(_relay_env_names "$1"); }
+# **짧게 끊는 읽개에 파이프를 물리지 않는다.** `… | grep -q` 는 맞추는 순간 끝나고, 그때 쓰는 쪽이
+# SIGPIPE 로 죽어 `pipefail` 아래에서 파이프라인이 **141** 이 된다 — 키가 **있는데도** 거절하는 길이다
+# (줄 수가 적은 fixture 에서는 경합이 안 나 조용히 지나간다). 키 목록을 먼저 값으로 받아 둔다.
+RELAY_KEYS="$(_relay_env_keys "$RELAYENVF" | sort -u)"
+_relay_env_has() { # <속성 이름>
+  local n
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    case $'\n'"${RELAY_KEYS}"$'\n' in *$'\n'"$n"$'\n'*) return 0 ;; esac
+  done < <(_relay_env_names "$1")
+  return 1
+}
 for _p in "${_RELAY_REQUIRED_PROPS[@]}"; do
   _relay_env_has "$_p" \
     || _die "채널 env 에 필수 키가 없다(${_p} — $(_relay_env_names "$_p" | tr '\n' ' ')) — §13.2 를 채우거나 --relay-env-file 이 가리키는 파일을 본다. **값이 비었는지는 여기서 보지 않는다**(그 갈래는 러너가 RefusedMissingChannelConfig 로 말한다, §13.6)" 3
@@ -146,8 +157,15 @@ _prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 3
 # **`run --env-from-file` 을 아는 판인가** — 같은 축의 둘째 문턱이다. 판 번호로 묻지 않고 **그 도구에게
 # 직접** 묻는다(이 플래그가 들어온 판 번호를 지어내면 그 수가 곧 거짓이 되는 자리다). 모르면 둘째 env
 # 파일이 컨테이너에 닿지 않고, 그 run 은 §13.2 를 채웠는데도 기동 실패로 끝난다.
-docker compose run --help 2>/dev/null | grep -q -- '--env-from-file' \
-  || _die "이 docker compose 는 'run --env-from-file' 을 모른다 — 채널 env 가 일회 컨테이너에 닿지 않는다(§13.3). compose 를 올린다" 3
+# 여기서도 **파이프를 물리지 않는다**(위 `_relay_env_has` 와 같은 사유): `docker … | grep -q` 는
+# 플래그 줄이 앞쪽에 있어 거의 매번 docker 를 SIGPIPE 로 죽이고, `pipefail` 아래에서 그 141 이
+# 「모르는 판」으로 읽힌다. 도움말을 **값으로** 받아 맞춘다.
+_relay_run_help="$(docker compose run --help 2>/dev/null || true)"
+case "$_relay_run_help" in
+  *--env-from-file*) ;;
+  *) _die "이 docker compose 는 'run --env-from-file' 을 모른다 — 채널 env 가 일회 컨테이너에 닿지 않는다(§13.3). compose 를 올린다" 3 ;;
+esac
+unset _relay_run_help
 
 # **반입·되돌림·훑기와 같은 잠금 둘을 같은 순서로 잡는다**(`tools/prod-env.sh`). relay 는 멱등이 아니지만
 # (집은 행은 종단으로 간다) **겹치면 돌지 않는 쪽**이 맞다 — 임대가 배타를 지더라도 반입 중에 옛
