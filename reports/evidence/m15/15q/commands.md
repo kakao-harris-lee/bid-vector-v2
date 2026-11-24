@@ -41,6 +41,20 @@ A 가 이 slice 의 설계를 바꿨다(앞 판 처방대로 짰으면 첫 실�
 미룸 셋 · 잠금 파일 하나 · flock 여섯 · 그 밖) · **신호 경로 12**(평가·relay 각 여섯) ·
 **runbook 2**(ExecStopPost 이름 집합 · relay drop-in 의 `5` 포함·`6` 제외).
 
+## unit 문면 — systemd 에게 직접 물었다
+
+§13.3 의 `ini` 블록 **여덟**(unit 둘 · timer 둘 · drop-in 넷)을 runbook 에서 **그대로 떠내** 임시
+디렉터리에 쓰고 `systemd-analyze verify` 를 돌렸다(`/etc` 와 `systemctl` 을 건드리지 않는다. 자리표시자
+셋은 버릴 값으로 바꿨다 — 묻는 것은 거동이 아니라 문법이다).
+
+| 대상 | 결과 |
+|---|---|
+| `bidvector-evaluation-commit.service` | 지적 **1 건** — 「스크립트가 아직 그 자리에 없다」뿐. `SuccessExitStatus=4`·`ExecStopPost=`·`OnFailure=`·`OnCalendar=` 에 지적 **0** |
+| `bidvector-notification-relay.service` | 지적 **1 건** — 같은 하나뿐. **`SuccessExitStatus=4 5`**(값 둘)에 지적 **0** |
+| **음성 대조** — `10-defer.conf` 에 `BogusKey=1` 을 넣는다 | `Unknown key name 'BogusKey' in section 'Service'` — **drop-in 을 실제로 읽었다**(읽지 않았다면 초록이 공허하다) |
+
+남는 그 한 건은 **반입 전이라 당연한 것**이다(알려진 제한 2 — `<저장소>` 에 이 두 파일이 아직 없다).
+
 ## 변이 — 스무 건 전부 RED
 
 산출물을 **커밋한 뒤** 한 자리씩 바꿔치우고 `prod-guards-check.sh` 를 돌린 뒤 `git checkout --` 로
