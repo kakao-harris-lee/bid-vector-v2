@@ -181,11 +181,28 @@ _relay_allowed_names() {
 # 어디에도 값이 없다). stderr 는 버린다.
 # 돌려주는 코드: 0 해석함 · 1 **compose 가 거절했다**(채널 env 의 일) · 2 그 밖의 도구가 어긋났다
 # (`mktemp`·`jq` — 채널 env 의 일이 **아니다**, cr R-1). 호출자가 둘을 다른 문면으로 낸다.
-_relay_parsed_keys() { # <채널 env 절대 경로>
-  local f="$1" stub out keys rc=0
-  stub="$(mktemp -d)" || return 2
-  # **신호로 끊겨도 임시 자리를 남기지 않는다**(cr R-7) — 아래 trap 은 함수가 어떻게 끝나든 돈다.
-  trap 'rm -rf "$stub"' RETURN
+# **신호로 끊겨도 임시 자리를 남기지 않는다**(cr R-7 · N-2). 자리는 **부모가 만들고 부모가 치운다** —
+# 해석 함수는 명령 치환 `$( )` 안에서 돌므로 **서브셸**이고, 거기서 전역에 적은 자리는 부모에게
+# 건너오지 않는다(첫 판이 그래서 신호 뒤에 자리를 남겼다 — 실측). `RETURN` trap 도 서브셸 안에서만
+# 도므로 신호 갈래를 덮지 못한다. 그래서 자리를 부모의 변수에 두고 신호 trap 을 해석 **앞에** 건다.
+_RELAY_STUB_DIR=""
+# `|| true` — 지우지 못한 것이 이 자리의 반환값을 바꾸지 않는다(cr N-4).
+_relay_stub_cleanup() {
+  [ -z "$_RELAY_STUB_DIR" ] || rm -rf "$_RELAY_STUB_DIR" || true
+  _RELAY_STUB_DIR=""
+}
+_relay_stub_on_signal() {
+  local sig="$1"
+  trap - TERM INT HUP
+  _relay_stub_cleanup
+  kill -s "$sig" $$
+}
+trap '_relay_stub_on_signal TERM' TERM
+trap '_relay_stub_on_signal INT' INT
+trap '_relay_stub_on_signal HUP' HUP
+
+_relay_parsed_keys() { # <채널 env 절대 경로> <stub 디렉터리 — 부모가 만들어 준다>
+  local f="$1" stub="$2" out keys rc=0
   # **경로를 JSON 문자열로 넣는다**(v L-2). 따옴표 없이 넣으면 경로의 ` #` 이 YAML 주석이 되어
   # `config` 가 **다른 파일**을 읽는다 — 그러면 검사한 파일과 컨테이너가 받는 파일이 갈린다(실측).
   {
@@ -196,12 +213,18 @@ _relay_parsed_keys() { # <채널 env 절대 경로>
     printf '    env_file:\n'
     printf '      - %s\n' "$(jq -Rn --arg p "$f" '$p')"
   } > "$stub/compose.yaml" || return 2
-  # **좁은 환경으로 부른다**(v L-3). `config` 는 **이 프로세스의 env** 로 `${VAR}` 를 풀고
-  # `run --env-from-file` 은 **컨테이너에 주는 env** 로만 푼다 — 그대로 두면 `…=${HOME:?x}` 가
-  # `config` 를 통과하고 run 에서는 파일이 통째로 버려져 `RefusedMissingChannelConfig` 로 끝난다.
-  # `PATH` 하나만 남긴다(docker 자신이 쓴다). 남는 비대칭은 `PATH` 한 이름이고, 위의 「값에 `$` 를
-  # 쓰지 않는다」가 그 한 칸까지 닫는다.
-  out="$(env -i "PATH=$PATH" docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
+  # **평소 환경으로 부른다 — 문턱 둘과 같은 env 다.** 한때 이 호출만 `env -i "PATH=$PATH"` 로
+  # 좁혔는데(v L-3 처방의 절반), 그것이 `HOME`·`DOCKER_CONFIG` 까지 떨어뜨려 **compose 가 사용자
+  # 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝나게** 했다(cr N-1 실측 — docker 는
+  # `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다). 멀쩡한 자격 파일을 들여다보게 만드는
+  # 혼동이고, cr R-1 이 끊으려던 바로 그 축이다.
+  #
+  # **그 좁힘은 지금 아무것도 막지 않는다** — 위의 「값에 `$` 를 쓰지 않는다」 전제가 **해석보다
+  # 먼저** 파일 전수를 보므로 여기 닿는 파일에는 `$` 가 한 글자도 없고, 두 해석기 어느 쪽에서도
+  # 보간이 **일어날 수 없다.** 좁힘이 더하는 것은 실패 경로 하나뿐이라 걷었다(cr N-1 처방 ⓐ).
+  # 그래서 이 호출은 문턱 둘(`version`·`run --help`)과 **같은 env** 로 돈다 — 「술어와 소비자가
+  # 같은 것을 본다」가 경로 축에 이어 env 축에서도 참이다.
+  out="$(docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
   [ "$rc" -eq 0 ] || return 1
   keys="$(printf '%s' "$out" | jq -r '.services.probe.environment // {} | keys[]' 2>/dev/null)" || return 2
   printf '%s' "$keys" | sort -u
@@ -211,18 +234,30 @@ _relay_parsed_keys() { # <채널 env 절대 경로>
 # 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나 진단이 엉뚱한 곳을 가리킨다.
 _relay_content_lines() { sed -n '/^[[:space:]]*$/d; /^[[:space:]]*#/d; p' "$1" | grep -c '' || true; }
 
-# **값에 `$` 를 쓰지 않는다**(v L-3 의 나머지 한 칸). 두 해석기의 `${VAR}` 조회 집합은 좁혀도 완전히
-# 같아지지 않는다 — `config` 는 이 프로세스의 env 로, `run` 은 컨테이너에 주는 env 로 푼다. `$` 가
-# **한 글자도 없으면** 조회가 일어날 수 없어 둘이 같은 파일을 같게 읽는다. 이것은 키 집합을 뽑는
-# 문법이 아니라 **좁히는 전제**다(거절만 더할 수 있고 통과를 만들 수 없다). §13.2 의 일곱 값 가운데
-# `$` 가 필요한 것은 없다.
-if grep -q '\$' "$RELAY_ABS"; then
-  _die "채널 env 에 '\$' 가 있다($RELAYENVF) — 값의 \${VAR} 는 compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다(§13.2 의 일곱 값에는 '\$' 가 필요 없다). 그 글자를 지운다(문면은 줄 내용을 옮기지 않는다)" 3
+# **경로에도 `$` 를 쓰지 않는다**(v M-1). 경로는 stub YAML 의 **값**으로 들어가고 compose 는 그 값을
+# 보간한다 — JSON 인용은 YAML 파싱만 닫고 보간은 닫지 않는다. 그래서 `…/${NOPE:-relay.env}` 는
+# `config` 가 이웃을, `run --env-from-file` 이 그 파일을 읽게 만든다(실측). 경로는 운영자가 고르는
+# 값이고 runbook 은 고정 경로를 적으므로, 거절이 비용 없는 자리다.
+case "$RELAY_ABS" in
+  *'$'*) _die "채널 env 의 경로에 '\$' 가 있다 — 그 글자는 compose 가 stub 의 값으로 보간해서, 검사한 파일과 컨테이너가 받는 파일이 갈린다. '\$' 없는 경로에 두고 다시(runbook §13.2 의 자리가 그 꼴이다)" 3 ;;
+esac
+# **값에도 `$` 를 쓰지 않는다**(v L-3). `config` 와 `run --env-from-file` 은 `${VAR}` 를 **서로 다른
+# env** 로 푼다 — `$` 가 한 글자도 없으면 조회가 일어날 수 없어 둘이 같은 파일을 같게 읽는다. 이것은
+# 키 집합을 뽑는 문법이 아니라 **좁히는 전제**다(거절만 더할 수 있고 통과를 만들 수 없다). §13.2 의
+# 일곱 값 가운데 `$` 가 필요한 것은 없다(§13.2·§13.6 이 그 제약을 적는다).
+#
+# **값 자리만 본다**(cr N-3) — 주석·빈 줄은 건너뛰고 첫 `=` **뒤**를 본다. 주석에 쓴 `$` 까지 거절하면
+# 운영자가 고칠 수 없는 자리를 가리키게 된다(`=` 가 없는 줄은 해석기가 따로 끊는다).
+if sed -n '/^[[:space:]]*#/d; s/^[^=]*=//p' "$RELAY_ABS" | grep -q '\$'; then
+  _die "채널 env 의 **값**에 '\$' 가 있다($RELAYENVF) — 값의 \${VAR} 는 compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다(§13.2 의 일곱 값에는 '\$' 가 필요 없다). 그 글자를 지운다(문면은 줄 내용을 옮기지 않는다)" 3
 fi
 RELAY_KEYS=""; _relay_parse_rc=0
-RELAY_KEYS="$(_relay_parsed_keys "$RELAY_ABS")" || _relay_parse_rc=$?
+_RELAY_STUB_DIR="$(mktemp -d)" \
+  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(임시 자리를 만들지 못했다) — 채널 env 의 일이 아니다. TMPDIR 를 본다" 3
+RELAY_KEYS="$(_relay_parsed_keys "$RELAY_ABS" "$_RELAY_STUB_DIR")" || _relay_parse_rc=$?
+_relay_stub_cleanup
 [ "$_relay_parse_rc" -ne 2 ] \
-  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(mktemp·jq) — 채널 env 의 일이 아니다. 임시 자리와 jq 를 본다" 3
+  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(stub 쓰기·jq) — 채널 env 의 일이 아니다. 임시 자리와 jq 를 본다" 3
 RELAY_CONTENT_N="$(_relay_content_lines "$RELAY_ABS")"
 # **읽지 못했거나 키가 0 인데 내용 줄이 있다 = 해석기가 이 파일을 통째로 버렸다.**
 # 두 갈래를 한 문면으로 모으는 이유: `config` 는 그런 입력에 **rc 1 로 말하지만**(실측)
@@ -239,6 +274,7 @@ unset _relay_parse_rc
 stray="$(comm -23 <(printf '%s\n' "$RELAY_KEYS" | grep -v '^$' | sort -u) <(_relay_allowed_names | sort -u) | tr '\n' ' ')"
 [ -z "${stray// /}" ] \
   || _die "채널 env 에 §13.2 밖의 키가 있다: ${stray}— 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)" 3
+unset stray
 _relay_env_has() { # <속성 이름>
   local n
   while IFS= read -r n; do

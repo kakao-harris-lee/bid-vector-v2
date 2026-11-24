@@ -162,14 +162,13 @@ if [ "${1:-}" = compose ]; then
       # 키 집합을 **소비자와 같은 해석기**로 뽑는데, 그 해석을 여기서 흉내 내면 단언이 재는 것은
       # compose 가 아니라 **이 가짜의 셋째 문법**이 된다 — 우회 줄이 거절되는지는 그러면 영영 미측정이다.
       # 그 호출은 stub 파일 하나를 읽는 client-side 렌더링이라 운영 스택·데몬에 닿지 않는다.
-      # 진짜 자리는 **파일**에서 읽는다 — 래퍼가 이 호출을 `env -i` 로 돌리므로(v L-3: 보간 조회
-      # 집합을 좁힌다) 환경 변수로는 건너오지 않는다. 그 좁힘은 산출물의 성질이고 하네스가 거기
-      # 맞춘다(반대로 하면 검사를 위해 산출물을 넓히는 꼴이다).
+      # 진짜 자리는 환경에서 읽는다 — 래퍼가 평소 env 로 부르므로 그대로 건너온다(cr N-1 로
+      # `env -i` 가 걷히면서 파일 우회도 함께 사라졌다).
       if [ -n "$ffile" ] && grep -q 'bidvector-relay-envcheck' "$ffile" 2>/dev/null; then
-        real="${SHIM_REAL_DOCKER:-}"
-        [ -n "$real" ] || real="$(cat "${0%/*}/.real-docker" 2>/dev/null || true)"
-        [ -n "$real" ] || { echo "SHIM: 진짜 docker 자리를 찾지 못했다" >&2; exit 97; }
-        exec "$real" "${ORIG[@]}"
+        [ -n "${SHIM_REAL_DOCKER:-}" ] || { echo "SHIM: 진짜 docker 자리를 찾지 못했다" >&2; exit 97; }
+        # 신호 경로 단언용 — 해석이 도는 **창**을 연다(cr N-2).
+        [ -z "${SHIM_CONFIG_SLEEP:-}" ] || sleep "$SHIM_CONFIG_SLEEP"
+        exec "$SHIM_REAL_DOCKER" "${ORIG[@]}"
       fi
       [ -n "${SHIM_CONFIG_FILE:-}" ] && [ -r "${SHIM_CONFIG_FILE:-}" ] || exit 1
       cat "$SHIM_CONFIG_FILE" ;;
@@ -274,7 +273,6 @@ cat > "$T/bin/flock" <<'SHIM'
 [ -z "${SHIM_FLOCK_RC:-}" ] || exit "${SHIM_FLOCK_RC}"
 exec "$SHIM_REAL_FLOCK" "$@"
 SHIM
-printf '%s\n' "$REAL_DOCKER" > "$T/bin/.real-docker"
 chmod +x "$T/bin/docker" "$T/bin/git" "$T/bin/flock"
 export PATH="$T/bin:$PATH"
 export SHIM_REAL_FLOCK="$REAL_FLOCK" SHIM_FLOCK_RC="" SHIM_REAL_DOCKER="$REAL_DOCKER"
@@ -283,7 +281,7 @@ SHIM_LOG="$T/shim.log"
 export SHIM_LOG SHIM_STATE="$T/state" SHIM_GIT_EXPECT_C="$REPO_ROOT"
 export SHIM_GIT_HEAD="$REL_SHA" SHIM_GIT_DIRTY="" SHIM_GIT_STATUS_RC=0
 export SHIM_PS_FILE="" SHIM_PS_RC=0 SHIM_PS_NAME_HIT="" SHIM_CONFIG_FILE="" SHIM_IMAGE_IDS_OK=1
-export SHIM_RUN_MARKER="" SHIM_RUN_SLEEP="" SHIM_RUN_RC=0 SHIM_NO_ENV_FROM_FILE="" SHIM_EMPTY_RUN_HELP=""
+export SHIM_RUN_MARKER="" SHIM_RUN_SLEEP="" SHIM_RUN_RC=0 SHIM_NO_ENV_FROM_FILE="" SHIM_EMPTY_RUN_HELP="" SHIM_CONFIG_SLEEP=""
 
 # ── 공통 단언 ──────────────────────────────────────────────────────────────────
 RUN_RC=0
@@ -727,6 +725,21 @@ _run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env
 _expect_rc 3 "relay — 경로에 ' #' 이 있어도 **그 파일**을 검사한다(이웃의 깨끗한 파일이 아니라)"
 _expect_text 'BIDVECTOR_PERSISTENCE_JDBCURL' "relay — 그 파일의 우회 키를 문면이 보인다"
 
+# ── v M-1 — 경로의 `$` 는 compose 가 stub 의 **값**에서 보간한다 ────────────────
+# JSON 인용은 YAML 파싱만 닫고 보간은 닫지 않는다. 그래서 `…/${NOPE:-relay.env}` 는 `config` 가
+# **이웃**을 읽고 `--env-from-file` 은 **그 파일**을 읽게 만든다 — L-2 와 같은 계열의 다른 통로다.
+RELAY_DOLLAR_ENV="$T/env/\${NOPE:-relay.env}"
+{ printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_BOT_CREDENTIAL=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_TELEGRAM_CHAT_ID=fixture\n'
+  printf 'BIDVECTOR_NOTIFICATION_SITE_BASE_URL=https://example.invalid\n'
+  printf 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil\n'; } > "$RELAY_DOLLAR_ENV"
+chmod 600 "$RELAY_DOLLAR_ENV"
+_relay_env   # 이웃의 깨끗한 relay.env — 보간이 열려 있으면 이쪽이 읽힌다
+_run ./tools/prod-notification-relay.sh --env-file "$T/env/prod.env" --relay-env-file "$RELAY_DOLLAR_ENV" --state-dir "$T/state" --owner op-fixture --project "$PROJ"
+_expect_rc 3 "relay — 경로에 '\$' 가 있으면 보내지 않는다(검사한 파일과 받는 파일이 갈린다)"
+_expect_text '경로에' "relay — 그 거절이 **경로** 축의 것이다(값 축이 아니라)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(경로 보간 축)"
+
 # ── v L-3 — 두 해석기의 `${VAR}` 조회 집합이 다르다 ─────────────────────────────
 # `config` 는 래퍼 프로세스의 env 로, `run --env-from-file` 은 컨테이너에 주는 env 로 푼다. 그래서
 # `…=${HOME:?x}` 는 `config` 를 통과하고 run 에서는 파일이 **통째로** 버려진다. 좁히는 전제로 닫는다.
@@ -760,6 +773,36 @@ _expect_rc 3 "relay — 임시 자리를 만들지 못하면 멈춘다"
 _expect_text '도구.*가 어긋났다' "relay — 그 문면이 **도구**를 가리킨다"
 _expect_no_text '통째로 버렸다' "relay — 도구 어긋남을 「채널 env 가 깨졌다」로 읽지 않는다"
 
+# ── cr N-2 — 해석 **도중에** 신호를 받아도 stub 임시 자리를 남기지 않는다 ────────
+# `RETURN` trap 은 함수가 스스로 끝날 때만 돈다 — 신호에는 돌지 않는다. 그래서 신호 trap 을 해석
+# 앞에 걸었고, 여기서 **그 창 안에서** TERM 을 보내 남는 것이 없음을 센다. 가짜 docker 가
+# `SHIM_CONFIG_SLEEP` 으로 창을 연다(그 갈래는 진짜 compose 로 넘어가기 직전이다).
+_relay_env
+mkdir -p "$T/stubtmp"
+rm -rf "${T:?}/stubtmp/"*
+RUN_RC=0
+: > "$SHIM_LOG"
+TMPDIR="$T/stubtmp" SHIM_CONFIG_SLEEP=10 \
+  setsid ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}" > "$T/out" 2> "$T/err" &
+stub_pid=$!
+for i in $(seq 1 200); do [ -n "$(ls -A "$T/stubtmp" 2>/dev/null)" ] && break; sleep 0.1; done
+if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+  kill -9 "$stub_pid" 2>/dev/null || true
+  _bad "stub 임시 자리가 만들어지지 않았다 — 신호 갈래를 잴 수 없다"
+else
+  _ok "stub 임시 자리가 해석 중에 실제로 있다(이 단언이 공허하지 않다)"
+  stub_pg="$(ps -o pgid= -p "$stub_pid" 2>/dev/null | tr -d ' ')"
+  kill -s TERM -"${stub_pg:-$stub_pid}" 2>/dev/null || kill -s TERM "$stub_pid" 2>/dev/null || true
+  wait "$stub_pid" 2>/dev/null || RUN_RC=$?
+  _expect_rc 143 "relay — 해석 중 TERM 이면 그 신호로 죽는다(128+15)"
+  if [ -z "$(ls -A "$T/stubtmp" 2>/dev/null)" ]; then
+    _ok "relay — 해석 중 TERM 이어도 stub 임시 자리를 남기지 않는다"
+  else
+    _bad "relay — 해석 중 TERM 이 stub 임시 자리를 남겼다: $(ls -A "$T/stubtmp" | tr '\n' ' ')"
+  fi
+fi
+rm -rf "${T:?}/stubtmp"
+
 # ── cr R-1 — 도구가 깨진 것을 「채널 env 가 깨졌다」로 읽지 않는다 ───────────────
 mkdir -p "$T/badbin"
 printf '#!/bin/sh\nexit 127\n' > "$T/badbin/jq"
@@ -767,7 +810,10 @@ chmod +x "$T/badbin/jq"
 _relay_env
 PATH="$T/badbin:$PATH" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
 _expect_rc 3 "relay — jq 가 깨지면 멈춘다"
-_expect_text 'jq' "relay — 그 문면이 **도구**를 가리킨다"
+# **제 문면을 잰다**(cr N-5) — 「jq 문턱」과 「해석 뒤 도구 어긋남」은 고칠 자리가 같아 보이지만
+# 서는 자리가 다르다. 문턱이 먼저 잡는다는 것을 그 글자로 못박는다.
+_expect_text '가장 단순한 JSON' "relay — 그 문면이 **jq 문턱**의 것이다(해석 뒤 갈래가 아니라)"
+_expect_no_text '도구.*가 어긋났다' "relay — 문턱이 먼저 잡으므로 해석 뒤 문면이 나오지 않는다"
 _expect_no_text '통째로 버렸다' "relay — 깨진 도구를 「채널 env 가 깨졌다」로 읽지 않는다"
 
 # ── cr H-2 — 이 파일은 **부르는 사용자**가 읽는다. other 에 열리면 거절한다 ──────

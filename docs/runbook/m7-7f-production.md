@@ -906,6 +906,12 @@ sudo -e /etc/bidvector-v2/relay.env   # 또는 평소 쓰는 편집기로 — �
 group 쓰기까지 거절하는데(`_prod_project_lock`) 이 자리는 그러지 않으므로, `docker` 처럼 **사람이 여럿
 든 group** 을 주면 그만큼이 자격을 읽는다.
 
+**값에 `$` 를 쓰지 않는다 — 파일 경로에도 쓰지 않는다.** compose 의 두 통로(`config` 의 `env_file:` 과
+`run --env-from-file`)는 `${VAR}` 를 **서로 다른 env** 로 풀기 때문에, `$` 가 한 글자라도 있으면 같은
+파일이 다르게 읽힐 수 있다. 래퍼는 **값 자리**(주석이 아닌 줄의 첫 `=` 뒤)와 **파일 경로** 양쪽에서
+그 글자를 거절한다(`exit 3`). 위 일곱 값 가운데 `$` 가 필요한 것은 없고, 이 절이 적는 경로
+(`/etc/bidvector-v2/relay.env`)에도 없다 — 주석에는 써도 된다.
+
 **이 일곱 키는 두 소비자의 합집합이다**(cr L-9). `relay` 는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
 `…SITE_BASE_URL` 을, §9.5 의 **경보**(`prod-alert-telegram.sh`)는 `…BOT_CREDENTIAL`·`…CHAT_ID`·
 `…TELEGRAM_BASE_URL` 을 읽는다. 둘 중 **더 엄한 쪽이 relay 의 키 집합 등식**이므로, 경보가 뒤에 자기
@@ -1260,6 +1266,10 @@ systemctl list-timers bidvector-notification-relay.timer   # 비어 있어야 �
 | 기동 실패, 「Telegram base URL 이 URI 로 해독되지 않는다」 | `…_TELEGRAM_BASE_URL` 을 덮어썼고 그 주소가 `java.net.URI` 가 받지 않는 모양이다(`\| \ " { } ^` · 16진 두 자리가 없는 `%` · 숫자 아닌 포트 · 65535 초과 포트) | 그 값을 지워 기본값(`https://api.telegram.org`)으로 되돌린다. **이 거부가 행을 지킨다** — 그대로 떴으면 첫 발송이 모호로 기록되고 집은 행이 전부 `ISOLATED` 로 탔다 |
 | 기동 실패, `RefusedChannelWithoutActiveRoute(channel=Email)` | `bidvector.relay.channel` 이 활성 경로가 없는 채널이다(Email 은 `enabled=false`) | `channel=telegram` 으로 고친다. 이 거부가 **행을 지킨다** — 그대로 떴으면 집은 행이 전부 `FAILED` 로 탔다 |
 | 기동 실패, `RefusedHttpClientLogging(enabled=…)` | JVM 에 JDK HttpClient 내부 로그 속성이 **지정돼** 있다(`JAVA_TOOL_OPTIONS` 로도 들어온다) | 그 속성을 **지운다**(값을 `false`·빈 값으로 두는 것으로는 풀리지 않는다 — 판정은 존재만 본다, §13.3). 지정해 두면 **요청 URL 이 stderr 로 나가고 그 URL 에 자격이 들어 있다**(§13.1 ①). 운영에서 이 속성은 금지다 |
+| 래퍼가 `exit 3`, 「채널 env 의 **값**에 '$' 가 있다」 | 값에 `${VAR}` 가 있다 — compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다 | 그 글자를 지운다. §13.2 의 일곱 값에는 `$` 가 필요 없다(**주석에는 써도 된다** — 래퍼는 주석이 아닌 줄의 첫 `=` 뒤만 본다) |
+| 래퍼가 `exit 3`, 「채널 env 의 **경로**에 '$' 가 있다」 | `--relay-env-file` 로 준 경로에 `$` 가 있다 — 그 글자는 compose 가 stub 의 값에서 보간해서 **검사한 파일과 컨테이너가 받는 파일이 갈린다** | `$` 없는 경로에 둔다(§13.2 의 자리가 그 꼴이다) |
+| 래퍼가 `exit 3`, 「compose 해석기가 채널 env 를 **통째로 버렸다**」 | 닫히지 않은 따옴표 · 값 뒤의 `!!` · `KEY=` 모양이 아닌 줄이 있다 — `run --env-from-file` 은 그런 파일을 **rc 0 으로 조용히 무시**한다 | 그 줄을 고친다. 이 거부가 없으면 러너가 `RefusedMissingChannelConfig` 로 끝나 **멀쩡한 자격 값**을 들여다보게 된다 |
+| 래퍼가 `exit 3`, 「**도구**가 어긋났다」 | `jq`·임시 자리(`TMPDIR`) 쪽 문제다 — **채널 env 의 일이 아니다** | 그 도구를 본다. 문면이 채널 env 를 가리키지 않는 것이 요점이다 |
 | 종료 코드 `4` | 그 환경이 발송 가능 모드가 아니다 | `environment=production` 인지 본다(§5 사상표) |
 | 마침 줄 `failed>0` | Telegram 이 **확정 거부**했다 — chat id 가 틀렸거나(400) 봇이 차단됐거나(403) 자격이 무효(401) | §13.1 ②③ 를 다시 본다. 본문 길이는 사유가 **아니다**(발송 어댑터가 4096자 상한에서 자르고 표지를 남긴다). 그 행은 되살아나지 않는다 — 설정을 고치면 **다음** 판정이 새 행을 낳는다 |
 | 메시지 끝에 「이하 생략」 | 본문이 Bot API 의 4096자 상한을 넘어 잘렸다 | 정상 거동이다(알림을 잃지 않는다). 뒷부분은 알림함·공고 상세에서 본다 |
