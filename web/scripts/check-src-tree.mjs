@@ -144,6 +144,21 @@ if (include === undefined || include.length !== 1 || include[0] !== 'src') {
   fail(`include 가 ["src"] 가 아니다: ${JSON.stringify(config.include)}`);
 }
 
+// **`exclude` 는 없어야 한다**(M15/15O r1 — cr H1). `include` 를 못박는 것만으로는 프로그램의 전수가
+// 서지 않는다: `"exclude": ["src/**/*.test.ts"]` 같은 **저장소 밖에서 흔한 관용구** 한 줄이면 화면
+// 파일이 프로그램에서 빠지는데 `include` 는 `["src"]` 그대로라 위 술어가 초록이다(실측: 그 한 줄에
+// src 안 113 → 93, 두 줄이면 68). 빠진 파일은 어느 TS 프로그램에도 없으므로 억제 주석 금지의
+// 모집단에서도 함께 빠진다 — `OPEN-M15-SRC-TS-COMMENT-DISABLE` (a) 축을 받던 유일한 층이다.
+//
+// 값을 고정하는 쪽이 아니라 **부재**를 단언한다. 오늘 이 파일에 그 키가 없고, 생겨야 할 사유가
+// 있다면 그때 이 술어를 함께 고치는 것이 맞다(조용히 지나가지 않는다).
+if (config.exclude !== undefined) {
+  fail(
+    `tsconfig.json 에 exclude 가 있다: ${JSON.stringify(config.exclude)} — include=["src"] 를 ` +
+      '못박아도 exclude 한 줄이 프로그램 전수를 줄인다(억제 주석 금지의 모집단이 함께 줄어든다)',
+  );
+}
+
 if (parsed.options.allowJs === true) {
   fail('allowJs 가 켜져 있다 — legacy .js 가 프로그램에 들어올 입구가 생긴다');
 }
@@ -302,6 +317,45 @@ for (const sourceFile of programFiles) {
         `${name} 에 타입 참조 지시가 있다: ` +
           `${sourceFile.typeReferenceDirectives.map((reference) => reference.fileName).join(', ')} ` +
           '— 전역 선언 표면은 tsconfig 의 types 한 자리에서만 연다',
+      );
+    }
+    // ④c **나머지 두 참조 축**(M15/15O — `OPEN-M15-SRC-TS-COMMENT-DISABLE` (c)ⓙ).
+    //
+    // ④b 는 `types` 축만 닫는다. 같은 전역 표면을 여는 자리가 **둘 더** 있고 둘 다 ④b 와 ②
+    // 를 건드리지 않는다:
+    //
+    //   `/// <reference path="../node_modules/@types/node/index.d.ts" />`
+    //   `/// <reference lib="dom.asynciterable" />`
+    //
+    // 앞은 `referencedFiles` 로, 뒤는 `libReferenceDirectives` 로 들어온다. 실측(착수 base):
+    // 그 `path` 한 줄이면 `process.env` 가 **값이 되고**(그 줄 없이는 typecheck exit 2)
+    // `gate:src-tree` 는 **0** 이었다 — 받는 것은 eslint `triple-slash-reference` 하나뿐이고
+    // 그 lint 는 이름을 단 `eslint-disable-next-line` 으로 꺼진다(같은 OPEN 의 (a) 축).
+    //
+    // `path` 참조는 **전면 금지가 아니라 경계**다 — `src` 안을 가리키는 것은 ④ 의 전수 술어가
+    // 이미 받는 자리이고, 막는 것은 그 경계 **밖**으로 나가는 참조다. `lib` 참조는 `lib` 목록과
+    // 같은 전역 표면을 여는데 tsconfig 밖에 둘 자리가 없으므로 0 이다. 오늘 `web/src` 의 두
+    // 지시는 모두 **0 건**이라 오탐이 없다.
+    for (const reference of sourceFile.referencedFiles) {
+      const target = resolve(dirname(realPath), reference.fileName);
+      let targetReal = target;
+      try {
+        targetReal = realpathSync(target);
+      } catch {
+        /* 해석되지 않는 참조도 경계 밖이면 아래에서 떨어진다 */
+      }
+      if (targetReal !== srcReal && !targetReal.startsWith(srcReal + sep)) {
+        fail(
+          `${name} 의 파일 참조 지시가 src 밖을 가리킨다: ${reference.fileName} → ` +
+            `${relative(webRoot, targetReal)} — 전역 선언 표면은 tsconfig 한 자리에서만 연다`,
+        );
+      }
+    }
+    if (sourceFile.libReferenceDirectives.length > 0) {
+      fail(
+        `${name} 에 lib 참조 지시가 있다: ` +
+          `${sourceFile.libReferenceDirectives.map((reference) => reference.fileName).join(', ')} ` +
+          '— lib 표면은 tsconfig 의 lib 한 자리에서만 연다',
       );
     }
   }
@@ -1142,8 +1196,8 @@ if (!existsSync(viteConfigPath)) {
 if (finishIfFailed()) return;
 
 console.log(
-  `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · allowJs 꺼짐 · ` +
-    `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · src 안 타입 참조 지시 0 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
+  `컴파일 경계 전제 성립: src 는 web/ 안의 실디렉터리 · rootDir=src · include=["src"] · exclude 없음 · allowJs 꺼짐 · ` +
+    `paths 없음 · resolveJsonModule=false 명시 · types == ${JSON.stringify(EXPECTED_TYPES)} · src 안 타입 참조 지시 0 · src 안 파일 참조 지시가 src 밖을 가리키지 않음 · src 안 lib 참조 지시 0 · web/ 심볼릭 링크 0(설치본·빌드·실행 산출물 제외) · src 안 파일 종류 == {ts,tsx,css} · 프로그램 파일 ${programFiles.length}(src 안 ${inSrcFiles.length}) 전부 ` +
     `src·node_modules 안 · **이 프로그램 안에서** ${API_CLIENT_PACKAGE} import 집합 == {${API_CALL_SITE}}(TS 프로그램 한정 — 전수는 번들 층이 센다) · 호출 능력 간선(import·재수출·동적) 집합 == {src/api/queries.ts} · 그 능력의 심볼 참조가 그 밖에서 0 · 재수출 0 · 호출 자리에서 **TS 가 client 로 해석한** import 는 이름 지정 하나 · 그 자리의 export **선언 종류**가 전부 허용 집합 {FunctionDeclaration, TypeAlias, Interface} 안(TypeChecker — 모르는 종류는 기본 위반) · 비리터럴 동적 import 0 · src 안 쿼리 접미 import 0 · src 안 import.meta 멤버 == {env} · src 안 DOM 스타일 읽기(getComputedStyle·getPropertyValue) 0 · css custom property 값이 토큰 모양 · **Vite 가 해석한** publicDir == ${publicDirVerdict}(단축 속성·문자열·계산식이 한 값으로 접힌다) · web/public 없음 · ` +
     `번들 그래프 경계 플러그인이 plugins·worker.plugins 두 자리에 원소로 등재됨(활성은 카나리 W-8 이 잰다).`,
 );
