@@ -897,10 +897,81 @@ compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay �
 `…_TELEGRAM_BASE_URL`(기본 `https://api.telegram.org`) · `…_TELEGRAM_ROUTE_KEY`(기본
 `telegram-primary`) · `…_TELEGRAM_CONNECT_TIMEOUT`(기본 `5s`) · `…_TELEGRAM_RESPONSE_TIMEOUT`(기본 `10s`).
 
-### 13.3 일회 러너 — relay 와 평가 커밋
+### 13.3 일회 러너 — 평가 커밋과 relay
 
 둘 다 `mode=once` 일회 러너다(상주 스케줄러가 없다 — `OPEN-6F10-SCHEDULER`). **순서가 있다**: 평가
-커밋이 `outbox` 에 행을 남기고, relay 가 그 행을 집어 보낸다. 같은 주기에 둘을 거는 쪽이 자연스럽다.
+커밋이 `outbox` 에 행을 남기고, relay 가 그 행을 집어 보낸다. 그래서 타이머도 **평가 커밋이 먼저**다 —
+훑기 07:30·13:30(§9.2) → 평가 커밋 07:35·13:35 → relay 07:40·13:40.
+
+호출은 **저장소의 스크립트 둘**이 진다(M15/15Q) — `tools/prod-evaluation-commit.sh` ·
+`tools/prod-notification-relay.sh`. 둘 다 §9.1 의 훑기 스크립트와 **같은 모양**이다: 같은 compose 파일
+셋 · 같은 프로젝트 이름 · 같은 env 파일 · release 태그는 `<state>/current` 에서 · `--pull never` ·
+잠금 둘 · manifest 이미지 ID · **반입 트리 == 그 release 의 커밋** · 설정 통로 · 일회 컨테이너 잔존과
+이름 충돌 · 자기 일회 컨테이너 이름 고정(`<프로젝트>-app-run-evaluation` · `…-app-run-relay`)과 신호
+trap. 그래서 §9.1 의 전제·§9.4 의 진단이 그대로 적용되고, **반입이 막는 것을 러너만 통과시키는 길이
+없다.** 잔존 검사는 셋이 **같은 술어**를 쓰므로 한 러너의 일회 컨테이너가 남으면 나머지 둘도 멈춘다
+(§11 제한 13).
+
+**이 스크립트들도 사본으로 떼어 둘 수 없다** — compose 파일 셋을 읽으므로 `<저장소>`(§1.4b) 안에서
+돈다(§9.1 과 같은 사유).
+
+#### 평가 커밋 — unit · timer
+
+```ini
+# /etc/systemd/system/bidvector-evaluation-commit.service
+[Unit]
+Description=bidvector 평가 커밋 (일회 러너)
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=<저장소>
+# `--current-active-bids` 에는 **기본값이 없다.** 이 저장소에 실 진행 입찰 계수기가 없어
+# (`OPEN-6F10-CAPACITY-SOURCE`) 그 값은 호출자가 댄다 — 일회 러너에서 그 호출자는 운영자다.
+# 여력을 0 으로 지어내면 용량 보류(`CapacityHold`) 판정이 조용히 사라진다. 지금 진행 중인 투찰 수를
+# 적고, 바뀌면 이 줄을 고친다.
+ExecStart=<저장소>/tools/prod-evaluation-commit.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --current-active-bids <현재 진행 투찰 수>
+# 상한을 반드시 둔다(§9.2 와 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다.
+TimeoutStartSec=15m
+TimeoutStopSec=1m
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-evaluation >/dev/null 2>&1 || true'
+```
+
+```ini
+# /etc/systemd/system/bidvector-evaluation-commit.timer
+[Unit]
+Description=bidvector 평가 커밋 — 하루 두 번
+
+[Timer]
+OnCalendar=*-*-* 07:35 Asia/Seoul
+OnCalendar=*-*-* 13:35 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```ini
+# /etc/systemd/system/bidvector-evaluation-commit.service.d/10-defer.conf
+[Service]
+# **미룸은 실패가 아니다**(§9.4 의 `4`). 훑기가 아직 돌고 있으면 이 run 은 잠금을 잡지 못하고 다음
+# 주기로 미룬다 — 설계된 정상이다. 경보를 끄더라도 **이 파일은 남긴다**.
+SuccessExitStatus=4
+```
+
+```ini
+# /etc/systemd/system/bidvector-evaluation-commit.service.d/20-alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
+```
+
+**`OnCalendar` 은 매 달력일이다 — 요일을 넣지 않는다.** run 당 계정 상한(`max-accounts-per-run`,
+기본 50) 밖의 계정은 **KST 달력일마다 한 칸씩** 회전하는 창으로 미뤄지고, 그 덮개는 **run 사이의
+최대 간격 `g`** 에 달려 있다(한 바퀴 = `K-상한+g` 달력일). 평일만 거는 timer 는 `g=3` 이라 한 바퀴가
+그만큼 길어진다 — 사유와 그 교환의 정본은 `docs/runbook/m6-6e-operations.md` §3.4 의 인용 블록이다.
+같은 이유로 스크립트는 그 상한과 연속 실패 상한에 **플래그를 열지 않는다**(출하 기본값 50·3 그대로).
+
+#### relay — unit · timer
 
 ```ini
 # /etc/systemd/system/bidvector-notification-relay.service
@@ -911,21 +982,13 @@ Description=bidvector 알림 relay (일회 러너)
 Type=oneshot
 User=deploy
 WorkingDirectory=<저장소>
-EnvironmentFile=/etc/bidvector-v2/relay.env
-# 호출 모양은 반입된 스택의 일회 컨테이너다 — §9.1 의 훑기 러너와 같은 전제(같은 compose 파일 셋 ·
-# 같은 프로젝트 이름 · release 태그는 <state>/current 에서 읽는다 · `--pull never`).
-#   bidvector.relay.mode=once · bidvector.relay.environment=production
-#   bidvector.relay.owner=<운영자 id> · bidvector.relay.channel=telegram · bidvector.relay.claim-limit=50
-#     (첫 run 은 이 상한이 아니라 §13.4 ② 를 따른다 — `claim-limit=1`)
-#   SPRING_MAIN_WEB_APPLICATION_TYPE=none
-# **env 파일이 둘이다.** `--env-file` 은 **스택 설정**(§1 ③ 의 `prod.env` — compose 가 요구하는 키
-# 집합이고 `prod-env-keys-check.sh` 가 등식으로 잰다)이고, `EnvironmentFile` 은 **알림 채널 설정**
-# (§13.2 의 `relay.env` — compose 가 모르는 키라 템플릿에 넣지 않는다)이다. 둘을 한 파일로 합치면
-# 그 등식 검사가 relay 키를 죽은 키로 보고 붉어진다.
-ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
-# 상한을 반드시 둔다(§9.1 과 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다.
+# `--owner` 에는 기본값이 없다(`bidvector.relay.owner` — 공백이면 러너가 기동 실패한다). 채널은
+# 스크립트가 `telegram` 으로 고정한다(오늘 활성 경로가 있는 채널은 그것 하나다 — §13.6 의
+# `RefusedChannelWithoutActiveRoute`). `--claim-limit` 기본은 50 이고, **첫 실발송만 §13.4 ② 의 `1`** 이다.
+ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
 TimeoutStartSec=15m
 TimeoutStopSec=1m
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-relay >/dev/null 2>&1 || true'
 ```
 
 ```ini
@@ -942,23 +1005,52 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-**`tools/prod-notification-relay.sh` 는 아직 없다** — §9.1 의 훑기 스크립트와 같은 모양으로 만드는 것이
-활성화 slice 의 몫이다(이 slice 는 코드와 절차까지만 낸다). 그때까지 손으로 돌리려면 §9.1 의 스크립트를
-읽고 같은 전제(잠금 · manifest 대조 · `--pull never`)를 지켜야 한다 — 그 전제를 건너뛰면 반입이 막는
-것을 러너만 통과시키는 길이 생긴다.
+```ini
+# /etc/systemd/system/bidvector-notification-relay.service.d/10-defer.conf
+[Service]
+# 둘을 실패에서 뺀다. `4` 는 **래퍼의 미룸**(잠금 경합 — 앞의 평가 커밋이 아직 돌고 있다)이고,
+# `5` 는 **러너의 `LEASE_BUSY`**(같은 owner 의 relay 가 임대를 쥐고 있다) — 둘 다 「기다리면 풀린다」다.
+# **`6`(`ENV_SUPPRESSED`)은 빼지 않는다**: 기다려도 풀리지 않는 설정 오류라 경보가 울어야 한다.
+SuccessExitStatus=4 5
+```
 
-**그 스크립트가 반드시 해야 하는 것이 하나 더 있다**: `relay.env` 의 세 값을 **일회 컨테이너까지**
-넘겨야 한다(둘째 `--env-file /etc/bidvector-v2/relay.env`, 또는 세 키를 `-e` 로). 위 unit 의
-`EnvironmentFile` 은 그 값을 **스크립트 프로세스**의 환경에 올릴 뿐이고, §9.1 선례의 일회 컨테이너는
-`--env-file` 로 받은 파일만 컨테이너에 전달한다 — 이 한 줄이 빠지면 세 값이 JVM 에 닿지 않고
-`production` 러너가 §13.2 를 채웠는데도 `RefusedMissingChannelConfig` 로 기동 실패한다.
+```ini
+# /etc/systemd/system/bidvector-notification-relay.service.d/20-alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
+```
+
+**`EnvironmentFile=` 을 쓰지 않는다 — `--relay-env-file` 이 그 자리다.** 앞 판의 이 절은 unit 에
+`EnvironmentFile=/etc/bidvector-v2/relay.env` 를 두고 「둘째 `--env-file` 로 컨테이너까지 넘긴다」고
+적었는데, **compose 의 최상위 `--env-file` 은 보간에만 쓰여 컨테이너에 닿지 않는다**(M15/15Q 실측 —
+키가 하나도 들어가지 않는다). 컨테이너까지 가는 통로는 `run --env-from-file` 이고 스크립트가 그것을
+쓴다. unit 이 파일 경로만 넘기면 되므로 `EnvironmentFile=` 은 필요 없다 — **값이 이 스크립트
+프로세스의 환경에 올라가지 않는 쪽**이 좁기도 하다(`/proc/<pid>/environ` 축).
+
+**env 파일이 둘인 것은 그대로다.** `--env-file` 은 **스택 설정**(§1 ③ 의 `prod.env` — compose 가
+요구하는 키 집합이고 `prod-env-keys-check.sh` 가 등식으로 잰다)이고, `--relay-env-file` 은 **알림 채널
+설정**(§13.2 의 `relay.env` — compose 가 모르는 키라 템플릿에 넣지 않는다)이다. 둘을 한 파일로 합치면
+그 등식 검사가 relay 키를 죽은 키로 보고 붉어진다.
+
+**둘째 파일은 새 설정 통로다 — 키 집합으로 닫는다.** `run --env-from-file` 로 들어온 값은 서비스가
+선언한 env 에 **더해지고, 같은 이름이면 이긴다**(M15/15Q 실측). 그래서 `relay.env` 에 들어온
+`JAVA_TOOL_OPTIONS` 나 `BIDVECTOR_PERSISTENCE_JDBCURL` 한 줄이 **반입 가드를 거치지 않은 채** compose 가
+준 값을 덮는다(`tools/prod-env.sh` 의 설정 통로 등식은 해석된 compose 만 본다 — 이 파일은 그 밖이다).
+스크립트는 그 파일의 **키 집합이 §13.2 의 일곱(필수 셋 + 선택 넷) 안인지**를 보고, 밖이면 `exit 3` 으로
+멈춘다. 허용 이름은 손으로 열거하지 않고 Spring 의 두 사상(dash 제거 · dash→`_`)으로 속성 이름에서
+만든다 — 그래서 §13.2 의 철자와 바인딩되는 철자가 갈리지 않는다. **값은 보지 않는다**: 세 값이
+비었는지는 러너가 `RefusedMissingChannelConfig` 로 말한다(§13.6).
 
 **금지되는 JVM 옵션 — 전제이고 선택이 아니다.** 이 러너의 JVM 에 JDK HttpClient 의 내부 로그 속성
 (`jdk.httpclient.HttpClient.log` · `jdk.internal.httpclient.debug`)을 **지정하지 않는다**. 켜면 요청
 URL 이 stderr 로 나가고, 그 URL 은 **경로에 봇 자격을 싣는다** — 발송 어댑터가 로거를 쥐지 않는다는
 보증은 그 축을 덮지 못한다(JDK 자신의 로그다). `JAVA_TOOL_OPTIONS` 로도 켜지므로 그 환경 변수까지
-본다. 러너는 그 둘이 지정된 채로는 **기동하지 않는다**(`RefusedHttpClientLogging` — 아래 §13.6) —
-문면이 아니라 기동 판정이 그 전제를 진다.
+본다. 러너는 그 둘이 지정된 채로는 **기동하지 않는다**(`RefusedHttpClientLogging` — §13.6). **래퍼가
+먼저 끊는다**(M15/15Q): 기동 거부는 종료 `1` 이라 러너의 「예외」와 같은 값이므로, 래퍼가 전제
+실패 `3` 으로 가른다. 래퍼가 보는 자리는 해석된 compose 가 **못 보는 둘**이다 — 자기 프로세스의 JVM
+옵션 통로(`JAVA_TOOL_OPTIONS`·`JDK_JAVA_OPTIONS`·`_JAVA_OPTIONS`)와 `relay.env`. compose 축은
+`app.JAVA_TOOL_OPTIONS` 를 허용 형태 하나로 묶은 설정 통로 등식이 이미 닫았다. 평가 커밋 래퍼도
+**같은 금지**를 진다(러너마다 「이쪽은 봐도 되나」를 다시 묻지 않는다).
 
 **「켜지 않는다」가 아니라 「지정하지 않는다」다.** 판정은 속성의 **존재**만 본다 — `=false` 나 빈 값
 (`-Djdk.internal.httpclient.debug=false`·`-Djdk.httpclient.HttpClient.log=`)처럼 JDK 가 실제로는
@@ -966,17 +1058,116 @@ URL 이 stderr 로 나가고, 그 URL 은 **경로에 봇 자격을 싣는다** 
 fail-closed 라 그렇게 두었다. 그 옵션을 디버깅에 쓰려면 **비-Live 환경에서** 쓴다(거기서는 거부하지
 않는다 — 보낼 자격도 찍힐 URL 도 없다).
 
-### 13.4 첫 발송 확인
+#### 종료 코드 — 래퍼의 것과 러너의 것
 
-1. **먼저 억제 환경에서 한 번** — `bidvector.relay.environment=staging` 으로 돌린다. 정책표가 그 환경에
-   `DryRun` 을 붙이므로 claim 0 이고 종료 코드는 `4` `ENV_SUPPRESSED` 다. 여기서 확인하는 것은
-   「러너가 뜨고 DB·잠금에 닿는다」뿐이다(발송은 0).
-2. **다음에 `production` 으로 한 번 — 단, `bidvector.relay.claim-limit=1` 로 시작한다.** 첫 실발송은
-   **한 건만** 보낸다: 설정이 틀렸을 때(chat id 오타·봇 차단) 거부가 전 행을 태우는 것을 한 건으로
-   막는다. 종료 코드 `0` 과 마침 줄의 `delivered=1` 을 본 뒤에 상한을 평소 값(§13.3 의 `50`)으로
-   올린다. 메시지가 실제로 도착했는지는 **Telegram 앱에서** 확인한다(장부는 발송을 선언하지만 읽음을
-   알지 못한다).
-3. 어긋나면 §13.6.
+평가 커밋은 러너의 코드가 셋(`EvaluationCommitExitCode` — `m6-6e-operations.md` §3.4)이라 래퍼의 둘과
+겹치지 않는다. **relay 는 다섯이라 겹쳤고, 래퍼가 두 개를 옮겼다**(M15/15Q): 러너 `3`(`LEASE_BUSY` —
+기다리면 풀린다)과 래퍼 `3`(전제 실패 — 고쳐야 한다), 러너 `4`(`ENV_SUPPRESSED` — 고쳐야 한다)와
+래퍼 `4`(미룸 — 기다리면 풀린다)는 **뜻이 정확히 반대**다. 경보는 종료 코드로만 갈라지므로 그
+겹침은 경보를 거꾸로 울린다.
+
+| 코드 | 평가 커밋 | relay |
+|---|---|---|
+| `0` | `COMPLETE` | `COMPLETE` |
+| `1` | `FAILED`(계정 전수를 못 읽었다) | `FAILED`(러너 예외 · 임대 상실 · **기동 거부**) |
+| `2` | `INCOMPLETE`(요청 실패·계정 실패) | `INCOMPLETE`(집었는데 전달 0 등) |
+| `3` | **래퍼의 전제 실패**(§9.4 의 목록 + `--current-active-bids` 결손) | **래퍼의 전제 실패**(같은 목록 + 채널 env 축 셋) |
+| `4` | **래퍼의 미룸**(잠금 경합 — 설계된 정상) | **래퍼의 미룸**(같음) |
+| `5` | — | 러너 `LEASE_BUSY`(옛 `3`) — 기다리면 풀린다 |
+| `6` | — | 러너 `ENV_SUPPRESSED`(옛 `4`) — 기다려도 안 풀린다 |
+
+그 옮김은 **래퍼 줄로 남는다**(「래퍼의 전제 실패 3 과 겹치지 않게 5 로 낸다」) — journal 에서 원래
+이름을 그대로 읽을 수 있다. 러너 자신의 코드 다섯은 `m6-6e-operations.md` §3.2 가 정본이고 바뀌지
+않았다.
+
+### 13.4 운영자 활성화 — 단계와 그 자리
+
+**여기부터는 실제로 메시지가 나간다.** 순서를 지킨다 — ① 설치 → ② 억제 환경으로 한 번 → ③
+`production` 을 **한 건만** → ④ Telegram 앱에서 눈으로 → ⑤ 그때 타이머를 켠다. 타이머를 먼저 켜면
+①~④ 의 확인 중에 주기 run 이 끼어든다.
+
+**① unit·timer·drop-in 을 깐다**(타이머는 아직 켜지 않는다).
+
+```bash
+# 위 §13.3 의 여섯 파일을 만든다(unit 둘 · timer 둘 · drop-in 넷). <저장소>·<운영자 id>·
+# <현재 진행 투찰 수> 를 그 host 의 값으로 바꾼다.
+sudo systemctl daemon-reload
+systemctl cat bidvector-evaluation-commit.service bidvector-notification-relay.service   # 눈으로 한 번
+systemctl show -p SuccessExitStatus bidvector-notification-relay.service   # 4 5 가 보여야 한다
+systemctl show -p SuccessExitStatus bidvector-evaluation-commit.service    # 4 가 보여야 한다
+systemctl show -p OnFailure bidvector-notification-relay.service           # 비어 있지 않아야 한다
+```
+
+**② 억제 환경으로 relay 를 한 번** — 보내지 않는다. 정책표가 `staging` 에 `DryRun` 을 붙이므로
+claim 0 이고, 래퍼가 옮긴 코드 **`6`**(`ENV_SUPPRESSED`)으로 끝난다. 여기서 확인하는 것은 「러너가
+뜨고 DB·잠금·채널 설정에 닿는다」뿐이다(발송 0).
+
+```bash
+cd <저장소>
+./tools/prod-notification-relay.sh \
+  --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+  --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment staging
+echo "exit=$?"   # 6 이면 정상이다(ENV_SUPPRESSED — 억제 환경). 3 이면 §9.4·§13.6 의 전제 목록을 본다
+```
+
+**③ `production` 으로 한 번 — 단, `--claim-limit 1`.** 첫 실발송은 **한 건만** 보낸다: 설정이 틀렸을
+때(chat id 오타 · 봇 차단) 거부가 전 행을 태우는 것을 한 건으로 막는다. 그 전에 평가 커밋을 한 번
+돌려 `outbox` 에 행을 만든다(없으면 relay 가 집을 것이 없다).
+
+```bash
+cd <저장소>
+./tools/prod-evaluation-commit.sh \
+  --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 \
+  --current-active-bids <현재 진행 투찰 수>
+echo "exit=$?"   # 0 이면 완료. 마침 줄의 accounts·skipped·failed·deferred 를 본다(m6-6e §3.4)
+
+./tools/prod-notification-relay.sh \
+  --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+  --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 1
+echo "exit=$?"   # 0 과 마침 줄의 delivered=1 을 본다
+```
+
+**④ Telegram 앱에서 눈으로 본다.** 장부는 발송을 선언하지만 **읽음을 알지 못한다** — 도착을 아는
+자리는 앱뿐이다. 어긋나면 §13.6 으로 가고, **타이머를 켜지 않은 채** 고친다.
+
+**⑤ 그때 타이머를 켠다.** 상한을 평소 값(`--claim-limit 50` — unit 의 줄)으로 두고 둘을 켠다.
+
+```bash
+sudo systemctl enable --now bidvector-evaluation-commit.timer
+sudo systemctl enable --now bidvector-notification-relay.timer
+systemctl list-timers bidvector-evaluation-commit.timer bidvector-notification-relay.timer  # NEXT 가 비어 있지 않아야 한다
+journalctl -u bidvector-evaluation-commit -u bidvector-notification-relay -n 80
+```
+
+**주기 확인은 §9.4 와 같은 모양이다** — 경보는 **실패한 run** 을 알리고, 아래 계수는 **아예 돌지
+않은 타이머**를 잡는다(발화하지 않는 것은 실패하지 않는다).
+
+```bash
+journalctl -u bidvector-notification-relay --since -2d | grep -c 'relay finished'
+journalctl -u bidvector-evaluation-commit --since -2d | grep -c 'evaluation-commit finished'
+systemctl list-timers bidvector-evaluation-commit.timer bidvector-notification-relay.timer
+```
+
+**다섯 분 간격의 뜻**: 세 러너가 같은 프로젝트·상태 잠금을 쥔다. 앞 run 이 5 분을 넘기면 뒤 run 은
+잠금을 잡지 못하고 **그 주기를 미룬다**(`exit 4`, 경보 없음 — 위 drop-in). 평가 커밋이 미루면 그 날의
+창이 다음 주기로, relay 가 미루면 행이 `PENDING` 으로 남았다가 다음 주기에 나간다 — **잃는 것은
+없다.** 미룸이 계속 쌓이면(위 계수가 0 이면) 간격을 넓힌다: 그때 고칠 것은 `OnCalendar` 의 분이지
+`TimeoutStartSec` 이 아니다.
+
+#### 첫 실 run 에서 재는 것 — `OPEN-M15-EVAL-COST-PER-ACCOUNT` ⓑⓒ
+
+그 OPEN 의 남은 둘은 **타이머가 돌기 전에는 잴 수 없다**. 첫 며칠의 run 에서 아래를 적고, 그 수로
+ⓑ 의 경보 술어와 ⓒ 의 상한을 다시 정한다(이 문서는 수를 박지 않는다 — 박으면 재는 날 거짓이 된다).
+
+| 무엇 | 어디서 | 왜 |
+|---|---|---|
+| 마침 줄의 `accounts` · `skipped` · `failed` · `deferred` | `evaluation-commit finished …` | 넷은 청중과 닫힌다. `deferred` 가 0 이 아니면 상한 50 이 실제로 물리고 있다는 뜻이고, 그때 비로소 회전의 한 바퀴(`K-50+1` 달력일)가 **운영의 수**가 된다 |
+| 멈춤 줄의 유무와 `cause=` | `evaluation-commit stopped cause=…` | **ⓑ 의 핵심.** `failed=1` 은 DB 장애와 **배포 중 SIGTERM** 에서 같은 값이다 — 둘을 가르는 정보는 `cause=interrupted` 줄 하나뿐이다. 경보 술어는 「`failed>0` **이고** 그 줄이 없다」여야 한다 |
+| run 하나의 벽시계 시간 | `journalctl -u bidvector-evaluation-commit` 의 run 시작·끝 | **ⓒ 의 입력.** 오늘 ML 은 `UnavailableMlAnalysis` 에 고정돼 실비가 0 에 가깝다 — 그 수는 **ML 배선이 서기 전의 바닥값**이고, 바닥값조차 5 분을 넘기면 §13.3 의 간격이 먼저 틀린 것이다 |
+| relay 마침 줄의 `delivered` · `failed` · `isolated` · `skippedDuplicates` | `relay finished …` | `isolated>0` 은 **받았는지 모른다**는 뜻이라 재발송하지 않는다(§13.6). 첫 며칠에 그 수가 0 이 아니면 Telegram 쪽 흔들림이지 설정이 아니다 |
+| 미룸 계수 — `exit 4`·`exit 5` 의 빈도 | `journalctl` 의 unit 종료 상태 | 위 「다섯 분 간격의 뜻」. 쌓이면 간격을 넓힌다 |
+
+ⓐ(회전 보폭)는 M15/15H 가 이미 닫았다 — 여기서 다시 재지 않는다.
 
 ### 13.5 끄는 법
 
