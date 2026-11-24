@@ -144,6 +144,50 @@ _prod_config_surface_ok() {
   return 0
 }
 
+# JDK HttpClient 의 **내부 로그 속성 둘**(M15/15Q). 켜면 JDK 자신이 요청 URL 을 stderr 로 찍고, 이
+# 저장소의 바깥 호출은 자격을 **URL 에** 싣는다(Telegram 봇 자격은 경로에 · 조달청 서비스 키는 질의
+# 문자열에). 그래서 운영의 일회 러너에서 이 둘은 **금지**다 — 이름은 `app` 의 `HttpClientLogProperty`
+# 와 같은 쌍이고, 러너 자신도 `RefusedHttpClientLogging` 으로 기동을 거부한다(runbook §13.3·§13.6).
+#
+# 래퍼가 **먼저** 끊는 이유: 기동 거부는 종료 1 이라 러너의 「예외」와 같은 값이다. 전제 실패(3)로
+# 가르면 journal 에서 둘이 구별된다 — 훑기가 손상된 `current` 를 앞에서 끊는 것과 같은 축이다.
+#
+# compose 축은 여기 없다 — `_prod_config_surface_ok` 가 `app.JAVA_TOOL_OPTIONS` 를 허용 형태 **하나**로
+# 이미 묶었다(그 형태에는 `-D` 가 들어갈 자리가 없다). 겹을 두 자리에 두지 않는다.
+BIDVECTOR_PROD_HTTPCLIENT_LOG_PROPS=(jdk.httpclient.HttpClient.log jdk.internal.httpclient.debug)
+
+# 이 프로세스의 JVM 옵션 통로 셋에 그 속성이 있는가. 있으면 1 과 `_PROD_HTTPCLIENT_LOG_ERR`.
+# **판정은 존재만 본다** — `=false`·빈 값처럼 JDK 가 실제로는 아무것도 찍지 않는 값도 거절이다
+# (값마다 JDK 의 해석을 흉내 내지 않는 쪽이 fail-closed 다, runbook §13.3).
+_prod_jvm_env_log_free() {
+  local v p
+  _PROD_HTTPCLIENT_LOG_ERR=""
+  for v in JAVA_TOOL_OPTIONS JDK_JAVA_OPTIONS _JAVA_OPTIONS; do
+    for p in "${BIDVECTOR_PROD_HTTPCLIENT_LOG_PROPS[@]}"; do
+      case "${!v:-}" in
+        *"$p"*)
+          _PROD_HTTPCLIENT_LOG_ERR="이 프로세스의 ${v} 에 JDK HttpClient 내부 로그 속성이 지정돼 있다(${p}) — 켜면 요청 URL 이 stderr 로 나가고 그 URL 은 자격을 싣는다. 값이 false·빈 값이어도 거절이다(판정은 존재만 본다). 그 속성을 지운 뒤 다시"
+          return 1 ;;
+      esac
+    done
+  done
+  return 0
+}
+
+# <파일> → 그 파일에 그 속성이 있는가. 있으면 1 과 `_PROD_HTTPCLIENT_LOG_ERR`.
+# **파일 내용은 어느 출력으로도 건너오지 않는다**(`grep -q`) — 이 자리에 오는 파일은 자격을 담는다.
+_prod_httpclient_log_free_file() {
+  local f="$1" p
+  _PROD_HTTPCLIENT_LOG_ERR=""
+  for p in "${BIDVECTOR_PROD_HTTPCLIENT_LOG_PROPS[@]}"; do
+    if grep -qF -- "$p" "$f" 2>/dev/null; then
+      _PROD_HTTPCLIENT_LOG_ERR="${f} 에 JDK HttpClient 내부 로그 속성이 있다(${p}) — runbook §13.3 이 금지한다. 그 줄을 지운다(문면은 줄 내용을 옮기지 않는다)"
+      return 1
+    fi
+  done
+  return 0
+}
+
 # release 태그의 모양 — `tools/prod-release.sh` 가 만들 수 있는 집합과 같다. 상태 파일에서 읽은 값을
 # 경로·이미지 참조로 쓰기 전에 이것으로 거른다. 손상된 `current` 가 **compose 의 이미지 조회까지**
 # 흘러가 거기서 exit 1 로 끝나던 길을 앞에서 끊는다(v V4-4 — 러너 자신의 「예외(1)」와 구별되지 않았다).
