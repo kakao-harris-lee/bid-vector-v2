@@ -1,10 +1,14 @@
 # M15 / 15Q — rollback
 
-**실측 HEAD: `011ffcfe5`**(이 slice 의 마지막 산출물 커밋 — commands 의 unit 실측 커밋). 이 파일을 담는
-커밋은 그 뒤에 온다. **앞 두 라운드의 실측을 옮기지 않고 그때마다 다시 돌렸다** — 자기 검토가
-`tools/prod-notification-relay.sh` 를(pipefail·SIGPIPE 꼴), 그 뒤 unit 실측이 `commands.md` 를 또
-움직였고, 둘 다 아래 복원 목록 **안**의 파일이다. 「측정 뒤 복원 목록 안 파일을 또 커밋하면
-재측정이다」를 그대로 따랐다(세 번 쟀고, 트리 해시는 세 번 다 같았다).
+**실측 HEAD: `bc67cdb0e`**(이 slice 의 마지막 산출물 커밋 — 수정 라운드 1 의 evidence 커밋). 이 파일을
+담는 커밋은 그 뒤에 온다. **앞 라운드들의 실측을 옮기지 않고 그때마다 다시 돌렸다** — 자기 검토가
+`tools/prod-notification-relay.sh` 를, unit 실측이 `commands.md` 를, 수정 라운드 1 이 산출물 여섯을
+움직였고 전부 아래 복원 목록 **안**의 파일이다. 「측정 뒤 복원 목록 안 파일을 또 커밋하면 재측정이다」를
+그대로 따랐다(**네 번** 쟀고, 트리 해시는 네 번 다 같았다).
+
+**수정 라운드 1 이 복원 목록을 바꿨다** — `tools/prod-notification-sweep.sh` 가 `in_scope` 로 들어와
+M 이 여섯에서 **일곱**이 됐다(cr H-1 의 `_need` 가드. 그 파일은 base 에 **있으므로** 복원 대상이고
+삭제 대상이 아니다).
 
 ## 전제 — 복원 원천은 착수 base 그대로다
 
@@ -25,14 +29,14 @@ bidvector-notification-relay.timer`) unit·drop-in 여섯을 지운 뒤 `daemon-
 
 ## 목록과 명령
 
-`git diff --name-status 71b1ad3a7..<실측 HEAD>` — **M 여섯 · A 다섯**(목록은 기계 산출이고 라운드마다
-다시 낸다. 앞 라운드의 「A 넷」은 이 문서가 아직 커밋되기 전의 수였다).
+`git diff --name-status 71b1ad3a7..<실측 HEAD>` — **M 일곱 · A 다섯**(목록은 기계 산출이고 라운드마다
+다시 낸다. 앞 라운드의 「M 여섯」은 `tools/prod-notification-sweep.sh` 가 들어오기 전의 수였다).
 
 ```
 git restore --source=71b1ad3a7 --staged --worktree -- \
   docs/discovery/capability-map.md docs/runbook/m6-6e-operations.md \
   docs/runbook/m7-7f-production.md milestone-15.md \
-  tools/prod-env.sh tools/prod-guards-check.sh
+  tools/prod-env.sh tools/prod-guards-check.sh tools/prod-notification-sweep.sh
 git rm -rq reports/evidence/m15/15q tools/prod-evaluation-commit.sh tools/prod-notification-relay.sh
 ```
 
@@ -44,7 +48,7 @@ git rm -rq reports/evidence/m15/15q tools/prod-evaluation-commit.sh tools/prod-n
 버릴 clone 에서 ①~⑥ 을 쟀다. 저장소 트리는 건드리지 않았다.
 
 - ① 명령 exit: `restore` **0** · `rm` **0**
-- ② 스테이징된 변경: **D 5 · M 6**(위 목록과 같은 수다)
+- ② 스테이징된 변경: **D 5 · M 7**(위 목록과 같은 수다)
 - ③ `git diff --cached 71b1ad3a7` **빈 출력** — 복원 뒤 트리가 base 와 같다
 - 트리 동일성을 해시로도 쟀다: 복원 뒤 `git write-tree` == `71b1ad3a7^{tree}` ==
   **`c78d93dd51448aee4ca928be692e5405c64e5839`**
@@ -62,7 +66,7 @@ git rm -rq reports/evidence/m15/15q tools/prod-evaluation-commit.sh tools/prod-n
 git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   docs/discovery/capability-map.md docs/runbook/m6-6e-operations.md \
   docs/runbook/m7-7f-production.md milestone-15.md \
-  tools/prod-env.sh tools/prod-guards-check.sh \
+  tools/prod-env.sh tools/prod-guards-check.sh tools/prod-notification-sweep.sh \
   tools/prod-evaluation-commit.sh tools/prod-notification-relay.sh \
   reports/evidence/m15/15q/
 git rev-list --merges <실측 HEAD>..<판정 SHA>
