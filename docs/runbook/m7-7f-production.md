@@ -693,6 +693,10 @@ sudo systemctl daemon-reload
 # ④ **한 호출로** 묻는다. 빈 출력이 성공 신호가 되지 않게 둘을 함께 받는다 —
 #    · `EnvironmentFiles` 줄이 없다 = 걷혔다   · `LimitCORE=0` = 이 호출이 그 unit 을 실제로 읽었다
 #    · 아무 줄도 없다 = 측정이 안 된 것이다(속성 이름·unit 이름을 본다. 빈 속성은 줄 자체가 안 나온다)
+#    · `EnvironmentFiles=…` 가 보이거나 `LimitCORE` 가 0 이 아니다 = **① · ② 의 앵커가 이 host 의 꼴과
+#      다르다**(`-` 접두 없음 · 등호 앞뒤 공백 · `User=` 가 다른 값) — 둘 다 조용한 no-op 이다.
+#      `cat "$U"` 로 그 줄을 눈으로 보고 손으로 고친 뒤 ③ 부터 다시 친다(앵커를 넓히지 않는다 —
+#      넓힌 정규식이 남의 줄을 지우는 쪽이 더 나쁘다).
 systemctl show -p EnvironmentFiles -p LimitCORE 'bidvector-alert@bidvector-notification-sweep.service.service'
 # ⑤ 맨 끝 — **실제로 한 통 간다**(④ 와 같다). 받는 쪽에 미리 말해 둔다.
 sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'

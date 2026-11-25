@@ -1,0 +1,11 @@
+# M15/15R — runbook(m7-7f-production.md)의 **코드 블록 줄 가운데 `relay.env` 를 담은 줄** 전수.
+# 형식·래칫·사유는 `runbook-prod-path-lines.txt` 의 머리말과 같다(이 파일은 자격 **파일** 축이고
+# 그 파일은 자격 **디렉터리** 축이다 — 뜻이 둘이라 집합도 둘이다).
+| # 예: /etc/bidvector-v2/relay.env
+| --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+| --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+| ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
+| sudo -e /etc/bidvector-v2/relay.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
+| sudo chmod 600 /etc/bidvector-v2/relay.env
+| sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env
+| sudo test -e /etc/bidvector-v2/relay.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env

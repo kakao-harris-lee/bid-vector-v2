@@ -61,9 +61,13 @@ done < <(env)
 # 그래서 지우는 대신 **내장 `default` context 를 못박는다** — `DOCKER_CONTEXT` 는 `currentContext` 를
 # 이기므로(같은 실측) 플러그인 탐색 축을 건드리지 않고 셋째 축이 닫힌다.
 #
-# 남는 자리: 운영 데몬이 `default` **밖**에만 있는 host(rootless 를 context 로 쓰는 배치)에서는 이 못박기가
-# 기본 소켓을 보게 만든다. 그 데몬에 release 이미지가 없으므로 `_prod_images_match` 가 `exit 3` 에서
-# 선다 — fail-closed 이고 등재된 제한이다(이 host 와 CI 러너는 두 변수 없이 `default` 로 돈다 — 실측).
+# **이 못박기는 운영자가 `docker context use` 로 고른 context 도 덮는다** — 앞 판(`unset`)과 base 에서는
+# 그 선택이 살아 있었다. 운영 데몬이 `default` **밖**에만 있는 host(rootless 를 context 로 쓰는 배치)에서는
+# 기본 소켓을 보게 되고, 그때 **멈추는 쪽과 틀린 답을 내는 쪽이 갈린다**(cr L-9): 이미지 등식
+# (`_prod_images_match`)을 부르는 넷(반입·훑기·평가 커밋·relay. 되돌림은 반입의 preflight 로 전이)은
+# `exit 3` 에서 서지만, **`prod-health.sh` 는 그 등식이 없어 다른 데몬의 상태를 건강 판정으로 낸다** —
+# 멈추지 않고 틀린 답을 낸다. 오늘 영향은 0 이다(이 host 와 CI 러너는 두 변수 없이 `default` 로 돈다 —
+# 실측). 등재된 제한 5 가 그 둘을 가른다.
 unset DOCKER_HOST 2>/dev/null || true
 export DOCKER_CONTEXT=default
 
