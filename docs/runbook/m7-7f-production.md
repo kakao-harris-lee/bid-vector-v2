@@ -655,10 +655,20 @@ User=deploy
 # **파일 부재는 여전히 스크립트의 `exit 2` 한 창구로 모인다** — `[ -r "$ENVF" ]` 갈래가 같은 값을 낸다
 # (`-` 접두가 하던 일이고, 그래서 그 줄이 없어도 조용히 서는 길이 생기지 않는다).
 #
-# **core dump 를 막는다**(S-9). 봇 자격은 스크립트의 셸 변수와 `curl` 의 메모리에 요청이 끝날 때까지
-# 살아 있고, 덤프가 남으면 그 값이 디스크로 간다 — 15P 의 「이 파일에는 파일로 쓰는 자리가 없다」
-# 정적 술어는 스크립트의 구문을 보지 **커널이 쓰는 파일**을 보지 않는다. 등재된 hardening 묶음(제한 7)과
-# 달리 이 지시는 **이 unit 하나에만 넣어도** 세 unit 의 모양이 어긋나지 않는다.
+# **core dump 축을 좁힌다**(S-9) — 「막는다」가 아니다. 봇 자격은 스크립트의 셸 변수와 `curl` 의 메모리에
+# 요청이 끝날 때까지 살아 있고, 덤프가 남으면 그 값이 디스크로 간다. 15P 의 「이 파일에는 파일로 쓰는
+# 자리가 없다」 정적 술어는 스크립트의 구문을 보지 **커널이 쓰는 파일**을 보지 않는다.
+#
+# **`core_pattern` 이 파이프 핸들러인 host 에서는 커널이 RLIMIT_CORE 를 강제하지 않는다**
+# (`core(5)`: "The RLIMIT_CORE limit is not enforced for core dumps that are piped to a program").
+# `LimitCORE=` 는 그 rlimit 를 세우는 지시이므로 그런 host 에서 이 줄은 **효과가 없다** — 2026-11-25
+# 실측 기준 이 host 가 그렇다. 가르는 명령은 하나다:
+#
+#     cat /proc/sys/kernel/core_pattern     # `|` 로 시작하면 이 겹은 없는 것이다
+#
+# 통로를 실제로 닫으려면 그 값을 파이프 아닌 꼴로 두어야 하고 그것은 host 결정이라 이 slice 밖이다
+# (세 unit 전부 + host 의 `core_pattern` 이 hardening 묶음 slice 몫 — §11 제한 7). 줄은 남긴다: 파이프가
+# 아닌 host 에서는 맞는 지시이고, 이 unit 하나에만 넣어도 세 unit 의 모양이 어긋나지 않는다.
 LimitCORE=0
 ExecStart=/usr/local/lib/bidvector-v2/prod-alert-telegram.sh %i
 # 경보가 매달려 자리를 쥐지 않게 한다 — 스크립트 자신도 connect 5s · 전체 15s 로 끊는다.
@@ -668,14 +678,29 @@ TimeoutStartSec=2m
 **이미 깔린 경보 unit 을 맞춘다**(2026-11-24 설치분 — 위 두 줄이 앞 판과 다르다). 저장소만 고쳐서는
 host 의 unit 이 바뀌지 않는다:
 
+**두 편집을 먼저, 멱등하게. `daemon-reload` 는 그 뒤에 한 번.** 순서가 중요하다 — `daemon-reload` 는
+**그 시점의** 파일을 읽으므로, 뒤에 넣은 줄은 다음 reload 까지 적용되지 않고 아래 확인이 옛 값을 보인다.
+둘 다 두 번 쳐도 같은 결과여야 한다(이 slice 가 §13.2 에서 세운 바로 그 규율이다).
+
 ```bash
-sudo sed -i '/^EnvironmentFile=-\/etc\/bidvector-v2\/relay\.env$/d' /etc/systemd/system/bidvector-alert@.service
+U=/etc/systemd/system/bidvector-alert@.service
+# ① 자격을 환경에 올리던 줄을 지운다(없으면 아무 일도 하지 않는다 — 줄 머리·전문 앵커라 과잉 매치가 없다).
+sudo sed -i '/^EnvironmentFile=-\/etc\/bidvector-v2\/relay\.env$/d' "$U"
+# ② core dump 축의 줄을 [Service] 아래에 넣는다 — **이미 있으면 넣지 않는다**(두 번 쳐도 한 줄).
+sudo grep -qx 'LimitCORE=0' "$U" || sudo sed -i '/^User=deploy$/a LimitCORE=0' "$U"
+# ③ 두 편집이 끝난 뒤 한 번.
 sudo systemctl daemon-reload
-# 위 블록대로 `LimitCORE=0` 한 줄을 `[Service]` 아래에 넣었는지 눈으로 보고, 둘을 실측한다.
-systemctl show -p EnvironmentFiles 'bidvector-alert@bidvector-notification-sweep.service.service'  # 비어 있어야 한다
-systemctl show -p LimitCORE 'bidvector-alert@bidvector-notification-sweep.service.service'         # 0 이어야 한다
-sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'   # 한 통 간다(④ 와 같다)
+# ④ **한 호출로** 묻는다. 빈 출력이 성공 신호가 되지 않게 둘을 함께 받는다 —
+#    · `EnvironmentFiles` 줄이 없다 = 걷혔다   · `LimitCORE=0` = 이 호출이 그 unit 을 실제로 읽었다
+#    · 아무 줄도 없다 = 측정이 안 된 것이다(속성 이름·unit 이름을 본다. 빈 속성은 줄 자체가 안 나온다)
+systemctl show -p EnvironmentFiles -p LimitCORE 'bidvector-alert@bidvector-notification-sweep.service.service'
+# ⑤ 맨 끝 — **실제로 한 통 간다**(④ 와 같다). 받는 쪽에 미리 말해 둔다.
+sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'
 ```
+
+**선택 — 사본 다시 깔기.** 이 slice 는 `tools/prod-alert-telegram.sh` 의 **진단 문면 한 줄**도 고쳤다
+(지워진 `EnvironmentFile=` 을 가리키고 있었다). 거동은 같으므로 급하지 않다. 문면까지 맞추려면 §9.5 ① 의
+줄을 다시 친다: `sudo install -m 755 -o root -g root tools/prod-alert-telegram.sh /usr/local/lib/bidvector-v2/prod-alert-telegram.sh`.
 
 **③ 훑기 unit 에 drop-in 둘** — §9.2 의 unit 파일은 **고치지 않는다**. **둘로 나누는 것이 설계다**:
 「미룸은 실패가 아니다」는 경보와 **독립인 러너의 계약**이고, 한 파일에 담으면 경보를 끄는 `rm` 한 줄이
@@ -943,9 +968,19 @@ rc 0). 도달 경로가 가깝다: §13.3 이 「root 전용으로 조이면 매
 # 디렉터리는 §1 ③ 이 만든다(0700 · 소유자는 "$USER") — 여기서 다시 만들지 않는다.
 sudo test -e /etc/bidvector-v2/relay.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env
 # 권한만 고칠 때는 **내용을 건드리지 않는 쪽**으로 — 재설치·복구에서 여기를 다시 치는 자리다.
-sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env && sudo chmod 600 /etc/bidvector-v2/relay.env
+# 둘을 `&&` 로 잇지 않는다: 그 이름의 group 이 없는 host 에서 `chown` 이 실패하면 `chmod` 가 조용히
+# 건너뛰어져, 자격 파일이 앞의 권한(예: 0644)에 남는다.
+sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env
+sudo chmod 600 /etc/bidvector-v2/relay.env
 sudo -e /etc/bidvector-v2/relay.env   # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
 ```
+
+**이 자리는 일반 파일이어야 한다.** 위 `chown`·`chmod` 는 심볼릭 링크를 **따라간다** — `relay.env` 가
+살아 있는 링크면 `test -e` 가 참이라 생성은 건너뛰고 권한만 **대상**에 적용돼, 자격이 `0700` 울타리 밖
+파일에 적히고도 래퍼의 권한 검사를 통과한다(`readlink -f` 로 푼 대상이 `600` 이므로). 그 디렉터리는
+§1 ③ 이 깐 `0700 $USER` 라 링크를 심을 수 있는 주체는 `$USER` 와 root 뿐이고 그 주체는 이미 sudo 를
+쥐므로 **권한 상승 축은 아니다** — 사고로만 닿는다(`sudo -e` 는 보통 링크 편집을 거부한다). 의심되면
+`ls -l /etc/bidvector-v2/relay.env` 로 먼저 본다.
 
 래퍼는 **other 에 한 비트라도 열려 있으면 거절한다**(`exit 3`) — 이 파일은 봇 자격을 담는다. 소유자
 **등식**은 걸지 않는다: `root:<그 사용자의 group> 0640` 처럼 읽을 수 있고 좁은 배치도 있어서다.
@@ -1201,7 +1236,7 @@ fail-closed 라 그렇게 두었다. 그 옵션을 디버깅에 쓰려면 **비-
 | `4` | **래퍼의 미룸**(잠금 경합 — 설계된 정상) | **래퍼의 미룸**(같음) |
 | `5` | — | 러너 `LEASE_BUSY`(옛 `3`) — 기다리면 풀린다 |
 | `6` | — | 러너 `ENV_SUPPRESSED`(옛 `4`) — 기다려도 안 풀린다 |
-| `7` | — | **모르는 코드**(러너의 다섯 밖 · `docker run` 자신의 실패 · 신호 종료) — 경보가 운다 |
+| `7` | — | **모르는 코드**(러너의 다섯 밖 · `docker run` 자신의 실패 · **일회 컨테이너가** 신호로 죽어 돌아온 128+n) — 경보가 운다 |
 
 그 옮김은 **래퍼 줄로 남는다**(「래퍼의 전제 실패 3 과 겹치지 않게 5 로 낸다」) — journal 에서 원래
 이름을 그대로 읽을 수 있다. 러너 자신의 코드 다섯은 `m6-6e-operations.md` §3.2 가 정본이고 바뀌지

@@ -128,8 +128,12 @@ BASE_URL="$(_value_of "$KEY_BASE_URL")"
 # 「끝에 `/` 없이」를 다른 키에만 적는다 — relay 에서 도는 값으로 경보만 조용히 서는 자리를 없앤다.
 BASE_URL="${BASE_URL%/}"
 
-[ -n "$CREDENTIAL" ] || _die "${KEY_CREDENTIAL} 이 비어 있다 — ${ENVF} 또는 unit 의 EnvironmentFile 을 본다(runbook §13.2)" 2
-[ -n "$CHAT_ID" ] || _die "${KEY_CHAT_ID} 가 비어 있다 — ${ENVF} 또는 unit 의 EnvironmentFile 을 본다(runbook §13.2)" 2
+# **문면이 가리키는 자리는 파일이다**(M15/15R, cr L-3·sec N-7). 앞 판은 「또는 unit 의 `EnvironmentFile`」을
+# 함께 들었는데, 15R 이 그 지시를 경보 unit 에서 걷었으므로(§9.5 ②) 그 안내는 **더는 없는 줄**을 보라고
+# 한다. 환경 갈래 자체는 남아 있고(`${!key-}`) `prod-alert-check.sh` ⑦ 이 그 경로를 잰다 — 바뀐 것은
+# 운영자를 어디로 보내는가뿐이다.
+[ -n "$CREDENTIAL" ] || _die "${KEY_CREDENTIAL} 이 비어 있다 — ${ENVF} 를 본다(runbook §13.2. 이 파일은 User= 가 직접 읽는다 — 경보 unit 은 그 값을 환경에 올리지 않는다, §9.5 ②)" 2
+[ -n "$CHAT_ID" ] || _die "${KEY_CHAT_ID} 가 비어 있다 — ${ENVF} 를 본다(runbook §13.2. 이 파일은 User= 가 직접 읽는다 — 경보 unit 은 그 값을 환경에 올리지 않는다, §9.5 ②)" 2
 # 모양 거부는 **원문도 길이도 적지 않는다**(`TelegramCredentialLeakTest` 와 같은 규율) — 남는 것은
 # 「어느 칸이 어떤 모양을 어겼는가」뿐이고 그것이 runbook §13.6 의 행 키다.
 [[ "$CREDENTIAL" =~ ^[0-9]+:[A-Za-z0-9_-]+$ ]] || _die "${KEY_CREDENTIAL} 이 Bot API 모양이 아니다" 2

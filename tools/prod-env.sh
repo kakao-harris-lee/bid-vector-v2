@@ -43,7 +43,8 @@ fi
 while IFS='=' read -r _k _; do
   case "$_k" in COMPOSE_*|GIT_*) unset "$_k" 2>/dev/null || true ;; esac
 done < <(env)
-# **데몬 선택 축 둘도 비운다**(M15/15R, S-8). `DOCKER_HOST`·`DOCKER_CONTEXT` 는 세 래퍼의 **모든 docker
+# **데몬 선택 축도 닫는다**(M15/15R, S-8). `DOCKER_HOST`·`DOCKER_CONTEXT` 는 **이 조각을 source 하는 전부**
+# (반입·되돌림·health·키 집합 검사·러너 셋)의 **모든 docker
 # 호출**이 어느 데몬을 보는지를 환경 문자열 하나로 바꾼다. 오늘도 fail-closed 이긴 하다 — 남의 데몬에서는
 # `_prod_images_match` 가 이미지를 못 찾아 `exit 3` 에서 선다. 그래도 §13.4 ①~⑤ 는 **운영자 셸에서 손으로**
 # 미는 절차이고 그 셸이 다른 context 를 쥐고 있을 수 있는데, 그때 나오는 거절은 「데몬을 잘못 골랐다」는
@@ -51,12 +52,20 @@ done < <(env)
 #
 # **접두로 비우지 않는다** — `DOCKER_CONFIG`·`HOME` 은 **플러그인 탐색 축**이고 cr N-1 이 되살린 자리다
 # (떨어뜨리면 compose 가 사용자 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝난다. docker 는
-# `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다). 위 두 접두와 달리 여기서는 **고를 축이 둘뿐**이라
-# 열거가 구멍을 남기지 않는다.
+# `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다).
 #
-# 남는 자리: `DOCKER_HOST` 가 **꼭 필요한 host**(rootless docker)에서는 래퍼가 기본 소켓을 보고 `exit 3`
-# 으로 선다 — fail-closed 이고 등재된 제한이다(이 host 와 CI 러너는 그 변수 없이 돈다 — 실측).
-unset DOCKER_HOST DOCKER_CONTEXT 2>/dev/null || true
+# **그런데 데몬을 고르는 축은 둘이 아니라 셋이다**(M15/15R, v F6): 그 둘을 비워도 `DOCKER_CONFIG`(또는
+# `HOME`) 아래 `config.json` 의 **`currentContext`** 가 남고, 그것이 `docker context use` 가 쓰는 바로 그
+# 자리다 — 「운영자 셸이 다른 context 를 쥐고 있다」의 **가장 흔한 꼴**이 이것이다(실측: 버릴
+# `DOCKER_CONFIG` 에 `currentContext` 를 세우면 두 변수를 비운 셸도 그 context 로 간다).
+# 그래서 지우는 대신 **내장 `default` context 를 못박는다** — `DOCKER_CONTEXT` 는 `currentContext` 를
+# 이기므로(같은 실측) 플러그인 탐색 축을 건드리지 않고 셋째 축이 닫힌다.
+#
+# 남는 자리: 운영 데몬이 `default` **밖**에만 있는 host(rootless 를 context 로 쓰는 배치)에서는 이 못박기가
+# 기본 소켓을 보게 만든다. 그 데몬에 release 이미지가 없으므로 `_prod_images_match` 가 `exit 3` 에서
+# 선다 — fail-closed 이고 등재된 제한이다(이 host 와 CI 러너는 두 변수 없이 `default` 로 돈다 — 실측).
+unset DOCKER_HOST 2>/dev/null || true
+export DOCKER_CONTEXT=default
 
 BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml docker/compose.prod.yaml)
 

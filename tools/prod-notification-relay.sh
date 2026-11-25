@@ -57,8 +57,10 @@
 # 래퍼의 `case` 와 runbook §13.3 의 표를 함께 고친다** — `tools/prod-guards-check.sh` 의 등식 단언
 # (`RelayExitCode` 의 값 집합 == 이 `case` 가 이름으로 받는 집합)이 그것을 강제한다.
 #
-# 신호(TERM·INT·HUP)로 끝나면 그 신호로 죽는다(128+n) — 그 경로는 trap 이 받아 이 run 의 일회 컨테이너를
-# 치우고 같은 신호로 자살하므로 **위 `case` 에 닿지 않는다**(측정 — guards-check 의 신호 갈래).
+# **「신호 종료」는 두 자리에서 뜻이 다르다.** ⓐ **래퍼 자신**이 TERM·INT·HUP 를 받으면 trap 이 받아 이 run 의
+# 일회 컨테이너를 치우고 같은 신호로 자살한다(128+n) — 그 경로는 **위 `case` 에 닿지 않는다**(측정 —
+# guards-check 의 신호 갈래). ⓑ **일회 컨테이너**가 KILL·TERM 으로 죽으면 `docker compose run` 이 128+n 을
+# **돌려주므로** 그 값은 `case` 로 와서 `7` 이 된다. 위 `*)` 문면이 말하는 것은 ⓑ 다.
 # 호출 모양·unit·타이머·활성화 절차의 정본은 runbook §13.3·§13.4 다.
 set -euo pipefail
 
@@ -287,8 +289,11 @@ unset _relay_parse_rc
 # 지워야 하는지 모른다(등재된 제한).
 stray_raw="$(comm -23 <(printf '%s\n' "$RELAY_KEYS" | grep -v '^$' | sort -u) <(_relay_allowed_names | sort -u))"
 if [ -n "${stray_raw//[[:space:]]/}" ]; then
-  stray_named="$(printf '%s\n' "$stray_raw" | grep -E '^[A-Z][A-Z0-9_]*$' | tr '\n' ' ' || true)"
-  stray_odd="$(printf '%s\n' "$stray_raw" | grep -v '^$' | grep -cvE '^[A-Z][A-Z0-9_]*$' || true)"
+  # **글자 범위를 로캘에서 떼어 놓는다**(cr L-6) — `[A-Z]` 는 로캘의 조합 순서에 따라 뜻이 달라질 수 있고,
+  # 이것은 **무엇을 journal 에 찍을지 고르는 보안 술어**다. 자매 스크립트(`prod-alert-*.sh`)가 같은 사유로
+  # `LC_ALL=C` 를 핀한다. 이 두 줄에만 건다 — 파일 전체에 걸면 위 `comm`·`sort` 의 조합 순서까지 바뀐다.
+  stray_named="$(printf '%s\n' "$stray_raw" | LC_ALL=C grep -E '^[A-Z][A-Z0-9_]*$' | tr '\n' ' ' || true)"
+  stray_odd="$(printf '%s\n' "$stray_raw" | grep -v '^$' | LC_ALL=C grep -cvE '^[A-Z][A-Z0-9_]*$' || true)"
   _die "채널 env 에 §13.2 밖의 키가 있다: 이름 꼴 ${stray_named:-(없음) }· 이름 꼴이 아닌 키 ${stray_odd} 개(이름을 찍지 않는다 — 그 이름은 이 파일의 바이트에서 만들어진 것이라 자격 조각일 수 있다) — 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)" 3
 fi
 unset stray_raw
@@ -390,5 +395,5 @@ case "$rc" in
   0|1|2) exit "$rc" ;;
   3) echo "notification-relay: 러너가 LEASE_BUSY(3) 로 끝났다 — 다른 relay 프로세스가 임대를 쥐고 있다(임대는 owner 가 아니라 소비자 종류 단위다 — 다른 --owner 로 다시 쳐도 같은 자물쇠에서 선다). 기다리면 풀린다(m6-6e §3.7). 래퍼의 전제 실패(3)와 겹치지 않게 **5** 로 낸다" >&2; exit 5 ;;
   4) echo "notification-relay: 러너가 ENV_SUPPRESSED(4) 로 끝났다 — 정책표가 이 환경에 붙인 모드가 Live 가 아니다(claim 0 · 행은 PENDING 보존). 기다려도 풀리지 않는다(m6-6e §5.1). 래퍼의 미룸(4)과 겹치지 않게 **6** 으로 낸다" >&2; exit 6 ;;
-  *) echo "notification-relay: 러너가 예상 밖의 종료 코드 ${rc} 를 냈다 — 래퍼가 5·6 을 쓰므로 그대로 통과시키지 않는다. docker run 자신의 실패(125·126·127) · 신호 종료(137·143) · 러너에 새로 생긴 코드가 여기 온다. **7** 로 낸다(SuccessExitStatus 밖이라 경보가 운다 — runbook §13.3 의 표)" >&2; exit 7 ;;
+  *) echo "notification-relay: 러너가 예상 밖의 종료 코드 ${rc} 를 냈다 — 래퍼가 5·6 을 쓰므로 그대로 통과시키지 않는다. docker run 자신의 실패(125·126·127) · **일회 컨테이너가** 신호로 죽어 돌아온 128+n(137·143) · 러너에 새로 생긴 코드가 여기 온다(래퍼 자신이 받은 신호는 위 trap 이 받아 이 자리에 닿지 않는다). **7** 로 낸다(SuccessExitStatus 밖이라 경보가 운다 — runbook §13.3 의 표)" >&2; exit 7 ;;
 esac
