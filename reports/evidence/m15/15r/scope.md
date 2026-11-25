@@ -6,7 +6,7 @@ slice: 15r-activation-runbook-fixes
 base_sha: 928ac2fa0f8fb1fdb3a6c444eac5bceb756b3d0a   # main, PR #204 머지 커밋
 head_sha: <리뷰 요청 시점에 기입>
 in_scope:
-  - docs/runbook/m7-7f-production.md      # §9.5 ② · §13.2 · §13.3 · §13.4 — S-1·S-2·S-3·S-4·S-9·S-10 과 runner 문면
+  - docs/runbook/m7-7f-production.md      # §1.4b · §9.5 ② · §13.2~§13.4 — S-1·S-2·S-3·S-4·S-6·S-9·S-10 과 runner 문면
   - docs/runbook/m6-6e-operations.md      # §3.2 — relay 래퍼의 「모르는 코드는 7」· 「relay 러너의 새 코드는 7 부터」
   - tools/prod-notification-relay.sh      # S-3(종료 코드 열거) · S-7(stray 이름을 모양으로 거른다)
   - tools/prod-env.sh                     # S-8(데몬 선택 축 둘을 비운다)
@@ -21,8 +21,6 @@ out_of_scope:
   - 실 Telegram 발송 · 실 API 호출.
   - 러너 코드(app/**) — 바꾸지 않는다. RelayExitCode 는 읽기만 한다(D-15R-3 의 등식).
   - S-5(공급망 — ci.yml 액션 SHA 핀 등) — 별도 slice.
-  - S-6(저장소 쓰기 권한 == 자격 신뢰 경계 문면) — 운영자가 승인한 묶음 밖이다. 아래 「알려진 제한」에
-    등재만 한다.
   - 앞 slice 의 evidence(15m·15p·15q 의 scope.md) — 고치지 않는다. 리뷰가 그 파일들에 더하라고 한 행
     (15m 통로 표의 core dump · 15m 제한 11 의 「5 부터」)은 이 파일의 「앞 evidence 에 대한 정정」 절이 든다.
   - tools/prod-evaluation-commit.sh · tools/prod-notification-sweep.sh — 러너 종료 코드를 옮기는 `case`
@@ -44,7 +42,7 @@ rollback: reports/evidence/m15/15r/rollback.md
 PR #204 에 남긴 독립 보안 리뷰(Codex 대체 sonnet, 코멘트 7160547788)의 판정은 「고친 뒤 활성화」였다.
 운영자가 §13.4 ① 에서 가장 먼저 치는 두 줄이 하나는 자격 디렉터리 권한을 `0700` → `0755` 로 되돌리고
 (S-1), 다른 하나는 이미 채운 `relay.env` 를 말없이 0 바이트로 만든다(S-2). 이 slice 는 그 둘과, 같은
-리뷰의 S-3·S-4·S-7·S-8·S-9·S-10, 그리고 「깨끗했던 것」 절이 문면 정정을 권한 세 자리를 고친다.
+리뷰의 S-3·S-4·S-6·S-7·S-8·S-9·S-10, 그리고 「깨끗했던 것」 절이 문면 정정을 권한 세 자리를 고친다.
 
 ## 위협 모델 경계
 
@@ -107,6 +105,12 @@ PR #204 에 남긴 독립 보안 리뷰(Codex 대체 sonnet, 코멘트 716054778
 `LEASE_BUSY` 문면도 같은 말을 한다면 함께 고친다). ④ `TimeoutStartSec` 상한과 trap 의 `docker rm -f`
 가 `CLAIMED` 고아를 만드는 쪽이고, 다음 run 의 `isolated>0` 은 그 귀결일 수 있다.
 
+**D-15R-9 (S-6 — 운영자 추가 승인 2026-11-25)** `<저장소>` 쓰기 권한이 무엇을 사는지를 runbook 두 자리에
+적는다. ① §13.3 — 「이 unit 이 실행하는 내용은 `<저장소>` 에 쓸 수 있는 사람이 정하고, 15Q 부터 그 집합이
+§13.2 의 두 값을 읽을 수 있는 집합과 같다」. 경보 스크립트(§9.5 ①)는 사본으로 떼어 그 경로를 막았지만 이
+래퍼들은 compose 파일을 읽어야 해 그 처방을 쓸 수 없다는 것도 함께 적는다. ② §1.4b — 「`<저장소>` 의 쓰기
+권한 집합이 자격의 신뢰 경계다 — `deploy` 소유 · 레인 금지」. 단언은 두지 않는다(산문이고 거동이 없다).
+
 ## 설계 검토 (세션 모델)
 
 **(1) 열거인가 구성인가.** D-15R-3 의 `case` 는 통과 집합을 열거하고 나머지를 한 자리(`7`)로 모으므로
@@ -130,7 +134,8 @@ PR #204 에 남긴 독립 보안 리뷰(Codex 대체 sonnet, 코멘트 716054778
 읽힌다.
 
 **(3) 과잉·미달.** 리뷰는 S-9 를 경보 unit 하나에만 권했다 — relay·평가 unit 에는 넣지 않는다(15m 제한 7 의
-hardening 묶음 slice 몫). S-6 은 승인 묶음 밖이라 등재만 한다.
+hardening 묶음 slice 몫). S-6 은 문면 둘까지다 — 리뷰가 「겹을 더하려면」으로 든 `ProtectSystem=strict` 는
+같은 묶음 slice 몫이다.
 
 ## 변이 표적 (구현 레인이 재고, verifier 가 다시 잰다)
 
@@ -151,6 +156,8 @@ hardening 묶음 slice 몫). S-6 은 승인 묶음 밖이라 등재만 한다.
 - 15m/scope.md 제한 11 의 「러너의 새 코드는 5 부터」는 **훑기 러너에 한해** 참이다. relay 에서는 래퍼가
   `5`·`6`·`7` 을 쓰고 러너의 코드를 옮겨 내므로, 러너의 새 값은 **래퍼 `case` 에 이름으로 등재한 뒤에만**
   뜻을 갖는다(D-15R-3 의 등식이 그것을 강제한다).
+- 15q/scope.md 위협 모델의 「막지 않는 것」은 docker 소켓 보유자만 든다. **`<저장소>` 쓰기 권한 보유자**도
+  같은 자리다 — 그 권한은 15Q 부터 운영 DB 에 더해 봇 자격·chat id 까지 산다(S-6, D-15R-9).
 - 15m/scope.md 통로 다섯(`/proc/<pid>/environ`)을 받아들인 사유 「relay 와 같은 배선」은 15Q 에서 전제가
   사라졌다. 이 slice 가 경보 unit 의 그 통로를 걷는다(S-4).
 
@@ -160,8 +167,8 @@ hardening 묶음 slice 몫). S-6 은 승인 묶음 밖이라 등재만 한다.
 
 ## 알려진 제한
 
-1. **S-6 미처리.** `<저장소>` 쓰기 권한이 봇 자격·chat id·운영 DB 의 신뢰 경계라는 문면(§13.3 · §1.4b)을
-   이 slice 는 더하지 않는다. 운영자 결정 대기.
+1. **S-6 은 문면으로만 닫는다.** `<저장소>` 쓰기 권한이 자격의 신뢰 경계라는 사실을 적을 뿐, 그 경계를
+   좁히는 겹(`ProtectSystem=strict` + `ReadWritePaths=`)은 더하지 않는다(15m 제한 7 의 hardening 묶음).
 2. **S-5 미처리.** 공급망 slice 로 간다.
 3. runbook 단언은 텍스트 술어다(위 경계 문장).
 4. D-15R-5 — 이름 꼴인 stray 키는 여전히 journal 에 찍힌다.
