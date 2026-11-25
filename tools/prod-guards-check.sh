@@ -1187,18 +1187,36 @@ unset _e
 # 펜스를 `^[[:space:]]*` 로 센다 — 들여쓴 블록을 보지 않으면 그 안의 BAD 줄이 축어로 들어와도 조용하다.
 _rb_code_lines() { awk '/^[[:space:]]*```/{inb = !inb; next} inb' "$RB"; }
 _rb_norm() { sed 's/^[[:space:]]*//; s/[[:space:]]\+/ /g; s/[[:space:]]*$//'; }
-_rb_expect() { grep '^| ' "$1" | sed 's/^| //' || true; }
+# **콜레이션을 명령 단위로 못박는다**(cr M-5 · v H3). 라운드 1 의 술어는 기대와 실측을 **같은 프로세스의
+# 같은 `sort`** 로 만들어 로캘과 무관했는데, 기대를 파일로 옮기면서 **한쪽 순서가 동결**되고 받는 쪽만
+# 주변 로캘을 따랐다 — 둘이 갈리면 `comm` 은 경고를 stderr 로만 내고 **조용히 틀린 답**을 낸다
+# (실측: `LC_ALL=en_US.utf8` 로 전건을 돌리면 같은 줄 스물셋이 「사라진 줄」과 「새로 생긴 줄」 양쪽에
+# 동시에 서며 **거짓으로** 붉었다 — exit 1 · 268 중 2 어긋남). 파일 전체에 `export LC_ALL=C` 를 걸면 이
+# 파일의 다른 `comm`·`sort` 조합 순서까지 바뀌므로 **비교하는 자리에만** 건다(래퍼의 `LC_ALL=C grep` 과
+# 같은 모양). 양쪽을 다 핀하므로 **기대 파일의 줄 순서는 더 이상 저자 몫이 아니다** — 내용이 맞으면 초록.
+_rb_sort() { LC_ALL=C sort; }
+_rb_expect() { grep '^| ' "$1" | sed 's/^| //' | _rb_sort || true; }
 _rb_set_check() { # <이름> <받은 집합> <기대 집합> <진단 꼬리>
   local name="$1" got="$2" want="$3" tail="$4" missing extra
-  missing="$(comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
-  extra="$(comm -13 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
+  missing="$(LC_ALL=C comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
+  extra="$(LC_ALL=C comm -13 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
   if [ -n "$got" ] && [ -z "$missing" ] && [ -z "$extra" ]; then
     _ok "${name} — 코드 블록의 그 줄 $(printf '%s' "$got" | grep -c '' || true) 개가 기대 집합과 **정확히** 같다"
   else
     _bad "${name} — 줄 집합이 기대와 다르다. 사라진 줄: [${missing}] · 새로 생긴 줄: [${extra}] — runbook 의 그 줄을 바꿨다면 ${tail} 도 함께 바꾼다(바뀐 줄은 리뷰가 본다)"
   fi
 }
-dir_lines="$(_rb_code_lines | grep -E '/etc/bidvector-v2|/var/lib/bidvector-v2' | _rb_norm | sort || true)"
+# **수집이 백틱 펜스만 본다 — 그 전제를 고정한다**(v H1). 틸드 펜스(`~~~`)도 렌더링되는 코드 블록이라
+# 그 안의 BAD 줄은 수집 밖이다(실측: GREEN). 이 문서는 백틱만 쓰므로 **틸드가 0 임을 단언**해 두면
+# 그 꼴이 들어오는 날 붉어진다(수집을 넓히는 쪽은 산문 오탐을 키운다 — 제한 7 의 비용). 네 칸 들여쓰기
+# 코드 블록은 산문 들여쓰기와 구별할 수 없어 제한에 등재한다.
+tilde_fences="$(grep -cE '^[[:space:]]*~~~' "$RB" || true)"
+if [ "$tilde_fences" = 0 ]; then
+  _ok "runbook 에 틸드 펜스가 없다(수집이 백틱 펜스만 보는 전제 — 생기면 그 안이 수집 밖이라 여기서 선다)"
+else
+  _bad "runbook 에 틸드 펜스가 ${tilde_fences} 줄 생겼다 — 그 블록의 줄은 경로 수집 밖이다(펜스 인식을 넓히거나 백틱으로 바꾼다)"
+fi
+dir_lines="$(_rb_code_lines | grep -E '/etc/bidvector-v2|/var/lib/bidvector-v2' | _rb_norm | _rb_sort || true)"
 _rb_set_check "자격·상태 디렉터리 경로" "$dir_lines" "$(_rb_expect "$DIR_EXPECT")" "$DIR_EXPECT"
 # **S-2** — `install … /dev/null` 은 **이미 채운 파일을 0 바이트로** 만든다(출력 없음 · rc 0). 도달
 # 경로가 가깝다: §13.3 이 「root 전용으로 조이면 매 run 이 `exit 3`」을 가리키며 §13.2 의 꼴을 지목하므로,
@@ -1213,7 +1231,7 @@ _rb_set_check "자격·상태 디렉터리 경로" "$dir_lines" "$(_rb_expect "$
 # 같은 처방을 자격 **파일** 축에도 쓴다. 라운드 1 의 동사 목록(`install|cp|tee|truncate|chown|chmod|dd`)은
 # `sed -i`·`rm -f`·`mv`·`ex` 로 같은 파일을 비우는 줄을 통과시켰다(실측) — **`sed -i` 는 이 문서의 집안
 # 관용구**라(§9.5 ① 이 그 꼴이다) 다음 저자가 고를 확률이 낮지 않았다. 이제 동사를 보지 않는다.
-relayenv_lines="$(_rb_code_lines | grep 'relay\.env' | _rb_norm | sort || true)"
+relayenv_lines="$(_rb_code_lines | grep 'relay\.env' | _rb_norm | _rb_sort || true)"
 _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect "$RELAYENV_EXPECT")" "$RELAYENV_EXPECT"
 
 # ── M15/15R(S-4 · S-9) — 경보 unit 의 자격 통로와 core dump ──────────────────────
