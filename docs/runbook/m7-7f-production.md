@@ -593,9 +593,11 @@ systemd 가 실패를 **아는** 자리는 `OnFailure=` 이고, 거기에 한 �
 
 **R-4 와의 자리**: 이것은 사용자 알림의 채널 발송이 아니라 **운영 경보**다. 자격·chat 은 §13.2 의
 `relay.env` 를 그대로 쓰므로, §13 을 켜지 않았으면 두 값이 없어 경보도 서지 않는다 — 그때는 ④ 의 직접
-실행이 `exit 2` 로 그 사실을 말한다(조용히 서는 길이 없다). 그래서 ② 의 `EnvironmentFile=` 에는 **`-`
-접두를 붙인다** — 없으면 파일이 **아예 없는** host 에서 systemd 가 기동에서 끊고 스크립트의 그 진단이
-돌지 않는다. `-` 는 두 갈래(파일 없음 · 값 비었음)를 **한 창구**로 모은다.
+실행이 `exit 2` 로 그 사실을 말한다(조용히 서는 길이 없다). **그 창구를 여는 것이 ② 에 `EnvironmentFile=`
+을 두지 않는 쪽이다**(M15/15R): 그 줄이 있으면 파일 부재는 `-` 접두가 받아야 하는 systemd 쪽 갈래가 되고,
+접두를 빠뜨린 판은 기동에서 끊겨 스크립트의 진단이 아예 돌지 않는다. 줄이 없으면 **두 갈래(파일 없음 ·
+값 비었음)가 처음부터 스크립트의 `exit 2` 하나**로 모인다 — 그 unit 이 자격을 환경에 올리지 않는 쪽이
+좁기도 하다(② 의 주석).
 
 **울리지 않아야 할 것 — 미룸(`exit 4`)**. 반입·되돌림·손 실행이 타이머 창과 겹치면 훑기는 잠금을 잡지
 못하고 **다음 주기로 미룬다**. 그 자리는 §9.1 이 「설계된 정상」이라고 적는 갈래이고, 2026-11-21 의 진짜
@@ -633,17 +635,40 @@ Description=bidvector 운영 경보 — %i 실패
 [Service]
 Type=oneshot
 User=deploy
-# 자격 두 값은 §13.2 의 파일에서 온다. systemd 는 이 파일을 **manager 권한으로** 읽어 환경으로 넘기므로,
-# 파일을 root 0600 으로 두어도 `User=` 가 읽을 필요가 없다. **다만 이 host 의 현물은 `deploy:deploy
-# 0600` 이다**(2026-11-23 `stat` — 값은 보지 않았다) — 그 경우 스크립트가 파일을 직접 읽는 갈래도
-# 선다. 두 갈래가 같은 값을 내야 하므로 스크립트의 해석기는 **손으로 고칠 때 생기는 artifact 넷**
-# (CRLF · 값 뒤 공백·탭 · `=` 뒤 공백 · 따옴표 뒤 CR·공백)에서 systemd 와 같은 값을 낸다. 전수 동치는
-# 아니다 — 따옴표 **안**의 C 이스케이프·줄 잇기·여러 줄 값은 풀지 않고, 세 키의 모양 검사가 그런 값을
-# 거부한다(fail-closed). `-` 접두는 파일 부재를 스크립트의 exit 2 로 넘긴다(위 「R-4 와의 자리」).
-EnvironmentFile=-/etc/bidvector-v2/relay.env
+# 자격 두 값은 §13.2 의 파일에서 온다 — **이 unit 은 그 파일을 환경으로 올리지 않는다**(M15/15R, S-4).
+# `User=deploy` 이고 §13.2 의 현물이 `deploy:deploy 0600` 이므로 **스크립트가 파일을 직접 읽고**,
+# `_value_of` 는 **파일 갈래를 환경 갈래보다 먼저** 본다 — 그래서 `EnvironmentFile=` 을 걷어도 이 host 의
+# 거동이 바뀌지 않는다. 걷는 이유는 §13.3 이 relay unit 에서 그 줄을 걷은 것과 **같다**: 값이 이 unit
+# 프로세스의 환경에 올라가지 않는 쪽이 좁다(`/proc/<pid>/environ` 축). 그 통로를 받아들였던 사유
+# (「오늘은 relay 와 같은 배선을 쓰는 쪽을 골랐다」)는 15Q 에서 전제가 사라졌다 — relay 는 더 이상
+# 그 배선이 아니다.
+#
+# 스크립트의 해석기는 **손으로 고칠 때 생기는 artifact 넷**(CRLF · 값 뒤 공백·탭 · `=` 뒤 공백 ·
+# 따옴표 뒤 CR·공백)에서 systemd 와 같은 값을 낸다. 전수 동치는 아니다 — 따옴표 **안**의 C 이스케이프·
+# 줄 잇기·여러 줄 값은 풀지 않고, 세 키의 모양 검사가 그런 값을 거부한다(fail-closed).
+# **파일 부재는 여전히 스크립트의 `exit 2` 한 창구로 모인다** — `[ -r "$ENVF" ]` 갈래가 같은 값을 낸다
+# (`-` 접두가 하던 일이고, 그래서 그 줄이 없어도 조용히 서는 길이 생기지 않는다).
+#
+# **core dump 를 막는다**(S-9). 봇 자격은 스크립트의 셸 변수와 `curl` 의 메모리에 요청이 끝날 때까지
+# 살아 있고, 덤프가 남으면 그 값이 디스크로 간다 — 15P 의 「이 파일에는 파일로 쓰는 자리가 없다」
+# 정적 술어는 스크립트의 구문을 보지 **커널이 쓰는 파일**을 보지 않는다. 등재된 hardening 묶음(제한 7)과
+# 달리 이 지시는 **이 unit 하나에만 넣어도** 세 unit 의 모양이 어긋나지 않는다.
+LimitCORE=0
 ExecStart=/usr/local/lib/bidvector-v2/prod-alert-telegram.sh %i
 # 경보가 매달려 자리를 쥐지 않게 한다 — 스크립트 자신도 connect 5s · 전체 15s 로 끊는다.
 TimeoutStartSec=2m
+```
+
+**이미 깔린 경보 unit 을 맞춘다**(2026-11-24 설치분 — 위 두 줄이 앞 판과 다르다). 저장소만 고쳐서는
+host 의 unit 이 바뀌지 않는다:
+
+```bash
+sudo sed -i '/^EnvironmentFile=-\/etc\/bidvector-v2\/relay\.env$/d' /etc/systemd/system/bidvector-alert@.service
+sudo systemctl daemon-reload
+# 위 블록대로 `LimitCORE=0` 한 줄을 `[Service]` 아래에 넣었는지 눈으로 보고, 둘을 실측한다.
+systemctl show -p EnvironmentFiles 'bidvector-alert@bidvector-notification-sweep.service.service'  # 비어 있어야 한다
+systemctl show -p LimitCORE 'bidvector-alert@bidvector-notification-sweep.service.service'         # 0 이어야 한다
+sudo systemctl start 'bidvector-alert@bidvector-notification-sweep.service.service'   # 한 통 간다(④ 와 같다)
 ```
 
 **③ 훑기 unit 에 drop-in 둘** — §9.2 의 unit 파일은 **고치지 않는다**. **둘로 나누는 것이 설계다**:
@@ -894,9 +919,25 @@ BIDVECTOR_NOTIFICATION_SITE_BASE_URL=             # 예: https://<운영 도메�
 root:root 0600 으로 두면 매 run 이 「채널 env 파일을 읽지 못했다」로 `exit 3` 이 되고 §13.4 ② 에서 활성화가
 멈춘다. §1 ③ 의 운영 env 와 **같은 꼴**로 만든다(파일을 만드는 자리가 여기다):
 
+**디렉터리는 §1 ③ 이 만든 `0700` 을 그대로 쓴다 — 여기서 다시 만들지 않는다.** 앞 판은 이 블록에서
+그 디렉터리를 `-m 755` 로 다시 만들었는데, GNU `install -d` 는 **이미 있는 디렉터리에도** `-m` 을
+적용하고 `-o` 가 없으면 소유자는 그대로다 — 그래서 §1 ③ 이 깐 `0700` 이 **조용히** `0755` 로 되돌아갔다
+(활성화 순서가 그렇게 만든다: §1 ③ 이 선행이고 이 절이 뒤다). 잃는 것은 셋이다 — 「같은 host 의 다른
+계정은 **들어가지도 못한다**」 겹 · 파일 이름·mtime·크기 · **그 디렉터리에 생기는 편집기 부산물의 여유**
+(umask 022 에서 생기는 `relay.env~` 는 `0644` 다). 파일 자신이 `0600` 이라 내용이 바로 새지는 않는다.
+
+**파일을 만드는 줄은 멱등 꼴이다 — 이미 채운 파일을 덮지 않는다.** 앞 판의
+`install … /dev/null …/relay.env` 는 **채워 둔 자격과 chat id 를 말없이 0 바이트로** 만들었다(출력 없음 ·
+rc 0). 도달 경로가 가깝다: §13.3 이 「root 전용으로 조이면 매 run 이 `exit 3`」을 가리키며 **이 블록의
+꼴**을 지목하므로, 권한을 고치러 여기를 다시 친 운영자가 방금 넣은 두 값을 함께 날린다. **그 사고는
+경보까지 끈다** — 빈 파일 → relay 가 `exit 3` → `OnFailure` → §9.5 의 경보가 **같은 빈 파일**을 읽고
+`exit 2` → 경보 unit 도 failed. 아무에게도 닿지 않고, 남는 창구는 §9.4 의 손 확인 한 줄뿐이다.
+
 ```bash
-sudo install -d -m 755 /etc/bidvector-v2
-sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env
+# 디렉터리는 §1 ③ 이 만든다(0700 · 소유자는 "$USER") — 여기서 다시 만들지 않는다.
+sudo test -e /etc/bidvector-v2/relay.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env
+# 권한만 고칠 때는 **내용을 건드리지 않는 쪽**으로 — 재설치·복구에서 여기를 다시 치는 자리다.
+sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env && sudo chmod 600 /etc/bidvector-v2/relay.env
 sudo -e /etc/bidvector-v2/relay.env   # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
 ```
 
@@ -969,6 +1010,8 @@ ExecStart=<저장소>/tools/prod-evaluation-commit.sh --env-file /etc/bidvector-
 # 상한을 반드시 둔다(§9.2 와 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다.
 TimeoutStartSec=15m
 TimeoutStopSec=1m
+# 조건 넷의 사유는 §9.2 의 같은 줄에 있다(성공·`exit 3`·`exit 4` 에서는 아무것도 하지 않는다).
+# **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
 ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-evaluation >/dev/null 2>&1 || true'
 ```
 
@@ -1023,12 +1066,20 @@ After=bidvector-evaluation-commit.service
 Type=oneshot
 User=deploy
 WorkingDirectory=<저장소>
-# `--owner` 에는 기본값이 없다(`bidvector.relay.owner` — 공백이면 러너가 기동 실패한다). 채널은
-# 스크립트가 `telegram` 으로 고정한다(오늘 활성 경로가 있는 채널은 그것 하나다 — §13.6 의
-# `RefusedChannelWithoutActiveRoute`). `--claim-limit` 기본은 50 이고, **첫 실발송만 §13.4 ② 의 `1`** 이다.
+# `--owner` 에는 기본값이 없다(`bidvector.relay.owner` — 공백이면 러너가 기동 실패한다). **그 값은
+# 아무것도 거르지 않는다**(M15/15R): claim 질의에 owner 열이 없고 로그 줄·메시지 본문에도 없다 — 자기
+# 자신과만 비교된다. 그래서 한 run 이 집는 행의 상한은 **전적으로 `--claim-limit`** 에서 온다.
+# 채널은 스크립트가 `telegram` 으로 고정한다(오늘 활성 경로가 있는 채널은 그것 하나다 — §13.6 의
+# `RefusedChannelWithoutActiveRoute`). `--claim-limit` 기본은 50 이고, **첫 실발송만 §13.4 ③ 의 `1`** 이다.
 ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
+# 상한을 반드시 둔다(§9.2 와 같은 이유). **이 상한과 아래 뒤처리가 `CLAIMED` 고아를 만드는 쪽이다**
+# (M15/15R): 상한에 걸린 run 은 TERM·KILL 로 끝나고, 집어 둔 행은 `CLAIMED` 로 남는다. 다음 run 은 그
+# 행을 **보내지 않고** `ISOLATED/ORPHANED_CLAIM` 으로 옮긴 뒤 `INCOMPLETE(2)` 로 끝나므로, §13.4 의
+# 측정 표에서 보는 `isolated>0` 은 **그 귀결일 수 있다** — Telegram 쪽 흔들림으로 먼저 읽지 않는다.
 TimeoutStartSec=15m
 TimeoutStopSec=1m
+# 조건 넷의 사유는 §9.2 의 같은 줄에 있다(성공·`exit 3`·`exit 4` 에서는 아무것도 하지 않는다).
+# **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
 ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-relay >/dev/null 2>&1 || true'
 ```
 
@@ -1050,8 +1101,10 @@ WantedBy=timers.target
 # /etc/systemd/system/bidvector-notification-relay.service.d/10-defer.conf
 [Service]
 # 둘을 실패에서 뺀다. `4` 는 **래퍼의 미룸**(잠금 경합 — 앞의 평가 커밋이 아직 돌고 있다)이고,
-# `5` 는 **러너의 `LEASE_BUSY`**(같은 owner 의 relay 가 임대를 쥐고 있다) — 둘 다 「기다리면 풀린다」다.
+# `5` 는 **러너의 `LEASE_BUSY`**(다른 relay 프로세스가 임대를 쥐고 있다 — **owner 별이 아니다**, 임대
+# 키는 소비자 종류 단위다) — 둘 다 「기다리면 풀린다」다.
 # **`6`(`ENV_SUPPRESSED`)은 빼지 않는다**: 기다려도 풀리지 않는 설정 오류라 경보가 울어야 한다.
+# **`7`(모르는 코드)도 빼지 않는다**: 러너의 다섯 밖에서 온 값이라 그 run 은 경보가 울어야 한다.
 SuccessExitStatus=4 5
 ```
 
@@ -1134,10 +1187,19 @@ fail-closed 라 그렇게 두었다. 그 옵션을 디버깅에 쓰려면 **비-
 | `4` | **래퍼의 미룸**(잠금 경합 — 설계된 정상) | **래퍼의 미룸**(같음) |
 | `5` | — | 러너 `LEASE_BUSY`(옛 `3`) — 기다리면 풀린다 |
 | `6` | — | 러너 `ENV_SUPPRESSED`(옛 `4`) — 기다려도 안 풀린다 |
+| `7` | — | **모르는 코드**(러너의 다섯 밖 · `docker run` 자신의 실패 · 신호 종료) — 경보가 운다 |
 
 그 옮김은 **래퍼 줄로 남는다**(「래퍼의 전제 실패 3 과 겹치지 않게 5 로 낸다」) — journal 에서 원래
 이름을 그대로 읽을 수 있다. 러너 자신의 코드 다섯은 `m6-6e-operations.md` §3.2 가 정본이고 바뀌지
 않았다.
+
+**`5`·`6`·`7` 은 래퍼의 것이다**(M15/15R, S-3). relay 래퍼의 끝 `case` 는 러너의 다섯을 **이름으로**
+받고 그 밖을 `7` 로 낸다. 앞 판은 모르는 코드를 그대로 흘렸는데, 그러면 러너에 여섯째가 `5` 로 들어오는
+날 **창 셋이 한꺼번에 조용해진다** — `10-defer.conf` 가 그 값을 깨끗한 종료로 만들어 `OnFailure` 가
+걸리지 않고, 래퍼는 아무 줄도 남기지 않으며, §13.4 의 미룸 계수(래퍼 문면을 센다)는 0 이다. `7` 은
+`SuccessExitStatus=4 5` 밖이라 그 run 에서는 경보가 운다. **relay 러너에 값을 더하면 래퍼의 `case` 와
+이 표를 함께 고친다** — `tools/prod-guards-check.sh` 의 등식 단언(`RelayExitCode` 의 값 집합 == 래퍼
+`case` 가 이름으로 받는 집합)이 그것을 강제한다. 러너의 새 값에 `5`·`6`·`7` 을 쓰지 않는다.
 
 ### 13.4 운영자 활성화 — 단계와 그 자리
 
@@ -1174,9 +1236,15 @@ cd <저장소>
 echo "exit=$?"   # 6 이면 정상이다(ENV_SUPPRESSED — 억제 환경). 3 이면 §9.4·§13.6 의 전제 목록을 본다
 ```
 
-**③ `production` 으로 한 번 — 단, `--claim-limit 1`.** 첫 실발송은 **한 건만** 보낸다: 설정이 틀렸을
+**③ `production` 으로 한 번 — 단, `--claim-limit 1`.** 첫 실발송은 **많아야 한 건**이다: 설정이 틀렸을
 때(chat id 오타 · 봇 차단) 거부가 전 행을 태우는 것을 한 건으로 막는다. **§13.2 의 값이 처음 하중을
 받는 자리가 여기다**(② 가 아니다).
+
+**「많아야」다 — 「한 통」이 아니다**(M15/15R). 집은 행 하나가 `sendMessage` **한 번**인 것은 맞지만
+(claim 은 `PENDING` 만 `LIMIT 1` 로 집고, 행마다 발송이 한 번이며, 4096자 초과는 자르고 표지를 남기지
+쪼개지 않고, 수신자 팬아웃도 run 안 재시도도 없다) **0 통인 run 도 정상이다**: 집을 `PENDING` 이 없거나,
+집은 행이 멱등 키로 접히면(아래 `skippedDuplicates`) 메시지는 가지 않는다. 그리고 **그 상한은 전적으로
+`--claim-limit` 에서 온다** — `--owner` 는 아무것도 거르지 않는다(§13.3 의 `ExecStart=` 주석).
 
 **①~⑤ 는 전부 `User=` 로 지정한 그 사용자로 민다** — 이 host 에서는 `deploy` 다(§1.3·§1.4 의 `$USER`).
 다른 계정으로 밟으면 잠금 자리의 소유자 단언에 걸려 relay 이야기가 아니라 **잠금 자리 이야기**로
@@ -1244,7 +1312,7 @@ journalctl -u bidvector-evaluation-commit  --since -2d | grep -c '돌고 있다'
 | 마침 줄의 `accounts` · `skipped` · `failed` · `deferred` | `evaluation-commit finished …` | 넷은 청중과 닫힌다. `deferred` 가 0 이 아니면 상한 50 이 실제로 물리고 있다는 뜻이고, 그때 비로소 회전의 한 바퀴(`K-50+1` 달력일)가 **운영의 수**가 된다 |
 | 멈춤 줄의 유무와 `cause=` | `evaluation-commit stopped cause=…` | **ⓑ 의 핵심.** `failed=1` 은 DB 장애와 **배포 중 SIGTERM** 에서 같은 값이다 — 둘을 가르는 정보는 `cause=interrupted` 줄 하나뿐이다. 경보 술어는 「`failed>0` **이고** 그 줄이 없다」여야 한다 |
 | run 하나의 벽시계 시간 | `journalctl -u bidvector-evaluation-commit` 의 run 시작·끝 | **ⓒ 의 입력.** 오늘 ML 은 `UnavailableMlAnalysis` 에 고정돼 실비가 0 에 가깝다 — 그 수는 **ML 배선이 서기 전의 바닥값**이고, 바닥값조차 5 분을 넘기면 §13.3 의 간격이 먼저 틀린 것이다 |
-| relay 마침 줄의 `delivered` · `failed` · `isolated` · `skippedDuplicates` | `relay finished …` | `isolated>0` 은 **받았는지 모른다**는 뜻이라 재발송하지 않는다(§13.6). 첫 며칠에 그 수가 0 이 아니면 Telegram 쪽 흔들림이지 설정이 아니다 |
+| relay 마침 줄의 `delivered` · `failed` · `isolated` · `skippedDuplicates` | `relay finished …` | `isolated>0` 은 **받았는지 모른다**는 뜻이라 재발송하지 않는다(§13.6). **그 고아를 만드는 쪽은 앞 run 의 `TimeoutStartSec` 상한과 뒤처리의 `docker rm -f` 다**(§13.3) — 상한에 걸려 끝난 run 의 `CLAIMED` 행을 다음 run 이 격리한다. 그 둘을 먼저 보고(앞 run 이 timeout 으로 끝났는가), 아니면 Telegram 쪽 흔들림이다 |
 | 미룸 계수 — `exit 4`(잠금 경합)·`exit 5`(임대) 의 빈도 | **래퍼가 남긴 stderr 한 줄**을 센다 — `4` 는 `돌고 있다`, `5` 는 `LEASE_BUSY`. 또는 `journalctl -u <unit> -o json --output-fields=_EXIT_STATUS` | **unit 종료 상태로는 셀 수 없다.** `10-defer.conf` 가 그 코드를 **깨끗한 종료**로 만들면 systemd 는 `status=4` 를 debug 로만 내고 기본 `journalctl -u …` 에는 「Deactivated successfully」만 남는다 — 그 계수는 미룸이 0 건이든 20 건이든 **같은 값**이 된다. 래퍼의 두 문면은 서로 달라 **둘을 갈라** 셀 수 있다 |
 
 ⓐ(회전 보폭)는 M15/15H 가 이미 닫았다 — 여기서 다시 재지 않는다.
