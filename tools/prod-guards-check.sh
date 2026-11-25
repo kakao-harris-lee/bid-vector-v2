@@ -315,6 +315,32 @@ _expect_text '운영 자리를 만들지 않는다' "문면이 사유와 고치�
 _expect_no_text '잠금 자리 점검만 하고 끝낸다' "자리 점검을 건너뛰고 끝나지 않는다"
 if [ -e "$T/no-such-lock-dir" ]; then _bad "그 자리를 만들었다"; else _ok "그 자리를 만들지 않았다"; fi
 
+echo "== prod-env.sh(M15/15R · S-8) — 데몬 선택 축 셋을 닫는다"
+# `COMPOSE_*`·`GIT_*` 는 접두로 비우면서 `DOCKER_HOST`·`DOCKER_CONTEXT` 는 남아 있었다. 그 둘은 세 래퍼의
+# **모든 docker 호출**이 어느 데몬을 보는지를 환경 문자열 하나로 바꾼다 — §13.4 ①~⑤ 는 운영자 셸에서
+# 손으로 미는 절차이고, 그 셸이 다른 context 를 쥐고 있을 수 있다. 오늘도 fail-closed 이긴 하다
+# (남의 데몬에서는 이미지 등식이 `exit 3` 에서 선다) — 그 거절이 **데몬을 잘못 골랐다**는 이야기를
+# 하지 않는 것이 비용이다.
+#
+# **`DOCKER_CONFIG`·`HOME` 은 건드리지 않는다**(cr N-1 이 되살린 자리 — 떨어뜨리면 compose 가 사용자
+# 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝난다). 그래서 이 단언의 **음성 대조는
+# 같은 줄 안에 있다**: `DOCKER_CONFIG` 가 살아남는지를 함께 본다(접두로 비우는 처방이면 여기서 선다).
+#
+# **셋째 축**(v F6): 두 변수를 비워도 `DOCKER_CONFIG` 아래 `config.json` 의 `currentContext` 가 남는다
+# (`docker context use` 가 쓰는 자리). 그래서 `DOCKER_CONTEXT` 는 **비우는 것이 아니라 내장 `default` 로
+# 못박는다** — 그 변수가 `currentContext` 를 이기므로 플러그인 탐색 축을 건드리지 않고 닫힌다.
+# 여기서 `default` **값까지** 단언한다: 그냥 비우는 앞 판으로 되돌리면 `exit 12` 에서 선다.
+RUN_RC=0
+(
+  export DOCKER_HOST=tcp://127.0.0.1:1 DOCKER_CONTEXT=elsewhere DOCKER_CONFIG="$T/dockercfg"
+  # shellcheck source=tools/prod-env.sh
+  . "$REPO_ROOT/tools/prod-env.sh"
+  [ -z "${DOCKER_HOST:-}" ] || exit 11
+  [ "${DOCKER_CONTEXT:-}" = default ] || exit 12
+  [ "${DOCKER_CONFIG:-}" = "$T/dockercfg" ] || exit 13
+) > "$T/out" 2> "$T/err" || RUN_RC=$?
+_expect_rc 0 "source 뒤 DOCKER_HOST 는 비고 DOCKER_CONTEXT 는 default 로 못박히고 DOCKER_CONFIG 는 남는다(11 안 비움 · 12 못박기 없음 · 13 과잉)"
+
 echo "== L-1 술어 — 반입 트리 ↔ manifest git_sha"
 MAN="$T/state/releases/${REL}.manifest"
 MAN_ARG="$MAN"
@@ -696,6 +722,20 @@ _relay_bypass '공백 없음' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk"SPRI
 _relay_bypass 'JVM 통로' 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=9'
 _expect_text 'JAVA_TOOL_OPTIONS' "relay — 우회 JVM 통로: 문면이 그 키 이름을 보인다"
 
+# ── M15/15R(S-7) — 거절 문면의 「키 이름」은 **자격 파일의 바이트에서 만들어진다** ─────
+# 위 등식이 보는 키는 compose 의 dotenv 해석기가 그 파일에서 만들어 낸 이름이고, 그 해석기는 따옴표로
+# 닫힌 값 뒤의 둘째 대입을 **새 변수로** 읽는다(v H-1). 그래서 운영자의 편집 사고가 자격 조각을 키
+# **이름**으로 만들 수 있고, 전수로 찍으면 그것이 journal 로 간다(지우기 어려운 자리다). 이름 꼴
+# (`^[A-Z][A-Z0-9_]*$`)만 찍고 나머지는 **개수로만** 말한다 — 거절 자체는 그대로 `exit 3` 이다.
+# 이름 꼴인 조각은 여전히 찍힌다(등재된 제한) — 이름을 전부 가리면 운영자가 무엇을 지울지 모른다.
+_relay_env 'BIDVECTOR_NOTIFICATION_TELEGRAM_ROUTEKEY="rk" fixtureOddKey=x'
+_run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_rc 3 "relay — 이름 꼴이 아닌 stray 키도 거절한다(개수로 세어 말한다)"
+_expect_no_text 'fixtureOddKey' "relay — 그 키 **문자열**은 어느 출력에도 없다(자격 조각이 이름이 되는 자리다)"
+# 뒤 글자까지 묶는다(cr L-2) — `1` 까지만 보면 10·11·100 도 접두 일치로 통과해 「뽑은 수를 고정한다」가 깨진다.
+_expect_text '이름 꼴이 아닌 키 1 개' "relay — 대신 개수를 말한다(0 이면 공허한 단언이 된다)"
+_expect_no_log ' run --rm' "relay — 그 거절이 compose run 앞에서 끝난다(stray 꼴 축)"
+
 # ── v L-1 — compose 가 파일을 **통째로 버리는** 입력 ────────────────────────────
 # 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나 진단이 엉뚱한 곳을 가리킨다. 키가 0 인데
 # 내용 줄이 있으면 **그 사실을 말하고** 멈춘다 — 「필수 키가 없다」와 고칠 자리가 다르다.
@@ -872,16 +912,110 @@ _expect_log "--bidvector.relay.claim-limit=1" "relay — 첫 실발송의 상한
 # **러너의 다섯과 래퍼의 둘이 겹치지 않는가**(M15/15Q). 러너 3(`LEASE_BUSY` — 기다리면 풀린다)과
 # 래퍼 3(전제 실패 — 고쳐야 한다), 러너 4(`ENV_SUPPRESSED` — 고쳐야 한다)와 래퍼 4(미룸 — 기다리면
 # 풀린다)는 **뜻이 정확히 반대**다. 겹치면 §9.5 의 경보가 거꾸로 운다.
+#
+# **M15/15R(S-3) — 통과를 열거로 닫는다.** 앞 판의 `*) exit "$rc"` 는 **모르는 코드를 그대로 흘렸고**,
+# 래퍼가 이미 쓰는 `5`·`6` 이 러너의 다음 코드 자리였다. 러너에 여섯째가 `5` 로 들어오는 날 창 셋이
+# 한꺼번에 조용해진다 — `10-defer.conf` 가 그 값을 깨끗한 종료로 만들어 `OnFailure` 가 안 걸리고,
+# 래퍼는 아무 줄도 남기지 않으며, §13.4 의 미룸 계수는 그 문면이 없어 0 이다. 이제 러너의 다섯만
+# 이름으로 받고 **그 밖은 `7`**(`SuccessExitStatus=4 5` 밖 — 경보가 운다)로 낸다.
+# **거동은 대표 구간으로, 가지의 꼴은 구조로 닫는다**(v G3). 0..255 전수 스윕을 재 보았더니 전건이
+# **16.6 초 → 94.2 초**(+78 초 · 5.7 배)였다 — 매 PR 과 매 로컬 반복에 붙는 값이라 받지 않았다. 대신 둘로
+# 나눈다: ⓐ 여기서 **대표 구간**(러너의 다섯 · 래퍼 자신의 셋 · `docker` CLI 실패 125·126·127 · 신호
+# 128·137·143 · 상한 255)을 재고, ⓑ 아래 「가지 전수 == 인식 수」를 **빈 줄이 아닌 모든 줄**로 세어
+# 어떤 꼴의 가지가 더해지거나 라벨 꼴이 바뀌어도 붉게 한다(그 둘이 스윕이 덮던 공간을 비용 없이 덮는다 —
+# 라벨이 파싱되는 꼴은 집합 등식과 교집합 단언이 다시 받는다).
+_relay_env
+for _rc_pair in "0 0" "1 1" "2 2" "3 5" "4 6" "5 7" "6 7" "7 7" "9 7" \
+                "125 7" "126 7" "127 7" "128 7" "137 7" "143 7" "255 7"; do
+  _rc_in="${_rc_pair%% *}" _rc_want="${_rc_pair##* }"
+  SHIM_RUN_RC="$_rc_in" _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+  _expect_rc "$_rc_want" "relay — 러너 종료 ${_rc_in} → 래퍼 ${_rc_want}"
+done
+unset _rc_pair _rc_in _rc_want
 SHIM_RUN_RC=3 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
-_expect_rc 5 "relay — 러너의 LEASE_BUSY(3)는 **5** 로 나온다(래퍼의 전제 실패 3 과 겹치지 않는다)"
 _expect_text 'LEASE_BUSY' "relay — 그 줄이 옮긴 코드의 원래 이름을 보인다"
+# M15/15R(D-15R-8 ③) — 임대는 **owner 별이 아니다**(`PostgresAdvisoryLockLease` 의 키는 소비자 종류
+# 단위다). 「같은 owner 의 relay 가 쥐고 있다」로 적으면 운영자가 다른 owner 로 다시 쳐서 풀릴 것처럼
+# 읽고, 실제로는 그 run 도 같은 자물쇠에서 선다.
+_expect_no_text '같은 owner' "relay — LEASE_BUSY 문면이 임대를 owner 별이라고 말하지 않는다"
 SHIM_RUN_RC=4 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
-_expect_rc 6 "relay — 러너의 ENV_SUPPRESSED(4)는 **6** 으로 나온다(래퍼의 미룸 4 와 겹치지 않는다)"
 _expect_text 'ENV_SUPPRESSED' "relay — 그 줄이 옮긴 코드의 원래 이름을 보인다"
-SHIM_RUN_RC=1 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
-_expect_rc 1 "relay — 러너의 FAILED(1)는 그대로 1 이다"
-SHIM_RUN_RC=2 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
-_expect_rc 2 "relay — 러너의 INCOMPLETE(2)는 그대로 2 다"
+SHIM_RUN_RC=137 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
+_expect_text '예상 밖의 종료 코드 137' "relay — 모르는 코드는 **원래 값을 문면에 담아** 7 로 난다"
+
+# **등식 — 러너의 값 집합 == 래퍼 `case` 가 이름으로 받는 집합**(M15/15R, S-3). 위 거동 단언은 오늘의
+# 사상을 잠그고, 이 등식은 **러너 쪽이 늘어나는 날**을 잡는다. 러너에 여섯째가 들어오면 그 값이
+# 래퍼의 열거 밖이 되어 여기서 선다(운영에서는 그 run 이 `7` 로 끝나 경보가 운다 — 조용한 통과가 없다).
+#
+# **뽑은 수를 함께 고정한다**(이 slice 의 경계 문장): 열거의 꼴이 바뀌어(`LEASE_BUSY(value = 3)` 따위)
+# 추출이 비면 「집합이 같다」가 공허하게 참이 되므로, **항목 수 == 해석된 값 수**를 먼저 센다.
+REX_KT=app/src/main/kotlin/bidvector/app/relay/RelayLines.kt
+RELAY_SH=tools/prod-notification-relay.sh
+# **자리를 못 읽으면 판정 불가로 선다**(cr M-2) — 열거가 옮겨졌는데 추출이 조용히 비면 아래 등식이
+# 공허하게 참이 된다. 이 파일의 관례대로 전제 실패는 `exit 2` 다.
+[ -r "$REX_KT" ] || _die "RelayExitCode 의 자리를 읽지 못했다: ${REX_KT}(열거가 옮겨졌다 — 등식을 고친다) · 판정 불가" 2
+[ -r "$RELAY_SH" ] || _die "relay 래퍼를 읽지 못했다: ${RELAY_SH} · 판정 불가" 2
+_rex_body() { awk '/^enum class RelayExitCode\(/ {inb = 1; next} inb && /^}/ {exit} inb {print}' "$REX_KT"; }
+# **항목 수와 값 추출은 서로 다른 술어로 센다**(v F3). 앞 판은 둘 다 **같은 정규식**이라 꼴이 다른 항목이
+# 분자·분모에서 **함께** 빠졌고, `NEW_CODE(5), // 주석` 한 줄이 등식을 공허하게 참으로 만들었다(실측).
+# 이제 분모는 「식별자로 시작해 여는 괄호가 오는 줄」이라는 **느슨한** 술어이고, 분자는 값을 실제로
+# 해석한 수다 — 꼴이 바뀌면 분모만 늘어 여기서 선다.
+rex_entry_n="$(_rex_body | grep -cE '^[[:space:]]*[A-Z][A-Za-z0-9_]*\(' || true)"
+rex_args="$(_rex_body | sed -nE 's/^    [A-Z][A-Z0-9_]*\((.+)\),$/\1/p' || true)"
+rex_arg_n=0 rex_vals=""
+while IFS= read -r _a; do
+  [ -n "$_a" ] || continue
+  rex_arg_n=$((rex_arg_n + 1))
+  case "$_a" in
+    *[!0-9]*) _v="$(sed -nE "s/^private const val ${_a} = ([0-9]+)\$/\1/p" "$REX_KT" | head -n1 || true)" ;;
+    *) _v="$_a" ;;
+  esac
+  [ -n "$_v" ] || continue
+  rex_vals="${rex_vals}${_v}"$'\n'
+done <<REXEOF
+${rex_args}
+REXEOF
+unset _a _v
+rex_val_n="$(printf '%s' "$rex_vals" | grep -c '' || true)"
+rex_set="$(printf '%s' "$rex_vals" | sort -u | tr '\n' ' ' || true)"
+_relay_case_body() {
+  awk '/^case "\$rc" in$/ {inb = 1; next} inb && /^esac$/ {exit} inb {print}' "$RELAY_SH"
+}
+# 래퍼 쪽도 같은 모양으로 **가지 수**(느슨)와 **인식한 가지 수**(엄격 — 숫자 라벨 또는 `*`)를 가른다.
+# 앞 판은 숫자 라벨만 추출해 `"8")`·`12[5-7])` 같은 가지가 추출 **밖**이라 조용히 통과했고, 라운드 1 의
+# 느슨한 쪽도 **꼴 열거**(`[^[:space:]()]+\)`)여서 공백 낀 대안(`125 | 126)`)과 여는 괄호 꼴(`(125)`)을
+# 놓쳤다(v G3 실측). 이제 느슨한 쪽은 **빈 줄이 아닌 줄 전부**다 — 가지가 어떤 꼴로 쓰이든, 본문이 여러
+# 줄로 늘어나든 분모가 늘어 선다(그 오탐은 기대를 함께 고치라는 뜻이고, 줄 집합 등식과 같은 래칫이다).
+case_branch_n="$(_relay_case_body | grep -cE '[^[:space:]]' || true)"
+case_known_n="$(_relay_case_body | grep -cE '^  ([0-9|]+|\*)\)' || true)"
+wrap_set="$(_relay_case_body | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' || true)"
+wrap_n="$(_relay_case_body | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | grep -c '' || true)"
+# **래퍼가 번역해서 내는 값**(가지 본문의 `exit <정수>` — 통과 갈래는 `exit "$rc"` 라 여기 안 든다).
+xlat_set="$(_relay_case_body | grep -oE 'exit [0-9]+' | awk '{print $2}' | sort -u || true)"
+if [ "$rex_entry_n" -ge 1 ] && [ "$rex_entry_n" = "$rex_val_n" ]; then
+  _ok "RelayExitCode 의 항목 ${rex_entry_n} 개가 모두 값으로 해석된다(꼴이 바뀌면 분모만 늘어 선다)"
+else
+  _bad "RelayExitCode 항목 ${rex_entry_n} 개 중 ${rex_val_n} 개만 값으로 해석됐다 — 열거의 꼴이 바뀌었다(추출을 고친다)"
+fi
+if [ "$case_branch_n" -ge 1 ] && [ "$case_branch_n" = "$case_known_n" ]; then
+  _ok "래퍼 case 의 가지 ${case_branch_n} 개를 모두 인식했다(인식 못 하는 꼴의 가지가 없다)"
+else
+  _bad "래퍼 case 의 가지 ${case_branch_n} 개 중 ${case_known_n} 개만 인식했다 — 숫자도 '*' 도 아닌 라벨이 있다(그 가지는 아래 등식 밖이다)"
+fi
+if [ "$wrap_n" -ge 1 ] && [ "$wrap_n" = "$rex_val_n" ] && [ "$wrap_set" = "$rex_set" ]; then
+  _ok "러너의 종료 코드 집합 == 래퍼 case 가 이름으로 받는 집합 (${rex_set})"
+else
+  _bad "러너 {${rex_set}}(${rex_val_n}) ≠ 래퍼 case {${wrap_set}}(${wrap_n}) — 러너에 값을 더했으면 래퍼의 case 와 §13.3 의 표를 함께 고친다"
+fi
+# **번역 값 ∩ 러너 값 = ∅**(cr M-3). 위 등식은 「집합이 같다」만 보므로, 러너에 `5` 가 생긴 날 래퍼에
+# `5) … exit 5` 를 더하면 **둘 다 초록**인데 그 순간 러너의 `5` 와 래퍼가 `LEASE_BUSY` 를 옮겨 내는 `5` 가
+# 다시 한 수로 만난다 — 이 slice 가 없앤 바로 그 꼴이다. 오늘 그것을 막는 것은 산문 한 줄뿐이었다.
+xlat_clash="$(printf '%s\n' "$xlat_set" | grep -v '^$' | sort -u | comm -12 - <(printf '%s' "$rex_vals" | grep -v '^$' | sort -u) | tr '\n' ' ' || true)"
+if [ -n "${xlat_set//[[:space:]]/}" ] && [ -z "${xlat_clash// /}" ]; then
+  _ok "래퍼가 번역해 내는 값 {$(printf '%s' "$xlat_set" | tr '\n' ' ')} 와 러너 값 {${rex_set}} 의 교집합이 비었다"
+else
+  _bad "래퍼의 번역 값과 러너 값이 겹친다: {${xlat_clash}} — 뜻이 다른 둘이 같은 수로 만나면 경보가 거꾸로 운다(번역 값을 러너 밖으로 옮긴다)"
+fi
 
 _hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
@@ -985,13 +1119,194 @@ if [ "$relay_after" = 1 ]; then
 else
   _bad "relay unit 블록에 'After=bidvector-evaluation-commit.service' 가 ${relay_after} 줄이다(1 이어야 한다) — Persistent=true 의 catch-up 에서 순서가 뒤집힌다"
 fi
-relay_defer="$(printf '%s\n' "$defer_block" | grep -E '^SuccessExitStatus=.*5' | grep -c '' || true)"
-relay_six="$(printf '%s\n' "$defer_block" | grep -cE '^SuccessExitStatus=([^#]*[^0-9])?6([^0-9]|$)' || true)"
-if [ "$relay_defer" = 1 ] && [ "$relay_six" = 0 ]; then
-  _ok "relay 의 10-defer.conf 가 5(LEASE_BUSY)는 빼고 6(ENV_SUPPRESSED)은 빼지 않는다"
+# **제외 목록을 「값 집합 등식」으로 본다**(M15/15R, sec N-2). 앞 판은 「`5` 를 빼는 줄이 1 · `6` 을 빼는
+# 줄이 0」만 봤고, 그래서 `SuccessExitStatus=4 5 7` 로 바꾼 변이가 **GREEN** 이었다 — 그 순간 `7`(모르는
+# 코드)이 깨끗한 종료가 되어 S-3 이 닫은 창 셋이 **한 층 위에서** 그대로 다시 열린다(경보 없음 · unit 은
+# 「Deactivated successfully」 · §13.4 의 계수는 `7` 을 세지 않는다). 이제 drop-in 마다 **unit 이름과 값
+# 집합의 쌍**을 모아 고정 집합과 등식으로 묶는다 — 무엇이 더해지든 빠지든 붉다.
+SES_WANT_SET="$(printf '%s\n' \
+  'bidvector-evaluation-commit|4' \
+  'bidvector-notification-relay|4 5' \
+  'bidvector-notification-sweep|4' | sort)"
+ses_pairs="$(awk '
+  /^# \/etc\/systemd\/system\/[a-z-]+\.service\.d\/10-defer\.conf$/ {
+    unit = $2; sub(/^\/etc\/systemd\/system\//, "", unit); sub(/\.service\.d\/10-defer\.conf$/, "", unit)
+    inb = 1; next
+  }
+  inb && /^```$/ { inb = 0; next }
+  inb && /^[[:space:]]*SuccessExitStatus[[:space:]]*=/ {
+    # **꼬리 `#` 를 지우지 않는다**(sec R-1). systemd 는 **줄 머리** `#`·`;` 만 주석으로 보므로
+    # (`systemd.syntax`: "lines starting with # or ; are ignored") 꼬리 주석은 **값의 일부**다 —
+    # `SuccessExitStatus=4 5 # 7 도 뺀다` 에서 systemd 는 `7` 을 받아 깨끗한 종료로 만든다
+    # (`systemd-analyze verify` 실측: `#`·`도`·`뺀다` 만 버리고 `7` 에 대해서는 말이 없다).
+    # 앞 판은 그 꼬리를 지워 값을 `4 5` 로 읽었고 그래서 **술어와 소비자가 다른 것을 보았다.**
+    line = $0; sub(/^[^=]*=[[:space:]]*/, "", line)
+    n = split(line, v, /[[:space:]]+/); out = ""
+    for (i = 1; i <= n; i++) if (v[i] != "") out = (out == "" ? v[i] : out " " v[i])
+    print unit "|" out
+  }' "$RB" | sort || true)"
+if [ "$ses_pairs" = "$SES_WANT_SET" ]; then
+  _ok "세 drop-in 의 SuccessExitStatus 값 집합이 기대와 정확히 같다(relay 는 4 5 · 나머지 둘은 4 — 6·7 은 빼지 않는다)"
 else
-  _bad "relay drop-in 의 제외 목록이 어긋났다 — 5 를 빼는 줄 ${relay_defer}(1 이어야 한다) · 6 을 빼는 줄 ${relay_six}(0 이어야 한다)"
+  _bad "drop-in 의 SuccessExitStatus 쌍이 기대와 다르다 — 받은 것: [$(printf '%s' "$ses_pairs" | tr '\n' ';')] · 기대: [$(printf '%s' "$SES_WANT_SET" | tr '\n' ';')]"
 fi
+
+# ── M15/15R — 활성화 절차가 **가장 먼저 치는 두 줄** ────────────────────────────
+# S-1·S-2 는 §13.4 ① 을 밟기 전의 §13.2 블록이고, 하나는 자격 둘을 담은 디렉터리의 권한을 되돌리고
+# 다른 하나는 이미 채운 `relay.env` 를 말없이 0 바이트로 만든다. 둘 다 텍스트 술어다(unit·설치 명령이
+# 있는 층이 문서뿐이다 — 이 파일 머리말의 경계) — 그래서 술어마다 **뽑은 수를 고정**해, 줄이 사라지거나
+# 꼴이 바뀌어 아무것도 못 집는 경우가 초록이 되지 않게 한다.
+#
+# **S-1** — GNU `install -d` 는 **이미 있는 디렉터리에도** `-m` 을 적용하고 `-o` 가 없으면 소유자는
+# 그대로라, §13.2 의 `-m 755` 한 줄이 §1 ③ 의 `0700` 을 조용히 되돌렸다. 그 디렉터리에는 `prod.env` 와
+# `relay.env` 가 함께 있다 — 파일은 `0600` 이라 내용이 바로 새지는 않지만, 「같은 host 의 다른 계정은
+# 들어가지도 못한다」 겹과 편집기 부산물(umask 022 의 `relay.env~` 는 `0644` 다)의 여유를 잃는다.
+# **꼴을 열거하지 않고 「정확한 줄 집합」으로 본다**(v F1). 앞 판은 `install -d` 라는 **한 꼴**을 찾아
+# `-m 700` 글자를 셌고, 그래서 같은 사고의 **정직한 다른 꼴** 셋이 통과했다(실측, coreutils 9.4 — 기존
+# 0700 디렉터리에 `install -m 755 -d` → 755 · `install -dm755` → 755 · `chmod 755` → 755. 셋 다 GREEN 이었다).
+# 꼴을 더 열거하면 다음 꼴에서 다시 열리므로, **그 디렉터리를 만지는 줄 전부를 모아 고정 집합과 등식**으로
+# 묶는다 — 플래그 순서를 바꾸든 묶음 플래그를 쓰든 `chmod`·`chown`·`mkdir` 로 바꾸든 집합이 달라져 붉다.
+# 모으는 범위: `install`·`mkdir`·`chmod`·`chown` 이 **디렉터리 자체를 인자 토큰으로** 받는 줄
+# (`…/relay.env` 처럼 그 아래 파일을 받는 줄은 이 집합이 아니다 — 아래 S-2 가 본다).
+# 새 줄이 정당하면 기대 집합을 **함께** 고친다(그것이 이 등식의 래칫이다).
+# **수집도 열거를 쓰지 않는다**(M15/15R 라운드 2 — v G1·G2 · cr M-4). 라운드 1 은 **판정**을 집합 등식으로
+# 바꿨지만 **수집**이 아직 꼴 열거였다: 동사 목록(`install|mkdir|chmod|chown`) · 경로 뒤 글자
+# (`[[:space:]`]|$`) · 펜스 꼴(`^``` `). 그래서 끝 슬래시(`/etc/bidvector-v2/`) · 따옴표 경로
+# (`"…"`) · **들여쓴 목록 안 코드 블록**(§1 ③ 의 블록 — 이 문서에 그런 펜스가 여덟 있다)이 모이지 않아
+# GREEN 이었다(전부 실측). 분류를 더 정교하게 하는 처방은 그 분류가 다시 열거라 같은 자리를 다시 연다.
+#
+# 그래서 수집 기준을 **「그 경로를 입에 담은 코드 블록 줄 전부」**로 바꾼다 — 동사·끝 글자·변수 대입을
+# 가리지 않는다. 기대 집합은 스크립트 안 리터럴이 아니라 **별도 파일**에 두고(선례:
+# `config/quality/leak-pattern-baseline.txt`) 그 파일과 **정확히 같은지**를 본다.
+DIR_EXPECT=config/quality/runbook-prod-path-lines.txt
+RELAYENV_EXPECT=config/quality/runbook-relay-env-lines.txt
+for _e in "$DIR_EXPECT" "$RELAYENV_EXPECT"; do
+  [ -r "$_e" ] || _die "기대 집합 파일을 읽지 못했다: ${_e}(옮겨졌거나 지워졌다) · 판정 불가" 2
+done
+unset _e
+# 펜스를 `^[[:space:]]*` 로 센다 — 들여쓴 블록을 보지 않으면 그 안의 BAD 줄이 축어로 들어와도 조용하다.
+_rb_code_lines() { awk '/^[[:space:]]*```/{inb = !inb; next} inb' "$RB"; }
+_rb_norm() { sed 's/^[[:space:]]*//; s/[[:space:]]\+/ /g; s/[[:space:]]*$//'; }
+# **콜레이션을 명령 단위로 못박는다**(cr M-5 · v H3). 라운드 1 의 술어는 기대와 실측을 **같은 프로세스의
+# 같은 `sort`** 로 만들어 로캘과 무관했는데, 기대를 파일로 옮기면서 **한쪽 순서가 동결**되고 받는 쪽만
+# 주변 로캘을 따랐다 — 둘이 갈리면 `comm` 은 경고를 stderr 로만 내고 **조용히 틀린 답**을 낸다
+# (실측: `LC_ALL=en_US.utf8` 로 전건을 돌리면 같은 줄 스물셋이 「사라진 줄」과 「새로 생긴 줄」 양쪽에
+# 동시에 서며 **거짓으로** 붉었다 — exit 1 · 268 중 2 어긋남). 파일 전체에 `export LC_ALL=C` 를 걸면 이
+# 파일의 다른 `comm`·`sort` 조합 순서까지 바뀌므로 **비교하는 자리에만** 건다(래퍼의 `LC_ALL=C grep` 과
+# 같은 모양). 양쪽을 다 핀하므로 **기대 파일의 줄 순서는 더 이상 저자 몫이 아니다** — 내용이 맞으면 초록.
+_rb_sort() { LC_ALL=C sort; }
+_rb_expect() { grep '^| ' "$1" | sed 's/^| //' | _rb_sort || true; }
+_rb_set_check() { # <이름> <받은 집합> <기대 집합> <진단 꼬리>
+  local name="$1" got="$2" want="$3" tail="$4" missing extra
+  missing="$(LC_ALL=C comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
+  extra="$(LC_ALL=C comm -13 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' '|' || true)"
+  if [ -n "$got" ] && [ -z "$missing" ] && [ -z "$extra" ]; then
+    _ok "${name} — 코드 블록의 그 줄 $(printf '%s' "$got" | grep -c '' || true) 개가 기대 집합과 **정확히** 같다"
+  else
+    _bad "${name} — 줄 집합이 기대와 다르다. 사라진 줄: [${missing}] · 새로 생긴 줄: [${extra}] — runbook 의 그 줄을 바꿨다면 ${tail} 도 함께 바꾼다(바뀐 줄은 리뷰가 본다)"
+  fi
+}
+# **수집이 백틱 펜스만 본다 — 그 전제를 고정한다**(v H1). 틸드 펜스(`~~~`)도 렌더링되는 코드 블록이라
+# 그 안의 BAD 줄은 수집 밖이다(실측: GREEN). 이 문서는 백틱만 쓰므로 **틸드가 0 임을 단언**해 두면
+# 그 꼴이 들어오는 날 붉어진다(수집을 넓히는 쪽은 산문 오탐을 키운다 — 제한 7 의 비용). 네 칸 들여쓰기
+# 코드 블록은 산문 들여쓰기와 구별할 수 없어 제한에 등재한다.
+tilde_fences="$(grep -cE '^[[:space:]]*~~~' "$RB" || true)"
+if [ "$tilde_fences" = 0 ]; then
+  _ok "runbook 에 틸드 펜스가 없다(수집이 백틱 펜스만 보는 전제 — 생기면 그 안이 수집 밖이라 여기서 선다)"
+else
+  _bad "runbook 에 틸드 펜스가 ${tilde_fences} 줄 생겼다 — 그 블록의 줄은 경로 수집 밖이다(펜스 인식을 넓히거나 백틱으로 바꾼다)"
+fi
+dir_lines="$(_rb_code_lines | grep -E '/etc/bidvector-v2|/var/lib/bidvector-v2' | _rb_norm | _rb_sort || true)"
+_rb_set_check "자격·상태 디렉터리 경로" "$dir_lines" "$(_rb_expect "$DIR_EXPECT")" "$DIR_EXPECT"
+# **S-2** — `install … /dev/null` 은 **이미 채운 파일을 0 바이트로** 만든다(출력 없음 · rc 0). 도달
+# 경로가 가깝다: §13.3 이 「root 전용으로 조이면 매 run 이 `exit 3`」을 가리키며 §13.2 의 꼴을 지목하므로,
+# 권한을 고치러 그 블록을 다시 친 운영자가 방금 넣은 자격과 chat id 를 함께 날린다. 그 사고는 **경보까지
+# 끈다** — 빈 파일 → relay `exit 3` → `OnFailure` → 경보가 **같은 빈 파일**을 읽고 `exit 2`.
+# 그래서 가드(`test -e`)와 `install` 은 **같은 줄**에 둔다(줄을 쪼개면 이 술어가 가드를 못 본다).
+# **여기도 「정확한 줄 집합」이다**(v F2). 앞 판은 `test -e` 라는 **글자의 존재**를 셌고, 그래서 가드를
+# `&&` 로 **뒤집은** 줄이 통과했다 — 그 꼴은 「있을 때만 비운다」라서 채운 파일을 실제로 0 바이트로
+# 만든다(실측). `;` 로 잇기 · 다른 파일(`prod.env`)을 보는 가드 · 권한 줄 자리에 `cp /dev/null` 추가도
+# 전부 GREEN 이었다. 연산자·경로·절단 수단을 하나씩 열거하는 대신 **relay.env 에 쓰는 줄 전부**를 모아
+# 고정 집합과 등식으로 묶는다(읽기·편집기 줄은 쓰기 어휘가 없어 모이지 않는다 — `sudo -e` 가 그렇다).
+# 같은 처방을 자격 **파일** 축에도 쓴다. 라운드 1 의 동사 목록(`install|cp|tee|truncate|chown|chmod|dd`)은
+# `sed -i`·`rm -f`·`mv`·`ex` 로 같은 파일을 비우는 줄을 통과시켰다(실측) — **`sed -i` 는 이 문서의 집안
+# 관용구**라(§9.5 ① 이 그 꼴이다) 다음 저자가 고를 확률이 낮지 않았다. 이제 동사를 보지 않는다.
+relayenv_lines="$(_rb_code_lines | grep 'relay\.env' | _rb_norm | _rb_sort || true)"
+_rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect "$RELAYENV_EXPECT")" "$RELAYENV_EXPECT"
+
+# ── M15/15R(S-4 · S-9) — 경보 unit 의 자격 통로와 core dump ──────────────────────
+# §13.3 은 relay unit 에서 `EnvironmentFile=` 을 **일부러 걷으면서** 사유로 `/proc/<pid>/environ` 축을
+# 든다. 그런데 **같은 자격을 읽는 경보 unit** 이 그 통로를 그대로 썼고, 그것을 받아들인 사유는
+# 「오늘은 relay 와 같은 배선을 쓰는 쪽을 골랐다」였다 — 15Q 에서 그 전제가 사라졌다. 비용은 0 이다:
+# 파일이 `deploy:deploy 0600` 이고 경보가 `User=deploy` 라 스크립트가 직접 읽으며, 파일 갈래를 환경
+# 갈래보다 **먼저** 본다. 파일 부재도 여전히 스크립트의 `exit 2` 한 창구로 모인다.
+#
+# **줄 머리 지시만 센다** — 산문·주석의 `EnvironmentFile=` 언급은 걸리지 않아야 한다(§13.3 은 「쓰지
+# 않는다」는 판단을 그 글자로 적는다). 아래 둘째 계수가 그 **오탐 대조**다: 파일에 그 글자가 여럿
+# 있는데도 첫째 계수가 0 이어야 앵커가 실제로 가르고 있다는 뜻이다.
+# **systemd 가 받는 꼴을 전부 앵커에 넣는다**(v F5). 앞 판은 `^EnvironmentFile=` 라 **등호 앞뒤 공백**과
+# **줄 머리 공백**을 놓쳤고(systemd 는 둘 다 받는다) 그 꼴로 되살린 변이가 GREEN 이었다. 주석(`#`·`;`)
+# 으로 시작하는 줄은 지시가 아니므로 뺀다 — 그것이 산문 오탐 대조와 같은 자리다.
+# **같은 통로를 여는 둘째 지시도 본다**(cr L-4): `Environment=` 로 그 두 키를 직접 실으면 막은 축
+# (`/proc/<pid>/environ`)이 그대로 다시 열린다.
+ENVF_DIRECTIVE='^[[:space:]]*EnvironmentFile[[:space:]]*='
+envf_relay="$(grep -cE "${ENVF_DIRECTIVE}[^=]*relay\.env" "$RB" || true)"
+envf_mentions="$(grep -cE 'EnvironmentFile' "$RB" || true)"
+envkey_inline="$(grep -cE '^[[:space:]]*Environment[[:space:]]*=.*BIDVECTOR_NOTIFICATION_TELEGRAM_(BOT_CREDENTIAL|CHAT_ID)' "$RB" || true)"
+if [ "$envf_relay" = 0 ] && [ "$envkey_inline" = 0 ] && [ "$envf_mentions" -ge 1 ]; then
+  _ok "runbook 의 어떤 EnvironmentFile·Environment 지시도 자격을 환경에 올리지 않는다(산문 언급 ${envf_mentions} 건은 세지 않는다)"
+else
+  _bad "자격을 환경에 올리는 지시가 있다 — EnvironmentFile→relay.env ${envf_relay} 줄 · Environment= 로 그 키 ${envkey_inline} 줄(둘 다 0 이어야 한다 · 문서의 그 글자 전체는 ${envf_mentions} 건)"
+fi
+# **core dump** — 봇 자격은 경보 스크립트의 셸 변수와 `curl` 의 메모리에 요청이 끝날 때까지 살아 있고,
+# 덤프가 남으면 그 값이 디스크로 간다. 15P 가 세운 「이 파일에는 파일로 쓰는 자리가 없다」 정적 술어는
+# 스크립트의 구문을 보지 **커널이 쓰는 파일**을 보지 않는다. 등재된 hardening 묶음과 달리 이 지시는
+# 경보 unit 하나에만 넣어도 세 unit 의 모양이 어긋나지 않는다.
+# **섹션까지 본다**(v F4). 앞 판은 블록 전체에서 `^LimitCORE=0$` 을 셌고, 그래서 그 줄을 `[Unit]` 밑으로
+# **옮긴** 변이가 GREEN 이었다(systemd 는 `[Unit]` 의 그 키를 무시한다). 뒤에 `LimitCORE=infinity` 를 더해
+# **마지막 값**으로 뒤집는 변이도 GREEN 이었다. 이제 `[Service]` 구간으로 자른 뒤 **그 구간의 LimitCORE
+# 지시 전부**를 모아 「한 줄이고 값이 0」을 본다 — 옮기면 구간 밖이라 0 이 되고, 덮어쓰면 2 가 된다.
+alert_block="$(awk '/^# \/etc\/systemd\/system\/bidvector-alert@\.service$/ {inb = 1; next} inb && /^```$/ {exit} inb {print}' "$RB" || true)"
+alert_service="$(printf '%s\n' "$alert_block" | awk '/^\[Service\]$/ {ins = 1; next} ins && /^\[/ {exit} ins {print}' || true)"
+# **값은 줄 끝까지가 값이다**(sec R-1 과 같은 사유) — 첫 토막만 떼면 `LimitCORE=0 # 메모` 를 `0` 으로
+# 읽는데, systemd 는 그 값을 통째로 파싱해 **실패하고 지시를 무시한다**(그러면 rlimit 가 안 선다).
+limitcore_vals="$(printf '%s\n' "$alert_service" | sed -nE 's/^[[:space:]]*LimitCORE[[:space:]]*=[[:space:]]*(.*)$/\1/p' | sed 's/[[:space:]]*$//' | tr '\n' ';' || true)"
+if [ "$limitcore_vals" = "0;" ]; then
+  _ok "경보 unit 의 [Service] 구간에 LimitCORE 지시가 하나이고 값이 정확히 0 이다(옮기면 0 줄 · 덮어쓰면 둘 · 꼬리 주석이 붙으면 값이 달라져 선다)"
+else
+  _bad "경보 unit [Service] 구간의 LimitCORE 값 열이 {0} 가 아니다: {${limitcore_vals}} — [Unit] 로 옮겼거나 뒤에서 덮어썼거나 꼬리 주석이 붙었거나 줄이 없다"
+fi
+# **§9.5 의 「깔린 unit 맞추기」 토막이 기대는 앵커 둘을 템플릿과 묶는다**(cr L-10). 그 토막은
+# `^User=deploy$` 뒤에 줄을 넣고 `grep -qx 'LimitCORE=0'` 로 멱등을 판정하는데, 템플릿이 그 두 꼴을
+# 유지하는지 보는 단언이 없었다 — 템플릿에서 `User=deploy` 를 옮기거나 `LimitCORE = 0` 으로 적으면
+# 게이트는 초록인데 운영자 토막이 아무것도 넣지 않거나 둘째 줄을 넣는다(④ 의 `show` 가 드러내긴 한다).
+alert_user_n="$(printf '%s\n' "$alert_service" | grep -cE '^User=deploy$' || true)"
+alert_lc_verbatim="$(printf '%s\n' "$alert_service" | grep -cE '^LimitCORE=0$' || true)"
+if [ "$alert_user_n" = 1 ] && [ "$alert_lc_verbatim" = 1 ]; then
+  _ok "§9.5 토막이 기대는 두 앵커가 템플릿에 축어로 있다(User=deploy 1 줄 · LimitCORE=0 1 줄)"
+else
+  _bad "§9.5 토막의 앵커가 템플릿과 어긋났다 — '^User=deploy\$' ${alert_user_n} 줄 · 축어 'LimitCORE=0' ${alert_lc_verbatim} 줄(둘 다 1 이어야 한다. 템플릿을 바꿨으면 그 토막의 sed 앵커도 함께 바꾼다)"
+fi
+
+# ── M15/15R(S-10) — `ExecStopPost` 가 지우는 이름의 **접두**가 운영 compose 의 `name:` 인가 ─────
+# 위 `esp_names` 는 꼬리(`sweep`·`evaluation`·`relay`)만 세고 접두는 보지 않았다. `--project` 를
+# 기본값과 다르게 쓰는 host 에서는 KILL 로 끝난 run 의 뒤처리가 **아무것도 지우지 않고**, 운영 DB
+# 자격을 받은 일회 컨테이너가 남는다(다음 주기의 잔존 검사가 `exit 3` 으로 크게 말하므로 조용하지는
+# 않다). 접두의 정본은 `docker/compose.prod.yaml` 의 `name:` 이고, 그 값은 `tools/prod-env.sh` 가
+# 이미 거기서 읽는다 — 여기서 베껴 적지 않는다(§9.2 의 경고가 그 교환을 문면으로 적는다).
+esp_prefixes="$(grep -E '^ExecStopPost=' "$RB" | grep -oE 'docker rm -f [^ ]*-app-run-[a-z]+' \
+  | sed 's/^docker rm -f //; s/-app-run-[a-z]*$//' | sort -u | tr '\n' ' ' || true)"
+if [ "$esp_prefixes" = "${BIDVECTOR_PROD_PROJECT} " ]; then
+  _ok "runbook 의 ExecStopPost 가 지우는 이름의 접두가 운영 compose 의 name: 하나다(${BIDVECTOR_PROD_PROJECT})"
+else
+  _bad "ExecStopPost 가 지우는 이름의 접두 집합이 {${BIDVECTOR_PROD_PROJECT}} 가 아니다: {${esp_prefixes}} — 프로젝트 이름이 다르면 그 줄도 함께 바꾼다(§9.2)"
+fi
+# 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
+unset DIR_EXPECT RELAYENV_EXPECT dir_lines relayenv_lines ENVF_DIRECTIVE envf_relay envf_mentions \
+  envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
+  esp_prefixes SES_WANT_SET ses_pairs \
+  rex_entry_n rex_args rex_arg_n rex_vals rex_val_n rex_set case_branch_n case_known_n wrap_set wrap_n \
+  xlat_set xlat_clash
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"
 [ "$FAIL" -eq 0 ] || exit 1

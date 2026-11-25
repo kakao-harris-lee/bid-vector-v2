@@ -1,0 +1,45 @@
+# M15/15R — runbook(m7-7f-production.md)의 **코드 블록 줄 가운데 운영 자격·상태 디렉터리 경로를 담은 줄** 전수.
+# `tools/prod-guards-check.sh` 가 이 집합과 **정확히 같은지**를 본다.
+#
+# 왜 동사도 경로 뒤 글자도 거르지 않는가: 그 분류가 곧 꼴 열거이고, 열거는 다음 꼴에서 다시 열린다
+# (실측 — 한 꼴만 보던 술어가 플래그 순서·묶음 플래그·`chmod`·끝 슬래시·따옴표 경로·들여쓴 블록·
+# `sed -i`·`rm -f`·`mv`·`ex` 를 전부 통과시켰다). 그래서 **그 경로를 입에 담는 줄 전부**를 고정한다.
+#
+# **여기 든 줄이 안전하다는 뜻이 아니다** — 이 파일은 「옳다」는 보증이 아니라 **바뀌면 리뷰가 보게
+# 하는 고정**이다. 줄의 안전성은 runbook 의 그 자리에서 따로 판단한다.
+#
+# **runbook 의 그 줄을 바꿨다면 이 파일도 함께 바꾼다**(래칫). 무해한 편집도 붉어지는 것은 설계다.
+# 데이터 줄은 `| ` 로 시작한다(수집된 줄 자신이 `#` 로 시작할 수 있어 주석과 가를 수 없다).
+# 정규화: 줄 머리·끝 공백 제거 · 내부 공백은 하나로. **순서는 게이트가 양쪽을 `LC_ALL=C sort` 하므로
+# 저자 몫이 아니다**(중복 줄은 계수까지 본다 — `sort -u` 가 아니다).
+| # 예: /etc/bidvector-v2/relay.env
+| --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+| --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env \
+| --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 \
+| --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 1
+| --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment staging
+| ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" # dry-run
+| ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" --apply
+| ./tools/prod-health.sh --env-file /etc/bidvector-v2/prod.env --public
+| ./tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+| ./tools/prod-release.sh --tag "$REL" --state-dir /var/lib/bidvector-v2 --env-file /etc/bidvector-v2/prod.env # dry-run
+| ./tools/prod-release.sh --tag "$REL" --state-dir /var/lib/bidvector-v2 --env-file /etc/bidvector-v2/prod.env --apply # 빌드 + 게이트 + manifest
+| ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 # dry-run
+| ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 # dry-run
+| ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
+| ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
+| ENVF=/etc/bidvector-v2/prod.env S=/var/lib/bidvector-v2
+| ExecStart=<저장소>/tools/prod-evaluation-commit.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --current-active-bids <현재 진행 투찰 수>
+| ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
+| ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+| git -C <저장소> checkout --detach "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
+| git checkout "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
+| git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh tools/prod-alert-telegram.sh
+| sudo -e /etc/bidvector-v2/relay.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
+| sudo chmod 600 /etc/bidvector-v2/prod.env
+| sudo chmod 600 /etc/bidvector-v2/relay.env
+| sudo chown "$USER" /etc/bidvector-v2/prod.env
+| sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env
+| sudo install -d -m 700 -o "$USER" /etc/bidvector-v2
+| sudo test -e /etc/bidvector-v2/prod.env || sudo install -m 600 -o "$USER" docker/prod.env.template /etc/bidvector-v2/prod.env
+| sudo test -e /etc/bidvector-v2/relay.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/relay.env
