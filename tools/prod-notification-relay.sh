@@ -49,9 +49,17 @@
 #   4 **미뤘다**(잠금 경합 — 설계된 정상, §9.1)
 #   5 러너 `LEASE_BUSY`(옛 3)                        — 기다리면 풀린다. 경보를 울리지 않는다
 #   6 러너 `ENV_SUPPRESSED`(옛 4)                    — 기다려도 안 풀린다. 경보를 울린다
+#   7 **모르는 코드**(M15/15R)                       — 러너의 다섯 밖. 경보를 울린다
 #
-# 신호(TERM·INT·HUP)로 끝나면 그 신호로 죽는다(128+n) — 그 경로에서 이 run 의 일회 컨테이너는 trap 이
-# 치운다. 호출 모양·unit·타이머·활성화 절차의 정본은 runbook §13.3·§13.4 다.
+# **`5`·`6`·`7` 은 래퍼의 것이다.** 끝의 `case` 는 러너의 다섯을 **이름으로** 받고 그 밖을 `7` 로 낸다 —
+# 앞 판처럼 모르는 코드를 그대로 흘리면 러너에 생긴 새 값이 래퍼의 `5` 자리로 들어와 `10-defer.conf` 의
+# 깨끗한 종료에 삼켜진다(경보 없음 · journal 에 단서 없음 · 미룸 계수 0). **relay 러너에 값을 더하면
+# 래퍼의 `case` 와 runbook §13.3 의 표를 함께 고친다** — `tools/prod-guards-check.sh` 의 등식 단언
+# (`RelayExitCode` 의 값 집합 == 이 `case` 가 이름으로 받는 집합)이 그것을 강제한다.
+#
+# 신호(TERM·INT·HUP)로 끝나면 그 신호로 죽는다(128+n) — 그 경로는 trap 이 받아 이 run 의 일회 컨테이너를
+# 치우고 같은 신호로 자살하므로 **위 `case` 에 닿지 않는다**(측정 — guards-check 의 신호 갈래).
+# 호출 모양·unit·타이머·활성화 절차의 정본은 runbook §13.3·§13.4 다.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -271,10 +279,19 @@ if [ "$_relay_parse_rc" -ne 0 ] || { [ -z "$RELAY_KEYS" ] && [ "$RELAY_CONTENT_N
   _die "compose 해석기가 채널 env 를 **통째로 버렸다**($RELAYENVF — 내용 줄 ${RELAY_CONTENT_N} 인데 키가 0 이다). 닫히지 않은 따옴표 · 값 뒤의 '!!' · '\${VAR:?…}' · 'KEY=' 모양이 아닌 줄이 그렇게 만든다. **일회 컨테이너 쪽은 이것을 조용히 버린다** — 그대로 두면 러너가 '설정이 비었다'로 끝나 엉뚱한 곳을 가리킨다(문면은 줄 내용을 옮기지 않는다 — 이 파일은 자격을 담는다)" 3
 fi
 unset _relay_parse_rc
-stray="$(comm -23 <(printf '%s\n' "$RELAY_KEYS" | grep -v '^$' | sort -u) <(_relay_allowed_names | sort -u) | tr '\n' ' ')"
-[ -z "${stray// /}" ] \
-  || _die "채널 env 에 §13.2 밖의 키가 있다: ${stray}— 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)" 3
-unset stray
+# **거절 문면은 이름을 전수로 찍지 않는다**(M15/15R, S-7). 여기 보이는 키는 compose 의 dotenv 해석기가
+# **이 파일의 바이트에서** 만들어 낸 이름이고(따옴표 뒤의 둘째 대입을 새 변수로 읽는다 — v H-1), 그래서
+# 편집 사고가 자격 조각을 키 **이름**으로 만들 수 있다. journal 은 지우기 어려우므로 **환경 변수 이름
+# 꼴만** 찍고 나머지는 개수로만 말한다. 거절 자체(3)는 꼴과 무관하게 그대로다.
+# 남는 자리: 이름 꼴인 조각(`LEAKED_123456` 따위)은 여전히 찍힌다 — 이름을 전부 가리면 운영자가 무엇을
+# 지워야 하는지 모른다(등재된 제한).
+stray_raw="$(comm -23 <(printf '%s\n' "$RELAY_KEYS" | grep -v '^$' | sort -u) <(_relay_allowed_names | sort -u))"
+if [ -n "${stray_raw//[[:space:]]/}" ]; then
+  stray_named="$(printf '%s\n' "$stray_raw" | grep -E '^[A-Z][A-Z0-9_]*$' | tr '\n' ' ' || true)"
+  stray_odd="$(printf '%s\n' "$stray_raw" | grep -v '^$' | grep -cvE '^[A-Z][A-Z0-9_]*$' || true)"
+  _die "채널 env 에 §13.2 밖의 키가 있다: 이름 꼴 ${stray_named:-(없음) }· 이름 꼴이 아닌 키 ${stray_odd} 개(이름을 찍지 않는다 — 그 이름은 이 파일의 바이트에서 만들어진 것이라 자격 조각일 수 있다) — 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)" 3
+fi
+unset stray_raw
 _relay_env_has() { # <속성 이름>
   local n
   while IFS= read -r n; do
@@ -365,8 +382,13 @@ rc=0
   --bidvector.relay.owner="$OWNER" \
   --bidvector.relay.channel=telegram \
   --bidvector.relay.claim-limit="$CLAIM_LIMIT" || rc=$?
+# **통과를 열거로 닫는다**(M15/15R, S-3). 앞 판의 `*) exit "$rc"` 는 모르는 코드를 그대로 흘렸는데,
+# 래퍼가 쓰는 `5`·`6` 은 **러너의 다음 코드 자리**이고 `10-defer.conf` 가 `5` 를 깨끗한 종료로 만든다 —
+# 러너에 여섯째가 `5` 로 들어오는 날 창 셋이 한꺼번에 조용해진다(경보 없음 · journal 에 단서 없음 ·
+# 미룸 계수 0). 그래서 러너의 다섯만 **이름으로** 받고 그 밖은 `7` 로 낸다.
 case "$rc" in
-  3) echo "notification-relay: 러너가 LEASE_BUSY(3) 로 끝났다 — 같은 owner 의 relay 가 임대를 쥐고 있다. 기다리면 풀린다(m6-6e §3.7). 래퍼의 전제 실패(3)와 겹치지 않게 **5** 로 낸다" >&2; exit 5 ;;
+  0|1|2) exit "$rc" ;;
+  3) echo "notification-relay: 러너가 LEASE_BUSY(3) 로 끝났다 — 다른 relay 프로세스가 임대를 쥐고 있다(임대는 owner 가 아니라 소비자 종류 단위다 — 다른 --owner 로 다시 쳐도 같은 자물쇠에서 선다). 기다리면 풀린다(m6-6e §3.7). 래퍼의 전제 실패(3)와 겹치지 않게 **5** 로 낸다" >&2; exit 5 ;;
   4) echo "notification-relay: 러너가 ENV_SUPPRESSED(4) 로 끝났다 — 정책표가 이 환경에 붙인 모드가 Live 가 아니다(claim 0 · 행은 PENDING 보존). 기다려도 풀리지 않는다(m6-6e §5.1). 래퍼의 미룸(4)과 겹치지 않게 **6** 으로 낸다" >&2; exit 6 ;;
-  *) exit "$rc" ;;
+  *) echo "notification-relay: 러너가 예상 밖의 종료 코드 ${rc} 를 냈다 — 래퍼가 5·6 을 쓰므로 그대로 통과시키지 않는다. docker run 자신의 실패(125·126·127) · 신호 종료(137·143) · 러너에 새로 생긴 코드가 여기 온다. **7** 로 낸다(SuccessExitStatus 밖이라 경보가 운다 — runbook §13.3 의 표)" >&2; exit 7 ;;
 esac

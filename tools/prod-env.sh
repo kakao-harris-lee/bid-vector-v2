@@ -43,6 +43,20 @@ fi
 while IFS='=' read -r _k _; do
   case "$_k" in COMPOSE_*|GIT_*) unset "$_k" 2>/dev/null || true ;; esac
 done < <(env)
+# **데몬 선택 축 둘도 비운다**(M15/15R, S-8). `DOCKER_HOST`·`DOCKER_CONTEXT` 는 세 래퍼의 **모든 docker
+# 호출**이 어느 데몬을 보는지를 환경 문자열 하나로 바꾼다. 오늘도 fail-closed 이긴 하다 — 남의 데몬에서는
+# `_prod_images_match` 가 이미지를 못 찾아 `exit 3` 에서 선다. 그래도 §13.4 ①~⑤ 는 **운영자 셸에서 손으로**
+# 미는 절차이고 그 셸이 다른 context 를 쥐고 있을 수 있는데, 그때 나오는 거절은 「데몬을 잘못 골랐다」는
+# 이야기를 하지 않는다.
+#
+# **접두로 비우지 않는다** — `DOCKER_CONFIG`·`HOME` 은 **플러그인 탐색 축**이고 cr N-1 이 되살린 자리다
+# (떨어뜨리면 compose 가 사용자 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝난다. docker 는
+# `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다). 위 두 접두와 달리 여기서는 **고를 축이 둘뿐**이라
+# 열거가 구멍을 남기지 않는다.
+#
+# 남는 자리: `DOCKER_HOST` 가 **꼭 필요한 host**(rootless docker)에서는 래퍼가 기본 소켓을 보고 `exit 3`
+# 으로 선다 — fail-closed 이고 등재된 제한이다(이 host 와 CI 러너는 그 변수 없이 돈다 — 실측).
+unset DOCKER_HOST DOCKER_CONTEXT 2>/dev/null || true
 
 BIDVECTOR_PROD_COMPOSE_FILES=(docker/compose.yaml docker/compose.local-tls.yaml docker/compose.prod.yaml)
 
