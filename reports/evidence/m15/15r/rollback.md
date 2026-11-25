@@ -1,9 +1,9 @@
 # M15 / 15R — rollback
 
-**실측 HEAD: `7036134ef`**. 이 파일을 담는 커밋은 그 뒤에 온다. **이번이 둘째 실측**이다 — 첫 실측
-(`740f1384b`) 뒤에 운영자 추가 승인으로 S-6(D-15R-9)이 범위에 들어와 **복원 목록 안의
-`docs/runbook/m7-7f-production.md` 가 움직였다.** 그 파일은 원천에 **있는** 파일이라 예외가 덮지 않으므로
-규율대로 다시 쟀다(앞 실측을 옮기지 않았다).
+**실측 HEAD: `deadc4ca5`**. 이 파일을 담는 커밋은 그 뒤에 온다. **이번이 셋째 실측**이다 — 복원 목록
+**안**의 파일이 움직일 때마다 다시 쟀다(S-6 이 범위에 들어오면서 runbook 이 · 수정 라운드 1 이 산출물
+다섯을 · 그리고 `tools/prod-alert-telegram.sh` 가 목록에 새로 들어오면서). 그 파일들은 원천에 **있는**
+파일이라 신설 파일 예외가 덮지 않는다. 앞 두 실측을 옮기지 않았다.
 
 ## 전제 — 복원 원천은 착수 base 다
 
@@ -24,29 +24,33 @@
 
 ## 목록과 명령
 
-`git diff --name-status 928ac2fa0..<실측 HEAD>` — **M 여섯 · A 셋**(기계 산출이고 라운드마다 다시 낸다.
-수정 라운드가 파일을 더 만들면 이 절차를 다시 돌린다).
+`git diff --name-status 928ac2fa0..<실측 HEAD>` — **M 일곱 · A 셋**(기계 산출이고 라운드마다 다시 낸다.
+수정 라운드가 파일을 더 만들면 이 절차를 다시 돌린다 — 라운드 1 이 `tools/prod-alert-telegram.sh` 를
+더했다).
 
 ```
 git restore --source=928ac2fa0f8fb1fdb3a6c444eac5bceb756b3d0a --staged --worktree -- \
   docs/runbook/m6-6e-operations.md docs/runbook/m7-7f-production.md milestone-15.md \
-  tools/prod-env.sh tools/prod-guards-check.sh tools/prod-notification-relay.sh
+  tools/prod-alert-telegram.sh tools/prod-env.sh tools/prod-guards-check.sh \
+  tools/prod-notification-relay.sh
 git rm -rq reports/evidence/m15/15r
 ```
 
-hunk 격리는 **필요 없다** — 위 여섯을 `base..HEAD` 에서 만진 커밋은 전부 이 slice 의 것이고
-(`git log --oneline 928ac2fa0..HEAD -- <여섯>` 이 그 목록이다), 하네스 레인(`CLAUDE.md`·`.claude/**`)
+hunk 격리는 **필요 없다** — 위 일곱을 `base..HEAD` 에서 만진 커밋은 전부 이 slice 의 것이고
+(`git log --oneline 928ac2fa0..HEAD -- <일곱>` 이 그 목록이다), 하네스 레인(`CLAUDE.md`·`.claude/**`)
 커밋은 이 range 에 **0** 건이다.
 
 ## 임시 clone 실측(실측 HEAD 에서)
 
 - ① 명령 exit: `restore` **0** · `rm` **0**
-- ② 스테이징된 변경: **D 3 · M 6**(위 목록과 같은 수다)
+- ② 스테이징된 변경: **D 3 · M 7**(위 목록과 같은 수다)
 - ③ `git diff --cached 928ac2fa0` **빈 출력**
 - 트리 동일성: 복원 뒤 `git write-tree` == `928ac2fa0^{tree}` == **`6f3714d875d722152a65f3197711cdf97a32b0b1`**
 - **양성 대조**(비파괴 절삭 — `checkout --` 을 쓰지 않았다): 복원 뒤 `tools/prod-env.sh` 에 한 줄을 더하자
   등식이 깨졌고(트리 `a4f05d3dc`) `head -n <원래 줄수>` 절삭으로 `6f3714d87` 로 돌아왔다. 빈 등식이
   건전성의 증거가 아님을 그 한 줄로 가른다.
+- **라운드 1 이 산출물을 다섯 더 만졌어도 복원 트리는 같은 객체다** — 복원은 원천의 blob 을 쓰므로
+  그 사이 산출물이 얼마나 바뀌었는지와 무관하다(첫 실측과 같은 `6f3714d87`).
 - `git rev-list --merges 928ac2fa0..<실측 HEAD>` **빈 출력** — 원천을 옮길 병합이 없다(위 전제).
 - ④ compile · ⑤ test · ⑥ 게이트는 **트리 동일성으로 갈음**한다 — 복원 뒤 트리가 원천의 트리와 **같은
   객체**이고 `928ac2fa0` 의 CI 는 **success** 다(실측). 「HEAD 가 초록이다」나 Gradle cache 적중을 근거로
@@ -57,8 +61,8 @@ hunk 격리는 **필요 없다** — 위 여섯을 `base..HEAD` 에서 만진 �
 ```
 git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   docs/runbook/m6-6e-operations.md docs/runbook/m7-7f-production.md milestone-15.md \
-  tools/prod-env.sh tools/prod-guards-check.sh tools/prod-notification-relay.sh \
-  reports/evidence/m15/15r/
+  tools/prod-alert-telegram.sh tools/prod-env.sh tools/prod-guards-check.sh \
+  tools/prod-notification-relay.sh reports/evidence/m15/15r/
 git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
 
