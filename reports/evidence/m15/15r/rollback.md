@@ -33,7 +33,8 @@ git restore --source=928ac2fa0f8fb1fdb3a6c444eac5bceb756b3d0a --staged --worktre
   docs/runbook/m6-6e-operations.md docs/runbook/m7-7f-production.md milestone-15.md \
   tools/prod-alert-telegram.sh tools/prod-env.sh tools/prod-guards-check.sh \
   tools/prod-notification-relay.sh
-git rm -rq reports/evidence/m15/15r
+git rm -rq reports/evidence/m15/15r \
+  config/quality/runbook-prod-path-lines.txt config/quality/runbook-relay-env-lines.txt
 ```
 
 hunk 격리는 **필요 없다** — 위 일곱을 `base..HEAD` 에서 만진 커밋은 전부 이 slice 의 것이고
@@ -62,7 +63,8 @@ hunk 격리는 **필요 없다** — 위 일곱을 `base..HEAD` 에서 만진 �
 git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   docs/runbook/m6-6e-operations.md docs/runbook/m7-7f-production.md milestone-15.md \
   tools/prod-alert-telegram.sh tools/prod-env.sh tools/prod-guards-check.sh \
-  tools/prod-notification-relay.sh reports/evidence/m15/15r/
+  tools/prod-notification-relay.sh reports/evidence/m15/15r/ \
+  config/quality/runbook-prod-path-lines.txt config/quality/runbook-relay-env-lines.txt
 git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
 

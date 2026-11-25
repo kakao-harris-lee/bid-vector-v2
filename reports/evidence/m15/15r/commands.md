@@ -12,7 +12,7 @@ base `928ac2fa0` · 브랜치 `fix/m15r-activation-runbook`
 
 | 명령 | 결과 |
 |---|---|
-| `./tools/prod-guards-check.sh` | exit 0 — **통과 260 · 어긋남 0** |
+| `./tools/prod-guards-check.sh` | exit 0 — **통과 268 · 어긋남 0** · 19.3 초 |
 | `./tools/prod-alert-check.sh` | exit 0 — 87 건 전부 통과(문면만 고친 `prod-alert-telegram.sh` 를 포함해 그대로 초록) |
 | `bash -n` — 래퍼·`prod-env`·`prod-guards-check`·`prod-alert-telegram` **파일별** | 각 exit 0 |
 
@@ -29,6 +29,17 @@ base `928ac2fa0` · 브랜치 `fix/m15r-activation-runbook`
 | 가드를 `&&` 로 뒤집으면(v F2) | 채운 파일 24바이트 → **0바이트** · 모드 600 → **실제 사고다** |
 | `currentContext` 가 셋째 축인가(v F6) | **그렇다** — 버릴 `DOCKER_CONFIG` 에 `currentContext` 를 세우면 두 변수를 비운 셸도 그 context 로 간다. `DOCKER_CONTEXT=default` 는 **그것을 이긴다**(둘 다 `docker context show` 로 실측) |
 | `prod-alert-check.sh` 가 경보 스크립트의 진단 문면을 고정하는가(cr L-3) | **아니다** — 그 파일의 `EnvironmentFile` 언급은 자기 주석·자기 `_ok` 문면이다. 문면을 고친 뒤 87 건 그대로 초록 |
+| systemd 가 꼬리 `#` 를 주석으로 보는가(sec R-1) | **아니다**(버릴 unit 사본에 `systemd-analyze verify` — 설치·기동·reload 없음). `SuccessExitStatus=4 5 # 7 도 뺀다` → `#`·`도`·`뺀다` 만 거절하고 **`7` 에는 말이 없다**(= 받는다). 양성 대조로 `… # 300 도 뺀다` 를 주니 `300` 도 거절 — **`#` 뒤를 계속 값으로 읽는다**. `LimitCORE=0 # 메모` 는 「Failed to parse resource value: `0 # 메모`」로 **지시 전체가 버려진다**(rlimit 가 아예 안 선다). `man systemd.syntax` 도 「lines starting with」만 든다 |
+
+## 0..255 전수 스윕의 비용 — 재고 받지 않았다 (v G3)
+
+구현해서 **실측**했다: 전건이 **16.6 초 → 94.2 초**(+77.6 초 · **5.7 배**). 매 PR 의 `container` job 과
+**매 로컬 반복**에 붙는 값이라 「수 초~수십 초」 문턱 밖이다. 그래서 지시의 대안대로 **대표 구간 + 구조**로
+나눴다 — ⓐ 거동은 대표 구간 열여섯(러너 다섯 · 래퍼 셋 · `docker` CLI 125·126·127 · 신호 128·137·143 ·
+상한 255)을 재고(+2.7 초), ⓑ 「가지 전수 == 인식 수」의 **느슨한 쪽을 「빈 줄이 아닌 모든 줄」**로 세어
+가지의 **꼴** 축을 비용 없이 닫는다. 그 둘이 스윕이 덮던 공간을 덮는 근거: 가지가 어떤 꼴로 더해지든
+분모가 늘어 붉고(G3 의 두 꼴로 실측), 라벨이 파싱되는 꼴은 **집합 등식**과 **번역 값 ∩ 러너 값 = ∅** 이
+다시 받는다(라운드 1 에서 실측).
 
 ## D-15R-2 의 거동 — 계약이 약속한 측정 (cr L-1)
 
@@ -62,42 +73,65 @@ base `928ac2fa0` · 브랜치 `fix/m15r-activation-runbook`
 통제군(변이 없음) **260 · 0 · exit 0**. 매 변이 뒤 되돌려 `git status --porcelain` 이 빈 것을 확인했다.
 `RelayLines.kt`(out_of_scope)도 그 사본에서만 만졌다.
 
-| 변이 (바꿔치우기) | 결과 | 무엇을 잠그는가 |
-|---|---|---|
-| §13.2 에 `install -d -m 755` 되살리기 | RED 1 | 디렉터리 줄 집합 등식 |
-| 같은 자리에 `install -m 755 -d` | **RED 1** | 〃 (앞 판은 GREEN — v F1) |
-| 같은 자리에 `install -dm755` | **RED 1** | 〃 (앞 판 GREEN) |
-| 같은 자리에 `chmod 755 <디렉터리>` | **RED 1** | 〃 (앞 판 GREEN) |
-| 같은 자리에 `mkdir -p -m 755`(거동은 무해) | **RED 1** | 〃 — 집합 밖이면 무해해도 붉다(래칫) |
-| `test -e` 가드 떼기 | RED 1 | relay.env 쓰기 줄 집합 등식 |
-| 가드를 `&&` 로 뒤집기 | **RED 1** | 〃 (앞 판 GREEN · 그 꼴이 파일을 비운다) |
-| 가드를 `;` 로 | **RED 1** | 〃 (앞 판 GREEN) |
-| 가드가 **다른 파일**(`prod.env`)을 봄 | **RED 1** | 〃 (앞 판 GREEN) |
-| 권한 줄을 `cp /dev/null` 로 바꿔치움 | **RED 1** | 〃 (앞 판 GREEN) |
-| `LimitCORE=0` 제거 | RED 1 | `[Service]` 구간의 값 열 등식 |
-| `LimitCORE` 를 `[Unit]` 로 **옮김** | **RED 1** | 〃 (앞 판 GREEN · systemd 는 그 키를 무시한다) |
-| 뒤에 `LimitCORE=infinity` 더하기 | **RED 1** | 〃 (앞 판 GREEN · 마지막 값이 이긴다) |
-| `EnvironmentFile=` 되살리기 | RED 2 | 지시 0 등식 |
-| `EnvironmentFile = `(등호 공백) | **RED 2** | 〃 (앞 판 GREEN · systemd 는 받는다) |
-| 줄 머리 공백 + `EnvironmentFile=` | **RED 2** | 〃 (앞 판 GREEN) |
-| `Environment=` 로 그 키를 실음 | **RED 2** | 같은 통로의 둘째 지시(cr L-4 — 앞 판에 단언 없음) |
-| `SuccessExitStatus=4 5 7` | **RED 1** | drop-in 셋의 unit↔값집합 쌍 등식(앞 판 GREEN — sec N-2 의 유일한 구멍) |
-| 래퍼 `case` 를 앞 판(`*) exit "$rc"`)으로 | RED 6 | 거동 넷 + 문면 + 집합 등식 |
-| `RelayExitCode` 에 여섯째 `(5)` | RED 1 | 집합 등식 |
-| `NEW_CODE(5), // 주석` | **RED 1** | 항목 수(느슨) ≠ 해석 수(엄격) — 앞 판은 둘이 같은 정규식이라 GREEN |
-| `NEW_CODE(5)` + 다음 줄 `,` | **RED 1** | 〃 (앞 판 GREEN) |
-| 래퍼에 `"8") exit 0` 가지 | **RED 2** | 가지 전수 == 인식 수 · 교집합 `{0}`(앞 판 GREEN) |
-| 래퍼에 `12[5-7]) exit 4` 가지 | **RED 2** | 〃 · 교집합 `{4}`(앞 판 GREEN · docker 실패를 미룸으로 삼킨다) |
-| 러너에 `5` + 래퍼에 `5) exit 5`(집합은 같아진다) | **RED 2** | 거동(5→7 이어야 한다) · **교집합 `{5}`** (cr M-3 — 앞 판에 단언 없음) |
-| stray 를 전수 출력으로 | RED 1 | 키 문자열이 출력에 보인다 |
-| `prod-env.sh` 의 `unset`·못박기 떼기 | RED 1 | `exit 11`(안 비움) · `exit 12`(못박기 없음) |
-| **음성 대조** — `DOCKER_CONFIG` 까지 떨어뜨림 | RED 1 | `exit 13`(과잉 — 플러그인 탐색 축을 지킨다) |
-| `ExecStopPost` 한 줄의 접두 바꾸기 | RED 1 | 접두 == compose 의 `name:` |
-| **음성 대조** — 산문 한 문단 추가 | **GREEN 260 · 0** | 무해한 변경은 붉지 않는다 |
-| **음성 대조** — unit 의 `Description` 문구 변경 | **GREEN 260 · 0** | 〃 |
+「**앞 판 GREEN**」은 세 판정(verifier·code-reviewer·보안 리뷰)이 **실제로 통과시킨 꼴**이다. 스물셋이
+전부 같은 병이었다 — 술어가 꼴을 열거한다. 판정은 라운드 1 에, **수집**은 라운드 2 에 집합 등식으로 바꿨다.
 
-「앞 판 GREEN」은 세 판정(verifier·code-reviewer·보안 리뷰)이 **실제로 통과시킨 꼴**이다 — 열한 꼴이
-전부 「정규식이 한 꼴만 집는다」는 같은 병이었고, 꼴을 더 열거하는 대신 **줄·값 집합 등식**으로 바꿨다.
+**자격·상태 디렉터리 경로 — 줄 집합 등식**(기대: `config/quality/runbook-prod-path-lines.txt`)
+
+| 변이 | 결과 |
+|---|---|
+| `install -d -m 755 <디렉터리>` 되살리기 | RED 1 |
+| `install -m 755 -d` · `install -dm755` · `chmod 755 <디렉터리>` | 각 **RED 1**(앞 판 GREEN — v F1) |
+| `mkdir -p -m 755`(거동은 무해) | **RED 1** — 집합 밖이면 무해해도 붉다(래칫) |
+| 끝 슬래시 `…/bidvector-v2/` · 따옴표 경로 `"…"` | 각 **RED 1**(앞 판 GREEN — v G1) |
+
+**자격 파일(relay.env) — 줄 집합 등식**(기대: `runbook-relay-env-lines.txt`)
+
+| 변이 | 결과 |
+|---|---|
+| `test -e` 가드 떼기 · `&&` 로 뒤집기 · `;` 로 잇기 · 다른 파일 가드 · `cp /dev/null` | 각 **RED 1**(뒤 넷은 앞 판 GREEN — v F2) |
+| **들여쓴 목록 안 코드 블록**에 가드 없는 BAD 줄 축어 | **RED 2**(앞 판 GREEN — v G2(a) · 그 펜스가 여덟 개였다) |
+| `sed -i "s/.*//"` · `rm -f` · `mv` · `ex -sc "%d\|x"` · `ln -sf` | 각 **RED 2**(앞 판 GREEN — cr M-4 · `sed -i` 는 이 문서의 집안 관용구다) |
+| 변수 경유(`F=<경로>; install … "$F"`) | **RED 2**(앞 판 GREEN — 대입 줄이 경로를 담아 걸린다) |
+
+**unit 지시 — 구간·값 집합 등식**
+
+| 변이 | 결과 |
+|---|---|
+| `LimitCORE=0` 제거 · `[Unit]` 로 옮김 · 뒤에 `infinity` 로 덮기 | 각 **RED 1**(뒤 둘은 앞 판 GREEN — v F4) |
+| `LimitCORE=0 # 메모`(꼬리 주석) | **RED 2**(앞 판 GREEN — sec R-1. systemd 는 **지시 전체를 버린다**) |
+| 템플릿을 `LimitCORE = 0` 으로 · 템플릿의 `User=deploy` 를 바꿈 | 각 **RED 1**(앞 판 단언 없음 — cr L-10) |
+| `EnvironmentFile=` 되살리기 · 등호 공백 꼴 · 줄 머리 공백 | 각 **RED 2**(뒤 둘은 앞 판 GREEN — v F5) |
+| `Environment=` 로 그 키를 실음 | **RED 2**(앞 판 단언 없음 — cr L-4) |
+| `SuccessExitStatus=4 5 7` | **RED 1**(앞 판 GREEN — sec N-2) |
+| `SuccessExitStatus=4 5 # 7 도 뺀다` | **RED 1**(앞 판 GREEN — sec R-1 의 마지막 구멍) |
+| `ExecStopPost` 한 줄의 접두 바꾸기 | RED 1 |
+
+**종료 코드 — 거동·집합·교집합**
+
+| 변이 | 결과 |
+|---|---|
+| 래퍼 `case` 를 앞 판(`*) exit "$rc"`)으로 | RED 7(거동 다섯 + 문면 + 집합) |
+| `RelayExitCode` 에 여섯째 `(5)` | RED 1 |
+| `NEW_CODE(5), // 주석` · 여러 줄 꼴 | 각 **RED 1**(앞 판 GREEN — v F3. 항목 수를 **다른 술어**로 센다) |
+| 래퍼에 `"8") exit 0` · `12[5-7]) exit 4` | 각 **RED 2**(앞 판 GREEN — 가지 전수 + 교집합) |
+| 래퍼에 `125 \| 126) exit 5`(공백 낀 대안) · `(125) exit 5` | **RED 3 · RED 2**(앞 판 GREEN — v G3) |
+| 러너에 `5` + 래퍼에 `5) exit 5`(집합은 같아진다) | **RED 2** — 거동 · **교집합 `{5}`**(cr M-3) |
+
+**그 밖**
+
+| 변이 | 결과 |
+|---|---|
+| stray 를 전수 출력으로 | RED 1(키 문자열이 출력에 보인다) |
+| `prod-env.sh` 의 `unset`·못박기 떼기 | RED 1(`exit 11`·`exit 12`) |
+| **음성** — `DOCKER_CONFIG` 까지 떨어뜨림(과잉) | RED 1(`exit 13` — 플러그인 탐색 축을 지킨다) |
+| **음성** — 산문 한 문단 · unit `Description` 문구 · 기대 파일에 주석 한 줄 | 각 **GREEN 268 · 0** |
+
+**변이가 엉뚱한 자리에 떨어진 것 하나를 잡았다.** cr L-10 의 `User=deploy` 변이를 처음에는 파일 첫
+일치(§4.5 의 인증서 검사 unit)에 떨어뜨려 **GREEN** 이 나왔다 — 게이트가 옳았고 변이가 틀렸다.
+블록 한정(`/경보 템플릿/,/닫는 울타리/`)으로 다시 쳐서 RED 를 확인했다. 「적용 여부를 numstat 으로
+본다」만으로는 **어디에** 적용됐는지가 안 잡힌다 — 그 줄이 문서에 다섯 번 나오는 자리에서는 바뀐 줄의
+앞뒤까지 봐야 한다.
 
 **양성 대조 하나는 고치는 중에 저절로 나왔다.** D-15R-1 의 술어는 내가 **산문에 쓴 반례**까지 집어
 GREEN 을 막았다(등재된 제한 7) — 블록 밖·산문 안의 같은 꼴도 본다는 뜻이다.
