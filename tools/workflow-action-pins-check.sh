@@ -99,10 +99,13 @@ code ~ /(^|[ \t[{,])[&*][A-Za-z0-9_-]+([ \t\]},]|$)/ {
   unsup("YAML 앵커·별칭 — 별칭이 가리키는 값을 이 검사가 풀지 못한다"); next
 }
 {
-  if (body ~ /uses/) {
+  # `uses` **키**는 두 꼴로만 읽는다. 그 밖의 자리에 `uses:` 가 보이면(흐름 매핑 `- {uses: …}` ·
+  # 중첩 · 한 줄 `run:` 본문) 통과가 아니라 정지다. 콜론 없는 `uses` 글자(step 이름·주석)는 키가
+  # 아니므로 보지 않는다.
+  if (body ~ /(^|[^A-Za-z0-9_-])uses[ \t]*:/) {
     if (body ~ /^-[ \t]+uses:/) { v = body; sub(/^-[ \t]+uses:/, "", v); take_use(v, cmt) }
     else if (body ~ /^uses:/)   { v = body; sub(/^uses:/, "", v); take_use(v, cmt) }
-    else { unsup("uses 글자가 읽을 수 있는 두 꼴(- uses: · uses:)이 아닌 자리에 있다") }
+    else { unsup("uses: 키가 읽을 수 있는 두 꼴(- uses: · uses:)이 아닌 자리에 있다") }
   }
   if (body ~ /:[ \t]*[|>][-+0-9]*$/) { inblock = 1; block_indent = ind }
 }
@@ -111,6 +114,7 @@ END { printf "COUNT\t%d\t%d\n", nuses, bad }
 
 AWK_JUDGE='
 function hex(s, n) { return (length(s) == n && s ~ /^[0-9a-f]+$/) }
+function pinnable(s) { return (hex(s, 40) || (substr(s, 1, 7) == "sha256:" && hex(substr(s, 8), 64))) }
 function viol(code, msg) { printf "%s\t%s\n", code, msg; nviol++ }
 BEGIN {
   FS = "\t"
@@ -120,7 +124,7 @@ BEGIN {
     if (line == "" || substr(line, 1, 1) == "#") { continue }
     n = split(line, f, /[ \t]+/)
     if (n != 3)                 { viol("POLICY", "기대 파일의 칸이 셋이 아니다: " line); continue }
-    if (!hex(f[2], 40))         { viol("POLICY", "기대 파일의 SHA 가 40자리 소문자 16진이 아니다: " line); continue }
+    if (!pinnable(f[2]))        { viol("POLICY", "기대 파일의 핀이 40자리 소문자 16진도 sha256:<64hex> 도 아니다: " line); continue }
     if (f[3] !~ /^v[0-9]/)      { viol("POLICY", "기대 파일의 판이 vN 꼴이 아니다: " line); continue }
     if (f[1] in pinsha)         { viol("POLICY", "기대 파일에 액션이 두 번 등재됐다: " f[1]); continue }
     pinsha[f[1]] = f[2]; pinver[f[1]] = f[3]; npins++
@@ -210,7 +214,8 @@ _first_pinned_file() { # <디렉터리> — 핀 줄을 가진 첫 워크플로 �
 }
 
 _mutate() { # <사본 디렉터리> <모드> <상대 경로> — 첫 핀 줄을 **바꿔치운다**
-  local wf="$1" mode="$2" target="$wf/$3" out
+  local wf="$1" mode="$2" target out
+  target="$wf/$3"
   out="$target.mutant"
   awk -v mode="$mode" '
     function hexshift(s,   i, c, r) {
