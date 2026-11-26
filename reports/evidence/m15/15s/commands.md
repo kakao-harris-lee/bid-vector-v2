@@ -31,8 +31,9 @@ base `8e7a91ead` · 브랜치 `chore/m15s-ci-action-pins`
 
 | 명령 | 결과 |
 |---|---|
-| `./tools/workflow-action-pins-check.sh .github/workflows` | exit 0 — uses **24**(핀 24 · 저장소 안 0) · 기대 파일 7 줄과 집합 등식 · 판 주석 일치 · 자기 변이 6 건 전부 붉음 |
+| `./tools/workflow-action-pins-check.sh .github/workflows` | exit 0 — uses **24**(핀 24 · 저장소 안 0) · 기대 파일 7 줄과 집합 등식 · 판 주석 일치 · 자기 변이 **17** 건 전부 붉음 |
 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · 참조 18 · 매달린 참조 0 (base 와 같은 수) |
+| `uv run --no-sync python ../tools/workflow-action-pins-parity.py ../.github/workflows`(cwd `ml-engine`) | exit 0 — uses 24 가 awk 게이트와 **PyYAML 6.0.3**(lock 핀)에서 같은 다중집합 · 음성 대조 둘 통과 |
 | `./gradlew --no-daemon check --continue` | **exit 0** · FAILED 0 · `:leakPatternGate` 와 `:workflow:sourceLanguageGate` 는 **실행**(UP-TO-DATE 아님). `--continue` 로 돌린 이유는 바로 아래 — 알려진 빨강을 안은 전건의 「그 밖은 통과」는 미측정이다 |
 | `bash -n tools/workflow-action-pins-check.sh` | exit 0 |
 | `shfmt -d tools/workflow-action-pins-check.sh` | exit 1 — **이 저장소의 게이트가 아니다**. 선례 `tools/workflow-step-refs-check.sh` 도 같은 exit 1 이다(기본 들여쓰기가 탭). `shfmt` 는 `prod-alert-check.sh` 의 **파서**로만 쓰인다 |
@@ -120,6 +121,89 @@ exit 0). `src/*/kotlin` 아래 비-`kt`/`kts`/`md` 파일이 그 하나뿐임을
 `buf build '.git#tag=<승인 태그>,subdir=contracts' -o /dev/null` **exit 0**,
 `buf breaking contracts --against '.git#tag=<승인 태그>,subdir=contracts'` **exit 0**. 원격이 아예 없는
 트리에서 둘 다 서므로 `persist-credentials: false` 가 이 게이트를 깨지 않는다.
+
+## 수정 라운드 1 — 수집을 구조로 닫았다
+
+verifier H-1 은 **수집이 열거라서 열린 자리**다. 표기 넷을 하나씩 막지 않고 층을 하나 더 세웠다.
+
+**㉮ awk 수집 자체**(세 원인을 구조로):
+| 고친 것 | 앞 판이 왜 열렸나 |
+|---|---|
+| 블록 본문 기준 = **키의 열**(대시 열이 아니다) | `- if: >-` 의 대시는 6열, 형제 키는 8열 → 형제가 본문으로 삼켜졌다 |
+| 지시자 앞에 **공백을 요구**하고 첫 콜론에만 건다 | `name: x:|` 을 블록으로 오인했다 |
+| 따옴표 친 키·복합 키·홀로 선 지시자·선두 탭 → **exit 2** | 「`uses` 키가 아님」으로 보여 unsupported 로도 안 갔다 |
+
+**㉯ 수집 완전성 = 고정된 파서와의 다중집합 등식**(`tools/workflow-action-pins-parity.py`,
+`ml-engine` job S-12). 게이트의 새 `--count` 출력 == PyYAML 이 같은 파일들에서 읽는 `uses` 값.
+
+H-1 의 표기 넷이 **각각 무엇에 잡히는가**(버릴 디렉터리, 자기 변이는 끈 채):
+
+| 표기 | 게이트 | parity |
+|---|---|---|
+| `- if: >-` 다음 줄 형제 `uses` | **exit 1 FORM**(수집된다) | exit 0 — 등식 성립 |
+| `- name: x:\|` 다음 줄 `uses` | **exit 1 FORM**(수집된다) | exit 0 — 등식 성립 |
+| 따옴표 키 `"uses"`·`'uses'` | **exit 2** 따옴표 친 키 | **exit 2** 수집을 내지 않는다 |
+| 복합 키 `? uses` | **exit 2** 복합 키 | **exit 2** 수집을 내지 않는다 |
+
+**그 층이 실제로 받는가** — 앞 판 awk(블록 기준을 대시 열로 되돌린 사본)에 같은 `- if: >-` 꼴을
+주면 게이트는 **exit 0 「수집 24」**(파서는 25)이고 parity 가 **exit 1 · 「파서만 수집: …」** 로
+선다. 표기를 열거하지 않고도 그 부류 전체가 붉는다.
+
+parity 자신의 음성 대조는 **매 실행** 돈다 — 각 목록을 자기 자신과 비교하되 한 건을 빼고 본다.
+처음에는 두 목록을 서로 비교하며 한쪽만 줄였는데, **게이트가 한 건을 놓친 판에서 그 조작이 우연히
+두 다중집합을 같게 만들어** 진짜 위반이 「음성 대조 실패」로 가려졌다(실측). 자기 자신과 비교하는
+꼴로 바꿨다.
+
+PyYAML 은 YAML 1.1 이라 맨 `on:` 을 **불리언 키 `True`** 로 읽는다(실측). `uses` 수집과는 무관하다 —
+수집기가 `uses` 가 아닌 키의 **값으로 내려가므로** 그 서브트리도 그대로 훑는다.
+
+## 자기 변이 열일곱 — 술어마다 하나 이상
+
+앞 판 여섯은 FORM 과 「한 액션 두 SHA」만 실질로 지켰다(verifier M-2). 기대 파일 쪽 변이는 0 이었다.
+
+| 변이(전부 바꿔치우기) | 기대 사유 |
+|---|---|
+| 핀→태그 · 39자리 · 대문자 · 새 워크플로 파일 · **블록 키(`- if: >-`)** | FORM |
+| 같은 줄을 둘로(한 액션 두 SHA) · **모든 핀을 다른 SHA 로** | SET |
+| 기대 파일: SHA 변경 · 한 줄 삭제 · 안 쓰는 줄 추가 | SET |
+| 꼬리 주석 삭제 · 주석 판만 변경 · 기대 파일의 판 칸 변경 | VERSION |
+| `./ci/act` 로 바꿔치움 | LOCALDIR |
+| 흐름 매핑 `- {uses: …}` | UNSUPPORTED |
+| 워크플로 전부를 `uses` 없는 하나로 | EMPTY |
+| 기대 파일 줄을 두 칸으로 | POLICY |
+
+열일곱 전부 ① 사본 ≠ 원본 확인 ② 붉음 ③ **기대한 사유로** 붉음. 세 번째가 없으면 「붉긴 붉은데
+다른 이유로」가 통과한다. 비용 — 자기 변이 포함 전건이 1 초 안쪽이다.
+
+## 술어 무력화 대조 — 변이가 그 술어에 **기대고 있는가**
+
+스크립트 사본에서 술어를 하나씩 **바꿔치워** 끄고(`viol()` 가 그 분류를 버리게 하거나 `unsup()` 이
+정지 깃발을 세우지 않게) 자기 변이 열일곱을 돌렸다. 무편집 사본은 exit 0(양성 대조).
+
+| 끈 술어 | 무력화 적용 | 결과 |
+|---|---|---|
+| FORM | 1 줄 | **exit 2** — `tag` 변이가 초록이 됐다 |
+| SET | 1 줄 | **exit 2** — `twoshas` 가 초록 |
+| VERSION | 1 줄 | **exit 2** — `nocomment` 가 초록 |
+| LOCALDIR | 1 줄 | **exit 2** — `localuses` 가 초록 |
+| EMPTY | 1 줄 | **exit 2** — `empty` 가 다른 사유로 붉음 |
+| POLICY | 1 줄 | **exit 2** — `pins_policy` 가 다른 사유로 붉음 |
+| UNSUPPORTED(정지 깃발) | 1 줄 | **exit 2** — `flowmap` 이 초록 |
+
+일곱 전부 자기 변이가 알아챈다. 앞 판에서는 이 가운데 다섯이 **꺼도 초록**이었다.
+
+## 그 밖의 지적 처분 — 실측
+
+| 지적 | 고친 뒤 |
+|---|---|
+| cr medium-2 `SELFCHECK` 가 `1` 이 아니면 말없이 꺼짐 | `true` → **exit 2** · `0` → 「건너뜀」 한 줄을 stderr 에 찍고 exit 0 |
+| cr medium-3 후행 슬래시 → 「통과」 찍고 exit 1 | 인자 끝 `/` 를 벗긴다 → **exit 0 · stderr 없음** |
+| cr medium-3 「통과」가 자기 변이 **앞** | 순서를 뒤집었다 — 이제 자기 변이 통과 줄이 먼저다 |
+| cr low CRLF 비대칭(`v5.1.0 != v5.1.0`) | 워크플로 줄에서도 CR 을 벗긴다 → CR 1256 줄 사본에서 **exit 0** |
+| cr low `--max-time` 은 시도별 | 세 자리(shfmt·buf 둘·trivy)에 `--retry-max-time 300` · 주석을 사실에 맞춤 |
+| verifier L-1 `.YML`·심볼릭 링크 | 수집을 **fail-closed 로 넓혔다**(`-iname`·`-L`). GitHub 이 그 둘을 돌리지 않더라도 손해는 「안 돌릴 파일에 핀을 요구」뿐이고 반대는 조용한 누락이다. parity 도 같은 규칙을 쓴다 |
+| cr low `local f` · `set -- $stats` | `local` 목록에 더하고 `read -r` 로 바꿨다 |
+| cr low 기대 파일 머리 주석 | 칸 셋 규칙과 「경로 붙은 첫 칸은 앞 둘만 저장소」를 더했다 |
 
 ## 하지 않은 것
 
