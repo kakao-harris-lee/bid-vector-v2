@@ -16,9 +16,16 @@
 `container` 로 들이면 그 job 의 전제가 깨지고, 게이트를 `ml-engine` 으로 옮기면 「새 의존 0」이
 깨진다.
 
-**막지 않는 것**: 두 수집이 **같은 방식으로** 틀린 경우. PyYAML 도 파일 목록을 게이트와 같은
-규칙으로 모으므로, 수집 대상 파일 자체를 놓치면 둘 다 놓친다(그 축은 게이트의 비공허 술어와
-`.github/actions` 술어가 따로 받는다).
+**파일 목록 규칙은 게이트의 `_workflow_files`(`find -L … -iname`)와 같아야 한다** — 확장자
+대소문자 무시 · 심볼릭 링크 **파일과 디렉터리** 둘 다 따라감 · 하위 디렉터리 재귀. 한쪽만 바꾸면
+등식이 거짓말이 된다. `Path.rglob` 은 디렉터리 링크를 따라가지 않아 쓰지 않는다(r1 cr medium ·
+verifier L-A 실측: 링크 디렉터리 하나로 `find -L` 2 · `rglob` 1).
+
+**종료 코드 계약은 게이트와 같다 — `0 통과 · 1 위반 · 2 판정 불가`.** 「어긋났다」만 1 이다.
+깨진 YAML · 비-UTF8 · 문자열이 아닌 `uses` 값 · 게이트를 부르지 못함 · 링크 순환은 전부 2 다.
+
+**막지 않는 것**: 두 수집이 **같은 방식으로** 틀린 경우. 파일 목록 규칙을 공유하므로 수집 대상
+파일 자체를 놓치면 둘 다 놓친다(그 축은 게이트의 비공허 술어와 LOCALDIR 술어가 따로 받는다).
 
 실행:
 
@@ -27,78 +34,142 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ImportError as exc:  # 러너에 파서가 없으면 **통과가 아니라 정지**다.
+    sys.stderr.write(f"PyYAML 을 import 하지 못했다 — 수집을 비교할 수 없다(판정 불가): {exc}\n")
+    raise SystemExit(2) from exc
 
 GATE = Path(__file__).resolve().parent / "workflow-action-pins-check.sh"
+SUFFIXES = (".yml", ".yaml")
+
+
+class Unmeasurable(Exception):
+    """잴 수 없다 — 「어긋났다(1)」가 아니라 「판정 불가(2)」로 나가는 모든 사유."""
 
 
 def workflow_files(root: Path) -> list[Path]:
-    """게이트의 `_workflow_files` 와 **같은 규칙** — 확장자 대소문자 무시, 심볼릭 링크 따라감."""
-    found = [
-        p
-        for p in sorted(root.rglob("*"))
-        if p.is_file() and p.suffix.lower() in (".yml", ".yaml")
-    ]
-    return found
+    """게이트의 `_workflow_files` 와 **같은 집합**을 낸다(`find -L` + `-iname`)."""
+    found: list[Path] = []
+    seen: set[tuple[int, int]] = set()
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        try:
+            stat = os.stat(dirpath)
+        except OSError as exc:
+            raise Unmeasurable(f"{dirpath}: 디렉터리를 stat 하지 못했다: {exc}") from exc
+        key = (stat.st_dev, stat.st_ino)
+        if key in seen:
+            # `find -L` 은 순환을 경고하고 건너뛴다. 여기서는 멈춘다 — 두 수집이 그 지점부터
+            # 서로 다른 집합을 보게 되므로 등식이 말하는 바가 사라진다.
+            raise Unmeasurable(f"{dirpath}: 심볼릭 링크 순환 — 파일 목록이 정해지지 않는다")
+        seen.add(key)
+        dirnames.sort()
+        for name in sorted(filenames):
+            path = Path(dirpath) / name
+            if path.is_file() and path.suffix.lower() in SUFFIXES:
+                found.append(path)
+    return sorted(found)
 
 
-def collect_uses(node: Any, out: list[str]) -> None:
+def collect_uses(node: Any, out: list[str], where: Path) -> None:
     """트리 어디에 있든 `uses` 키의 값을 전부 줍는다 — step 자리·job 자리를 가리지 않는다."""
     if isinstance(node, dict):
         for key, value in node.items():
             if isinstance(key, str) and key == "uses":
                 if not isinstance(value, str):
-                    raise ValueError(f"uses 값이 문자열이 아니다: {value!r}")
+                    raise Unmeasurable(f"{where}: uses 값이 문자열이 아니다: {value!r}")
                 out.append(value)
             else:
-                collect_uses(value, out)
+                collect_uses(value, out, where)
     elif isinstance(node, list):
         for item in node:
-            collect_uses(item, out)
+            collect_uses(item, out, where)
 
 
 def yaml_uses(root: Path) -> list[str]:
     out: list[str] = []
     for path in workflow_files(root):
-        text = path.read_text(encoding="utf-8")
-        for doc in yaml.safe_load_all(text):
-            collect_uses(doc, out)
+        try:
+            text = path.read_text(encoding="utf-8")
+            for doc in yaml.safe_load_all(text):
+                collect_uses(doc, out, path)
+        except Unmeasurable:
+            raise
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
+            raise Unmeasurable(f"{path}: YAML 을 읽지 못한다: {exc}") from exc
     return out
 
 
 def gate_uses(root: Path) -> list[str]:
-    run = subprocess.run(
-        [str(GATE), "--count", str(root)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        run = subprocess.run(
+            [str(GATE), "--count", str(root)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise Unmeasurable(f"{GATE}: 게이트를 실행하지 못했다: {exc}") from exc
     if run.returncode != 0:
         sys.stderr.write(run.stderr)
-        sys.stderr.write(
-            f"게이트의 --count 가 비-0({run.returncode})으로 끝났다 — 수집을 비교할 수 없다(판정 불가)\n"
-        )
-        # 종료 코드 계약은 게이트와 같다: `0 통과 · 1 위반 · 2 판정 불가`.
-        # `raise SystemExit("문자열")` 은 **1** 로 끝나므로 쓰지 않는다(실측).
-        sys.exit(2)
+        raise Unmeasurable(f"게이트의 --count 가 비-0({run.returncode})으로 끝났다")
     return [line for line in run.stdout.splitlines() if line]
 
 
 def mismatch(gate: list[str], parsed: list[str]) -> list[str]:
     """두 다중집합의 차이를 양방향으로 낸다. 같으면 빈 목록."""
     left, right = Counter(gate), Counter(parsed)
-    lines: list[str] = []
-    for value in sorted((left - right).elements()):
-        lines.append(f"  게이트만 수집: {value}")
-    for value in sorted((right - left).elements()):
-        lines.append(f"  파서만 수집: {value}")
+    lines = [f"  게이트만 수집: {v}" for v in sorted((left - right).elements())]
+    lines += [f"  파서만 수집: {v}" for v in sorted((right - left).elements())]
     return lines
+
+
+def compare_dir(root: Path) -> tuple[int, list[str], int]:
+    """**본 판정을 내는 단 하나의 경로.** 음성 대조도 이 함수를 지난다."""
+    gate = gate_uses(root)
+    parsed = yaml_uses(root)
+    if not gate and not parsed:
+        raise Unmeasurable(f"{root}: 양쪽 수집이 비었다 — 등식이 공허하다")
+    diff = mismatch(gate, parsed)
+    return (1 if diff else 0, diff, len(gate))
+
+
+# 한 매핑에 `uses:` 를 두 번 둔다 — **두 수집이 실제로 갈리는 입력**이다(실측): awk 는 줄 단위라
+# 둘 다 세고, PyYAML 은 중복 키를 마지막 하나로 접는다. 그래서 심은 사본에서 `compare_dir` 은
+# 반드시 1 을 내야 한다.
+_PLANT = """on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+"""
+
+
+def negative_control() -> None:
+    """**호출 자리까지** 받는 음성 대조(r1 cr low · verifier L-B).
+
+    앞 판은 `mismatch(v, v[1:])` 였다 — 다중집합 차이의 정의상 비지 않은 `v` 에 대해 **언제나**
+    참이라 발화할 수 없었고, 비교 함수만 지켰다. 이제 본 판정과 **같은 `compare_dir`** 에 두
+    수집이 실제로 갈리는 입력을 주고 1 이 나오는지 잰다. 그래서 `parsed = list(gate)` 처럼
+    두 수집을 한 출처로 묶는 치환은 여기서 **0 이 나와 정지**한다.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "plant.yml").write_text(_PLANT, encoding="utf-8")
+        rc, _diff, _n = compare_dir(Path(tmp))
+    if rc != 1:
+        raise Unmeasurable(
+            "음성 대조 실패 — 두 수집이 갈리는 입력에서도 판정 경로가 어긋남을 내지 않는다"
+        )
 
 
 def main() -> int:
@@ -110,30 +181,14 @@ def main() -> int:
         sys.stderr.write(f"워크플로 디렉터리가 없다: {root}\n")
         return 2
 
-    gate = gate_uses(root)
-    parsed = yaml_uses(root)
-
-    # 비공허 — 「오탐 0 인 판이 양성도 0」을 막는다. 둘 다 비면 등식은 공허하게 참이다.
-    if not gate or not parsed:
-        sys.stderr.write(
-            f"수집이 비었다(게이트 {len(gate)} · 파서 {len(parsed)}) — 등식이 공허하다(판정 불가)\n"
-        )
+    try:
+        negative_control()
+        rc, diff, count = compare_dir(root)
+    except Unmeasurable as exc:
+        sys.stderr.write(f"{exc} — 수집을 비교할 수 없다(판정 불가)\n")
         return 2
 
-    # 음성 대조 — 비교 자체가 **한 건의 차이를 낼 수 있는가**를 매 실행 잰다. 각 목록을 **자기
-    # 자신**과 비교하되 한 건을 빼고 본다. 두 목록을 서로 비교하면서 한쪽만 줄이면 안 된다 —
-    # 애초에 둘이 다를 때 그 조작이 우연히 둘을 같게 만들 수 있고(실측: 게이트가 한 건을 놓친
-    # 판에서 파서 쪽을 하나 줄이자 두 다중집합이 같아졌다), 그러면 진짜 위반이 「음성 대조
-    # 실패」로 가려진다.
-    for label, values in (("게이트", gate), ("파서", parsed)):
-        if not mismatch(values, values[1:]):
-            sys.stderr.write(
-                f"음성 대조 실패 — {label} 수집에서 한 건을 빼도 비교가 어긋나지 않는다(판정 불가)\n"
-            )
-            return 2
-
-    diff = mismatch(gate, parsed)
-    if diff:
+    if rc != 0:
         sys.stderr.write(
             "수집 등식 위반 — awk 게이트가 읽은 uses 다중집합이 YAML 파서의 것과 다르다:\n"
         )
@@ -141,8 +196,8 @@ def main() -> int:
         return 1
 
     print(
-        f"수집 등식 통과 — uses {len(gate)} 건이 awk 게이트와 PyYAML "
-        f"{yaml.__version__} 에서 같은 다중집합 · 음성 대조 둘 통과"
+        f"수집 등식 통과 — uses {count} 건이 awk 게이트와 PyYAML "
+        f"{yaml.__version__} 에서 같은 다중집합 · 음성 대조(심은 중복 키) 통과"
     )
     return 0
 
