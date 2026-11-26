@@ -1,8 +1,9 @@
 # M15 / 15S — rollback
 
-**실측 HEAD: `78367735b`**. 이 파일을 담는 커밋은 그 뒤에 온다. **둘째 실측이다** — 수정 라운드 1 이
-복원 목록 안의 파일 넷을 움직이고 **신설 파일 하나**(`tools/workflow-action-pins-parity.py`)를
-더해서 다시 쟀다. 앞 실측(`c59b04f45` · M 2 · A 4)을 옮기지 않았다.
+**실측 HEAD: `1a418b2b1`**. 이 파일을 담는 커밋은 그 뒤에 온다. **셋째 실측이다** — 수정 라운드 1 이
+복원 목록 안의 파일을 움직이고 신설 파일 하나(`tools/workflow-action-pins-parity.py`)를 더했고,
+라운드 마무리에서 팀장이 in_scope 를 넓혀 `tools/one-command-check.sh` 가 목록에 들어왔다.
+앞 두 실측(`c59b04f45` · M 2 · A 4 / `78367735b` · M 2 · A 6)을 옮기지 않았다.
 
 ## 전제 — 복원 원천은 착수 base 다
 
@@ -12,7 +13,7 @@
 
 - **단언 ① 원천이 HEAD 의 조상이다**: `git merge-base --is-ancestor` **예**.
 - **단언 ② 원천에 이 slice 의 첫 산출물 커밋(`91caaea12` — 계약)이 없다**: **없다**(실측).
-- `base..<실측 HEAD>` 의 커밋은 **열둘 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`)
+- `base..<실측 HEAD>` 의 커밋은 **열다섯 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`)
   커밋은 **0** 건이다 — 그래서 hunk 격리가 필요 없다. (앞 판은 「다섯」이라고 적었다 — 그 시점에도
   수가 틀렸고 결론만 같았다. verifier L-2 정정.)
 - 머지 뒤의 되돌림은 이 문서가 아니라 **그 PR 의 머지 커밋 revert** 다.
@@ -23,13 +24,13 @@
 
 ## 목록과 명령
 
-`git diff --name-status 8e7a91ead..<실측 HEAD>` — **M 2 · A 6**(기계 산출이고 라운드마다 다시 낸다.
-수정 라운드 1 이 `tools/workflow-action-pins-parity.py` 를 더해 A 가 넷에서 여섯이 됐다 —
-evidence 셋 + 산출물 셋).
+`git diff --name-status 8e7a91ead..<실측 HEAD>` — **M 3 · A 6**(기계 산출이고 라운드마다 다시 낸다.
+수정 라운드 1 이 `tools/workflow-action-pins-parity.py` 를 더해 A 가 넷에서 여섯이 됐고,
+라운드 마무리의 in_scope 확장으로 `tools/one-command-check.sh` 가 M 에 들어왔다).
 
 ```
 git restore --source=8e7a91ead0e01e6a4f4c5f4d827d2668176a80b6 --staged --worktree -- \
-  .github/workflows/ci.yml milestone-15.md
+  .github/workflows/ci.yml milestone-15.md tools/one-command-check.sh
 git rm -rq reports/evidence/m15/15s \
   config/quality/workflow-action-pins.txt \
   tools/workflow-action-pins-check.sh tools/workflow-action-pins-parity.py
@@ -45,7 +46,7 @@ ci.yml 에는 S-12 가 없지만, 스크립트를 남기면 `tools/` 에 호출�
 저장소 밖 clone(`--no-hardlinks`)에서 돌렸다. 공유 작업 트리를 건드리지 않았다.
 
 - ① 명령 exit: `restore` **0** · `rm` **0**
-- ② 되돌린 것(판정 대상 대비): **D 6 · M 2** — 위 목록과 같은 수다
+- ② 되돌린 것(판정 대상 대비): **D 6 · M 3** — 위 목록과 같은 수다
 - ③ `git diff --cached 8e7a91ead` **빈 출력(0 줄)**
 - 트리 동일성: 복원 뒤 `git write-tree` == `8e7a91ead^{tree}` == **`5a7a6238fe300694fcd64fe6ed8e470537f52e33`**
 - **양성 대조**(비파괴 절삭 — `checkout --` 을 쓰지 않았다): 복원 뒤 `.github/workflows/ci.yml` 에 한 줄을
@@ -60,8 +61,8 @@ ci.yml 에는 S-12 가 없지만, 스크립트를 남기면 `tools/` 에 호출�
 
 ```
 git diff --name-only <실측 HEAD>..<판정 SHA> -- \
-  .github/workflows/ci.yml milestone-15.md reports/evidence/m15/15s/ \
-  config/quality/workflow-action-pins.txt \
+  .github/workflows/ci.yml milestone-15.md tools/one-command-check.sh \
+  reports/evidence/m15/15s/ config/quality/workflow-action-pins.txt \
   tools/workflow-action-pins-check.sh tools/workflow-action-pins-parity.py
 git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
