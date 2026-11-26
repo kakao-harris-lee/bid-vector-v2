@@ -1,9 +1,9 @@
 # M15 / 15S — rollback
 
-**실측 HEAD: `1a418b2b1`**. 이 파일을 담는 커밋은 그 뒤에 온다. **셋째 실측이다** — 수정 라운드 1 이
-복원 목록 안의 파일을 움직이고 신설 파일 하나(`tools/workflow-action-pins-parity.py`)를 더했고,
-라운드 마무리에서 팀장이 in_scope 를 넓혀 `tools/one-command-check.sh` 가 목록에 들어왔다.
-앞 두 실측(`c59b04f45` · M 2 · A 4 / `78367735b` · M 2 · A 6)을 옮기지 않았다.
+**실측 HEAD: `5705c6653`**. 이 파일을 담는 커밋은 그 뒤에 온다. **넷째 실측이다** — 승인 전 일괄
+정리가 복원 목록 안의 파일 넷을 또 움직였다(목록 자체는 셋째와 같다 — 신설 파일이 없다).
+앞 세 실측(`c59b04f45` · M 2 · A 4 / `78367735b` · M 2 · A 6 / `1a418b2b1` · M 3 · A 6)을 옮기지
+않았다.
 
 ## 전제 — 복원 원천은 착수 base 다
 
@@ -13,7 +13,7 @@
 
 - **단언 ① 원천이 HEAD 의 조상이다**: `git merge-base --is-ancestor` **예**.
 - **단언 ② 원천에 이 slice 의 첫 산출물 커밋(`91caaea12` — 계약)이 없다**: **없다**(실측).
-- `base..<실측 HEAD>` 의 커밋은 **열다섯 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`)
+- `base..<실측 HEAD>` 의 커밋은 **스물 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`)
   커밋은 **0** 건이다 — 그래서 hunk 격리가 필요 없다. (앞 판은 「다섯」이라고 적었다 — 그 시점에도
   수가 틀렸고 결론만 같았다. verifier L-2 정정.)
 - 머지 뒤의 되돌림은 이 문서가 아니라 **그 PR 의 머지 커밋 revert** 다.
@@ -26,7 +26,8 @@
 
 `git diff --name-status 8e7a91ead..<실측 HEAD>` — **M 3 · A 6**(기계 산출이고 라운드마다 다시 낸다.
 수정 라운드 1 이 `tools/workflow-action-pins-parity.py` 를 더해 A 가 넷에서 여섯이 됐고,
-라운드 마무리의 in_scope 확장으로 `tools/one-command-check.sh` 가 M 에 들어왔다).
+in_scope 확장으로 `tools/one-command-check.sh` 가 M 에 들어왔다. 승인 전 일괄 정리는 같은 아홉을
+다시 만졌을 뿐 목록을 바꾸지 않았다).
 
 ```
 git restore --source=8e7a91ead0e01e6a4f4c5f4d827d2668176a80b6 --staged --worktree -- \
