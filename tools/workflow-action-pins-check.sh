@@ -130,7 +130,13 @@ code ~ /(^|[ \t[{,])[&*][A-Za-z0-9_-]+([ \t\]},]|$)/ {
 
   # 읽지 못하는 키 표기는 전부 정지다(r1 verifier H-1 ③). 따옴표 친 키·복합 키는 앞 판에서
   # 「`uses` 키가 아님」으로 보여 unsupported 로도 가지 않았다.
-  if (rest ~ /^["\047]/)       { unsup("따옴표 친 키 — 키 이름을 이 검사가 풀지 못한다"); next }
+  # 따옴표 뒤에 **콜론이 오는 것만** 키로 본다(r1 cr low). 앞 판은 따옴표로 시작하면 키인지
+  # 값인지 가리지 않고 멈춰서, `- "src/**"` 같은 **평범한 시퀀스 값** 하나가 게이트를 판정
+  # 불가로 세우고 사실과 다른 사유를 찍었다. 좁혀도 안전한 이유가 이 라운드에 생겼다 —
+  # 수집 누락은 parity 등식이 따로 받는다. `- "a: b"`(콜론을 품은 값)도 바르게 지나간다.
+  if (rest ~ /^"[^"]*"[ \t]*:/ || rest ~ /^\047[^\047]*\047[ \t]*:/) {
+    unsup("따옴표 친 키 — 키 이름을 이 검사가 풀지 못한다"); next
+  }
   if (rest == "?" || rest ~ /^\?[ \t]/) { unsup("복합 키(? …) — 이 검사가 읽지 못하는 표기"); next }
   if (rest ~ /^[|>][-+0-9]*$/) { unsup("홀로 선 블록 스칼라 지시자 — 앞 줄의 키와 짝을 잇지 못한다"); next }
 
@@ -308,6 +314,7 @@ _mutate_wf() { # <사본 디렉터리> <모드> <상대 경로> — 워크플로
         else if (mode == "badversion") { sub(/#[ \t]*v[0-9][0-9A-Za-z.-]*/, "# v0.0.0", line) }
         else if (mode == "flowmap")    { line = pre "@v5}"; sub(/uses: /, "{uses: ", line) }
         else if (mode == "localuses")  { sub(/uses:.*$/, "uses: ./ci/act", line) }
+        else if (mode == "quotedkey")  { sub(/uses:.*$/, "\"uses\": actions/checkout@v5", line) }
         else if (mode == "blockkey" && line ~ /^[ ]*-[ ]+uses:/) {
           # r1 verifier H-1 ⓐ — step 의 첫 키가 블록 스칼라면 형제 키가 본문으로 삼켜지던 꼴.
           # 들여쓰기만 재사용한다(`pre` 는 `@` 앞 전부라 쓸 수 없다).
@@ -361,6 +368,7 @@ twoshas:SET
 allshas:SET
 localuses:LOCALDIR
 flowmap:UNSUPPORTED
+quotedkey:UNSUPPORTED
 nocomment:VERSION
 badversion:VERSION
 empty:EMPTY
