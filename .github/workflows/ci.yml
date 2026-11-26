@@ -5,6 +5,21 @@ on:
     branches: [main]
   pull_request:
 
+# M15/15S(D-15S-4·5) — **무너진 step 이 쥐는 것의 크기를 줄인다.** 위의 액션 핀이 막는 것은 상류
+# 태그의 이동이고, 이 두 줄이 줄이는 것은 그래도 무언가가 무너졌을 때의 피해 반경이다.
+#
+# ① `contents: read` — 이 워크플로에는 `GITHUB_TOKEN` 을 쓰는 step 이 하나도 없다(`secrets.`·
+#    `GITHUB_TOKEN`·`gh` 0 건, 2026-11-26 실측). 기본 권한은 저장소 설정에 따라 쓰기까지 열릴 수
+#    있으므로 **워크플로가 스스로 바닥을 정한다**. artifact 업로드는 이 권한으로 선다.
+# ② 모든 `actions/checkout` 에 `persist-credentials: false` — 기본값은 토큰을 `.git/config` 의
+#    확장 헤더로 남겨, 뒤따르는 **모든** step(빌드 스크립트·test·설치 스크립트)이 그것을 읽을 수
+#    있게 한다. 이 워크플로에는 checkout 뒤에 원격을 다시 치는 step 이 없다 —
+#    `contractGate` 의 `buf breaking` 은 `.git#tag=…` 을 쓰지만 그것은 **로컬 이력**을 읽는다
+#    (origin 을 지운 clone 에서 exit 0 으로 실측, 2026-11-26). `fetch-depth: 0` 은 checkout 안에서
+#    끝난다.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,13 +35,14 @@ jobs:
       # `fetch-depth: 0` 은 `contractGate` 가 요구한다 — `buf breaking` 이
       # `.git#tag=<승인 태그>,subdir=contracts` 를 대조 대상으로 쓰므로 **전체 이력과 태그**가
       # 있어야 한다. 기본값(얕은 clone, 태그 없음)이면 그 검사가 대상을 찾지 못한다.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # 러너의 launcher JVM. 컴파일에 쓰이는 toolchain 은 gradle.properties 의
       # `bidvector.jvmToolchain` 이 정하고, 없으면 foojay resolver 가 내려받는다.
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
@@ -48,8 +64,13 @@ jobs:
           fi
           base="https://github.com/bufbuild/buf/releases/download/v${version}"
           tmp="$(mktemp -d)"
-          curl -fsSL -o "$tmp/buf" "$base/buf-Linux-x86_64"
-          curl -fsSL -o "$tmp/sha256.txt" "$base/sha256.txt"
+          # M15/15S(D-15S-6) — `install shfmt` 와 같은 꼴. `--retry-all-errors` 는 **끊긴** 연결에
+          # 듣고 **느린** 연결에는 안 듣는다: 시간 상한이 없으면 매달린 내려받기가 이 job 의 기본
+          # 6시간까지 러너를 쥔다.
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 120 -o "$tmp/buf" "$base/buf-Linux-x86_64"
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 120 -o "$tmp/sha256.txt" "$base/sha256.txt"
           # 대상 자산의 행이 없으면 `pipefail` 로 여기서 떨어진다 — 조용한 미검증을 막는다.
           ( cd "$tmp" && grep ' buf-Linux-x86_64$' sha256.txt | sed 's/buf-Linux-x86_64$/buf/' | sha256sum -c - )
           mkdir -p "$RUNNER_TEMP/bin"
@@ -61,7 +82,7 @@ jobs:
 
       # v6 은 **캐싱을 `gradle-actions-caching` 상용 컴포넌트로 분리**해 Gradle 이용약관 동의를
       # 요구한다(MIT 아님). Node 24 는 v5 에서 이미 충족되므로 라이선스 변경을 딸려 들이지 않는다.
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5.0.2
 
       # check 가 게이트 전부를 든다 — 컴파일 · ktlint · detekt · sizeGate ·
       # domainDependencyGate · architecture test · compatibilitySmoke.
@@ -76,11 +97,11 @@ jobs:
       # 안의 `contractGate`가 `buf`와 전체 이력·태그를 요구하는데, 그 둘을 이미 갖춘 job이
       # 여기뿐이다(verifier r2 실측 — 다른 job 에 그대로 두면 S-20 이 반드시 실패하고,
       # step 순서상 뒤따르는 6C 게이트 축 전체가 CI 에서 한 번도 실행되지 않았다).
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version-file: ml-engine/.python-version
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
         with:
           version: "0.9.22"
 
@@ -90,7 +111,7 @@ jobs:
       # 정본」이 이 job 에서만 성립하지 않는다), 이미지 Node 가 바뀌는 날 이 변경과 무관한
       # 이유로 붉어진다. 선례가 같은 파일에 있다 — S-20 이 Python 전건을 품게 된 라운드에
       # setup-python·setup-uv 를 바로 위에 더했다.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -123,7 +144,7 @@ jobs:
       # (새 step 을 만들지 않는다). `web` job 과 조건이 다른 이유를 적는다: 거기서는 업로드 조건이
       # **스모크 step 하나**라 「파일 0 건」이 곧 신호이고(`if-no-files-found: error`), 여기서는
       # 깨진 step 이 Kotlin·Python 일 수도 있어 **0 건이 정상**이다 — 그래서 기본 동작(경고)을 쓴다.
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         if: always()
         with:
           name: reports
@@ -142,20 +163,22 @@ jobs:
       run:
         working-directory: ml-engine
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          persist-credentials: false
 
       # `.python-version`(3.12, D-5A-1)을 읽어 버전을 고정한다 — 워크플로에 숫자를 적지
       # 않는다(`buf` 버전과 같은 이유, install buf 주석 참고). v6 부터 Node 24(`using: node24`
       # 실측, v5 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major),
       # v5 는 아니다(verifier r1 F-5).
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version-file: ml-engine/.python-version
 
       # 재현성(D-5A-4) — 로컬 실측 버전과 같은 값으로 고정. uv 자체는 lock 대상이 아니라
       # (lock 파일이 검증하는 것은 Python 의존성 그래프뿐) 여기서 직접 핀한다. v7 부터 Node 24
       # (실측 — v6 이하는 node20), v6 는 아니다(verifier r1 F-5, 같은 원칙).
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7.6.0
         with:
           version: "0.9.22"
 
@@ -240,12 +263,14 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          persist-credentials: false
 
       # `web/.nvmrc`(ADR 0011 D-1 — Node 의 정본)를 읽어 버전을 고정한다. 워크플로에 숫자를
       # 적지 않는다(`buf`·`.python-version` 과 같은 이유). v5 부터 Node 24(`using: node24`
       # 실측, v4 는 node20) — 위 job 들과 같은 원칙(Node 24 를 만족하는 가장 낮은 major).
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
         with:
           node-version-file: web/.nvmrc
           cache: npm
@@ -324,7 +349,7 @@ jobs:
       # 때만** 돈다. 그때 산출물이 0 건이면 그 자체가 신호다 — 빈 artifact 를 올리고 초록인
       # 것은 보관하지 않은 것과 같다(PR #75 리뷰 G · 같은 파일 선례 PR #68 M-4).
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         if: ${{ !cancelled() && steps.web-smoke.outcome == 'failure' }}
         with:
           name: web-playwright
@@ -337,13 +362,13 @@ jobs:
       # 실측 12m44s 이고 그것을 기다리면 web 단독 실패도 13분 뒤에 드러난다 — 지금 이 job 은
       # 독립이고 CI 임계경로는 `check` 가 쥐고 있으므로, 같은 job 에서 짓는 쪽이 총 wall clock
       # 을 늘리지 않는다(중복 컴파일 비용은 실측 21~59s).
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
 
       # Gradle 캐시 복원 — 이것이 bootJar 를 21s 로 만든다(`container` job 실측).
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5.0.2
 
       - name: 앱 배포물 빌드 — 여정 e2e 의 입력 (W-12)
         working-directory: ${{ github.workspace }}
@@ -359,7 +384,7 @@ jobs:
       # 여정 trace 는 **따로 올린다** — 스모크와 같은 이름에 얹으면 어느 층이 깨졌는지 이름이
       # 말하지 못한다. 같은 관례(실패 때만 · 0 건이면 신호)를 쓴다. 실행 맥락 파일(로그인 이름·
       # 비밀 문구)은 **이 경로 밖**이라 올라가지 않는다(D-7E-6).
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         if: ${{ !cancelled() && steps.web-journey.outcome == 'failure' }}
         with:
           name: web-journey-playwright
@@ -405,14 +430,16 @@ jobs:
       # 이 job 의 compose 는 `:local` 이미지를 쓰므로 이 값은 **행에 찍히는 식별자**로만 쓰인다.
       BIDVECTOR_RELEASE_TAG: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5.0.2
 
       # M7/7F-local(검토 r2 R2-H1) — **이 워크플로 자신의 `if:` 가 없는 step id 를 가리키는지**
       # 먼저 잰다. r1 이 빌드 step 둘을 하나로 합치면서 취약점 게이트 둘의 조건이 옛 id 를 그대로
@@ -421,6 +448,13 @@ jobs:
       - name: 워크플로 step 참조 검사 — 매달린 steps.<id> 0 (S-20z)
         id: workflow_step_refs
         run: ./tools/workflow-step-refs-check.sh .github/workflows/ci.yml
+
+      # M15/15S(D-15S-2·7) — **이 워크플로가 부르는 액션이 전부 commit SHA 로 핀돼 있는가.**
+      # 자리가 위 검사 바로 옆인 사유도 같다: 이 job 이 워크플로 게이트의 자리이고, 비싼 step
+      # 앞에서 끊는다. 이 게이트 자신이 checkout 뒤에 도는 것은 막는 축이 상류의 태그 이동이지
+      # 이 저장소의 저자가 아니기 때문이다(스크립트 머리 주석의 위협 모델 경계).
+      - name: 워크플로 액션 핀 검사 — uses 전부 commit SHA (S-20z2)
+        run: ./tools/workflow-action-pins-check.sh .github/workflows
 
       # M6/6A-2a r1(code-review LOW) — `::add-mask::` 를 먼저 붙인다. argv 축은 아래 주석대로
       # 닫혀 있지만, 더 실질적인 축은 **공개 워크플로 로그**다: 스모크의 `fail()` 이 앱 로그를
@@ -608,7 +642,9 @@ jobs:
           [ "${#pinned}" -eq 64 ] || { echo "tool.trivy.sha256 이 64자리가 아니다(${#pinned})" >&2; exit 1; }
           tmp="$(mktemp -d)"
           # r1(code-review L-9) — 네트워크 한 번 튀는 것으로 CI 가 붉어지지 않게 한다.
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors -o "$tmp/$asset" \
+          # M15/15S(D-15S-6) — 시간 상한도 함께 건다(`install shfmt`·`install buf` 와 같은 값).
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 120 -o "$tmp/$asset" \
             "https://github.com/aquasecurity/trivy/releases/download/v${version}/${asset}"
           printf '%s  %s\n' "$pinned" "$asset" > "$tmp/pinned.sha256"
           # `--strict` 가 형식 불량 줄을 **경고가 아니라 실패**로 만든다(위 주석의 경로를 닫는다).
@@ -689,7 +725,7 @@ jobs:
         # 만든다 — install 자신 · 조건이 install 을 안 보던 S-22e(「trivy 가 필요하다」 exit 2) ·
         # 올릴 파일이 없는 이 step. **원인 하나에 빨강 하나**가 맞다.
         if: ${{ !cancelled() && steps.install_trivy.outcome == 'success' && (steps.scan_ml.outcome != 'skipped' || steps.scan_app.outcome != 'skipped' || steps.scan_web.outcome != 'skipped' || steps.scan_proxy.outcome != 'skipped') }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         with:
           name: sbom-cyclonedx
           path: build/vuln-scan/*-sbom.cdx.json
@@ -1183,14 +1219,16 @@ jobs:
     # 6시간을 쥐지 않게 상한을 두되(다른 job 과 같은 사유) 실측의 두 배 이상으로 잡는다.
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c  # v5.0.2
 
       # 루트 lifecycle task 하나가 둘을 든다 — 대상 집합 등식(`mutationCoverageGate`)과 모듈별
       # 세 축 래칫(`mutationReportGate`). 모듈 이름을 이 워크플로에 적지 않는다: 대상 집합의
@@ -1207,7 +1245,7 @@ jobs:
       - run: ./gradlew --no-daemon --max-workers=1 mutationCheck
 
       # 래칫이 붉을 때 사람이 볼 것은 「무엇이 살아남았는가」다 — 실패해도 올린다.
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         if: always()
         with:
           name: mutation-reports
