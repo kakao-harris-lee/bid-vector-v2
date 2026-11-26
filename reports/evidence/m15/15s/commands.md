@@ -201,7 +201,8 @@ PyYAML 은 YAML 1.1 이라 맨 `on:` 을 **불리언 키 `True`** 로 읽는다(
 | cr medium-3 「통과」가 자기 변이 **앞** | 순서를 뒤집었다 — 이제 자기 변이 통과 줄이 먼저다 |
 | cr low CRLF 비대칭(`v5.1.0 != v5.1.0`) | 워크플로 줄에서도 CR 을 벗긴다 → CR 1256 줄 사본에서 **exit 0** |
 | cr low `--max-time` 은 시도별 | 세 자리(shfmt·buf 둘·trivy)에 `--retry-max-time 300` · 주석을 사실에 맞춤 |
-| verifier L-1 `.YML`·심볼릭 링크 | 수집을 **fail-closed 로 넓혔다**(`-iname`·`-L`). GitHub 이 그 둘을 돌리지 않더라도 손해는 「안 돌릴 파일에 핀을 요구」뿐이고 반대는 조용한 누락이다. parity 도 같은 규칙을 쓴다 |
+| verifier L-1 `.YML`·심볼릭 링크 | 수집을 **fail-closed 로 넓혔다**(`-iname`·`-L`). GitHub 문서는 「`.yml`·`.yaml`」과 「`.github/workflows` 디렉터리」만 적고 **대문자 확장자·하위 디렉터리·symlink 실행 여부는 적지 않는다**(팀장 조회) — 「무시한다」에 기대지 않는다. parity 도 같은 규칙을 쓴다 |
+| 라운드 마무리 — `tools/one-command-check.sh` | 팀장이 in_scope 를 넓혀 **같은 라운드에서 닫았다**(`_step` 한 줄 + 명령 한 줄, `git diff --numstat` **3 0**). 그 스크립트의 「세 job 의 명령 그대로」 선언이 다시 참이다 |
 | cr low `local f` · `set -- $stats` | `local` 목록에 더하고 `read -r` 로 바꿨다 |
 | cr low 기대 파일 머리 주석 | 칸 셋 규칙과 「경로 붙은 첫 칸은 앞 둘만 저장소」를 더했다 |
 
