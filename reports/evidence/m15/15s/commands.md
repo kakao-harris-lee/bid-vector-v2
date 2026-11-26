@@ -31,9 +31,9 @@ base `8e7a91ead` · 브랜치 `chore/m15s-ci-action-pins`
 
 | 명령 | 결과 |
 |---|---|
-| `./tools/workflow-action-pins-check.sh .github/workflows` | exit 0 — uses **24**(핀 24 · 저장소 안 0) · 기대 파일 7 줄과 집합 등식 · 판 주석 일치 · 자기 변이 **17** 건 전부 붉음 |
+| `./tools/workflow-action-pins-check.sh .github/workflows` | exit 0 — uses **24**(핀 24 · 저장소 안 0) · 기대 파일 7 줄과 집합 등식 · 판 주석 일치 · 자기 변이 **18** 건 전부 붉음 |
 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · 참조 18 · 매달린 참조 0 (base 와 같은 수) |
-| `uv run --no-sync python ../tools/workflow-action-pins-parity.py ../.github/workflows`(cwd `ml-engine`) | exit 0 — uses 24 가 awk 게이트와 **PyYAML 6.0.3**(lock 핀)에서 같은 다중집합 · 음성 대조 둘 통과 |
+| `uv run --no-sync python ../tools/workflow-action-pins-parity.py ../.github/workflows`(cwd `ml-engine`) | exit 0 — uses 24 가 awk 게이트와 **PyYAML 6.0.3**(lock 핀)에서 같은 다중집합 · 음성 대조(심은 중복 키) 통과 |
 | `./gradlew --no-daemon check --continue` | **exit 0** · FAILED 0 · `:leakPatternGate` 와 `:workflow:sourceLanguageGate` 는 **실행**(UP-TO-DATE 아님). `--continue` 로 돌린 이유는 바로 아래 — 알려진 빨강을 안은 전건의 「그 밖은 통과」는 미측정이다 |
 | `bash -n tools/workflow-action-pins-check.sh` | exit 0 |
 | `shfmt -d tools/workflow-action-pins-check.sh` | exit 1 — **이 저장소의 게이트가 아니다**. 선례 `tools/workflow-step-refs-check.sh` 도 같은 exit 1 이다(기본 들여쓰기가 탭). `shfmt` 는 `prod-alert-check.sh` 의 **파서**로만 쓰인다 |
@@ -205,6 +205,29 @@ PyYAML 은 YAML 1.1 이라 맨 `on:` 을 **불리언 키 `True`** 로 읽는다(
 | 라운드 마무리 — `tools/one-command-check.sh` | 팀장이 in_scope 를 넓혀 **같은 라운드에서 닫았다**(`_step` 한 줄 + 명령 한 줄, `git diff --numstat` **3 0**). 그 스크립트의 「세 job 의 명령 그대로」 선언이 다시 참이다 |
 | cr low `local f` · `set -- $stats` | `local` 목록에 더하고 `read -r` 로 바꿨다 |
 | cr low 기대 파일 머리 주석 | 칸 셋 규칙과 「경로 붙은 첫 칸은 앞 둘만 저장소」를 더했다 |
+
+## 승인 전 일괄 — 라운드 1 리뷰의 남은 다섯
+
+차단 지적이 아니라 **승인 전 정리**다(verifier `ready-for-review` · code-reviewer `approve`).
+
+| 지적 | 처분 | 실측 |
+|---|---|---|
+| parity 의 파일 목록이 게이트와 **다르다**(cr medium · v L-A) | `Path.rglob` 은 **디렉터리 링크를 따라가지 않는다** — `os.walk(followlinks=True)` 로 맞췄다. 세 자리에 적은 「같은 규칙」이 비로소 참이다 | 링크 디렉터리를 둔 사본: `find -L` **2** · 게이트 `--count` **25** · parity **25 · exit 0**(앞 판은 exit 1 「게이트만 수집」) |
+| parity 의 예외 갈래가 traceback + exit 1(cr medium) | 「어긋났다」만 1. 나머지는 **경로를 붙인 한 줄 + exit 2** | 값이 문자열 아님 · 깨진 YAML · 비-UTF8 · 게이트 실행 실패 · 링크 순환 — **다섯 다 exit 2** · 정상 대조군 exit 0 |
+| 음성 대조가 구조상 늘 참(cr low · v L-B) | `mismatch(v, v[1:])` 를 버리고 **본 판정과 같은 `compare_dir`** 에 두 수집이 실제로 갈리는 입력을 준다 | 아래 |
+| `--retry-max-time` 총합 문면(cr low) | 세 자리를 「그 값 + 마지막 시도의 `--max-time`, ≈364s」로 | 숫자는 그대로 |
+| 따옴표 친 **값**을 키로 오진(cr low) | 따옴표 뒤에 **콜론이 올 때만** 키 | 아래 |
+
+**음성 대조의 입력**은 한 매핑에 `uses:` 를 두 번 둔 파일이다 — awk 는 줄 단위라 **둘**을 세고
+PyYAML 은 중복 키를 **하나**로 접는다(실측). 두 **진짜** 수집기가 갈리는 입력이라 `compare_dir`
+전체가 그 경로를 지난다. 치환 대조 셋 — `parsed = list(gate)` · `mismatch(gate, gate)` ·
+`mismatch` 가 늘 빈 목록 — **전부 exit 2**, 무치환 사본 exit 0. 앞 판은 세 치환 모두에서 초록이었다.
+
+**따옴표 좁힘** — `- "src/**"` · `- 'docs/**'` · `- "a: b"` 는 **exit 0**(수집 1 · parity 등식
+성립)이고 `- "uses":` · `- 'uses':` · `- "name": x` 는 **여전히 exit 2** 다. 좁힌 틈은 **두 층이
+함께** 받는다: 줄을 넘는 따옴표 값 안에 `uses: evil/action@v1"` 을 숨기면 게이트가 **FORM**,
+parity 가 **「게이트만 수집: evil/action@v1"」** 로 붉는다. 자기 변이는 `quotedkey` 를 더해
+**열여덟**이 됐다.
 
 ## 하지 않은 것
 
