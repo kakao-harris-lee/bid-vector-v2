@@ -1,7 +1,8 @@
 # M15 / 15S — rollback
 
-**실측 HEAD: `c59b04f45`**. 이 파일을 담는 커밋은 그 뒤에 온다. **첫 실측이고 유일하다** — 복원 목록
-안의 파일이 그 뒤로 움직이지 않았다.
+**실측 HEAD: `78367735b`**. 이 파일을 담는 커밋은 그 뒤에 온다. **둘째 실측이다** — 수정 라운드 1 이
+복원 목록 안의 파일 넷을 움직이고 **신설 파일 하나**(`tools/workflow-action-pins-parity.py`)를
+더해서 다시 쟀다. 앞 실측(`c59b04f45` · M 2 · A 4)을 옮기지 않았다.
 
 ## 전제 — 복원 원천은 착수 base 다
 
@@ -11,8 +12,9 @@
 
 - **단언 ① 원천이 HEAD 의 조상이다**: `git merge-base --is-ancestor` **예**.
 - **단언 ② 원천에 이 slice 의 첫 산출물 커밋(`91caaea12` — 계약)이 없다**: **없다**(실측).
-- `base..HEAD` 의 커밋은 **다섯 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`) 커밋은
-  **0** 건이다 — 그래서 hunk 격리가 필요 없다.
+- `base..<실측 HEAD>` 의 커밋은 **열둘 전부 이 slice 의 것**이고 하네스 레인(`CLAUDE.md`·`.claude/**`)
+  커밋은 **0** 건이다 — 그래서 hunk 격리가 필요 없다. (앞 판은 「다섯」이라고 적었다 — 그 시점에도
+  수가 틀렸고 결론만 같았다. verifier L-2 정정.)
 - 머지 뒤의 되돌림은 이 문서가 아니라 **그 PR 의 머지 커밋 revert** 다.
 
 **저장소 밖에는 되돌릴 것이 없다** — 운영 host·systemd·운영 컨테이너·DB 에 닿는 명령을 하나도 돌리지
@@ -21,25 +23,29 @@
 
 ## 목록과 명령
 
-`git diff --name-status 8e7a91ead..<실측 HEAD>` — **M 2 · A 4**(기계 산출이고 라운드마다 다시 낸다.
-수정 라운드가 파일을 더 만들면 이 절차를 다시 돌린다).
+`git diff --name-status 8e7a91ead..<실측 HEAD>` — **M 2 · A 6**(기계 산출이고 라운드마다 다시 낸다.
+수정 라운드 1 이 `tools/workflow-action-pins-parity.py` 를 더해 A 가 넷에서 여섯이 됐다 —
+evidence 셋 + 산출물 셋).
 
 ```
 git restore --source=8e7a91ead0e01e6a4f4c5f4d827d2668176a80b6 --staged --worktree -- \
   .github/workflows/ci.yml milestone-15.md
 git rm -rq reports/evidence/m15/15s \
-  config/quality/workflow-action-pins.txt tools/workflow-action-pins-check.sh
+  config/quality/workflow-action-pins.txt \
+  tools/workflow-action-pins-check.sh tools/workflow-action-pins-parity.py
 ```
 
-두 번째 명령이 게이트 스크립트와 기대 파일을 함께 지운다 — **ci.yml 을 되돌리면서 게이트만 남기면 그
-게이트가 영구히 붉는다**(되돌린 워크플로는 태그를 쓴다). 순서는 상관없지만 **둘 다** 해야 한다.
+두 번째 명령이 게이트 스크립트·parity 스크립트·기대 파일을 함께 지운다 — **ci.yml 을 되돌리면서
+게이트만 남기면 그 게이트가 영구히 붉는다**(되돌린 워크플로는 태그를 쓴다). parity 도 같다: 되돌린
+ci.yml 에는 S-12 가 없지만, 스크립트를 남기면 `tools/` 에 호출자 없는 파일이 남고 그 안의
+`GATE` 경로가 사라진 스크립트를 가리킨다. 순서는 상관없지만 **셋 다** 지워야 한다.
 
 ## 임시 clone 실측 (실측 HEAD 에서)
 
 저장소 밖 clone(`--no-hardlinks`)에서 돌렸다. 공유 작업 트리를 건드리지 않았다.
 
 - ① 명령 exit: `restore` **0** · `rm` **0**
-- ② 되돌린 것(판정 대상 대비): **D 4 · M 2** — 위 목록과 같은 수다
+- ② 되돌린 것(판정 대상 대비): **D 6 · M 2** — 위 목록과 같은 수다
 - ③ `git diff --cached 8e7a91ead` **빈 출력(0 줄)**
 - 트리 동일성: 복원 뒤 `git write-tree` == `8e7a91ead^{tree}` == **`5a7a6238fe300694fcd64fe6ed8e470537f52e33`**
 - **양성 대조**(비파괴 절삭 — `checkout --` 을 쓰지 않았다): 복원 뒤 `.github/workflows/ci.yml` 에 한 줄을
@@ -55,7 +61,8 @@ git rm -rq reports/evidence/m15/15s \
 ```
 git diff --name-only <실측 HEAD>..<판정 SHA> -- \
   .github/workflows/ci.yml milestone-15.md reports/evidence/m15/15s/ \
-  config/quality/workflow-action-pins.txt tools/workflow-action-pins-check.sh
+  config/quality/workflow-action-pins.txt \
+  tools/workflow-action-pins-check.sh tools/workflow-action-pins-parity.py
 git rev-list --merges <실측 HEAD>..<판정 SHA>
 ```
 
