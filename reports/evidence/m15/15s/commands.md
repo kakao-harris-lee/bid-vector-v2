@@ -1,0 +1,130 @@
+# M15 / 15S — commands
+
+base `8e7a91ead` · 브랜치 `chore/m15s-ci-action-pins`
+
+환경: WSL2 Ubuntu · bash · `gh`(상류 공개 조회에만) · `buf 1.72.0` · `shfmt v3.14.1`(앞 레인이 받아 둔
+바이너리를 `config/quality/shell-guard-policy.properties` 의 핀과 **체크섬 대조**한 뒤 scratchpad 에서
+실행 — 일치). **러너에서 액션을 돌리지 않았다** — 핀이 실제로 받아지는가의 실측 자리는 PR 의 CI 다섯 job
+뿐이다. 조회 요청에 이 저장소의 이름·값을 싣지 않았다. 운영 host·systemd·운영 컨테이너에 닿는 명령은
+하나도 없다.
+
+## 액션 일곱 — 태그 → 커밋 → 판 (D-15S-1)
+
+`gh api repos/<o>/<r>/git/ref/tags/<major>` · tag 객체면 `git/tags/<sha>` 로 벗김 ·
+`git/matching-refs/tags/<major>` 로 같은 커밋을 가리키는 태그 대조. 2026-11-26.
+
+| 액션 | ref 객체 | 커밋 | 같은 커밋의 태그 | 적은 판 |
+|---|---|---|---|---|
+| `actions/checkout` | commit | `fbc6f3992d…6c09` | v5 · **v5.1.0** | v5.1.0 |
+| `actions/setup-java` | commit | `b6effb05e4…f961` | v5 · **v5.7.0** | v5.7.0 |
+| `actions/setup-node` | commit | `a0853c2454…1444` | v5 · **v5.0.0** | v5.0.0 |
+| `actions/setup-python` | commit | `ece7cb06ca…61a1` | v6 · **v6.3.0** | v6.3.0 |
+| `actions/upload-artifact` | commit | `b7c566a772…789f` | v6 · **v6.0.0** | v6.0.0 |
+| `astral-sh/setup-uv` | **tag**(벗김) | `37802adc94…3b78` | v7 · v7.6 · **v7.6.0** | v7.6.0 |
+| `gradle/actions/setup-gradle` | **tag**(벗김) | `0723195856…7d7c` | v5 · **v5.0.2** | v5.0.2 |
+
+일곱 전부 `vX.Y.Z` 태그가 있어 「major 만 적고 제한에 올린다」 갈래는 쓰이지 않았다. 전체 40자리 값은
+`config/quality/workflow-action-pins.txt` 가 든다. 판은 올리지 않았다 — 각 줄의 커밋은 **오늘 그 major 가
+가리키던 것** 그대로다.
+
+## acceptance
+
+| 명령 | 결과 |
+|---|---|
+| `./tools/workflow-action-pins-check.sh .github/workflows` | exit 0 — uses **24**(핀 24 · 저장소 안 0) · 기대 파일 7 줄과 집합 등식 · 판 주석 일치 · 자기 변이 6 건 전부 붉음 |
+| `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | exit 0 — job 5 · id 15 · 참조 18 · 매달린 참조 0 (base 와 같은 수) |
+| `./gradlew --no-daemon check --continue` | **exit 0** · FAILED 0 · `:leakPatternGate` 와 `:workflow:sourceLanguageGate` 는 **실행**(UP-TO-DATE 아님). `--continue` 로 돌린 이유는 바로 아래 — 알려진 빨강을 안은 전건의 「그 밖은 통과」는 미측정이다 |
+| `bash -n tools/workflow-action-pins-check.sh` | exit 0 |
+| `shfmt -d tools/workflow-action-pins-check.sh` | exit 1 — **이 저장소의 게이트가 아니다**. 선례 `tools/workflow-step-refs-check.sh` 도 같은 exit 1 이다(기본 들여쓰기가 탭). `shfmt` 는 `prod-alert-check.sh` 의 **파서**로만 쓰인다 |
+| `shellcheck` | **이 host 에 없다**(설치하지 않았다) |
+
+`yaml.safe_load` 로 파싱한 뒤 구조로 센 수: job 5 · `uses` 24 · 그중 40자리 핀 **24** · checkout step 5 ·
+그중 `persist-credentials: false` **5** · 최상위 `permissions` = `{contents: read}` · `check` job 의
+`fetch-depth: 0` 보존.
+
+**첫 `check` 는 이 slice 와 무관한 이유로 붉었다**(34m17s · FAILED **1**) — 공유 작업 트리의 Kotlin
+**소스 트리 안**에 2026-09-26 자 OMC 상태 파일 하나가 남아 있어 `:workflow:sourceLanguageGate` 가 그것을
+offender 로 셌다. gitignore 대상이라 `git status` 에는 보이지 않고, CI 는 새 checkout 이라 해당 없다 —
+**로컬 전용 사고**다. scratchpad 에 사본을 두고 치운 뒤 `--continue` 로 다시 돌렸다(43s · 357 up-to-date ·
+exit 0). `src/*/kotlin` 아래 비-`kt`/`kts`/`md` 파일이 그 하나뿐임을 전수로 확인했다(치운 뒤 **0**).
+둘째 실행이 대부분 up-to-date 인 것은 첫 실행이 test·컴파일을 **실제로 돌린** 뒤이기 때문이고, 그
+사이에 바뀐 것은 그 한 파일의 부재와 evidence 뿐이다.
+
+## RED → GREEN
+
+게이트와 기대 파일을 먼저 커밋했다. 그 커밋에서 `.github/workflows` 는 아직 태그였고 게이트는
+**exit 1 · FORM 24 건 + SET 7 건**이었다(액션 일곱이 전부 「기대 파일에만 있다」). 다음 커밋이 24 건을
+핀해 exit 0 이 됐다.
+
+## 게이트 술어 — 전부 거동으로 쟀다
+
+버릴 디렉터리에 최소 워크플로와 최소 기대 파일을 두고 양쪽을 재는 꼴이다(자기 변이는 끈 채).
+
+| 넣은 것 | 결과 |
+|---|---|
+| 흐름 매핑 `- {uses: …}` | **exit 2** 읽지 못하는 표기 |
+| `uses:` 를 블록 스칼라로 쪼갬 | **exit 2** |
+| YAML 앵커·별칭 | **exit 2** |
+| `uses: ${{ … }}` | **exit 2** 정적으로 읽을 수 없다 |
+| 따옴표 값(`"…"`·`'…'`) | **exit 0** — 벗겨서 센다 |
+| 블록 스칼라 본문 안의 `- uses: …@v1` 글자 | **exit 0** — 본문은 세지 않는다 |
+| `./…`(저장소 안) 한 건 + 핀 한 건 | **exit 0** — uses 2(핀 1 · 저장소 안 1) |
+| 워크플로 디렉터리의 형제 `actions/` 생성 | **exit 1** LOCALDIR · **지운 뒤 exit 0**(양성 대조) |
+| `uses` 0 건 | **exit 1** EMPTY — 「훑지 못했다」와 구별되지 않는다 |
+| `docker://…@sha256:<64hex>` + 기대 파일 등재 | **exit 0** |
+| `docker://…@sha256:<16자리>` | **exit 1** FORM |
+| `docker://…:<태그>` | **exit 1** FORM(핀이 없다) |
+| 한 액션을 두 SHA 로 | **exit 1** SET |
+| 꼬리 주석의 판만 다르게 | **exit 1** VERSION |
+
+**꼴 ⓒ 는 처음에 도달 불가능한 허용이었다** — 기대 파일 파서가 40자리만 받아 `docker://` 핀은 등재할 길이
+없었고, 그래서 늘 SET 으로 붉었다(위 표의 「등재」 행이 그것을 드러냈다). 파서가 두 꼴을 받게 고쳤다.
+
+**`uses` 글자 술어는 자기 step 이름에 걸렸다** — 처음 판은 「`uses` 글자가 두 꼴 밖에 있으면 exit 2」라
+새 step 의 이름(「… uses 전부 commit SHA」)에서 발화했다. 키는 **콜론이 있는 자리**로만 읽도록 좁혔다.
+
+## 자기 변이 여섯 (매 실행, D-15S-2)
+
+임시 사본에 **바꿔치우기**로 넣고, 각각 ① 사본이 원본과 실제로 달라졌는지 ② 붉는지 ③ **기대한 사유로**
+붉는지를 본다. 세 번째가 없으면 「붉긴 붉은데 다른 이유로」가 통과한다.
+
+| 변이 | 적용 확인 | 기대 사유 | 결과 |
+|---|---|---|---|
+| 핀 → 태그(`@v5`) | 사본 ≠ 원본 | FORM | 붉음 |
+| 39자리 SHA | 사본 ≠ 원본 | FORM | 붉음 |
+| 대문자 SHA | 사본 ≠ 원본 | FORM | 붉음 |
+| 기대 파일에 없는 40자리 | 사본 ≠ 원본 | SET | 붉음 |
+| 꼬리 주석 삭제 | 사본 ≠ 원본 | VERSION | 붉음 |
+| 새 워크플로 파일의 태그 `uses` | 파일 생성 | FORM | 붉음 |
+
+적용 확인이 음성이면 게이트가 **exit 2 로 선다**(초록으로 넘기지 않는다). 그 분기는 `sub` 가 아무것도
+바꾸지 못하는 경우(주석 없는 줄에 「주석 삭제」)를 받는다.
+
+## 손 변이 둘 — 실물에서
+
+변이 전에 `git status --porcelain -- <경로>` 가 **빈 출력**임을 확인하고(미커밋 산출물이 함께 지워지는
+사고를 막는다) 변이 → 적용 확인 → 판정 → `git checkout --` 복원 순서로 했다.
+
+| 바꿔치운 것 | `git diff --numstat` | 게이트 | 복원 뒤 |
+|---|---|---|---|
+| `ci.yml` 의 첫 checkout 핀 → `@v5` | `1 1` | exit 1 · FORM | porcelain 빈 출력 · exit 0 |
+| 기대 파일의 checkout SHA → 다른 40자리 | `1 1` | exit 1 · SET(두 값을 다 찍는다) | porcelain 빈 출력 · exit 0 |
+
+## 착수 실측
+
+다섯 항목은 `scope.md` 의 「착수 실측」 절에 사실로 적었다(태그→커밋 조회 · 복합 액션 전이 `uses` 0 건 ·
+`contractGate` 가 원격을 다시 치지 않음 · base 의 자격 사용 step 0 건 · census 등재 자리 부재). 여기서
+되풀이하지 않는다.
+
+`contractGate` 축만 명령을 적는다 — 저장소 밖 임시 clone 에서 `git remote remove origin` 한 뒤
+`buf build '.git#tag=<승인 태그>,subdir=contracts' -o /dev/null` **exit 0**,
+`buf breaking contracts --against '.git#tag=<승인 태그>,subdir=contracts'` **exit 0**. 원격이 아예 없는
+트리에서 둘 다 서므로 `persist-credentials: false` 가 이 게이트를 깨지 않는다.
+
+## 하지 않은 것
+
+- 액션을 로컬에서 실행하지 않았다(`act` 등). **핀이 받아지는가**는 PR 의 CI 다섯 job 이 유일한 실측 자리다.
+- 액션의 판을 올리지 않았다. 기존 「Node 24 를 만족하는 가장 낮은 major」 주석과 그 정책은 그대로다.
+- 기대 파일의 SHA↔판 대응이 **옳은가**는 오프라인 게이트가 재지 못한다 — 위 표의 조회가 그 자리이고,
+  리뷰가 같은 조회로 다시 잰다(제한 5).
+- `config/quality/shell-guard-policy.properties` 는 무편집이다 — 셸 census 가 아니라 `shfmt` 핀이다.
