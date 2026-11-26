@@ -43,13 +43,26 @@ set -euo pipefail
 export LC_ALL=C
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COUNT_MODE=0
+if [ "${1:-}" = "--count" ]; then COUNT_MODE=1; shift; fi
+
 DIR="${1:-}"
+# 후행 슬래시 정규화(r1 cr medium-3) — 벗기지 않으면 사본 안의 상대 경로 산출이 어긋나 **판정이
+# 아닌 사고**로 exit 1 이 났다. 종료 코드 계약은 `0 통과 · 1 위반 · 2 판정 불가`다.
+while [ -n "$DIR" ] && [ "${DIR%/}" != "$DIR" ] && [ -n "${DIR%/}" ]; do DIR="${DIR%/}"; done
 PINS="${2:-$REPO_ROOT/config/quality/workflow-action-pins.txt}"
 SELFCHECK="${WORKFLOW_ACTION_PINS_SELFCHECK:-1}"
 
-[ -n "$DIR" ] || { echo "사용법: $0 <워크플로 디렉터리> [기대 파일]" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "사용법: $0 [--count] <워크플로 디렉터리> [기대 파일]" >&2; exit 2; }
 [ -d "$DIR" ] || { echo "워크플로 디렉터리가 없다: $DIR" >&2; exit 2; }
-[ -f "$PINS" ] || { echo "기대 파일이 없다: $PINS" >&2; exit 2; }
+[ "$COUNT_MODE" = "1" ] || [ -f "$PINS" ] || { echo "기대 파일이 없다: $PINS" >&2; exit 2; }
+
+# 자기 변이 대조 스위치는 **열거로 닫는다**(r1 cr medium-2) — 읽지 못하는 값에서 조용히 꺼지면
+# 게이트의 자기 건전성 측정만 사라지고 CI 는 초록이다. 끌 때도 한 줄 찍는다.
+case "$SELFCHECK" in
+  0 | 1) ;;
+  *) echo "WORKFLOW_ACTION_PINS_SELFCHECK 가 0·1 이 아니다: $SELFCHECK" >&2; exit 2 ;;
+esac
 
 AWK_SCAN='
 function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
@@ -84,30 +97,51 @@ function take_use(v, cmt,   q, i, val, rest) {
 }
 FNR == 1 { inblock = 0 }
 {
-  ci = comment_at($0)
-  code = (ci > 0) ? substr($0, 1, ci - 1) : $0
-  cmt = (ci > 0) ? trim(substr($0, ci)) : ""
-  match(code, /^ */); ind = RLENGTH
+  raw = $0
+  sub(/\r$/, "", raw)      # CRLF — 기대 파일 reader 와 **대칭**으로 벗긴다(r1 cr low: 벗기지
+                           # 않으면 「v5.1.0 != v5.1.0」 같은 자기모순 진단이 난다)
+  ci = comment_at(raw)
+  code = (ci > 0) ? substr(raw, 1, ci - 1) : raw
+  cmt = (ci > 0) ? trim(substr(raw, ci)) : ""
+  match(code, /^[ \t]*/); ws = RLENGTH      # 블록 본문 비교용 — 들여쓰기 문자 수
+  match(code, /^ */); ind = RLENGTH         # 열 계산용 — 공백만(아래에서 탭을 거부한다)
   body = trim(code)
   blank = (body == "")
 }
+# ── 블록 스칼라 본문 ────────────────────────────────────────────────────────
+# **기준은 대시 자리가 아니라 키의 열이다**(r1 verifier H-1 ①). `- if: >-` 에서 대시는 6열이고
+# 같은 step 의 형제 키 `uses:` 는 8열이다. 앞 판은 `block_indent` 에 대시 열(6)을 넣어 8열의
+# 형제 키를 **본문으로 삼켰고**, 그 줄의 `uses` 가 수집에서 조용히 빠졌다(초록).
 inblock {
-  if (blank || ind > block_indent) { next }
+  if (blank || ws > block_indent) { next }
   inblock = 0
 }
+# YAML 은 들여쓰기에 탭을 금지한다. 블록 본문 **밖**에서 선두 탭이 보이면 열 계산의 전제가
+# 깨지므로 통과가 아니라 정지다.
+code ~ /^ *\t/ { unsup("들여쓰기에 탭 — 열 계산의 전제가 깨진다"); next }
 code ~ /(^|[ \t[{,])[&*][A-Za-z0-9_-]+([ \t\]},]|$)/ {
   unsup("YAML 앵커·별칭 — 별칭이 가리키는 값을 이 검사가 풀지 못한다"); next
 }
 {
-  # `uses` **키**는 두 꼴로만 읽는다. 그 밖의 자리에 `uses:` 가 보이면(흐름 매핑 `- {uses: …}` ·
-  # 중첩 · 한 줄 `run:` 본문) 통과가 아니라 정지다. 콜론 없는 `uses` 글자(step 이름·주석)는 키가
-  # 아니므로 보지 않는다.
-  if (body ~ /(^|[^A-Za-z0-9_-])uses[ \t]*:/) {
-    if (body ~ /^-[ \t]+uses:/) { v = body; sub(/^-[ \t]+uses:/, "", v); take_use(v, cmt) }
-    else if (body ~ /^uses:/)   { v = body; sub(/^uses:/, "", v); take_use(v, cmt) }
-    else { unsup("uses: 키가 읽을 수 있는 두 꼴(- uses: · uses:)이 아닌 자리에 있다") }
+  # 키 자리를 연다 — 중첩 목록(`- - key:`)까지 대시를 벗기고 **키가 시작하는 열**을 센다.
+  rest = body
+  keycol = ind
+  while (match(rest, /^-[ \t]+/)) { keycol += RLENGTH; rest = substr(rest, RLENGTH + 1) }
+
+  # 읽지 못하는 키 표기는 전부 정지다(r1 verifier H-1 ③). 따옴표 친 키·복합 키는 앞 판에서
+  # 「`uses` 키가 아님」으로 보여 unsupported 로도 가지 않았다.
+  if (rest ~ /^["\047]/)       { unsup("따옴표 친 키 — 키 이름을 이 검사가 풀지 못한다"); next }
+  if (rest == "?" || rest ~ /^\?[ \t]/) { unsup("복합 키(? …) — 이 검사가 읽지 못하는 표기"); next }
+  if (rest ~ /^[|>][-+0-9]*$/) { unsup("홀로 선 블록 스칼라 지시자 — 앞 줄의 키와 짝을 잇지 못한다"); next }
+
+  if (rest ~ /(^|[^A-Za-z0-9_-])uses[ \t]*:/) {
+    if (rest ~ /^uses[ \t]*:/) { v = rest; sub(/^uses[ \t]*:/, "", v); take_use(v, cmt) }
+    else { unsup("uses: 키가 읽을 수 있는 자리에 있지 않다 — 흐름 매핑·중첩·한 줄 run 본문") }
   }
-  if (body ~ /:[ \t]*[|>][-+0-9]*$/) { inblock = 1; block_indent = ind }
+
+  # 블록 스칼라 시작. 지시자 앞에 **공백을 요구한다**(r1 verifier H-1 ②) — `name: x:|` 처럼
+  # 콜론 뒤 공백 없는 일반 스칼라를 블록으로 오인하던 자리다. 첫 콜론에만 건다.
+  if (rest ~ /^[^:]*:[ \t]+[|>][-+0-9]*$/) { inblock = 1; block_indent = keycol }
 }
 END { printf "COUNT\t%d\t%d\n", nuses, bad }
 '
@@ -133,7 +167,16 @@ BEGIN {
 }
 $1 == "USE" {
   file = $2; ln = $3; val = $4; cmt = $5
-  if (val ~ /^\.\//) { nlocal++; next }
+  # 저장소 안 액션은 **오늘 실패다**(r1 verifier M-1 · cr medium-1). 앞 판은 세기만 하고
+  # 「보지 않는 자리가 생기면 실패」를 `.github/actions` **디렉터리 이름**에 걸어, `./tools/act`
+  # 처럼 다른 자리에 두면 그 `action.yml` 안의 태그 `uses` 가 한 단계 간접으로 그대로 열렸다.
+  # 술어를 이름이 아니라 **참조 자체**로 옮긴다. 저장소 안 액션을 실제로 들이는 날에는 이 게이트를
+  # 그 `action.yml` 까지 넓히는 것이 맞고, 그 전에는 조용히 통과시키지 않는다(오늘 0 건).
+  if (val ~ /^\.\//) {
+    nlocal++
+    viol("LOCALDIR", file " " ln "행: 저장소 안 액션 참조 — 그 action.yml 안의 uses 를 이 검사가 보지 않는다: " val)
+    next
+  }
   at = index(val, "@")
   if (at == 0) { viol("FORM", file " " ln "행: 핀이 없다(@ 가 없다): " val); next }
   action = substr(val, 1, at - 1); ref = substr(val, at + 1)
@@ -174,10 +217,18 @@ END {
 }
 '
 
+# 수집 대상 파일. **fail-closed 로 넓게 잡는다**(r1 verifier L-1) — 확장자는 대소문자를 무시하고
+# (`.YML`), 심볼릭 링크도 따라간다(`-L`). GitHub 이 그 둘을 워크플로로 실행하지 않더라도 손해는
+# 「안 돌릴 파일에까지 핀을 요구한다」뿐이고, 반대 방향은 조용한 수집 누락이다.
+# **parity 스크립트가 같은 규칙을 쓴다** — 두 수집이 어긋나면 등식 자체가 거짓말이 된다.
+_workflow_files() { # <디렉터리>
+  find -L "$1" -type f \( -iname '*.yml' -o -iname '*.yaml' \) | sort
+}
+
 _judge() { # <디렉터리> <기대 파일> — 판정 줄을 stdout 에, 종료 코드로 결과를 낸다
-  local dir="$1" pins="$2" files=() report judged summary localdir=""
+  local dir="$1" pins="$2" files=() report judged summary localdir="" f
   local nuses npinned nlocal npins bad nviol
-  while IFS= read -r f; do files+=("$f"); done < <(find "$dir" -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
+  while IFS= read -r f; do files+=("$f"); done < <(_workflow_files "$dir")
   if [ "${#files[@]}" -eq 0 ]; then
     echo "EMPTY	워크플로 파일(*.yml·*.yaml)이 한 건도 없다: $dir"
     return 2
@@ -201,6 +252,25 @@ _judge() { # <디렉터리> <기대 파일> — 판정 줄을 stdout 에, 종료
   return 0
 }
 
+# `--count` — 수집한 `uses` 값만 한 줄씩 정렬해 낸다. `tools/workflow-action-pins-parity.py` 가
+# **고정된 YAML 파서(PyYAML)와의 다중집합 등식**으로 수집 완전성을 재는 입력이다. 꼴·등식·판은
+# 보지 않는다(기대 파일도 읽지 않는다) — 이 모드가 답하는 물음은 「무엇을 수집했는가」 하나다.
+_count_mode() { # <디렉터리>
+  local dir="$1" files=() report f
+  while IFS= read -r f; do files+=("$f"); done < <(_workflow_files "$dir")
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo "워크플로 파일(*.yml·*.yaml)이 한 건도 없다: $dir" >&2
+    return 2
+  fi
+  report="$(awk "$AWK_SCAN" "${files[@]}")"
+  if [ -n "$(printf '%s\n' "$report" | awk -F'\t' '$1=="UNSUPPORTED"')" ]; then
+    echo "워크플로에 이 검사가 읽지 못하는 표기가 있다 — 수집을 내지 않는다(판정 불가):" >&2
+    printf '%s\n' "$report" | awk -F'\t' '$1=="UNSUPPORTED" {printf "  %s %s행: %s\n", $2, $3, $4}' >&2
+    return 2
+  fi
+  printf '%s\n' "$report" | awk -F'\t' '$1=="USE" {print $4}' | sort
+}
+
 _first_pinned_file() { # <디렉터리> — 핀 줄을 가진 첫 워크플로 파일의 **상대 경로**
   local dir="$1" f
   while IFS= read -r f; do
@@ -209,11 +279,11 @@ _first_pinned_file() { # <디렉터리> — 핀 줄을 가진 첫 워크플로 �
       printf '%s\n' "${f#"$dir"/}"
       return 0
     fi
-  done < <(find "$dir" -type f \( -name '*.yml' -o -name '*.yaml' \) | sort)
+  done < <(_workflow_files "$dir")
   return 1
 }
 
-_mutate() { # <사본 디렉터리> <모드> <상대 경로> — 첫 핀 줄을 **바꿔치운다**
+_mutate_wf() { # <사본 디렉터리> <모드> <상대 경로> — 워크플로 쪽 변이(전부 **바꿔치우기**)
   local wf="$1" mode="$2" target out
   target="$wf/$3"
   out="$target.mutant"
@@ -223,17 +293,27 @@ _mutate() { # <사본 디렉터리> <모드> <상대 경로> — 첫 핀 줄을 
       for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); r = r ((c == "0") ? "1" : "0") }
       return r
     }
-    hit { print; next }
+    mode != "allshas" && hit { print; next }
     {
       line = $0
       if (line ~ /uses:/ && match(line, /@[0-9a-f]+/) && RLENGTH == 41) {
         sha = substr(line, RSTART + 1, 40)
         pre = substr(line, 1, RSTART - 1); post = substr(line, RSTART + 41)
-        if (mode == "tag")            { line = pre "@v5" post }
-        else if (mode == "short")     { line = pre "@" substr(sha, 1, 39) post }
-        else if (mode == "upper")     { line = pre "@" toupper(sha) post }
-        else if (mode == "unlisted")  { line = pre "@" hexshift(sha) post }
-        else if (mode == "nocomment") { sub(/[ \t]*#.*$/, "", line) }
+        if (mode == "tag")             { line = pre "@v5" post }
+        else if (mode == "short")      { line = pre "@" substr(sha, 1, 39) post }
+        else if (mode == "upper")      { line = pre "@" toupper(sha) post }
+        else if (mode == "allshas")    { line = pre "@" hexshift(sha) post }
+        else if (mode == "twoshas")    { line = line "\n" pre "@" hexshift(sha) post }
+        else if (mode == "nocomment")  { sub(/[ \t]*#.*$/, "", line) }
+        else if (mode == "badversion") { sub(/#[ \t]*v[0-9][0-9A-Za-z.-]*/, "# v0.0.0", line) }
+        else if (mode == "flowmap")    { line = pre "@v5}"; sub(/uses: /, "{uses: ", line) }
+        else if (mode == "localuses")  { sub(/uses:.*$/, "uses: ./ci/act", line) }
+        else if (mode == "blockkey" && line ~ /^[ ]*-[ ]+uses:/) {
+          # r1 verifier H-1 ⓐ — step 의 첫 키가 블록 스칼라면 형제 키가 본문으로 삼켜지던 꼴.
+          # 들여쓰기만 재사용한다(`pre` 는 `@` 앞 전부라 쓸 수 없다).
+          match(line, /^[ ]*/); lead = substr(line, 1, RLENGTH)
+          line = lead "- if: >-\n" lead "    true\n" lead "  uses: actions/checkout@v5  # v5.1.0"
+        }
         hit = 1
       }
       print line
@@ -242,31 +322,98 @@ _mutate() { # <사본 디렉터리> <모드> <상대 경로> — 첫 핀 줄을 
   mv "$out" "$target"
 }
 
+_mutate_pins() { # <사본 기대 파일> <모드> — 기대 파일 쪽 변이(r1 cr low: 앞 판은 이 쪽이 0 이었다)
+  local pins="$1" mode="$2" out="$1.mutant"
+  awk -v mode="$mode" '
+    function hexshift(s,   i, c, r) {
+      r = ""
+      for (i = 1; i <= length(s); i++) { c = substr(s, i, 1); r = r ((c == "0") ? "1" : "0") }
+      return r
+    }
+    hit || /^[ \t]*(#|$)/ { print; next }
+    {
+      n = split($0, f, /[ \t]+/)
+      if (n == 3) {
+        if (mode == "pins_sha")          { print f[1] "  " hexshift(f[2]) "  " f[3]; hit = 1; next }
+        else if (mode == "pins_version") { print f[1] "  " f[2] "  v0.0.0"; hit = 1; next }
+        else if (mode == "pins_drop")    { hit = 1; next }
+        else if (mode == "pins_policy")  { print f[1] "  " f[2]; hit = 1; next }
+      }
+      print
+    }
+    END {
+      if (mode == "pins_extra") { print "zz/never-used  0123456789abcdef0123456789abcdef01234567  v1.0.0" }
+    }
+  ' "$pins" > "$out"
+  mv "$out" "$pins"
+}
+
+# 술어마다 변이 하나 이상(r1 verifier M-2). 앞 판의 여섯은 FORM 과 「한 액션 두 SHA」만 실질로
+# 지켰고 — 기대 불일치 · 판 불일치 · 역방향 등식 · unsupported · LOCALDIR · EMPTY · POLICY 는
+# 술어를 꺼도 변이가 초록이었다. 꺼서 재는 무력화 대조는 evidence 가 든다.
+_SELFCHECK_MODES="
+tag:FORM
+short:FORM
+upper:FORM
+blockkey:FORM
+newfile:FORM
+twoshas:SET
+allshas:SET
+localuses:LOCALDIR
+flowmap:UNSUPPORTED
+nocomment:VERSION
+badversion:VERSION
+empty:EMPTY
+pins_sha:SET
+pins_drop:SET
+pins_extra:SET
+pins_version:VERSION
+pins_policy:POLICY
+"
+
 _selfcheck() {
   local tmp rc out spec mode want rel n_red=0
-  local modes="tag:FORM short:FORM upper:FORM unlisted:SET nocomment:VERSION newfile:FORM"
   rel="$(_first_pinned_file "$DIR")" || {
     echo "자기 변이 대조: 핀 줄을 가진 워크플로 파일이 없다 — 변이를 얹을 자리가 없다" >&2
     return 2
   }
   tmp="$(mktemp -d)"
   MUTATION_TMP="$tmp"   # 예기치 못한 죽음에서도 사본을 남기지 않는다(아래 EXIT trap)
-  for spec in $modes; do
+  for spec in $_SELFCHECK_MODES; do
     mode="${spec%%:*}"; want="${spec##*:}"
     rm -rf "$tmp/wf" "$tmp/pins.txt"
     cp -R "$DIR" "$tmp/wf"
     cp "$PINS" "$tmp/pins.txt"
-    if [ "$mode" = "newfile" ]; then
-      printf 'name: mutant\non:\n  push:\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5  # v5.1.0\n' \
-        > "$tmp/wf/zzz-mutant.yml"
-      [ -f "$tmp/wf/zzz-mutant.yml" ] || { _mutation_abort "$tmp" "$mode" "사본에 적용되지 않았다"; return 2; }
-    else
-      _mutate "$tmp/wf" "$mode" "$rel"
-      if cmp -s "$tmp/wf/$rel" "$DIR/$rel"; then
-        _mutation_abort "$tmp" "$mode" "사본이 원본과 같다 — 더하기만 한 변이는 초록이 된다"
-        return 2
-      fi
-    fi
+    case "$mode" in
+      newfile)
+        printf 'name: mutant\non:\n  push:\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v5  # v5.1.0\n' \
+          > "$tmp/wf/zzz-mutant.yml"
+        [ -f "$tmp/wf/zzz-mutant.yml" ] || { _mutation_abort "$tmp" "$mode" "사본에 적용되지 않았다"; return 2; }
+        ;;
+      empty)
+        # 수집 0 건을 만든다 — **바꿔치우기**다(사본의 워크플로 파일을 전부 지우고 하나를 둔다).
+        find "$tmp/wf" -type f \( -iname '*.yml' -o -iname '*.yaml' \) -delete
+        printf 'name: mutant\non:\n  push:\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n' \
+          > "$tmp/wf/zzz-mutant.yml"
+        if [ -n "$(_count_mode "$tmp/wf" 2>/dev/null)" ]; then
+          _mutation_abort "$tmp" "$mode" "수집이 0 건이 되지 않았다"; return 2
+        fi
+        ;;
+      pins_*)
+        _mutate_pins "$tmp/pins.txt" "$mode"
+        if cmp -s "$tmp/pins.txt" "$PINS"; then
+          _mutation_abort "$tmp" "$mode" "사본이 원본과 같다 — 더하기만 한 변이는 초록이 된다"
+          return 2
+        fi
+        ;;
+      *)
+        _mutate_wf "$tmp/wf" "$mode" "$rel"
+        if cmp -s "$tmp/wf/$rel" "$DIR/$rel"; then
+          _mutation_abort "$tmp" "$mode" "사본이 원본과 같다 — 더하기만 한 변이는 초록이 된다"
+          return 2
+        fi
+        ;;
+    esac
     out="$(WORKFLOW_ACTION_PINS_SELFCHECK=0 bash "${BASH_SOURCE[0]}" "$tmp/wf" "$tmp/pins.txt" 2>&1)" && rc=0 || rc=$?
     if [ "$rc" = "0" ]; then
       _mutation_abort "$tmp" "$mode" "변이를 넣었는데 게이트가 초록이다"
@@ -292,6 +439,11 @@ _mutation_abort() { # <임시 디렉터리> <모드> <사유>
 MUTATION_TMP=""
 trap '[ -z "$MUTATION_TMP" ] || rm -rf "$MUTATION_TMP"' EXIT
 
+if [ "$COUNT_MODE" = "1" ]; then
+  _count_mode "$DIR"
+  exit $?
+fi
+
 verdict="$(_judge "$DIR" "$PINS")" && rc=0 || rc=$?
 stats="$(printf '%s\n' "$verdict" | awk -F'\t' '$1=="STATS" {print $2, $3, $4, $5}')"
 body="$(printf '%s\n' "$verdict" | awk -F'\t' '$1!="STATS" && NF>0')"
@@ -307,10 +459,15 @@ if [ "$rc" != "0" ]; then
   exit 1
 fi
 
-# shellcheck disable=SC2086
-set -- $stats
-echo "워크플로 액션 핀 통과 — uses ${1} 건(핀 ${2} · 저장소 안 ${3}) · 기대 파일 ${4} 줄과 집합 등식 · 판 주석 일치"
+# `set --` 는 스크립트의 위치 인자를 덮는다(r1 cr low) — 이름으로 읽는다.
+read -r nuses npinned nlocal npins <<< "$stats"
 
-if [ "$SELFCHECK" = "1" ]; then
-  _selfcheck
-fi
+# **자기 변이 대조가 먼저다**(r1 cr medium-3) — 앞 판은 「통과」를 찍은 뒤 게이트 자신을 쟀다.
+# 그래서 자기 변이가 실패하는 어떤 갈래에서도 stdout 첫 줄이 「통과」였고, 로그를 훑는 사람에게는
+# 초록으로 보였다. 판정 문구는 **게이트 자신의 건전성까지 선 뒤에만** 낸다.
+case "$SELFCHECK" in
+  1) _selfcheck ;;
+  0) echo "자기 변이 대조 건너뜀(SELFCHECK=0) — 이 실행은 게이트 자신을 재지 않았다" >&2 ;;
+esac
+
+echo "워크플로 액션 핀 통과 — uses ${nuses} 건(핀 ${npinned} · 저장소 안 ${nlocal}) · 기대 파일 ${npins} 줄과 집합 등식 · 판 주석 일치"
