@@ -64,12 +64,16 @@ jobs:
           fi
           base="https://github.com/bufbuild/buf/releases/download/v${version}"
           tmp="$(mktemp -d)"
-          # M15/15S(D-15S-6) — `install shfmt` 와 같은 꼴. `--retry-all-errors` 는 **끊긴** 연결에
-          # 듣고 **느린** 연결에는 안 듣는다: 시간 상한이 없으면 매달린 내려받기가 이 job 의 기본
-          # 6시간까지 러너를 쥔다.
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+          # M15/15S(D-15S-6) — `install shfmt`·`install trivy` 와 같은 꼴. `--retry-all-errors` 는
+          # **끊긴** 연결에 듣고 **느린** 연결에는 안 듣는다: 시간 상한이 없으면 매달린 내려받기가
+          # 이 job 의 기본 6시간까지 러너를 쥔다.
+          #
+          # **`--max-time` 은 시도별이고 재시도마다 다시 선다**(r1 cr low 실측 — 그 하나만으로는
+          # 최악 4×120+3×2 = 486s 이고 내려받기가 둘인 이 step 은 그 두 배다). 총합은
+          # `--retry-max-time` 이 못박는다.
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/buf" "$base/buf-Linux-x86_64"
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/sha256.txt" "$base/sha256.txt"
           # 대상 자산의 행이 없으면 `pipefail` 로 여기서 떨어진다 — 조용한 미검증을 막는다.
           ( cd "$tmp" && grep ' buf-Linux-x86_64$' sha256.txt | sed 's/buf-Linux-x86_64$/buf/' | sha256sum -c - )
@@ -237,6 +241,17 @@ jobs:
         run: |
           uv build --wheel -o /tmp/ml-engine-wheel
           uv run python -m pytest tests/gates/test_wheel_reexport.py -q
+
+      # M15/15S 수정 라운드 1(r1 verifier H-1) — **핀 게이트의 수집 완전성**을 고정된 YAML 파서로
+      # 잰다. 게이트가 awk 로 YAML 을 훑는 대가가 그 지적이었다: `- if: >-` 다음 줄의 형제 `uses:`
+      # 가 유효한 YAML 인데도 수집에서 조용히 빠지고 게이트는 초록이었다. 표기를 하나씩 막는 대신
+      # **다중집합 등식**에 건다 — 게이트의 `--count` == PyYAML 이 같은 파일들에서 읽는 값.
+      #
+      # **자리가 여기인 사유**: 판정 게이트 자신은 `container` job 에 있다(그 job 의 전제가 「새
+      # 의존 0」이다). `pyyaml` 이 lock 으로 핀된 자리는 이 job 뿐이므로 parity 만 여기서 진다 —
+      # 파서를 container 로 들이면 그 전제가 깨지고, 게이트를 이리로 옮기면 「새 의존 0」이 깨진다.
+      - name: 워크플로 액션 핀 — awk 수집 ↔ YAML 파서 등식 (S-12)
+        run: uv run --no-sync python ../tools/workflow-action-pins-parity.py ../.github/workflows
 
   # M7/7A — `web/` 골격의 게이트(ADR 0011 D-5). 별도 job 하나로 둔다(하네스 2026-09-12 「줄일 수
   # 있는 단위는 게이트가 아니라 job」). **사실 관계를 정확히 적는다**(PR #75 리뷰 D): `ml-engine`·
@@ -643,7 +658,8 @@ jobs:
           tmp="$(mktemp -d)"
           # r1(code-review L-9) — 네트워크 한 번 튀는 것으로 CI 가 붉어지지 않게 한다.
           # M15/15S(D-15S-6) — 시간 상한도 함께 건다(`install shfmt`·`install buf` 와 같은 값).
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+          # `--max-time` 은 **시도별**이라 총합은 `--retry-max-time` 이 못박는다(r1 cr low).
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/$asset" \
             "https://github.com/aquasecurity/trivy/releases/download/v${version}/${asset}"
           printf '%s  %s\n' "$pinned" "$asset" > "$tmp/pinned.sha256"
@@ -1176,7 +1192,9 @@ jobs:
           tmp="$(mktemp -d)"
           # `--retry-all-errors` 는 **끊긴** 연결에 듣고 **느린** 연결에는 안 듣는다 — 시간 상한을
           # 따로 건다(r1 cr LOW: 매달리면 이 job 의 두 시간 상한까지 러너를 쥔다).
-          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors \
+          # M15/15S 수정 라운드 1 — `--max-time` 은 **시도별**이라 그 하나로는 총합이 서지 않는다.
+          # 세 내려받기(shfmt·buf·trivy)를 같은 꼴로 맞춘다(「같은 값」 주석이 계속 참이 되게).
+          curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/$asset" \
             "https://github.com/mvdan/sh/releases/download/v${version}/${asset}"
           printf '%s  %s\n' "$pinned" "$asset" > "$tmp/pinned.sha256"
