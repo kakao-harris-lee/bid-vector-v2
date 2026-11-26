@@ -70,7 +70,9 @@ jobs:
           #
           # **`--max-time` 은 시도별이고 재시도마다 다시 선다**(r1 cr low 실측 — 그 하나만으로는
           # 최악 4×120+3×2 = 486s 이고 내려받기가 둘인 이 step 은 그 두 배다). 총합은
-          # `--retry-max-time` 이 못박는다.
+          # `--retry-max-time` 이 못박는다 — **정확히는 그 값 + 마지막 시도의 `--max-time`** 이다.
+          # 재시도 타이머가 상한에 닿기 전에 시작한 전송은 그 뒤로도 `--max-time` 만큼 더 간다
+          # (curl man). 이 값들로 내려받기 하나의 최악은 ≈364s 이고 이 step 은 둘이다.
           curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/buf" "$base/buf-Linux-x86_64"
           curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
@@ -658,7 +660,8 @@ jobs:
           tmp="$(mktemp -d)"
           # r1(code-review L-9) — 네트워크 한 번 튀는 것으로 CI 가 붉어지지 않게 한다.
           # M15/15S(D-15S-6) — 시간 상한도 함께 건다(`install shfmt`·`install buf` 와 같은 값).
-          # `--max-time` 은 **시도별**이라 총합은 `--retry-max-time` 이 못박는다(r1 cr low).
+          # `--max-time` 은 **시도별**이라 총합은 `--retry-max-time` 이 못박는다(r1 cr low) —
+          # 정확히는 그 값 + 마지막 시도의 `--max-time`, 이 값들로 ≈364s(`install buf` 주석 참고).
           curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/$asset" \
             "https://github.com/aquasecurity/trivy/releases/download/v${version}/${asset}"
@@ -1193,6 +1196,7 @@ jobs:
           # `--retry-all-errors` 는 **끊긴** 연결에 듣고 **느린** 연결에는 안 듣는다 — 시간 상한을
           # 따로 건다(r1 cr LOW: 매달리면 이 job 의 두 시간 상한까지 러너를 쥔다).
           # M15/15S 수정 라운드 1 — `--max-time` 은 **시도별**이라 그 하나로는 총합이 서지 않는다.
+          # 총합은 `--retry-max-time` + 마지막 시도의 `--max-time`, 이 값들로 ≈364s 다.
           # 세 내려받기(shfmt·buf·trivy)를 같은 꼴로 맞춘다(「같은 값」 주석이 계속 참이 되게).
           curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors --retry-max-time 300 \
             --connect-timeout 10 --max-time 120 -o "$tmp/$asset" \
