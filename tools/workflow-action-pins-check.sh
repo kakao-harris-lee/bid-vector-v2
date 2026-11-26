@@ -250,6 +250,7 @@ _selfcheck() {
     return 2
   }
   tmp="$(mktemp -d)"
+  MUTATION_TMP="$tmp"   # 예기치 못한 죽음에서도 사본을 남기지 않는다(아래 EXIT trap)
   for spec in $modes; do
     mode="${spec%%:*}"; want="${spec##*:}"
     rm -rf "$tmp/wf" "$tmp/pins.txt"
@@ -278,13 +279,18 @@ _selfcheck() {
     esac
   done
   rm -rf "$tmp"
+  MUTATION_TMP=""
   echo "자기 변이 대조 통과 — 변이 ${n_red} 건 전부 적용 확인 + 기대 사유로 붉음"
 }
 
 _mutation_abort() { # <임시 디렉터리> <모드> <사유>
   echo "자기 변이 대조 실패 — 변이 '$2': $3" >&2
   rm -rf "$1"
+  MUTATION_TMP=""
 }
+
+MUTATION_TMP=""
+trap '[ -z "$MUTATION_TMP" ] || rm -rf "$MUTATION_TMP"' EXIT
 
 verdict="$(_judge "$DIR" "$PINS")" && rc=0 || rc=$?
 stats="$(printf '%s\n' "$verdict" | awk -F'\t' '$1=="STATS" {print $2, $3, $4, $5}')"
