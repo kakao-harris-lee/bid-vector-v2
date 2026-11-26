@@ -82,6 +82,9 @@ trap 'rm -rf "$ONE_COMMAND_WHEEL_DIR"' EXIT
 uv build --wheel -o "$ONE_COMMAND_WHEEL_DIR"
 uv run python -m pytest tests/gates/test_wheel_reexport.py -q
 
+_step "Python — 워크플로 액션 핀 수집 등식 (S-12)"
+uv run --no-sync python ../tools/workflow-action-pins-parity.py ../.github/workflows
+
 # ---- web(web job, working-directory: web) ----
 # M7/7A — ci.yml `web` job 의 명령을 순서까지 그대로 둔다. 뺀 CI 전용 step 은 둘이다:
 # 체크아웃·setup-node(툴체인 설치)와 `npx playwright install-deps chromium`(브라우저가 쓰는
