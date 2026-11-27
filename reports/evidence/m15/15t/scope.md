@@ -4,7 +4,7 @@
 milestone: M15
 slice: 15t-ml-serving-pip-hashes
 base_sha: afc3b9db6f494b76285207e04a39649401dcfec8   # main, PR #206 머지 커밋
-head_sha: 리뷰 시점의 PR head   # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다. 승인 전 일괄 라운드의 마지막 **산출물** 커밋은 `fc4d0766e`(pins 주석)이고, rollback 실측은 main 병합 뒤로 미뤘다(팀장 지시 2026-11-27 — 별건 PR #208 이 같은 Dockerfile 의 apt RUN 을 고치므로 실측 자리가 그 병합 커밋이 된다)
+head_sha: 리뷰 시점의 PR head   # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다. 마지막 **산출물** 커밋은 main 병합 `847a755d2`(부모 `98bd626df` ∥ `78f2c77a9`)이고 rollback 실측 자리도 그 병합 커밋이다
 in_scope:
   - docker/ml-serving.Dockerfile              # builder: lock 에서 해시 목록 산출 · 빌드 의존 해시 강제 / runtime: --require-hashes 설치 + 설치 보고서
   - tools/image-pip-lock-check.sh             # 신설 — 이미지 설치 집합·내려받은 바이트 ↔ uv.lock 등식 게이트(이름은 구현 레인이 census 관례에 맞춰 조정 가능)
@@ -210,6 +210,13 @@ proxy 세 이미지의 위생 판정을 같은 회차에서 지우지 않게 —
 
 **⑧ 「이미지에 들어간 바이트」 주장을 술어만큼으로 좁혔다**(cr F-3 = vr F-1) — 게이트 머리 주석 ·
 ci.yml step 주석 · Dockerfile · milestone-15.md 네 자리. 막지 않는 것은 제한 8 로 등재했다.
+
+**⑨ main(`78f2c77a9`, PR #208 libpam 상향)을 병합했다**(팀장 지시 2026-11-27, rebase 아님). 같은
+Dockerfile 의 runtime apt RUN 을 양쪽이 고쳐 **복원 원천이 착수 base 에서 그 SHA 로 옮겨갔다** —
+rollback.md 가 셋째 단언(두 원천의 blob 동일성)과 「내 표지 0 · 남의 표지 보존」 계수를 든다.
+acceptance 는 그 병합 커밋에서 전건 재실행했고, 취약점 게이트도 한 번 돌려 exit 0 을 확인했다
+(차단후보 0 — #208 이 닫은 `CVE-2025-6020` 이 이미지에서 실제로 닫혀 있다). 이미지 크기가
+`+2,078,880` 늘어 상한의 86.5% 다(여유 약 54MB — 제한 4 의 분모가 그만큼 줄었다).
 
 **④ in_scope 의 조건부 셋은 조건이 거짓이어서 건드리지 않았다** — `tools/one-command-check.sh`(그
 파일에 container 축이 0 건) · `config/quality/shell-guard-policy.properties`(그 파일은 파서 핀이고

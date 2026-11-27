@@ -1,6 +1,7 @@
 # M15 / 15T — commands
 
-base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes`
+base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes` · **main 병합 `847a755d2`**(부모 `98bd626df` ∥ `78f2c77a9` — PR #208 libpam 상향). 아래 acceptance 는 그 **병합 커밋**에서
+돌린 것이다.
 
 환경: WSL2 Ubuntu · bash · Docker 29.5.1 · host `uv 0.11.28`(쓰지 않았다 — 판정에 쓴 uv 는 **이미지가
 핀한 0.9.22** 하나다. `ghcr.io/astral-sh/uv:0.9.22@sha256:2320e6c2…` 에서 뜯어 scratchpad 에서 실행) ·
@@ -76,17 +77,30 @@ base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes`
 
 | 명령 | 결과 |
 |---|---|
-| `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` | **exit 0** — **18 step 전부 CACHED** 이고 이미지 id 가 앞 회차와 **같은 객체**다(이 라운드의 Dockerfile 변경이 주석뿐임을 그 동일성이 기계로 보인다). 설치 RUN 의 실제 실행은 아래 대조 넷이 각자 전건으로 쟀다 |
-| `./tools/image-hygiene-check.sh … config/quality/image-hygiene-policy.properties` | **exit 0** — 금지-import 5건 · uid 10001 · base-layer 접두 일치 · `size_bytes=343,931,147` / `cap=400,000,000`(86%) |
+| `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` | **exit 0** — 병합 커밋에서 runtime stage 가 apt RUN 부터 **실제로 다시 돌았다**(CACHED 12 = builder 전부). `pip check` 「No broken requirements found」 · 이미지 id `sha256:3f9d6a4a…` |
+| `./tools/image-hygiene-check.sh … config/quality/image-hygiene-policy.properties` | **exit 0** — 금지-import 5건 · uid 10001 · base-layer 접두 일치 · `size_bytes=346,010,027` / `cap=400,000,000`(86.5%). 병합 전 343,931,147 에서 `+2,078,880` — #208 의 libpam 상향 layer 다 |
 | `./tools/image-pip-lock-check.sh … ml-engine/uv.lock /opt/bidvector/pip-install-report.json serving` | **exit 0** — 계수·자기 변이는 아래 |
 | `./tools/workflow-action-pins-check.sh .github/workflows` | **exit 0** — uses 24(핀 24) · 기대 파일 7줄과 집합 등식 · 자기 변이 18건 |
 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | **exit 0** — job 5 · id 15 · 참조 18 · 매달린 참조 0(새 step 은 id 를 두지 않았다 — 가리키는 자리 없는 id 는 죽은 설정이다) |
 | `bv-build.sh ./gradlew --no-daemon check --continue` | **exit 0** · FAILED 0 · `:leakPatternGate` 실행(UP-TO-DATE 아님) |
+| `./tools/vuln-scan-check.sh bidvector/ml-serving:local ml-serving config/quality/vuln-policy.properties` | **exit 0** — 차단후보(HIGH·CRITICAL, only-fixed) **0** · allowlist 등재 0 · SBOM 구성요소 116(하한 80) · vuln-db 2026-11-27T01:08Z. 이미지 안 `dpkg-query` 로 네 libpam 이 `1.5.2-6+deb12u3` 임을 확인 |
 | `bash -n` / `python3 -m py_compile` | 둘 다 **exit 0** |
 | `uv run ruff check ../tools/image-pip-lock-check.py` | exit 1(RUF002 ∪ 기호 · N818) — **이 저장소의 게이트가 아니다**. 선례 `tools/workflow-action-pins-parity.py` 도 같은 N818 과 `ruff format --check` exit 1 을 낸다(저장소 뿌리 `tools/*.py` 는 `ml-engine` 의 ruff 범위 밖) |
 
 `tools/one-command-check.sh` 는 **안 고쳤다** — 계약의 조건(「그 파일이 container 축을 지면」)이
 거짓이다(그 스크립트에 `docker build`·위생 게이트가 0건, 지는 축은 `check`·`ml-engine`·`web`).
+
+### main 병합 확인 (충돌 0 이어도 눈으로 본다)
+
+`git merge origin/main`(rebase 아님) → 충돌 **0** · 「Auto-merging docker/ml-serving.Dockerfile」 ·
+부모 둘. 자동 병합이 같은 본문을 접거나 주석 여는 줄을 잃는 사고가 있었으므로 **양방향 등식**으로 쟀다:
+
+- 병합이 내 쪽에 더한 것(`+18 -3`)의 **줄 내용 집합**이 #208 이 base 에 더한 것과 **같다**.
+- 병합이 main 쪽에 더한 것(`+90 -11`)의 줄 내용 집합이 내가 base 에 더한 것과 **같다**.
+- 줄 수 239 = 224(내 쪽) + 15(#208 의 순증). 충돌 표지 0.
+- 표지 계수가 양쪽 모두 `병합 ≥ 각 쪽`: 하한 항목 **6** · `libpam` 5 · `CVE-2025-6020` 3 ·
+  `--require-hashes` 5 · `uv export` 3 · `build-constraints` 3 · `pip-install-report` 2 · `pip check` 2.
+- runtime 의 pip 설치 RUN 블록이 병합 전 내 판과 **바이트까지 같다**(`diff` 빈 출력).
 
 ## 게이트 계수와 자기 변이
 
@@ -170,7 +184,7 @@ URL·sha256·판·패키지 메타데이터(공개 색인 정보). 참조형 스
 
 | | 줄 | 바이트 |
 |---|---|---|
-| evidence(`reports/evidence/m15/15t/`) | 465 | 41,620 |
+| evidence(`reports/evidence/m15/15t/`) | 508 | 44,933 |
 | 산출물 코드 넷 | 851 | 49,920 |
 
 앞 회차의 초과(evidence 36,451 > 산출물 35,516)는 분자·분모가 **둘 다** 작았던 자리다. 이 라운드는
