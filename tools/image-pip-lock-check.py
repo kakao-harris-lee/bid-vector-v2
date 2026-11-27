@@ -6,16 +6,22 @@
 변이 대조 때문이다: 같은 판독기를 **바꿔치운 사본**에 다시 걸어야 하고, 그러려면 판독기가
 파일 경로만 받는 것이어야 한다(이미지를 다시 뜨지 않는다).
 
-두 등식(계약 D-15T-4):
+세 술어(계약 D-15T-4 의 둘 + 수정 라운드 1 의 (다), cr F-2):
 
   (가) 설치 집합 == 보고서 집합 ∪ {프로젝트 자신} ∪ {base 가 싣고 온 것}
       — 세 모집단 모두 **측정값**이다. 「base 가 싣고 온 것」은 손 목록이 아니라 같은 base
         다이제스트 이미지에 같은 질의를 걸어 받는다(셸이 잰다). 「프로젝트 자신」도 손 이름이
         아니라 lock 에서 **registry 가 아닌 단 하나의 항목**으로 도출한다 — 그 항목이 둘이거나
-        없으면 판정 불가다.
-  (나) 보고서 항목마다 **실제로 내려받은 archive 의 sha256** ∈ lock 의 그 (이름, 판) 해시 집합
-      — `--require-hashes` 플래그와 **독립된 측정**이다. 플래그가 사라져도 받은 바이트가 lock 과
-        다르면 여기서 붉는다.
+        없으면 판정 불가다. **(이름, 판) 단위다 — 바이트를 보지 않는다.**
+  (나) 보고서 항목마다 보고서가 적은 archive 의 sha256 ∈ lock 의 그 (이름, 판) 해시 집합
+      — `--require-hashes` 플래그와 **독립된 측정**이다. 플래그가 사라져도 보고서에 적힌 바이트가
+        lock 과 다르면 여기서 붉는다. 보고서는 설치 RUN **한 걸음의 기록**이고 최종 파일시스템의
+        측정이 아니다(같은 (이름, 판)의 강제 재설치는 이 술어 밖 — 알려진 제한).
+  (다) 보고서 집합의 **이름**이 lock 의 프로젝트 항목이 선언한 직접 의존을 **포함**한다 —
+        무조건 항목 + `extra == '<--extra>'` 항목. 앞 판 Dockerfile 은 `pip install
+        "<wheel>[serving]"` 로 extras 닫힘을 wheel 메타데이터에서 받았고, 목록 설치로 바꾸면서
+        그 보증이 사라졌다(목록이 좁아지면 이미지도 함께 좁아져 (가)·(나) 둘 다 초록이다).
+        닫힘을 다시 구현하지 않는다 — **직접 의존 이름의 포함**만 본다. 그 집합이 비면 정지다.
 
 종료 코드(이 저장소의 게이트 관례): **0 통과 · 1 이미지가 기준을 어겼다 · 2 판정 불가**.
 「판정 불가」로 끊는 자리는 조용한 통과가 생길 수 있는 모든 자리다 — 보고서 스키마 판이 다름,
@@ -24,7 +30,7 @@
 사용법:
 
     tools/image-pip-lock-check.py --lock <uv.lock> --report <report.json> \
-        --installed <설치 집합 파일> --base <base 집합 파일>
+        --installed <설치 집합 파일> --base <base 집합 파일> --extra <extra 이름>
 
 `--installed`·`--base` 는 한 줄에 `<정규화 이름> <판>` 꼴이다(셸이 이미지 안
 `importlib.metadata` 로 만든다).
@@ -72,11 +78,58 @@ def read_pairs(path: Path, label: str) -> set[tuple[str, str]]:
     return pairs
 
 
-def load_lock(path: Path) -> tuple[dict[tuple[str, str], set[str]], tuple[str, str]]:
+def required_names(project_entry: dict[str, object], extra: str) -> set[str]:
+    """lock 의 프로젝트 항목이 **선언한** 직접 의존 이름 — 무조건 + `extra == '<extra>'`.
+
+    닫힘 해석이 아니다(전이 의존은 보지 않는다). 표식의 **꼴이 바뀌면 정지**한다 — 겹 표식
+    (`extra == 'x' and sys_platform == 'linux'`)을 조용히 빼면 (다)가 그만큼 비어 버린다.
+    """
+    metadata = project_entry.get("metadata")
+    if not isinstance(metadata, dict):
+        raise Undecidable("lock 의 프로젝트 항목에 [package.metadata] 가 없다 — (다)를 잴 수 없다")
+    provides = metadata.get("provides-extras")
+    if not isinstance(provides, list) or extra not in provides:
+        raise Undecidable(
+            f"lock 의 프로젝트 항목이 extra {extra!r} 를 선언하지 않는다(provides-extras={provides!r})"
+            " — extra 이름이 바뀌었거나 인자가 틀렸다"
+        )
+    entries = metadata.get("requires-dist")
+    if not isinstance(entries, list) or not entries:
+        raise Undecidable("lock 의 프로젝트 항목에 requires-dist 가 없다 — (다)를 잴 수 없다")
+
+    wanted: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+            raise Undecidable(f"requires-dist 항목을 읽지 못했다: {entry!r}")
+        name = normalize(entry["name"])
+        marker = entry.get("marker")
+        if marker is None:
+            wanted.add(name)
+            continue
+        if not isinstance(marker, str):
+            raise Undecidable(f"requires-dist 의 marker 가 문자열이 아니다: {entry!r}")
+        collapsed = " ".join(marker.split())
+        if collapsed in (f"extra == '{extra}'", f'extra == "{extra}"'):
+            wanted.add(name)
+        elif f"extra == '{extra}'" in collapsed or f'extra == "{extra}"' in collapsed:
+            raise Undecidable(
+                f"requires-dist 의 표식 꼴이 단순 extra 비교가 아니다: {marker!r}"
+                " — 겹 표식을 조용히 빼면 (다)가 그만큼 비어 버린다"
+            )
+    if not wanted:
+        raise Undecidable(
+            f"extra {extra!r} 가 요구하는 직접 의존 이름이 0 건이다 — (다)가 공허하게 참이 된다"
+        )
+    return wanted
+
+
+def load_lock(
+    path: Path,
+) -> tuple[dict[tuple[str, str], set[str]], tuple[str, str], dict[str, object]]:
     """`uv.lock` 을 **조회용으로만** 읽는다 — 닫힘 해석을 다시 구현하지 않는다.
 
-    stdlib `tomllib` 만 쓴다(`container` job 에 uv 가 없다). 반환은 두 개다 —
-    (이름, 판) → sha256 집합, 그리고 프로젝트 자신의 (이름, 판).
+    stdlib `tomllib` 만 쓴다(`container` job 에 uv 가 없다). 반환은 세 개다 —
+    (이름, 판) → sha256 집합, 프로젝트 자신의 (이름, 판), 그리고 프로젝트 항목 자체((다)의 입력).
     """
     try:
         import tomllib
@@ -91,7 +144,7 @@ def load_lock(path: Path) -> tuple[dict[tuple[str, str], set[str]], tuple[str, s
         raise Undecidable(f"lock({path})에서 package 목록을 읽지 못했다")
 
     hashes: dict[tuple[str, str], set[str]] = {}
-    project_entries: list[tuple[str, str]] = []
+    project_entries: list[tuple[tuple[str, str], dict[str, object]]] = []
     for entry in packages:
         name = entry.get("name")
         version = entry.get("version")
@@ -101,7 +154,7 @@ def load_lock(path: Path) -> tuple[dict[tuple[str, str], set[str]], tuple[str, s
         source = entry.get("source")
         if not isinstance(source, dict) or "registry" not in source:
             # registry 가 아닌 항목 == 이 저장소가 스스로 만드는 것(editable/virtual).
-            project_entries.append(key)
+            project_entries.append((key, entry))
             continue
         collected: set[str] = set()
         sdist = entry.get("sdist")
@@ -110,18 +163,22 @@ def load_lock(path: Path) -> tuple[dict[tuple[str, str], set[str]], tuple[str, s
         for wheel in entry.get("wheels") or []:
             if isinstance(wheel, dict) and isinstance(wheel.get("hash"), str):
                 collected.add(wheel["hash"])
-        hashes[key] = {
+        # **덮어쓰지 않고 합친다**(cr F-4). uv 의 fork resolution·여러 registry 에서 같은
+        # (이름, 판) 항목이 둘 생기면 대입은 앞 항목의 해시를 지운다 — 방향은 거짓 빨강이지만
+        # 사유가 「받은 바이트가 lock 에 없다」로 나와 원인을 가리키지 않는다. 오늘 중복 0 건.
+        hashes.setdefault(key, set()).update(
             value.split("sha256:", 1)[1] for value in collected if value.startswith("sha256:")
-        }
+        )
 
     if len(project_entries) != 1:
         raise Undecidable(
             "lock 에서 registry 가 아닌 항목이 정확히 하나가 아니다"
-            f"({len(project_entries)}개: {sorted(project_entries)}) — 프로젝트 자신을 도출할 수 없다"
+            f"({len(project_entries)}개: {sorted(k for k, _ in project_entries)})"
+            " — 프로젝트 자신을 도출할 수 없다"
         )
     if not hashes:
         raise Undecidable(f"lock({path})에 registry 항목이 없다 — 대조할 해시가 0 이다")
-    return hashes, project_entries[0]
+    return hashes, project_entries[0][0], project_entries[0][1]
 
 
 def load_report(path: Path) -> list[tuple[str, str, str, str]]:
@@ -174,10 +231,11 @@ def load_report(path: Path) -> list[tuple[str, str, str, str]]:
 
 
 def check(
-    lock_path: Path, report_path: Path, installed_path: Path, base_path: Path
+    lock_path: Path, report_path: Path, installed_path: Path, base_path: Path, extra: str
 ) -> tuple[int, list[str], str]:
-    """두 등식을 재고 (종료 코드, 위반 문면 목록, 요약 한 줄) 을 낸다."""
-    lock_hashes, project = load_lock(lock_path)
+    """세 술어를 재고 (종료 코드, 위반 문면 목록, 요약 한 줄) 을 낸다."""
+    lock_hashes, project, project_entry = load_lock(lock_path)
+    wanted = required_names(project_entry, extra)
     report_items = load_report(report_path)
     installed = read_pairs(installed_path, "설치 집합")
     base = read_pairs(base_path, "base 집합")
@@ -219,10 +277,18 @@ def check(
             f"(가) {name}=={version} 이 보고서·프로젝트·base 에는 있는데 이미지에 설치돼 있지 않다"
         )
 
+    # (다) 선언 — 목록이 좁아지는 경로는 (가)·(나)가 둘 다 초록이므로 **lock 의 선언**과 대조한다.
+    report_names = {name for name, _version, _digest, _url in report_items}
+    for name in sorted(wanted - report_names):
+        violations.append(
+            f"(다) lock 이 extra {extra!r} 의 직접 의존으로 선언한 {name} 이 설치 보고서에 없다"
+            " — 설치 목록이 wheel 의 선언보다 좁다"
+        )
+
     summary = (
         f"lock-패키지={len(lock_hashes)}건 보고서-항목={len(report_items)}건 해시-대조={compared}건 "
         f"설치-집합={len(installed)}건 base-집합={len(base)}건 "
-        f"프로젝트={project[0]}=={project[1]}"
+        f"프로젝트={project[0]}=={project[1]} extra={extra}·요구-이름={len(wanted)}건"
     )
     return (EXIT_VIOLATION if violations else EXIT_OK), violations, summary
 
@@ -233,6 +299,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--installed", required=True, type=Path)
     parser.add_argument("--base", required=True, type=Path)
+    parser.add_argument("--extra", required=True)
     args = parser.parse_args(argv)
 
     for label, path in (
@@ -246,7 +313,9 @@ def main(argv: list[str]) -> int:
             return EXIT_UNDECIDABLE
 
     try:
-        code, violations, summary = check(args.lock, args.report, args.installed, args.base)
+        code, violations, summary = check(
+            args.lock, args.report, args.installed, args.base, args.extra
+        )
     except Undecidable as exc:
         print(f"판정 불가: {exc}", file=sys.stderr)
         return EXIT_UNDECIDABLE
