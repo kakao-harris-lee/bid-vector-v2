@@ -4,7 +4,7 @@
 milestone: M15
 slice: 15t-ml-serving-pip-hashes
 base_sha: afc3b9db6f494b76285207e04a39649401dcfec8   # main, PR #206 머지 커밋
-head_sha: <리뷰 요청 시점에 기입>
+head_sha: 리뷰 시점의 PR head   # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다. 마지막 **산출물** 커밋은 `9170addf2`(milestone 문단)이고 rollback 실측 HEAD 는 `56a92a070`(commands.md 커밋)이다
 in_scope:
   - docker/ml-serving.Dockerfile              # builder: lock 에서 해시 목록 산출 · 빌드 의존 해시 강제 / runtime: --require-hashes 설치 + 설치 보고서
   - tools/image-pip-lock-check.sh             # 신설 — 이미지 설치 집합·내려받은 바이트 ↔ uv.lock 등식 게이트(이름은 구현 레인이 census 관례에 맞춰 조정 가능)
@@ -142,8 +142,39 @@ lock 이 `pyproject.toml` 과 어긋났을 때 조용히 지나가지 않도록 
 2. base 이미지의 pip·stdlib 은 base 다이제스트 핀에 의존한다.
 3. 해시는 무결성이지 검토가 아니다.
 
-구현 중 늘어나면 번호를 이어 적는다.
+구현 중 늘어난 것 — 실측과 함께 `commands.md` 「알려진 제한」 절이 정본이다.
+
+4. **extra 를 `dev` 로 넓히는 경로는 두 등식과 위생 게이트 모두 초록이다.** 설치되는 것이 lock 안이라
+   바이트도 집합도 맞고, 더해지는 도구 이름들이 위생 게이트의 금지 패키지 다섯(DB·HTTP 계열)에 없다.
+   상시로 남는 축은 이미지 크기 상한 하나다(여유 56MB).
+5. `(가)`의 base 모집단과 위생 게이트 (2)의 base layer 파생은 같은 정책 두 키를 **다른 방법**으로
+   쓴다 — 레지스트리 접근이 없으면 둘 다 판정 불가다.
+6. 보고서 경로가 Dockerfile 과 CI step 인자 **두 자리**에 산다(어긋나면 fail-closed exit 2). 정책 키로
+   옮기려면 `config/quality/image-hygiene-policy.properties`(in_scope 밖)를 건드려야 한다.
+7. `lightgbm` 은 이 이미지에서 import 되지 않는다(`libgomp.so.1` 부재). **착수 전에도 같았다** — 이
+   slice 가 만든 것도 고친 것도 아니고, 별건으로 보고한다.
+
+## 계약 갱신 (2026-11-27, 구현 레인의 사실 기록)
+
+**① 「설치되는 집합의 거동 변화 0 이 목표다」(out_of_scope 둘째 줄)는 달성되지 않았고, 될 수 없다.**
+실측: 출하 이미지의 전이 의존 `narwhals` 가 2.29.0 인데 `uv.lock` 은 2.26.0 이다. 이 slice 가 닫는 것이
+바로 그 갈림이므로 **그 한 판이 lock 의 값으로 내려가는 것이 의도된 거동 변화**다(lock 은 CI
+`ml-engine` job 이 test 하는 집합이다). `uv.lock`·`pyproject.toml` 의 **내용**은 손대지 않았다 — 그 절은
+지켰다.
+
+**② 우회 ①의 문면을 실측으로 좁혔다.** 「`--require-hashes` 를 지운다」만으로는 열리지 않는다 — 목록이
+해시를 싣고 있으면 pip 이 해시 검사 모드를 암묵으로 켠다(문서 + 실측, `docker build` exit 1). 실제로
+여는 변이는 목록을 `--no-hashes` 로 만드는 것이고, 그 이미지에서 (나)가 붉어지는 것을 쟀다.
+
+**③ D-15T-5 의 변이 셋에 넷째를 더했다** — 「설치 집합 사본에서 한 줄 제거 → (가) 붉음」. 앞 셋은 모두
+「보고서·lock 이 틀렸다」 방향이고 이미지 질의가 조용히 줄어드는 축을 받지 못했다.
+
+**④ in_scope 의 조건부 셋은 조건이 거짓이어서 건드리지 않았다** — `tools/one-command-check.sh`(그
+파일에 container 축이 0 건) · `config/quality/shell-guard-policy.properties`(그 파일은 파서 핀이고
+스크립트 census 가 아니다. `tools/` 를 훑는 Gradle task 도 0 건) · `.dockerignore`(이 저장소에 없고
+`uv.lock` 이 컨텍스트에 든다).
 
 ## 하네스 레인 변경
 
-(리뷰 요청 시점마다 갱신 — 착수 시점 없음)
+없음. `tools/` 의 게이트 스크립트는 `.claude/` 하네스가 아니다. `base..<실측 HEAD>` 에
+`CLAUDE.md`·`.claude/**` 커밋 **0** 건(실측, rollback.md).
