@@ -19,7 +19,7 @@
 | --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 1
 | --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment staging
 | ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
-| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
+| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50 2>&1 | tee /var/tmp/bidvector-collection-step3.log
 | ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --from <YYYY-MM-DD> --to <YYYY-MM-DD> --categories construction,service --calls-per-day 1000 --calls-total 31000
 | ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" # dry-run
 | ./tools/prod-deploy.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --release "$REL" --apply
@@ -33,19 +33,18 @@
 | ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 # dry-run
 | ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
 | ./tools/prod-rollback.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --apply
+| CFG="$(docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml --env-file /etc/bidvector-v2/prod.env config --format json)"
 | ENVF=/etc/bidvector-v2/prod.env S=/var/lib/bidvector-v2
 | ExecStart=<저장소>/tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 1000 --calls-total 31000
 | ExecStart=<저장소>/tools/prod-evaluation-commit.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --current-active-bids <현재 진행 투찰 수>
 | ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
 | ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
-| P="$(docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml --env-file /etc/bidvector-v2/prod.env config --format json | jq -r .name)"
-| S=/var/lib/bidvector-v2
 | command grep -c '^BIDVECTOR_KONEPS_SERVICE' /etc/bidvector-v2/koneps.env # 1 — 값은 보지 않는다
 | git -C <저장소> checkout --detach "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
 | git checkout "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
 | git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh tools/prod-alert-telegram.sh
 | stat -c '%U %G %a' /etc/bidvector-v2/koneps.env # deploy deploy 600
-| stat -c '%U %g %a' /var/lib/bidvector-v2-run-state # deploy 10001 2770
+| stat -c '%U %g %a' /var/lib/bidvector-v2-run-state # deploy 10001 2700
 | sudo -e /etc/bidvector-v2/koneps.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
 | sudo -e /etc/bidvector-v2/prod.env # BIDVECTOR_EVALUATION_CANDIDATECAP — ④ ⓑ 보다 넉넉히
 | sudo -e /etc/bidvector-v2/relay.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
@@ -53,7 +52,7 @@
 | sudo chmod 600 /etc/bidvector-v2/relay.env
 | sudo chown "$USER" /etc/bidvector-v2/prod.env
 | sudo chown "$USER:$USER" /etc/bidvector-v2/relay.env
-| sudo install -d -m 2770 -o "$USER" -g 10001 /var/lib/bidvector-v2-run-state
+| sudo install -d -m 2700 -o "$USER" -g 10001 /var/lib/bidvector-v2-run-state
 | sudo install -d -m 700 -o "$USER" /etc/bidvector-v2
 | sudo test -e /etc/bidvector-v2/koneps.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/koneps.env
 | sudo test -e /etc/bidvector-v2/prod.env || sudo install -m 600 -o "$USER" docker/prod.env.template /etc/bidvector-v2/prod.env

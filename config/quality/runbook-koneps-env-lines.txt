@@ -15,7 +15,7 @@
 # 정규화: 줄 머리·끝 공백 제거 · 내부 공백은 하나로. **순서는 게이트가 양쪽을 `LC_ALL=C sort` 하므로
 # 저자 몫이 아니다**(중복 줄은 계수까지 본다 — `sort -u` 가 아니다).
 | ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
-| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
+| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50 2>&1 | tee /var/tmp/bidvector-collection-step3.log
 | ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --from <YYYY-MM-DD> --to <YYYY-MM-DD> --categories construction,service --calls-per-day 1000 --calls-total 31000
 | ExecStart=<저장소>/tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 1000 --calls-total 31000
 | command grep -c '^BIDVECTOR_KONEPS_SERVICE' /etc/bidvector-v2/koneps.env # 1 — 값은 보지 않는다

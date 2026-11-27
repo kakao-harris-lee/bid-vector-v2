@@ -76,6 +76,31 @@ cd "$REPO_ROOT"
 
 _die() { echo "prod-collection: $1" >&2; exit "${2:-3}"; }
 
+# **저장소 포함 판정은 실경로 대 실경로다**(M15/15U r1 — cr medium · vr M1). 위 `REPO_ROOT` 는 `pwd` 가
+# 심링크를 유지하는 **논리** 경로이고(선례 네 스크립트와 `tools/prod-env.sh` 가 같은 꼴이다) 비교 대상은
+# `readlink -f` 로 **해석된** 경로다. 둘을 그대로 맞대면 심링크된 저장소 경로로 래퍼를 부르는 배치에서
+# 저장소 **안**을 가리키는 자리가 통과한다(실측: 논리 비교 MISSED · 실경로 비교 CAUGHT). runbook 은
+# `WorkingDirectory=<저장소>` 가 심링크인 배치를 배제하지 않는다.
+#
+# `REPO_ROOT` 자신을 `pwd -P` 로 바꾸지 않는 이유: 그 값은 `cd` 와 compose 파일 셋 읽기에도 쓰이고 선례
+# 넷이 같은 꼴이라, 이 slice 가 그 cwd 의 뜻을 혼자 바꾸면 래퍼들의 모양이 갈린다. 그래서 **비교만**
+# 양쪽에 건다 — 논리든 실경로든 어느 쪽에 걸려도 거절이다(겹 둘).
+REPO_ROOT_REAL="$(readlink -f "$REPO_ROOT" 2>/dev/null || printf '%s' "$REPO_ROOT")"
+
+# <실경로> <무엇> <원문 경로> → 저장소 안이면 전제 실패(3). 실험 입력은 커밋되지 않는다.
+# 러너도 같은 판단을 하지만(`requireOutsideRepository`) **이 배치에서는 아무것도 보지 못한다**(vr L5):
+# 컨테이너가 받는 경로는 고정된 `/var/lib/bidvector-run-state` 이고 그 안에 저장소 표식이 없으므로,
+# host 쪽 실경로가 저장소 안이어도 러너 쪽 가드는 통과한다. **그래서 이 래퍼가 유일한 겹이다.**
+_collection_outside_repository() {
+  local abs="$1" what="$2" raw="$3" root
+  for root in "$REPO_ROOT" "$REPO_ROOT_REAL"; do
+    case "$abs/" in
+      "$root"/*)
+        _die "${what} 가 저장소 안이다(${raw} → ${abs}) — 실험 입력은 커밋되지 않는다. 저장소 밖의 자리를 준다(runbook §14 ①)" 3 ;;
+    esac
+  done
+}
+
 # **값 없는 플래그는 전제 실패(3)다**(M15/15Q cr H-1) — `$# == 1` 인데 `shift 2` 를 하면 bash 가 비-0 을
 # 내고 `set -e` 아래에서 스크립트가 **그 자리에서 1 로, 아무 말 없이** 죽는다. 그 `1` 은 러너의
 # `FAILED`(예외·기동 거부)와 같은 값이라 §9.5 의 경보가 틀린 이야기를 하고 journal 에 단서가 한 줄도
@@ -150,9 +175,12 @@ done
 unset _n
 [ -r "$ENVF" ] || _die "운영 env 파일을 읽지 못했다: $ENVF" 3
 
-# ── 실행 상태 root — 붙임의 원천을 묶는다 ──────────────────────────────────────
+# ── 실행 상태 root — 붙임의 원천을 묶는다(인자 검사) ──────────────────────────
 # `run -v <원천>:<대상>` 의 원천은 **이 root 아래 래퍼가 지은 한 경로**뿐이고, 대상은 위의 고정 경로다.
 # 그래서 인자가 할 수 있는 것은 root 를 고르는 것까지다 — 아래 넷이 그 범위를 닫는다.
+# **디렉터리를 만드는 것은 여기가 아니다**(M15/15U r1, cr medium) — 전제 검사 뒤로 옮겼다. 앞 판은
+# 거절되는 run 과 **미룬 run** 도 운영자의 root 아래에 자리를 남겼고, 그것은 「그 거절이 … 앞에서
+# 끝난다」는 이 slice 의 문면과 어긋났다.
 case "$RUN_STATE_ROOT" in
   /*) ;;
   *) _die "--run-state-root 는 절대 경로다(상대 경로는 부른 자리에 따라 다른 자리를 가리킨다): ${RUN_STATE_ROOT}" 3 ;;
@@ -164,40 +192,20 @@ case "$RUN_STATE_ROOT" in
   *:*) _die "--run-state-root 에 ':' 가 있다 — 그 글자는 docker 의 붙임 문법이라 둘째 붙임·옵션을 만들 수 있다. ':' 없는 자리에 둔다: ${RUN_STATE_ROOT}" 3 ;;
 esac
 # **만들지 않는다** — 경로를 잘못 대면 상한 회계가 0 에서 다시 서고(러너도 같은 사유로 디렉터리를 만들지
-# 않는다) 운영자는 그것을 알 길이 없다. 소유·권한을 세우는 것은 운영자의 한 번이다(§14 ①).
+# 않는다) 운영자는 그것을 알 길이 없다. 소유·권한을 세우는 것은 운영자의 한 번이다(§14.1).
 [ -d "$RUN_STATE_ROOT" ] \
   || _die "실행 상태 root 가 없거나 디렉터리가 아니다: ${RUN_STATE_ROOT} — 만들지 않는다(경로를 잘못 대면 상한 회계가 0 에서 다시 선다). runbook §14 ① 이 그 자리를 만든다" 3
-# **저장소 안이면 거절한다** — 실험 입력은 커밋되지 않는다. 심링크까지 풀어 본다: 이름만 대조하면
-# 저장소 밖을 가리키는 이름이 안을 가리켜도 지나간다(러너도 `realpath` 로 같은 판단을 하지만 그 거부는
-# 종료 1 이라 「예외」와 섞인다 — 래퍼가 전제 실패 3 으로 먼저 가른다).
 RUN_STATE_ABS="$(readlink -f "$RUN_STATE_ROOT" 2>/dev/null || true)"
 [ -n "$RUN_STATE_ABS" ] || _die "실행 상태 root 의 절대 경로를 구하지 못했다: ${RUN_STATE_ROOT}" 3
-case "$RUN_STATE_ABS/" in
-  "$REPO_ROOT"/*) _die "실행 상태 root 가 저장소 안이다(${RUN_STATE_ROOT} → ${RUN_STATE_ABS}) — 실험 입력은 커밋되지 않는다. 저장소 밖의 자리를 준다(runbook §14 ①)" 3 ;;
-esac
+_collection_outside_repository "$RUN_STATE_ABS" "실행 상태 root" "${RUN_STATE_ROOT}"
 case "$RUN_STATE_ABS" in
   *:*) _die "실행 상태 root 의 실경로에 ':' 가 있다 — 붙임 문법이라 받지 않는다: ${RUN_STATE_ABS}" 3 ;;
 esac
-# **달 디렉터리는 래퍼가 짓는다 — 인자에서 오지 않는다.** 달 문자열은 위의 `TO`(KST)에서 잘라 쓰므로
-# 창 계산과 **같은 「오늘」**이고, 달이 바뀌는 자정에 걸친 run 도 한 값을 끝까지 쓴다.
-# `--from/--to` 갈래에서는 그 `to` 가 달을 정한다(메우기를 그 달의 회계에 붙인다).
-RUN_STATE_DIR="${RUN_STATE_ABS}/${COLLECTION_BRANCH_DIR}/${TO%-*}"
-# `-m 2770` — **새로 만드는 자리의 모양을 보장한다**: 컨테이너는 uid/gid 10001 로 돌고 이 래퍼는
-# `User=`(이 host 에서는 `deploy`)로 도므로, 둘이 같은 자리에 쓰는 길은 **group 공유**다(root 에 setgid 가
-# 서 있어 자식이 그 group 을 물려받는다 — §14 ①). umask 에 기대지 않는다.
-mkdir -p -m 2770 "$RUN_STATE_DIR" \
-  || _die "달 디렉터리를 만들지 못했다: ${RUN_STATE_DIR} — root 의 소유·권한을 본다(runbook §14 ①)" 3
-# **이미 있는 자리에는 위 `-m` 이 적용되지 않는다**(운영자가 손으로 만든 자리 · 옛 run 이 남긴 자리).
-# group 쓰기가 닫혀 있으면 컨테이너가 원장에 쓰지 못하고 러너가 기동에서 죽는다 — 여기서 먼저 끊는다.
-# **gid 등식은 보지 않는다**(등재된 제한): 그 값은 이미지의 사용자이고, 등식은 §14 ① 의 운영자 확인이다.
-_rs_mode="$(stat -c '%a' "$RUN_STATE_DIR" 2>/dev/null || true)"
-[ -n "$_rs_mode" ] \
-  || _die "달 디렉터리의 권한을 읽지 못했다: ${RUN_STATE_DIR}" 3
-[ "$(( 8#${_rs_mode: -3} & 8#070 ))" -eq $(( 8#070 )) ] \
-  || _die "달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다(${RUN_STATE_DIR} mode=${_rs_mode} gid=$(stat -c '%g' "$RUN_STATE_DIR" 2>/dev/null || echo '?')) — 컨테이너는 uid/gid 10001 로 돌고 이 래퍼는 $(id -un) 으로 돈다. 둘이 같은 원장에 쓰는 길은 group 공유뿐이다. 'chmod 2770' 과 group 을 runbook §14 ① 의 값으로 맞춘 뒤 다시" 3
-[ "$(( 8#${_rs_mode: -3} & 8#007 ))" -eq 0 ] \
-  || _die "달 디렉터리가 other 에 열려 있다(${RUN_STATE_DIR} mode=${_rs_mode}) — 이 자리는 호출 상한 회계를 담는다(지우면 상한이 0 에서 다시 선다). 'chmod 2770' 뒤에 다시" 3
-unset _rs_mode
+# **달 경로는 여기서 계산만 한다.** 달 문자열은 위의 `TO`(KST)에서 잘라 쓰므로 창 계산과 **같은
+# 「오늘」**이고, 달이 바뀌는 자정에 걸친 run 도 한 값을 끝까지 쓴다. `--from/--to` 갈래에서는 그 `to` 가
+# 달을 정한다(메우기를 그 달의 회계에 붙인다).
+RUN_STATE_PARENT="${RUN_STATE_ABS}/${COLLECTION_BRANCH_DIR}"
+RUN_STATE_DIR="${RUN_STATE_PARENT}/${TO%-*}"
 
 # ── 서비스 키 env — 키 집합을 닫는다 ───────────────────────────────────────────
 # 술어는 relay 와 **같은 것**이다(`tools/prod-env.sh` — 사본 둘은 한쪽만 고쳐지는 날이 온다). 여기 남는
@@ -263,6 +271,93 @@ PROJ="$(printf '%s' "$cfg" | jq -r .name)"
 
 # 술어는 훑기·평가 커밋·relay 와 **같은 것**이라 남은 그쪽 컨테이너도 여기서 걸린다(runbook §11 제한 13).
 _prod_oneoff_residue "$PROJ" || _die "${_PROD_ONEOFF_ERR}" 3
+
+# ── 실행 상태 디렉터리 — **전제를 다 지난 뒤에** 만든다 ────────────────────────
+# 자리가 여기인 사유(M15/15U r1, cr medium): 거절되는 run(트리·프로젝트 이름·잔존·서비스 키 env)과
+# **미룬 run**(잠금 경합 → 4)은 운영자의 root 아래에 **아무것도 남기지 않아야 한다.**
+#
+# **두 층을 각각 명시적으로 만든다.** `mkdir -p -m <mode>` 의 `-m` 은 **마지막 디렉터리에만** 적용되고
+# 중간 디렉터리는 **호출자 umask** 로 만들어진다(실측: umask 0022 → 2755 · 0077 → 2700 · **0000 → 2777**).
+# 마지막 꼴이 이 축의 사고다 — `notice-list` 에 other 쓰기가 열리면 **다른 host 계정이 달 디렉터리를
+# 바꿔칠 수 있고**(지운 뒤 새로 만든다) 그 순간 호출 상한 회계가 0 에서 다시 선다(6G 가 「운영자 승인
+# 없이는 지우지 않는다」로 적은 바로 그 사고). umask 에 기대지 않는다.
+#
+# **모드가 층마다 다른 사유는 실측이다.** 컨테이너는 host 쪽 **조상**을 지나지 않는다 — bind 붙임은
+# 데몬(root)이 붙임 시점에 경로를 풀고, 컨테이너 안에서는 붙임 자리부터 권한이 재어진다(실측: 조상이
+# 2700 이어도 uid 가 다르고 **gid 만 같은** 컨테이너가 잎에 쓴다 · 음성 대조로 잎이 2700 이면 같은 호출이
+# 실패한다). 그래서 **group 쓰기가 필요한 자리는 잎 하나**이고, 조상에 group 쓰기를 열면 같은 group 의
+# 다른 계정에게 위의 바꿔치기를 허락하는 것뿐이다. 조상은 `2700`, 잎은 `2770` 이다.
+#
+# **setgid 가 group 을 잇는다.** root 의 setgid → `notice-list` → 잎으로 group 이 물려 내려가므로
+# (실측: 세 층 전부 group 10001) 조상의 setgid 는 **다음 달 디렉터리가 바른 group 으로 생기는가**를
+# 정하는 자리다. 그 비트는 **여기서 잴 수 있다** — gid 의 *값* 등식만 못 재고(그 gid 로 `chgrp` 할 권한이
+# 없다, `OPEN-M15-COLLECTION-RUN-STATE-GID`) setgid 의 **유무**는 잰다.
+_collection_dir_mode() { # <경로> → mode 세 자리 + setuid/setgid 자리
+  stat -c '%a' "$1" 2>/dev/null || true
+}
+# <경로> <무엇> → 그 자리가 심링크면 전제 실패(3).
+# **두 층 가운데 어느 것도 심링크여서는 안 된다**(M15/15U r1 — vr M1 의 배치가 바로 그 꼴이다: root 는
+# 저장소 밖인데 `notice-list` 가 저장소 안을 가리키는 심링크였다). 이 자리를 만드는 것은 래퍼이고
+# 운영자가 여기에 링크를 둘 이유가 없으므로, 받지 않는 쪽이 설명이 하나다.
+#
+# **mode 술어로는 이것을 가를 수 없다**(이 라운드 실측): GNU `stat` 은 기본이 `lstat` 이라 심링크 자리에서
+# **링크 자신의 mode(777)** 를 낸다. 그래서 앞 판은 심링크를 **우연히** setgid 축에서 막았고, 문면은
+# 운영자에게 엉뚱한 자리(setgid)를 가리켰다. 우연을 의도로 바꾸는 것이 이 검사다.
+_collection_not_symlink() {
+  [ ! -L "$1" ] \
+    || _die "${2} 가 심링크다(${1} → $(readlink "$1" 2>/dev/null || echo '?')) — 이 두 층은 래퍼가 만드는 자리이고 링크를 받지 않는다(링크 하나로 붙임의 원천이 저장소 안이나 root 밖으로 간다). 그 링크를 걷고 실제 디렉터리를 둔다(runbook §14 ①)" 3
+}
+_collection_prepare_run_state() {
+  local m
+  _collection_not_symlink "$RUN_STATE_PARENT" "실행 상태 갈래 디렉터리"
+  mkdir -p -m 2700 "$RUN_STATE_PARENT" \
+    || _die "실행 상태 갈래 디렉터리를 만들지 못했다: ${RUN_STATE_PARENT} — root 의 소유·권한을 본다(runbook §14 ①)" 3
+  _collection_not_symlink "$RUN_STATE_PARENT" "실행 상태 갈래 디렉터리"
+  m="$(_collection_dir_mode "$RUN_STATE_PARENT")"
+  [ -n "$m" ] || _die "실행 상태 갈래 디렉터리의 권한을 읽지 못했다: ${RUN_STATE_PARENT}" 3
+  # setgid 가 없으면 **다음 달 디렉터리의 group 이 이 래퍼의 gid** 가 되고, 그 자리는 컨테이너가 쓰지
+  # 못한다 — 러너가 기동에서 죽고 그 종료는 1 이라 「예외」와 섞인다. 여기서 3 으로 먼저 가른다.
+  [ "$(( 8#${m} & 8#2000 ))" -eq $(( 8#2000 )) ] \
+    || _die "실행 상태 갈래 디렉터리에 setgid 가 없다(${RUN_STATE_PARENT} mode=${m}) — 그 비트가 group 을 달 디렉터리로 잇는다. 없으면 다음 달의 자리가 이 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다. 'chmod 2700' 뒤에 다시(runbook §14 ①)" 3
+  [ "$(( 8#${m: -3} & 8#020 ))" -eq 0 ] \
+    || _die "실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 이 자리에 쓸 수 있으면 달 디렉터리를 **바꿔칠 수 있고** 그 순간 호출 상한 회계가 0 에서 다시 선다. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다. 'chmod 2700' 뒤에 다시" 3
+  [ "$(( 8#${m: -3} & 8#007 ))" -eq 0 ] \
+    || _die "실행 상태 갈래 디렉터리가 other 에 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 위와 같은 바꿔치기를 누구에게나 허락한다. 'chmod 2700' 뒤에 다시" 3
+  _collection_not_symlink "$RUN_STATE_DIR" "달 디렉터리"
+  mkdir -p -m 2770 "$RUN_STATE_DIR" \
+    || _die "달 디렉터리를 만들지 못했다: ${RUN_STATE_DIR} — 갈래 디렉터리의 소유·권한을 본다(runbook §14 ①)" 3
+  _collection_not_symlink "$RUN_STATE_DIR" "달 디렉터리"
+  m="$(_collection_dir_mode "$RUN_STATE_DIR")"
+  [ -n "$m" ] || _die "달 디렉터리의 권한을 읽지 못했다: ${RUN_STATE_DIR}" 3
+  # **이미 있는 자리에는 위 `-m` 이 적용되지 않는다**(운영자가 손으로 만든 자리 · 옛 run 이 남긴 자리).
+  # group 쓰기가 닫혀 있으면 컨테이너가 원장에 쓰지 못한다(음성 대조로 쟀다).
+  [ "$(( 8#${m: -3} & 8#070 ))" -eq $(( 8#070 )) ] \
+    || _die "달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다(${RUN_STATE_DIR} mode=${m} gid=$(stat -c '%g' "$RUN_STATE_DIR" 2>/dev/null || echo '?')) — 컨테이너는 uid/gid 10001 로 돌고 이 래퍼는 $(id -un) 으로 돈다. 둘이 같은 원장에 쓰는 길은 group 공유뿐이다. 'chmod 2770' 과 group 을 runbook §14 ① 의 값으로 맞춘 뒤 다시" 3
+  [ "$(( 8#${m: -3} & 8#007 ))" -eq 0 ] \
+    || _die "달 디렉터리가 other 에 열려 있다(${RUN_STATE_DIR} mode=${m}) — 이 자리는 호출 상한 회계를 담는다(지우면 상한이 0 에서 다시 선다). 'chmod 2770' 뒤에 다시" 3
+  # **만든 뒤 실경로를 다시 본다**(vr M1) — **둘째 겹**이다. 위 인자 검사는 root 의 실경로만 봤으므로,
+  # `notice-list` 나 달 디렉터리 자신이 저장소 안을 가리키는 심링크인 배치에서는 붙는 자리가 저장소 안이
+  # 된다(실측: root 는 밖인데 달 디렉터리의 실경로가 저장소 안이었다). 러너 쪽 같은 가드는 컨테이너
+  # 경로가 고정이라 그 배치에서 **아무것도 보지 못하므로** 겹은 래퍼 안에만 둘 수 있다.
+  #
+  # **위 심링크 거절이 서 있는 동안 이 셋은 발화하지 않는다** — 그렇다고 지우지 않는 이유는 둘이다:
+  # ⓐ 이 값(`real`)이 `-v` 에 실리는 **그 경로**다(재는 자리와 붙는 자리를 한 값으로 묶는 규율) ·
+  # ⓑ 한 층의 거절이 뚫려도(새 꼴·TOCTOU) 경계 자체는 남는다. 발화하지 않는 겹임을 문면으로 적어 둔다.
+  local real
+  real="$(readlink -f "$RUN_STATE_DIR" 2>/dev/null || true)"
+  [ -n "$real" ] || _die "달 디렉터리의 실경로를 구하지 못했다: ${RUN_STATE_DIR}" 3
+  _collection_outside_repository "$real" "달 디렉터리" "${RUN_STATE_DIR}"
+  case "$real" in
+    *:*) _die "달 디렉터리의 실경로에 ':' 가 있다 — 붙임 문법이라 받지 않는다: ${real}" 3 ;;
+  esac
+  case "$real/" in
+    "$RUN_STATE_ABS"/*) ;;
+    *) _die "달 디렉터리의 실경로가 실행 상태 root 밖이다(${RUN_STATE_DIR} → ${real} · root ${RUN_STATE_ABS}) — 심링크로 붙임의 원천을 root 밖으로 옮긴 자리다. 그 심링크를 걷은 뒤 다시" 3 ;;
+  esac
+  # **붙이는 것은 실경로다** — 재는 자리와 붙는 자리가 같아야 한다(둘째 env 파일의 경로 축과 같은 규율).
+  RUN_STATE_DIR="$real"
+}
+_collection_prepare_run_state
 
 echo "collection: release ${rel} · 프로젝트 ${PROJ} · 창 ${FROM}~${TO} · 업종 ${CATEGORIES} · 상한 ${CALLS_PER_DAY}/일 ${CALLS_TOTAL}/누적 · 실행 상태 ${RUN_STATE_DIR}"
 ONEOFF_NAME="${PROJ}-app-run-collection"
