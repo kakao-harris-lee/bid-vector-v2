@@ -498,6 +498,11 @@ cd <저장소>
 # /etc/systemd/system/bidvector-notification-sweep.service
 [Unit]
 Description=bidvector 알림 훑기 (일회 러너)
+# **순서 — 수집이 먼저다**(M15/15U). 타이머 넷 모두 `Persistent=true` 라 창을 놓친 뒤 부팅하면 systemd 가
+# 밀린 run 들을 거의 동시에 띄운다. 잠금 둘은 **직렬화는 하지만 순서를 정하지 않으므로** 훑기가 먼저
+# 잠금을 쥐면 그 catch-up 사슬은 그날의 공고 없이 돈다. `After=` 는 「그 unit 도 이번에 함께 뜬다면 그
+# 뒤에」이지 「먼저 띄워라」가 아니다 — 수집이 안 뜨는 주기에는 아무 일도 하지 않는다.
+After=bidvector-collection.service
 
 [Service]
 Type=oneshot
@@ -833,6 +838,37 @@ app 여유를 더하는 문면.
    `run ml-serving` 잔존과 compose 밖에서 손으로 띄운 컨테이너는 세지 않는다. 반입(`prod-deploy.sh`)도 이
    검사를 하지 않는다 — 계약이 주기 러너로 좁힌 선택이고, 남은 일회 컨테이너는 잠금의 대상이 아니라
    반입 중에도 같은 DB 를 쓸 수 있다.
+14. **공고는 §14 의 타이머를 켜야 들어온다**(M15/15U). 수집도 상주 스케줄러가 아니라 일회 러너이고,
+   켜지 않으면 **반입 직후 상태에서 `notice` 가 0 으로 남는다** — 그러면 평가 커밋과 relay 타이머는 매일
+   빈 채로 돈다(평가 후보 질의가 `notice` 만 읽는다). 켜는 것 자체가 운영자 승인 항목이다.
+15. **`--days-back 1` 의 창은 이틀 넘는 정지에 구멍을 남긴다.** `Persistent=true` 는 놓친 창의 run
+   **하나**를 따라잡을 뿐 창을 넓히지 않는다. 구멍을 **재는** 자리는 §14.5 ④ ⓔ 이고 메우는 것은
+   `--from/--to` 손 실행이다(§14.7) — 자동으로 메우지 않는다.
+16. **달 경계에서 일 상한 회계가 0 에서 다시 선다**(월 1회, 최대 하루치). 실행 상태 디렉터리를 달마다
+   가르는 대가다(§14.1 — 그 가름이 `--calls-total` 을 월 상한으로 만든다). 옛 달의 디렉터리를 지우면
+   그 달의 호출 이력과 상한 회계가 함께 사라진다(§14.6).
+17. **`raw_observation`·`collection_run` 은 run 마다 늘고 보존 러너가 파기하지 않는다** — 전자는
+   **마스킹 대상**(PII 만 지우고 행은 남긴다 · 6G 백테스트 표본을 지키는 선택)이고 후자는 수집 장부로
+   **면제 등재**돼 있다. 그래서 디스크 증가는 막는 자리가 아니라 **재는 자리**만 둔다(§14.5 ④ ⓒⓓ).
+18. **후보 상한 초과는 수집이 켜진 뒤의 상시 위험이다.** 상한(`BIDVECTOR_EVALUATION_CANDIDATECAP`)을
+   넘으면 평가 run 이 건너뜀이 아니라 **실패**로 끝나고, 상한을 올려도 공고가 그 위로 쌓이면 다시
+   붉어진다. 근본 처방(후보 질의를 지역·업종으로 좁히기)은 별 slice 다
+   (`OPEN-M15-CANDIDATE-QUERY-SCOPE`).
+19. **래퍼는 실행 상태 자리의 gid *값* 등식을 재지 않는다.** 보는 것은 두 층의 **mode**(조상: setgid
+   있음 · group·other 쓰기 없음 / 달: group rwx 열림 · other 닫힘)와 **심링크 아님**까지이고, 그 group 이
+   **이미지의 10001 인가**는 §14.1 의 운영자 확인이다. 사유는 측정의 한계다 — CI·로컬에서 그 gid 를
+   fixture 로 만들 수 없어(`chgrp` 권한이 없다) 양성 대조가 불가능하고, 양성 없는 단언은 조용히 전부
+   거절하는 술어와 구별되지 않는다. **setgid 의 유무는 재므로**(권한이 필요 없다) 「다음 달의 자리가
+   틀린 group 으로 생긴다」는 축은 닫혀 있다.
+21. **둘째 env 파일에는 검사와 소비 사이의 창이 있다.** 래퍼가 `koneps.env` 의 권한·키 집합을 본 뒤
+   `docker compose run --env-from-file` 이 그 파일을 다시 읽기까지 release·manifest 검사와 잠금 둘과
+   `docker ps` 둘이 돈다(수 초). 그 창에서 파일을 바꿀 수 있는 주체는 **그 파일에 쓸 수 있는 사람**뿐이고
+   mode 술어가 other 를 닫으므로 위협 모델 경계(「`<저장소>` 에 쓸 수 있는 사람」과 같은 급) 밖이다 —
+   relay(§13.3)에서 물려받은 창이고, 좁히려면 읽은 바이트를 그대로 넘기는 통로가 필요한데 `--env-from-file`
+   은 **경로만** 받는다. 실행 상태 두 층의 심링크·mode 검사에도 같은 창이 있다.
+20. **`status` 는 재수집으로 갱신되지 않는다** — 취소·마감된 공고가 `Open` 으로 남아 후보에 들 수 있다
+   (러너의 기존 거동이고 §14 가 바꾸지 않는다). 후보 질의의 둘째 조건(`deadline_at > now()`)이 마감
+   지난 것은 걸러 내므로 오늘 영향은 「마감 전에 취소된 공고」로 좁다.
 
 ## 12. 운영 계정 — 처음 한 번 · 비밀 문구 교체
 
@@ -1028,7 +1064,9 @@ compose 세 파일의 `${VAR` 참조 집합과 **등식**으로 재고, relay �
 
 둘 다 `mode=once` 일회 러너다(상주 스케줄러가 없다 — `OPEN-6F10-SCHEDULER`). **순서가 있다**: 평가
 커밋이 `outbox` 에 행을 남기고, relay 가 그 행을 집어 보낸다. 그래서 타이머도 **평가 커밋이 먼저**다 —
-훑기 07:30·13:30(§9.2) → 평가 커밋 07:35·13:35 → relay 07:40·13:40.
+**수집 07:10·13:10(§14)** → 훑기 07:30·13:30(§9.2) → 평가 커밋 07:35·13:35 → relay 07:40·13:40.
+사슬의 머리가 수집인 이유는 §14 에 있다(평가 후보 질의가 `notice` 만 읽는다 — 그날 들어온 공고를 그
+주기의 평가가 본다).
 
 호출은 **저장소의 스크립트 둘**이 진다(M15/15Q) — `tools/prod-evaluation-commit.sh` ·
 `tools/prod-notification-relay.sh`. 둘 다 §9.1 의 훑기 스크립트와 **같은 모양**이다: 같은 compose 파일
@@ -1056,6 +1094,10 @@ trap. 그래서 §9.1 의 전제·§9.4 의 진단이 그대로 적용되고, **
 # /etc/systemd/system/bidvector-evaluation-commit.service
 [Unit]
 Description=bidvector 평가 커밋 (일회 러너)
+# **순서 — 수집이 먼저다**(M15/15U). 그 run 이 들인 공고를 **이 run 이 후보로 본다**(평가 후보 질의는
+# `notice` 만 읽는다). 사유와 `After=` 의 뜻은 §9.2 의 같은 줄에 있다 — relay 는 이 unit 뒤에 서므로
+# 수집 간선을 다시 걸지 않는다(systemd 의 순서는 그래프다).
+After=bidvector-collection.service
 
 [Service]
 Type=oneshot
@@ -1415,3 +1457,410 @@ systemctl list-timers bidvector-notification-relay.timer   # 비어 있어야 �
 내부 로그 속성을 켜면 요청 URL 이 stderr 로 나가고 그 URL 은 경로에 자격을 싣는다** — 그 축은 패키지
 로거 게이트 **밖**이다. 그래서 **운영에서 그 두 속성은 금지**이고(§13.3), 켜진 채로는 러너가 **기동하지
 않는다**(`RefusedHttpClientLogging`). 그 전제 위에서 「무엇이 거부됐는지」는 계수와 이 표로 읽는다.
+
+## 14. 운영 공고 수집 — unit · timer · 활성화 (M15/15U)
+
+운영 DB 에 공고가 **0 건이면** 평가 커밋과 relay 타이머는 매일 빈 채로 돈다(2026-11-27 읽기 전용 조회 —
+`collection_run` 0 · `notice` 0). 평가 후보 질의는 `notice` 만 읽으므로(「입찰 가능 상태 · 마감 일시가
+지금보다 뒤」 둘뿐이다) **공고 목록 갈래 하나**가 그 사슬의 머리다. 이 절이 그 진입점과 절차를 만든다.
+
+러너 자체(무엇을 수집하는가 · 종료 코드 다섯 · 슬롯 줄의 회계 · 멈춤 줄)의 정본은
+`docs/runbook/m6-6e-operations.md` §1.3·§3.3 이고, 실 호출 캠페인의 선례는
+`docs/runbook/m6-6g-real-collection.md` §2-1 이다. 여기에는 **운영 반입된 스택에서 그것을 어떻게
+거는가**만 적는다. 호출은 **저장소의 `tools/prod-collection.sh`** 가 지고, 그 모양은 §9.1 의 훑기·§13.3 의
+둘과 같다(같은 compose 파일 셋 · 같은 프로젝트 이름 · 같은 env 파일 · release 태그는 `<state>/current` ·
+`--pull never` · 잠금 둘 · manifest 이미지 ID · **반입 트리 == 그 release 의 커밋** · 설정 통로 · 일회
+컨테이너 잔존과 이름 충돌 · 자기 일회 이름 고정(`<프로젝트>-app-run-collection`)과 신호 trap). 그래서
+§9.1 의 전제와 §9.4 의 진단이 그대로 적용되고, **반입이 막는 것을 이 러너만 통과시키는 길이 없다.**
+이 스크립트도 사본으로 떼어 둘 수 없다 — compose 파일 셋을 읽으므로 `<저장소>`(§1.4b) 안에서 돈다.
+
+**운영자 승인 항목이 둘이다.** 하나는 「조달청 API 를 주기적으로 실제로 부른다」이고(승인: 2026-11-27
+「운영 수집 진행해」), 다른 하나는 **③ 의 첫 손 실행 뒤 ⑤ 에서 후보 상한을 정하는 것**이다. 후보가 상한
+(`BIDVECTOR_EVALUATION_CANDIDATECAP`, 운영 현행 1000)을 넘으면 평가 run 이 **건너뜀이 아니라 실패**로
+끝나므로(`CandidateCapExceededException`), 수집을 켠 뒤 하루 이틀 안에 평가가 붉어질 수 있다. 그래서
+**타이머는 실측 뒤에 켠다**(아래 ①~⑦ 의 순서가 그것이다).
+
+### 14.1 선행 — 서비스 키 env 와 실행 상태 자리 (한 번)
+
+**서비스 키 env.** 조달청 서비스 키는 compose 템플릿이 모르는 키라 `prod.env` 에 넣지 않는다(그 파일의
+키 집합은 `prod-env-keys-check.sh` 가 등식으로 잰다 — 넣으면 죽은 키로 붉어진다). 둘째 env 파일에 두고
+래퍼가 `--koneps-env-file` 로 받는다. 이 파일의 키는 **`bidvector.koneps.service-key` 가 받는 환경 변수
+이름 둘**(`BIDVECTOR_KONEPS_SERVICEKEY` · `BIDVECTOR_KONEPS_SERVICE_KEY`)뿐이고 그 밖이면 `exit 3` 이다 —
+`base-url`·`operations.*` 는 **공개 설정이고 통로가 compose** 다(여기 들어오면 반입 가드를 거치지 않고
+조회 주소를 바꾸는 길이 된다).
+
+```bash
+# 2026-11-21 에 이미 만들어 두었다 — **여기서 내용을 건드리지 않는다.** 확인만 한다.
+stat -c '%U %G %a' /etc/bidvector-v2/koneps.env        # deploy deploy 600
+command grep -c '^BIDVECTOR_KONEPS_SERVICE' /etc/bidvector-v2/koneps.env   # 1 — 값은 보지 않는다
+# 없을 때만 만든다. **`test -e` 와 `install` 을 같은 줄에 둔다** — 줄을 쪼개면 재설치·복구에서 이
+# 블록을 다시 친 운영자가 이미 채운 키를 **말없이 0 바이트로** 만든다(§13.2 의 같은 꼴).
+sudo test -e /etc/bidvector-v2/koneps.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/koneps.env
+sudo -e /etc/bidvector-v2/koneps.env  # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
+```
+
+**실행 상태 자리.** 시도 원장과 호출 상한 회계가 사는 디렉터리다. app 이미지의 사용자는 **uid/gid
+10001** 이고 일회 컨테이너에 쓰기 가능한 볼륨이 없으므로 host 에서 붙여야 한다. 래퍼는 `--run-state-root`
+아래 `notice-list/<YYYY-MM>`(KST) 을 만들어 그 한 자리만 붙인다.
+
+**왜 달마다 가르는가.** `--calls-total` 은 **그 디렉터리 생애의 누적**이다(원장 전체의 줄을 센다) — 끝없이
+도는 운영에서 한 디렉터리를 쓰면 언젠가 닿고 그 뒤 **매 run 이 `INCOMPLETE(2)`** 다. 달로 가르면 그 값이
+월 상한이 되고 원장 크기도 달 단위로 묶인다(러너를 고치지 않고 닫는 길이다).
+
+**왜 group 을 공유하는가.** 래퍼는 `User=`(이 host 에서는 `deploy`)로 돌며 디렉터리를 만들고, 컨테이너는
+uid/gid 10001 로 그 안에 쓴다. 둘이 같은 원장에 쓰는 길은 **group 공유**뿐이다 — root 에 **setgid** 를
+세워 자식이 그 group 을 물려받게 하고, 래퍼가 달 디렉터리를 `2770` 으로 만들어 group 쓰기를 보장한다.
+
+**모드가 층마다 다르다 — `2700` / `2700` / `2770`.** 컨테이너는 host 쪽 **조상을 지나지 않는다**: bind
+붙임은 데몬(root)이 붙임 시점에 경로를 풀고, 컨테이너 안에서는 **붙임 자리부터** 권한이 재어진다
+(2026-11-27 실측 — 조상이 `2700` 이어도 uid 가 다르고 **gid 만 같은** 컨테이너가 달 디렉터리에 썼고,
+달 디렉터리가 `2700` 이면 같은 호출이 실패했다). 그래서 **group 쓰기가 필요한 자리는 달 디렉터리
+하나**이고, root 나 `notice-list` 에 group 쓰기를 열면 같은 group 의 다른 계정에게 **달 디렉터리
+바꿔치기**(지운 뒤 새로 만들기 = 호출 상한 회계가 0 에서 다시 서기)를 허락하는 것뿐이다.
+
+```bash
+# 이 자리는 **저장소 밖**이어야 한다(래퍼가 저장소 안을 거절한다 — 실험 입력은 커밋되지 않는다).
+getent group 10001 || echo '(없음 — 그 gid 를 쓰는 host 계정이 없다. 있으면 그 계정이 원장에 쓸 수 있다)'
+sudo install -d -m 2700 -o "$USER" -g 10001 /var/lib/bidvector-v2-run-state
+stat -c '%U %g %a' /var/lib/bidvector-v2-run-state     # deploy 10001 2700
+```
+
+`getent group 10001` 이 사람 group 을 내면 **그 계정도 원장에 쓸 수 있다**(상한 회계를 0 으로 되돌리는 길).
+이 host 에서는 비어 있어야 하고, 아니면 그 group 을 전용으로 바꾼 뒤 이미지의 사용자와 맞춘다.
+
+**`notice-list` 와 달 디렉터리는 래퍼가 만든다 — 손으로 만들지 않는다.** 래퍼는 두 층을 **각각
+명시적으로** 만들고(`mkdir -p -m` 의 `-m` 은 **마지막 디렉터리에만** 적용되고 중간 디렉터리는 호출자
+umask 를 따른다 — umask 0000 이면 `2777` 이 된다) 이미 있는 자리에는 모양을 **검사**한다. 어긋나면
+`exit 3` 이고 문면이 고칠 자리를 말한다(§14.9). 그 두 층이 **심링크면 거절**한다 — 링크 하나로 붙임의
+원천이 저장소 안이나 root 밖으로 간다. 권한을 고칠 때 `chmod 2700`·`chmod 0700` 은 디렉터리의 setgid 를
+**지우지 않는다**(실측) — 지우려면 `chmod g-s` 를 명시해야 하므로, 평소 권한 수정이 그 비트를 잃게 하지
+않는다.
+
+### 14.2 거는 법 — 손 실행
+
+unit 을 깔기 **전**의 확인용이다(그때는 타이머가 없으므로 겹칠 것이 없다). 깐 뒤에는 `systemctl start`
+로 돈다(§9.3 과 같은 사유 — 같은 unit 의 run 이 하나로 묶인다).
+
+```bash
+cd <저장소>
+./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
+echo "exit=$?"
+```
+
+**창은 둘 중 하나다 — 기본값이 없다.** `--days-back <N>`(주기: `to` = 오늘 KST, `from` = 오늘-N) 또는
+`--from/--to`(첫 적재·메우기, §14.7). 둘을 함께 주면 `exit 3` 이다. **범위 상한(31일)·미래 금지는
+러너가 기동 실패로 드러낸다** — 래퍼는 같은 술어를 다시 적지 않는다(모양만 본다).
+
+**처방 unit 은 `--days-back 1` 이다.** 창이 하루 겹쳐 자정 무렵 공고와 하루의 결손을 메우되, 같은 창의
+재수집이 `raw_observation` 에 누적되는 양을 2 배로 묶는다(`notice` 에는 멱등이고, 관측 키에 관측 시각이
+들어가 재수집마다 새 행이 선다. `collection_run` 도 슬롯마다 한 행씩 는다).
+
+### 14.3 unit · timer · drop-in
+
+```ini
+# /etc/systemd/system/bidvector-collection.service
+[Unit]
+Description=bidvector 공고 목록 수집 (일회 러너)
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=<저장소>
+# **창·상한·업종에는 기본값이 없다**(러너의 여섯 값이 미설정이면 기동 실패다 — m6-6e §1.5). 아래 수의
+# 근거는 §14.4 의 「상한을 어디서 가져왔는가」다. **첫 활성화에서는 ③ 이 더 작은 값으로 한 번 돈다.**
+ExecStart=<저장소>/tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 1000 --calls-total 31000
+# 상한을 반드시 둔다(§9.2 와 같은 이유) — 러너는 도는 내내 프로젝트·상태 잠금을 쥔다. **값의 근거**:
+# 처방 창의 슬롯은 넷(날짜 둘 × 업종 둘)이고 쪽은 100 행이므로 기대 호출은 열 단위다. 최소 호출 간격이
+# 1 초, 요청 시한이 10 초이니 **스물넷 호출이면 최악 약 4 분**이다. 15m 는 그 위에 한 자릿수 여유를 두고,
+# 동시에 **훑기(07:30)까지의 20 분 안**에 끝나 그 주기의 사슬을 굶기지 않는다. 상한에 걸려 죽은 run 은
+# 다음 run 이 같은 디렉터리에서 이어 돈다(멱등).
+TimeoutStartSec=15m
+TimeoutStopSec=1m
+# 조건 넷의 사유는 §9.2 의 같은 줄에 있다(성공·`exit 3`·`exit 4` 에서는 아무것도 하지 않는다).
+# **프로젝트 이름이 다르면 이 줄도 함께 바꾼다**(기본값은 운영 compose 의 `name:` 이다).
+ExecStopPost=-/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || [ "$$EXIT_STATUS" = 3 ] || [ "$$EXIT_STATUS" = 4 ] || /usr/bin/docker rm -f bidvector-v2-prod-app-run-collection >/dev/null 2>&1 || true'
+```
+
+```ini
+# /etc/systemd/system/bidvector-collection.timer
+[Unit]
+Description=bidvector 공고 목록 수집 — 하루 두 번
+
+[Timer]
+OnCalendar=*-*-* 07:10 Asia/Seoul
+OnCalendar=*-*-* 13:10 Asia/Seoul
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+**왜 07:10·13:10 인가.** 사슬의 머리이고 훑기(07:30)보다 앞이어야 그 주기의 평가 커밋(07:35)이 **그 run 이
+들인 공고**를 후보로 본다. 간격 20 분은 `TimeoutStartSec` 상한과 같은 자릿수가 아니라 **한 자릿수 위**다 —
+수집이 매달려 상한까지 가면 그 주기의 훑기·평가·relay 는 잠금에서 `exit 4` 로 미루고 다음 주기에 돈다
+(잃는 것은 없다 — §13.4 의 「다섯 분 간격의 뜻」과 같은 교환).
+
+```ini
+# /etc/systemd/system/bidvector-collection.service.d/10-defer.conf
+[Service]
+# **미룸은 실패가 아니다**(§9.4 의 `4`). 반입·되돌림·훑기·평가 커밋·relay 가 돌고 있으면 이 run 은 잠금을
+# 잡지 못하고 다음 주기로 미룬다 — 같은 창의 재수집이 `notice` 에 멱등이라 그래도 된다. 경보를 끄더라도
+# **이 파일은 남긴다.**
+#
+# **`5` 는 빼지 않는다 — relay 의 `5` 와 다른 판단이다.** 이 래퍼의 `5` 는 러너의
+# `ALREADY_RUNNING`(실행 상태 디렉터리를 남이 쥐었다)인데, 래퍼의 잠금 둘을 지난 뒤에 그 코드가 서는
+# 경로는 **래퍼를 거치지 않은 실행**(손으로 띄운 `java -jar`·컨테이너)뿐이다 — 래퍼를 거친 손 실행은
+# 프로젝트 잠금에서 `4` 로 먼저 미룬다. 즉 설계된 정상이 아니라 사람이 알아야 하는 어긋남이다.
+SuccessExitStatus=4
+```
+
+```ini
+# /etc/systemd/system/bidvector-collection.service.d/20-alert.conf
+[Unit]
+OnFailure=bidvector-alert@%n.service
+```
+
+**깔린 unit 둘에 줄 하나씩 더한다**(§9.2 · §13.3 의 `[Unit]` 블록 — 그 문면이 정본이다). 타이머 넷이
+`Persistent=true` 라 창을 놓친 뒤 부팅하면 systemd 가 밀린 run 들을 거의 동시에 띄우고, 잠금 둘은
+**직렬화는 하지만 순서를 정하지 않는다.**
+
+```bash
+U=/etc/systemd/system
+for u in bidvector-notification-sweep bidvector-evaluation-commit; do
+  sudo grep -qx 'After=bidvector-collection.service' "$U/$u.service" \
+    || sudo sed -i '/^Description=/a After=bidvector-collection.service' "$U/$u.service"
+done
+sudo systemctl daemon-reload
+systemctl show -p After bidvector-evaluation-commit.service | tr ' ' '\n' | command grep -c bidvector-collection.service  # 1
+```
+
+relay 에는 더하지 않는다 — systemd 의 순서는 그래프이고 relay → 평가 커밋 → 수집 경로가 이미 서 있다
+(간선을 겹쳐 걸면 사슬이 늘 때마다 모든 unit 을 고쳐야 한다).
+
+### 14.4 종료 코드 — 래퍼의 것과 러너의 것
+
+러너의 코드가 **다섯**이라 래퍼의 둘과 겹쳤고, 래퍼가 두 개를 옮겼다(relay 와 같은 축). 러너
+`3`(`ALREADY_RUNNING` — 기다리면 풀린다)과 래퍼 `3`(전제 실패 — 고쳐야 한다), 러너 `4`(`UNLOCKABLE` —
+기다려도 안 풀린다)와 래퍼 `4`(미룸 — 기다리면 풀린다)는 **뜻이 정확히 반대**다. 경보는 종료 코드로만
+갈라지므로 그 겹침은 경보를 거꾸로 울린다.
+
+| 코드 | 뜻 | 경보 |
+|---|---|---|
+| `0` | `COMPLETE` — 전 슬롯이 끝까지 읽혔다 | — |
+| `1` | `FAILED` — 러너 예외 · **기동 거부**(서비스 키 결손 · 범위 상한·미래 · 미지 업종 · 실행 상태 형식) | 운다 |
+| `2` | `INCOMPLETE` — 일 상한·쿼터·절단으로 그날 공고가 덜 들어왔다. **다음 run 이 이어 돈다**(멱등) | **운다** — 사람이 알아야 한다 |
+| `3` | **래퍼의 전제 실패** — §9.4 의 목록 + 창·상한 인자 + 서비스 키 env 축 + 실행 상태 root 축 | 운다 |
+| `4` | **래퍼의 미룸**(잠금 경합 — 설계된 정상) | 울지 않는다(`10-defer.conf`) |
+| `5` | 러너 `ALREADY_RUNNING`(옛 `3`) — 래퍼를 거치지 않은 실행이 실행 상태 디렉터리를 쥐었다. 호출 0 | **운다** |
+| `6` | 러너 `UNLOCKABLE`(옛 `4`) — 자물쇠를 걸 수 없다. 호출 0. 기다려도 안 풀린다 | 운다 |
+| `7` | **모르는 코드**(러너의 다섯 밖 · `docker run` 자신의 실패 125·126·127 · **일회 컨테이너가** 신호로 죽어 돌아온 128+n) | 운다 |
+
+그 옮김은 **래퍼 줄로 남는다**(「래퍼의 전제 실패 3 과 겹치지 않게 5 로 낸다」) — journal 에서 원래
+이름을 그대로 읽을 수 있다. **러너에 값을 더하면 래퍼의 `case` 와 이 표를 함께 고친다** —
+`tools/prod-guards-check.sh` 의 등식 단언(`CollectionExitCode` 의 값 집합 == 래퍼 `case` 가 이름으로
+받는 집합 · 래퍼가 번역해 내는 값 ∩ 러너 값 = ∅)이 그것을 강제한다. 러너의 새 값에 `5`·`6`·`7` 을
+쓰지 않는다.
+
+**상한을 어디서 가져왔는가.** 포털 한도는 **키 × operation × 일 1,000 건**이다(m6-6g §5 실측). 이 갈래가
+부르는 operation 은 업종마다 하나씩(공고 목록 공사·용역)이고 각자 1,000/일을 쓴다. `--calls-per-day` 는
+**두 operation 에 걸친 한 예산**이라 그 값이 1,000 이면 최악에도 어느 한 operation 의 포털 한도를 넘지
+않는다 — 그래서 `1000` 이다. `--calls-total` 은 그 디렉터리 생애의 누적이고 디렉터리가 달마다 갈리므로
+**월 상한**이다: `1,000/일 × 31일 = 31000`. **둘 다 지어낸 수가 아니라 포털 한도에서 내려온 수**이고,
+처방 창의 기대 호출(열 단위)보다 두 자릿수 크다 — 상한은 폭주 방지 문턱이지 목표가 아니다.
+
+### 14.5 활성화 — 단계와 그 자리 (운영자)
+
+**순서를 지킨다.** 타이머를 먼저 켜면 ③·④ 의 확인 중에 주기 run 이 끼어들고, 그때 평가가 상한 초과로
+붉어지면 경보가 **고치는 중에** 온다.
+
+**① 선행(§14.1)과 unit 네 파일을 깐다 — 타이머는 아직 켜지 않는다.**
+
+```bash
+# §14.3 의 네 파일(unit 하나 · timer 하나 · drop-in 둘)을 만들고 §14.3 끝의 `After=` 토막을 돌린다.
+# <저장소> 를 그 host 의 값으로 바꾼다.
+sudo systemctl daemon-reload
+systemctl cat bidvector-collection.service                       # 눈으로 한 번
+systemctl show -p SuccessExitStatus bidvector-collection.service # 4 가 보여야 한다
+systemctl show -p OnFailure bidvector-collection.service         # 비어 있지 않아야 한다
+```
+
+**② 평가 커밋 타이머를 잠시 멈춘다.** 수집 뒤 첫 평가가 **후보 상한 초과로 붉어져** 경보가 가는 것을
+막는다. 멈춤과 되켬은 **한 쌍**이고 되켬은 ⑦ 이다.
+
+```bash
+sudo systemctl disable --now bidvector-evaluation-commit.timer
+systemctl list-timers bidvector-evaluation-commit.timer   # 비어 있어야 한다
+```
+
+**③ 하루 창 · 작은 상한으로 손 실행 한 번.** 첫 실 호출이다. 작은 값으로 묶는 이유는 6G §7 2항과 같다 —
+응답이 기대와 다르면 노출을 한 번으로 끊는다.
+
+**출력을 파일로 남긴다** — ④ ⓕ 가 그 파일에서 호출 수를 센다. 이 run 은 **손 실행**이라 journal 에
+남지 않는다(이 unit 은 ⑦ 까지 한 번도 돌지 않는다).
+
+```bash
+cd <저장소>
+./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50 2>&1 | tee /var/tmp/bidvector-collection-step3.log
+echo "exit=${PIPESTATUS[0]}"   # 0 이면 전 슬롯이 끝까지 읽혔다. 2 면 상한·쿼터·절단이다(④ 의 수를 보고 상한을 올린다)
+```
+
+`$?` 가 아니라 `${PIPESTATUS[0]}` 를 읽는다 — `tee` 를 물렸으므로 `$?` 는 `tee` 의 것이다(래퍼의 종료
+코드가 이 절차의 판정값이다).
+
+마침 줄은 `collection finished slots=… truncatedSlots=… halted=… exit=…` 이고, 슬롯마다
+`collection slot date=… source=… received=… normalized=… duplicate=… dropped=… … pages=… truncated=…`
+한 줄이 선다. **서비스 키는 어느 줄에도 없다**(줄의 입력 타입이 계수와 열거값만 나른다).
+
+**④ 읽기 전용 질의로 재는 것.** ⑤ 의 입력이다. 아래는 **읽기만** 한다.
+
+```bash
+# 프로젝트 이름·DB 사용자·DB 이름을 **전부 해석된 compose 에서 읽는다** — 리터럴로 적으면 `prod.env` 가
+# 바뀌는 날 이 블록이 거짓이 된다(바로 윗줄만 읽고 아래는 박아 두는 꼴을 만들지 않는다).
+CFG="$(docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f docker/compose.prod.yaml --env-file /etc/bidvector-v2/prod.env config --format json)"
+P="$(printf '%s' "$CFG" | jq -r .name)"
+PGUSER_="$(printf '%s' "$CFG" | jq -r '.services.postgres.environment.POSTGRES_USER')"
+PGDB_="$(printf '%s' "$CFG" | jq -r '.services.postgres.environment.POSTGRES_DB')"
+[ -n "$P" ] && [ "$PGUSER_" != null ] && [ "$PGDB_" != null ] || { echo "compose 에서 프로젝트·DB 이름을 읽지 못했다 — 질의하지 않는다" >&2; false; }
+docker exec -i "${P}-postgres-1" psql -U "$PGUSER_" -d "$PGDB_" -At <<'SQL'
+-- ⓐ 들어온 공고
+SELECT 'notice', count(*) FROM notice;
+-- ⓑ **마감 전 후보 수** — 평가 질의와 같은 조건이다(상태 어휘는 코드의 `isBiddable` 에서 왔다:
+--    `Open`·`Renoticed` 둘이고 구간은 반개구간이다). 평가 러너는 주입된 시계를 쓰고 이 질의는 DB 의
+--    `now()` 를 쓰므로 그 둘은 **몇 초 다르다** — 상한을 정하는 데는 그 차가 뜻이 없다.
+SELECT 'candidates', count(*) FROM notice WHERE status IN ('Open','Renoticed') AND deadline_at > now();
+-- ⓒ 관측 행의 증가(재수집마다 는다 — 보존 러너는 이 표를 **파기하지 않고** PII 만 지운다)
+SELECT 'raw_observation', count(*) FROM raw_observation;
+-- ⓓ 수집 회계 행(보존 러너의 파기 대상이 아니다 — 수집 장부로 등재돼 있다)
+SELECT 'collection_run', count(*) FROM collection_run;
+-- ⓔ **구멍 재기** — 최근 30일 가운데 수집 회계가 덮은 날짜 수. 30 보다 작으면 그만큼이 구멍이다
+--    (host 가 이틀 넘게 꺼져 있으면 `Persistent=true` 가 run 하나를 따라잡을 뿐 창을 넓히지 않는다).
+SELECT 'covered_days', count(DISTINCT reference_date) FROM collection_run
+  WHERE reference_date > current_date - 30;
+SQL
+# ⓕ 호출 수 — 슬롯 줄의 `pages=` 합이 이 갈래의 목록 호출 수다(쪽마다 한 호출).
+# **③ 의 run 은 손 실행이라 journal 에 없다**(이 unit 은 ⑦ 까지 한 번도 돌지 않는다) — 그래서 ③ 이
+# 남긴 **파일**에서 센다. 아래 `_pages` 는 입력이 비면 **조용히 0 이 아니라 멈춘다**: `paste -sd+ | bc`
+# 는 빈 입력에서 아무것도 내지 않고 exit 0 이라, 그대로 두면 측정 표의 이 칸이 말없이 빈다.
+_pages() {  # <로그 파일…>
+  local n s
+  n="$(sed -n 's/.* pages=\([0-9]\{1,\}\) .*/\1/p' "$@" | grep -c '' || true)"
+  [ "$n" -gt 0 ] || { echo "ⓕ: 슬롯 줄을 한 줄도 찾지 못했다($*) — 측정 실패다(0 이 아니다). 그 run 의 출력을 본다" >&2; return 1; }
+  s="$(sed -n 's/.* pages=\([0-9]\{1,\}\) .*/\1/p' "$@" | paste -sd+ | bc)"
+  printf '슬롯 %s 개 · 호출 %s 회\n' "$n" "$s"
+}
+_pages /var/tmp/bidvector-collection-step3.log
+# ⑦ 뒤부터는 같은 계수를 journal 에서 센다(그때는 unit 이 돈다).
+# journalctl -u bidvector-collection --since -1d > /var/tmp/bv-col.log && _pages /var/tmp/bv-col.log
+```
+
+| 무엇 | 어디서 | 첫 run (___) | 왜 |
+|---|---|---|---|
+| `notice` 행 수 | ⓐ | | 사슬의 머리가 실제로 물을 넣었는가 |
+| **마감 전 후보 수** | ⓑ | | **⑤ 의 입력.** 이 수가 `BIDVECTOR_EVALUATION_CANDIDATECAP`(현행 1000)을 넘으면 평가 run 이 **실패**로 끝난다 |
+| 호출 수 | ⓕ | | 포털 한도(operation 별 1,000/일)와 `--calls-per-day` 를 그 수로 다시 본다 |
+| `raw_observation` 증가 | ⓒ (두 run 의 차) | | 재수집 누적의 **실측 기울기**. 디스크 증가를 이 수로 본다 |
+| `collection_run` 증가 | ⓓ (두 run 의 차) | | 슬롯 수 × run 수. 역시 파기되지 않는다 |
+| 덮은 날짜 수 / 30 | ⓔ | | 구멍이 있는가(§14.7 로 메운다) |
+| run 하나의 벽시계 시간 | `journalctl` 의 run 시작·끝 | | `TimeoutStartSec` 15m 와 간격 20 분이 맞는가 |
+
+**수를 적기 전에는 ⑤ 로 가지 않는다** — 이 문서는 그 수를 박지 않는다(박으면 재는 날 거짓이 된다).
+
+**⑤ 그 수로 후보 상한을 정해 `prod.env` 를 고친다**(운영자 결정 — 이 문서가 값을 정하지 않는다).
+
+```bash
+sudo -e /etc/bidvector-v2/prod.env   # BIDVECTOR_EVALUATION_CANDIDATECAP — ④ ⓑ 보다 넉넉히
+./tools/prod-health.sh --env-file /etc/bidvector-v2/prod.env --public
+```
+
+`prod.env` 는 compose 의 보간에 쓰이므로 **다음 일회 run 부터** 새 값이 간다(떠 있는 서비스를 내리지
+않는다 — 상주 app 에 그 값을 반영하려면 반입 절차를 쓴다). 후보가 상한을 넘는 날은 **상한을 올려도
+공고가 그 위로 쌓이면 다시 붉어진다** — 근본 처방(후보 질의를 좁히기)은 별 slice 다
+(`OPEN-M15-CANDIDATE-QUERY-SCOPE`).
+
+**⑥ 평가 커밋을 손으로 한 번 돌려 소요와 마침 줄의 계수를 적는다**(§13.4 의 측정 표 ⓑⓒ 와 같은 칸).
+
+```bash
+cd <저장소>
+./tools/prod-evaluation-commit.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --current-active-bids <현재 진행 투찰 수>
+echo "exit=$?"   # 0 이면 완료. 1 이면 §13.4·m6-6e §3.4 로 사유를 읽는다(후보 상한 초과가 이 자리다)
+```
+
+**⑦ 그때 타이머를 켠다 — 수집과 평가 커밋을 함께.** ② 의 멈춤을 되켜는 자리다.
+
+```bash
+sudo systemctl enable --now bidvector-collection.timer
+sudo systemctl enable --now bidvector-evaluation-commit.timer
+systemctl list-timers bidvector-collection.timer bidvector-evaluation-commit.timer  # NEXT 가 비어 있지 않아야 한다
+journalctl -u bidvector-collection -n 40
+```
+
+**주기 확인은 §9.4·§13.4 와 같은 모양이다** — 경보는 **실패한 run** 을 알리고, 아래 계수는 **아예 돌지
+않은 타이머**를 잡는다(발화하지 않는 것은 실패하지 않는다). 미룸은 **래퍼의 문면**으로 센다(unit 종료
+상태는 `SuccessExitStatus` 가 가린다).
+
+```bash
+journalctl -u bidvector-collection --since -2d | command grep -c 'collection finished'
+journalctl -u bidvector-collection --since -2d | command grep -c '돌고 있다'   # exit 4 — 잠금 경합
+systemctl list-timers bidvector-collection.timer
+```
+
+### 14.6 달이 바뀔 때
+
+달 디렉터리는 래퍼가 **run 시작 때 한 번** 정하고(창 계산과 같은 KST 「오늘」) 없으면 만든다 — 운영자가
+매달 할 일은 없다. 대신 **일 상한 회계가 새 디렉터리로 넘어가 그날의 소비가 0 에서 다시 선다**(월 1회,
+최대 하루치 — 등재된 제한). 옛 달의 디렉터리는 **지우지 않는다**: 그 안의 원장이 그 달의 호출 이력이고,
+지우면 그 달의 상한 회계가 사라진다. 디스크가 문제가 되면 **옛 달만** 다른 자리로 옮긴다.
+
+### 14.7 메우기 — 구멍이 남았을 때
+
+`Persistent=true` 는 놓친 창의 run **하나**를 따라잡을 뿐 **창을 넓히지 않는다**. 처방 창이 `--days-back 1`
+이므로 host 가 **이틀 넘게** 꺼져 있으면 그 사이 날짜가 구멍으로 남는다. 재는 자리는 §14.5 ④ ⓔ 이고,
+메우는 것은 **손 실행**이다(타이머를 고치지 않는다).
+
+```bash
+cd <저장소>
+# 창은 **31일 이하**여야 한다(넘으면 러너가 기동 거부 — `SPAN_TOO_LONG`). 넓으면 31일씩 나눠 **차례로**
+# 돌린다(멱등, 같은 실행 상태 디렉터리 — 이 갈래는 표본을 고정하지 않는다).
+./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --from <YYYY-MM-DD> --to <YYYY-MM-DD> --categories construction,service --calls-per-day 1000 --calls-total 31000
+```
+
+`--from/--to` 갈래의 달 디렉터리는 **`to` 의 달**이다 — 메우기를 그 달의 회계에 붙인다. 지난 달을 메우면
+그 달의 누적이 다시 움직이므로, 두 달에 걸친 구멍은 **달마다 나눠** 돌린다.
+
+### 14.8 끄는 법
+
+```bash
+sudo systemctl disable --now bidvector-collection.timer
+systemctl list-timers bidvector-collection.timer   # 비어 있어야 한다
+```
+
+타이머만 끄면 **이미 들어온 공고는 그대로** 있고 새 공고가 들어오지 않는다(평가 후보가 마감으로 말라
+간다). 더 센 차단이 필요하면 `koneps.env` 의 서비스 키를 비운다 — 그러면 수집 러너가 **기동 실패**한다
+(호출 0). `notice` 행의 파기는 보존 정책이 정한다(정본은 `m6-6b3-retention.md`).
+
+### 14.9 어긋날 때
+
+| 증상 | 뜻 | 처방 |
+|---|---|---|
+| 래퍼가 `exit 3`, 「실행 상태 root 가 저장소 안이다」 | `--run-state-root` 가 `<저장소>` 아래다(심링크로도 본다) | §14.1 의 자리를 준다 — 실험 입력은 커밋되지 않는다 |
+| 래퍼가 `exit 3`, 「달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다」 | 이미 있는 달 디렉터리의 mode 가 좁다(손으로 만든 자리) | `chmod 2770` 과 group 을 §14.1 의 값으로 맞춘다. **컨테이너는 uid/gid 10001 로 돈다** |
+| 래퍼가 `exit 3`, 「… 가 심링크다」 | `notice-list` 나 달 디렉터리가 링크다 — 링크 하나로 붙임의 원천이 저장소 안이나 root 밖으로 간다 | 링크를 걷고 실제 디렉터리를 둔다. 그 두 층은 **래퍼가 만든다**(§14.1) |
+| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 setgid 가 없다」 | `notice-list` 에 set-group-ID 가 없다 — 그 비트가 group 을 달 디렉터리로 잇는다 | `chmod 2700 <root>/notice-list`. 없으면 **다음 달**의 자리가 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다 |
+| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다」 또는 「other 에 열려 있다」 | 조상에 쓰기가 열렸다 — 그 자리에 쓸 수 있으면 **달 디렉터리를 바꿔칠 수 있고** 호출 상한 회계가 0 에서 다시 선다 | `chmod 2700`. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다(§14.1) |
+| 래퍼가 `exit 3`, 「달 디렉터리의 실경로가 실행 상태 root 밖이다」 | 붙임의 원천이 root 밖으로 나갔다 | 그 자리의 링크·마운트를 걷는다 |
+| 래퍼가 `exit 3`, 「서비스 키 env 에 … 밖의 키가 있다」 | 그 파일에 허용 집합 밖의 이름이 있다 — 그 파일은 일회 컨테이너의 env 를 **덮는다** | 그 줄을 지운다. `base-url`·`operations.*` 는 compose 축이다(§14.1) |
+| 래퍼가 `exit 3`, 「compose 해석기가 … 통째로 버렸다」 | 닫히지 않은 따옴표 · 값 뒤의 `!!` · `KEY=` 모양이 아닌 줄 — `run --env-from-file` 은 그런 파일을 **rc 0 으로 조용히 무시**한다 | 그 줄을 고친다. 이 거절이 없으면 러너가 「서비스 키가 없다」로 끝나 **멀쩡한 키**를 들여다보게 된다 |
+| 래퍼가 `exit 3`, 「--days-back 과 --from/--to 를 함께 줄 수 없다」 | 창을 정하는 자리가 둘이다 | 하나만 준다(§14.2) |
+| 기동 실패 `1`, 범위가 `SPAN_TOO_LONG` | 창이 31일을 넘었다 | §14.7 처럼 나눠 돌린다. **래퍼는 이 술어를 복제하지 않는다** |
+| 기동 실패 `1`, `RUN_STATE_FORMAT_MISSING|MISMATCHED|LEGACY_LINE` | 실행 상태 디렉터리가 **옛 형식**이다 | 고치지 말고 보고한다(m6-6e §1.5 와 같은 처분) |
+| 마침 줄 `exit=INCOMPLETE(2)`, `truncated=QuotaExhausted` | 포털 쿼터(`resultCode 22`·HTTP 429)다 — operation 별 1,000/일 | **다음 날** 같은 디렉터리로 다시 돈다(이어 돈다). 타이머가 그것을 한다 |
+| 마침 줄 `exit=INCOMPLETE(2)`, 멈춤 줄에 `cause=` 예산 | 일 상한에 닿았다 | **KST 자정** 뒤 재실행(타이머). 상한이 작으면 §14.5 ④ ⓕ 의 수로 올린다 |
+| 평가 커밋이 `1`, 후보 상한 초과 | 수집이 켜진 뒤의 상시 위험이다 | §14.5 ⑤ 로 상한을 올린다. 근본 처방은 `OPEN-M15-CANDIDATE-QUERY-SCOPE` |
+| `exit 5` | 래퍼를 거치지 않은 실행이 실행 상태 디렉터리를 쥐었다. 호출 0 | 그 프로세스를 찾는다(`pgrep -af 'java -jar .*app.jar'` · `docker ps -a`). 래퍼를 거친 손 실행이면 `4` 로 미뤘을 것이다 |
+| `exit 6` | 자물쇠를 **걸 수 없다** — 잠금 미지원 파일 시스템이거나 자물쇠 파일을 못 엶 | 기다려도 풀리지 않는다. §14.1 의 경로·권한을 고친다 |
+| `exit 7` | 러너의 다섯 밖 · `docker run` 자신의 실패 · 일회 컨테이너가 신호로 죽어 돌아온 128+n | journal 의 그 줄이 **원래 값**을 담는다. 러너에 값이 생겼으면 §14.4 의 표와 래퍼 `case` 를 함께 고친다 |
+
+**로그에 서비스 키 원문이 남지 않는다 — 단, 전제가 하나 있다.** 러너의 줄은 계수와 열거값만 나르고
+`ServiceKey` 의 `toString` 은 원문을 내지 않는다. **그러나 JDK HttpClient 자신의 내부 로그 속성을 켜면
+요청 URL 이 stderr 로 나가고 이 갈래의 URL 은 질의 문자열에 서비스 키를 싣는다** — 그래서 운영에서 그 두
+속성은 **금지**이고 래퍼가 `exit 3` 으로 먼저 끊는다(§13.3 과 같은 금지·같은 술어).

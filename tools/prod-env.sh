@@ -435,3 +435,241 @@ _prod_migrations_lost() {
   _prod_migrations "$state" "$to"   >/dev/null || return 1
   comm -23 <(_prod_migrations "$state" "$from") <(_prod_migrations "$state" "$to")
 }
+
+# ── 둘째 env 파일 — compose 템플릿 **밖**의 설정을 일회 컨테이너까지 넘기는 통로 ──────────────
+# M15/15Q 가 relay 래퍼에 세우고 **M15/15U 가 수집 래퍼와 공유하게 뽑았다.** 사본 둘을 두면 한쪽만
+# 고쳐지는 날이 온다(v2-지침서 §5 중복 금지) — 이 통로의 술어는 여기 하나다.
+#
+# 이 통로가 왜 좁혀야 하는가: compose 의 최상위 `--env-file` 은 **보간에만** 쓰여 컨테이너에 닿지
+# 않으므로(실측) 둘째 파일이 컨테이너까지 가는 길은 `run --env-from-file` 하나다. 그리고 그 값은 서비스가
+# 선언한 env 에 **더하고, 같은 이름이면 이긴다**(실측). 그래서 이 파일에 들어온 `JAVA_TOOL_OPTIONS` 나
+# `BIDVECTOR_PERSISTENCE_JDBCURL` 한 줄이 **반입 가드를 거치지 않은 채** compose 가 준 값을 덮는다
+# (`_prod_config_surface_ok` 는 해석된 compose 만 본다 — 이 파일은 그 밖이다). 통로 이름을 열거해
+# 거부하면 새 이름 하나로 다시 열리므로 **표면 자체를 등식으로** 닫는다.
+#
+# 허용 이름은 손으로 열거하지 않고 **속성 이름에서 만든다** — Spring 의 `SystemEnvironmentPropertyMapper`
+# 가 환경 변수 후보를 **둘** 만든다(dash 제거 · dash→`_`). 두 사상을 여기서 같은 규칙으로 되풀이하면
+# 「문서에 적힌 철자」와 「바인딩되는 철자」가 갈리지 않는다.
+#
+# 호출자가 쓰는 자리:
+#   BIDVECTOR_SECOND_ENV_REQUIRED_PROPS=( <속성 이름…> )   # 없으면 거절
+#   BIDVECTOR_SECOND_ENV_OPTIONAL_PROPS=( <속성 이름…> )   # 있어도 되고 없어도 된다
+#   _prod_stub_trap_install                                  # 해석 **앞**에 신호 trap 을 건다
+#   _prod_second_env_ok <경로> <라벨> <자리 참조> || _die "$_PROD_SECOND_ENV_ERR" 3
+#   <그 뒤> "$_PROD_SECOND_ENV_ABS"                          # 재는 것과 넘기는 것이 **같은 경로**다
+BIDVECTOR_SECOND_ENV_REQUIRED_PROPS=()
+BIDVECTOR_SECOND_ENV_OPTIONAL_PROPS=()
+
+# <속성 이름> → 그 속성이 받는 환경 변수 이름 둘
+_prod_spring_env_names() {
+  local p="$1" dots
+  dots="$(printf '%s' "$p" | tr '.' '_' | tr '[:lower:]' '[:upper:]')"
+  printf '%s\n' "${dots//-/}"   # dash 제거   — bidvector.…bot-credential → …BOTCREDENTIAL
+  printf '%s\n' "${dots//-/_}"  # dash → `_`  — bidvector.…bot-credential → …BOT_CREDENTIAL
+}
+_prod_second_env_allowed_names() {
+  local p
+  # 빈 배열에서도 `set -u` 아래 안전한 꼴로 펼친다(선택 속성이 없는 호출자가 있다).
+  for p in ${BIDVECTOR_SECOND_ENV_REQUIRED_PROPS[@]+"${BIDVECTOR_SECOND_ENV_REQUIRED_PROPS[@]}"} \
+           ${BIDVECTOR_SECOND_ENV_OPTIONAL_PROPS[@]+"${BIDVECTOR_SECOND_ENV_OPTIONAL_PROPS[@]}"}; do
+    _prod_spring_env_names "$p"
+  done
+}
+
+# **임시 자리는 부모가 만들고 부모가 치운다**(cr R-7 · N-2). 해석 함수는 명령 치환 `$( )` 안에서 돌므로
+# **서브셸**이고, 거기서 전역에 적은 자리는 부모에게 건너오지 않는다(첫 판이 그래서 신호 뒤에 자리를
+# 남겼다 — 실측). `RETURN` trap 도 서브셸 안에서만 도므로 신호 갈래를 덮지 못한다.
+_PROD_STUB_DIR=""
+# `|| true` — 지우지 못한 것이 이 자리의 반환값을 바꾸지 않는다(cr N-4).
+_prod_stub_cleanup() {
+  [ -z "$_PROD_STUB_DIR" ] || rm -rf "$_PROD_STUB_DIR" || true
+  _PROD_STUB_DIR=""
+}
+_prod_stub_on_signal() {
+  local sig="$1"
+  trap - TERM INT HUP
+  _prod_stub_cleanup
+  kill -s "$sig" $$
+}
+# `$$` 는 이 함수가 서브셸이 아니므로 **부르는 스크립트의 PID** 다(trap 이 그것을 자살시킨다).
+_prod_stub_trap_install() {
+  trap '_prod_stub_on_signal TERM' TERM
+  trap '_prod_stub_on_signal INT' INT
+  trap '_prod_stub_on_signal HUP' HUP
+}
+
+# **키 집합은 소비자와 같은 해석기로 뽑는다**(v H-1). 앞 판은 줄마다 **첫 `KEY=` 를 sed 로** 뽑았고,
+# compose 의 dotenv 해석기는 **따옴표로 닫힌 값 뒤의 둘째 대입을 새 변수로** 읽는다 — 그래서
+# `…ROUTEKEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil` 한 줄이 래퍼의 모든 검사를 통과하고
+# 컨테이너에는 그 DB 자격 통로가 들어갔다(verifier 실측). 술어가 **소비자와 다른 문법**에 걸려 있으면
+# 꼴을 하나씩 막는 처방은 다음 꼴에서 다시 열린다. 그래서 문법을 늘리지 않고 **해석기를 바꾼다**:
+# `env_file:` 로 이 파일을 받는 stub 서비스에 `docker compose config` 를 돌려 그 서비스의 environment
+# 키 집합을 읽는다.
+#
+# **두 해석기가 같다는 것은 실측이다**(M15/15Q evidence commands — 정상 · 우회 넷 · 버려짐 셋 · 빈 파일,
+# 아홉 입력 전부에서 `config`+`env_file:` 의 키 집합 == `run --env-from-file` 이 컨테이너에 넣는 키 집합).
+#
+# **값은 어디로도 나가지 않는다** — `config` 출력은 변수로 받아 `jq` 가 **키만** 낸다(argv·화면·로그
+# 어디에도 값이 없다). stderr 는 버린다.
+# 돌려주는 코드: 0 해석함 · 1 **compose 가 거절했다**(그 파일의 일) · 2 그 밖의 도구가 어긋났다
+# (`mktemp`·`jq` — 그 파일의 일이 **아니다**, cr R-1). 호출자가 둘을 다른 문면으로 낸다.
+_prod_second_env_parsed_keys() { # <파일 절대 경로> <stub 디렉터리 — 부모가 만들어 준다>
+  local f="$1" stub="$2" out keys rc=0
+  # **경로를 JSON 문자열로 넣는다**(v L-2). 따옴표 없이 넣으면 경로의 ` #' 이 YAML 주석이 되어
+  # `config` 가 **다른 파일**을 읽는다 — 그러면 검사한 파일과 컨테이너가 받는 파일이 갈린다(실측).
+  {
+    printf 'name: bidvector-second-env-check\n'
+    printf 'services:\n'
+    printf '  probe:\n'
+    printf '    image: bidvector-second-env-check:none\n'
+    printf '    env_file:\n'
+    printf '      - %s\n' "$(jq -Rn --arg p "$f" '$p')"
+  } > "$stub/compose.yaml" || return 2
+  # **평소 환경으로 부른다 — 문턱 둘과 같은 env 다.** 한때 이 호출만 `env -i "PATH=$PATH"` 로
+  # 좁혔는데(v L-3 처방의 절반), 그것이 `HOME`·`DOCKER_CONFIG` 까지 떨어뜨려 **compose 가 사용자
+  # 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝나게** 했다(cr N-1 실측 — docker 는
+  # `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다). 그 좁힘은 지금 아무것도 막지 않는다 —
+  # 아래 「값에 `$` 를 쓰지 않는다」 전제가 **해석보다 먼저** 파일 전수를 보므로 여기 닿는 파일에는
+  # `$` 가 한 글자도 없고, 두 해석기 어느 쪽에서도 보간이 **일어날 수 없다**(cr N-1 처방 ⓐ).
+  out="$(docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  keys="$(printf '%s' "$out" | jq -r '.services.probe.environment // {} | keys[]' 2>/dev/null)" || return 2
+  printf '%s' "$keys" | sort -u
+}
+
+# 주석·빈 줄이 아닌 줄의 수 — **해석기가 파일을 통째로 버렸는가**를 가르는 데만 쓴다(v L-1). 닫히지
+# 않은 따옴표·`"v" !!x`·`${X:?m}` 같은 줄이 있으면 compose 는 rc 0 으로 **파일 전체를 무시한다** —
+# 그대로 두면 러너가 「설정이 비었다」로 끝나 진단이 엉뚱한 곳을 가리킨다.
+_prod_second_env_content_lines() { sed -n '/^[[:space:]]*$/d; /^[[:space:]]*#/d; p' "$1" | grep -c '' || true; }
+
+# <경로> <라벨> <자리 참조> → 0 이면 `_PROD_SECOND_ENV_ABS` 에 **해석된 절대 경로**가 있다.
+# 어긋나면 1 과 `_PROD_SECOND_ENV_ERR`(종료 코드는 호출자가 정한다 — 세 래퍼 모두 전제 실패 `3` 이다).
+_prod_second_env_ok() {
+  local f="$1" label="$2" where="$3" abs mode keys content_n parse_rc=0 stray_raw stray_named stray_odd p
+  _PROD_SECOND_ENV_ERR=""
+  _PROD_SECOND_ENV_ABS=""
+  # **이 파일은 부르는 사용자가 직접 읽어야 한다**(cr H-2). 앞 판의 `EnvironmentFile=` 은 systemd
+  # manager(root)가 읽어 환경으로 넘겼지만, 이제는 래퍼와 docker CLI 가 `User=` 로 읽는다.
+  if [ ! -r "$f" ]; then
+    _PROD_SECOND_ENV_ERR="${label} 파일을 읽지 못했다: ${f} — 이 파일은 **이 스크립트를 돌리는 사용자**($(id -un))가 직접 읽는다(${where} 의 'install -m 600 -o \$USER'). root 전용으로 조이면 매 run 이 여기서 멈춘다"
+    return 1
+  fi
+  # **경로를 한 번만 풀고 그 뒤로는 그것만 쓴다**(cr R-2). 해석·권한·금지 속성 스캔·컨테이너 전달이
+  # **같은 것을 보아야** 「술어와 소비자가 같은 것을 본다」가 경로 축에서도 참이 된다.
+  abs="$(readlink -f "$f" 2>/dev/null || true)"
+  if [ -z "$abs" ]; then
+    _PROD_SECOND_ENV_ERR="${label} 의 절대 경로를 구하지 못했다: ${f}"
+    return 1
+  fi
+  # **other 에 한 비트라도 열려 있으면 거절한다.** 이 파일은 자격을 담는다 — 잠금 자리의 권한을 보는
+  # `_prod_project_lock` 과 같은 축이다. 소유자 **등식**은 걸지 않는다: `root:<내 group> 0640` 처럼
+  # 읽을 수 있고 좁은 배치가 있고, 그것까지 거절하면 도는 host 를 멈춘다. group 은 잠금 자리 술어
+  # (`& 022`)보다 느슨하다 — 그 틈은 설치 절차의 「그 사용자의 전용 group」이 닫는다.
+  mode="$(stat -c '%a' "$abs" 2>/dev/null || true)"
+  if [ -z "$mode" ] || [ "$(( 8#${mode: -3} & 8#007 ))" -ne 0 ]; then
+    _PROD_SECOND_ENV_ERR="${label} 의 권한을 읽지 못했거나 other 에 열려 있다(${f} mode=${mode:-?}) — 이 파일은 자격을 담는다(${where}). 'chmod 600' 뒤에 다시"
+    return 1
+  fi
+  # ── compose 문턱 둘 — 이 파일을 그 해석기로 읽기 **전에** 선다 ─────────────────
+  # 아래 `run --pull never` 가 compose 판에 기댄다 — 문턱이 반입에만 있으면 내려앉은 host 에서 「알 수
+  # 없는 플래그」의 종료 코드가 러너 자신의 「1 예외」와 섞인다. 이 둘이 **먼저** 서야 아래 해석의
+  # 실패가 「판이 낡았다」와 섞이지 않는다.
+  _prod_compose_version_ok || { _PROD_SECOND_ENV_ERR="$_PROD_COMPOSE_VER_ERR"; return 1; }
+  # **`run --env-from-file` 을 아는 판인가** — 같은 축의 둘째 문턱이다. 판 번호로 묻지 않고 **그 도구에게
+  # 직접** 묻는다(이 플래그가 들어온 판 번호를 지어내면 그 수가 곧 거짓이 되는 자리다). 모르면 둘째 env
+  # 파일이 컨테이너에 닿지 않고, 그 run 은 설정을 채웠는데도 기동 실패로 끝난다.
+  # 여기서는 **파이프를 물리지 않는다**: `docker … | grep -q` 는 플래그 줄이 앞쪽에 있어 docker 를
+  # SIGPIPE 로 죽일 수 있고, `pipefail` 아래에서 그 141 이 「모르는 판」으로 읽힌다. 값으로 받아 맞춘다.
+  # **빈 출력은 따로 말한다**(cr L-6) — 「플래그가 없다」와 「도움말을 받지 못했다」는 고칠 자리가 다르다.
+  local run_help
+  run_help="$(docker compose run --help 2>/dev/null || true)"
+  if [ -z "$run_help" ]; then
+    _PROD_SECOND_ENV_ERR="'docker compose run --help' 이 아무것도 내지 않았다 — 플래그 지원을 판정할 수 없다(docker 가 깨졌거나 권한이 없다). 'docker compose version' 을 먼저 본다"
+    return 1
+  fi
+  case "$run_help" in
+    *--env-from-file*) ;;
+    *)
+      _PROD_SECOND_ENV_ERR="이 docker compose 는 'run --env-from-file' 을 모른다 — ${label} 가 일회 컨테이너에 닿지 않는다(${where}). compose 를 올린다"
+      return 1 ;;
+  esac
+  # **`jq` 도 같은 문턱을 받는다**(cr R-1). 아래 키 집합 조회는 compose 와 `jq` 두 도구를 지나는데,
+  # `jq` 가 깨진 것을 「그 파일이 깨졌다」로 읽으면 운영자가 엉뚱한 파일을 들여다본다.
+  command -v jq >/dev/null 2>&1 || {
+    _PROD_SECOND_ENV_ERR="jq 가 필요하다 — ${label} 의 키 집합을 compose 출력에서 뽑는 데 쓴다"
+    return 1
+  }
+  printf '{}' | jq -e . >/dev/null 2>&1 || {
+    _PROD_SECOND_ENV_ERR="jq 가 가장 단순한 JSON 도 읽지 못한다 — 도구가 깨졌다(${label} 의 일이 아니다)"
+    return 1
+  }
+  # **경로에도 `$` 를 쓰지 않는다**(v M-1). 경로는 stub YAML 의 **값**으로 들어가고 compose 는 그 값을
+  # 보간한다 — JSON 인용은 YAML 파싱만 닫고 보간은 닫지 않는다. 그래서 `…/${NOPE:-relay.env}` 는
+  # `config` 가 이웃을, `run --env-from-file` 이 그 파일을 읽게 만든다(실측).
+  case "$abs" in
+    *'$'*)
+      _PROD_SECOND_ENV_ERR="${label} 의 경로에 '\$' 가 있다 — 그 글자는 compose 가 stub 의 값으로 보간해서, 검사한 파일과 컨테이너가 받는 파일이 갈린다. '\$' 없는 경로에 두고 다시(${where} 의 자리가 그 꼴이다)"
+      return 1 ;;
+  esac
+  # **값에도 `$` 를 쓰지 않는다**(v L-3). `config` 와 `run --env-from-file` 은 `${VAR}` 를 **서로 다른
+  # env** 로 푼다 — `$` 가 한 글자도 없으면 조회가 일어날 수 없어 둘이 같은 파일을 같게 읽는다. 이것은
+  # 키 집합을 뽑는 문법이 아니라 **좁히는 전제**다(거절만 더할 수 있고 통과를 만들 수 없다).
+  #
+  # **값 자리만 본다**(cr N-3) — 주석·빈 줄은 건너뛰고 첫 `=` **뒤**를 본다. 주석에 쓴 `$` 까지 거절하면
+  # 운영자가 고칠 수 없는 자리를 가리키게 된다(`=` 가 없는 줄은 해석기가 따로 끊는다).
+  if sed -n '/^[[:space:]]*#/d; s/^[^=]*=//p' "$abs" | grep -q '\$'; then
+    _PROD_SECOND_ENV_ERR="${label} 의 **값**에 '\$' 가 있다(${f}) — 값의 \${VAR} 는 compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다(${where} 의 값에는 '\$' 가 필요 없다). 그 글자를 지운다(문면은 줄 내용을 옮기지 않는다)"
+    return 1
+  fi
+  _PROD_STUB_DIR="$(mktemp -d)" || {
+    _PROD_SECOND_ENV_ERR="${label} 의 키 집합을 뽑는 **도구**가 어긋났다(임시 자리를 만들지 못했다) — ${label} 의 일이 아니다. TMPDIR 를 본다"
+    return 1
+  }
+  keys="$(_prod_second_env_parsed_keys "$abs" "$_PROD_STUB_DIR")" || parse_rc=$?
+  _prod_stub_cleanup
+  if [ "$parse_rc" -eq 2 ]; then
+    _PROD_SECOND_ENV_ERR="${label} 의 키 집합을 뽑는 **도구**가 어긋났다(stub 쓰기·jq) — ${label} 의 일이 **아니다**. 임시 자리와 jq 를 본다"
+    return 1
+  fi
+  content_n="$(_prod_second_env_content_lines "$abs")"
+  # **읽지 못했거나 키가 0 인데 내용 줄이 있다 = 해석기가 이 파일을 통째로 버렸다.**
+  # 두 갈래를 한 문면으로 모으는 이유: `config` 는 그런 입력에 **rc 1 로 말하지만**(실측)
+  # `run --env-from-file` 은 **rc 0 으로 조용히 버린다**(verifier 실측). 소비자 쪽이 조용하므로 여기서
+  # 크게 말하는 것이 이 검사의 값이다.
+  if [ "$parse_rc" -ne 0 ] || { [ -z "$keys" ] && [ "$content_n" != 0 ]; }; then
+    if [ "$content_n" = 0 ]; then
+      _PROD_SECOND_ENV_ERR="${label} 를 compose 해석기로 읽지 못했다(${f} — 내용 줄이 0 이다) — 판정 불가. 'docker compose version' 과 그 파일의 권한을 본다"
+      return 1
+    fi
+    _PROD_SECOND_ENV_ERR="compose 해석기가 ${label} 를 **통째로 버렸다**(${f} — 내용 줄 ${content_n} 인데 키가 0 이다). 닫히지 않은 따옴표 · 값 뒤의 '!!' · '\${VAR:?…}' · 'KEY=' 모양이 아닌 줄이 그렇게 만든다. **일회 컨테이너 쪽은 이것을 조용히 버린다** — 그대로 두면 러너가 '설정이 비었다'로 끝나 엉뚱한 곳을 가리킨다(문면은 줄 내용을 옮기지 않는다 — 이 파일은 자격을 담는다)"
+    return 1
+  fi
+  # **거절 문면은 이름을 전수로 찍지 않는다**(M15/15R, S-7). 여기 보이는 키는 compose 의 dotenv 해석기가
+  # **이 파일의 바이트에서** 만들어 낸 이름이고(따옴표 뒤의 둘째 대입을 새 변수로 읽는다 — v H-1), 그래서
+  # 편집 사고가 자격 조각을 키 **이름**으로 만들 수 있다. journal 은 지우기 어려우므로 **환경 변수 이름
+  # 꼴만** 찍고 나머지는 개수로만 말한다. 거절 자체는 꼴과 무관하게 그대로다.
+  # 남는 자리: 이름 꼴인 조각(`LEAKED_123456` 따위)은 여전히 찍힌다 — 이름을 전부 가리면 운영자가 무엇을
+  # 지워야 하는지 모른다(등재된 제한).
+  stray_raw="$(comm -23 <(printf '%s\n' "$keys" | grep -v '^$' | sort -u) <(_prod_second_env_allowed_names | sort -u))"
+  if [ -n "${stray_raw//[[:space:]]/}" ]; then
+    # **글자 범위를 로캘에서 떼어 놓는다**(cr L-6) — `[A-Z]` 는 로캘의 조합 순서에 따라 뜻이 달라질 수
+    # 있고, 이것은 **무엇을 journal 에 찍을지 고르는 보안 술어**다. 이 두 줄에만 건다.
+    stray_named="$(printf '%s\n' "$stray_raw" | LC_ALL=C grep -E '^[A-Z][A-Z0-9_]*$' | tr '\n' ' ' || true)"
+    stray_odd="$(printf '%s\n' "$stray_raw" | grep -v '^$' | LC_ALL=C grep -cvE '^[A-Z][A-Z0-9_]*$' || true)"
+    _PROD_SECOND_ENV_ERR="${label} 에 ${where} 밖의 키가 있다: 이름 꼴 ${stray_named:-(없음) }· 이름 꼴이 아닌 키 ${stray_odd} 개(이름을 찍지 않는다 — 그 이름은 이 파일의 바이트에서 만들어진 것이라 자격 조각일 수 있다) — 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. ${where} 의 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)"
+    return 1
+  fi
+  for p in ${BIDVECTOR_SECOND_ENV_REQUIRED_PROPS[@]+"${BIDVECTOR_SECOND_ENV_REQUIRED_PROPS[@]}"}; do
+    local n found=""
+    while IFS= read -r n; do
+      [ -n "$n" ] || continue
+      case $'\n'"${keys}"$'\n' in *$'\n'"$n"$'\n'*) found=1 ;; esac
+    done < <(_prod_spring_env_names "$p")
+    if [ -z "$found" ]; then
+      _PROD_SECOND_ENV_ERR="${label} 에 필수 키가 없다(${p} — $(_prod_spring_env_names "$p" | tr '\n' ' ')) — ${where} 를 채우거나 그 파일을 가리키는 인자를 본다. **값이 비었는지는 여기서 보지 않는다**(그 갈래는 러너가 기동 거부로 말한다)"
+      return 1
+    fi
+  done
+  _PROD_SECOND_ENV_ABS="$abs"
+  return 0
+}
