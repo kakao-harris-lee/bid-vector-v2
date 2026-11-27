@@ -22,10 +22,11 @@
 # 술어(판독은 `tools/image-pip-lock-check.py`, 그 머리 주석이 세 술어의 정본):
 #   · (가) 설치 집합 == 보고서 집합 ∪ {프로젝트 자신} ∪ {base 가 싣고 온 것} — 양방향, (이름, 판).
 #   · (나) 보고서 항목마다 보고서가 적은 archive 의 sha256 ∈ lock 의 그 (이름, 판) 해시 집합.
-#   · (다) 보고서 이름 집합 ⊇ lock 의 프로젝트 항목이 `<extra>` 에 선언한 직접 의존 이름.
-#   · 비공허 — 네 모집단과 (다)의 요구 집합 모두 ≥ 1 이고 계수를 출력한다. 「오탐 0 인 판이 양성도
-#     0」을 막는다.
-#   · 자기 변이 대조 — 임시 사본에 변이 **다섯**을 넣고 각각 **exit 1(위반)로** 붉어지는지, 그리고
+#   · (다) 보고서 이름 집합 ⊇ lock 의 프로젝트 항목이 `<extra>` 에 선언한 직접 의존 이름
+#     (무조건 + 그 extra 기여. 표식은 받는 꼴 둘로만 읽고 그 밖은 정지 · extra 기여가 0 이면 정지).
+#   · 비공허 — 네 모집단과 (다)의 두 부분집합(무조건·extra 기여) 모두 ≥ 1 이고 계수를 각각
+#     출력한다. 「오탐 0 인 판이 양성도 0」을 막고, 변이 ⑤·⑥이 그 두 축을 각각 쓴다.
+#   · 자기 변이 대조 — 임시 사본에 변이 **여섯**을 넣고 각각 **exit 1(위반)로** 붉어지는지, 그리고
 #     **기대한 사유((가)/(나)/(다))로** 붉어지는지를 매 실행 잰다. 종료 코드 계약이 세 갈래이므로
 #     「비-0」으로 세면 판정 불가(2)가 성공으로 읽힌다(cr F-1). 변이마다 사본이 실제로 달라졌는지
 #     먼저 확인한다(더하기만 한 변이는 초록이 된다).
@@ -190,19 +191,36 @@ if [ "$rc" -ne 0 ]; then
   exit 2
 fi
 
+# `python3 -B` — 판독기를 **모듈로 불러 쓰는 자리**(아래 변이기)가 `tools/__pycache__/` 를 만들지
+# 않게 한다(vr F-8). `.gitignore` 가 덮어 clean-tree 에는 영향이 없었지만, 게이트가 저장소 트리에
+# 파일을 남기지 않는 편이 맞다.
+#
+# **종료 코드는 계약 안으로 접는다**(cr R2-F3 의 셸 쪽). 판독기가 `0·1·2` 밖의 값을 내면(크래시·
+# 신호로 죽음) 그것은 「이미지가 기준을 어겼다」가 아니라 **게이트 고장**이므로 2 로 읽는다 —
+# 앞 판은 그런 값을 그대로 받아 최종 exit 1 과 「본 판정이 이미 위반」이라는 거짓 문면을 냈다.
+_fold_rc() { # <판독기 종료 코드> → 0·1·2
+  case "$1" in
+    0 | 1 | 2) printf '%s' "$1" ;;
+    *)
+      echo "판독기가 종료 코드 계약(0·1·2) 밖의 값을 냈다: $1 — 게이트 고장으로 읽는다(판정 불가)" >&2
+      printf '2'
+      ;;
+  esac
+}
+
 _read() { # <보고서> <lock> <설치 집합> → 판독기 종료 코드(출력은 그대로 흘린다)
   local report="$1" lock="$2" installed="$3" out=0
-  python3 "$READER" --lock "$lock" --report "$report" \
+  python3 -B "$READER" --lock "$lock" --report "$report" \
     --installed "$installed" --base "$WORK/base.txt" --extra "$SERVING_EXTRA" || out=$?
-  return "$out"
+  return "$(_fold_rc "$out")"
 }
 
 _read_capture() { # <출력 파일> <보고서> <lock> <설치 집합> → 판독기 종료 코드
   local sink="$1" report="$2" lock="$3" installed="$4" out=0
-  python3 "$READER" --lock "$lock" --report "$report" \
+  python3 -B "$READER" --lock "$lock" --report "$report" \
     --installed "$installed" --base "$WORK/base.txt" --extra "$SERVING_EXTRA" \
     > "$sink" 2>&1 || out=$?
-  return "$out"
+  return "$(_fold_rc "$out")"
 }
 
 # ---- 본 판정 ----
@@ -218,7 +236,7 @@ fi
 # 변이마다 「사본이 원본과 실제로 달라졌는가」를 **변이기 자신이** 비-0 으로 단언한다.
 #
 # 변이기는 **판독기 모듈을 그대로 불러** 요구 집합·프로젝트 항목을 얻는다(`importlib`) — 같은
-# 논리를 두 벌로 두면 한쪽의 교정이 다른 쪽을 놓친다. 다섯을 **한 번에** 만들고, 하나라도
+# 논리를 두 벌로 두면 한쪽의 교정이 다른 쪽을 놓친다. 여섯을 **한 번에** 만들고, 하나라도
 # 반영에 실패하면 전체가 판정 불가다.
 #
 # **본 판정이 이미 위반이면 자기 변이를 돌리지 않는다.** 변이의 기대는 「초록 입력에서 그 변이가
@@ -226,13 +244,23 @@ fi
 # 어긋남을 낸다(실측: `--extra serving` 을 뺀 이미지에서 변이 ②가 「(다)가 섞였다」로 어긋나
 # exit 1 이어야 할 판정이 exit 2 가 됐다). 자기 변이가 막는 것은 **거짓 초록**이고, 판정이 이미
 # 붉으면 막을 거짓 초록이 없다 — 그래서 건너뛰고 그 사실을 요약에 적는다.
+#
+# **끈 사실은 본 판정과 무관하게 찍는다**(cr R2-F4). 앞 판은 `VERDICT != 0` 가 먼저 걸려 「끌 때도
+# 한 줄 찍는다」는 스위치 자신의 규율이 깨졌고 요약도 「건너뜀」만 말했다 — 끈 사실이 로그에서
+# 사라졌다. 요약은 두 사유의 **합**으로 만든다.
 SELFCHECK_SUMMARY="자기변이=꺼짐"
+if [ "$SELFCHECK" != "1" ]; then
+  echo "주의: IMAGE_PIP_LOCK_SELFCHECK=0 — 자기 변이 대조를 끄고 돌았다" >&2
+fi
 if [ "$VERDICT" -ne 0 ]; then
   SELFCHECK_SUMMARY="자기변이=건너뜀(본 판정이 이미 위반이라 초록 기준선이 없다)"
+  if [ "$SELFCHECK" != "1" ]; then
+    SELFCHECK_SUMMARY="자기변이=꺼짐+건너뜀(스위치가 0 이고 본 판정도 이미 위반이다)"
+  fi
 elif [ "$SELFCHECK" = "1" ]; then
   mrc=0
   IPLC_WORK="$WORK" IPLC_LOCK="$LOCK_FILE" IPLC_READER="$READER" IPLC_EXTRA="$SERVING_EXTRA" \
-    python3 -c '
+    python3 -B -c '
 import importlib.util, json, os, tomllib
 from pathlib import Path
 
@@ -247,7 +275,8 @@ norm = reader.normalize
 
 report = json.load(open(work + "/report.json", encoding="utf-8"))
 _hashes, project, project_entry = reader.load_lock(Path(lock_path))
-wanted = reader.required_names(project_entry, extra)
+unconditional, contributed = reader.required_names(project_entry, extra)
+wanted = unconditional | contributed
 
 base = set()
 for line in open(work + "/base.txt", encoding="utf-8"):
@@ -294,17 +323,25 @@ if len(json.load(open(target2, encoding="utf-8"))["install"]) != len(report["ins
     raise SystemExit("② 변이가 사본에 반영되지 않았다")
 say("②", "보고서에서 " + norm(dropped2["metadata"]["name"]) + " 제거(base·프로젝트·요구 밖)")
 
-# ⑤ 보고서에서 **요구 이름** 하나를 제거 → (다). 설치 목록이 선언보다 좁아지는 축이다.
-wanted_idx = [i for i, (n, v) in enumerate(pairs()) if n in wanted]
-if not wanted_idx:
-    raise SystemExit("⑤ 보고서에 요구 이름이 0 건이다 — (다)가 공허하다")
-mutated = copy()
-dropped5 = mutated["install"].pop(wanted_idx[0])
-target5 = work + "/report-mut-required.json"
-json.dump(mutated, open(target5, "w", encoding="utf-8"))
-if len(json.load(open(target5, encoding="utf-8"))["install"]) != len(report["install"]) - 1:
-    raise SystemExit("⑤ 변이가 사본에 반영되지 않았다")
-say("⑤", "보고서에서 요구 이름 " + norm(dropped5["metadata"]["name"]) + " 제거")
+# ⑤·⑥ 보고서에서 **요구 이름** 하나를 제거 → (다). 설치 목록이 선언보다 좁아지는 축이다.
+#    표적을 **extra 기여 부분집합**과 **무조건 부분집합**에서 각각 고른다(cr R2-F1). 앞 판은
+#    `wanted`(둘의 합집합)에서 보고서 순서상 첫 항목을 집어 늘 무조건 쪽(`grpcio`)을 재고 있었다 —
+#    (다)가 존재하는 사유인 extra 기여 셋은 **어떤 변이도 건드리지 않았다**. 그러면 extra 가지가
+#    조용히 기여를 멈추는 날에도 자기 변이 전부가 통과한다. 「비공허를 쓰는 축에서 재라」.
+def drop_one(tag, subset, label, out_name):
+    idx = [i for i, (n, v) in enumerate(pairs()) if n in subset]
+    if not idx:
+        raise SystemExit(tag + " 보고서에 " + label + " 요구 이름이 0 건이다 — 그 축이 공허하다")
+    mutated_local = copy()
+    dropped_local = mutated_local["install"].pop(idx[0])
+    out_path = work + "/" + out_name
+    json.dump(mutated_local, open(out_path, "w", encoding="utf-8"))
+    if len(json.load(open(out_path, encoding="utf-8"))["install"]) != len(report["install"]) - 1:
+        raise SystemExit(tag + " 변이가 사본에 반영되지 않았다")
+    say(tag, "보고서에서 " + label + " 요구 이름 " + norm(dropped_local["metadata"]["name"]) + " 제거")
+
+drop_one("⑤", contributed, "extra 기여", "report-mut-required-extra.json")
+drop_one("⑥", unconditional, "무조건", "report-mut-required-uncond.json")
 
 # ③ lock 사본에서 한 패키지의 해시를 제거 → (나)(대조할 집합이 빈다).
 #    줄 꼴에 기대는 자리라 **사유를 구분해** 적는다(cr F-6): 지울 줄이 없거나 사본이 TOML 로
@@ -388,14 +425,13 @@ say("④", "설치 집합에서 " + installed_lines[0] + " 제거")
   _expect_red "보고서 항목 제거" "(가)" "(다)" "$WORK/report-mut-drop.json" "$LOCK_FILE" "$WORK/installed.txt"
   _expect_red "lock 해시 제거" "(나)" "-" "$WORK/report.json" "$WORK/lock-mut.toml" "$WORK/installed.txt"
   _expect_red "설치 집합 항목 제거" "(가)" "(다)" "$WORK/report.json" "$LOCK_FILE" "$WORK/installed-mut.txt"
-  _expect_red "요구 이름 제거" "(다)" "-" "$WORK/report-mut-required.json" "$LOCK_FILE" "$WORK/installed.txt"
+  _expect_red "요구 이름 제거 — extra 기여" "(다)" "-" "$WORK/report-mut-required-extra.json" "$LOCK_FILE" "$WORK/installed.txt"
+  _expect_red "요구 이름 제거 — 무조건" "(다)" "-" "$WORK/report-mut-required-uncond.json" "$LOCK_FILE" "$WORK/installed.txt"
   if [ "$mutation_failures" -gt 0 ]; then
     echo "== 자기 변이 대조 실패: ${mutation_failures}건(판정 불가) ==" >&2
     exit 2
   fi
-  SELFCHECK_SUMMARY="자기변이=5건 전부 exit 1 + 기대 사유((나)·(가)·(나)·(가)·(다))"
-else
-  echo "주의: IMAGE_PIP_LOCK_SELFCHECK=0 — 자기 변이 대조를 끄고 돌았다" >&2
+  SELFCHECK_SUMMARY="자기변이=6건 전부 exit 1 + 기대 사유((나)·(가)·(나)·(가)·(다)extra·(다)무조건)"
 fi
 
 echo "-- 실측 요약 --"

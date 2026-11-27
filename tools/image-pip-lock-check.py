@@ -42,6 +42,7 @@ import argparse
 import json
 import re
 import sys
+import traceback
 from pathlib import Path
 
 # 보고서 스키마 판. pip 25.0.1 실측값은 문자열 "1" 이다 — 판이 달라지면 `download_info`
@@ -78,11 +79,36 @@ def read_pairs(path: Path, label: str) -> set[tuple[str, str]]:
     return pairs
 
 
-def required_names(project_entry: dict[str, object], extra: str) -> set[str]:
-    """lock 의 프로젝트 항목이 **선언한** 직접 의존 이름 — 무조건 + `extra == '<extra>'`.
+# 표식을 **받는 꼴 둘**로만 읽는다(수정 라운드 2 — vr F-6 · cr R2-F2·R2-F5). 「extra 가 X 와
+# 같다」한 절이고, 공백·따옴표 종류·좌우 뒤집힘만 정규화해 받는다. 그 밖은 **읽지 않고 세운다** —
+# 표식 문법을 손 정규식으로 넓게 흉내 내면 흉내가 틀린 자리가 곧 조용히 빠지는 가지가 된다.
+_MARKER_EXTRA_FORMS = (
+    re.compile(r"""\Aextra\s*==\s*(['"])(?P<name>[^'"]*)\1\Z"""),
+    re.compile(r"""\A(['"])(?P<name>[^'"]*)\1\s*==\s*extra\Z"""),
+)
 
-    닫힘 해석이 아니다(전이 의존은 보지 않는다). 표식의 **꼴이 바뀌면 정지**한다 — 겹 표식
-    (`extra == 'x' and sys_platform == 'linux'`)을 조용히 빼면 (다)가 그만큼 비어 버린다.
+
+def _marker_extra(marker: str) -> str | None:
+    """표식이 단순 extra 비교면 그 extra 이름, 아니면 None(호출부가 정지시킨다)."""
+    collapsed = " ".join(marker.split())
+    for pattern in _MARKER_EXTRA_FORMS:
+        matched = pattern.match(collapsed)
+        if matched is not None:
+            return matched.group("name")
+    return None
+
+
+def required_names(project_entry: dict[str, object], extra: str) -> tuple[set[str], set[str]]:
+    """lock 의 프로젝트 항목이 **선언한** 직접 의존 이름 — (무조건, `<extra>` 기여) 두 집합.
+
+    닫힘 해석이 아니다(전이 의존은 보지 않는다). 항목마다 셋 중 하나로 **분류**하고 그 밖은
+    정지한다 — 「조용히 빠지는」 가지가 0 이어야 한다:
+      ⓐ 표식 없음 → 무조건 요구
+      ⓑ 표식이 단순 extra 비교 → 그 extra 가 인자면 기여 요구, 다른 extra 면 정당하게 건너뜀
+      ⓒ 그 밖 전부(환경 표식 · 겹 표식 · 못 읽는 꼴) → **정지**
+    앞 판은 ⓒ 가운데 「정확한 꼴을 부분문자열로 담은 것」만 세우고 나머지를 버렸다 — 실측:
+    무조건 의존에 `sys_platform == 'linux'` 를 달거나 `extra=='serving'`·`'serving' == extra`
+    로 적으면 그 이름이 요구 집합에서 조용히 빠지고(5→4) 게이트는 초록이었다.
     """
     metadata = project_entry.get("metadata")
     if not isinstance(metadata, dict):
@@ -97,30 +123,40 @@ def required_names(project_entry: dict[str, object], extra: str) -> set[str]:
     if not isinstance(entries, list) or not entries:
         raise Undecidable("lock 의 프로젝트 항목에 requires-dist 가 없다 — (다)를 잴 수 없다")
 
-    wanted: set[str] = set()
+    unconditional: set[str] = set()
+    contributed: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
             raise Undecidable(f"requires-dist 항목을 읽지 못했다: {entry!r}")
         name = normalize(entry["name"])
         marker = entry.get("marker")
         if marker is None:
-            wanted.add(name)
+            unconditional.add(name)
             continue
         if not isinstance(marker, str):
             raise Undecidable(f"requires-dist 의 marker 가 문자열이 아니다: {entry!r}")
-        collapsed = " ".join(marker.split())
-        if collapsed in (f"extra == '{extra}'", f'extra == "{extra}"'):
-            wanted.add(name)
-        elif f"extra == '{extra}'" in collapsed or f'extra == "{extra}"' in collapsed:
+        marker_extra = _marker_extra(marker)
+        if marker_extra is None:
             raise Undecidable(
-                f"requires-dist 의 표식 꼴이 단순 extra 비교가 아니다: {marker!r}"
-                " — 겹 표식을 조용히 빼면 (다)가 그만큼 비어 버린다"
+                f"requires-dist({name})의 표식이 단순 extra 비교가 아니다: {marker!r}"
+                " — 환경 표식·겹 표식·못 읽는 꼴은 통과가 아니라 정지다(조용히 빠지면 (다)가"
+                " 그만큼 비어 버린다). 받는 꼴은 「extra == 'X'」와 「'X' == extra」 둘뿐이다"
             )
-    if not wanted:
+        if marker_extra == extra:
+            contributed.add(name)
+    if not unconditional and not contributed:
         raise Undecidable(
             f"extra {extra!r} 가 요구하는 직접 의존 이름이 0 건이다 — (다)가 공허하게 참이 된다"
         )
-    return wanted
+    # **인자 extra 가 기여하는 이름이 0 이면 정지**(vr F-7). 무조건 의존만으로 비공허가 충족되면
+    # 「`provides-extras` 에는 있으나 고유 의존이 없는 extra」가 초록으로 지나간다 — 그러면 (다)가
+    # 재는 것이 이 extra 가 아니라 프로젝트의 무조건 의존뿐이다(실측: 그런 extra 로 rc 0 · 요구 2).
+    if not contributed:
+        raise Undecidable(
+            f"extra {extra!r} 가 **고유하게** 요구하는 직접 의존 이름이 0 건이다"
+            f"(무조건 {len(unconditional)}건뿐) — 이 extra 에 대해 (다)는 아무것도 재지 않는다"
+        )
+    return unconditional, contributed
 
 
 def load_lock(
@@ -235,7 +271,8 @@ def check(
 ) -> tuple[int, list[str], str]:
     """세 술어를 재고 (종료 코드, 위반 문면 목록, 요약 한 줄) 을 낸다."""
     lock_hashes, project, project_entry = load_lock(lock_path)
-    wanted = required_names(project_entry, extra)
+    unconditional, contributed = required_names(project_entry, extra)
+    wanted = unconditional | contributed
     report_items = load_report(report_path)
     installed = read_pairs(installed_path, "설치 집합")
     base = read_pairs(base_path, "base 집합")
@@ -288,7 +325,8 @@ def check(
     summary = (
         f"lock-패키지={len(lock_hashes)}건 보고서-항목={len(report_items)}건 해시-대조={compared}건 "
         f"설치-집합={len(installed)}건 base-집합={len(base)}건 "
-        f"프로젝트={project[0]}=={project[1]} extra={extra}·요구-이름={len(wanted)}건"
+        f"프로젝트={project[0]}=={project[1]} extra={extra}"
+        f"·요구-이름={len(wanted)}건(무조건 {len(unconditional)} · extra 기여 {len(contributed)})"
     )
     return (EXIT_VIOLATION if violations else EXIT_OK), violations, summary
 
@@ -318,6 +356,16 @@ def main(argv: list[str]) -> int:
         )
     except Undecidable as exc:
         print(f"판정 불가: {exc}", file=sys.stderr)
+        return EXIT_UNDECIDABLE
+    except Exception:  # noqa: BLE001 — 아래 사유
+        # **예기치 못한 예외도 판정 불가(2)다**(cr R2-F3). 앞 판은 `Undecidable` 만 잡아
+        # `KeyError`·`UnicodeDecodeError` 같은 것이 파이썬의 종료 코드 **1** 로 나갔고, 셸은 그것을
+        # 「이미지가 기준을 어겼다」로 읽어 거짓 사유(「lock 등식 게이트 실패」)와 거짓 문면
+        # (「본 판정이 이미 위반」)을 냈다. 종료 코드 계약(`0/1/2`)이 그 자리에서 깨진다.
+        # 역추적은 그대로 stderr 로 보낸다 — 게이트가 고장 난 회차에 무엇이 났는지가 로그에 있어야
+        # 한다. 삼키는 것이 아니라 **분류를 고치는** 것이므로 `BLE` 린트 규율의 취지에 어긋나지 않는다.
+        traceback.print_exc()
+        print("판정 불가: 판독기가 예기치 못한 예외로 끊겼다(위반이 아니라 게이트 고장이다)", file=sys.stderr)
         return EXIT_UNDECIDABLE
 
     for line in violations:
