@@ -32,15 +32,63 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.22@sha256:2320e6c239737dc73cccce393a8bb89eb
 # 옮긴다.
 WORKDIR /src
 COPY contracts/proto ./contracts/proto
-COPY ml-engine/pyproject.toml ml-engine/setup.py ml-engine/.python-version ./ml-engine/
+COPY ml-engine/pyproject.toml ml-engine/setup.py ml-engine/.python-version ml-engine/uv.lock ./ml-engine/
 COPY ml-engine/tools ./ml-engine/tools
 COPY ml-engine/src ./ml-engine/src
 
 WORKDIR /src/ml-engine
-# uv.lock 은 dev 그룹(pytest·mypy 등)까지 고정한다 — wheel 빌드는 `[build-system].requires`
-# (grpcio-tools, PEP 517 격리 빌드 환경)만 필요해 lock 파일 없이 `uv build` 를 그대로 쓴다
-# (CI S-11 단계와 같은 명령, `uv sync` 를 이 stage 에서 부르지 않는다).
-RUN uv build --wheel -o /wheels
+# M15/15T(D-15T-1) — **이 이미지가 받는 Python 배포물의 바이트를 `uv.lock` 에 묶는다.** 앞 판은
+# lock 을 이 stage 에 들이지 않았고, 그래서 두 자리가 해시 없이 풀렸다 — ① 격리 빌드 환경의
+# `setuptools>=68`·`grpcio-tools`(와 그 전이. 그 도구들이 출하 wheel 안의 **생성 stub** 을 만든다)
+# ② runtime stage 의 의존 전체. 같은 저장소의 `uv.lock` 은 그 닫힘을 sha256 으로 갖고 있고 CI
+# `ml-engine` job 은 그것으로 설치한다. 즉 **검사한 집합과 출하하는 집합이 다른 경로로 풀렸다.**
+#
+# 해시 목록은 **커밋하지 않는다** — 저장소에 두면 「lock ↔ 생성물」 등식 게이트가 하나 더 필요해진다.
+# 원천을 하나(`uv.lock`)로 두고 이 stage 가 그때그때 만든다. 목록은 runtime 에 남기지 않는다
+# (아래 설치 RUN 이 지운다) — 남는 것은 설치 **보고서**이고 그것이 결과 등식 게이트의 입력이다.
+#
+# **`--locked` 다(`--frozen` 이 아니다).** uv 0.9.22 실측(2026-11-27):
+#   · 정상 lock 에서 `--network none` 으로 exit 0 — 재해석이 없어 빌드에 네트워크 의존을 더하지 않는다.
+#   · `pyproject.toml` 의 판만 올린 사본에서 exit 2 로 끊긴다. 같은 사본에서 `--frozen` 은 exit 0 이고
+#     `uv sync --frozen --all-extras --dry-run` 도 exit 0 이다 — 즉 **`ml-engine` job 의 어느 step 도
+#     pyproject↔lock 어긋남을 받지 않는다.** 이 줄이 그것을 처음 끊는 자리다.
+#   · `--no-dev` 는 이 프로젝트에서 **거동 0** 이다(`dev` 는 dependency group 이 아니라 extra 라
+#     `--extra serving` 이 이미 그것을 뺀다 — 산출이 바이트까지 같음을 실측). CI `ml-engine` job 의
+#     관용구를 그대로 둔다(새 축약을 만들지 않는다).
+#
+# 빌드 제약은 **lock 닫힘 전체**(`--all-extras`)다. 격리 빌드 환경이 요구하는 것
+# (`[build-system].requires` 와 그 전이)은 `dev` extra 를 타고 lock 에 들어 있고, 제약은 요청된
+# 패키지에만 걸리므로 넓은 집합이 좁히는 일은 없다 — 어느 extra 가 빌드 도구를 싣는지에 기대지 않는다.
+#
+# 비공허를 여기서 잰다: 목록에 해시가 0 건이면 `--require-hashes` 는 「요구할 것이 없다」로 조용히
+# 통과한다. 그 초록은 방어의 증거가 아니다.
+#
+# **`--extra serving` 의 이름은 게이트가 lock 의 선언과 대조한다**(cr F-2). 앞 판은 extras 닫힘을
+# wheel 메타데이터에서 받았고(`pip install "<wheel>[serving]"`) 목록 설치로 바꾸면서 그 보증이
+# 사라졌다 — 이 인자를 떨어뜨리거나 이름을 바꾸면 목록과 이미지가 **함께** 좁아져 결과 등식 둘이
+# 모두 초록이 된다. `tools/image-pip-lock-check.sh` 의 (다)가 「보고서 이름 ⊇ lock 이 이 extra 에
+# 선언한 직접 의존」을 단언하고, CI step 이 그 이름을 같은 문자열로 넘긴다.
+RUN set -eu; \
+    mkdir -p /pip-input; \
+    uv export --format requirements.txt --locked --no-emit-project --no-annotate --no-header \
+        --all-extras > /pip-input/build-constraints.txt; \
+    uv export --format requirements.txt --locked --no-emit-project --no-annotate --no-header \
+        --extra serving --no-dev > /pip-input/serving-requirements.txt; \
+    for list in /pip-input/build-constraints.txt /pip-input/serving-requirements.txt; do \
+        hashes="$(awk 'index($0, "--hash=sha256:") > 0 { n++ } END { print n+0 }' "$list")"; \
+        pins="$(awk 'index($0, "==") > 0 { n++ } END { print n+0 }' "$list")"; \
+        [ "$hashes" -ge 1 ] && [ "$pins" -ge 1 ] \
+            || { echo "$list 의 해시 ${hashes}건·고정 ${pins}건 — uv export 가 해시를 싣지 않았다" >&2; exit 1; }; \
+        echo "$list: 고정 ${pins}건 해시 ${hashes}건"; \
+    done
+
+# M15/15T(D-15T-3) — 격리 빌드 환경에도 해시를 강제한다. `--require-hashes` 는 빌드 의존마다
+# 일치하는 해시를 요구하고, 그 해시는 위 제약 파일(= lock)에서만 온다. `setuptools>=68` 이 lock 의
+# 판으로 좁혀지는 것이 의도된 부수 효과다. 음성 대조(일회 실측, commands.md): 제약 파일에서
+# `setuptools` 의 **해시 전부**를 다른 값으로 바꿔치우면 이 줄이 exit 2(`Hash mismatch for
+# setuptools==…`) 로 끊긴다. **하나만** 바꿔치우면 통과한다 — 그 패키지의 다른 해시(sdist/wheel)가
+# 아직 맞기 때문이다. 변이를 넣는 사람은 그 패키지의 집합 전체를 갈아야 한다.
+RUN uv build --wheel -o /wheels -b /pip-input/build-constraints.txt --require-hashes
 
 # ---- runtime ----
 FROM python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3adc7812bab69eca5dbdc1a5cc690ad28306d234ffb4ef8ac9753 AS runtime
@@ -127,12 +175,43 @@ RUN groupadd --system --gid 10001 mlserving \
 WORKDIR /app
 
 COPY --from=builder /wheels/*.whl /tmp/wheels/
-# extras 문법(`pkg[serving]`) 은 로컬 wheel 경로에도 붙는다 — `[project.dependencies]`
-# (grpcio·protobuf, 항상)+`serving` extra(numpy·lightgbm·pyyaml)만 들어오고 dev/training
-# 전용 도구(grpcio-tools·pytest 등)는 들어오지 않는다(5A D-5A-0 (b)).
-RUN wheel_file="$(ls /tmp/wheels/*.whl)" \
-    && pip install --no-cache-dir --no-compile "${wheel_file}[serving]" \
-    && rm -rf /tmp/wheels /root/.cache/pip
+COPY --from=builder /pip-input/serving-requirements.txt /tmp/pip-input/serving-requirements.txt
+
+# M15/15T(D-15T-2) — **설치가 두 걸음이다.** 앞 판은 `pip install "${wheel_file}[serving]"` 한 줄로
+# extras 닫힘을 pip 이 그 자리에서 해석하게 했다. `pyproject.toml` 이 직접 의존의 **판**은 `==` 로
+# 고정하지만 ① 전이 의존(scipy·narwhals 등)은 판도 떠 있었고 ② 어느 것도 **바이트**가 고정돼
+# 있지 않았다. 실측(2026-11-27): 출하 이미지의 `narwhals` 는 2.29.0 인데 `uv.lock` 은 2.26.0 이다 —
+# 검사한 집합과 출하한 집합이 실제로 갈려 있었다. 이 두 걸음이 그것을 닫는다(그 한 판의 하향이
+# 이 slice 의 **의도된 거동 변화**다 — lock 이 CI 가 test 하는 집합이다).
+#
+# ① 의존: `--require-hashes` 는 목록의 **모든** 항목에 해시를 요구하므로 해시 불일치는 설치
+#    **전에** 실패한다. `--only-binary :all:` 로 sdist 로 떨어지는 경로를 닫아 설치 중 임의 빌드
+#    코드가 돌지 않게 하고, `--no-deps` 로 목록 밖 유입을 닫는다(닫힘은 lock 이 이미 갖고 있다).
+#    `--report` 가 내려받은 archive 의 **URL·판·sha256**(색인 링크가 선언한 값이고, pip 이 받은
+#    바이트를 그 값과 대조한다 — pip 25.0.1 소스 확인, commands.md)을 남긴다 — 그것이
+#    `tools/image-pip-lock-check.sh` 의 입력이고, 플래그와 **독립된** 결과 측정이다. 실측: pip 25.0.1
+#    의 보고서는 스키마 판 "1" 이고 항목마다 `download_info.archive_info.hashes.sha256` 을 싣는다
+#    (캐시 적중 회차에도 그대로 싣는다 — 해시 없는 항목은 게이트가 통과가 아니라 정지로 받는다).
+#    **보고서는 이 RUN 한 걸음의 기록이다** — 최종 파일시스템의 측정이 아니므로, 뒤에 같은 (이름, 판)을
+#    강제 재설치하는 걸음을 더하면 두 등식 밖이다(알려진 제한, scope.md).
+# ② 프로젝트 wheel: 같은 빌드가 방금 만든 파일이라 해시를 적지 않는다. `--no-index` 로 이 걸음이
+#    무엇도 새로 받지 못하게 한다(양성 대조 실측: `--no-index` 아래서 색인에만 있는 판을 요구하면
+#    exit 1 `from versions: none`).
+# ③ `pip check` — wheel 의 메타데이터가 요구하는 것이 ①의 집합으로 충족되는지. 닫힘이 모자라면
+#    여기서 비-0 이다.
+#
+# 보고서는 `/opt/bidvector/` 에 **root 소유로** 남긴다 — `/app` 은 실행 사용자 소유이고 그 아래
+# `artifacts` 는 named volume 의 자리다. 내용은 공개 색인 정보(URL·해시·판)뿐이고 비밀값이 없다.
+RUN set -eu; \
+    mkdir -p /opt/bidvector; \
+    pip install --no-cache-dir --no-compile --require-hashes --only-binary :all: --no-deps \
+        --report /opt/bidvector/pip-install-report.json \
+        -r /tmp/pip-input/serving-requirements.txt; \
+    wheel_file="$(ls /tmp/wheels/*.whl)"; \
+    pip install --no-cache-dir --no-compile --no-deps --no-index "$wheel_file"; \
+    pip check; \
+    chmod 0644 /opt/bidvector/pip-install-report.json; \
+    rm -rf /tmp/wheels /tmp/pip-input /root/.cache/pip
 
 # 정책 파일은 저장소 사본을 이미지에 복사한다(D-6C-7) — 정본은 저장소이고 런타임 경로는
 # env 로만 지정한다(기본값 없음, `ml_engine.app.server.ServerConfig.from_env`가 빈 env 를
