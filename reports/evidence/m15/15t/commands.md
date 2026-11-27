@@ -77,9 +77,9 @@ base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes` · **main 병�
 
 | 명령 | 결과 |
 |---|---|
-| `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` | **exit 0** — 병합 커밋에서 runtime stage 가 apt RUN 부터 **실제로 다시 돌았다**(CACHED 12 = builder 전부). `pip check` 「No broken requirements found」 · 이미지 id `sha256:3f9d6a4a…` |
+| `docker build -f docker/ml-serving.Dockerfile -t bidvector/ml-serving:local .` | **exit 0** — 병합 커밋 회차에 runtime stage 가 apt RUN 부터 **실제로 다시 돌았다**(CACHED 12 = builder 전부) · `pip check` 「No broken requirements found」. 마지막 라운드는 Dockerfile 무변경이라 18 step 전부 CACHED 이고 이미지 id 가 **같은 객체** `sha256:3f9d6a4a…` 다 |
 | `./tools/image-hygiene-check.sh … config/quality/image-hygiene-policy.properties` | **exit 0** — 금지-import 5건 · uid 10001 · base-layer 접두 일치 · `size_bytes=346,010,027` / `cap=400,000,000`(86.5%). 병합 전 343,931,147 에서 `+2,078,880` — #208 의 libpam 상향 layer 다 |
-| `./tools/image-pip-lock-check.sh … ml-engine/uv.lock /opt/bidvector/pip-install-report.json serving` | **exit 0** — 계수·자기 변이는 아래 |
+| `./tools/image-pip-lock-check.sh … ml-engine/uv.lock /opt/bidvector/pip-install-report.json serving` | **exit 0** — 계수·자기 변이 여섯은 아래 |
 | `./tools/workflow-action-pins-check.sh .github/workflows` | **exit 0** — uses 24(핀 24) · 기대 파일 7줄과 집합 등식 · 자기 변이 18건 |
 | `./tools/workflow-step-refs-check.sh .github/workflows/ci.yml` | **exit 0** — job 5 · id 15 · 참조 18 · 매달린 참조 0(새 step 은 id 를 두지 않았다 — 가리키는 자리 없는 id 는 죽은 설정이다) |
 | `bv-build.sh ./gradlew --no-daemon check --continue` | **exit 0** · FAILED 0 · `:leakPatternGate` 실행(UP-TO-DATE 아님) |
@@ -111,7 +111,7 @@ base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes` · **main 병�
 | 해시 대조 | 8(`compared == 0` 이면 「불일치 0 이 공허하게 참」이라 정지) |
 | 설치 집합 | 10(보고서 8 + 프로젝트 1 + base 1) |
 | base 집합 | 1 — `pip 25.0.1`. 손 목록이 아니라 정책 다이제스트 이미지에 **같은 질의**를 걸어 받는다 |
-| (다) 요구 이름 | **5** — `grpcio`·`protobuf`(무조건) + `lightgbm`·`numpy`·`pyyaml`(`extra == 'serving'`). lock 의 프로젝트 항목에서 도출하고, extra 이름이 `provides-extras` 에 없으면 정지 |
+| (다) 요구 이름 | **5 = 무조건 2 + extra 기여 3** — `grpcio`·`protobuf` / `lightgbm`·`numpy`·`pyyaml`. 두 계수를 **따로** 낸다(합집합만 내면 변이가 어느 축을 쓰는지 로그에 없다). extra 이름이 `provides-extras` 에 없으면 정지, **extra 기여가 0 이어도 정지** |
 
 자기 변이 **다섯**(매 실행, 임시 사본). 기대는 **exit 1(위반) + 기대 사유**다 — 「비-0」으로 세면
 판정 불가가 성공으로 읽힌다(위 RED). 변이기가 사본 반영을 스스로 비-0 으로 단언하고, 다섯을 한
@@ -120,15 +120,48 @@ base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes` · **main 병�
 
 | 변이 | 기대 | 실측 |
 |---|---|---|
-| 보고서의 해시 하나를 다른 값으로 **바꿔치우기** | (나) | exit 1 · (나) |
-| 보고서에서 **base∪프로젝트∪요구 밖** 항목 제거(`narwhals`) | (가)이고 (다)는 **섞이지 않는다** | exit 1 · (가) 단독 |
-| lock 사본에서 한 패키지의 해시 제거(`grpcio`, 11줄) | (나) | exit 1 · (나) |
-| 설치 집합 사본에서 한 줄 제거(`grpcio 1.83.1`) | (가) | exit 1 · (가) |
-| 보고서에서 **요구 이름** 제거(`grpcio`) | (다) | exit 1 · (다) |
+| ① 보고서의 해시 하나를 다른 값으로 **바꿔치우기** | (나) | exit 1 · (나) |
+| ② 보고서에서 **base∪프로젝트∪요구 밖** 항목 제거(`narwhals`) | (가)이고 (다)는 **섞이지 않는다** | exit 1 · (가) 단독 |
+| ③ lock 사본에서 한 패키지의 해시 제거(`grpcio`, 11줄) | (나) | exit 1 · (나) |
+| ④ 설치 집합 사본에서 한 줄 제거(`grpcio 1.83.1`) | (가) | exit 1 · (가) |
+| ⑤ 보고서에서 **extra 기여** 요구 이름 제거(`lightgbm`) | (다) | exit 1 · (다) |
+| ⑥ 보고서에서 **무조건** 요구 이름 제거(`grpcio`) | (다) | exit 1 · (다) |
+
+⑤·⑥을 가른 이유는 **쓰는 축에서 재기** 위해서다 — 앞 판은 합집합의 첫 항목이라 늘 무조건
+쪽(`grpcio`)만 쟀고, (다)가 존재하는 사유인 extra 기여 셋은 어떤 변이도 건드리지 않았다.
 
 본 판정이 이미 위반이면 자기 변이를 **건너뛴다**(요약에 그렇게 찍는다) — 변이의 기대는 「초록
 입력에서 위반이 생긴다」라 입력이 이미 붉으면 사유 대조가 원래 있던 위반을 집는다(아래 F-2 대조에서
 실측: exit 1 이어야 할 판정이 exit 2 가 됐다).
+
+### 표식 판독과 인자 — 받는 꼴 둘, 그 밖은 정지
+
+`requires-dist` 표식을 **분류**한다. lock 사본을 바꿔치워 재고(사본이 원본과 다름을 먼저 확인),
+판독기를 직접 걸었다. 「조용히 빠지는」 가지가 0 이어야 한다 — 앞 판의 빠짐이 RED 열이다.
+
+| 입력(lock 사본) | 앞 판 | 고친 판 |
+|---|---|---|
+| 무조건 의존에 `sys_platform == 'linux'` | **0** · 요구 4(조용히 빠짐) | **2** · 「표식이 단순 extra 비교가 아니다」 |
+| `extra=='serving'`(공백 없음) | **0** · 요구 4 | **0** · 요구 5(받는 꼴로 정규화) |
+| `'serving' == extra`(좌우 뒤집힘) | **0** · 요구 4 | **0** · 요구 5 |
+| serving 표식 **셋 전부**를 공백 없는 꼴로 | **0** · 요구 2 · 「자기 변이 5건 전부 붉음」 | **0** · 요구 5(무조건 2 · extra 3) |
+| `extra == serving`(인용 없음) · `extra in ['serving']` · `extra != 'serving'` · 겹 표식 | — | **2** 넷 모두 |
+| `extra == "serving"`(큰따옴표) · `extra   ==   'serving'` | — | **0** · 요구 5 |
+| `provides-extras` 에만 있고 고유 의존 0 인 extra(`--extra empty`) | **0** · 요구 2 | **2** · 「고유하게 요구하는 이름이 0 건」 |
+| extra 기여 가지를 코드에서 꺼 버린 사본 | — | **2**(위 가드가 받는다) |
+| 틀린 인자 `servin`·`Serving`·`serv ing`·인자 넷 · `SELFCHECK=yes` | 2 | **2**(그대로) |
+
+넷째 줄이 cr R2-F1 의 시나리오다 — 앞 판은 요구가 2 로 줄고도 자기 변이 다섯이 전부 통과했다.
+
+### 종료 코드 계약과 스위치
+
+| 입력 | 앞 판 | 고친 판 |
+|---|---|---|
+| 판독기에 UTF-8 아닌 `--installed`(예기치 못한 예외) | **1**(= 「이미지가 기준을 어겼다」) | **2** + 역추적 |
+| 스텁 판독기가 `137`(계약 밖) | 게이트 **1** | 게이트 **2** + 사유 한 줄 |
+| `SELFCHECK=0` + 본 판정 위반 | 경고 **없음** · 요약 「건너뜀」만 | 경고 **있음** · 요약 「꺼짐+건너뜀」 · exit 1 |
+| `SELFCHECK=0` + 정상 | 경고 있음 | 경고 있음 · 요약 「꺼짐」 · exit 0 |
+| 게이트 실행이 `tools/__pycache__` 를 만드는가 | 만든다 | **만들지 않는다**(`python3 -B`) |
 
 ## 빌드 층 일회 대조
 
@@ -142,7 +175,7 @@ base `afc3b9db6` · 브랜치 `chore/m15t-ml-serving-pip-hashes` · **main 병�
 | lock 사본의 `pyyaml` 해시 11건 전부 바꿔치움 → serving 목록 | `docker build` **exit 1** — 설치 step 이 「THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE」로 끊긴다(설치 **전**) |
 | lock 사본의 `setuptools` 해시 2건 전부 바꿔치움 → 빌드 제약 | `docker build` **exit 1** — `uv build` step 이 exit 2 「Hash mismatch for `setuptools==84.0.0`」 |
 | **해시 하나만** 바꿔치움 | `uv build` **exit 0** — 그 패키지의 다른 해시(sdist/wheel)가 아직 맞는다. 변이를 넣는 사람은 집합 전체를 갈아야 한다 |
-| **`--extra serving` 제거**(cr F-2 대조) | `docker build` **exit 0** · 신설 게이트 **exit 1** — (다)가 `lightgbm`·`numpy`·`pyyaml` 셋을 사유로 든다(보고서 항목 3 · 설치 5). 같은 이미지에 위생 게이트는 exit 1 이지만 사유가 **기동 실패**다(numpy 부재) — `lightgbm` 만 빠지는 경우는 그 축이 받지 못한다 |
+| **`--extra serving` 제거**(cr F-2 대조 · 술어 변경 뒤 재실측) | `docker build` **exit 0** · 신설 게이트 **exit 1** — (다)가 `lightgbm`·`numpy`·`pyyaml` 셋을 사유로 든다(보고서 항목 3 · 설치 5 · 자기 변이 건너뜀). 같은 이미지에 위생 게이트는 exit 1 이지만 사유가 **기동 실패**다(numpy 부재) — `lightgbm` 만 빠지는 경우는 그 축이 받지 못한다 |
 | **`--extra dev` 를 더해 넓힘**(vr F-2 대조) | `docker build` **exit 0** · 신설 게이트 **exit 0**(보고서 33 · 설치 35) · 위생 게이트 **exit 1 — 크기 455,619,980 > 400,000,000** |
 
 ### 우회 ① — 설치 전 차단을 지우면
@@ -184,8 +217,8 @@ URL·sha256·판·패키지 메타데이터(공개 색인 정보). 참조형 스
 
 | | 줄 | 바이트 |
 |---|---|---|
-| evidence(`reports/evidence/m15/15t/`) | 508 | 44,933 |
-| 산출물 코드 넷 | 851 | 49,920 |
+| evidence(`reports/evidence/m15/15t/`) | 563 | 50,255 |
+| 산출물 코드 넷 | 953 | 58,130 |
 
 앞 회차의 초과(evidence 36,451 > 산출물 35,516)는 분자·분모가 **둘 다** 작았던 자리다. 이 라운드는
 중복 서술(제한 목록·계약 변경 서술)을 `scope.md` 한 자리로 옮겨 분자의 증가를 억제했고, 술어 추가로

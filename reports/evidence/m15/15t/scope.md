@@ -4,7 +4,7 @@
 milestone: M15
 slice: 15t-ml-serving-pip-hashes
 base_sha: afc3b9db6f494b76285207e04a39649401dcfec8   # main, PR #206 머지 커밋
-head_sha: 리뷰 시점의 PR head   # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다. 마지막 **산출물** 커밋은 main 병합 `847a755d2`(부모 `98bd626df` ∥ `78f2c77a9`)이고 rollback 실측 자리도 그 병합 커밋이다
+head_sha: 리뷰 시점의 PR head   # 이 파일을 담은 커밋이 그 SHA 라 자기 안에 적을 수 없다. 마지막 **산출물** 커밋은 `0a5a46150`(게이트 둘의 술어 수정)이고 rollback 실측 자리도 그것이다. main 병합 `847a755d2`(부모 `98bd626df` ∥ `78f2c77a9`)는 그 조상이다
 in_scope:
   - docker/ml-serving.Dockerfile              # builder: lock 에서 해시 목록 산출 · 빌드 의존 해시 강제 / runtime: --require-hashes 설치 + 설치 보고서
   - tools/image-pip-lock-check.sh             # 신설 — 이미지 설치 집합·내려받은 바이트 ↔ uv.lock 등식 게이트(이름은 구현 레인이 census 관례에 맞춰 조정 가능)
@@ -174,8 +174,13 @@ satisfied」로 no-op 이라 의도가 있어야 열린다(저자 축). 알려�
    `--target` + `ENV PYTHONPATH` 나 `.pth` 는 질의가 따라가 (가)가 받는다(둘 다 verifier 실측).
 10. **네트워크가 흔들리면 base 질의가 상시 정지다**(cr F-8). `docker pull` 에 재시도 셋을 붙였지만 셋 다
    실패하면 exit 2 다 — 제한 5 와 같은 축이고, 기존 위생 게이트도 같은 모양이다.
+11. **`requires-dist` 에 새 표식 꼴이 들어오면 게이트가 정지한다**(수정 라운드 2 의 의도된
+   fail-closed). 받는 꼴은 「extra 가 X 와 같다」 한 절뿐이므로, 상류가 플랫폼 조건부 직접 의존
+   (`sys_platform == 'linux'`)이나 겹 표식을 쓰면 그 자리에서 exit 2 가 되고 **사람이 결정**해야
+   한다(무조건 요구로 올리면 플랫폼에 따라 거짓 빨강이 되므로 자동으로 더할 수 없다). 오늘
+   `requires-dist` 19 항목에 그런 꼴은 0 건이다.
 
-## 계약 갱신 (2026-11-27, 구현 레인의 사실 기록 — 승인 전 일괄 수정 라운드까지)
+## 계약 갱신 (2026-11-27, 구현 레인의 사실 기록 — 수정 라운드 둘과 main 병합까지)
 
 **① 「설치되는 집합의 거동 변화 0 이 목표다」(out_of_scope 둘째 줄)는 달성되지 않았고, 될 수 없다.**
 실측: 출하 이미지의 전이 의존 `narwhals` 가 2.29.0 인데 `uv.lock` 은 2.26.0 이다. 이 slice 가 닫는 것이
@@ -222,6 +227,20 @@ acceptance 는 그 병합 커밋에서 전건 재실행했고, 취약점 게이�
 파일에 container 축이 0 건) · `config/quality/shell-guard-policy.properties`(그 파일은 파서 핀이고
 스크립트 census 가 아니다. `tools/` 를 훑는 Gradle task 도 0 건) · `.dockerignore`(이 저장소에 없고
 `uv.lock` 이 컨텍스트에 든다).
+
+**⑩ (다)의 가장자리 셋을 fail-closed 로 닫았다**(수정 라운드 2 — vr F-6·F-7 · cr R2-F1~F5).
+① `requires-dist` 표식을 **분류**하고 받는 꼴 둘(`extra == 'X'` · `'X' == extra`, 공백·따옴표 종류
+정규화) 밖은 **정지**다 — 앞 판은 「정확한 꼴을 부분문자열로 담은 것」만 세우고 환경 표식·공백 없는
+꼴·좌우 뒤집힘을 **조용히 버렸다**(요구 5→4, exit 0). ② **인자 extra 의 기여가 0 이면 정지** —
+무조건 의존만으로 비공허가 충족되는 경로를 닫는다. ③ 자기 변이 ⑤의 표적을 **extra 기여
+부분집합**에서 고르고 무조건 쪽을 ⑥으로 분리했다 — 앞 판은 합집합의 첫 항목이라 늘 무조건
+쪽(`grpcio`)만 쟀고, 그래서 extra 가지가 조용히 멈추는 입력에서 「자기 변이 전부 붉음 · exit 0」이
+가능했다(실측). 요약이 두 계수를 따로 낸다. 더불어 판독기의 예기치 못한 예외와 셸이 받는 계약 밖
+종료 코드를 **2** 로 접고(앞 판은 둘 다 1 = 「이미지가 기준을 어겼다」), `SELFCHECK=0` 경고를 본
+판정과 무관하게 찍고, `python3 -B` 로 `tools/__pycache__` 를 만들지 않는다.
+
+**이 라운드가 Dockerfile·ci.yml 을 건드리지 않았다** — (다)의 인자·보고서 경로 계약이 그대로이고
+게이트 둘의 내부만 바뀌었다. 이미지도 같은 객체다(`docker build` 전부 CACHED).
 
 ## 하네스 레인 변경
 
