@@ -1179,10 +1179,16 @@ _col_root_reject "심링크 타깃에 콜론" "$T/rs-colon-link"
 # 유지하는 **논리** 경로이고 비교 대상은 `readlink -f` 로 해석된 경로다. 둘을 그대로 맞대면 저장소
 # **안**을 가리키는 root 가 통과한다(실측: 논리 비교 MISSED · 실경로 비교 CAUGHT). 그래서 래퍼는
 # 논리·실경로 **양쪽**에 비교를 걸고, 이 단언이 그 겹을 잰다.
+# **가짜 git 의 기대 루트를 그 호출에 맞춰 준다** — 안 그러면 `git -C` 가 어긋나(exit 98) run 이 **다른
+# 사유로** 3 이 되고 이 단언이 공허하게 참이 된다(실측: 그 상태에서 실경로 비교를 걷는 변이가 GREEN).
+# 문면 단언이 축을 못박는 자리다.
 ln -sfn "$REPO_ROOT" "$T/repolink"
-_run "$T/repolink/tools/prod-collection.sh" "${COL_BASE[@]}" --run-state-root "$REPO_ROOT/reports" \
-  --days-back 1 --categories construction --calls-per-day 7 --calls-total 9
+: > "$SHIM_LOG"; RUN_RC=0
+SHIM_GIT_EXPECT_C="$T/repolink" "$T/repolink/tools/prod-collection.sh" "${COL_BASE[@]}" \
+  --run-state-root "$REPO_ROOT/reports" --days-back 1 --categories construction \
+  --calls-per-day 7 --calls-total 9 > "$T/out" 2> "$T/err" || RUN_RC=$?
 _expect_rc 3 "수집 — 심링크된 저장소 경로로 불러도 저장소 안을 거절한다(논리 ↔ 실경로 비대칭)"
+_expect_text '저장소 안이다' "수집 — 그 거절이 **저장소 포함 축**의 것이다(git 축이 아니다 — 공허한 3 을 가른다)"
 _expect_no_log ' run --rm' "수집 — 그 거절이 compose run 앞에서 끝난다(저장소 포함 축)"
 
 # ── ③-b 실행 상태 디렉터리 — **두 층**의 모양 (M15/15U r1) ─────────────────────
