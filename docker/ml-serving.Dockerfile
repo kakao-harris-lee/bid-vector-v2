@@ -110,6 +110,19 @@ LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3a
 # allowlist 에 등재하지 않는다 — 네 kind 모두 등재 0 을 유지하고 상향으로 해소하는 것이 이
 # 저장소의 관례다(`config/quality/vuln-allowlist.properties` 머리 주석 · 선례 chore 2026-10-29).
 #
+# chore(2026-11-27) — `CVE-2025-6020`(HIGH, libpam 네 패키지 `libpam0g`·`libpam-modules`·
+# `libpam-modules-bin`·`libpam-runtime` 1.5.2-6+deb12u2)이 같은 자리를 다시 붉혔다(vuln DB 갱신,
+# 모든 PR 과 main 의 S-22d). **여기도 베이스 상향으로는 닫히지 않는다**: 같은 태그의 최신 index
+# `sha256:44cf1793…`(2026-11-24)도 네 패키지가 deb12u2 이고 debian point release 도 12.15 그대로다
+# (그 이미지에서 `dpkg-query`·`/etc/debian_version` 실측 — 그래서 `scan.os.name.ml-serving` 은 무편집).
+# 수정판 **1.5.2-6+deb12u3** 은 `bookworm-security` 에 있다(고정 베이스에서 `apt-cache policy` 의
+# Candidate 로 네 패키지 모두 실측). 그래서 선례와 같은 갈래다 — 런타임 stage 에서 그 넷을 올리고
+# 하한을 아래 술어로 단언하고, 등재하지 않는다.
+#
+# 이 회차에 **하한 목록의 성분이 셋으로 늘었다**(패키지·하한·취약점 ID). 둘일 때는 실패 문면이
+# CVE 를 축어로 담을 수 있었지만 한 목록이 두 CVE 를 닫는 지금은 그 문면이 둘 중 하나를 틀리게
+# 말한다 — 어느 하한이 미달인지와 그것이 무엇을 닫는지는 같은 줄에서 와야 한다.
+#
 # **하한은 설치 인자가 아니라 `dpkg --compare-versions` 로 닫는다.** `apt-get install` 에는 apk 의
 # `'curl>=8.23.0-r0'` 같은 하한 문법이 없고 `pkg=<판>` 정확 고정뿐인데, 정확 고정은 security pocket
 # 이 다음 판으로 갈아치우는 날 **모든 빌드를 붉힌다**(web·proxy 가 apk 하한을 고른 것과 같은 사유).
@@ -143,12 +156,14 @@ LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3a
 #    내려 적거나 상류 버전 성분만 비교한다.
 RUN set -eu; \
     apt-get -o Acquire::Retries=3 update -qq; \
-    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0; \
-    for floor in 'apt 2.6.2' 'libapt-pkg6.0 2.6.2'; do \
+    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0 libpam0g libpam-modules libpam-modules-bin libpam-runtime; \
+    for floor in 'apt 2.6.2 CVE-2026-109518' 'libapt-pkg6.0 2.6.2 CVE-2026-109518' \
+                 'libpam0g 1.5.2-6+deb12u3 CVE-2025-6020' 'libpam-modules 1.5.2-6+deb12u3 CVE-2025-6020' \
+                 'libpam-modules-bin 1.5.2-6+deb12u3 CVE-2025-6020' 'libpam-runtime 1.5.2-6+deb12u3 CVE-2025-6020'; do \
         set -- $floor; \
         cur="$(dpkg-query -f '${Version}' -W "$1")"; \
         dpkg --compare-versions "$cur" ge "$2" \
-            || { echo "$1 $cur 가 하한 $2 미만이다 — CVE-2026-109518 이 닫히지 않는다" >&2; exit 1; }; \
+            || { echo "$1 $cur 가 하한 $2 미만이다 — $3 이 닫히지 않는다" >&2; exit 1; }; \
     done; \
     rm -rf /var/lib/apt/lists/*
 
