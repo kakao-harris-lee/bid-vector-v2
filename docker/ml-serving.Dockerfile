@@ -62,6 +62,12 @@ WORKDIR /src/ml-engine
 #
 # 비공허를 여기서 잰다: 목록에 해시가 0 건이면 `--require-hashes` 는 「요구할 것이 없다」로 조용히
 # 통과한다. 그 초록은 방어의 증거가 아니다.
+#
+# **`--extra serving` 의 이름은 게이트가 lock 의 선언과 대조한다**(cr F-2). 앞 판은 extras 닫힘을
+# wheel 메타데이터에서 받았고(`pip install "<wheel>[serving]"`) 목록 설치로 바꾸면서 그 보증이
+# 사라졌다 — 이 인자를 떨어뜨리거나 이름을 바꾸면 목록과 이미지가 **함께** 좁아져 결과 등식 둘이
+# 모두 초록이 된다. `tools/image-pip-lock-check.sh` 의 (다)가 「보고서 이름 ⊇ lock 이 이 extra 에
+# 선언한 직접 의존」을 단언하고, CI step 이 그 이름을 같은 문자열로 넘긴다.
 RUN set -eu; \
     mkdir -p /pip-input; \
     uv export --format requirements.txt --locked --no-emit-project --no-annotate --no-header \
@@ -166,10 +172,13 @@ COPY --from=builder /pip-input/serving-requirements.txt /tmp/pip-input/serving-r
 # ① 의존: `--require-hashes` 는 목록의 **모든** 항목에 해시를 요구하므로 해시 불일치는 설치
 #    **전에** 실패한다. `--only-binary :all:` 로 sdist 로 떨어지는 경로를 닫아 설치 중 임의 빌드
 #    코드가 돌지 않게 하고, `--no-deps` 로 목록 밖 유입을 닫는다(닫힘은 lock 이 이미 갖고 있다).
-#    `--report` 가 **실제로 내려받은 archive 의 sha256·URL·판**을 남긴다 — 그것이
+#    `--report` 가 내려받은 archive 의 **URL·판·sha256**(색인 링크가 선언한 값이고, pip 이 받은
+#    바이트를 그 값과 대조한다 — pip 25.0.1 소스 확인, commands.md)을 남긴다 — 그것이
 #    `tools/image-pip-lock-check.sh` 의 입력이고, 플래그와 **독립된** 결과 측정이다. 실측: pip 25.0.1
 #    의 보고서는 스키마 판 "1" 이고 항목마다 `download_info.archive_info.hashes.sha256` 을 싣는다
 #    (캐시 적중 회차에도 그대로 싣는다 — 해시 없는 항목은 게이트가 통과가 아니라 정지로 받는다).
+#    **보고서는 이 RUN 한 걸음의 기록이다** — 최종 파일시스템의 측정이 아니므로, 뒤에 같은 (이름, 판)을
+#    강제 재설치하는 걸음을 더하면 두 등식 밖이다(알려진 제한, scope.md).
 # ② 프로젝트 wheel: 같은 빌드가 방금 만든 파일이라 해시를 적지 않는다. `--no-index` 로 이 걸음이
 #    무엇도 새로 받지 못하게 한다(양성 대조 실측: `--no-index` 아래서 색인에만 있는 판을 요구하면
 #    exit 1 `from versions: none`).
