@@ -1,0 +1,24 @@
+# M15/15U — runbook(m7-7f-production.md)의 **코드 블록 줄 가운데 조달청 서비스 키 파일(`koneps.env`)을
+# 담은 줄** 전수. `tools/prod-guards-check.sh` 가 이 집합과 **정확히 같은지**를 본다.
+#
+# 왜 이 축을 따로 고정하는가: 자격 파일이 둘이 됐다(`relay.env` · `koneps.env`). M15/15R 의 S-2 가 닫은
+# 사고 부류는 **파일 이름과 무관**하다 — `install … /dev/null` 한 줄이 **이미 채운 자격 파일을 말없이
+# 0 바이트로** 만들고(출력 없음 · rc 0), 그 run 은 기동 실패로만 드러난다. 그래서 동사도 연산자도
+# 거르지 않고 **그 파일을 입에 담는 줄 전부**를 고정한다(그 분류가 곧 꼴 열거이고, 열거는 다음 꼴에서
+# 다시 열린다 — 선례의 실측은 `runbook-relay-env-lines.txt` 머리말에 있다).
+#
+# **여기 든 줄이 안전하다는 뜻이 아니다** — 이 파일은 「옳다」는 보증이 아니라 **바뀌면 리뷰가 보게
+# 하는 고정**이다. 줄의 안전성은 runbook 의 그 자리에서 따로 판단한다.
+#
+# **runbook 의 그 줄을 바꿨다면 이 파일도 함께 바꾼다**(래칫). 무해한 편집도 붉어지는 것은 설계다.
+# 데이터 줄은 `| ` 로 시작한다(수집된 줄 자신이 `#` 로 시작할 수 있어 주석과 가를 수 없다).
+# 정규화: 줄 머리·끝 공백 제거 · 내부 공백은 하나로. **순서는 게이트가 양쪽을 `LC_ALL=C sort` 하므로
+# 저자 몫이 아니다**(중복 줄은 계수까지 본다 — `sort -u` 가 아니다).
+| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
+| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50
+| ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --from <YYYY-MM-DD> --to <YYYY-MM-DD> --categories construction,service --calls-per-day 1000 --calls-total 31000
+| ExecStart=<저장소>/tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 1000 --calls-total 31000
+| command grep -c '^BIDVECTOR_KONEPS_SERVICE' /etc/bidvector-v2/koneps.env # 1 — 값은 보지 않는다
+| stat -c '%U %G %a' /etc/bidvector-v2/koneps.env # deploy deploy 600
+| sudo -e /etc/bidvector-v2/koneps.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
+| sudo test -e /etc/bidvector-v2/koneps.env || sudo install -m 600 -o "$USER" -g "$USER" /dev/null /etc/bidvector-v2/koneps.env

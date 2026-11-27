@@ -103,213 +103,34 @@ esac
 [[ "$CLAIM_LIMIT" =~ ^[1-9][0-9]{0,4}$ ]] \
   || _die "--claim-limit 는 1 이상의 정수다(러너가 1 미만을 기동 실패로 거부한다): ${CLAIM_LIMIT}" 3
 [ -r "$ENVF" ] || _die "운영 env 파일을 읽지 못했다: $ENVF" 3
-# **이 파일은 부르는 사용자가 직접 읽어야 한다**(cr H-2). 앞 판의 `EnvironmentFile=` 은 systemd
-# manager(root)가 읽어 환경으로 넘겼지만, 이제는 이 스크립트와 docker CLI 가 `User=` 로 읽는다 —
-# §13.2 가 그 꼴(`install -m 600 -o "$USER"`)로 만들라고 적는다.
-[ -r "$RELAYENVF" ] \
-  || _die "채널 env 파일을 읽지 못했다: $RELAYENVF — 이 파일은 **이 스크립트를 돌리는 사용자**($(id -un))가 직접 읽는다(§13.2 의 'install -m 600 -o \$USER'). root 전용으로 조이면 매 run 이 여기서 멈춘다" 3
-# **경로를 한 번만 풀고 그 뒤로는 그것만 쓴다**(cr R-2). 해석·권한·금지 속성 스캔·컨테이너 전달이
-# **같은 것을 보아야** 이 slice 의 규율(「술어와 소비자가 같은 것을 본다」)이 경로 축에서도 참이 된다.
-RELAY_ABS="$(readlink -f "$RELAYENVF" 2>/dev/null || true)"
-[ -n "$RELAY_ABS" ] || _die "채널 env 의 절대 경로를 구하지 못했다: $RELAYENVF" 3
-# **other 에 한 비트라도 열려 있으면 거절한다.** 이 파일은 봇 자격과 chat id 를 담는다(§13.1) —
-# 잠금 자리의 권한을 보는 `_prod_project_lock` 과 같은 축이다. 소유자 **등식**은 걸지 않는다:
-# root:<내 group> 0640 처럼 읽을 수 있고 좁은 배치가 있고, 그것까지 거절하면 도는 host 를 멈춘다.
-# group 은 잠금 자리 술어(`& 022`)보다 느슨하다 — 그 틈은 §13.2 가 「그 사용자의 전용 group」으로 닫는다.
-_relay_mode="$(stat -c '%a' "$RELAY_ABS" 2>/dev/null || true)"
-[ -n "$_relay_mode" ] && [ "$(( 8#${_relay_mode: -3} & 8#007 ))" -eq 0 ] \
-  || _die "채널 env 의 권한을 읽지 못했거나 other 에 열려 있다($RELAYENVF mode=${_relay_mode:-?}) — 이 파일은 봇 자격을 담는다(§13.2). 'chmod 600' 뒤에 다시" 3
-unset _relay_mode
-
-# ── compose 문턱 둘 — relay.env 를 그 해석기로 읽기 **전에** 선다 ───────────────
-# 아래 `run --pull never` 가 compose 판에 기댄다 — 문턱이 반입에만 있으면 내려앉은 host 에서 「알 수
-# 없는 플래그」의 종료 코드가 러너 자신의 「1 예외」와 섞인다(훑기 머리말의 CR L-7 과 같은 축).
-# 이 둘이 **먼저** 서야 아래 채널 env 해석의 실패가 「판이 낡았다」와 섞이지 않는다.
-_prod_compose_version_ok || _die "$_PROD_COMPOSE_VER_ERR" 3
-# **`run --env-from-file` 을 아는 판인가** — 같은 축의 둘째 문턱이다. 판 번호로 묻지 않고 **그 도구에게
-# 직접** 묻는다(이 플래그가 들어온 판 번호를 지어내면 그 수가 곧 거짓이 되는 자리다). 모르면 둘째 env
-# 파일이 컨테이너에 닿지 않고, 그 run 은 §13.2 를 채웠는데도 기동 실패로 끝난다.
-# 여기서는 **파이프를 물리지 않는다**: `docker … | grep -q` 는 플래그 줄이 앞쪽에 있어 docker 를
-# SIGPIPE 로 죽일 수 있고, `pipefail` 아래에서 그 141 이 「모르는 판」으로 읽힌다. 값으로 받아 맞춘다.
-# **빈 출력은 따로 말한다**(cr L-6) — 「플래그가 없다」와 「도움말을 받지 못했다」는 고칠 자리가 다르다.
-_relay_run_help="$(docker compose run --help 2>/dev/null || true)"
-[ -n "$_relay_run_help" ] \
-  || _die "'docker compose run --help' 이 아무것도 내지 않았다 — 플래그 지원을 판정할 수 없다(docker 가 깨졌거나 권한이 없다). 'docker compose version' 을 먼저 본다" 3
-case "$_relay_run_help" in
-  *--env-from-file*) ;;
-  *) _die "이 docker compose 는 'run --env-from-file' 을 모른다 — 채널 env 가 일회 컨테이너에 닿지 않는다(§13.3). compose 를 올린다" 3 ;;
-esac
-unset _relay_run_help
-# **`jq` 도 같은 문턱을 받는다**(cr R-1). 아래 키 집합 조회는 compose 와 `jq` 두 도구를 지나는데,
-# `jq` 가 깨진 것을 「채널 env 가 깨졌다」로 읽으면 운영자가 엉뚱한 파일을 들여다본다. 도구 문턱은
-# 도구 자리에 둔다 — 아래 해석 실패는 그때 **채널 env 의 일**만 뜻하게 된다.
-command -v jq >/dev/null 2>&1 \
-  || _die "jq 가 필요하다 — 채널 env 의 키 집합을 compose 출력에서 뽑는 데 쓴다" 3
-printf '{}' | jq -e . >/dev/null 2>&1 \
-  || _die "jq 가 가장 단순한 JSON 도 읽지 못한다 — 도구가 깨졌다(채널 env 의 일이 아니다)" 3
-
-# ── relay.env — 키 집합과 JVM 옵션 축 ────────────────────────────────────────────
-# **값은 어느 출력에도 옮기지 않는다** — 이 파일은 봇 자격과 chat id 를 담는다(§13.1). 아래 문면이
-# 나르는 것은 **키 이름**과 **속성 이름**뿐이다.
+# ── 둘째 env 파일 — 축 전부는 `tools/prod-env.sh` 의 **공유 술어**가 진다(M15/15U) ─────────────
+# 권한(other 0) · compose 문턱 둘(판 · `run --env-from-file` 지원) · `jq` 문턱 · 경로와 값의 `$` ·
+# 키 집합(**소비자와 같은 해석기**로 뽑는다) · 「통째로 버려짐」 · 필수 키 — 그 일곱을 한 자리에 둔다.
+# M15/15U 의 수집 래퍼가 **같은 통로**(`run --env-from-file`)를 쓰므로 사본 둘을 두지 않는다
+# (v2-지침서 §5 중복 금지: 사본 둘은 한쪽만 고쳐지는 날이 온다). **이 자리에 남는 것은 이 파일의 속성
+# 목록과 라벨뿐이다** — §13.2 의 일곱(필수 셋 + 선택 넷)이고, 허용 환경 변수 이름은 그 속성 이름에서
+# Spring 의 두 사상으로 도출된다(손 목록이 아니다).
 #
-# 허용 이름을 손으로 적지 않고 속성 이름에서 만든다 — Spring 의 `SystemEnvironmentPropertyMapper` 가
-# 환경 변수 후보를 **둘** 만든다(dash 제거 · dash→`_`). 두 사상을 여기서 같은 규칙으로 되풀이하면
-# 「문서에 적힌 철자」와 「바인딩되는 철자」가 갈리지 않는다.
-_RELAY_REQUIRED_PROPS=(
+# 거동은 앞 판과 **같다** — 검사의 순서·문면·종료 코드가 그대로이고, 그 등식의 증인은
+# `tools/prod-guards-check.sh` 의 relay 단언 계수다(뽑기 전과 같은 수가 통과한다).
+BIDVECTOR_SECOND_ENV_REQUIRED_PROPS=(
   bidvector.notification.telegram.bot-credential
   bidvector.notification.telegram.chat-id
   bidvector.notification.site-base-url
 )
-_RELAY_OPTIONAL_PROPS=(
+BIDVECTOR_SECOND_ENV_OPTIONAL_PROPS=(
   bidvector.notification.telegram.base-url
   bidvector.notification.telegram.route-key
   bidvector.notification.telegram.connect-timeout
   bidvector.notification.telegram.response-timeout
 )
-_relay_env_names() { # <속성 이름> → 그 속성이 받는 환경 변수 이름 둘
-  local p="$1" dots
-  dots="$(printf '%s' "$p" | tr '.' '_' | tr '[:lower:]' '[:upper:]')"
-  printf '%s\n' "${dots//-/}"   # dash 제거   — bidvector.…bot-credential → …BOTCREDENTIAL
-  printf '%s\n' "${dots//-/_}"  # dash → `_`  — bidvector.…bot-credential → …BOT_CREDENTIAL
-}
-_relay_allowed_names() {
-  local p
-  for p in "${_RELAY_REQUIRED_PROPS[@]}" "${_RELAY_OPTIONAL_PROPS[@]}"; do _relay_env_names "$p"; done
-}
-# **키 집합은 소비자와 같은 해석기로 뽑는다**(v H-1). 앞 판은 줄마다 **첫 `KEY=` 를 sed 로** 뽑았고,
-# compose 의 dotenv 해석기는 **따옴표로 닫힌 값 뒤의 둘째 대입을 새 변수로** 읽는다 — 그래서
-# `…ROUTEKEY="rk" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil` 한 줄이 래퍼의 모든 검사를 통과하고
-# 컨테이너에는 그 DB 자격 통로가 들어갔다(verifier 실측). 술어가 **소비자와 다른 문법**에 걸려 있으면
-# 꼴을 하나씩 막는 처방은 다음 꼴에서 다시 열린다. 그래서 문법을 늘리지 않고 **해석기를 바꾼다**:
-# `env_file:` 로 이 파일을 받는 stub 서비스에 `docker compose config` 를 돌려 그 서비스의 environment
-# 키 집합을 읽는다.
-#
-# **두 해석기가 같다는 것은 실측이다**(evidence commands — 정상 · 우회 넷 · 버려짐 셋 · 빈 파일,
-# 아홉 입력 전부에서 `config`+`env_file:` 의 키 집합 == `run --env-from-file` 이 컨테이너에 넣는 키 집합).
-#
-# **값은 어디로도 나가지 않는다** — `config` 출력은 변수로 받아 `jq` 가 **키만** 낸다(argv·화면·로그
-# 어디에도 값이 없다). stderr 는 버린다.
-# 돌려주는 코드: 0 해석함 · 1 **compose 가 거절했다**(채널 env 의 일) · 2 그 밖의 도구가 어긋났다
-# (`mktemp`·`jq` — 채널 env 의 일이 **아니다**, cr R-1). 호출자가 둘을 다른 문면으로 낸다.
-# **신호로 끊겨도 임시 자리를 남기지 않는다**(cr R-7 · N-2). 자리는 **부모가 만들고 부모가 치운다** —
-# 해석 함수는 명령 치환 `$( )` 안에서 돌므로 **서브셸**이고, 거기서 전역에 적은 자리는 부모에게
-# 건너오지 않는다(첫 판이 그래서 신호 뒤에 자리를 남겼다 — 실측). `RETURN` trap 도 서브셸 안에서만
-# 도므로 신호 갈래를 덮지 못한다. 그래서 자리를 부모의 변수에 두고 신호 trap 을 해석 **앞에** 건다.
-_RELAY_STUB_DIR=""
-# `|| true` — 지우지 못한 것이 이 자리의 반환값을 바꾸지 않는다(cr N-4).
-_relay_stub_cleanup() {
-  [ -z "$_RELAY_STUB_DIR" ] || rm -rf "$_RELAY_STUB_DIR" || true
-  _RELAY_STUB_DIR=""
-}
-_relay_stub_on_signal() {
-  local sig="$1"
-  trap - TERM INT HUP
-  _relay_stub_cleanup
-  kill -s "$sig" $$
-}
-trap '_relay_stub_on_signal TERM' TERM
-trap '_relay_stub_on_signal INT' INT
-trap '_relay_stub_on_signal HUP' HUP
-
-_relay_parsed_keys() { # <채널 env 절대 경로> <stub 디렉터리 — 부모가 만들어 준다>
-  local f="$1" stub="$2" out keys rc=0
-  # **경로를 JSON 문자열로 넣는다**(v L-2). 따옴표 없이 넣으면 경로의 ` #` 이 YAML 주석이 되어
-  # `config` 가 **다른 파일**을 읽는다 — 그러면 검사한 파일과 컨테이너가 받는 파일이 갈린다(실측).
-  {
-    printf 'name: bidvector-relay-envcheck\n'
-    printf 'services:\n'
-    printf '  probe:\n'
-    printf '    image: bidvector-relay-envcheck:none\n'
-    printf '    env_file:\n'
-    printf '      - %s\n' "$(jq -Rn --arg p "$f" '$p')"
-  } > "$stub/compose.yaml" || return 2
-  # **평소 환경으로 부른다 — 문턱 둘과 같은 env 다.** 한때 이 호출만 `env -i "PATH=$PATH"` 로
-  # 좁혔는데(v L-3 처방의 절반), 그것이 `HOME`·`DOCKER_CONFIG` 까지 떨어뜨려 **compose 가 사용자
-  # 플러그인으로 깔린 host 에서 매 run 이 「통째로 버렸다」로 끝나게** 했다(cr N-1 실측 — docker 는
-  # `HOME` 이 없으면 `/etc/passwd` 로 되돌아가지 않는다). 멀쩡한 자격 파일을 들여다보게 만드는
-  # 혼동이고, cr R-1 이 끊으려던 바로 그 축이다.
-  #
-  # **그 좁힘은 지금 아무것도 막지 않는다** — 위의 「값에 `$` 를 쓰지 않는다」 전제가 **해석보다
-  # 먼저** 파일 전수를 보므로 여기 닿는 파일에는 `$` 가 한 글자도 없고, 두 해석기 어느 쪽에서도
-  # 보간이 **일어날 수 없다.** 좁힘이 더하는 것은 실패 경로 하나뿐이라 걷었다(cr N-1 처방 ⓐ).
-  # 그래서 이 호출은 문턱 둘(`version`·`run --help`)과 **같은 env** 로 돈다 — 「술어와 소비자가
-  # 같은 것을 본다」가 경로 축에 이어 env 축에서도 참이다.
-  out="$(docker compose -f "$stub/compose.yaml" config --format json 2>/dev/null)" || rc=$?
-  [ "$rc" -eq 0 ] || return 1
-  keys="$(printf '%s' "$out" | jq -r '.services.probe.environment // {} | keys[]' 2>/dev/null)" || return 2
-  printf '%s' "$keys" | sort -u
-}
-# 주석·빈 줄이 아닌 줄의 수 — **해석기가 파일을 통째로 버렸는가**를 가르는 데만 쓴다(v L-1). 닫히지
-# 않은 따옴표·`"v" !!x`·`${X:?m}` 같은 줄이 있으면 compose 는 rc 0 으로 **파일 전체를 무시한다** —
-# 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나 진단이 엉뚱한 곳을 가리킨다.
-_relay_content_lines() { sed -n '/^[[:space:]]*$/d; /^[[:space:]]*#/d; p' "$1" | grep -c '' || true; }
-
-# **경로에도 `$` 를 쓰지 않는다**(v M-1). 경로는 stub YAML 의 **값**으로 들어가고 compose 는 그 값을
-# 보간한다 — JSON 인용은 YAML 파싱만 닫고 보간은 닫지 않는다. 그래서 `…/${NOPE:-relay.env}` 는
-# `config` 가 이웃을, `run --env-from-file` 이 그 파일을 읽게 만든다(실측). 경로는 운영자가 고르는
-# 값이고 runbook 은 고정 경로를 적으므로, 거절이 비용 없는 자리다.
-case "$RELAY_ABS" in
-  *'$'*) _die "채널 env 의 경로에 '\$' 가 있다 — 그 글자는 compose 가 stub 의 값으로 보간해서, 검사한 파일과 컨테이너가 받는 파일이 갈린다. '\$' 없는 경로에 두고 다시(runbook §13.2 의 자리가 그 꼴이다)" 3 ;;
-esac
-# **값에도 `$` 를 쓰지 않는다**(v L-3). `config` 와 `run --env-from-file` 은 `${VAR}` 를 **서로 다른
-# env** 로 푼다 — `$` 가 한 글자도 없으면 조회가 일어날 수 없어 둘이 같은 파일을 같게 읽는다. 이것은
-# 키 집합을 뽑는 문법이 아니라 **좁히는 전제**다(거절만 더할 수 있고 통과를 만들 수 없다). §13.2 의
-# 일곱 값 가운데 `$` 가 필요한 것은 없다(§13.2·§13.6 이 그 제약을 적는다).
-#
-# **값 자리만 본다**(cr N-3) — 주석·빈 줄은 건너뛰고 첫 `=` **뒤**를 본다. 주석에 쓴 `$` 까지 거절하면
-# 운영자가 고칠 수 없는 자리를 가리키게 된다(`=` 가 없는 줄은 해석기가 따로 끊는다).
-if sed -n '/^[[:space:]]*#/d; s/^[^=]*=//p' "$RELAY_ABS" | grep -q '\$'; then
-  _die "채널 env 의 **값**에 '\$' 가 있다($RELAYENVF) — 값의 \${VAR} 는 compose 의 두 통로가 **서로 다른 env** 로 풀어 같은 파일이 다르게 읽힌다(§13.2 의 일곱 값에는 '\$' 가 필요 없다). 그 글자를 지운다(문면은 줄 내용을 옮기지 않는다)" 3
-fi
-RELAY_KEYS=""; _relay_parse_rc=0
-_RELAY_STUB_DIR="$(mktemp -d)" \
-  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(임시 자리를 만들지 못했다) — 채널 env 의 일이 아니다. TMPDIR 를 본다" 3
-RELAY_KEYS="$(_relay_parsed_keys "$RELAY_ABS" "$_RELAY_STUB_DIR")" || _relay_parse_rc=$?
-_relay_stub_cleanup
-[ "$_relay_parse_rc" -ne 2 ] \
-  || _die "채널 env 의 키 집합을 뽑는 **도구**가 어긋났다(stub 쓰기·jq) — 채널 env 의 일이 아니다. 임시 자리와 jq 를 본다" 3
-RELAY_CONTENT_N="$(_relay_content_lines "$RELAY_ABS")"
-# **읽지 못했거나 키가 0 인데 내용 줄이 있다 = 해석기가 이 파일을 통째로 버렸다.**
-# 두 갈래를 한 문면으로 모으는 이유: `config` 는 그런 입력에 **rc 1 로 말하지만**(실측)
-# `run --env-from-file` 은 **rc 0 으로 조용히 버린다**(verifier 실측). 소비자 쪽이 조용하므로 여기서
-# 크게 말하는 것이 이 검사의 값이다 — 그대로 두면 러너가 `RefusedMissingChannelConfig`(1)로 끝나
-# 진단이 엉뚱한 곳을 가리킨다.
-if [ "$_relay_parse_rc" -ne 0 ] || { [ -z "$RELAY_KEYS" ] && [ "$RELAY_CONTENT_N" != 0 ]; }; then
-  if [ "$RELAY_CONTENT_N" = 0 ]; then
-    _die "채널 env 를 compose 해석기로 읽지 못했다($RELAYENVF — 내용 줄이 0 이다) — 판정 불가. 'docker compose version' 과 그 파일의 권한을 본다" 3
-  fi
-  _die "compose 해석기가 채널 env 를 **통째로 버렸다**($RELAYENVF — 내용 줄 ${RELAY_CONTENT_N} 인데 키가 0 이다). 닫히지 않은 따옴표 · 값 뒤의 '!!' · '\${VAR:?…}' · 'KEY=' 모양이 아닌 줄이 그렇게 만든다. **일회 컨테이너 쪽은 이것을 조용히 버린다** — 그대로 두면 러너가 '설정이 비었다'로 끝나 엉뚱한 곳을 가리킨다(문면은 줄 내용을 옮기지 않는다 — 이 파일은 자격을 담는다)" 3
-fi
-unset _relay_parse_rc
-# **거절 문면은 이름을 전수로 찍지 않는다**(M15/15R, S-7). 여기 보이는 키는 compose 의 dotenv 해석기가
-# **이 파일의 바이트에서** 만들어 낸 이름이고(따옴표 뒤의 둘째 대입을 새 변수로 읽는다 — v H-1), 그래서
-# 편집 사고가 자격 조각을 키 **이름**으로 만들 수 있다. journal 은 지우기 어려우므로 **환경 변수 이름
-# 꼴만** 찍고 나머지는 개수로만 말한다. 거절 자체(3)는 꼴과 무관하게 그대로다.
-# 남는 자리: 이름 꼴인 조각(`LEAKED_123456` 따위)은 여전히 찍힌다 — 이름을 전부 가리면 운영자가 무엇을
-# 지워야 하는지 모른다(등재된 제한).
-stray_raw="$(comm -23 <(printf '%s\n' "$RELAY_KEYS" | grep -v '^$' | sort -u) <(_relay_allowed_names | sort -u))"
-if [ -n "${stray_raw//[[:space:]]/}" ]; then
-  # **글자 범위를 로캘에서 떼어 놓는다**(cr L-6) — `[A-Z]` 는 로캘의 조합 순서에 따라 뜻이 달라질 수 있고,
-  # 이것은 **무엇을 journal 에 찍을지 고르는 보안 술어**다. 자매 스크립트(`prod-alert-*.sh`)가 같은 사유로
-  # `LC_ALL=C` 를 핀한다. 이 두 줄에만 건다 — 파일 전체에 걸면 위 `comm`·`sort` 의 조합 순서까지 바뀐다.
-  stray_named="$(printf '%s\n' "$stray_raw" | LC_ALL=C grep -E '^[A-Z][A-Z0-9_]*$' | tr '\n' ' ' || true)"
-  stray_odd="$(printf '%s\n' "$stray_raw" | grep -v '^$' | LC_ALL=C grep -cvE '^[A-Z][A-Z0-9_]*$' || true)"
-  _die "채널 env 에 §13.2 밖의 키가 있다: 이름 꼴 ${stray_named:-(없음) }· 이름 꼴이 아닌 키 ${stray_odd} 개(이름을 찍지 않는다 — 그 이름은 이 파일의 바이트에서 만들어진 것이라 자격 조각일 수 있다) — 이 파일은 일회 컨테이너의 env 를 **덮으므로**, 여기 들어온 이름 하나가 반입 가드를 거치지 않고 compose 가 준 값을 이긴다. §13.2 의 일곱 키만 둔다(키는 compose 자신의 해석기가 뽑은 것이다 — 한 줄에 대입이 둘이면 둘 다 보인다)" 3
-fi
-unset stray_raw
-_relay_env_has() { # <속성 이름>
-  local n
-  while IFS= read -r n; do
-    [ -n "$n" ] || continue
-    case $'\n'"${RELAY_KEYS}"$'\n' in *$'\n'"$n"$'\n'*) return 0 ;; esac
-  done < <(_relay_env_names "$1")
-  return 1
-}
-for _p in "${_RELAY_REQUIRED_PROPS[@]}"; do
-  _relay_env_has "$_p" \
-    || _die "채널 env 에 필수 키가 없다(${_p} — $(_relay_env_names "$_p" | tr '\n' ' ')) — §13.2 를 채우거나 --relay-env-file 이 가리키는 파일을 본다. **값이 비었는지는 여기서 보지 않는다**(그 갈래는 러너가 RefusedMissingChannelConfig 로 말한다, §13.6)" 3
-done
-unset _p
+# **신호 trap 을 해석 앞에 건다**(cr R-7 · N-2) — 해석은 `$( )` 안에서 돌아 서브셸이므로 거기서 만든
+# 임시 자리는 부모가 치워야 하고, `RETURN` trap 은 신호 갈래를 덮지 못한다. 아래 `_relay_on_signal` 이
+# 이 trap 을 나중에 바꿔 단다(그때부터는 일회 컨테이너를 치우는 쪽이 신호를 받는다).
+_prod_stub_trap_install
+_prod_second_env_ok "$RELAYENVF" "채널 env" "§13.2" || _die "$_PROD_SECOND_ENV_ERR" 3
+# **재는 경로와 넘기는 경로가 같다**(cr R-2) — 해석·권한·금지 속성 스캔·컨테이너 전달이 이 한 값을 쓴다.
+RELAY_ABS="$_PROD_SECOND_ENV_ABS"
 
 # **금지 속성 둘** — 술어는 `tools/prod-env.sh` 에 하나로 둔다(평가 커밋 래퍼도 같은 판단을 한다).
 # 보는 자리는 **해석된 compose 가 못 보는 둘**이다: 이 프로세스의 JVM 옵션 통로와 `relay.env`.

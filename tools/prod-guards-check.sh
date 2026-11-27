@@ -158,13 +158,14 @@ if [ "${1:-}" = compose ]; then
   case "$sub" in
     version) printf 'v%s\n' "${SHIM_COMPOSE_VER:-2.29.0}" ;;
     config)
-      # **채널 env 해석만은 진짜 compose 에 맡긴다**(M15/15Q 수정 라운드 1, v H-1). 래퍼는 relay.env 의
+      # **둘째 env 파일의 해석만은 진짜 compose 에 맡긴다**(M15/15Q 수정 라운드 1, v H-1 · M15/15U 부터
+      # 래퍼 둘이 같은 술어를 쓴다 — 가르는 글자는 stub 의 프로젝트 이름이다). 래퍼는 그 파일의
       # 키 집합을 **소비자와 같은 해석기**로 뽑는데, 그 해석을 여기서 흉내 내면 단언이 재는 것은
       # compose 가 아니라 **이 가짜의 셋째 문법**이 된다 — 우회 줄이 거절되는지는 그러면 영영 미측정이다.
       # 그 호출은 stub 파일 하나를 읽는 client-side 렌더링이라 운영 스택·데몬에 닿지 않는다.
       # 진짜 자리는 환경에서 읽는다 — 래퍼가 평소 env 로 부르므로 그대로 건너온다(cr N-1 로
       # `env -i` 가 걷히면서 파일 우회도 함께 사라졌다).
-      if [ -n "$ffile" ] && grep -q 'bidvector-relay-envcheck' "$ffile" 2>/dev/null; then
+      if [ -n "$ffile" ] && grep -q 'bidvector-second-env-check' "$ffile" 2>/dev/null; then
         [ -n "${SHIM_REAL_DOCKER:-}" ] || { echo "SHIM: 진짜 docker 자리를 찾지 못했다" >&2; exit 97; }
         # 신호 경로 단언용 — 해석이 도는 **창**을 연다(cr N-2).
         [ -z "${SHIM_CONFIG_SLEEP:-}" ] || sleep "$SHIM_CONFIG_SLEEP"
@@ -949,73 +950,77 @@ _expect_text '예상 밖의 종료 코드 137' "relay — 모르는 코드는 **
 #
 # **뽑은 수를 함께 고정한다**(이 slice 의 경계 문장): 열거의 꼴이 바뀌어(`LEASE_BUSY(value = 3)` 따위)
 # 추출이 비면 「집합이 같다」가 공허하게 참이 되므로, **항목 수 == 해석된 값 수**를 먼저 센다.
-REX_KT=app/src/main/kotlin/bidvector/app/relay/RelayLines.kt
-RELAY_SH=tools/prod-notification-relay.sh
-# **자리를 못 읽으면 판정 불가로 선다**(cr M-2) — 열거가 옮겨졌는데 추출이 조용히 비면 아래 등식이
-# 공허하게 참이 된다. 이 파일의 관례대로 전제 실패는 `exit 2` 다.
-[ -r "$REX_KT" ] || _die "RelayExitCode 의 자리를 읽지 못했다: ${REX_KT}(열거가 옮겨졌다 — 등식을 고친다) · 판정 불가" 2
-[ -r "$RELAY_SH" ] || _die "relay 래퍼를 읽지 못했다: ${RELAY_SH} · 판정 불가" 2
-_rex_body() { awk '/^enum class RelayExitCode\(/ {inb = 1; next} inb && /^}/ {exit} inb {print}' "$REX_KT"; }
-# **항목 수와 값 추출은 서로 다른 술어로 센다**(v F3). 앞 판은 둘 다 **같은 정규식**이라 꼴이 다른 항목이
-# 분자·분모에서 **함께** 빠졌고, `NEW_CODE(5), // 주석` 한 줄이 등식을 공허하게 참으로 만들었다(실측).
-# 이제 분모는 「식별자로 시작해 여는 괄호가 오는 줄」이라는 **느슨한** 술어이고, 분자는 값을 실제로
-# 해석한 수다 — 꼴이 바뀌면 분모만 늘어 여기서 선다.
-rex_entry_n="$(_rex_body | grep -cE '^[[:space:]]*[A-Z][A-Za-z0-9_]*\(' || true)"
-rex_args="$(_rex_body | sed -nE 's/^    [A-Z][A-Z0-9_]*\((.+)\),$/\1/p' || true)"
-rex_arg_n=0 rex_vals=""
-while IFS= read -r _a; do
-  [ -n "$_a" ] || continue
-  rex_arg_n=$((rex_arg_n + 1))
-  case "$_a" in
-    *[!0-9]*) _v="$(sed -nE "s/^private const val ${_a} = ([0-9]+)\$/\1/p" "$REX_KT" | head -n1 || true)" ;;
-    *) _v="$_a" ;;
-  esac
-  [ -n "$_v" ] || continue
-  rex_vals="${rex_vals}${_v}"$'\n'
-done <<REXEOF
+# **M15/15U — 래퍼가 둘이 됐다**(relay · 수집). 술어를 사본으로 두지 않고 **라벨·열거 이름·두 경로를
+# 인자로 받는 함수 하나**로 둔다(v2-지침서 §5 중복 금지와 같은 사유: 사본 둘은 한쪽만 고쳐지는 날이 온다).
+# 단언 **수**는 래퍼마다 넷으로 그대로다 — relay 쪽 계수는 앞 판과 같다.
+_exit_code_equation_check() { # <라벨> <enum 이름> <KT 경로> <래퍼 경로>
+  local label="$1" enum="$2" kt="$3" sh="$4"
+  local body rex_entry_n rex_args rex_vals rex_val_n rex_set _a _v
+  local case_body case_branch_n case_known_n wrap_set wrap_n xlat_set xlat_clash
+  # **자리를 못 읽으면 판정 불가로 선다**(cr M-2) — 열거가 옮겨졌는데 추출이 조용히 비면 아래 등식이
+  # 공허하게 참이 된다. 이 파일의 관례대로 전제 실패는 `exit 2` 다.
+  [ -r "$kt" ] || _die "${enum} 의 자리를 읽지 못했다: ${kt}(열거가 옮겨졌다 — 등식을 고친다) · 판정 불가" 2
+  [ -r "$sh" ] || _die "${label} 래퍼를 읽지 못했다: ${sh} · 판정 불가" 2
+  body="$(awk -v e="enum class ${enum}(" 'index($0, e) == 1 {inb = 1; next} inb && /^}/ {exit} inb {print}' "$kt")"
+  # **항목 수와 값 추출은 서로 다른 술어로 센다**(v F3). 앞 판은 둘 다 **같은 정규식**이라 꼴이 다른 항목이
+  # 분자·분모에서 **함께** 빠졌고, `NEW_CODE(5), // 주석` 한 줄이 등식을 공허하게 참으로 만들었다(실측).
+  # 이제 분모는 「식별자로 시작해 여는 괄호가 오는 줄」이라는 **느슨한** 술어이고, 분자는 값을 실제로
+  # 해석한 수다 — 꼴이 바뀌면 분모만 늘어 여기서 선다.
+  rex_entry_n="$(printf '%s\n' "$body" | grep -cE '^[[:space:]]*[A-Z][A-Za-z0-9_]*\(' || true)"
+  rex_args="$(printf '%s\n' "$body" | sed -nE 's/^    [A-Z][A-Z0-9_]*\((.+)\),$/\1/p' || true)"
+  rex_vals=""
+  while IFS= read -r _a; do
+    [ -n "$_a" ] || continue
+    case "$_a" in
+      *[!0-9]*) _v="$(sed -nE "s/^private const val ${_a} = ([0-9]+)\$/\1/p" "$kt" | head -n1 || true)" ;;
+      *) _v="$_a" ;;
+    esac
+    [ -n "$_v" ] || continue
+    rex_vals="${rex_vals}${_v}"$'\n'
+  done <<REXEOF
 ${rex_args}
 REXEOF
-unset _a _v
-rex_val_n="$(printf '%s' "$rex_vals" | grep -c '' || true)"
-rex_set="$(printf '%s' "$rex_vals" | sort -u | tr '\n' ' ' || true)"
-_relay_case_body() {
-  awk '/^case "\$rc" in$/ {inb = 1; next} inb && /^esac$/ {exit} inb {print}' "$RELAY_SH"
+  rex_val_n="$(printf '%s' "$rex_vals" | grep -c '' || true)"
+  rex_set="$(printf '%s' "$rex_vals" | sort -u | tr '\n' ' ' || true)"
+  # 래퍼 쪽도 같은 모양으로 **가지 수**(느슨)와 **인식한 가지 수**(엄격 — 숫자 라벨 또는 `*`)를 가른다.
+  # 앞 판은 숫자 라벨만 추출해 `"8")`·`12[5-7])` 같은 가지가 추출 **밖**이라 조용히 통과했고, 라운드 1 의
+  # 느슨한 쪽도 **꼴 열거**(`[^[:space:]()]+\)`)여서 공백 낀 대안(`125 | 126)`)과 여는 괄호 꼴(`(125)`)을
+  # 놓쳤다(v G3 실측). 이제 느슨한 쪽은 **빈 줄이 아닌 줄 전부**다 — 가지가 어떤 꼴로 쓰이든, 본문이 여러
+  # 줄로 늘어나든 분모가 늘어 선다(그 오탐은 기대를 함께 고치라는 뜻이고, 줄 집합 등식과 같은 래칫이다).
+  case_body="$(awk '/^case "\$rc" in$/ {inb = 1; next} inb && /^esac$/ {exit} inb {print}' "$sh")"
+  case_branch_n="$(printf '%s\n' "$case_body" | grep -cE '[^[:space:]]' || true)"
+  case_known_n="$(printf '%s\n' "$case_body" | grep -cE '^  ([0-9|]+|\*)\)' || true)"
+  wrap_set="$(printf '%s\n' "$case_body" | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' || true)"
+  wrap_n="$(printf '%s\n' "$case_body" | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | grep -c '' || true)"
+  # **래퍼가 번역해서 내는 값**(가지 본문의 `exit <정수>` — 통과 갈래는 `exit "$rc"` 라 여기 안 든다).
+  xlat_set="$(printf '%s\n' "$case_body" | grep -oE 'exit [0-9]+' | awk '{print $2}' | sort -u || true)"
+  if [ "$rex_entry_n" -ge 1 ] && [ "$rex_entry_n" = "$rex_val_n" ]; then
+    _ok "${enum} 의 항목 ${rex_entry_n} 개가 모두 값으로 해석된다(꼴이 바뀌면 분모만 늘어 선다)"
+  else
+    _bad "${enum} 항목 ${rex_entry_n} 개 중 ${rex_val_n} 개만 값으로 해석됐다 — 열거의 꼴이 바뀌었다(추출을 고친다)"
+  fi
+  if [ "$case_branch_n" -ge 1 ] && [ "$case_branch_n" = "$case_known_n" ]; then
+    _ok "${label} — 래퍼 case 의 가지 ${case_branch_n} 개를 모두 인식했다(인식 못 하는 꼴의 가지가 없다)"
+  else
+    _bad "${label} — 래퍼 case 의 가지 ${case_branch_n} 개 중 ${case_known_n} 개만 인식했다 — 숫자도 '*' 도 아닌 라벨이 있다(그 가지는 아래 등식 밖이다)"
+  fi
+  if [ "$wrap_n" -ge 1 ] && [ "$wrap_n" = "$rex_val_n" ] && [ "$wrap_set" = "$rex_set" ]; then
+    _ok "${label} — 러너의 종료 코드 집합 == 래퍼 case 가 이름으로 받는 집합 (${rex_set})"
+  else
+    _bad "${label} — 러너 {${rex_set}}(${rex_val_n}) ≠ 래퍼 case {${wrap_set}}(${wrap_n}) — 러너에 값을 더했으면 래퍼의 case 와 runbook 의 표를 함께 고친다"
+  fi
+  # **번역 값 ∩ 러너 값 = ∅**(cr M-3). 위 등식은 「집합이 같다」만 보므로, 러너에 `5` 가 생긴 날 래퍼에
+  # `5) … exit 5` 를 더하면 **둘 다 초록**인데 그 순간 러너의 `5` 와 래퍼가 옮겨 내는 `5` 가 다시 한 수로
+  # 만난다 — 이 축이 없앤 바로 그 꼴이다. 오늘 그것을 막는 것은 산문 한 줄뿐이었다.
+  xlat_clash="$(printf '%s\n' "$xlat_set" | grep -v '^$' | sort -u | comm -12 - <(printf '%s' "$rex_vals" | grep -v '^$' | sort -u) | tr '\n' ' ' || true)"
+  if [ -n "${xlat_set//[[:space:]]/}" ] && [ -z "${xlat_clash// /}" ]; then
+    _ok "${label} — 래퍼가 번역해 내는 값 {$(printf '%s' "$xlat_set" | tr '\n' ' ')} 와 러너 값 {${rex_set}} 의 교집합이 비었다"
+  else
+    _bad "${label} — 래퍼의 번역 값과 러너 값이 겹친다: {${xlat_clash}} — 뜻이 다른 둘이 같은 수로 만나면 경보가 거꾸로 운다(번역 값을 러너 밖으로 옮긴다)"
+  fi
 }
-# 래퍼 쪽도 같은 모양으로 **가지 수**(느슨)와 **인식한 가지 수**(엄격 — 숫자 라벨 또는 `*`)를 가른다.
-# 앞 판은 숫자 라벨만 추출해 `"8")`·`12[5-7])` 같은 가지가 추출 **밖**이라 조용히 통과했고, 라운드 1 의
-# 느슨한 쪽도 **꼴 열거**(`[^[:space:]()]+\)`)여서 공백 낀 대안(`125 | 126)`)과 여는 괄호 꼴(`(125)`)을
-# 놓쳤다(v G3 실측). 이제 느슨한 쪽은 **빈 줄이 아닌 줄 전부**다 — 가지가 어떤 꼴로 쓰이든, 본문이 여러
-# 줄로 늘어나든 분모가 늘어 선다(그 오탐은 기대를 함께 고치라는 뜻이고, 줄 집합 등식과 같은 래칫이다).
-case_branch_n="$(_relay_case_body | grep -cE '[^[:space:]]' || true)"
-case_known_n="$(_relay_case_body | grep -cE '^  ([0-9|]+|\*)\)' || true)"
-wrap_set="$(_relay_case_body | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' || true)"
-wrap_n="$(_relay_case_body | sed -nE 's/^  ([0-9|]+)\).*/\1/p' | tr '|' '\n' | grep -v '^$' | grep -c '' || true)"
-# **래퍼가 번역해서 내는 값**(가지 본문의 `exit <정수>` — 통과 갈래는 `exit "$rc"` 라 여기 안 든다).
-xlat_set="$(_relay_case_body | grep -oE 'exit [0-9]+' | awk '{print $2}' | sort -u || true)"
-if [ "$rex_entry_n" -ge 1 ] && [ "$rex_entry_n" = "$rex_val_n" ]; then
-  _ok "RelayExitCode 의 항목 ${rex_entry_n} 개가 모두 값으로 해석된다(꼴이 바뀌면 분모만 늘어 선다)"
-else
-  _bad "RelayExitCode 항목 ${rex_entry_n} 개 중 ${rex_val_n} 개만 값으로 해석됐다 — 열거의 꼴이 바뀌었다(추출을 고친다)"
-fi
-if [ "$case_branch_n" -ge 1 ] && [ "$case_branch_n" = "$case_known_n" ]; then
-  _ok "래퍼 case 의 가지 ${case_branch_n} 개를 모두 인식했다(인식 못 하는 꼴의 가지가 없다)"
-else
-  _bad "래퍼 case 의 가지 ${case_branch_n} 개 중 ${case_known_n} 개만 인식했다 — 숫자도 '*' 도 아닌 라벨이 있다(그 가지는 아래 등식 밖이다)"
-fi
-if [ "$wrap_n" -ge 1 ] && [ "$wrap_n" = "$rex_val_n" ] && [ "$wrap_set" = "$rex_set" ]; then
-  _ok "러너의 종료 코드 집합 == 래퍼 case 가 이름으로 받는 집합 (${rex_set})"
-else
-  _bad "러너 {${rex_set}}(${rex_val_n}) ≠ 래퍼 case {${wrap_set}}(${wrap_n}) — 러너에 값을 더했으면 래퍼의 case 와 §13.3 의 표를 함께 고친다"
-fi
-# **번역 값 ∩ 러너 값 = ∅**(cr M-3). 위 등식은 「집합이 같다」만 보므로, 러너에 `5` 가 생긴 날 래퍼에
-# `5) … exit 5` 를 더하면 **둘 다 초록**인데 그 순간 러너의 `5` 와 래퍼가 `LEASE_BUSY` 를 옮겨 내는 `5` 가
-# 다시 한 수로 만난다 — 이 slice 가 없앤 바로 그 꼴이다. 오늘 그것을 막는 것은 산문 한 줄뿐이었다.
-xlat_clash="$(printf '%s\n' "$xlat_set" | grep -v '^$' | sort -u | comm -12 - <(printf '%s' "$rex_vals" | grep -v '^$' | sort -u) | tr '\n' ' ' || true)"
-if [ -n "${xlat_set//[[:space:]]/}" ] && [ -z "${xlat_clash// /}" ]; then
-  _ok "래퍼가 번역해 내는 값 {$(printf '%s' "$xlat_set" | tr '\n' ' ')} 와 러너 값 {${rex_set}} 의 교집합이 비었다"
-else
-  _bad "래퍼의 번역 값과 러너 값이 겹친다: {${xlat_clash}} — 뜻이 다른 둘이 같은 수로 만나면 경보가 거꾸로 운다(번역 값을 러너 밖으로 옮긴다)"
-fi
+_exit_code_equation_check relay RelayExitCode \
+  app/src/main/kotlin/bidvector/app/relay/RelayLines.kt tools/prod-notification-relay.sh
 
 _hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
 _run ./tools/prod-notification-relay.sh "${RELAY_ARGS[@]}"
@@ -1036,6 +1041,276 @@ for frc in 1 64 65 70 127 137; do
   _expect_rc 3 "relay — flock 종료 ${frc} 는 전제 실패(3) — 경합으로 접지 않는다"
 done
 
+echo "== 수집 러너(prod-collection.sh) — 훑기와 같은 전제 + 창·상한 인자 · 서비스 키 env · 실행 상태 붙임"
+# M15/15U. 러너 셋이 받는 단언을 **같은 모양으로** 받고(트리 축 · 프로젝트 이름 · 잔존 · 이름 충돌 ·
+# 미룸(4) ↔ 전제 실패(3) · 금지 JVM 옵션 · 신호 trap), 더해지는 축은 넷이다 —
+#   ① **창·상한 인자**(기본값을 지어내지 않는다 · 모양 검사 · 인자 주입 거절)
+#   ② **서비스 키 env**(둘째 env 파일 — 키 집합을 `bidvector.koneps.service-key` 가 받는 이름으로 닫는다)
+#   ③ **실행 상태 host 붙임**(`run -v` — `_prod_config_surface_ok` 는 `config` 출력을 보므로 이 자리를
+#      **보지 못한다**. 그래서 붙임의 원천을 래퍼가 지은 한 경로로 묶는 것이 이 단언들의 일이다)
+#   ④ **러너 다섯과 래퍼 둘의 겹침 옮김**(relay 와 같은 축, 다른 수)
+#
+# 단언은 문면 grep 이 아니라 **가짜 docker 가 받은 argv** 로 잰다 — 창·상한·업종·붙임·env 파일이 실제
+# 호출에 실렸는가.
+KONEPSENV="$T/env/koneps.env"
+_koneps_env() { # [추가 줄…] — 서비스 키 한 키. **값은 자리값이다**(자격이 아니다).
+  { printf 'BIDVECTOR_KONEPS_SERVICE_KEY=fixture\n'
+    [ "$#" -eq 0 ] || printf '%s\n' "$@"
+  } > "$KONEPSENV"
+  chmod 600 "$KONEPSENV"
+}
+_koneps_env
+# 실행 상태 root — **저장소 밖**이고 group 쓰기가 열려 있다(컨테이너의 uid/gid 10001 이 그 group 으로
+# 쓴다 — runbook §14 ①). **gid 등식은 여기서 재지 못한다**: 이 검사를 돌리는 계정은 gid 10001 로
+# `chgrp` 할 수 없다(등재된 제한 — 그 등식은 §14 ① 의 운영자 확인이다). 그래서 fixture 는 **mode 축**만
+# 양성으로 세우고, 아래 음성 대조가 「이미 있는 달 디렉터리의 mode」를 잰다.
+RSROOT="$T/runstate"
+install -d -m 2770 "$RSROOT" || _die "실행 상태 root fixture 를 만들지 못했다 — 판정 불가" 2
+# **달·창은 KST 로 짓는다**(우회 6) — host 의 TZ 에 기대지 않는다. 자정 경계의 한 초에서 이 계산과
+# 래퍼의 계산이 갈릴 수 있다(등재된 제한 — 그때는 조용히 지나가지 않고 붉다).
+KST_MONTH="$(TZ=Asia/Seoul date +%Y-%m)"
+KST_TODAY="$(TZ=Asia/Seoul date +%F)"
+KST_BACK1="$(TZ=Asia/Seoul date -d "$KST_TODAY -1 day" +%F)"
+COL_MONTH_DIR="$RSROOT/notice-list/$KST_MONTH"
+# 컨테이너 안 경로는 **고정**이다(D-15U-4) — 인자에서 오지 않는다.
+COL_IN_CONTAINER=/var/lib/bidvector-run-state
+COL_BASE=(--env-file "$T/env/prod.env" --koneps-env-file "$KONEPSENV" --state-dir "$T/state" --project "$PROJ")
+COL_ARGS=("${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories construction,service --calls-per-day 50 --calls-total 50)
+COL_FIXED=("${COL_BASE[@]}" --run-state-root "$RSROOT" --from 2026-11-01 --to 2026-11-20 \
+  --categories construction --calls-per-day 7 --calls-total 9)
+
+# ── 훑기와 같은 전제 ────────────────────────────────────────────────────────────
+export SHIM_CONFIG_FILE="$T/cfg.json" SHIM_GIT_HEAD="$REL_SHA" SHIM_GIT_DIRTY=""
+export SHIM_PS_FILE="$T/ps-clean" SHIM_PS_NAME_HIT="" SHIM_PS_NAME_STATE=running
+SHIM_GIT_HEAD="$OTHER_SHA" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 다른 커밋의 트리에서는 수집하지 않는다"
+_expect_no_log ' run --rm' "수집 — 그 거절이 일회 컨테이너 앞에서 끝난다"
+SHIM_CONFIG_FILE="$T/cfg-othername.json" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 해석된 프로젝트 이름이 잠금과 다르면 수집하지 않는다"
+_expect_no_log 'docker ps' "수집 — 그 거절이 잔존 조회 앞에서 끝난다"
+SHIM_PS_FILE="$T/ps-residue" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 지난 run 의 (멈춘) 일회 컨테이너가 남아 있으면 수집하지 않는다"
+_expect_text "${PROJ}-app-run-abc" "수집 — 거절 문면이 남은 이름을 보인다"
+SHIM_PS_NAME_HIT="deadbeefcafe" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 일회 컨테이너 이름이 전역에서 이미 쓰이면 수집하지 않는다"
+SHIM_PS_NAME_HIT="deadbeefcafe" SHIM_PS_NAME_STATE=exited _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — **멈춘** 동명 컨테이너가 있어도 수집하지 않는다(docker ps -aq)"
+# cr H-1 선례 — 값 없는 플래그는 전제 실패(3)다(러너의 `FAILED`(1)와 같은 값이 되지 않는다).
+_run ./tools/prod-collection.sh --days-back
+_expect_rc 3 "수집 — 값 없는 플래그는 전제 실패(3)다"
+_expect_text '값이 없다' "수집 — 그 거절이 문면을 남긴다"
+_run ./tools/prod-collection.sh --what-is-this 1
+_expect_rc 3 "수집 — 알 수 없는 인자는 전제 실패(3)다"
+JAVA_TOOL_OPTIONS='-Djdk.httpclient.HttpClient.log=all' _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — JAVA_TOOL_OPTIONS 에 JDK HttpClient 내부 로그 속성이 있으면 수집하지 않는다"
+_expect_text 'jdk\.httpclient\.HttpClient\.log' "수집 — 문면이 지워야 할 속성 이름을 보인다"
+_expect_no_log ' run --rm' "수집 — 그 거절이 compose run 앞에서 끝난다(JVM 옵션 축)"
+
+# ── ① 창·상한·업종 인자 — 기본값을 지어내지 않는다 ─────────────────────────────
+_col_reject() { # <이름> <인자…> — 전제 실패(3)이고 일회 컨테이너를 띄우지 않는다
+  local name="$1"; shift
+  _run ./tools/prod-collection.sh "$@"
+  _expect_rc 3 "수집 — 인자 ${name}: 거절한다"
+  _expect_no_log ' run --rm' "수집 — 인자 ${name}: 그 거절이 compose run 앞에서 끝난다"
+}
+_col_reject '창 없음' "${COL_BASE[@]}" --run-state-root "$RSROOT" \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--from 만' "${COL_BASE[@]}" --run-state-root "$RSROOT" --from 2026-11-01 \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--to 만' "${COL_BASE[@]}" --run-state-root "$RSROOT" --to 2026-11-20 \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--days-back + --from' "${COL_FIXED[@]}" --days-back 1
+_col_reject '--days-back 0' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 0 \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--days-back -1' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back -1 \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--days-back 031' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 031 \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--days-back 공백' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back ' ' \
+  --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--from 2026-13-40' "${COL_BASE[@]}" --run-state-root "$RSROOT" \
+  --from 2026-13-40 --to 2026-11-20 --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--to 날짜 꼴 아님' "${COL_BASE[@]}" --run-state-root "$RSROOT" \
+  --from 2026-11-01 --to 20261120 --categories construction --calls-per-day 7 --calls-total 9
+_col_reject '--calls-per-day 0' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories construction --calls-per-day 0 --calls-total 9
+_col_reject '--calls-per-day 정수 아님' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories construction --calls-per-day 7x --calls-total 9
+_col_reject '--calls-total 없음' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories construction --calls-per-day 7
+_col_reject '--categories 없음' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --calls-per-day 7 --calls-total 9
+_col_reject '--run-state-root 없음' "${COL_BASE[@]}" --days-back 1 \
+  --categories construction --calls-per-day 7 --calls-total 9
+# **인자 주입**(우회 5) — 업종 값에 러너 플래그를 끼운다. 러너 인자는 배열로 넘어가므로 낱말 쪼개짐이
+# 일어나지 않지만, 그 사실에 기대지 않고 **값의 모양**으로도 끊는다(겹 둘).
+_col_reject '업종 값 주입' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories 'construction --bidvector.collection.calls-total=999999' --calls-per-day 7 --calls-total 9
+_col_reject '업종 대문자' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories CONSTRUCTION --calls-per-day 7 --calls-total 9
+_col_reject '업종 빈 칸' "${COL_BASE[@]}" --run-state-root "$RSROOT" --days-back 1 \
+  --categories 'construction,' --calls-per-day 7 --calls-total 9
+
+# ── ③ 실행 상태 root — 붙임의 원천을 묶는다 ────────────────────────────────────
+_col_root_reject() { # <이름> <root>
+  local name="$1" root="$2"
+  _col_reject "실행 상태 root ${name}" "${COL_BASE[@]}" --run-state-root "$root" --days-back 1 \
+    --categories construction --calls-per-day 7 --calls-total 9
+}
+_col_root_reject '상대 경로' runstate
+_col_root_reject '없는 경로' "$T/no-such-runstate"
+_col_root_reject '파일' "$T/env/prod.env"
+# **저장소 안** — 실험 입력은 커밋되지 않는다(러너도 거부하지만 래퍼가 **먼저** 끊는다: 러너의 거부는
+# 종료 1 이라 「예외」와 같은 값이다).
+_col_root_reject '저장소 안' "$REPO_ROOT/reports"
+# **심링크로 저장소 안** — 이름만 대조하면 지나간다(`readlink -f` 로 푼 경로를 본다).
+ln -sfn "$REPO_ROOT/reports" "$T/rs-link"
+_col_root_reject '심링크로 저장소 안' "$T/rs-link"
+# **붙임 문법** — root 에 ':' 가 있으면 `run -v` 의 둘째 붙임·옵션(':ro' 뒤집기)을 만들 수 있다.
+install -d -m 2770 "$T/rs:colon" || _die "콜론 fixture 를 만들지 못했다 — 판정 불가" 2
+_col_root_reject "콜론이 든 경로" "$T/rs:colon"
+# **이미 있는 달 디렉터리의 mode** — 첫 run 은 `mkdir -m 2770` 이라 모양이 보장되지만, 이미 있는
+# 디렉터리에는 그 `-m` 이 적용되지 않는다(운영자가 손으로 만든 자리 · 옛 run 이 남긴 자리). group 쓰기가
+# 닫혀 있으면 컨테이너의 uid 10001 이 원장에 쓰지 못하고 러너가 기동에서 죽는다 — 래퍼가 먼저 끊는다.
+install -d -m 0700 "$RSROOT/notice-list"
+install -d -m 0700 "$COL_MONTH_DIR"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 이미 있는 달 디렉터리에 group 쓰기가 닫혀 있으면 수집하지 않는다"
+_expect_no_log ' run --rm' "수집 — 그 거절이 compose run 앞에서 끝난다(실행 상태 mode 축)"
+chmod 2770 "$COL_MONTH_DIR"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 0 "양성 — 같은 달 디렉터리가 2770 이면 수집한다(위 단언이 mode 축의 것이다)"
+rm -rf "${RSROOT:?}/notice-list"
+
+# ── ② 서비스 키 env — 키 집합을 닫는다 ─────────────────────────────────────────
+# 술어는 relay 와 **같은 것**이다(`tools/prod-env.sh` 의 둘째 env 파일 검사) — 사본 둘을 두지 않는다.
+# 허용 이름은 손 목록이 아니라 `bidvector.koneps.service-key` 에서 Spring 의 두 사상으로 도출된다.
+_col_env_reject() { # <이름> <덧붙일 줄…>
+  local name="$1"; shift
+  _koneps_env "$@"
+  _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+  _expect_rc 3 "수집 — 서비스 키 env ${name}: 거절한다"
+  _expect_no_log ' run --rm' "수집 — 서비스 키 env ${name}: 그 거절이 compose run 앞에서 끝난다"
+}
+_col_env_reject 'JVM 통로 키' 'JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=50'
+_expect_text 'JAVA_TOOL_OPTIONS' "수집 — 문면이 지워야 할 키 이름을 보인다"
+_col_env_reject 'DB 자격 통로 키' 'BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:postgresql://elsewhere/x'
+_expect_text 'BIDVECTOR_PERSISTENCE_JDBCURL' "수집 — 문면이 그 키 이름을 보인다"
+# **값은 어느 출력에도 없다** — 이 파일은 서비스 키를 담는다(위 파일에 그 자리값이 실제로 있다).
+_expect_no_text 'fixture' "수집 — 거절 문면이 서비스 키 env 의 **값**을 옮기지 않는다"
+_col_env_reject '따옴표 뒤 둘째 대입' 'BIDVECTOR_KONEPS_SERVICEKEY="k" BIDVECTOR_PERSISTENCE_JDBCURL=jdbc:evil'
+_col_env_reject '값의 ${VAR}' 'BIDVECTOR_KONEPS_SERVICEKEY=${PATH:?x}'
+_col_env_reject '안 닫힌 따옴표' 'BIDVECTOR_KONEPS_SERVICEKEY="v'
+_expect_text '통째로 버렸다' "수집 — 그 문면이 「필수 키가 없다」가 아니라 버려짐을 말한다"
+_col_env_reject '값에 숨은 JDK 로그 속성' 'BIDVECTOR_KONEPS_SERVICEKEY=-Djdk.internal.httpclient.debug=true'
+_expect_text 'jdk\.internal\.httpclient\.debug' "수집 — 문면이 그 속성 이름을 보인다"
+# **키 집합 밖** — `base-url` 은 compose 축이다(이 파일의 키가 아니다).
+printf 'BIDVECTOR_KONEPS_BASE_URL=https://example.invalid\n' > "$KONEPSENV"
+chmod 600 "$KONEPSENV"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 서비스 키 env 에 허용 집합 밖의 키가 있으면 수집하지 않는다(base-url 은 compose 축이다)"
+# **필수 키 부재** — 서비스 키가 없으면 러너가 기동 실패(1)로 끝난다. 래퍼가 3 으로 먼저 가른다.
+printf '# 주석만 있고 키가 없다\n' > "$KONEPSENV"
+chmod 600 "$KONEPSENV"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 서비스 키 env 에 필수 키가 없으면 수집하지 않는다"
+_expect_text 'service-key' "수집 — 문면이 빠진 속성 이름을 보인다"
+_koneps_env
+chmod 644 "$KONEPSENV"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 서비스 키 env 가 other 에 열려 있으면 수집하지 않는다(이 파일은 서비스 키를 담는다)"
+_koneps_env
+_col_reject '--koneps-env-file 없음' --env-file "$T/env/prod.env" --state-dir "$T/state" \
+  --project "$PROJ" --run-state-root "$RSROOT" --days-back 1 \
+  --categories construction --calls-per-day 7 --calls-total 9
+
+# ── 양성 — argv 로 잰다 ────────────────────────────────────────────────────────
+_koneps_env
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 0 "수집 — 양성: 잔존 0 · 같은 커밋 · 같은 프로젝트 · 서비스 키 env 가 허용 집합이면 수집한다"
+_expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-collection" "수집 — 자기 일회 컨테이너 이름을 고정해 띄운다"
+_expect_log " -v ${COL_MONTH_DIR}:${COL_IN_CONTAINER}" "수집 — 붙임은 달 디렉터리 하나 → 고정된 컨테이너 경로다"
+_expect_log "--env-from-file ${KONEPSENV}" "수집 — 서비스 키 env 가 **일회 컨테이너까지** 간다"
+_expect_log "--env-file $T/env/prod.env" "수집 — 스택 env 파일은 그대로 compose 에 간다(파일이 둘이다)"
+_expect_log "-e SPRING_MAIN_WEB_APPLICATION_TYPE=none" "수집 — 러너 run 은 HTTP 표면을 끈다"
+_expect_log "--bidvector.collection.mode=once" "수집 — 러너 스위치를 준다"
+_expect_log "--bidvector.collection.from=${KST_BACK1}" "수집 — --days-back 1 의 from 은 어제(KST)다"
+_expect_log "--bidvector.collection.to=${KST_TODAY}" "수집 — --days-back 1 의 to 는 오늘(KST)다"
+_expect_log "--bidvector.collection.categories=construction,service" "수집 — 업종을 그대로 넘긴다"
+_expect_log "--bidvector.collection.calls-per-day=50" "수집 — 일 상한을 그대로 넘긴다"
+_expect_log "--bidvector.collection.calls-total=50" "수집 — 총 상한을 그대로 넘긴다"
+_expect_log "--bidvector.collection.run-state-dir=${COL_IN_CONTAINER}" "수집 — 러너가 받는 실행 상태 경로는 **고정된 컨테이너 경로**다(host 경로가 아니다)"
+# **달 디렉터리는 래퍼가 `date` 로 짓는다 — 인자에서 오지 않는다.** root 밖에는 아무것도 만들지 않는다.
+if [ -d "$COL_MONTH_DIR" ]; then _ok "수집 — 달 디렉터리를 root 아래에 만든다(${KST_MONTH})"; else _bad "수집 — 달 디렉터리를 만들지 않았다: $COL_MONTH_DIR"; fi
+if [ "$(ls -A "$RSROOT")" = notice-list ]; then _ok "수집 — root 아래에 만든 것은 notice-list 하나다"; else _bad "수집 — root 아래에 다른 것이 생겼다: $(ls -A "$RSROOT" | tr '\n' ' ')"; fi
+if [ ! -e "$T/notice-list" ] && [ ! -e "$T/state/notice-list" ]; then _ok "수집 — root 밖에는 아무것도 만들지 않았다"; else _bad "수집 — root 밖에 디렉터리를 만들었다"; fi
+# cr L-3 선례 — `' run --rm'` 은 `' run '` 보다 느슨하다(첫 플래그가 다른 `run` 이 생기면 지나간다).
+# 느슨해진 사유는 플래그 지원 질의(`run --help`) 하나뿐이므로 그 **수**를 세어 원래 세기를 되찾는다.
+col_run_n="$(grep -cE '^docker .* run ' "$SHIM_LOG" || true)"
+if [ "$col_run_n" = 2 ]; then
+  _ok "수집 — 양성 run 에서 ' run ' 줄은 둘이다(도움말 질의 하나 + 일회 컨테이너 하나)"
+else
+  _bad "수집 — ' run ' 줄이 ${col_run_n} 개다(둘이어야 한다 — 거절 갈래의 ' run --rm' 단언이 그만큼 느슨해진다)"
+fi
+# **붙임은 하나다** — 둘째 `-v` 가 생기면 여기서 선다(「인자가 붙임을 실을 수 없다」의 계수 축).
+col_mount_n="$(grep -oE ' -v [^ ]+' "$SHIM_LOG" | grep -c '' || true)"
+if [ "$col_mount_n" = 1 ]; then _ok "수집 — 붙임은 정확히 하나다 (${col_mount_n})"; else _bad "수집 — 붙임이 ${col_mount_n} 개다(하나여야 한다)"; fi
+# **`--from/--to` 갈래** — 창 계산 축이 아니라 인자 축이다(자정 경계와 무관하다).
+_run ./tools/prod-collection.sh "${COL_FIXED[@]}"
+_expect_rc 0 "수집 — 양성: --from/--to 갈래도 돈다(첫 적재·메우기)"
+_expect_log "--bidvector.collection.from=2026-11-01" "수집 — --from 을 그대로 넘긴다"
+_expect_log "--bidvector.collection.to=2026-11-20" "수집 — --to 를 그대로 넘긴다"
+_expect_log "--bidvector.collection.categories=construction" "수집 — 업종 하나도 그대로 넘긴다"
+_expect_no_log "days-back" "수집 — 래퍼의 인자 이름이 러너에 새지 않는다"
+# **러너의 술어를 셸에 사본으로 두지 않는다**(과잉 금지) — 31일 넘는 창·미래는 러너가 기동 실패로
+# 드러낸다. 래퍼는 그것을 다시 검사하지 않으므로 **통과**해야 한다.
+_run ./tools/prod-collection.sh "${COL_BASE[@]}" --run-state-root "$RSROOT" \
+  --from 2026-01-01 --to 2026-11-20 --categories construction --calls-per-day 7 --calls-total 9
+_expect_rc 0 "수집 — 31일 넘는 창은 래퍼가 막지 않는다(러너의 술어를 셸에 베껴 적지 않는다)"
+_expect_log "--bidvector.collection.from=2026-01-01" "수집 — 그 창을 그대로 러너에 넘긴다"
+
+# ── ④ 종료 코드 — 러너 다섯과 래퍼 둘이 겹치지 않게 옮겼다 ────────────────────
+# 러너 `3`(`ALREADY_RUNNING` — 기다리면 풀린다)과 래퍼 `3`(전제 실패 — 고쳐야 한다), 러너
+# `4`(`UNLOCKABLE` — 기다려도 안 풀린다)와 래퍼 `4`(미룸 — 기다리면 풀린다)는 **뜻이 정확히 반대**다.
+# 거동은 대표 구간으로, 가지의 꼴은 아래 등식이 구조로 닫는다(v G3 와 같은 교환).
+for _rc_pair in "0 0" "1 1" "2 2" "3 5" "4 6" "5 7" "6 7" "7 7" "9 7" \
+                "125 7" "126 7" "127 7" "128 7" "137 7" "143 7" "255 7"; do
+  _rc_in="${_rc_pair%% *}" _rc_want="${_rc_pair##* }"
+  SHIM_RUN_RC="$_rc_in" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+  _expect_rc "$_rc_want" "수집 — 러너 종료 ${_rc_in} → 래퍼 ${_rc_want}"
+done
+unset _rc_pair _rc_in _rc_want
+SHIM_RUN_RC=3 _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_text 'ALREADY_RUNNING' "수집 — 그 줄이 옮긴 코드의 원래 이름을 보인다"
+SHIM_RUN_RC=4 _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_text 'UNLOCKABLE' "수집 — 그 줄이 옮긴 코드의 원래 이름을 보인다"
+SHIM_RUN_RC=137 _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_text '예상 밖의 종료 코드 137' "수집 — 모르는 코드는 **원래 값을 문면에 담아** 7 로 난다"
+_exit_code_equation_check 수집 CollectionExitCode \
+  app/src/main/kotlin/bidvector/app/collection/CollectionLines.kt tools/prod-collection.sh
+
+# ── 잠금 — 미룸(4) ↔ 전제 실패(3) ──────────────────────────────────────────────
+_hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 4 "수집 — 프로젝트 잠금이 잡혀 있으면 **미룬다**(4) — 전제 실패(3)가 아니다"
+_expect_no_log ' run --rm' "수집 — 그 미룸이 일회 컨테이너 앞에서 끝난다"
+_release_lock
+_hold_lock "$T/state/.lock"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 4 "수집 — 상태 디렉터리 잠금이 잡혀 있어도 **미룬다**(4)"
+_release_lock
+rm -f "$T/state/.lock"
+chmod 500 "$T/state"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 3 "수집 — 잠금 **파일을 열지 못하면** 전제 실패(3)다"
+chmod 700 "$T/state"
+for frc in 1 64 65 70 127 137; do
+  SHIM_FLOCK_RC="$frc" _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+  _expect_rc 3 "수집 — flock 종료 ${frc} 는 전제 실패(3) — 경합으로 접지 않는다"
+done
+rm -rf "${RSROOT:?}/notice-list"
+
 # 신호 경로 — 러너 셋이 **각자의** 일회 컨테이너만 치운다. **HUP 도 건다**(cr L-1): §9.2 가 끊긴
 # ssh 세션·`KillSignal=` 을 바꾼 unit 에 돌리는 갈래이고, trap 이 어긋나면 **운영 DB 자격을 받은 일회
 # 컨테이너가 남는** 바로 그 경로다. 훑기에만 있던 것을 셋 모두에 둔다.
@@ -1049,6 +1324,15 @@ SIG_ONEOFF_SUFFIX=relay
 SIG_ARGS=("${RELAY_ARGS[@]}")
 _signal_case TERM 143
 _signal_case HUP 129
+# M15/15U — 넷째 러너. 같은 갈래를 받는다: `TimeoutStartSec` 상한에 걸려 죽은 run 이 **운영 DB 자격과
+# 서비스 키를 받은 일회 컨테이너**를 남기지 않아야 한다(이 러너는 그 둘을 함께 쥔다).
+_koneps_env
+SIG_SCRIPT=./tools/prod-collection.sh
+SIG_ONEOFF_SUFFIX=collection
+SIG_ARGS=("${COL_ARGS[@]}")
+_signal_case TERM 143
+_signal_case HUP 129
+rm -rf "${RSROOT:?}/notice-list"
 
 echo "== runbook — ExecStopPost 가 조건 없이 돌지 않는가"
 # 문서에는 구조 술어가 없다 — 이 단언은 **텍스트 술어**다(unit 예시가 있는 층이 문서뿐이다). 조건 없는
@@ -1067,7 +1351,7 @@ echo "== runbook — ExecStopPost 가 조건 없이 돌지 않는가"
 # 넓히고 **개수 등식은 그대로** 둔다 — 새 unit 이 조건 없는 줄을 들고 들어오면 그 등식이 깨진다.
 # 러너 이름 집합도 함께 센다(꼬리를 `.*` 로 열면 아무 이름이나 통과해 등식이 공허해진다).
 RB=docs/runbook/m7-7f-production.md
-ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| \[ "\$\$EXIT_STATUS" = 4 \] \|\| .*docker rm -f [^ ]*-app-run-(sweep|evaluation|relay)'
+ESP_WANT='^ExecStopPost=-/bin/sh -c .\[ "\$\$SERVICE_RESULT" = success \] \|\| \[ "\$\$EXIT_STATUS" = 3 \] \|\| \[ "\$\$EXIT_STATUS" = 4 \] \|\| .*docker rm -f [^ ]*-app-run-(sweep|evaluation|relay|collection)'
 esp_n="$(grep -cE '^ExecStopPost=' "$RB" || true)"
 esp_cond="$(grep -cE "$ESP_WANT" "$RB" || true)"
 if [ "$esp_n" -ge 1 ] && [ "$esp_n" = "$esp_cond" ]; then
@@ -1081,10 +1365,10 @@ fi
 # (`docker rm -f <프로젝트>-app-run-sweep`)도 집어, unit 의 그 줄을 지우고 산문만 남겨도 집합 등식이
 # 초록이었다. 이제 세는 모집단은 `esp_n` 이 세는 바로 그 줄들이다.
 esp_names="$(grep -E '^ExecStopPost=' "$RB" | grep -oE 'docker rm -f [^ ]*-app-run-[a-z]+' | sed 's/.*-app-run-//' | sort -u | tr '\n' ' ')"
-if [ "$esp_names" = "evaluation relay sweep " ]; then
-  _ok "runbook 의 ExecStopPost 가 러너 셋의 **서로 다른** 일회 이름을 지운다(${esp_names})"
+if [ "$esp_names" = "collection evaluation relay sweep " ]; then
+  _ok "runbook 의 ExecStopPost 가 러너 넷의 **서로 다른** 일회 이름을 지운다(${esp_names})"
 else
-  _bad "runbook 의 ExecStopPost 가 지우는 이름 집합이 {evaluation, relay, sweep} 가 아니다: ${esp_names}"
+  _bad "runbook 의 ExecStopPost 가 지우는 이름 집합이 {collection, evaluation, relay, sweep} 가 아니다: ${esp_names}"
 fi
 
 # M15/15M(cr H-1) — **`SuccessExitStatus=4` 가 drop-in 에 있어야** 미룸이 `OnFailure` 를 끌지 않는다.
@@ -1113,18 +1397,42 @@ fi
 # **relay unit 이 평가 커밋 뒤에 선다**(cr M-3). 타이머 셋이 `Persistent=true` 라 창을 놓친 뒤 부팅하면
 # systemd 가 밀린 run 들을 거의 동시에 띄우고, 잠금 둘은 **직렬화는 하지만 순서를 정하지 않는다** —
 # relay 가 먼저 잡으면 그 catch-up run 은 평가 커밋의 행 없이 돌고 끝난다. 그 한 줄이 그 순서를 세운다.
-relay_after="$(awk '/^# \/etc\/systemd\/system\/bidvector-notification-relay\.service$/ {inb = 1; next} inb && /^```$/ {exit} inb {print}' "$RB" | grep -cE '^After=bidvector-evaluation-commit\.service$' || true)"
-if [ "$relay_after" = 1 ]; then
-  _ok "runbook 의 relay unit 이 평가 커밋 뒤에 선다(After=)"
+# **M15/15U — 사슬이 넷이 됐다**(수집 → 훑기 → 평가 커밋 → relay). 한 unit 의 줄만 세던 앞 판을
+# **`(unit, After 값)` 쌍 집합 등식**으로 넓힌다 — 줄이 빠지든 남의 unit 으로 옮겨지든 값이 바뀌든 붉다.
+# 평가 커밋이 수집 뒤에 서면 그 run 이 **그 주기의 공고를 보고** 판정한다(relay 의 `After=` 와 같은 뜻).
+# relay 에 수집 간선을 다시 걸지 않는다 — systemd 의 순서는 그래프이고 relay → 평가 커밋 → 수집 경로가
+# 이미 서 있다(간선을 겹쳐 걸면 사슬이 늘 때마다 모든 unit 을 고쳐야 한다).
+AFTER_WANT_SET="$(printf '%s\n' \
+  'bidvector-evaluation-commit|bidvector-collection.service' \
+  'bidvector-notification-relay|bidvector-evaluation-commit.service' \
+  'bidvector-notification-sweep|bidvector-collection.service' | sort)"
+after_pairs="$(awk '
+  /^# \/etc\/systemd\/system\/[a-z@-]+\.service$/ {
+    unit = $2; sub(/^\/etc\/systemd\/system\//, "", unit); sub(/\.service$/, "", unit)
+    inb = 1; next
+  }
+  inb && /^```$/ { inb = 0; next }
+  inb && /^[[:space:]]*After[[:space:]]*=/ {
+    line = $0; sub(/^[^=]*=[[:space:]]*/, "", line); sub(/[[:space:]]*$/, "", line)
+    print unit "|" line
+  }' "$RB" | sort || true)"
+if [ "$after_pairs" = "$AFTER_WANT_SET" ]; then
+  _ok "runbook 의 unit 순서 간선 집합이 기대와 정확히 같다(수집 → 훑기 · 수집 → 평가 커밋 · 평가 커밋 → relay)"
 else
-  _bad "relay unit 블록에 'After=bidvector-evaluation-commit.service' 가 ${relay_after} 줄이다(1 이어야 한다) — Persistent=true 의 catch-up 에서 순서가 뒤집힌다"
+  _bad "unit 의 After= 쌍이 기대와 다르다 — 받은 것: [$(printf '%s' "$after_pairs" | tr '\n' ';')] · 기대: [$(printf '%s' "$AFTER_WANT_SET" | tr '\n' ';')] — Persistent=true 의 catch-up 에서 순서가 뒤집힌다"
 fi
 # **제외 목록을 「값 집합 등식」으로 본다**(M15/15R, sec N-2). 앞 판은 「`5` 를 빼는 줄이 1 · `6` 을 빼는
 # 줄이 0」만 봤고, 그래서 `SuccessExitStatus=4 5 7` 로 바꾼 변이가 **GREEN** 이었다 — 그 순간 `7`(모르는
 # 코드)이 깨끗한 종료가 되어 S-3 이 닫은 창 셋이 **한 층 위에서** 그대로 다시 열린다(경보 없음 · unit 은
 # 「Deactivated successfully」 · §13.4 의 계수는 `7` 을 세지 않는다). 이제 drop-in 마다 **unit 이름과 값
 # 집합의 쌍**을 모아 고정 집합과 등식으로 묶는다 — 무엇이 더해지든 빠지든 붉다.
+# **M15/15U — 수집 drop-in 은 `4` 만 뺀다.** 러너의 `ALREADY_RUNNING` 을 옮긴 `5` 는 **빼지 않는다**:
+# 래퍼의 잠금 둘 아래에서 그 코드가 서는 경로는 **래퍼를 거치지 않은 실행**(손으로 띄운 `java -jar`·
+# 컨테이너)이 같은 실행 상태 디렉터리를 쥔 경우뿐이고, 그것은 설계된 정상이 아니라 사람이 알아야 하는
+# 어긋남이다(래퍼를 거친 손 실행은 프로젝트 잠금에서 `4` 로 먼저 미룬다 — 위 잠금 단언이 그 축이다).
+# relay 의 `5`(`LEASE_BUSY`)와 다른 판단이고, 그 차이의 사유는 runbook §14 가 적는다.
 SES_WANT_SET="$(printf '%s\n' \
+  'bidvector-collection|4' \
   'bidvector-evaluation-commit|4' \
   'bidvector-notification-relay|4 5' \
   'bidvector-notification-sweep|4' | sort)"
@@ -1180,7 +1488,8 @@ fi
 # `config/quality/leak-pattern-baseline.txt`) 그 파일과 **정확히 같은지**를 본다.
 DIR_EXPECT=config/quality/runbook-prod-path-lines.txt
 RELAYENV_EXPECT=config/quality/runbook-relay-env-lines.txt
-for _e in "$DIR_EXPECT" "$RELAYENV_EXPECT"; do
+KONEPSENV_EXPECT=config/quality/runbook-koneps-env-lines.txt
+for _e in "$DIR_EXPECT" "$RELAYENV_EXPECT" "$KONEPSENV_EXPECT"; do
   [ -r "$_e" ] || _die "기대 집합 파일을 읽지 못했다: ${_e}(옮겨졌거나 지워졌다) · 판정 불가" 2
 done
 unset _e
@@ -1233,6 +1542,12 @@ _rb_set_check "자격·상태 디렉터리 경로" "$dir_lines" "$(_rb_expect "$
 # 관용구**라(§9.5 ① 이 그 꼴이다) 다음 저자가 고를 확률이 낮지 않았다. 이제 동사를 보지 않는다.
 relayenv_lines="$(_rb_code_lines | grep 'relay\.env' | _rb_norm | _rb_sort || true)"
 _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect "$RELAYENV_EXPECT")" "$RELAYENV_EXPECT"
+# **M15/15U — 자격 파일이 둘이 됐다.** `koneps.env` 는 조달청 서비스 키를 담고, §14 가 그 파일을 입에
+# 담는다. S-2 의 사고 부류(이미 채운 자격 파일을 `install … /dev/null` 이 **말없이 0 바이트로** 만든다)는
+# 파일 이름과 무관하므로 같은 처방을 이 축에도 둔다 — 동사를 보지 않고 **그 파일을 입에 담은 코드 블록 줄
+# 전부**를 고정 집합과 묶는다. 이 파일이 비면 수집 run 이 기동 실패(1)로 끝난다.
+konepsenv_lines="$(_rb_code_lines | grep 'koneps\.env' | _rb_norm | _rb_sort || true)"
+_rb_set_check "자격 파일(koneps.env) 언급" "$konepsenv_lines" "$(_rb_expect "$KONEPSENV_EXPECT")" "$KONEPSENV_EXPECT"
 
 # ── M15/15R(S-4 · S-9) — 경보 unit 의 자격 통로와 core dump ──────────────────────
 # §13.3 은 relay unit 에서 `EnvironmentFile=` 을 **일부러 걷으면서** 사유로 `/proc/<pid>/environ` 축을
@@ -1302,11 +1617,10 @@ else
   _bad "ExecStopPost 가 지우는 이름의 접두 집합이 {${BIDVECTOR_PROD_PROJECT}} 가 아니다: {${esp_prefixes}} — 프로젝트 이름이 다르면 그 줄도 함께 바꾼다(§9.2)"
 fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
-unset DIR_EXPECT RELAYENV_EXPECT dir_lines relayenv_lines ENVF_DIRECTIVE envf_relay envf_mentions \
+unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
+  ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
-  esp_prefixes SES_WANT_SET ses_pairs \
-  rex_entry_n rex_args rex_arg_n rex_vals rex_val_n rex_set case_branch_n case_known_n wrap_set wrap_n \
-  xlat_set xlat_clash
+  esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"
 [ "$FAIL" -eq 0 ] || exit 1
