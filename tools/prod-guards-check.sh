@@ -1900,14 +1900,28 @@ _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect 
 # 만드는 `0644` 로 두지 않는 유일한 길은 **`tee` 보다 앞선 `install -m 600`** 이다(`tee` 는 있는 파일의
 # mode 를 바꾸지 않는다 — 실측: 먼저 만들면 600 유지 · 안 만들면 644). 그래서 **순서**가 거동이다.
 # 자리 이름은 하나로 두고(등재 줄 목록의 수집 필터 밖이라 그 래칫이 따라가지 않는다) 여기서 직접 센다.
+# ── M15/15V(D-15V-6) — §14.5 ④ 의 전제 가드가 **질의를 감싸는가** ─────────────
+# 붙여넣는 셸에는 `set -e` 가 없어서 앞 판의 `… || { echo …; false; }` 는 `$?` 만 세우고 **다음 줄의
+# `docker exec … psql` 이 그대로 돌았다**. 그래서 질의는 `if …; then` **안**에 있어야 한다(가짜 `docker`
+# 로 세 꼴을 쟀다 — 정상 1 회 · 빈/`null` 0 회, evidence commands). 그 구조를 여기서 고정한다.
+q_if_n="$(_rb_code_lines | grep -cE '^if \[ -n "\$P" \] && \[ "\$P" != null \]' || true)"
+q_exec_n="$(_rb_code_lines | grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' || true)"
+q_fi_n="$(_rb_code_lines | grep -cE '^  echo "compose 에서 프로젝트·DB 이름을 읽지 못했다' || true)"
+if [ "$q_if_n" = 1 ] && [ "$q_exec_n" = 1 ] && [ "$q_fi_n" = 1 ]; then
+  _ok "runbook 의 ④ 질의가 전제 가드(`if …; then`) 안에 있다 — 빈 값·null 에서 psql 에 닿지 않는다"
+else
+  _bad "④ 의 전제 가드 구조가 어긋났다 — if 줄 ${q_if_n} · docker exec 줄 ${q_exec_n} · else 줄 ${q_fi_n}(각 1 이어야 한다). `||` 꼴로 되돌리면 붙여넣는 셸에서 질의가 그대로 돈다"
+fi
 COL_LOG=/var/tmp/bidvector-collection-step3.log
 col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
 col_log_install_n="$(printf '%s\n' "$col_log_lines" | grep -cE "^install -m 600 /dev/null ${COL_LOG}\$" || true)"
 col_log_tee_n="$(printf '%s\n' "$col_log_lines" | grep -cF "| tee ${COL_LOG}" || true)"
 col_log_rm_n="$(printf '%s\n' "$col_log_lines" | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
 # 순서: `install` 줄이 `tee` 줄보다 **앞**이어야 한다. 수집 순서가 문서 순서다.
-col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}\$" | head -n1 | cut -d: -f1)"
-col_log_tee_at="$(printf '%s\n' "$col_log_lines" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1)"
+# `|| true` — 무매치(`grep` exit 1)가 `set -e` 아래에서 **게이트를 죽이지 않게** 한다. 죽은 게이트는
+# 판정이 아니라 침묵이다(이 라운드의 변이가 그 꼴을 드러냈다 — exit 1 · BAD 0 · 요약 줄 없음).
+col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}\$" | head -n1 | cut -d: -f1 || true)"
+col_log_tee_at="$(printf '%s\n' "$col_log_lines" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1 || true)"
 if [ "$col_log_install_n" = 1 ] && [ "$col_log_tee_n" = 1 ] && [ "$col_log_rm_n" -ge 1 ] \
    && [ -n "$col_log_install_at" ] && [ -n "$col_log_tee_at" ] && [ "$col_log_install_at" -lt "$col_log_tee_at" ]; then
   _ok "runbook 의 ③ 로그 파일은 0600 으로 먼저 만들고(install 1 줄 · tee 보다 앞) 지우는 줄이 있다(${col_log_rm_n})"
@@ -1987,6 +2001,7 @@ fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
 unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
   COL_LOG col_log_lines col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
+  q_if_n q_exec_n q_fi_n \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
   esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs \
