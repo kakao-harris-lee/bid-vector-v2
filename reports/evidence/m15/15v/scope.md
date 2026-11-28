@@ -1,0 +1,149 @@
+# M15 / 15V — 운영 공고 수집 후속 (첫 실수집 전 — 실행 상태 root · 운영 gid 구성 · runbook 처방)
+
+```yaml
+milestone: M15
+slice: 15v-collection-followup
+base_sha: 9a2ce352b3ea2d39b57d91f94f723cff36150b98   # main, PR #209 머지 커밋
+head_sha: <리뷰 요청 시점에 기입>
+in_scope:
+  - tools/prod-collection.sh              # 실행 상태 root 술어 · 두 층 생성 방식 · group 등식 · 생성 자리
+  - tools/prod-guards-check.sh            # 위 거동 단언 · 공허하던 단언 넷 · fixture 정리 · 시간대 축
+  - docs/runbook/m7-7f-production.md      # §14.1 · §14.5 ③④ · §14.9 · §11 제한
+  - config/quality/runbook-prod-path-lines.txt   # runbook 운영 경로 줄이 바뀌면 따라간다
+  - config/quality/runbook-koneps-env-lines.txt  # 위와 같다(바뀔 때만)
+  - docs/discovery/capability-map.md      # OPEN-M15-COLLECTION-RUN-STATE-GID 행 갱신
+  - milestone-15.md                       # 15V 한 문단
+  - reports/evidence/m15/15u/commands.md  # 「라운드 이력 절」 하나를 걷는다(evidence-pack 금지 꼴) — 내용은 옮기지 않는다
+  - reports/evidence/m15/15v/
+out_of_scope:
+  - 러너 코드(`app/**`·`workflow/**`·`adapters/**`) · `tools/prod-env.sh` · `tools/prod-notification-relay.sh`.
+  - /etc · systemd 의 실제 설치, 조달청 실호출, 운영 DB — **하나도 하지 않는다**. 실측은 scratchpad 와
+    버릴 컨테이너(`--network none --rm`)에서만 돈다.
+  - `/etc/bidvector-v2/*.env` 의 값 — 읽지 않는다.
+  - 후보 상한의 값 · 타이머 enable — 실측 뒤 운영자 결정이다(15U D-15U-6 그대로).
+  - gid **값** 등식(그 group 이 app 이미지의 10001 인가) — 이미지 조회가 필요한 축이라 OPEN 으로 남긴다.
+  - `reports/evidence/m15/15u/scope.md` — 닫힌 계약은 고쳐 쓰지 않는다. D-15U-4 의 어긋난 문장은 아래
+    「15U 계약 정정」 절이 든다.
+acceptance_commands:
+  - ./tools/prod-guards-check.sh          # CI `container` job 의 그 step 축어
+  - bash -n tools/prod-collection.sh tools/prod-guards-check.sh
+  - ./gradlew check                       # CI `check` job — evidence·runbook 을 훑는 게이트가 여기 있다
+  # (CI) container job 전건 — 판정은 PR head 의 CI.
+rollback: reports/evidence/m15/15v/rollback.md
+```
+
+## 무엇을 닫는가
+
+PR #209 의 r2 판정(verifier ready · code-reviewer approve)이 차단 없이 남긴 medium 둘 · low 열둘이다
+(PR #209 「머지 전 처분 — 넘기는 지적」 코멘트). 첫 실수집(다음 release 반입 뒤 §14.5 ③)보다 **앞에**
+닫는다 — 아래 「먼저 재현할 것」이 참이면 그 첫 run 이 `exit 3` 으로 선다.
+
+## 먼저 재현할 것 (구현 전 — 결과에 따라 설계가 갈린다)
+
+**가설 H: 운영 gid 구성에서 지금의 래퍼는 첫 run 에 `exit 3` 으로 죽는다.** runbook §14.1 이 만드는
+root 는 `소유 deploy · group 10001 · 2700` 이고 `deploy` 는 group 10001 의 구성원이 **아니다**(그 group 에
+사람이 없어야 한다는 것이 §14.1 의 요구다). 그 구성에서 r2 가 잰 사실 둘:
+
+- 비구성원이 `chmod 2700` 을 치면 커널이 setgid 를 **지운다**(vr L-b: `700`).
+- `mkdir -p -m 2770 <root>/notice-list/<달>` 한 번에 만든 잎은 `770` 이다(vr L-a — `mkdir -m` 이 만든 뒤
+  chmod 를 한 번 더 치고 거기서 비트가 떨어진다).
+
+래퍼는 조상을 `mkdir -p -m 2700` 으로 **따로** 만든다. 같은 기전이면 조상이 `700`(setgid 탈락)으로 서고
+바로 뒤의 「갈래 디렉터리에 setgid 가 없다」 술어가 `exit 3` 을 낸다 — 그리고 그 문면의 처방(`chmod 2700`)은
+같은 이유로 먹지 않는다. r2 의 두 레인은 잎만 쟀고 이 조합은 재지 않았다.
+
+재현: 버릴 컨테이너를 root 로 띄워 scratchpad 디렉터리를 `1000:10001 2700` 으로 만든 뒤, host 의 `deploy`
+(비구성원)로 래퍼의 `_collection_prepare_run_state` 와 같은 순서의 명령을 친다. **H 가 거짓이면** 구현 전에
+보고하고 D-15V-2 를 접는다(나머지는 그대로 간다). 재현 표(구성 × 명령 × 결과 mode·gid)를 commands.md 에 남긴다.
+
+## 결정
+
+- **D-15V-1 root 도 술어 안으로 들인다.** 인자 검사 자리(생성보다 앞)에서 root 의 ⓐ setgid 있음
+  ⓑ group 쓰기 닫힘 ⓒ other 쓰기 닫힘을 본다. 어긋나면 `exit 3` 이고 문면은 §14.1 의 `install -d` 줄을
+  가리킨다. 사유: 조상에 건 논증 둘(그 비트가 group 을 아래로 잇는다 · 쓸 수 있으면 아래 층을 바꿔칠 수
+  있다)이 한 층 위에도 그대로 선다(cr M-1 · vr L-h). root 가 심링크인 것은 지금처럼 받는다(실경로로 푼다).
+- **D-15V-2 두 층은 `-m` 없이 만든다 — umask 를 좁힌 부속 셸에서 `mkdir` 한 번씩.** 조상은 `umask 077`,
+  잎은 `umask 007`. `mkdir(2)` 는 부모의 setgid 와 group 을 물려주고, `-m` 이 없으면 뒤따르는 chmod 가
+  없어 그 비트가 구성원 여부와 무관하게 남는다. 결과 모양은 지금 문서의 `2700`/`2770` 그대로다 — 바뀌는
+  것은 만드는 법뿐이다. (H 가 참일 때의 처방이다. 이 방식이 구성원·비구성원 **두 구성 모두**에서 그 모양을
+  내는지 재현 표로 보인다. 다른 방식이 더 좁게 닫으면 근거를 적고 그쪽으로 간다.)
+- **D-15V-3 group 등식을 잰다 — 조상의 gid == root 의 gid · 잎의 gid == root 의 gid.** setgid 비트는
+  「앞으로 만들 자리」만 묶는다. **이미 있는 자리**의 group 이 틀린 경우(cr M-1 의 귀결: 러너가 기동에서
+  죽고 그 종료가 1 이라 예외와 섞인다)는 비트 술어가 보지 못한다. root 의 gid 는 운영자가 §14.1 에서 정한
+  값이고 `stat` 으로 권한 없이 읽힌다. 어긋나면 `exit 3`. 조상 setgid 술어는 남긴다(다음 달의 자리를 묶는다) —
+  다만 「새로 만든 경우에는 D-15V-2 때문에 늘 참」이라는 사정거리를 주석에 적는다.
+  `OPEN-M15-COLLECTION-RUN-STATE-GID` 는 **「root 의 gid 가 이미지의 gid 인가」 한 칸으로 좁혀** 남긴다.
+- **D-15V-4 처방 문면은 운영 gid 구성에서 실제로 먹는 명령만 적는다.** 래퍼의 `_die` 문면과 §14.9 표의
+  `chmod 2700`·`chmod 2770`·「group 을 맞춘다」를 전수해, 비구성원 소유자가 `sudo` 없이 치면 먹지 않는
+  것은 `sudo` 꼴로 고치고 각각을 재현 표에서 한 번씩 친다. §14.1 의 「`chmod 2700`·`chmod 0700` 은 setgid 를
+  지우지 않는다(실측)」은 **구성원일 때만 참**이다 — 조건을 붙이거나 걷는다.
+- **D-15V-5 §14.5 ③ 의 로그 파일은 `0600` 으로 먼저 만들고, ④ 끝에 지우는 단계를 둔다.** `tee` 앞에
+  `install -m 600 /dev/null <그 경로>` 한 줄(`tee` 는 있는 파일의 mode 를 바꾸지 않는다 — 실측으로 확인),
+  ④ ⓕ 뒤에 제거 한 줄과 「지우기 전에는 ⓕ 를 다시 셀 수 있다」는 순서 주. 자리는 `/var/tmp` 그대로 둔다
+  (cr M-2). 등재 줄 목록이 따라간다.
+- **D-15V-6 §14.5 ④ 의 전제 가드는 질의를 실제로 막는다.** 세 값 모두 「비어 있지 않다 · `null` 이 아니다」로
+  보고, 질의 블록을 `if … then … fi` 로 감싼다(붙여넣기 셸에는 `set -e` 가 없다 — cr L-3 · vr L-i). 그
+  토막을 뽑아 빈 값·`null` 에서 질의 명령에 닿지 않음을 가짜 `docker` 로 한 번 잰다.
+- **D-15V-7 생성을 이름 충돌 검사 뒤로 옮긴다**(cr L-1). 「거절·미룬 run 은 자리를 남기지 않는다」 단언에
+  그 꼴을 더해 전칭이 표본 셋 위에 서게 한다.
+- **D-15V-8 공허하던 단언을 가른다.** 각각 r2 의 그 변이가 **RED 로 바뀌는 것**이 완료 기준이다:
+  - 잎 심링크 거절(vr V6b) — 문면 단언으로 축을 못박는다.
+  - `TimeoutStartSec` 부등식(vr V12c) — 가드 주석이 말하는 부등식을 코드로 세운다.
+  - 「붙임의 원천은 실경로다」(vr V14 · cr L-2) — 글자가 같은 중복 단언을 걷고, **root 를 심링크로 준 꼴**
+    (거절되지 않는 유일한 층)에서 `-v` 에 실린 값이 실경로임을 잰다. 래퍼 끝의 `RUN_STATE_DIR="$real"` 이
+    여전히 값을 바꾸지 않는 겹이면 그 사실을 제한으로 등재한다(지우지 않는다 — 15U 주석의 사유 둘).
+  - rc 만 보던 음성 셋 + 심링크 셋째 꼴(cr L-5) — `_expect_text` 한 줄씩.
+- **D-15V-9 가드 fixture 정리를 trap 안으로**(cr L-4) — 저장소 안에 만드는 심링크 타깃을 `_cleanup` 이 지운다.
+- **D-15V-10 KST 축 단언은 24시간 판별한다**(vr L-c) — 반대 방향 구역을 함께 써서 하루 어느 시각의 CI
+  에서도 `TZ=Asia/Seoul` 제거 변이가 RED 가 되게 한다. 시각을 고정한 재현(가짜 `date` 또는 `faketime` 없이
+  되는 방식)으로 창 밖 시각에서도 RED 임을 보인다.
+- **D-15V-11 15U `commands.md` 의 라운드 이력 절을 걷는다**(vr L-g) — 절 제목을 주제 제목으로 바꾸거나
+  본문을 주제 절로 접는다. 수치·명령은 건드리지 않는다.
+
+## 15U 계약 정정 (닫힌 문서를 고치지 않고 여기 적는다)
+
+15U scope.md 의 D-15U-4 「소유자 10001 로 만드는 것은 운영자」는 runbook §14.1 의
+`install -d -m 2700 -o "$USER" -g 10001` 과 어긋난다(vr L-j). 맞는 쪽은 runbook 이다 — **소유자는 래퍼를
+돌리는 사용자, group 이 10001** 이다. 문자 그대로(소유자 10001)면 래퍼가 `notice-list` 를 만들지 못한다.
+
+## 위협 모델 경계
+
+15U 의 경계 그대로다. 방어하는 것: 운영자의 손 실수(틀린 자리·틀린 mode·틀린 group) · 같은 host 의
+**다른 비특권 계정**이 실행 상태 자리를 바꿔쳐 호출 상한 회계를 0 으로 되돌리는 것 · 서비스 키와 그 모양이
+argv·화면·로그·오류 문면·**새 로그 파일**에 닿는 것. 방어하지 않는 것: `deploy`·root 자신, 검사와 사용
+사이의 창(runbook 제한 21). D-15V-1·3 은 이 경계 안의 축을 넓히는 것이고 경계를 옮기지 않는다.
+
+## 설계 검토 (세션 모델)
+
+- **(1) 열거인가 구성인가.** D-15V-3 은 비트 열거에서 **등식**으로 한 칸 옮긴다 — 「group 이 이어지는가」를
+  비트의 유무(원인)로 재던 것을 gid 의 같음(결과)으로 잰다. D-15V-2 는 「구성원일 때만 먹는 chmod」에
+  기대던 생성을 커널의 상속에만 기대게 한다.
+- **(2) 우회 다섯 — 각각 가드 음성 한 꼴로 선다.** ⓐ root 에 setgid 없음 → 3 ⓑ root 에 group 쓰기 → 3
+  ⓒ root 에 other 쓰기 → 3 ⓓ 이미 있는 조상의 gid 가 root 와 다름(비트는 있음) → 3 ⓔ 이미 있는 잎의 gid 가
+  root 와 다름(mode 는 2770) → 3. 다섯 모두 문면 단언으로 축을 못박는다. gid 를 바꾸는 fixture 가 host 에서
+  권한 없이 서지 않으면(비구성원은 `chgrp` 를 못 친다) 호출자가 **속한 다른 group** 을 쓰거나 가짜 `stat`
+  으로 세우고, 어느 쪽인지 commands.md 에 적는다 — 세울 수 없는 꼴을 「통과」로 적지 않는다.
+- **(2b) 값 획득 축.** 새 public 표면 0(새 인자·새 env·새 출력 값 없음). 새 `_die` 문면이 내는 것은 경로·
+  mode·gid 숫자뿐이다. 새로 생기는 값의 자리는 runbook 의 로그 파일 하나이고 D-15V-5 가 mode 와 수명을 묶는다.
+- **(3) 과잉·미달.** root 를 「정확히 2700」으로 조이지 않는다 — 필요한 것은 비트 셋이고 운영자가
+  group 읽기를 여는 것까지 막을 근거가 없다. gid 값 등식은 미달로 남는다(OPEN, 사유는 out_of_scope).
+
+## 구현 레인이 정하고 근거를 적을 것
+
+1. H 의 재현 결과와 그에 따른 D-15V-2 의 최종 꼴.
+2. (2) ⓓ·ⓔ fixture 를 세우는 방식.
+3. D-15V-10 의 반대 방향 구역 선택과 창 밖 시각 재현 방식.
+4. 변이 표 — r2 의 V6b·V12c·V14 가 RED 로 바뀌었는가 + 새 술어(D-15V-1·3·7)마다 변이 하나씩.
+   기대는 「비-0」이 아니라 **그 축의 문면을 든 실패**다. 변이 전 커밋, 변이 뒤 `git diff --numstat` 으로 적용 확인.
+
+## 알려진 제한
+
+(구현 레인이 실측으로 채운다.)
+
+## 하네스 레인 변경
+
+없음.
+
+## 계약 갱신
+
+(없음 — 수정 라운드가 새 파일을 만들면 여기 등재한다.)
