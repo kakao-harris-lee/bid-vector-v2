@@ -123,6 +123,18 @@ LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3a
 # CVE 를 축어로 담을 수 있었지만 한 목록이 두 CVE 를 닫는 지금은 그 문면이 둘 중 하나를 틀리게
 # 말한다 — 어느 하한이 미달인지와 그것이 무엇을 닫는지는 같은 줄에서 와야 한다.
 #
+# chore(2026-11-28) — `CVE-2026-124851`(HIGH, `libzstd1` 1.5.4+dfsg2-5)이 **셋째로** 같은 자리를
+# 붉혔다(vuln DB 갱신, 모든 PR 과 main 의 S-22d). 앞 둘과 같은 실측 결과다 — 같은 태그의 최신
+# index `sha256:44cf1793…`(2026-11-24)도 `libzstd1` **1.5.4+dfsg2-5** 이고 `/etc/debian_version`
+# 도 **12.15** 그대로라 베이스 상향이 닫는 것이 0 이고(그 이미지에서 실측, `scan.os.name.ml-serving`
+# 무편집), 수정판 **1.5.4+dfsg2-5+deb12u1** 은 `bookworm-security` 에 있다(고정 베이스에서
+# `apt-cache policy` 의 Candidate 로 실측). 그래서 올리는 패키지와 하한 행 하나만 늘린다.
+#
+# 세 회차가 같은 처방으로 끝났다는 것이 **이 자리의 성질**을 말한다 — 이 베이스는 point release
+# 사이에 security pocket 으로만 고쳐지므로, 다음 회차도 이 RUN 에 행을 더하는 일이 된다. 그
+# 반복이 비용이 되는 날의 선택지(베이스 태그 상향·`apt-get upgrade` 전체·주인 지정)는 이 chore 의
+# 범위가 아니다 — `OPEN-CVE-APT-RUNBOOK-BRANCH` 가 그 주인 문제를 이미 들고 있다.
+#
 # **하한은 설치 인자가 아니라 `dpkg --compare-versions` 로 닫는다.** `apt-get install` 에는 apk 의
 # `'curl>=8.23.0-r0'` 같은 하한 문법이 없고 `pkg=<판>` 정확 고정뿐인데, 정확 고정은 security pocket
 # 이 다음 판으로 갈아치우는 날 **모든 빌드를 붉힌다**(web·proxy 가 apk 하한을 고른 것과 같은 사유).
@@ -156,10 +168,11 @@ LABEL org.bidvector.baseimage="python:3.12.16-slim-bookworm@sha256:6dd8b6dab6b3a
 #    내려 적거나 상류 버전 성분만 비교한다.
 RUN set -eu; \
     apt-get -o Acquire::Retries=3 update -qq; \
-    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0 libpam0g libpam-modules libpam-modules-bin libpam-runtime; \
+    apt-get -o Acquire::Retries=3 install --only-upgrade -y --no-remove --no-install-recommends apt libapt-pkg6.0 libpam0g libpam-modules libpam-modules-bin libpam-runtime libzstd1; \
     for floor in 'apt 2.6.2 CVE-2026-109518' 'libapt-pkg6.0 2.6.2 CVE-2026-109518' \
                  'libpam0g 1.5.2-6+deb12u3 CVE-2025-6020' 'libpam-modules 1.5.2-6+deb12u3 CVE-2025-6020' \
-                 'libpam-modules-bin 1.5.2-6+deb12u3 CVE-2025-6020' 'libpam-runtime 1.5.2-6+deb12u3 CVE-2025-6020'; do \
+                 'libpam-modules-bin 1.5.2-6+deb12u3 CVE-2025-6020' 'libpam-runtime 1.5.2-6+deb12u3 CVE-2025-6020' \
+                 'libzstd1 1.5.4+dfsg2-5+deb12u1 CVE-2026-124851'; do \
         set -- $floor; \
         cur="$(dpkg-query -f '${Version}' -W "$1")"; \
         dpkg --compare-versions "$cur" ge "$2" \
