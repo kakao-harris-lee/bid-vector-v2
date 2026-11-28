@@ -383,6 +383,9 @@ hd != "" {
   }
   scanned++
   if (hdraw) { if (index($0, BT) > 0) { live++; hit(FNR, "(비인용 heredoc)") } ; next }
+  # SKIPHD — 인용 heredoc 본문을 **데이터로** 건너뛴다. `tools/*.sh` 의 heredoc 은 실행되는
+  # 가짜를 만들므로 셸로 훑는 쪽이 맞지만, ④ 등재본의 heredoc 은 SQL 데이터다(cr L-1).
+  if (SKIPHD) next
   bsp = walk($0, bst, bsp, FNR)
   next
 }
@@ -2151,20 +2154,42 @@ for _t in "${Q_REAL_TOOLS[@]}"; do
 done
 QBASH="$(command -v bash)"
 [ -n "$QBASH" ] || _die "bash 자리를 찾지 못했다 — 판정 불가" 2
-sed "1s|.*|#!${QBASH}|" "$T/bin/docker" > "$T/qbin/docker"
-chmod +x "$T/qbin/docker"
-head -n1 "$T/qbin/docker" | grep -qxF "#!${QBASH}" \
+# **토막이 정한 `SHIM_*` 가 가짜에 닿지 않게 한다**(마지막 묶음 — vr M-1). 가짜 `docker` 는
+# `>> "${SHIM_LOG}"`(append · 내용은 argv) · `: > "$SHIM_RUN_MARKER"`(truncate) · `cat "$SHIM_CONFIG_FILE"`
+# (read)를 하고, 토막은 **대입 접두**로 그 값을 정할 수 있다(`-r` 는 `SHIM_LOG=… docker` 를 막지
+# 않는다 — PATH·SHELL 따위만 막는다). 리뷰가 그 꼴로 격리 밖 append 와 0 바이트 truncate 를
+# 실측했다. 위험 이름 가짜 다섯도 같은 꼴이었다.
+#
+# 변수마다 거르는 대신 **자리를 하나로 묶는다**: 진짜 가짜는 `$T/qreal/` (PATH 밖)에 두고, PATH 에
+# 놓는 것은 **`env -i` 로 들어가 가드가 정한 값만 물려 그것을 부르는 얇은 래퍼**다. 그러면 토막이
+# 무엇을 대입해도 래퍼의 `env -i` 가 **전부 버린다** — 한 자리에서 부류가 닫히고 `SHIM_*` 열거가
+# 필요 없다. 현재 cfg fixture 자리는 **파일**로 넘긴다(환경이 아니라서 토막이 못 바꾼다).
+mkdir -p "$T/qreal"
+sed "1s|.*|#!${QBASH}|" "$T/bin/docker" > "$T/qreal/docker"
+chmod +x "$T/qreal/docker"
+head -n1 "$T/qreal/docker" | grep -qxF "#!${QBASH}" \
   || _die "가짜 docker 의 shebang 을 절대 경로로 박지 못했다 — 전용 PATH 에서 bash 를 뺄 수 없다(판정 불가)" 2
+Q_CFG_CURRENT="$T/q-cfg-current"
+printf '%s\n' "$T/cfg-q-ok.json" > "$Q_CFG_CURRENT"
+QENV="$(command -v env)"
+[ -n "$QENV" ] || _die "env 자리를 찾지 못했다 — 판정 불가" 2
+# `env` 도 **절대 경로**로 부른다 — 래퍼는 전용 PATH 를 물려받아 돌므로 그 이름이 거기 없다
+# (첫 판은 `exec env: not found` 로 가짜가 아예 안 돌았고 측정이 0 이 됐다).
+{ printf '#!%s\n' "$QBASH"
+  printf '%s\n' '# 얇은 래퍼 — 토막이 정한 환경을 전부 버리고 가드가 박은 값만 물려 진짜 가짜를 부른다.'
+  printf 'exec %s -i "PATH=%s" "SHIM_LOG=%s" "SHIM_CONFIG_FILE=$(<%s)" %s "$@"\n' \
+    "$QENV" "$T/qbin" "$SHIM_LOG" "$Q_CFG_CURRENT" "$T/qreal/docker"
+} > "$T/qbin/docker"
+chmod +x "$T/qbin/docker"
 for _t in "${Q_DANGER_TOOLS[@]}"; do
-  cat > "$T/qbin/$_t" <<'QFAKE'
-#!/usr/bin/env bash
-# 위험 이름의 가짜 — 부르면 argv 만 적고 **아무것도 하지 않는다**(tools/prod-guards-check.sh 전용).
-printf '%s %s\n' "${0##*/}" "$*" >> "${SHIM_LOG:-/dev/null}"
-exit 0
-QFAKE
-  # shebang 도 절대 경로로 — 전용 PATH 에 `bash` 가 없으므로 `/usr/bin/env bash` 는 127 로 죽고
-  # **가짜가 기록을 남기지 못한다**(양성 대조가 그 실수를 잡았다: 기록 0 회).
-  sed -i "1s|.*|#!${QBASH}|" "$T/qbin/$_t"
+  # shebang 은 절대 경로로(전용 PATH 에 `bash` 가 없으므로 `/usr/bin/env bash` 는 127 로 죽고
+  # **가짜가 기록을 남기지 못한다** — 양성 대조가 그 실수를 잡았다: 기록 0 회), 기록 자리는
+  # **축어로 박는다**(`${SHIM_LOG}` 를 읽으면 토막이 대입 접두로 그 자리를 옮긴다 — vr M-1).
+  { printf '#!%s\n' "$QBASH"
+    printf '%s\n' '# 위험 이름의 가짜 — argv 만 적고 **아무것도 하지 않는다**(prod-guards-check 전용).'
+    printf 'printf %s "${0##*/}" "$*" >> %s\n' "'%s %s\\n'" "'$SHIM_LOG'"
+    printf 'exit 0\n'
+  } > "$T/qbin/$_t"
   chmod +x "$T/qbin/$_t"
 done
 unset _t _p
@@ -2174,7 +2199,8 @@ q_danger_hit=""
 q_denied=""
 _q_run() { # <돌릴 스크립트> <cfg fixture> → q_exec_n 세우고 위험 호출을 q_danger_n 에 누적
   : > "$SHIM_LOG"
-  ( cd "$T/qrun" && env -i "PATH=$T/qbin" "SHIM_LOG=$SHIM_LOG" "SHIM_CONFIG_FILE=$2" \
+  printf '%s\n' "$2" > "$Q_CFG_CURRENT"   # 래퍼가 **파일에서** 읽는다(환경이 아니라 토막이 못 바꾼다)
+  ( cd "$T/qrun" && env -i "PATH=$T/qbin" \
       "$QBASH" -r "$1" ) > "$T/qout" 2> "$T/qerr" < /dev/null || true
   q_exec_n="$(grep -cE '^docker exec ' "$SHIM_LOG" || true)"
   q_danger_n=$(( q_danger_n + $(grep -cE "^(${Q_DANGER_RE}) " "$SHIM_LOG" || true) ))
@@ -2238,6 +2264,27 @@ else
   _bad "bash -r 양성 대조가 어긋났다 — restricted 줄 ${q_rest_n}(7 이상이어야) · probe 가 남긴 파일 ${q_rest_files} 개(0 이어야). 플래그가 먹지 않으면 절대 경로·command -p·리다이렉션 축이 열린 채다: $(head -c 200 "$T/qerr" | tr '\n' ' ' || true)"
 fi
 q_denied=""
+# **`SHIM_*` 양성 probe**(마지막 묶음 — vr M-1). 토막이 대입 접두로 가짜의 기록 자리·절단 자리를
+# 정할 수 있었다(실측: 임의 경로 append · 임의 경로 0 바이트). 얇은 래퍼의 `env -i` 가 그것을
+# 버리는지 **세 축으로** 잰다 — ① 토막이 고른 자리에 아무것도 생기지 않음 ② 미리 넣어 둔 바이트가
+# 보존됨 ③ **가드가 박은 자리에는 두 줄이 들어옴**(가짜가 실제로 돌았다는 비공허 — 이것이 없으면
+# 「안 생겼다」는 「아무것도 안 돌았다」와 같은 값이다).
+printf 'keep-me\n' > "$T/qrun/keep-me"
+cat > "$T/qshimvar.sh" <<'QSHIMVAR'
+SHIM_LOG=esc-shimlog docker version
+SHIM_RUN_MARKER=keep-me docker compose run x
+QSHIMVAR
+_q_run "$T/qshimvar.sh" "$T/cfg-q-ok.json"
+q_shimvar_log="$(grep -c '^docker ' "$SHIM_LOG" || true)"
+q_shimvar_keep="$(cat "$T/qrun/keep-me" 2>/dev/null || true)"
+if [ ! -e "$T/qrun/esc-shimlog" ] && [ "$q_shimvar_keep" = keep-me ] && [ "$q_shimvar_log" = 2 ]; then
+  _ok "토막이 정한 SHIM_* 가 가짜에 닿지 않는다 — 토막이 고른 기록 자리는 **생기지 않았고**, 절단 자리의 바이트는 **보존됐고**, 가드가 박은 자리에는 docker 줄 ${q_shimvar_log} 개가 들어왔다(가짜가 실제로 돌았다)"
+else
+  _bad "토막이 정한 SHIM_* 가 가짜에 닿는다 — 토막이 고른 기록 자리 $([ -e "$T/qrun/esc-shimlog" ] && echo 있음 || echo 없음) · 절단 자리 내용 [${q_shimvar_keep}](keep-me 이어야) · 가드 자리의 docker 줄 ${q_shimvar_log}(2 이어야). 래퍼의 env -i 가 토막의 대입을 버리지 못하면 임의 경로 append·0 바이트 truncate 가 된다"
+fi
+q_danger_n=0
+q_danger_hit=""
+q_denied=""
 # ── 계약 갱신 ⑥ — 「뽑아서 실행」에서 **「등재본과 같음을 보고, 등재본을 실행」**으로 ─────────
 # 같은 축의 지적이 세 번 돌았다(범위 상한 없음 → 격리가 PATH 만 막음 → 꼴 검사가 대입 접두·단일
 # `&`·조립 경로에서 열리고 **자기 실패에서 통과**). 세 번 다 처방이 **열거**였다 — 임의의 셸 문면을
@@ -2276,12 +2323,18 @@ q_marker_n="$(grep -c '^CFG="\$(docker compose' "$RB" || true)"
 q_expect_psql="$(grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' "$STEP4_EXPECT" || true)"
 q_cmp_rc=0
 cmp -s "$q_fence" "$STEP4_EXPECT" || q_cmp_rc=$?
+# **등재본이 심링크면 받지 않는다**(vr L-a). 등식 뒤에 같은 이름을 **두 번** 읽으므로(`cmp` ·
+# 자르는 awk) 대상이 저장소 밖이면 그 사이에 바뀔 수 있다 — `stat` 이 기본 `lstat` 인 것과 같은
+# 부류의 자리다(이 slice 가 15U 에서 한 번 밟았다).
+q_expect_link=no
+[ ! -L "$STEP4_EXPECT" ] || q_expect_link=yes
 # 비공허: 등식이 「둘 다 비었다」로 참이 되지 않게 한다. 표지가 문서에 하나라는 것은 추출이 **그**
 # 펜스라는 진술이고, psql 줄 하나는 등재본이 측정 대상을 담는다는 진술이다.
-if [ "$q_cmp_rc" = 0 ] && [ "$q_fence_n" -ge 20 ] && [ "$q_marker_n" = 1 ] && [ "$q_expect_psql" = 1 ]; then
-  _ok "runbook §14.5 ④ 펜스 본문이 등재본과 **바이트로 같다**(${q_fence_n} 줄 · 시작 표지 문서에 1 회 · 등재본의 psql 줄 1) — 아래에서 돌리는 것은 그 등재본이다"
+if [ "$q_cmp_rc" = 0 ] && [ "$q_fence_n" -ge 20 ] && [ "$q_marker_n" = 1 ] && [ "$q_expect_psql" = 1 ] \
+   && [ "$q_expect_link" = no ]; then
+  _ok "runbook §14.5 ④ 펜스 본문이 등재본과 **바이트로 같다**(${q_fence_n} 줄 · 시작 표지 문서에 1 회 · 등재본의 psql 줄 1 · 등재본은 심링크가 아니다) — 아래에서 돌리는 것은 그 등재본이다"
 else
-  _bad "④ 펜스 본문과 등재본이 다르다(cmp rc ${q_cmp_rc} · 펜스 ${q_fence_n} 줄 · 표지 ${q_marker_n} 회 · 등재본 psql ${q_expect_psql} 줄) — **아무것도 실행하지 않았다**. runbook §14.5 ④ 를 고쳤으면 ${STEP4_EXPECT} 를 **같은 커밋에서** 맞춘다(그 diff 가 리뷰를 지난다). 차이: $(diff "$STEP4_EXPECT" "$q_fence" 2>/dev/null | head -c 300 | tr '\n' '~' || true)"
+  _bad "④ 펜스 본문과 등재본이 다르다(cmp rc ${q_cmp_rc} · 펜스 ${q_fence_n} 줄 · 표지 ${q_marker_n} 회 · 등재본 psql ${q_expect_psql} 줄 · 심링크 ${q_expect_link}) — **아무것도 실행하지 않았다**. runbook §14.5 ④ 를 고쳤으면 ${STEP4_EXPECT} 를 **같은 커밋에서** 맞춘다(그 diff 가 리뷰를 지난다). **그 줄이 경로 래칫에도 들면 맞출 파일이 셋이다** — 오늘 그런 줄은 CFG= 줄과 _pages 줄 둘이고 셋째는 ${DIR_EXPECT} 다. 차이: $(diff "$STEP4_EXPECT" "$q_fence" 2>/dev/null | head -c 300 | tr '\n' '~' || true)"
 fi
 # ㉯ 돌릴 토막은 **등재본에서** 자른다.
 q_block="$T/q-block.sh"
@@ -2305,6 +2358,28 @@ else
   [ "$q_block_exec" = 1 ] || q_why="${q_why}psql 호출 줄이 ${q_block_exec} 개다(1 이어야) · "
   [ "$q_block_last" = fi ] || q_why="${q_why}마지막 줄이 닫는 fi 가 아니다([${q_block_last}]) · "
   q_why="${q_why%· }"
+fi
+# **실행 원천이 등재본이라는 것의 상주 증인**(cr L-2). 정상 상태에서 두 파일은 바이트로 같으므로
+# 자르는 원천을 runbook 쪽으로 되돌리는 변이는 **결과가 같아 GREEN** 이다 — 설계의 중심 진술에
+# 증인이 없었다. 둘을 둔다: ① 자른 줄이 전부 등재본에 있는가(두 파일이 다른 판에서 선다)
+# ② **가드 자신의 그 한 줄이 등재본을 읽는가**(문자열 술어임을 안다 — 그러나 이 축을 재는 다른
+# 길이 없고, 원천을 바꾸는 편집은 정확히 그 줄을 지난다).
+q_cut_extra="$(LC_ALL=C comm -23 <(LC_ALL=C sort -u "$q_block") <(LC_ALL=C sort -u "$STEP4_EXPECT") | tr '\n' '~' || true)"
+q_src_n="$(grep -cxF "' \"\$STEP4_EXPECT\" > \"\$q_block\"" "${BASH_SOURCE[0]}" || true)"
+if [ -z "$q_cut_extra" ] && [ "$q_src_n" = 1 ]; then
+  _ok "자른 토막의 원천이 등재본이다 — 자른 줄 가운데 등재본에 없는 것이 0 이고, 자르는 그 한 줄이 등재본을 읽는다(원천을 runbook 쪽으로 되돌리는 편집은 그 줄을 지난다)"
+else
+  _bad "자른 토막의 원천이 등재본인지 서지 않는다 — 등재본에 없는 줄 [${q_cut_extra}] · 자르는 줄의 원천 인자 계수 ${q_src_n}(1 이어야). 실행되는 글자는 **등재본**이어야 한다(계약 갱신 ⑥)"
+fi
+# **등재본의 실행 구간에 살아 있는 백틱 0**(cr L-1). 이 파일은 이제 **실행되는 셸 스크립트**인데
+# `BACKTICK_FILES` 밖이다. 그대로 더하면 `SQL` heredoc 본문의 SQL 주석 백틱이 오탐으로 붉으므로,
+# 자른 토막을 **인용 heredoc 본문을 데이터로 건너뛰는 모드**로 훑는다(bash 가 그 파일에 하는 일과
+# 같다). 실행 구간의 다른 줄에 살아 있는 백틱이 들어오면 여기서 선다.
+q_bt_block="$(awk -v SKIPHD=1 -f "$T/backtick-scan.awk" "$q_block" | grep -E '^(LIVE|STOP) ' | tr '\n' '~' || true)"
+if [ -z "$q_bt_block" ]; then
+  _ok "등재본의 실행 구간에 살아 있는 백틱이 0 이다(인용 heredoc 본문은 데이터로 건너뛴다 — 그 안의 SQL 주석 백틱은 셸이 보지 않는다)"
+else
+  _bad "등재본의 실행 구간에 살아 있는 백틱이 있다: ${q_bt_block}— 그 자리는 격리 안에서 **실행된다**. 걷는다"
 fi
 if [ "$q_cmp_rc" = 0 ] && [ -z "$q_why" ]; then
   _ok "등재본에서 측정 토막을 잘랐다(${q_block_n} 줄 · 상한 40 · psql 호출 한 줄 · 마지막 줄이 닫는 fi) — 아래 측정이 공허하지 않다"
@@ -2432,6 +2507,7 @@ unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konep
   q_usernull_n q_dbemp_n q_dbnull_n q_blocked q_exec_n q_danger_n q_danger_hit q_bin_got \
   q_bin_want q_unlisted Q_REAL_TOOLS Q_DANGER_TOOLS Q_UNLISTED_TOOLS Q_DANGER_RE QBASH \
   q_denied q_why q_rest_n q_rest_files STEP4_EXPECT q_fence q_fence_n q_marker_n \
+  Q_CFG_CURRENT QENV q_shimvar_log q_shimvar_keep q_src_n q_cut_extra q_bt_block q_expect_link \
   q_expect_psql q_cmp_rc \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
