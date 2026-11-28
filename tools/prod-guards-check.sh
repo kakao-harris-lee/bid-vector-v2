@@ -321,6 +321,37 @@ _expect_text '운영 자리를 만들지 않는다' "문면이 사유와 고치�
 _expect_no_text '잠금 자리 점검만 하고 끝낸다' "자리 점검을 건너뛰고 끝나지 않는다"
 if [ -e "$T/no-such-lock-dir" ]; then _bad "그 자리를 만들었다"; else _ok "그 자리를 만들지 않았다"; fi
 
+echo "== 문면 자리의 살아 있는 백틱 — 부류 래칫 (M15/15V r1, cr H-1 · M-2)"
+# 큰따옴표 안의 백틱 짝은 **명령 치환**이다. 이 slice 가 더한 네 문면이 그 꼴이었고, 실측으로
+# **가짜 `sudo` 가 두 번 실행됐고** 그 단어가 출력에서 사라졌다(`** 가 필요하다**`). `bash -n` 은 백틱
+# 안을 파싱 시점에 보지 않아 rc 0 이고, 기존 문면 단언들은 뭉개진 자리보다 **앞**을 보므로 통과했다 —
+# 이 slice 가 세운 어떤 층에도 걸리지 않았다. 그래서 **부류**를 닫는다.
+#
+# 모집단: 두 in_scope 스크립트에서 **주석이 아닌** 줄 가운데 문면을 **큰따옴표로** 넘기는 호출
+# (`_ok|_bad|_die|_expect_*` 뒤에 공백 + `"`). 단일 인용으로 넘기는 자리(`_expect_text '…'`)는 백틱이
+# 리터럴이라 모집단 밖이다 — 가르는 글자는 **여는 인용부호**다. 주석은 첫 비공백이 `#` 인 줄로 뺀다
+# (그 줄의 백틱은 이 저장소의 문서 관례다 — 실측 여섯 줄 전부 주석이었다).
+#
+# **비공허**: 모집단이 1 미만이면 그 자체가 어긋남이다(추출이 비면 「0 개」가 공허하게 참이 된다).
+_msg_lines() { # <파일…> — 문면을 큰따옴표로 넘기는, 주석이 아닌 줄
+  awk '{ line = $0; sub(/^[[:space:]]+/, "", line)
+         if (line ~ /^#/) next
+         if ($0 ~ /(_ok|_bad|_die|_expect_[a-z_]+) "/) print FILENAME ":" FNR ":" $0 }' "$@"
+}
+BACKTICK_FILES=(tools/prod-collection.sh tools/prod-guards-check.sh)
+msg_total="$(_msg_lines "${BACKTICK_FILES[@]}" | grep -c '' || true)"
+# **탈출한 백틱은 치환이 아니다** — 세기 전에 걷는다(cr 가 권한 처방 가운데 하나가 탈출이다). 그 걷기가
+# 없으면 이 블록의 `_bad` 문면이 자기 래칫에 걸린다(실측).
+_msg_live_backtick() { _msg_lines "${BACKTICK_FILES[@]}" | sed 's/\\`//g'; }
+msg_backtick="$(_msg_live_backtick | grep -c '`' || true)"
+msg_backtick_where="$(_msg_live_backtick | grep '`' | cut -d: -f1,2 | tr '\n' ' ' || true)"
+if [ "$msg_total" -ge 1 ] && [ "$msg_backtick" = 0 ]; then
+  _ok "문면 자리 ${msg_total} 줄에 살아 있는 백틱이 0 이다(큰따옴표 안의 백틱은 명령 치환이다 — 문면을 짜는 자리가 명령을 돌리는 자리가 된다)"
+else
+  _bad "문면 자리 ${msg_total} 줄 가운데 ${msg_backtick} 줄이 백틱을 담았다: ${msg_backtick_where}— 큰따옴표 안의 백틱은 **실행된다**. 탈출(\\\`)하거나 걷는다. 모집단이 0 이면 추출을 고친다"
+fi
+unset msg_total msg_backtick msg_backtick_where
+
 echo "== prod-env.sh(M15/15R · S-8) — 데몬 선택 축 셋을 닫는다"
 # `COMPOSE_*`·`GIT_*` 는 접두로 비우면서 `DOCKER_HOST`·`DOCKER_CONTEXT` 는 남아 있었다. 그 둘은 세 래퍼의
 # **모든 docker 호출**이 어느 데몬을 보는지를 환경 문자열 하나로 바꾼다 — §13.4 ①~⑤ 는 운영자 셸에서
@@ -1224,8 +1255,13 @@ _col_run_state_reject() { # <이름> <갈래 mode> <달 mode> [갈래에 더 걸
 }
 _col_run_state_reject '갈래에 setgid 가 없다' 2700 2770 g-s
 _expect_text '갈래 디렉터리에 setgid 가 없다' "수집 — 그 문면이 setgid 축의 것이다(group 을 잇는 비트다)"
+# **그 처방의 `sudo` 가 문면에 실제로 남는가**(M15/15V r1, cr H-1) — 앞 판은 그 단어를 큰따옴표 안
+# 백틱에 담아 **명령 치환으로 실행**하고 출력에서는 지웠다(`** 가 필요하다**`). 비구성원 소유자에게
+# `sudo` 없는 `chmod` 는 아무것도 고치지 못하므로 그 단어가 이 문장의 전부다.
+_expect_text 'sudo' "수집 — setgid 처방에 **sudo 라는 단어**가 남아 있다(백틱 치환으로 사라지지 않았다)"
 _col_run_state_reject '갈래에 group 쓰기가 열렸다' 2770 2770
 _expect_text '달 디렉터리를 \*\*바꿔칠 수 있고\*\*' "수집 — 그 문면이 바꿔치기 사고를 가리킨다"
+_expect_text 'setgid 를 함께 되세우려면 sudo' "수집 — group 쓰기 처방에도 **sudo 라는 단어**가 남아 있다"
 # **rc 만 보던 셋에 문면을 붙인다**(M15/15V D-15V-8, cr L-5) — 같은 args 의 양성이 바로 뒤에 있어 오늘은
 # 다른 축의 3 을 받을 길이 좁지만, 이 라운드에 스스로 겪은 공허함(`SHIM_GIT_EXPECT_C`)이 그 꼴이었다.
 _col_run_state_reject '갈래가 other 에 열렸다' 2707 2770
@@ -1238,8 +1274,10 @@ _expect_text '달 디렉터리가 other 에 열려 있다' "수집 — 그 문�
 # ── D-15V-1 — **root 도 술어 안이다**(cr M-1 · vr L-h) ─────────────────────────
 # 앞 판은 root 에 대해 mode 를 한 번도 읽지 않았고, `RSROOT` fixture 가 언제나 `install -d -m 2700`
 # (setgid 있음)이라 **그 축의 음성이 한 꼴도 없었다**. root 에 setgid 가 없으면 두 층의 group 이 래퍼의
-# gid 로 박히는데 조상의 setgid 는 커널 상속으로 서므로 **비트 술어 전부가 통과한 뒤** 컨테이너가 원장에
-# 쓰지 못한다(이 라운드 실측: 버릴 컨테이너로 `쓰기 실패` · 러너 종료 1).
+# gid 로 박히고 컨테이너가 원장에 쓰지 못한다(실측: 버릴 컨테이너로 `쓰기 실패` · 러너 종료 1).
+# **그 꼴의 rc 3 을 지금 내는 것은 조상 setgid 술어다**(M15/15V r1, vr L-2) — `-m` 을 걷은 뒤로는 조상이
+# `700` 으로 생기기 때문이다. 그래서 아래 셋은 **문면 단언이 축을 못박는다**(rc 만 보면 다른 축의 3 을
+# 받아 공허해지는 자리다 — verifier 가 그것을 실측했다).
 _col_root_mode_reject() { # <이름> <root 에 걸 chmod> <기대 문면>
   local name="$1" mode="$2" want="$3"
   rm -rf "${RSROOT:?}/notice-list"
@@ -1286,6 +1324,24 @@ if [ "$(stat -c '%g' "$COL_MONTH_DIR")" = "$(stat -c '%g' "$RSROOT")" ]; then
 else
   _bad "수집 — 래퍼가 만든 달 디렉터리의 gid 가 root 와 다르다($(stat -c '%g' "$COL_MONTH_DIR") ≠ $(stat -c '%g' "$RSROOT"))"
 fi
+# **기준값이 `id -g` 가 아니라 root 의 gid 임을 가른다**(M15/15V r1, vr M-2). 위 fixture 의 root gid 는
+# 호출자의 primary gid 와 **같아서** 그 둘을 가르지 못했다 — `RUN_STATE_ROOT_GID="$(id -g)"` 변이가
+# GREEN 이었고, 「커널 상속」 양성도 그 구성에서는 상속 없이 참이다(cr M-1 축이 CI 에서 안 보이는 구성).
+# root 를 **보조 group** 으로 세우면 두 층이 그 gid 를 물려받고, 기준값을 `id -g` 로 바꾸는 변이는
+# 불일치로 선다. 권한은 필요 없고 `chgrp` 는 디렉터리의 setgid 를 지우지 않는다(실측).
+rm -rf "${RSROOT:?}/notice-list"
+chgrp "$COL_ALT_GID" "$RSROOT"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 0 "양성 — root 의 gid 가 호출자 primary 와 다를 때도 수집한다(기준값은 root 의 gid 다)"
+_col_alt_leaf="$(stat -c '%g' "$COL_MONTH_DIR" 2>/dev/null || true)"
+if [ "$_col_alt_leaf" = "$COL_ALT_GID" ]; then
+  _ok "수집 — 두 층이 root 의 보조 group(${COL_ALT_GID})을 물려받았다 — 「id -g」 로는 설명되지 않는 값이다"
+else
+  _bad "수집 — 달 디렉터리의 gid 가 ${_col_alt_leaf:-?} 로 root 의 ${COL_ALT_GID} 와 다르다(커널 상속이 서지 않았다)"
+fi
+unset _col_alt_leaf
+chgrp "$(id -g)" "$RSROOT"
+rm -rf "${RSROOT:?}/notice-list"
 # **양성** — 두 층이 각각 2700·2770 이면 돈다(위 다섯이 공허하지 않음의 반대쪽).
 rm -rf "${RSROOT:?}/notice-list"
 install -d -m 2700 "$RSROOT/notice-list"
@@ -1329,11 +1385,17 @@ _col_no_residue '다른 커밋의 트리(3)' 3 SHIM_GIT_HEAD="$OTHER_SHA"
 _hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
 _col_no_residue '프로젝트 잠금 경합(4)' 4
 _release_lock
-# **마지막 전제까지 넣는다**(M15/15V D-15V-7, cr L-1). 생성이 이름 충돌 검사 **앞**이던 동안 그 두 거절
-# (조회 실패 · 이름이 전역에서 이미 쓰임)은 `exit 3` 이면서 자리를 남겼다 — 절 제목이 전칭인데 표본이
-# 둘뿐이던 자리다. 이제 넷이고, 그 둘이 **생성보다 앞에 서는 마지막 전제**다.
+# **표본을 넷으로 늘린다**(M15/15V D-15V-7, cr L-1) — 절 제목이 전칭인데 표본이 둘뿐이던 자리다.
+# **둘의 거절 자리가 다르다**(M15/15V r1, cr L-3 — 앞 판 주석은 둘을 「생성보다 앞에 서는 마지막 전제」로
+# 묶어 적었고 그것은 거짓이다): 이름 충돌만 **생성 바로 앞**이고, `docker ps` 조회 실패는 그보다 앞인
+# **잔존 검사**에서 끊긴다(가짜 docker 의 `ps` 분기 첫 줄이 `SHIM_PS_RC` 를 보므로 `name=` 분기에 닿지
+# 않는다 — verifier 실측). 그래서 D-15V-7 을 되돌리는 변이를 단독으로 받는 것은 **첫 줄 하나**다.
+# 그 사실을 문면 단언으로 코드에 적는다(rc 만 보는 음성은 축을 못박아야 한다는 교훈을 자기가 더한
+# 자리에도 적용한다).
 _col_no_residue '일회 이름이 전역에서 쓰임(3)' 3 SHIM_PS_NAME_HIT=deadbeefcafe
+_expect_text '이미 다른 컨테이너가 쓰고 있다' "수집 — 그 표본이 **이름 충돌** 축에서 끊긴다(생성 바로 앞)"
 _col_no_residue 'docker ps 조회 실패(3)' 3 SHIM_PS_RC=7
+_expect_text '잔존을 세지 못했다' "수집 — 그 표본은 **잔존** 축에서 끊긴다(이름 충돌 축이 아니다)"
 rm -rf "${RSROOT:?}/notice-list"
 
 # **만든 뒤 실경로를 다시 본다**(M15/15U r1, vr M1) — 인자 검사는 **root** 의 실경로만 본다. root 는
@@ -1736,8 +1798,14 @@ fi
 # **왜 그 값인가**를 묶는다(두 수를 함께 올리는 변경이 그 사슬을 굶기면 여기서 선다).
 # 간격은 위 `oncal_pairs` 에서 **수집과 바로 뒤 러너(훑기)** 의 분 차로 산출한다 — 손으로 적지 않는다.
 tss_ineq_bad=0 tss_min_gap=""
-_tss_minutes() { # <systemd 시간 문자열> → 분(정수). 아는 꼴만 받고 모르는 꼴은 빈 값이다.
+# <systemd 시간 문자열> → 분(정수). **받는 꼴을 먼저 가르고 나머지는 빈 값**이다(그 빈 값을 아래
+# `_bad` 가 받아 판정 없이 지나가지 않는다). 앞 판은 접미사만 보고 바로 산술에 넣어 `1min30s`(「value too
+# great for base」)·`0.5h`(「invalid arithmetic operator」)에서 **게이트가 요약 줄도 없이 죽었다**(실측) —
+# 이 slice 가 앞 라운드에 고친 바로 그 침묵 꼴이 한 자리 남아 있었다. systemd 는 그 둘을 받으므로
+# 도달 경로가 있다.
+_tss_minutes() {
   case "$1" in
+    *[!0-9smh]* | "" | *[0-9]) printf '' ;;
     *m) printf '%s' "${1%m}" ;;
     *s) printf '%s' "$(( ${1%s} / 60 ))" ;;
     *h) printf '%s' "$(( ${1%h} * 60 ))" ;;
@@ -1874,7 +1942,11 @@ if [ "$tilde_fences" = 0 ]; then
 else
   _bad "runbook 에 틸드 펜스가 ${tilde_fences} 줄 생겼다 — 그 블록의 줄은 경로 수집 밖이다(펜스 인식을 넓히거나 백틱으로 바꾼다)"
 fi
-dir_lines="$(_rb_code_lines | grep -E '/etc/bidvector-v2|/var/lib/bidvector-v2' | _rb_norm | _rb_sort || true)"
+# **`/var/tmp/bidvector` 를 수집 필터에 더한다**(M15/15V r1, cr L-1). 앞 판의 필터는 §14.5 ③④ 가 만든
+# 새 sink 다섯 줄 가운데 **한 줄만** 집었고(그 줄이 `/etc/bidvector-v2` 를 담아서 들어왔다) 나머지 넷은
+# 래칫 밖이었다 — 둘째 `/var/tmp` sink 를 더하는 줄은 집합 등식도 전용 단언도 보지 못했다.
+# 이제 집합 등식이 그 축까지 들고, 전용 단언(`col_log_*`)은 **순서** 전담으로 남는다.
+dir_lines="$(_rb_code_lines | grep -E '/etc/bidvector-v2|/var/lib/bidvector-v2|/var/tmp/bidvector' | _rb_norm | _rb_sort || true)"
 _rb_set_check "자격·상태 디렉터리 경로" "$dir_lines" "$(_rb_expect "$DIR_EXPECT")" "$DIR_EXPECT"
 # **S-2** — `install … /dev/null` 은 **이미 채운 파일을 0 바이트로** 만든다(출력 없음 · rc 0). 도달
 # 경로가 가깝다: §13.3 이 「root 전용으로 조이면 매 run 이 `exit 3`」을 가리키며 §13.2 의 꼴을 지목하므로,
@@ -1900,27 +1972,54 @@ _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect 
 # 만드는 `0644` 로 두지 않는 유일한 길은 **`tee` 보다 앞선 `install -m 600`** 이다(`tee` 는 있는 파일의
 # mode 를 바꾸지 않는다 — 실측: 먼저 만들면 600 유지 · 안 만들면 644). 그래서 **순서**가 거동이다.
 # 자리 이름은 하나로 두고(등재 줄 목록의 수집 필터 밖이라 그 래칫이 따라가지 않는다) 여기서 직접 센다.
-# ── M15/15V(D-15V-6) — §14.5 ④ 의 전제 가드가 **질의를 감싸는가** ─────────────
-# 붙여넣는 셸에는 `set -e` 가 없어서 앞 판의 `… || { echo …; false; }` 는 `$?` 만 세우고 **다음 줄의
-# `docker exec … psql` 이 그대로 돌았다**. 그래서 질의는 `if …; then` **안**에 있어야 한다(가짜 `docker`
-# 로 세 꼴을 쟀다 — 정상 1 회 · 빈/`null` 0 회, evidence commands). 그 구조를 여기서 고정한다.
-q_if_n="$(_rb_code_lines | grep -cE '^if \[ -n "\$P" \] && \[ "\$P" != null \]' || true)"
-q_exec_n="$(_rb_code_lines | grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' || true)"
-q_fi_n="$(_rb_code_lines | grep -cE '^  echo "compose 에서 프로젝트·DB 이름을 읽지 못했다' || true)"
-if [ "$q_if_n" = 1 ] && [ "$q_exec_n" = 1 ] && [ "$q_fi_n" = 1 ]; then
-  _ok "runbook 의 ④ 질의가 전제 가드(`if …; then`) 안에 있다 — 빈 값·null 에서 psql 에 닿지 않는다"
+# ── M15/15V r1(vr M-1 · cr L-2) — §14.5 ④ 의 전제 가드를 **돌려서** 잰다 ───────
+# 앞 판은 줄 **존재**를 셋으로만 셌고(`if` 1 · `docker exec` 1 · `else` 1), 그래서 **막으려던 바로 그
+# 회귀**가 지나갔다(실측: `docker exec` 를 `fi` 뒤로 옮겨도 · `PGUSER_`·`PGDB_` 조건을 지워도 GREEN).
+# 정본 Phase 2.5 (1) 의 「문자열 술어 → 실행 층」으로 옮긴다: runbook 에서 그 토막을 **축어로 뽑아**
+# 가짜 `docker` 앞에서 돌리고 **`docker exec` 가 불린 횟수**를 센다.
+#
+# 가짜 `docker` 는 이 검사의 PATH 앞에 이미 있다. `config` 는 `$SHIM_CONFIG_FILE` 을 그대로 내므로
+# 운영 env 파일을 열지 않는다(블록의 `--env-file` 경로는 가짜가 읽지 않는다 — 운영 자원 접촉 0).
+q_block="$T/q-block.sh"
+awk '/^CFG="\$\(docker compose/ {inb = 1} inb {print} inb && /^fi$/ {exit}' \
+  <(_rb_code_lines) > "$q_block"
+q_block_n="$(grep -c '' "$q_block" || true)"
+q_block_exec="$(grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' "$q_block" || true)"
+if [ "$q_block_n" -ge 10 ] && [ "$q_block_exec" = 1 ]; then
+  _ok "runbook 에서 ④ 토막을 뽑았다(${q_block_n} 줄 · psql 호출 한 줄) — 아래 측정이 공허하지 않다"
 else
-  _bad "④ 의 전제 가드 구조가 어긋났다 — if 줄 ${q_if_n} · docker exec 줄 ${q_exec_n} · else 줄 ${q_fi_n}(각 1 이어야 한다). `||` 꼴로 되돌리면 붙여넣는 셸에서 질의가 그대로 돈다"
+  _bad "④ 토막을 뽑지 못했다(${q_block_n} 줄 · psql 호출 ${q_block_exec}) — 꼴이 바뀌었으면 추출을 고친다(판정 없이 지나가지 않는다)"
+fi
+# 세 cfg fixture: 정상 · `.name` 이 빈 값 · `POSTGRES_USER` 가 없음(`jq -r` 이 `null` 을 낸다).
+printf '%s' "$(cat "$T/cfg.json")" > "$T/cfg-q-ok.json"
+printf '%s' "$(sed "s/\"name\":\"${PROJ}\"/\"name\":\"\"/" "$T/cfg.json")" > "$T/cfg-q-noname.json"
+printf '%s' "$(sed 's/"POSTGRES_USER":"x"/"POSTGRES_NOTUSER":"x"/' "$T/cfg.json")" > "$T/cfg-q-nouser.json"
+_q_exec_count() { # <cfg fixture> → 그 꼴에서 `docker exec` 가 불린 횟수
+  : > "$SHIM_LOG"
+  ( cd "$REPO_ROOT" && SHIM_CONFIG_FILE="$1" bash "$q_block" ) > "$T/out" 2> "$T/err" || true
+  grep -cE '^docker exec ' "$SHIM_LOG" || true
+}
+q_ok_n="$(_q_exec_count "$T/cfg-q-ok.json")"
+q_noname_n="$(_q_exec_count "$T/cfg-q-noname.json")"
+q_nouser_n="$(_q_exec_count "$T/cfg-q-nouser.json")"
+if [ "$q_ok_n" = 1 ] && [ "$q_noname_n" = 0 ] && [ "$q_nouser_n" = 0 ]; then
+  _ok "④ 토막을 돌려 쟀다 — 정상 psql 1 회 · 프로젝트 이름 빈 값 0 회 · DB 사용자 null 0 회(빈 값·null 에서 질의에 닿지 않는다)"
+else
+  _bad "④ 토막이 빈 값·null 에서 질의를 막지 못한다 — 정상 ${q_ok_n}(1 이어야) · 이름 빈 값 ${q_noname_n}(0) · 사용자 null ${q_nouser_n}(0). 질의가 'if …; then' **안**에 있고 세 값 모두 -n 과 != null 로 보는지 확인한다"
 fi
 COL_LOG=/var/tmp/bidvector-collection-step3.log
 col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
-col_log_install_n="$(printf '%s\n' "$col_log_lines" | grep -cE "^install -m 600 /dev/null ${COL_LOG}\$" || true)"
+# 꼬리의 `&& \` 를 받는다(vr L-5 가 `install` 실패를 보게 하려고 그 줄을 `&&` 로 이었다) — 앵커는
+# 명령과 **정확한 경로**에 그대로 둔다.
+col_log_install_n="$(printf '%s\n' "$col_log_lines" | grep -cE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" || true)"
 col_log_tee_n="$(printf '%s\n' "$col_log_lines" | grep -cF "| tee ${COL_LOG}" || true)"
-col_log_rm_n="$(printf '%s\n' "$col_log_lines" | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
+# **주석 줄은 세지 않는다**(M15/15V r1, vr L-4) — 앞 판은 그 줄 앞에 `# ` 를 붙여도 초록이었다(실측).
+# `_rb_norm` 이 줄 머리 공백을 걷으므로 첫 글자가 `#` 인지만 보면 된다.
+col_log_rm_n="$(printf '%s\n' "$col_log_lines" | grep -v '^#' | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
 # 순서: `install` 줄이 `tee` 줄보다 **앞**이어야 한다. 수집 순서가 문서 순서다.
 # `|| true` — 무매치(`grep` exit 1)가 `set -e` 아래에서 **게이트를 죽이지 않게** 한다. 죽은 게이트는
 # 판정이 아니라 침묵이다(이 라운드의 변이가 그 꼴을 드러냈다 — exit 1 · BAD 0 · 요약 줄 없음).
-col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}\$" | head -n1 | cut -d: -f1 || true)"
+col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" | head -n1 | cut -d: -f1 || true)"
 col_log_tee_at="$(printf '%s\n' "$col_log_lines" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1 || true)"
 if [ "$col_log_install_n" = 1 ] && [ "$col_log_tee_n" = 1 ] && [ "$col_log_rm_n" -ge 1 ] \
    && [ -n "$col_log_install_at" ] && [ -n "$col_log_tee_at" ] && [ "$col_log_install_at" -lt "$col_log_tee_at" ]; then
@@ -2001,7 +2100,7 @@ fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
 unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
   COL_LOG col_log_lines col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
-  q_if_n q_exec_n q_fi_n \
+  q_block q_block_n q_block_exec q_ok_n q_noname_n q_nouser_n \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
   esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs \

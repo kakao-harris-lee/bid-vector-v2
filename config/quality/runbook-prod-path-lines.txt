@@ -39,11 +39,15 @@
 | ExecStart=<저장소>/tools/prod-evaluation-commit.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2 --current-active-bids <현재 진행 투찰 수>
 | ExecStart=<저장소>/tools/prod-notification-relay.sh --env-file /etc/bidvector-v2/prod.env --relay-env-file /etc/bidvector-v2/relay.env --state-dir /var/lib/bidvector-v2 --owner <운영자 id> --environment production --claim-limit 50
 | ExecStart=<저장소>/tools/prod-notification-sweep.sh --env-file /etc/bidvector-v2/prod.env --state-dir /var/lib/bidvector-v2
+| _pages /var/tmp/bidvector-collection-step3.log
 | command grep -c '^BIDVECTOR_KONEPS_SERVICE' /etc/bidvector-v2/koneps.env # 1 — 값은 보지 않는다
 | git -C <저장소> checkout --detach "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
 | git checkout "$(sed -n 's/^git_sha=//p' "/var/lib/bidvector-v2/releases/${REL}.manifest")"
 | git diff --name-only "$(cat /var/lib/bidvector-v2/previous 2>/dev/null || echo HEAD)" HEAD -- tools/prod-cert-check.sh tools/prod-alert-telegram.sh
+| install -m 600 /dev/null /var/tmp/bidvector-collection-step3.log && \
+| shred -u /var/tmp/bidvector-collection-step3.log 2>/dev/null || rm -f /var/tmp/bidvector-collection-step3.log
 | stat -c '%U %G %a' /etc/bidvector-v2/koneps.env # deploy deploy 600
+| stat -c '%U %a' /var/tmp/bidvector-collection-step3.log # <운영자> 600 — tee 가 mode 를 바꾸지 않는다
 | stat -c '%U %g %a' /var/lib/bidvector-v2-run-state # deploy 10001 2700
 | sudo -e /etc/bidvector-v2/koneps.env # 또는 평소 쓰는 편집기로 — 값은 화면·history 에 남기지 않는다
 | sudo -e /etc/bidvector-v2/prod.env # BIDVECTOR_EVALUATION_CANDIDATECAP — ④ ⓑ 보다 넉넉히
