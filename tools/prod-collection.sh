@@ -201,6 +201,39 @@ _collection_outside_repository "$RUN_STATE_ABS" "실행 상태 root" "${RUN_STAT
 case "$RUN_STATE_ABS" in
   *:*) _die "실행 상태 root 의 실경로에 ':' 가 있다 — 붙임 문법이라 받지 않는다: ${RUN_STATE_ABS}" 3 ;;
 esac
+# **root 도 술어 안이다**(M15/15V D-15V-1 · cr M-1 · vr L-h). 앞 판은 root 에 대해 `-d`·실경로·`:`·저장소
+# 포함만 보고 **mode 를 한 번도 읽지 않았다.** 그런데 한 층 아래(`notice-list`)에는 같은 비트 셋을 재고 그
+# 사유를 「그 비트가 group 을 아래로 잇는다」·「쓸 수 있으면 아래 층을 바꿔칠 수 있다」로 적었다 — 두
+# 논증이 **한 층 위에 그대로** 선다. 비어 있던 그 층을 메운다.
+#
+# **왜 이것이 거동 축인가**(실측): root 에 setgid 가 없으면 아래 두 층의 group 이 **래퍼의 gid** 로
+# 박히고, 컨테이너(그 이미지의 gid)는 소유자도 group 도 아니라 other(0)로 떨어져 **원장에 쓰지 못하고**
+# 러너가 기동에서 죽는다 — 그 종료는 `1` 이라 러너의 「예외」와 섞인다(이 래퍼가 `3` 으로 가르겠다고
+# 선언한 혼동이다).
+#
+# **그 꼴을 지금 먼저 받는 것은 조상의 setgid 술어다**(M15/15V r1, vr L-2 — 이 주석의 앞 판은 「조상의
+# setgid 는 그때도 커널 상속으로 서므로 비트 술어가 전부 통과한다」로 적었고 그것은 **D-15V-2 전의
+# 거동**이다). `-m` 을 걷은 뒤로는 root 에 setgid 가 없으면 `( umask 077 && mkdir )` 이 조상을 `700` 으로
+# 만들므로(실측) 그 술어가 선다. 이 자리의 셋은 **그보다 앞에서** 사유를 바르게 말하는 층이고, gid 등식이
+# 「이미 있는 자리의 틀린 group」을 받는 셋째 층이다.
+#
+# **「정확히 2700」으로 조이지 않는다**(과잉 금지) — 필요한 것은 비트 **셋**이고, 운영자가 group 읽기를
+# 여는 것까지 막을 근거가 없다.
+RUN_STATE_ROOT_MODE="$(stat -c '%a' "$RUN_STATE_ABS" 2>/dev/null || true)"
+[ -n "$RUN_STATE_ROOT_MODE" ] \
+  || _die "실행 상태 root 의 권한을 읽지 못했다: ${RUN_STATE_ABS}" 3
+[ "$(( 8#${RUN_STATE_ROOT_MODE} & 8#2000 ))" -eq $(( 8#2000 )) ] \
+  || _die "실행 상태 root 에 setgid 가 없다(${RUN_STATE_ROOT} mode=${RUN_STATE_ROOT_MODE}) — 그 비트가 group 을 아래 두 층으로 잇는다. 없으면 두 층이 이 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못하고 러너가 기동에서 죽는다(종료 1 — 전제 실패와 섞인다). runbook §14.1 의 'sudo install -d -m 2700 -o \"\$USER\" -g <이미지 gid>' 로 다시 만든다" 3
+[ "$(( 8#${RUN_STATE_ROOT_MODE: -3} & 8#020 ))" -eq 0 ] \
+  || _die "실행 상태 root 에 group 쓰기가 열려 있다(${RUN_STATE_ROOT} mode=${RUN_STATE_ROOT_MODE}) — 이 자리에 쓸 수 있으면 갈래 디렉터리를 **바꿔칠 수 있고** 그 순간 호출 상한 회계가 0 에서 다시 선다. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다(runbook §14.1)" 3
+[ "$(( 8#${RUN_STATE_ROOT_MODE: -3} & 8#002 ))" -eq 0 ] \
+  || _die "실행 상태 root 에 other 쓰기가 열려 있다(${RUN_STATE_ROOT} mode=${RUN_STATE_ROOT_MODE}) — 위와 같은 바꿔치기를 누구에게나 허락한다. 'sudo chmod 2700 ${RUN_STATE_ABS}' 뒤에 다시(runbook §14.1)" 3
+# **root 의 gid 는 아래 두 층의 기대값이다**(D-15V-3). 운영자가 §14.1 에서 정한 값이고 `stat` 으로 권한
+# 없이 읽힌다 — 그 값과 두 층의 gid 가 같은지를 생성 뒤에 **등식으로** 잰다(비트의 유무가 아니라 결과를
+# 본다). 「그 gid 가 app 이미지의 gid 인가」는 이미지 조회가 필요해 OPEN 으로 남는다.
+RUN_STATE_ROOT_GID="$(stat -c '%g' "$RUN_STATE_ABS" 2>/dev/null || true)"
+[ -n "$RUN_STATE_ROOT_GID" ] \
+  || _die "실행 상태 root 의 group 을 읽지 못했다: ${RUN_STATE_ABS}" 3
 # **달 경로는 여기서 계산만 한다.** 달 문자열은 위의 `TO`(KST)에서 잘라 쓰므로 창 계산과 **같은
 # 「오늘」**이고, 달이 바뀌는 자정에 걸친 run 도 한 값을 끝까지 쓴다. `--from/--to` 갈래에서는 그 `to` 가
 # 달을 정한다(메우기를 그 달의 회계에 붙인다).
@@ -282,16 +315,28 @@ _prod_oneoff_residue "$PROJ" || _die "${_PROD_ONEOFF_ERR}" 3
 # 바꿔칠 수 있고**(지운 뒤 새로 만든다) 그 순간 호출 상한 회계가 0 에서 다시 선다(6G 가 「운영자 승인
 # 없이는 지우지 않는다」로 적은 바로 그 사고). umask 에 기대지 않는다.
 #
+# **`-m` 을 쓰지 않는다 — umask 를 좁힌 부속 셸에서 `mkdir` 한 번씩**(M15/15V D-15V-2). 사유는 **문면과
+# 현물을 하나로** 맞추는 것이다(거동 결함의 처방이 아니다 — 아래 실측). GNU `mkdir -m` 은 `mkdir(2)` 가
+# 요청 모양에 닿지 못한 자리에 **chmod 를 한 번 더** 치는데, 커널은 **group 의 비구성원**이 치는 chmod 에서
+# `S_ISGID` 를 지운다. 운영 구성(root 의 group 에 사람이 없다 — §14.1 의 요구)에서 래퍼 사용자는 바로 그
+# 비구성원이므로, `-m 2770` 으로 만든 잎은 `770` 이 됐다(실측). **거동에는 영향이 없었다** — 잎 술어는
+# `&070`·`&007` 만 보고 gid 는 커널 상속으로 바로 내려오며, 그 자리에 gid 만 같은 컨테이너가 실제로 썼다.
+# 그래도 문서·fixture 가 적는 `2770` 과 현물이 갈린 채 남으므로, `mkdir(2)` 의 상속에만 기대어 **두 구성
+# (구성원·비구성원) 모두에서 `2700`/`2770`** 이 나오게 한다(재현 표 — evidence commands).
+#
 # **모드가 층마다 다른 사유는 실측이다.** 컨테이너는 host 쪽 **조상**을 지나지 않는다 — bind 붙임은
 # 데몬(root)이 붙임 시점에 경로를 풀고, 컨테이너 안에서는 붙임 자리부터 권한이 재어진다(실측: 조상이
 # 2700 이어도 uid 가 다르고 **gid 만 같은** 컨테이너가 잎에 쓴다 · 음성 대조로 잎이 2700 이면 같은 호출이
 # 실패한다). 그래서 **group 쓰기가 필요한 자리는 잎 하나**이고, 조상에 group 쓰기를 열면 같은 group 의
 # 다른 계정에게 위의 바꿔치기를 허락하는 것뿐이다. 조상은 `2700`, 잎은 `2770` 이다.
 #
-# **setgid 가 group 을 잇는다.** root 의 setgid → `notice-list` → 잎으로 group 이 물려 내려가므로
-# (실측: 세 층 전부 group 10001) 조상의 setgid 는 **다음 달 디렉터리가 바른 group 으로 생기는가**를
-# 정하는 자리다. 그 비트는 **여기서 잴 수 있다** — gid 의 *값* 등식만 못 재고(그 gid 로 `chgrp` 할 권한이
-# 없다, `OPEN-M15-COLLECTION-RUN-STATE-GID`) setgid 의 **유무**는 잰다.
+# **setgid 가 group 을 잇고, 등식이 그 결과를 잰다**(D-15V-3). root 의 setgid → `notice-list` → 잎으로
+# group 이 물려 내려간다. 비트 술어는 「**앞으로** 만들 자리」만 묶으므로 **이미 있는 자리의 group 이 틀린
+# 경우**는 보지 못한다 — 그 꼴이 cr M-1 의 귀결이고(러너가 기동에서 죽고 종료가 1 이라 예외와 섞인다)
+# 이 라운드가 끝까지 재현했다. 그래서 **두 층의 gid == root 의 gid** 를 등식으로 잰다(원인이 아니라 결과를
+# 본다). root 의 gid 는 운영자가 §14.1 에서 정한 값이고 `stat` 으로 권한 없이 읽힌다.
+# 남는 미달 한 칸: **그 gid 가 app 이미지의 gid 인가**(이미지 조회가 필요하다 —
+# `OPEN-M15-COLLECTION-RUN-STATE-GID`).
 _collection_dir_mode() { # <경로> → mode 세 자리 + setuid/setgid 자리
   stat -c '%a' "$1" 2>/dev/null || true
 }
@@ -307,34 +352,52 @@ _collection_not_symlink() {
   [ ! -L "$1" ] \
     || _die "${2} 가 심링크다(${1} → $(readlink "$1" 2>/dev/null || echo '?')) — 이 두 층은 래퍼가 만드는 자리이고 링크를 받지 않는다(링크 하나로 붙임의 원천이 저장소 안이나 root 밖으로 간다). 그 링크를 걷고 실제 디렉터리를 둔다(runbook §14 ①)" 3
 }
+# <경로> <무엇> — 그 자리의 gid 가 root 의 gid 와 같은가(D-15V-3).
+_collection_gid_matches_root() {
+  local g
+  g="$(stat -c '%g' "$1" 2>/dev/null || true)"
+  [ -n "$g" ] || _die "${2}의 group 을 읽지 못했다: ${1}" 3
+  [ "$g" = "$RUN_STATE_ROOT_GID" ] \
+    || _die "${2}의 group 이 실행 상태 root 의 group 과 다르다(${1} gid=${g} ≠ root gid=${RUN_STATE_ROOT_GID}) — 컨테이너는 그 group 으로 원장에 쓴다. 틀린 group 으로 이미 만들어진 자리는 **비트를 다시 세워도 고쳐지지 않는다**(러너가 기동에서 죽고 종료는 1 이다). 'sudo chgrp -R ${RUN_STATE_ROOT_GID} ${RUN_STATE_ABS}' 뒤에 다시(runbook §14.1)" 3
+}
 _collection_prepare_run_state() {
   local m
   _collection_not_symlink "$RUN_STATE_PARENT" "실행 상태 갈래 디렉터리"
-  mkdir -p -m 2700 "$RUN_STATE_PARENT" \
-    || _die "실행 상태 갈래 디렉터리를 만들지 못했다: ${RUN_STATE_PARENT} — root 의 소유·권한을 본다(runbook §14 ①)" 3
+  # **부속 셸에서 umask 를 좁혀 만든다 — `-m` 을 쓰지 않는다**(D-15V-2, 위 머리말). `umask 077` 이면
+  # `mkdir(2)` 가 `0700` 을 내고 부모의 setgid·group 이 커널 상속으로 붙어 `2700` 이 된다 — chmod 가
+  # 없으므로 비구성원에게서도 그 비트가 떨어지지 않는다.
+  ( umask 077 && mkdir -p "$RUN_STATE_PARENT" ) \
+    || _die "실행 상태 갈래 디렉터리를 만들지 못했다: ${RUN_STATE_PARENT} — root 의 소유·권한을 본다(runbook §14.1)" 3
   _collection_not_symlink "$RUN_STATE_PARENT" "실행 상태 갈래 디렉터리"
   m="$(_collection_dir_mode "$RUN_STATE_PARENT")"
   [ -n "$m" ] || _die "실행 상태 갈래 디렉터리의 권한을 읽지 못했다: ${RUN_STATE_PARENT}" 3
   # setgid 가 없으면 **다음 달 디렉터리의 group 이 이 래퍼의 gid** 가 되고, 그 자리는 컨테이너가 쓰지
   # 못한다 — 러너가 기동에서 죽고 그 종료는 1 이라 「예외」와 섞인다. 여기서 3 으로 먼저 가른다.
+  #
+  # **사정거리**: 위 생성이 부모의 비트를 상속하고 root 의 setgid 는 인자 검사가 이미 요구하므로, **새로
+  # 만든 경우 이 술어는 늘 참**이다(공허하다). 하중을 받는 것은 **이미 있는 자리**다 — 운영자가 손으로
+  # 만들었거나 옛 run 이 남긴 조상. 그 경우의 group 은 비트가 아니라 아래 등식이 잡는다.
   [ "$(( 8#${m} & 8#2000 ))" -eq $(( 8#2000 )) ] \
-    || _die "실행 상태 갈래 디렉터리에 setgid 가 없다(${RUN_STATE_PARENT} mode=${m}) — 그 비트가 group 을 달 디렉터리로 잇는다. 없으면 다음 달의 자리가 이 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다. 'chmod 2700' 뒤에 다시(runbook §14 ①)" 3
+    || _die "실행 상태 갈래 디렉터리에 setgid 가 없다(${RUN_STATE_PARENT} mode=${m}) — 그 비트가 group 을 달 디렉터리로 잇는다. 없으면 다음 달의 자리가 이 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다. 'sudo chmod 2700 ${RUN_STATE_PARENT}' 뒤에 다시 — **sudo 가 필요하다**: 이 자리의 group 에 속하지 않은 소유자가 치는 chmod 는 커널이 setgid 를 지운다(runbook §14.1)" 3
   [ "$(( 8#${m: -3} & 8#020 ))" -eq 0 ] \
-    || _die "실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 이 자리에 쓸 수 있으면 달 디렉터리를 **바꿔칠 수 있고** 그 순간 호출 상한 회계가 0 에서 다시 선다. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다. 'chmod 2700' 뒤에 다시" 3
+    || _die "실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 이 자리에 쓸 수 있으면 달 디렉터리를 **바꿔칠 수 있고** 그 순간 호출 상한 회계가 0 에서 다시 선다. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다. 'sudo chmod 2700 ${RUN_STATE_PARENT}' 뒤에 다시(setgid 를 함께 되세우려면 sudo 가 필요하다)" 3
   [ "$(( 8#${m: -3} & 8#007 ))" -eq 0 ] \
-    || _die "실행 상태 갈래 디렉터리가 other 에 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 위와 같은 바꿔치기를 누구에게나 허락한다. 'chmod 2700' 뒤에 다시" 3
+    || _die "실행 상태 갈래 디렉터리가 other 에 열려 있다(${RUN_STATE_PARENT} mode=${m}) — 위와 같은 바꿔치기를 누구에게나 허락한다. 'sudo chmod 2700 ${RUN_STATE_PARENT}' 뒤에 다시" 3
+  _collection_gid_matches_root "$RUN_STATE_PARENT" "실행 상태 갈래 디렉터리"
   _collection_not_symlink "$RUN_STATE_DIR" "달 디렉터리"
-  mkdir -p -m 2770 "$RUN_STATE_DIR" \
-    || _die "달 디렉터리를 만들지 못했다: ${RUN_STATE_DIR} — 갈래 디렉터리의 소유·권한을 본다(runbook §14 ①)" 3
+  # `umask 007` — `mkdir(2)` 가 `0770` 을 내고 부모의 setgid·group 이 붙어 `2770` 이 된다(chmod 없음).
+  ( umask 007 && mkdir -p "$RUN_STATE_DIR" ) \
+    || _die "달 디렉터리를 만들지 못했다: ${RUN_STATE_DIR} — 갈래 디렉터리의 소유·권한을 본다(runbook §14.1)" 3
   _collection_not_symlink "$RUN_STATE_DIR" "달 디렉터리"
   m="$(_collection_dir_mode "$RUN_STATE_DIR")"
   [ -n "$m" ] || _die "달 디렉터리의 권한을 읽지 못했다: ${RUN_STATE_DIR}" 3
   # **이미 있는 자리에는 위 `-m` 이 적용되지 않는다**(운영자가 손으로 만든 자리 · 옛 run 이 남긴 자리).
   # group 쓰기가 닫혀 있으면 컨테이너가 원장에 쓰지 못한다(음성 대조로 쟀다).
   [ "$(( 8#${m: -3} & 8#070 ))" -eq $(( 8#070 )) ] \
-    || _die "달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다(${RUN_STATE_DIR} mode=${m} gid=$(stat -c '%g' "$RUN_STATE_DIR" 2>/dev/null || echo '?')) — 컨테이너는 uid/gid 10001 로 돌고 이 래퍼는 $(id -un) 으로 돈다. 둘이 같은 원장에 쓰는 길은 group 공유뿐이다. 'chmod 2770' 과 group 을 runbook §14 ① 의 값으로 맞춘 뒤 다시" 3
+    || _die "달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다(${RUN_STATE_DIR} mode=${m} gid=$(stat -c '%g' "$RUN_STATE_DIR" 2>/dev/null || echo '?')) — 컨테이너는 uid/gid 10001 로 돌고 이 래퍼는 $(id -un) 으로 돈다. 둘이 같은 원장에 쓰는 길은 group 공유뿐이다. 'sudo chmod 2770 ${RUN_STATE_DIR}' 뒤에 다시(runbook §14.1)" 3
   [ "$(( 8#${m: -3} & 8#007 ))" -eq 0 ] \
-    || _die "달 디렉터리가 other 에 열려 있다(${RUN_STATE_DIR} mode=${m}) — 이 자리는 호출 상한 회계를 담는다(지우면 상한이 0 에서 다시 선다). 'chmod 2770' 뒤에 다시" 3
+    || _die "달 디렉터리가 other 에 열려 있다(${RUN_STATE_DIR} mode=${m}) — 이 자리는 호출 상한 회계를 담는다(지우면 상한이 0 에서 다시 선다). 'sudo chmod 2770 ${RUN_STATE_DIR}' 뒤에 다시" 3
+  _collection_gid_matches_root "$RUN_STATE_DIR" "달 디렉터리"
   # **만든 뒤 실경로를 다시 본다**(vr M1) — **둘째 겹**이다. 위 인자 검사는 root 의 실경로만 봤으므로,
   # `notice-list` 나 달 디렉터리 자신이 저장소 안을 가리키는 심링크인 배치에서는 붙는 자리가 저장소 안이
   # 된다(실측: root 는 밖인데 달 디렉터리의 실경로가 저장소 안이었다). 러너 쪽 같은 가드는 컨테이너
@@ -357,14 +420,18 @@ _collection_prepare_run_state() {
   # **붙이는 것은 실경로다** — 재는 자리와 붙는 자리가 같아야 한다(둘째 env 파일의 경로 축과 같은 규율).
   RUN_STATE_DIR="$real"
 }
-_collection_prepare_run_state
-
-echo "collection: release ${rel} · 프로젝트 ${PROJ} · 창 ${FROM}~${TO} · 업종 ${CATEGORIES} · 상한 ${CALLS_PER_DAY}/일 ${CALLS_TOTAL}/누적 · 실행 상태 ${RUN_STATE_DIR}"
 ONEOFF_NAME="${PROJ}-app-run-collection"
 clash="$(docker ps -aq --filter "name=^${ONEOFF_NAME}$" 2>/dev/null)" \
   || _die "일회 컨테이너 이름 충돌을 세지 못했다(docker ps 실패) — 판정 불가" 3
 [ -z "$clash" ] \
   || _die "일회 컨테이너 이름 ${ONEOFF_NAME} 를 이미 다른 컨테이너가 쓰고 있다(이 프로젝트 밖일 수 있다) — 'docker ps -a --filter name=^${ONEOFF_NAME}\$' 로 보고 치운 뒤 다시" 3
+
+# **이름 충돌 검사까지 지난 뒤에 만든다**(M15/15V D-15V-7, cr L-1). 앞 판은 생성이 이 검사 **앞**이라
+# 그 두 거절(조회 실패 · 이름이 전역에서 이미 쓰임)도 `exit 3` 이면서 자리를 남겼다 — 가드의 절 제목
+# 「거절·미룬 run 은 자리를 남기지 않는다」가 전칭인데 표본이 둘뿐이던 자리다. 이제 **마지막 전제** 뒤다.
+_collection_prepare_run_state
+
+echo "collection: release ${rel} · 프로젝트 ${PROJ} · 창 ${FROM}~${TO} · 업종 ${CATEGORIES} · 상한 ${CALLS_PER_DAY}/일 ${CALLS_TOTAL}/누적 · 실행 상태 ${RUN_STATE_DIR}"
 
 _collection_on_signal() {
   local sig="$1"

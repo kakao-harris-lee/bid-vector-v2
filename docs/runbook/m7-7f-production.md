@@ -854,18 +854,25 @@ app 여유를 더하는 문면.
    넘으면 평가 run 이 건너뜀이 아니라 **실패**로 끝나고, 상한을 올려도 공고가 그 위로 쌓이면 다시
    붉어진다. 근본 처방(후보 질의를 지역·업종으로 좁히기)은 별 slice 다
    (`OPEN-M15-CANDIDATE-QUERY-SCOPE`).
-19. **래퍼는 실행 상태 자리의 gid *값* 등식을 재지 않는다.** 보는 것은 두 층의 **mode**(조상: setgid
-   있음 · group·other 쓰기 없음 / 달: group rwx 열림 · other 닫힘)와 **심링크 아님**까지이고, 그 group 이
-   **이미지의 10001 인가**는 §14.1 의 운영자 확인이다. 사유는 측정의 한계다 — CI·로컬에서 그 gid 를
-   fixture 로 만들 수 없어(`chgrp` 권한이 없다) 양성 대조가 불가능하고, 양성 없는 단언은 조용히 전부
-   거절하는 술어와 구별되지 않는다. **setgid 의 유무는 재므로**(권한이 필요 없다) 「다음 달의 자리가
-   틀린 group 으로 생긴다」는 축은 닫혀 있다.
+19. **래퍼는 「그 group 이 *이미지의* group 인가」만 재지 않는다**(M15/15V 로 좁아졌다). 보는 것은
+   **root 와 두 층**의 mode(root·조상: setgid 있음 · group·other 쓰기 없음 / 달: group rwx 열림 · other
+   닫힘) · **심링크 아님** · 그리고 **두 층의 gid == root 의 gid** 등식이다. root 의 gid 는 운영자가
+   §14.1 에서 정한 값이고 `stat` 으로 권한 없이 읽히므로 그 등식은 CI 가 잰다(가드가 호출자의 **보조
+   group** 으로 root 를 세운 양성까지 든다 — `chgrp` 는 디렉터리의 setgid 를 지우지 않아 그 fixture 가
+   mode 축과 섞이지 않는다). 남는 한 칸은 **root 의 gid 가 app 이미지의 gid 인가**이고, 그것은 이미지
+   조회가 필요해 열어 둔다(`OPEN-M15-COLLECTION-RUN-STATE-GID`). 그 한 칸이 어긋나면 **세 층의 gid 가
+   일관되게 틀리고** 래퍼는 통과한다 — 컨테이너가 원장에 쓰지 못해 러너가 종료 1 로 죽는다.
 21. **둘째 env 파일에는 검사와 소비 사이의 창이 있다.** 래퍼가 `koneps.env` 의 권한·키 집합을 본 뒤
    `docker compose run --env-from-file` 이 그 파일을 다시 읽기까지 release·manifest 검사와 잠금 둘과
    `docker ps` 둘이 돈다(수 초). 그 창에서 파일을 바꿀 수 있는 주체는 **그 파일에 쓸 수 있는 사람**뿐이고
    mode 술어가 other 를 닫으므로 위협 모델 경계(「`<저장소>` 에 쓸 수 있는 사람」과 같은 급) 밖이다 —
    relay(§13.3)에서 물려받은 창이고, 좁히려면 읽은 바이트를 그대로 넘기는 통로가 필요한데 `--env-from-file`
    은 **경로만** 받는다. 실행 상태 두 층의 심링크·mode 검사에도 같은 창이 있다.
+   **§14.5 ③ 의 로그 이름에도 선점 창이 있다** — `/var/tmp` 는 sticky·world-writable 이라 다른 비특권
+   계정이 그 이름을 미리 만들 수 있다. 그 경우 `install` 이 rc 1 로 끝나고 그 줄이 `&&` 로 이어져
+   **거기서 멈춘다**(앞 판은 보지 않고 `tee` 로 갔다). 이 host 에서는 `fs.protected_regular=2` 라 `tee` 도
+   거부됐지만 **운영 host 의 그 sysctl 값은 재지 않았다** — 선점된 자리는 지우지 말고 다른 이름으로
+   돌린 뒤 그 파일이 왜 있는지 본다.
 20. **`status` 는 재수집으로 갱신되지 않는다** — 취소·마감된 공고가 `Open` 으로 남아 후보에 들 수 있다
    (러너의 기존 거동이고 §14 가 바꾸지 않는다). 후보 질의의 둘째 조건(`deadline_at > now()`)이 마감
    지난 것은 걸러 내므로 오늘 영향은 「마감 전에 취소된 공고」로 좁다.
@@ -1528,13 +1535,26 @@ stat -c '%U %g %a' /var/lib/bidvector-v2-run-state     # deploy 10001 2700
 `getent group 10001` 이 사람 group 을 내면 **그 계정도 원장에 쓸 수 있다**(상한 회계를 0 으로 되돌리는 길).
 이 host 에서는 비어 있어야 하고, 아니면 그 group 을 전용으로 바꾼 뒤 이미지의 사용자와 맞춘다.
 
-**`notice-list` 와 달 디렉터리는 래퍼가 만든다 — 손으로 만들지 않는다.** 래퍼는 두 층을 **각각
-명시적으로** 만들고(`mkdir -p -m` 의 `-m` 은 **마지막 디렉터리에만** 적용되고 중간 디렉터리는 호출자
-umask 를 따른다 — umask 0000 이면 `2777` 이 된다) 이미 있는 자리에는 모양을 **검사**한다. 어긋나면
-`exit 3` 이고 문면이 고칠 자리를 말한다(§14.9). 그 두 층이 **심링크면 거절**한다 — 링크 하나로 붙임의
-원천이 저장소 안이나 root 밖으로 간다. 권한을 고칠 때 `chmod 2700`·`chmod 0700` 은 디렉터리의 setgid 를
-**지우지 않는다**(실측) — 지우려면 `chmod g-s` 를 명시해야 하므로, 평소 권한 수정이 그 비트를 잃게 하지
-않는다.
+**root 의 그 셋이 래퍼의 전제다**(M15/15V). 래퍼는 **붙이기 전에** root 의 ⓐ setgid 있음 ⓑ group 쓰기
+닫힘 ⓒ other 쓰기 닫힘을 보고, 어긋나면 `exit 3` 으로 이 블록을 가리킨다. 「정확히 `2700`」을 요구하지는
+않는다 — 필요한 것은 그 셋이고 group 읽기를 여는 것까지 막지 않는다. root 의 **gid** 는 아래 두 층의
+기대값이기도 하다(래퍼가 두 층의 gid 가 그것과 같은지를 등식으로 잰다).
+
+**`notice-list` 와 달 디렉터리는 래퍼가 만든다 — 손으로 만들지 않는다.** 래퍼는 두 층을 **각각**
+`mkdir` 한다(`umask 077` → `2700` · `umask 007` → `2770`). `-m` 을 쓰지 않는 사유는 실측이다: GNU
+`mkdir -m` 은 `mkdir(2)` 가 요청 모양에 닿지 못한 자리에 **chmod 를 한 번 더** 치는데, 커널은 **그 group
+의 비구성원**이 치는 chmod 에서 setgid 를 지운다. 이 host 의 `User=` 는 그 group(§14.1 의 요구대로 사람이
+없는 group)의 비구성원이므로 `-m 2770` 으로 만든 달 디렉터리는 **`770`** 이 됐다 — 거동에는 영향이
+없었지만(gid 는 커널이 상속하고 group 쓰기도 열린다) 이 문서가 적는 모양과 갈렸다. `mkdir(2)` 의 상속에만
+기대면 **구성원·비구성원 두 구성 모두에서** `2700`/`2770` 이 나온다.
+
+이미 있는 자리에는 모양과 **group 을 검사**한다. 어긋나면 `exit 3` 이고 문면이 고칠 자리를 말한다(§14.9).
+그 두 층이 **심링크면 거절**한다 — 링크 하나로 붙임의 원천이 저장소 안이나 root 밖으로 간다.
+
+**권한을 고치는 명령에는 `sudo` 가 필요하다.** 소유자가 그 group 의 비구성원이면 `chmod 2700` 이
+setgid 를 **세우지 못한다**(커널이 지운다 — 실측: `700` 이 된다). 그래서 §14.9 의 처방은 전부 `sudo` 꼴이고,
+같은 이유로 **「`chmod` 는 setgid 를 지우지 않는다」는 이 host 에서 참이 아니다**(구성원 소유자에게만 참인
+문장이었다 — 걷었다).
 
 ### 14.2 거는 법 — 손 실행
 
@@ -1695,17 +1715,29 @@ systemctl list-timers bidvector-evaluation-commit.timer   # 비어 있어야 한
 **③ 하루 창 · 작은 상한으로 손 실행 한 번.** 첫 실 호출이다. 작은 값으로 묶는 이유는 6G §7 2항과 같다 —
 응답이 기대와 다르면 노출을 한 번으로 끊는다.
 
-**출력을 파일로 남긴다** — ④ ⓕ 가 그 파일에서 호출 수를 센다. 이 run 은 **손 실행**이라 journal 에
-남지 않는다(이 unit 은 ⑦ 까지 한 번도 돌지 않는다).
+**출력을 파일로 남긴다 — 단 `0600` 으로 먼저 만든다**(M15/15V D-15V-5). ④ ⓕ 가 그 파일에서 호출 수를
+센다(이 run 은 **손 실행**이라 journal 에 남지 않는다 — 이 unit 은 ⑦ 까지 한 번도 돌지 않는다). 그 파일은
+래퍼의 stderr 와 **러너의 출력 전부**를 담고 `/var/tmp` 는 재부팅에도 남으므로, 평소 umask(0022)가 만드는
+`0644` 로 두지 않는다. `tee` 는 **있는 파일의 mode 를 바꾸지 않으므로** 먼저 만드는 한 줄이 그 자리를
+정한다. ④ 를 끝낸 뒤 **지운다**(아래 ④ 끝).
+
+`install` 이 실패하면 **거기서 멈춘다**(`&&` 로 잇는다). 그 이름이 다른 비특권 계정에게 **선점**돼 있으면
+(`/var/tmp` 는 sticky·world-writable 이다) `install` 이 rc 1 로 끝나는데, 앞 판은 그것을 보지 않고 `tee` 로
+갔다 — 그러면 ④ ⓕ 가 빈 파일에서 멈추고 운영자는 그 사유를 로그에서 찾는다. 선점된 자리는 **지우지 말고**
+다른 이름으로 돌린 뒤 그 파일이 왜 있는지 본다.
 
 ```bash
 cd <저장소>
+install -m 600 /dev/null /var/tmp/bidvector-collection-step3.log && \
 ./tools/prod-collection.sh --env-file /etc/bidvector-v2/prod.env --koneps-env-file /etc/bidvector-v2/koneps.env --state-dir /var/lib/bidvector-v2 --run-state-root /var/lib/bidvector-v2-run-state --days-back 1 --categories construction,service --calls-per-day 50 --calls-total 50 2>&1 | tee /var/tmp/bidvector-collection-step3.log
 echo "exit=${PIPESTATUS[0]}"   # 0 이면 전 슬롯이 끝까지 읽혔다. 2 면 상한·쿼터·절단이다(④ 의 수를 보고 상한을 올린다)
+stat -c '%U %a' /var/tmp/bidvector-collection-step3.log   # <운영자> 600 — tee 가 mode 를 바꾸지 않는다
 ```
 
 `$?` 가 아니라 `${PIPESTATUS[0]}` 를 읽는다 — `tee` 를 물렸으므로 `$?` 는 `tee` 의 것이다(래퍼의 종료
-코드가 이 절차의 판정값이다).
+코드가 이 절차의 판정값이다). **`1` 이면 두 가지다**: 위 `install` 이 실패해 래퍼가 **아예 돌지 않았거나**
+(그 자리가 이미 다른 소유자에게 잡혀 있다 — `install` 의 stderr 가 바로 위에 뜬다), 러너가 §14.9 표의
+「예외」로 끝났거나다. 둘은 **같은 코드로 보고되므로** 그 줄 위의 stderr 를 먼저 본다.
 
 마침 줄은 `collection finished slots=… truncatedSlots=… halted=… exit=…` 이고, 슬롯마다
 `collection slot date=… source=… received=… normalized=… duplicate=… dropped=… … pages=… truncated=…`
@@ -1720,7 +1752,12 @@ CFG="$(docker compose -f docker/compose.yaml -f docker/compose.local-tls.yaml -f
 P="$(printf '%s' "$CFG" | jq -r .name)"
 PGUSER_="$(printf '%s' "$CFG" | jq -r '.services.postgres.environment.POSTGRES_USER')"
 PGDB_="$(printf '%s' "$CFG" | jq -r '.services.postgres.environment.POSTGRES_DB')"
-[ -n "$P" ] && [ "$PGUSER_" != null ] && [ "$PGDB_" != null ] || { echo "compose 에서 프로젝트·DB 이름을 읽지 못했다 — 질의하지 않는다" >&2; false; }
+# **가드가 질의를 실제로 막는다**(M15/15V D-15V-6). 붙여넣는 셸에는 `set -e` 가 없어서, 앞 판의
+# `… || { echo …; false; }` 는 `$?` 만 세우고 **다음 줄의 `docker exec` 가 그대로 돌았다**. 질의를
+# `if … then … fi` 안에 둔다. 세 값 모두 **비어 있지 않고 `null` 이 아닌지**를 같은 꼴로 본다.
+if [ -n "$P" ] && [ "$P" != null ] \
+   && [ -n "$PGUSER_" ] && [ "$PGUSER_" != null ] \
+   && [ -n "$PGDB_" ] && [ "$PGDB_" != null ]; then
 docker exec -i "${P}-postgres-1" psql -U "$PGUSER_" -d "$PGDB_" -At <<'SQL'
 -- ⓐ 들어온 공고
 SELECT 'notice', count(*) FROM notice;
@@ -1737,6 +1774,9 @@ SELECT 'collection_run', count(*) FROM collection_run;
 SELECT 'covered_days', count(DISTINCT reference_date) FROM collection_run
   WHERE reference_date > current_date - 30;
 SQL
+else
+  echo "compose 에서 프로젝트·DB 이름을 읽지 못했다 — 질의하지 않았다" >&2
+fi
 # ⓕ 호출 수 — 슬롯 줄의 `pages=` 합이 이 갈래의 목록 호출 수다(쪽마다 한 호출).
 # **③ 의 run 은 손 실행이라 journal 에 없다**(이 unit 은 ⑦ 까지 한 번도 돌지 않는다) — 그래서 ③ 이
 # 남긴 **파일**에서 센다. 아래 `_pages` 는 입력이 비면 **조용히 0 이 아니라 멈춘다**: `paste -sd+ | bc`
@@ -1764,6 +1804,13 @@ _pages /var/tmp/bidvector-collection-step3.log
 | run 하나의 벽시계 시간 | `journalctl` 의 run 시작·끝 | | `TimeoutStartSec` 15m 와 간격 20 분이 맞는가 |
 
 **수를 적기 전에는 ⑤ 로 가지 않는다** — 이 문서는 그 수를 박지 않는다(박으면 재는 날 거짓이 된다).
+
+**표를 적은 뒤 ③ 의 로그를 지운다**(D-15V-5). 지우기 **전까지는** ⓕ 를 몇 번이든 다시 셀 수 있으므로,
+표의 칸이 다 차고 ⑤ 로 넘어갈 때 지운다.
+
+```bash
+shred -u /var/tmp/bidvector-collection-step3.log 2>/dev/null || rm -f /var/tmp/bidvector-collection-step3.log
+```
 
 **⑤ 그 수로 후보 상한을 정해 `prod.env` 를 고친다**(운영자 결정 — 이 문서가 값을 정하지 않는다).
 
@@ -1843,10 +1890,13 @@ systemctl list-timers bidvector-collection.timer   # 비어 있어야 한다
 | 증상 | 뜻 | 처방 |
 |---|---|---|
 | 래퍼가 `exit 3`, 「실행 상태 root 가 저장소 안이다」 | `--run-state-root` 가 `<저장소>` 아래다(심링크로도 본다) | §14.1 의 자리를 준다 — 실험 입력은 커밋되지 않는다 |
-| 래퍼가 `exit 3`, 「달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다」 | 이미 있는 달 디렉터리의 mode 가 좁다(손으로 만든 자리) | `chmod 2770` 과 group 을 §14.1 의 값으로 맞춘다. **컨테이너는 uid/gid 10001 로 돈다** |
+| 래퍼가 `exit 3`, 「달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다」 | 이미 있는 달 디렉터리의 mode 가 좁다(손으로 만든 자리) | `sudo chmod 2770 <그 경로>`. **컨테이너는 그 group 으로 원장에 쓴다** |
 | 래퍼가 `exit 3`, 「… 가 심링크다」 | `notice-list` 나 달 디렉터리가 링크다 — 링크 하나로 붙임의 원천이 저장소 안이나 root 밖으로 간다 | 링크를 걷고 실제 디렉터리를 둔다. 그 두 층은 **래퍼가 만든다**(§14.1) |
-| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 setgid 가 없다」 | `notice-list` 에 set-group-ID 가 없다 — 그 비트가 group 을 달 디렉터리로 잇는다 | `chmod 2700 <root>/notice-list`. 없으면 **다음 달**의 자리가 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다 |
-| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다」 또는 「other 에 열려 있다」 | 조상에 쓰기가 열렸다 — 그 자리에 쓸 수 있으면 **달 디렉터리를 바꿔칠 수 있고** 호출 상한 회계가 0 에서 다시 선다 | `chmod 2700`. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다(§14.1) |
+| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 setgid 가 없다」 | `notice-list` 에 set-group-ID 가 없다 — 그 비트가 group 을 달 디렉터리로 잇는다 | **`sudo` 가 필요하다** — `sudo chmod 2700 <root>/notice-list`. 소유자가 그 group 의 비구성원이면 `sudo` 없는 `chmod` 는 커널이 setgid 를 지워 **아무것도 고치지 못한다**(실측). 없으면 **다음 달**의 자리가 래퍼의 group 으로 생겨 컨테이너가 원장에 쓰지 못한다 |
+| 래퍼가 `exit 3`, 「실행 상태 갈래 디렉터리에 group 쓰기가 열려 있다」 또는 「other 에 열려 있다」 | 조상에 쓰기가 열렸다 — 그 자리에 쓸 수 있으면 **달 디렉터리를 바꿔칠 수 있고** 호출 상한 회계가 0 에서 다시 선다 | `sudo chmod 2700 <root>/notice-list`. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다(§14.1) |
+| 래퍼가 `exit 3`, 「실행 상태 root 에 setgid 가 없다」 | root 에 set-group-ID 가 없다 — 그 비트가 group 을 **아래 두 층으로** 잇는다. 없으면 두 층이 래퍼의 group 으로 생긴다 — **D-15V-2 뒤로는 조상이 `700` 으로 만들어져 「갈래 디렉터리에 setgid 가 없다」가 먼저 서고**(앞 판의 `-m 2700` 은 그 비트를 명시로 세워 술어를 전부 통과시킨 뒤 컨테이너 쓰기에서 러너를 종료 **1** 로 죽였다), gid 등식이 그 둘째 겹이다 | §14.1 의 `sudo install -d -m 2700 -o "$USER" -g <이미지 gid>` 로 다시 만든다. 이미 두 층이 틀린 group 으로 생겼으면 `sudo chgrp -R <그 gid> <root>` 까지 한다 |
+| 래퍼가 `exit 3`, 「실행 상태 root 에 group 쓰기가 열려 있다」 또는 「other 쓰기가 열려 있다」 | root 에 쓰기가 열렸다 — 그 자리에 쓸 수 있으면 `notice-list` 를 **바꿔칠 수 있다**(조상에 건 것과 같은 논증이 한 층 위에 선다) | `sudo chmod 2700 <root>`. group 쓰기가 필요한 자리는 **달 디렉터리 하나**다(§14.1) |
+| 래퍼가 `exit 3`, 「… 의 group 이 실행 상태 root 의 group 과 다르다」 | 이미 있는 자리의 group 이 틀리다 — setgid 비트는 「**앞으로** 만들 자리」만 묶으므로 그 꼴을 보지 못한다. 컨테이너는 그 group 으로 원장에 쓴다 | `sudo chgrp -R <root 의 gid> <root>` 뒤에 다시. **비트를 다시 세워도 고쳐지지 않는다** — group 은 이미 박혀 있다 |
 | 래퍼가 `exit 3`, 「달 디렉터리의 실경로가 실행 상태 root 밖이다」 | 붙임의 원천이 root 밖으로 나갔다 | 그 자리의 링크·마운트를 걷는다 |
 | 래퍼가 `exit 3`, 「서비스 키 env 에 … 밖의 키가 있다」 | 그 파일에 허용 집합 밖의 이름이 있다 — 그 파일은 일회 컨테이너의 env 를 **덮는다** | 그 줄을 지운다. `base-url`·`operations.*` 는 compose 축이다(§14.1) |
 | 래퍼가 `exit 3`, 「compose 해석기가 … 통째로 버렸다」 | 닫히지 않은 따옴표 · 값 뒤의 `!!` · `KEY=` 모양이 아닌 줄 — `run --env-from-file` 은 그런 파일을 **rc 0 으로 조용히 무시**한다 | 그 줄을 고친다. 이 거절이 없으면 러너가 「서비스 키가 없다」로 끝나 **멀쩡한 키**를 들여다보게 된다 |
