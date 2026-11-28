@@ -2131,7 +2131,16 @@ _q_fixture usernull  'del(.services.postgres.environment.POSTGRES_USER)'
 _q_fixture dbemp     '.services.postgres.environment.POSTGRES_DB = ""'
 _q_fixture dbnull    'del(.services.postgres.environment.POSTGRES_DB)'
 # ⓒ 격리 실행 환경 — 열거한 이름만 든 PATH, 빈 환경, 저장소 밖 cwd.
-Q_REAL_TOOLS=(bash cat grep jq)                       # 토막과 가짜 docker 가 쓰는 도구
+# **열거에서 `bash` 와 `grep` 을 뺐다**(계약 갱신 ⑥ · 리뷰 r4 M-1). `bash` 가 PATH 에 있으면
+# restricted 셸이 그 이름으로 부른 자식이 **제한 없는** 셸이다(rbash 의 고전적 탈출 — 실측으로
+# 격리 밖 쓰기가 됐다). 가짜 `docker` 는 shebang 을 `$QBASH` **절대 경로**로 박아 그 이름 없이
+# 돈다(가드가 만든 신뢰 스크립트이므로 제한 밖에서 도는 것이 맞다 — 그리고 `-r` 는 애초에 자식에게
+# 물려지지 않는다, 제한 14). `grep` 은 가짜의 둘째 env 분기 하나에만 쓰이고 ④ 는 그 분기를 타지
+# 않는다(없으면 127 로 그 `&&` 가 거짓이 되어 같은 자리로 떨어진다 — 아래 계수로 확인한다).
+# **`cat` 은 못 뺀다** — 가짜가 cfg fixture 를 그것으로 낸다(builtin 으로 바꾸면 공유 shim 이
+# 갈라진다). 등재본 등식이 실행되는 글자를 고정하므로 그 남은 읽기 도구의 사정거리는 **리뷰된
+# 그 한 장**이다.
+Q_REAL_TOOLS=(cat jq)                                 # 가짜 docker 가 cfg fixture 를 내는 데 쓰는 것
 Q_DANGER_TOOLS=(sudo systemctl journalctl shred rm)   # 넓어진 토막이 부르는 이름 — 가짜로 둔다
 Q_UNLISTED_TOOLS=(sed awk paste bc)                   # 열거 밖 — 해석되지 않아야 한다
 mkdir -p "$T/qbin" "$T/qrun"
@@ -2140,8 +2149,12 @@ for _t in "${Q_REAL_TOOLS[@]}"; do
   [ -n "$_p" ] || _die "격리 PATH 에 넣을 ${_t} 를 찾지 못했다 — 판정 불가" 2
   ln -sf "$_p" "$T/qbin/$_t"
 done
-cp "$T/bin/docker" "$T/qbin/docker"
+QBASH="$(command -v bash)"
+[ -n "$QBASH" ] || _die "bash 자리를 찾지 못했다 — 판정 불가" 2
+sed "1s|.*|#!${QBASH}|" "$T/bin/docker" > "$T/qbin/docker"
 chmod +x "$T/qbin/docker"
+head -n1 "$T/qbin/docker" | grep -qxF "#!${QBASH}" \
+  || _die "가짜 docker 의 shebang 을 절대 경로로 박지 못했다 — 전용 PATH 에서 bash 를 뺄 수 없다(판정 불가)" 2
 for _t in "${Q_DANGER_TOOLS[@]}"; do
   cat > "$T/qbin/$_t" <<'QFAKE'
 #!/usr/bin/env bash
@@ -2149,10 +2162,12 @@ for _t in "${Q_DANGER_TOOLS[@]}"; do
 printf '%s %s\n' "${0##*/}" "$*" >> "${SHIM_LOG:-/dev/null}"
 exit 0
 QFAKE
+  # shebang 도 절대 경로로 — 전용 PATH 에 `bash` 가 없으므로 `/usr/bin/env bash` 는 127 로 죽고
+  # **가짜가 기록을 남기지 못한다**(양성 대조가 그 실수를 잡았다: 기록 0 회).
+  sed -i "1s|.*|#!${QBASH}|" "$T/qbin/$_t"
   chmod +x "$T/qbin/$_t"
 done
 unset _t _p
-QBASH="$(command -v bash)"
 Q_DANGER_RE="$(printf '%s|' "${Q_DANGER_TOOLS[@]}")"; Q_DANGER_RE="${Q_DANGER_RE%|}"
 q_danger_n=0
 q_danger_hit=""
@@ -2223,121 +2238,98 @@ else
   _bad "bash -r 양성 대조가 어긋났다 — restricted 줄 ${q_rest_n}(7 이상이어야) · probe 가 남긴 파일 ${q_rest_files} 개(0 이어야). 플래그가 먹지 않으면 절대 경로·command -p·리다이렉션 축이 열린 채다: $(head -c 200 "$T/qerr" | tr '\n' ' ' || true)"
 fi
 q_denied=""
-# ⓐ 펜스 동일성 추출 — 시작 표지가 **든 그 펜스** 안에서, 종단자까지. 종단자 없이 펜스가 닫히면 0 줄.
-q_block="$T/q-block.sh"
+# ── 계약 갱신 ⑥ — 「뽑아서 실행」에서 **「등재본과 같음을 보고, 등재본을 실행」**으로 ─────────
+# 같은 축의 지적이 세 번 돌았다(범위 상한 없음 → 격리가 PATH 만 막음 → 꼴 검사가 대입 접두·단일
+# `&`·조립 경로에서 열리고 **자기 실패에서 통과**). 세 번 다 처방이 **열거**였다 — 임의의 셸 문면을
+# 실행하면서 「해로운 꼴」을 세는 한 그 집합은 닫히지 않는다(리뷰가 게이트 GREEN 인 채 격리 밖 쓰기를
+# 실측했다: `X=1 bash -c …` 대입 접두 · 단일 `&` · 조립 경로의 `jq` 읽기 · 등재된 `bash` 가 `-r` 를
+# 벗긴다).
+#
+# 구성으로 닫는다. **실행되는 글자를 리뷰된 한 장으로 고정한다** — 「무엇이 실행될 수 있는가」가
+# 검사기의 사정거리가 아니라 **저장소의 그 파일**이 된다.
+#  ㉮ runbook §14.5 ④ 의 그 펜스 **본문 전체**를 뽑아 등재본과 **바이트로** 견준다(`cmp`). 다르면
+#     `_bad` 이고 **아무것도 실행하지 않는다**. runbook 의 ④ 를 고치는 사람은 등재본을 함께 고치고
+#     그 diff 가 리뷰를 지난다(등재 줄 래칫과 같은 규율).
+#  ㉯ 돌리는 것은 추출본이 아니라 **등재본**이다. 그 안에서 측정 토막(`CFG=` ~ 닫는 `fi`)을 잘라
+#     쓴다 — 자르는 원천이 저장소의 파일이므로 종단자·상한 검사는 **비공허 확인**으로 남는다.
+#  ㉰ 실행 전 꼴 검사는 **걷었다**. 그 층은 발견을 출력하고 빈 출력을 통과로 읽어 **검사기의 모든
+#     내부 실패가 통과**였고(awk 가 깨지거나 heredoc 종단자가 어긋나면 삼킨다), 세 층 가운데 혼자
+#     양성 대조가 없었다. 등식이 그 층의 일을 **더 좁게** 한다.
+#  ㉱ 깊이 방어는 남긴다 — `env -i` · 전용 PATH · `bash -r` · stdin `/dev/null` · 저장소 밖 cwd ·
+#     위험 이름 가짜와 그 양성 대조 · `-r` 양성 probe.
+STEP4_EXPECT=config/quality/runbook-collection-step4-block.txt
+[ -r "$STEP4_EXPECT" ] || _die "④ 등재본을 읽지 못했다: ${STEP4_EXPECT}(옮겨졌거나 지워졌다) · 판정 불가" 2
+q_fence="$T/q-fence.txt"
+# 시작 표지가 **든 그 펜스**의 본문을 바이트 그대로. 다른 펜스는 모으고 버린다(섞일 길이 없다).
 awk '
   /^[[:space:]]*```/ {
-    if (fence && collecting && !closed) n = 0
-    if (fence && collecting) exit
-    fence = !fence
+    if (infence) {
+      if (hit) { for (i = 1; i <= n; i++) print buf[i]; exit }
+      infence = 0; n = 0; hit = 0
+    } else { infence = 1; n = 0; hit = 0 }
     next
   }
-  !fence { next }
+  infence { buf[++n] = $0; if ($0 ~ /^CFG="\$\(docker compose/) hit = 1 }
+' "$RB" > "$q_fence"
+q_fence_n="$(grep -c '' "$q_fence" || true)"
+q_marker_n="$(grep -c '^CFG="\$(docker compose' "$RB" || true)"
+q_expect_psql="$(grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' "$STEP4_EXPECT" || true)"
+q_cmp_rc=0
+cmp -s "$q_fence" "$STEP4_EXPECT" || q_cmp_rc=$?
+# 비공허: 등식이 「둘 다 비었다」로 참이 되지 않게 한다. 표지가 문서에 하나라는 것은 추출이 **그**
+# 펜스라는 진술이고, psql 줄 하나는 등재본이 측정 대상을 담는다는 진술이다.
+if [ "$q_cmp_rc" = 0 ] && [ "$q_fence_n" -ge 20 ] && [ "$q_marker_n" = 1 ] && [ "$q_expect_psql" = 1 ]; then
+  _ok "runbook §14.5 ④ 펜스 본문이 등재본과 **바이트로 같다**(${q_fence_n} 줄 · 시작 표지 문서에 1 회 · 등재본의 psql 줄 1) — 아래에서 돌리는 것은 그 등재본이다"
+else
+  _bad "④ 펜스 본문과 등재본이 다르다(cmp rc ${q_cmp_rc} · 펜스 ${q_fence_n} 줄 · 표지 ${q_marker_n} 회 · 등재본 psql ${q_expect_psql} 줄) — **아무것도 실행하지 않았다**. runbook §14.5 ④ 를 고쳤으면 ${STEP4_EXPECT} 를 **같은 커밋에서** 맞춘다(그 diff 가 리뷰를 지난다). 차이: $(diff "$STEP4_EXPECT" "$q_fence" 2>/dev/null | head -c 300 | tr '\n' '~' || true)"
+fi
+# ㉯ 돌릴 토막은 **등재본에서** 자른다.
+q_block="$T/q-block.sh"
+awk '
   !collecting && /^CFG="\$\(docker compose/ { collecting = 1 }
   collecting && !closed { buf[++n] = $0 }
   collecting && !closed && /^fi$/ { closed = 1 }
   END { if (closed) for (i = 1; i <= n; i++) print buf[i] }
-' "$RB" > "$q_block"
+' "$STEP4_EXPECT" > "$q_block"
 q_block_n="$(grep -c '' "$q_block" || true)"
 q_block_exec="$(grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' "$q_block" || true)"
 q_block_last="$(tail -n1 "$q_block" 2>/dev/null || true)"
-# ⓔ **실행 전에 받는 꼴만 통과시킨다**(승인 전 묶음 — vr M-1 = cr M-1).
-# 실측: `env -i` + 열거 PATH + 저장소 밖 cwd 는 **PATH 로 해석되는 이름만** 막는다. 절대 경로 명령 ·
-# `command -p` · 출력 리다이렉션 · `cd` · `exec 3>파일` · `source` · `/dev/tcp` 는 그 격리 안에서
-# **그대로 실행됐다**(무해 대상으로 재고 파일 생성·소켓 개방까지 봤다). 위험 이름 가짜는 PATH 경유
-# 호출만 세므로 그 꼴을 보지 못한다. 두 층을 더한다.
-#  ㉠ 실행을 **`bash -r`**(restricted)로 한다 — 실측으로 위 일곱을 전부 거절한다(「cannot specify `/'
-#     in command names」·「command: -p: restricted」·「cannot redirect output」·「cd: restricted」·
-#     「.: restricted」). `>&2`(fd **복제**는 restricted 목록 밖이다)와 인용 heredoc 은 통과하므로 ④ 는
-#     그대로 돈다. `-r` 뒤 생성된 파일 0 을 확인했다.
-#  ㉡ `-r` 이 남기는 것은 **읽기 축**이다(`cat <절대 경로>` · `$(< 파일)` · `< 파일`). 그 축은 실행
-#     **전에** 토막을 훑어 거절한다 — 열거(나쁜 꼴 목록)가 아니라 **받는 꼴**을 정하고 나머지를 세운다:
-#     명령 자리의 낱말이 **등재 집합** 안(닫힌 집합이라 `cat`·`command`·`source`·`eval`·`bash`·절대
-#     경로 명령이 전부 밖이다) · **절대 경로 낱말**이 등재 집합 안 · `<` 는 인용 heredoc 으로만 ·
-#     `>` 는 fd 복제로만 · `/dev/tcp|udp` 금지. ④ 는 오늘 그대로 통과한다.
-#     절대 경로 낱말까지 보는 이유: 등재된 `jq` 는 **파일 이름을 인자로 받으면 그 파일을 읽는다**
-#     (`jq . /etc/<자격>`). 명령 자리만 보면 그 꼴이 남고, 상대 경로는 cwd 가 빈 `$T/qrun` 이라
-#     아무것도 찾지 못하므로 **절대 경로 낱말 하나를 닫으면 읽기 축이 닫힌다**. ④ 의 그 낱말은
-#     가짜 docker 의 `--env-file` 인자 하나뿐이고 가짜는 그 파일을 읽지 않는다.
-Q_SHAPE_ALLOW="[ docker echo jq printf"
-Q_SHAPE_ABS="/etc/bidvector-v2/prod.env"
-cat > "$T/q-shape.awk" <<'QSHAPE'
-# 인용 heredoc 여는 꼴의 정규식은 **동적으로** 짓는다 — 두 꺾쇠를 축어로 적으면 이 본문을 셸로
-# 훑는 백틱 스캐너가 그것을 heredoc 여는 줄로 읽고 받지 않는 꼴(STOP)로 세운다(실측: 두 군데).
-BEGIN { split(ALLOW, _a, " "); for (_i in _a) OK[_a[_i]] = 1
-        split(ABS, _b, " "); for (_i in _b) OKABS[_b[_i]] = 1
-        BT = sprintf("%c", 96); HD = sprintf("%c%c", 60, 60) "'[A-Za-z_][A-Za-z0-9_]*'" }
-hd != "" { if ($0 == hd) hd = ""; next }
-/^[[:space:]]*#/ { next }
-{
-  line = $0
-  if (match(line, HD)) {
-    hd = substr(line, RSTART + 3, RLENGTH - 4)
-    sub(HD, " ", line)
-  }
-  t = line
-  gsub(/>&[0-9]/, " ", t)
-  if (t ~ /</) print "입력 리다이렉션(인용 heredoc 밖의 <): " $0
-  if (t ~ />/) print "출력 리다이렉션(fd 복제 밖의 >): " $0
-  if (line ~ /\/dev\/(tcp|udp)/) print "내장 네트워크(/dev/tcp|udp): " $0
-  na = split(line, tk, /[[:space:]]+/)
-  for (j = 1; j <= na; j++) {
-    v = tk[j]; gsub(/^["'\''"]+|["'\''"]+$/, "", v)
-    if (v ~ /^\//  && !(v in OKABS)) print "등재 밖 절대 경로 낱말 [" v "]: " $0
-  }
-  c = line
-  gsub(/\$\(/, "\n", c); gsub(BT, "\n", c)
-  gsub(/\|\|/, "\n", c); gsub(/&&/, "\n", c); gsub(/[|;]/, "\n", c)
-  nf = split(c, fr, "\n")
-  for (i = 1; i <= nf; i++) {
-    f = fr[i]
-    sub(/^[[:space:]]+/, "", f); sub(/[[:space:]]+$/, "", f)
-    while (f ~ /^(if|then|else|elif|fi|do|done|while|until|case|esac|!|\{|\})([[:space:]]|$)/) {
-      sub(/^[^[:space:]]+[[:space:]]*/, "", f)
-    }
-    if (f == "" || f == "\\") continue
-    w = f; sub(/[[:space:]].*/, "", w)
-    if (w ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue
-    if (w in OK) continue
-    print "등재 밖 명령 자리 [" w "]: " $0
-  }
-}
-QSHAPE
+# 사유별 문면(vr L-1 · r4 L-b 정정) — 하한 미달을 「종단자」로 부르지 않고, 0 줄에 안쪽 `fi` 사유가
+# 함께 붙지 않게 사유를 **배타적으로** 짠다.
 q_why=""
-[ "$q_block_n" -ge 10 ] || q_why="${q_why}종단자를 못 봤다(${q_block_n} 줄 — 종단자 없이 펜스가 닫히면 아무것도 내지 않으므로 0 줄이다) · "
-[ "$q_block_n" -le 40 ] || q_why="${q_why}상한 40 줄을 넘었다(${q_block_n} 줄 — 펜스가 커졌으면 상한과 함께 본다) · "
-[ "$q_block_exec" = 1 ] || q_why="${q_why}psql 호출 줄이 ${q_block_exec} 개다(1 이어야 — 0 이면 안쪽 fi 에서 먼저 끊겼다) · "
-[ "$q_block_last" = fi ] || q_why="${q_why}마지막 줄이 닫는 fi 가 아니다([${q_block_last}]) · "
-if [ -z "$q_why" ]; then
-  _ok "runbook 에서 ④ 토막을 뽑았다(${q_block_n} 줄 · 상한 40 · psql 호출 한 줄 · 마지막 줄이 닫는 fi) — 아래 측정이 공허하지 않고 그 펜스를 넘지도 않는다"
-  q_shape_bad="$(awk -v ALLOW="$Q_SHAPE_ALLOW" -v ABS="$Q_SHAPE_ABS" -f "$T/q-shape.awk" "$q_block" || true)"
-  if [ -z "$q_shape_bad" ]; then
-    _ok "④ 토막의 꼴이 받는 집합 안이다 — 명령 자리는 등재된 다섯(${Q_SHAPE_ALLOW})과 대입뿐 · 절대 경로 낱말은 등재된 하나뿐 · 입력은 인용 heredoc · 출력은 fd 복제뿐이다(그래서 bash -r 가 남기는 읽기 축에 닿지 않는다)"
-    # ⓑ 실행은 여기서만 — 추출 넷과 꼴 검사를 **둘 다** 지났을 때다.
-    _q_run "$q_block" "$T/cfg-q-ok.json";       q_ok_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-noname.json";   q_noname_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-namenull.json"; q_namenull_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-useremp.json";  q_useremp_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-usernull.json"; q_usernull_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-dbemp.json";    q_dbemp_n="$q_exec_n"
-    _q_run "$q_block" "$T/cfg-q-dbnull.json";   q_dbnull_n="$q_exec_n"
-    q_blocked="${q_noname_n}${q_namenull_n}${q_useremp_n}${q_usernull_n}${q_dbemp_n}${q_dbnull_n}"
-    if [ "$q_ok_n" = 1 ] && [ "$q_blocked" = 000000 ]; then
-      _ok "④ 토막을 일곱 꼴로 돌려 쟀다 — 정상 psql 1 회 · 여섯 결손 꼴(이름 빈 값·이름 null·사용자 빈 값·사용자 null·DB 빈 값·DB null) 모두 0 회"
-    else
-      _bad "④ 토막이 결손 값에서 질의를 막지 못한다 — 정상 ${q_ok_n}(1 이어야) · 이름 빈 값 ${q_noname_n} · 이름 null ${q_namenull_n} · 사용자 빈 값 ${q_useremp_n} · 사용자 null ${q_usernull_n} · DB 빈 값 ${q_dbemp_n} · DB null ${q_dbnull_n}(여섯 다 0 이어야). 질의가 'if …; then' **안**에 있고 세 값 모두 -n 과 != null 로 보는지 확인한다${q_denied:+ ── 다만 격리가 거절한 흔적이 있다(${q_denied}): 구조가 아니라 **PATH 열거**(${q_bin_want}) 또는 bash -r 가 토막의 한 줄을 막은 것이다. 그 줄은 다음 stderr 가 가리킨다: $(head -c 200 "$T/qerr" | tr '\n' ' ' || true)}"
-    fi
-    # ⓓ 그 일곱 run 이 위험 이름을 한 번도 부르지 않았는가 — 추출이 ④ 펜스를 넘지 않았다는 **실행 층** 진술.
-    if [ "$q_danger_n" = 0 ]; then
-      _ok "④ 토막을 일곱 꼴로 돌리는 동안 위험 이름 호출 0 회(${Q_DANGER_TOOLS[*]}) — 추출이 ④ 펜스를 넘지 않았다"
-    else
-      _bad "④ 토막 실행이 위험 이름을 ${q_danger_n} 회 불렀다: ${q_danger_hit}— 추출이 §14.5 ④ 의 펜스를 넘었다. 닫는 fi 의 꼴을 확인한다(그 줄이 'fi' 가 아니면 추출이 문서 끝까지 간다). 가짜가 받아 **아무 일도 일어나지 않았다**"
-    fi
+if [ "$q_block_n" = 0 ]; then
+  q_why="닫는 fi 를 보지 못해 아무것도 자르지 못했다(0 줄) — 등재본에 시작 표지나 닫는 fi 가 없다"
+else
+  [ "$q_block_n" -ge 10 ] || q_why="${q_why}자른 토막이 하한보다 짧다(${q_block_n} 줄 — 안쪽 fi 에서 먼저 끊겼을 수 있다) · "
+  [ "$q_block_n" -le 40 ] || q_why="${q_why}상한 40 줄을 넘었다(${q_block_n} 줄) · "
+  [ "$q_block_exec" = 1 ] || q_why="${q_why}psql 호출 줄이 ${q_block_exec} 개다(1 이어야) · "
+  [ "$q_block_last" = fi ] || q_why="${q_why}마지막 줄이 닫는 fi 가 아니다([${q_block_last}]) · "
+  q_why="${q_why%· }"
+fi
+if [ "$q_cmp_rc" = 0 ] && [ -z "$q_why" ]; then
+  _ok "등재본에서 측정 토막을 잘랐다(${q_block_n} 줄 · 상한 40 · psql 호출 한 줄 · 마지막 줄이 닫는 fi) — 아래 측정이 공허하지 않다"
+  # ㉯ 실행은 여기서만 — 바이트 등식과 비공허를 **둘 다** 지났을 때다.
+  _q_run "$q_block" "$T/cfg-q-ok.json";       q_ok_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-noname.json";   q_noname_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-namenull.json"; q_namenull_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-useremp.json";  q_useremp_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-usernull.json"; q_usernull_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-dbemp.json";    q_dbemp_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-dbnull.json";   q_dbnull_n="$q_exec_n"
+  q_blocked="${q_noname_n}${q_namenull_n}${q_useremp_n}${q_usernull_n}${q_dbemp_n}${q_dbnull_n}"
+  if [ "$q_ok_n" = 1 ] && [ "$q_blocked" = 000000 ]; then
+    _ok "④ 토막을 일곱 꼴로 돌려 쟀다 — 정상 psql 1 회 · 여섯 결손 꼴(이름 빈 값·이름 null·사용자 빈 값·사용자 null·DB 빈 값·DB null) 모두 0 회"
   else
-    _bad "④ 토막의 꼴이 받는 집합 밖이다 — **실행하지 않았다**: $(printf '%s' "$q_shape_bad" | tr '\n' '~'). 받는 꼴은 명령 자리가 등재된 다섯(${Q_SHAPE_ALLOW})과 대입 · 절대 경로 낱말은 등재된 것(${Q_SHAPE_ABS})뿐 · 입력은 인용 heredoc · 출력은 fd 복제뿐이다. §14.5 ④ 에 파일을 읽거나 쓰는 줄이 들어왔으면 그 줄을 빼고(이 블록은 **읽기 전용 질의**다), 정말 필요하면 등재 집합을 함께 넓힌다"
+    _bad "④ 토막이 결손 값에서 질의를 막지 못한다 — 정상 ${q_ok_n}(1 이어야) · 이름 빈 값 ${q_noname_n} · 이름 null ${q_namenull_n} · 사용자 빈 값 ${q_useremp_n} · 사용자 null ${q_usernull_n} · DB 빈 값 ${q_dbemp_n} · DB null ${q_dbnull_n}(여섯 다 0 이어야). 질의가 'if …; then' **안**에 있고 세 값 모두 -n 과 != null 로 보는지 확인한다${q_denied:+ ── 다만 격리가 거절한 흔적이 있다(${q_denied}): 구조가 아니라 **PATH 열거**(${q_bin_want}) 또는 bash -r 가 토막의 한 줄을 막은 것이다. 그 줄은 다음 stderr 가 가리킨다: $(head -c 200 "$T/qerr" | tr '\n' ' ' || true)}"
+  fi
+  # 위험 이름 호출 0 — 깊이 방어가 실제로 아무것도 부르지 않았다는 **실행 층** 진술.
+  if [ "$q_danger_n" = 0 ]; then
+    _ok "④ 토막을 일곱 꼴로 돌리는 동안 위험 이름 호출 0 회(${Q_DANGER_TOOLS[*]})"
+  else
+    _bad "④ 토막 실행이 위험 이름을 ${q_danger_n} 회 불렀다: ${q_danger_hit}— 등재본에 그 이름을 부르는 줄이 들어왔다(그 줄은 리뷰를 지났어야 한다). 가짜가 받아 **아무 일도 일어나지 않았다**"
   fi
 else
-  _bad "④ 토막을 뽑지 못해 **실행하지 않았다** — ${q_why%· }. §14.5 ④ 의 펜스와 닫는 줄을 본다(판정 없이 지나가지 않는다)"
+  _bad "④ 측정 토막을 쓸 수 없어 **실행하지 않았다** — ${q_why:-등재본이 펜스와 다르다(위 등식 참조)}"
 fi
 COL_LOG=/var/tmp/bidvector-collection-step3.log
 col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
@@ -2439,7 +2431,8 @@ unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konep
   q_block q_block_n q_block_exec q_block_last q_ok_n q_noname_n q_namenull_n q_useremp_n \
   q_usernull_n q_dbemp_n q_dbnull_n q_blocked q_exec_n q_danger_n q_danger_hit q_bin_got \
   q_bin_want q_unlisted Q_REAL_TOOLS Q_DANGER_TOOLS Q_UNLISTED_TOOLS Q_DANGER_RE QBASH \
-  q_denied q_why q_shape_bad Q_SHAPE_ALLOW Q_SHAPE_ABS q_rest_n q_rest_files \
+  q_denied q_why q_rest_n q_rest_files STEP4_EXPECT q_fence q_fence_n q_marker_n \
+  q_expect_psql q_cmp_rc \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
   esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs \
