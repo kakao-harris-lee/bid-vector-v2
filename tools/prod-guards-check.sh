@@ -448,7 +448,7 @@ bt_stop="$(_bt_num STOP "$bt_out")"
 if [ "$bt_live" = 0 ] && [ "$bt_stop" = 0 ]; then
   _ok "두 스크립트에 살아 있는 백틱이 0 이다(단일 인용·주석·탈출 밖의 백틱은 명령 치환이다 — 문면을 짜는 자리가 명령을 돌리는 자리가 된다)"
 else
-  _bad "살아 있는 백틱 ${bt_live} 자 · 스캐너가 받지 않는 꼴 ${bt_stop} 군데: $(_bt_where LIVE "$bt_out")$(_bt_where STOP "$bt_out")— 백틱은 **실행된다**. 걷거나 탈출한다(걷는 쪽이 읽기에 낫다). STOP 은 인용이 파일 끝까지 닫히지 않았거나 heredoc 꼴이 받는 둘 밖이라는 뜻이다"
+  _bad "살아 있는 백틱 ${bt_live} 자 · 스캐너가 받지 않는 꼴 ${bt_stop} 군데: $(_bt_where LIVE "$bt_out")$(_bt_where STOP "$bt_out")— 셸이 그 백틱을 **실행하는 자리면** 걷거나 탈출한다(걷는 쪽이 읽기에 낫다). **인용 heredoc 본문의 백틱이 데이터라면 처방이 다르다**(vr L-2 = cr L-1): 본문은 셸 프로그램으로 훑으므로 fixture·문서의 리터럴 백틱이 여기서 붉는다 — 걷지 말고 그 자리를 **단일 인용으로 감싼다**. STOP 은 인용이 파일 끝까지 닫히지 않았거나 heredoc 꼴이 받는 둘(`<<'DELIM'`·`<<DELIM`) 밖이라는 뜻이다"
 fi
 unset bt_out bt_live bt_stop bt_scanned bt_pos bt_neg bt_live_probe bt_dead_probe BT_CH BACKTICK_FLOOR
 
