@@ -178,7 +178,7 @@ argv) · `: > "$SHIM_RUN_MARKER"`(truncate) · `cat "$SHIM_CONFIG_FILE"`(read), 
 | 명령 | 종료 | 핵심 결과 |
 |---|---|---|
 | `bash -n tools/prod-collection.sh tools/prod-guards-check.sh` | **0** | — |
-| `./tools/prod-guards-check.sh` | **0** | 통과 **524** · 어긋남 **0**(15V 착수 전 474) · **stderr 0 줄** |
+| `./tools/prod-guards-check.sh` | **0** | 통과 **527** · 어긋남 **0**(15V 착수 전 474) · **stderr 0 줄** |
 | `./gradlew --no-daemon check --continue` | **0** | `BUILD SUCCESSFUL` · `FAILED`/`FAILURE` 줄 0 · `:leakPatternGate` 실행됨 |
 
 사전 점검은 **별도 호출 셋**으로 봤다(Gradle 프로세스 0 · available 17572MB · swap free 7396MB · RSS
@@ -253,7 +253,9 @@ argv) · `: > "$SHIM_RUN_MARKER"`(truncate) · `cat "$SHIM_CONFIG_FILE"`(read), 
 `--network none` 이고 붙인 자리는 scratchpad 아래뿐이다(잔존 0). 공유 잠금 자리는 만들지 않았다.
 scratchpad: `…/scratchpad/m15v/`(임시 clone 하나 포함) — 지우지 않고 경로만 남긴다.
 
-**크기(합산 — 정본)**: evidence 셋 합 **662 줄**(260+79+323) ≤ 산출물 추가 **890 줄**(바뀐 줄 942).
+**크기(합산 — 정본)**: evidence 셋 합 **683 줄**(262+95+326) ≤ 산출물 추가 **890 줄**(바뀐 줄 942).
+분모는 **이 slice 의 산출물만** 센다 — 병합으로 들어온 libzstd chore(`docker/ml-serving.Dockerfile` ·
+그 chore evidence)는 남의 것이라 제외한다.
 이 수는 **마지막 커밋에서 명령 출력으로** 채웠다(`wc -l` · `git diff --numstat` · 게이트 요약 줄) —
 베껴 적은 수가 거듭 어긋났으므로 손으로 적는 자리를 남기지 않는다. 늘리지 않고
 갈아 썼다: 걷은 술어를 말하던 행과 문단, 변이 표의 통과·어긋남 쌍 전부, 라운드 이름을 단 비교
