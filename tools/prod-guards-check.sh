@@ -58,8 +58,13 @@ _require_lock_dir() {
 
 T="$(mktemp -d)" || _die "임시 디렉터리를 만들지 못했다" 2
 PROJ="bv-guards-check-$$"
+# **저장소 안에 만드는 fixture 는 trap 이 지운다**(M15/15V D-15V-9, cr L-4). 평상 흐름의 `rm -rf` 만
+# 두면 중간의 Ctrl-C·`_die` 에서 저장소에 미추적 디렉터리가 남고, clean-tree 게이트는 in_scope 경로만
+# 보므로 그 자리는 잡히지 않는다. 이름은 한 자리에 둔다(만드는 곳과 지우는 곳이 갈리지 않게).
+REPO_LINK_TARGET="$REPO_ROOT/reports/.m15v-link-target"
 _cleanup() {
   rm -rf "$T"
+  rm -rf "${REPO_LINK_TARGET:?}"
   rm -f "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock" "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}-probe.lock"
 }
 trap _cleanup EXIT
@@ -1218,12 +1223,69 @@ _col_run_state_reject() { # <이름> <갈래 mode> <달 mode> [갈래에 더 걸
   _expect_no_log ' run --rm' "수집 — 실행 상태 ${name}: 그 거절이 compose run 앞에서 끝난다"
 }
 _col_run_state_reject '갈래에 setgid 가 없다' 2700 2770 g-s
-_expect_text 'setgid 가 없다' "수집 — 그 문면이 setgid 축의 것이다(group 을 잇는 비트다)"
+_expect_text '갈래 디렉터리에 setgid 가 없다' "수집 — 그 문면이 setgid 축의 것이다(group 을 잇는 비트다)"
 _col_run_state_reject '갈래에 group 쓰기가 열렸다' 2770 2770
 _expect_text '달 디렉터리를 \*\*바꿔칠 수 있고\*\*' "수집 — 그 문면이 바꿔치기 사고를 가리킨다"
+# **rc 만 보던 셋에 문면을 붙인다**(M15/15V D-15V-8, cr L-5) — 같은 args 의 양성이 바로 뒤에 있어 오늘은
+# 다른 축의 3 을 받을 길이 좁지만, 이 라운드에 스스로 겪은 공허함(`SHIM_GIT_EXPECT_C`)이 그 꼴이었다.
 _col_run_state_reject '갈래가 other 에 열렸다' 2707 2770
+_expect_text '갈래 디렉터리가 other 에 열려 있다' "수집 — 그 문면이 조상 other 축의 것이다"
 _col_run_state_reject '달에 group 쓰기가 닫혔다' 2700 2750
+_expect_text '달 디렉터리에 group 읽기·쓰기·탐색이 열려 있지 않다' "수집 — 그 문면이 잎 group 축의 것이다"
 _col_run_state_reject '달이 other 에 열렸다' 2700 2777
+_expect_text '달 디렉터리가 other 에 열려 있다' "수집 — 그 문면이 잎 other 축의 것이다"
+
+# ── D-15V-1 — **root 도 술어 안이다**(cr M-1 · vr L-h) ─────────────────────────
+# 앞 판은 root 에 대해 mode 를 한 번도 읽지 않았고, `RSROOT` fixture 가 언제나 `install -d -m 2700`
+# (setgid 있음)이라 **그 축의 음성이 한 꼴도 없었다**. root 에 setgid 가 없으면 두 층의 group 이 래퍼의
+# gid 로 박히는데 조상의 setgid 는 커널 상속으로 서므로 **비트 술어 전부가 통과한 뒤** 컨테이너가 원장에
+# 쓰지 못한다(이 라운드 실측: 버릴 컨테이너로 `쓰기 실패` · 러너 종료 1).
+_col_root_mode_reject() { # <이름> <root 에 걸 chmod> <기대 문면>
+  local name="$1" mode="$2" want="$3"
+  rm -rf "${RSROOT:?}/notice-list"
+  chmod "$mode" "$RSROOT"
+  _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+  _expect_rc 3 "수집 — 실행 상태 root ${name}: 수집하지 않는다"
+  _expect_text "$want" "수집 — 실행 상태 root ${name}: 그 문면이 그 축의 것이다"
+  _expect_no_log ' run --rm' "수집 — 실행 상태 root ${name}: 그 거절이 compose run 앞에서 끝난다"
+  chmod 2700 "$RSROOT"
+}
+_col_root_mode_reject 'setgid 없음' g-s '실행 상태 root 에 setgid 가 없다'
+_col_root_mode_reject 'group 쓰기 열림' 2770 '실행 상태 root 에 group 쓰기가 열려 있다'
+_col_root_mode_reject 'other 쓰기 열림' 2702 '실행 상태 root 에 other 쓰기가 열려 있다'
+
+# ── D-15V-3 — **group 등식**(비트가 아니라 결과를 잰다) ────────────────────────
+# 비트 술어는 「앞으로 만들 자리」만 묶으므로 **이미 있는 자리의 group 이 틀린 경우**를 보지 못한다 —
+# 그것이 cr M-1 의 귀결이다. fixture 는 **호출자가 속한 보조 group** 으로 세운다(비구성원은 `chgrp` 를
+# 치지 못하므로 임의 gid 는 쓸 수 없다. `chgrp` 는 **디렉터리**의 setgid 를 지우지 않으므로 — 이 라운드
+# 실측 — 비트는 멀쩡한 채 gid 만 틀린 자리가 선다: 축이 섞이지 않는다).
+# 보조 group 이 없는 계정에서는 이 꼴을 세울 수 없다 — 그때는 **통과로 적지 않고 판정 불가로 선다**.
+COL_ALT_GID=""
+for _g in $(id -G); do [ "$_g" != "$(id -g)" ] && { COL_ALT_GID="$_g"; break; }; done
+[ -n "$COL_ALT_GID" ] \
+  || _die "gid 불일치 fixture 를 세울 보조 group 이 없다(id -G 가 primary 하나뿐이다) — 이 축을 재지 못하므로 판정 불가다. 그 계정에 보조 group 을 하나 둔다" 2
+_col_gid_reject() { # <이름> <어느 층> <기대 문면>
+  local name="$1" which="$2" want="$3"
+  rm -rf "${RSROOT:?}/notice-list"
+  install -d -m 2700 "$RSROOT/notice-list"
+  install -d -m 2770 "$COL_MONTH_DIR"
+  chgrp "$COL_ALT_GID" "$which"
+  _run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+  _expect_rc 3 "수집 — gid 불일치 ${name}: 수집하지 않는다"
+  _expect_text "$want" "수집 — gid 불일치 ${name}: 그 문면이 group 등식 축의 것이다"
+  _expect_no_log ' run --rm' "수집 — gid 불일치 ${name}: 그 거절이 compose run 앞에서 끝난다"
+}
+_col_gid_reject '조상' "$RSROOT/notice-list" '갈래 디렉터리의 group 이 실행 상태 root 의 group 과 다르다'
+_col_gid_reject '잎' "$COL_MONTH_DIR" '달 디렉터리의 group 이 실행 상태 root 의 group 과 다르다'
+# **양성 — 두 층의 gid 가 root 와 같으면 돈다**(위 둘이 공허하지 않음의 반대쪽).
+rm -rf "${RSROOT:?}/notice-list"
+_run ./tools/prod-collection.sh "${COL_ARGS[@]}"
+_expect_rc 0 "양성 — 두 층을 래퍼가 만들면 gid 가 root 와 같다(등식이 전부 거절하는 술어가 아니다)"
+if [ "$(stat -c '%g' "$COL_MONTH_DIR")" = "$(stat -c '%g' "$RSROOT")" ]; then
+  _ok "수집 — 래퍼가 만든 달 디렉터리의 gid 가 root 의 gid 와 같다(커널 상속)"
+else
+  _bad "수집 — 래퍼가 만든 달 디렉터리의 gid 가 root 와 다르다($(stat -c '%g' "$COL_MONTH_DIR") ≠ $(stat -c '%g' "$RSROOT"))"
+fi
 # **양성** — 두 층이 각각 2700·2770 이면 돈다(위 다섯이 공허하지 않음의 반대쪽).
 rm -rf "${RSROOT:?}/notice-list"
 install -d -m 2700 "$RSROOT/notice-list"
@@ -1267,6 +1329,11 @@ _col_no_residue '다른 커밋의 트리(3)' 3 SHIM_GIT_HEAD="$OTHER_SHA"
 _hold_lock "${BIDVECTOR_PROD_LOCK_DIR}/prod.${PROJ}.lock"
 _col_no_residue '프로젝트 잠금 경합(4)' 4
 _release_lock
+# **마지막 전제까지 넣는다**(M15/15V D-15V-7, cr L-1). 생성이 이름 충돌 검사 **앞**이던 동안 그 두 거절
+# (조회 실패 · 이름이 전역에서 이미 쓰임)은 `exit 3` 이면서 자리를 남겼다 — 절 제목이 전칭인데 표본이
+# 둘뿐이던 자리다. 이제 넷이고, 그 둘이 **생성보다 앞에 서는 마지막 전제**다.
+_col_no_residue '일회 이름이 전역에서 쓰임(3)' 3 SHIM_PS_NAME_HIT=deadbeefcafe
+_col_no_residue 'docker ps 조회 실패(3)' 3 SHIM_PS_RC=7
 rm -rf "${RSROOT:?}/notice-list"
 
 # **만든 뒤 실경로를 다시 본다**(M15/15U r1, vr M1) — 인자 검사는 **root** 의 실경로만 본다. root 는
@@ -1285,9 +1352,8 @@ _col_dir_link_reject() { # <이름> <심링크 자리> <타깃> — 호출 전�
 }
 # **갈래가 저장소 안을 가리킨다** — root 는 밖인데 붙는 자리가 저장소 안이 되는 바로 그 배치다.
 rm -rf "${RSROOT:?}/notice-list"
-_col_dir_link_reject '갈래가 저장소 안을 가리킨다' "$RSROOT/notice-list" "$REPO_ROOT/reports/.m15u-link-target"
+_col_dir_link_reject '갈래가 저장소 안을 가리킨다' "$RSROOT/notice-list" "$REPO_LINK_TARGET"
 _expect_text '심링크다' "수집 — 그 문면이 심링크 축의 것이다(mode 축이 아니다)"
-rm -rf "${REPO_ROOT:?}/reports/.m15u-link-target"
 # **root 밖을 가리키는 심링크도 거절한다** — 저장소 안이 아니어도 붙임의 원천이 root 밖으로 나간다
 # (「붙이는 원천은 root 아래 래퍼가 지은 한 경로뿐」이라는 (2b) 의 주장이 그 자리다).
 rm -rf "${RSROOT:?}/notice-list"
@@ -1296,8 +1362,11 @@ _expect_text '심링크다' "수집 — root 밖을 가리키는 심링크도 �
 # **달 디렉터리 자신이 심링크인 꼴** — 갈래는 멀쩡하고 잎만 바꿔 끼운 자리다.
 rm -rf "${RSROOT:?}/notice-list"
 install -d -m 2700 "$RSROOT/notice-list"
-_col_dir_link_reject '달 디렉터리가 저장소 안을 가리킨다' "$COL_MONTH_DIR" "$REPO_ROOT/reports/.m15u-link-target"
-rm -rf "${REPO_ROOT:?}/reports/.m15u-link-target"
+_col_dir_link_reject '달 디렉터리가 저장소 안을 가리킨다' "$COL_MONTH_DIR" "$REPO_LINK_TARGET"
+# **잎 꼴에도 문면을 못박는다**(M15/15V D-15V-8, vr L-e · cr L-5). 앞 판은 이 꼴의 `rc 3` 을 **심링크
+# 술어가 아니라 `lstat` 이 내는 777 의 mode 축**이 받고 있었고(vr V6b: 잎의 심링크 거절 둘만 지우면
+# GREEN), 그래서 (2b) 의 「세 꼴 문면이 심링크 축」은 둘만 참이었다.
+_expect_text '달 디렉터리 가 심링크다' "수집 — 잎 꼴도 **심링크 축**이 받는다(mode 축이 아니다)"
 rm -rf "${RSROOT:?}/notice-list"
 
 # ── ② 서비스 키 env — 키 집합을 닫는다 ─────────────────────────────────────────
@@ -1361,7 +1430,6 @@ _expect_rc 0 "수집 — 양성: 잔존 0 · 같은 커밋 · 같은 프로젝�
 _expect_log "run .*--rm .*--pull never .*--name ${PROJ}-app-run-collection" "수집 — 자기 일회 컨테이너 이름을 고정해 띄운다"
 _expect_log " -v ${COL_MONTH_DIR}:${COL_IN_CONTAINER}" "수집 — 붙임은 달 디렉터리 하나 → 고정된 컨테이너 경로다"
 _expect_log "--env-from-file ${KONEPSENV}" "수집 — 서비스 키 env 가 **일회 컨테이너까지** 간다"
-_expect_log " -v ${RSROOT}/notice-list/${KST_MONTH}:${COL_IN_CONTAINER}" "수집 — 붙임의 원천은 **실경로**다(재는 자리와 붙는 자리가 같다)"
 _expect_log "--env-file $T/env/prod.env" "수집 — 스택 env 파일은 그대로 compose 에 간다(파일이 둘이다)"
 _expect_log "-e SPRING_MAIN_WEB_APPLICATION_TYPE=none" "수집 — 러너 run 은 HTTP 표면을 끈다"
 _expect_log "--bidvector.collection.mode=once" "수집 — 러너 스위치를 준다"
@@ -1402,14 +1470,42 @@ _expect_rc 0 "수집 — 양성: 달을 넘는 --from/--to 창도 돈다"
 _expect_log " -v ${RSROOT}/notice-list/2026-10:" "수집 — 달을 넘는 창의 달 디렉터리는 **to** 의 달이다(from 이 아니다)"
 _expect_no_log " -v ${RSROOT}/notice-list/2026-09:" "수집 — from 의 달을 쓰지 않는다"
 rm -rf "${RSROOT:?}/notice-list"
-# **KST 축**(M15/15U r1, vr L1 Fh) — 앞 판의 창 단언은 하네스와 래퍼가 **같은 host TZ** 를 쓰므로
-# `TZ=Asia/Seoul` 을 지우는 변이가 이 host·CI(둘 다 KST)에서는 GREEN 이었다. 래퍼를 **다른 TZ 환경**으로
-# 불러, 그 환경이 아니라 KST 의 날짜가 러너에 가는지 본다(UTC+14 는 KST 보다 날짜가 앞서는 구역이다).
+# **KST 축 — 24시간 판별한다**(M15/15V D-15V-10, vr L-c). 앞 판은 `Pacific/Kiritimati`(UTC+14) 하나만
+# 썼는데 그 구역은 KST 보다 5시간 앞이라 **KST 19:00~23:59 에만** 날짜가 다르다 — 그 밖 시각의 CI 에서는
+# `TZ=Asia/Seoul` 제거 변이가 초록이었다. 반대 방향 구역(`Etc/GMT+12` = UTC-12, KST 보다 21시간 뒤라
+# **KST 00:00~20:59 에** 날짜가 다르다)을 함께 써서 두 창의 합집합이 하루를 덮게 한다.
+for _tz in Pacific/Kiritimati Etc/GMT+12; do
+  rm -rf "${RSROOT:?}/notice-list"
+  : > "$SHIM_LOG"; RUN_RC=0
+  TZ="$_tz" ./tools/prod-collection.sh "${COL_ARGS[@]}" > "$T/out" 2> "$T/err" || RUN_RC=$?
+  _expect_rc 0 "수집 — host TZ 가 ${_tz} 여도 돈다"
+  _expect_log "--bidvector.collection.to=${KST_TODAY}" "수집 — ${_tz} 에서도 창의 to 는 **KST** 의 오늘이다"
+  _expect_log " -v ${RSROOT}/notice-list/${KST_MONTH}:" "수집 — ${_tz} 에서도 달 디렉터리를 **KST** 로 짓는다"
+done
+unset _tz
+# **그 합집합이 하루를 덮는다는 것을 이 자리에서 센다** — 두 구역 가운데 **적어도 하나**가 지금 KST 와
+# 다른 날짜여야 위 단언이 공허하지 않다(둘 다 같은 날짜인 시각이 있으면 그 시각의 CI 에서 변이가 초록이다).
+_kst_now="$(TZ=Asia/Seoul date +%F)"
+_kir="$(TZ=Pacific/Kiritimati date +%F)"
+_gmt12="$(TZ=Etc/GMT+12 date +%F)"
+if [ "$_kir" != "$_kst_now" ] || [ "$_gmt12" != "$_kst_now" ]; then
+  _ok "수집 — 두 구역 가운데 적어도 하나가 지금 KST 와 다른 날짜다(KST ${_kst_now} · UTC+14 ${_kir} · UTC-12 ${_gmt12}) — 위 단언이 지금 시각에 판별력이 있다"
+else
+  _bad "수집 — 두 구역 모두 KST 와 같은 날짜다(${_kst_now}) — 지금 시각에는 KST 축 단언이 공허하다(구역 선택을 고친다)"
+fi
+unset _kst_now _kir _gmt12
+# **붙임의 원천은 실경로다**(M15/15V D-15V-8, vr V14 · cr L-2). 앞 판의 그 단언은 `COL_MONTH_DIR` 와
+# **글자까지 같아** 아무것도 재지 않았다(fixture 에 심링크 성분이 없고 두 층의 심링크는 전부 거절된다).
+# **root 자신은 거절되지 않는 유일한 층**이므로 거기서 잰다 — root 를 심링크로 주고 `-v` 에 실린 값이
+# 해석된 경로인지 본다.
+rm -rf "${RSROOT:?}/notice-list"
+ln -sfn "$RSROOT" "$T/rs-root-link"
 : > "$SHIM_LOG"; RUN_RC=0
-TZ=Pacific/Kiritimati ./tools/prod-collection.sh "${COL_ARGS[@]}" > "$T/out" 2> "$T/err" || RUN_RC=$?
-_expect_rc 0 "수집 — host TZ 가 KST 가 아니어도 돈다"
-_expect_log "--bidvector.collection.to=${KST_TODAY}" "수집 — 창의 to 는 **KST** 의 오늘이다(호출 환경의 TZ 가 아니다)"
-_expect_log " -v ${RSROOT}/notice-list/${KST_MONTH}:" "수집 — 달 디렉터리도 **KST** 로 짓는다"
+./tools/prod-collection.sh "${COL_BASE[@]}" --run-state-root "$T/rs-root-link" --days-back 1 \
+  --categories construction --calls-per-day 7 --calls-total 9 > "$T/out" 2> "$T/err" || RUN_RC=$?
+_expect_rc 0 "수집 — root 를 심링크로 줘도 돈다(두 층과 달리 root 는 받는다)"
+_expect_log " -v ${RSROOT}/notice-list/${KST_MONTH}:${COL_IN_CONTAINER}" "수집 — 붙임의 원천은 **해석된** 경로다(심링크 원문이 아니다)"
+_expect_no_log " -v $T/rs-root-link/" "수집 — 심링크 원문을 붙임의 원천으로 쓰지 않는다"
 rm -rf "${RSROOT:?}/notice-list"
 # **러너의 술어를 셸에 사본으로 두지 않는다**(과잉 금지) — 31일 넘는 창·미래는 러너가 기동 실패로
 # 드러낸다. 래퍼는 그것을 다시 검사하지 않으므로 **통과**해야 한다.
@@ -1634,6 +1730,39 @@ if [ "$tss_pairs" = "$TSS_WANT_SET" ]; then
 else
   _bad "TimeoutStartSec 쌍이 기대와 다르다 — 받은 것: [$(printf '%s' "$tss_pairs" | tr '\n' ';')] · 기대: [$(printf '%s' "$TSS_WANT_SET" | tr '\n' ';')]"
 fi
+# **부등식을 코드로 세운다**(M15/15V D-15V-8, vr L-d). 위 주석과 §14.3 이 「그 상한은 수집 창과 훑기 사이
+# 간격보다 작아야 그 주기의 사슬이 굶지 않는다」고 주장하는데 **그 부등식이 코드에 없었다** — 기대 집합을
+# 함께 고치는 변이(vr V12c: 수집을 25m 로)가 GREEN 이었다. 집합 등식은 「오늘의 값」을 묶고, 이 부등식은
+# **왜 그 값인가**를 묶는다(두 수를 함께 올리는 변경이 그 사슬을 굶기면 여기서 선다).
+# 간격은 위 `oncal_pairs` 에서 **수집과 바로 뒤 러너(훑기)** 의 분 차로 산출한다 — 손으로 적지 않는다.
+tss_ineq_bad=0 tss_min_gap=""
+_tss_minutes() { # <systemd 시간 문자열> → 분(정수). 아는 꼴만 받고 모르는 꼴은 빈 값이다.
+  case "$1" in
+    *m) printf '%s' "${1%m}" ;;
+    *s) printf '%s' "$(( ${1%s} / 60 ))" ;;
+    *h) printf '%s' "$(( ${1%h} * 60 ))" ;;
+    *) printf '' ;;
+  esac
+}
+for _slot in 07 13; do
+  _c="$(printf '%s\n' "$oncal_pairs" | sed -nE "s/^bidvector-collection\|\*-\*-\* ${_slot}:([0-9]{2}) .*/\1/p" | head -n1)"
+  _s="$(printf '%s\n' "$oncal_pairs" | sed -nE "s/^bidvector-notification-sweep\|\*-\*-\* ${_slot}:([0-9]{2}) .*/\1/p" | head -n1)"
+  if [ -z "$_c" ] || [ -z "$_s" ]; then
+    tss_ineq_bad=$((tss_ineq_bad + 1))
+    continue
+  fi
+  _gap=$(( 10#$_s - 10#$_c ))
+  if [ -z "$tss_min_gap" ] || [ "$_gap" -lt "$tss_min_gap" ]; then tss_min_gap="$_gap"; fi
+done
+_tss_col="$(_tss_minutes "$(printf '%s\n' "$tss_pairs" | sed -nE 's/^bidvector-collection\|(.*)$/\1/p' | head -n1)")"
+if [ -z "$tss_min_gap" ] || [ -z "$_tss_col" ] || [ "$tss_ineq_bad" -ne 0 ]; then
+  _bad "수집의 TimeoutStartSec 부등식을 재지 못했다(간격 ${tss_min_gap:-?} · 상한 ${_tss_col:-?} · 못 읽은 창 ${tss_ineq_bad}) — 꼴이 바뀌었으면 추출을 고친다(판정 없이 지나가지 않는다)"
+elif [ "$_tss_col" -lt "$tss_min_gap" ]; then
+  _ok "수집의 TimeoutStartSec(${_tss_col}분) < 수집→훑기 최소 간격(${tss_min_gap}분) — 상한에 걸린 run 이 그 주기의 사슬을 굶기지 않는다"
+else
+  _bad "수집의 TimeoutStartSec(${_tss_col}분) ≥ 수집→훑기 최소 간격(${tss_min_gap}분) — 상한까지 매달린 run 이 훑기·평가·relay 의 그 주기를 모두 미루게 한다(상한을 줄이거나 OnCalendar 간격을 넓힌다)"
+fi
+unset _slot _c _s _gap _tss_col
 unset _slot _u _col_min _other
 
 if [ "$after_pairs" = "$AFTER_WANT_SET" ]; then
@@ -1766,6 +1895,25 @@ _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect 
 # 담는다. S-2 의 사고 부류(이미 채운 자격 파일을 `install … /dev/null` 이 **말없이 0 바이트로** 만든다)는
 # 파일 이름과 무관하므로 같은 처방을 이 축에도 둔다 — 동사를 보지 않고 **그 파일을 입에 담은 코드 블록 줄
 # 전부**를 고정 집합과 묶는다. 이 파일이 비면 수집 run 이 기동 실패(1)로 끝난다.
+# ── M15/15V(D-15V-5) — §14.5 ③ 의 로그 파일은 **0600 으로 먼저 만든 뒤** `tee` 가 쓴다 ─────
+# 그 파일은 래퍼의 stderr 와 러너 출력 전부를 담고 `/var/tmp` 는 재부팅에도 남는다. 평소 umask(0022)가
+# 만드는 `0644` 로 두지 않는 유일한 길은 **`tee` 보다 앞선 `install -m 600`** 이다(`tee` 는 있는 파일의
+# mode 를 바꾸지 않는다 — 실측: 먼저 만들면 600 유지 · 안 만들면 644). 그래서 **순서**가 거동이다.
+# 자리 이름은 하나로 두고(등재 줄 목록의 수집 필터 밖이라 그 래칫이 따라가지 않는다) 여기서 직접 센다.
+COL_LOG=/var/tmp/bidvector-collection-step3.log
+col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
+col_log_install_n="$(printf '%s\n' "$col_log_lines" | grep -cE "^install -m 600 /dev/null ${COL_LOG}\$" || true)"
+col_log_tee_n="$(printf '%s\n' "$col_log_lines" | grep -cF "| tee ${COL_LOG}" || true)"
+col_log_rm_n="$(printf '%s\n' "$col_log_lines" | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
+# 순서: `install` 줄이 `tee` 줄보다 **앞**이어야 한다. 수집 순서가 문서 순서다.
+col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}\$" | head -n1 | cut -d: -f1)"
+col_log_tee_at="$(printf '%s\n' "$col_log_lines" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1)"
+if [ "$col_log_install_n" = 1 ] && [ "$col_log_tee_n" = 1 ] && [ "$col_log_rm_n" -ge 1 ] \
+   && [ -n "$col_log_install_at" ] && [ -n "$col_log_tee_at" ] && [ "$col_log_install_at" -lt "$col_log_tee_at" ]; then
+  _ok "runbook 의 ③ 로그 파일은 0600 으로 먼저 만들고(install 1 줄 · tee 보다 앞) 지우는 줄이 있다(${col_log_rm_n})"
+else
+  _bad "③ 로그 파일의 모양·순서가 어긋났다 — install ${col_log_install_n} 줄(자리 ${col_log_install_at:-?}) · tee ${col_log_tee_n} 줄(자리 ${col_log_tee_at:-?}) · 제거 ${col_log_rm_n} 줄. 먼저 만들지 않으면 평소 umask 에서 0644 로 생기고 tee 는 그 mode 를 바꾸지 않는다"
+fi
 konepsenv_lines="$(_rb_code_lines | grep 'koneps\.env' | _rb_norm | _rb_sort || true)"
 _rb_set_check "자격 파일(koneps.env) 언급" "$konepsenv_lines" "$(_rb_expect "$KONEPSENV_EXPECT")" "$KONEPSENV_EXPECT"
 
@@ -1838,10 +1986,11 @@ else
 fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
 unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
+  COL_LOG col_log_lines col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
   esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs \
-  ONCAL_WANT_SET oncal_pairs oncal_order_bad TSS_WANT_SET tss_pairs
+  ONCAL_WANT_SET oncal_pairs oncal_order_bad TSS_WANT_SET tss_pairs tss_ineq_bad tss_min_gap
 
 echo "prod-guards-check: 통과 ${PASS} · 어긋남 ${FAIL}"
 [ "$FAIL" -eq 0 ] || exit 1
