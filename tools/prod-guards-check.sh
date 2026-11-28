@@ -321,36 +321,131 @@ _expect_text '운영 자리를 만들지 않는다' "문면이 사유와 고치�
 _expect_no_text '잠금 자리 점검만 하고 끝낸다' "자리 점검을 건너뛰고 끝나지 않는다"
 if [ -e "$T/no-such-lock-dir" ]; then _bad "그 자리를 만들었다"; else _ok "그 자리를 만들지 않았다"; fi
 
-echo "== 문면 자리의 살아 있는 백틱 — 부류 래칫 (M15/15V r1, cr H-1 · M-2)"
-# 큰따옴표 안의 백틱 짝은 **명령 치환**이다. 이 slice 가 더한 네 문면이 그 꼴이었고, 실측으로
-# **가짜 `sudo` 가 두 번 실행됐고** 그 단어가 출력에서 사라졌다(`** 가 필요하다**`). `bash -n` 은 백틱
-# 안을 파싱 시점에 보지 않아 rc 0 이고, 기존 문면 단언들은 뭉개진 자리보다 **앞**을 보므로 통과했다 —
-# 이 slice 가 세운 어떤 층에도 걸리지 않았다. 그래서 **부류**를 닫는다.
+echo "== 코드의 살아 있는 백틱 — 인용 상태를 따라가는 스캐너 (M15/15V r2, vr M-a · cr L-2)"
+# 큰따옴표 안의 백틱 짝은 **명령 치환**이다. r1 이 더한 네 문면이 그 꼴이었고, 실측으로 **가짜 `sudo` 가
+# 두 번 실행됐고** 그 단어가 출력에서 사라졌다. `bash -n` 은 백틱 안을 파싱 시점에 보지 않아 rc 0 이다.
 #
-# 모집단: 두 in_scope 스크립트에서 **주석이 아닌** 줄 가운데 문면을 **큰따옴표로** 넘기는 호출
-# (`_ok|_bad|_die|_expect_*` 뒤에 공백 + `"`). 단일 인용으로 넘기는 자리(`_expect_text '…'`)는 백틱이
-# 리터럴이라 모집단 밖이다 — 가르는 글자는 **여는 인용부호**다. 주석은 첫 비공백이 `#` 인 줄로 뺀다
-# (그 줄의 백틱은 이 저장소의 문서 관례다 — 실측 여섯 줄 전부 주석이었다).
+# r1 의 래칫은 모집단이 **열거**였다 — 호출 이름(`_ok|_bad|_die|_expect_*`) 뒤에 공백 + 큰따옴표. 그래서
+# 실측된 미탐이 셋이었다(전부 가짜 `sudo` 가 실제로 실행되고 GREEN): `_expect_text '…' "… 설명 …"` 의
+# **둘째** 인자(그 꼴이 가드에 97 줄) · 래퍼의 `echo "collection: …"`(비주석 6 줄) · `|| _die \` 다음 줄의
+# 문면. 분류를 더 정교하게 하는 처방은 그 분류가 다시 열거라 같은 자리를 다시 연다.
 #
-# **비공허**: 모집단이 1 미만이면 그 자체가 어긋남이다(추출이 비면 「0 개」가 공허하게 참이 된다).
-_msg_lines() { # <파일…> — 문면을 큰따옴표로 넘기는, 주석이 아닌 줄
-  awk '{ line = $0; sub(/^[[:space:]]+/, "", line)
-         if (line ~ /^#/) next
-         if ($0 ~ /(_ok|_bad|_die|_expect_[a-z_]+) "/) print FILENAME ":" FNR ":" $0 }' "$@"
+# 그래서 **구성**으로 바꾼다: 두 스크립트의 **모든 줄**을 셸 인용 상태를 따라가며 훑고, 살아 있는 백틱
+# (단일 인용 밖 · 주석 밖 · 탈출 아님)이 **0** 인지 본다. `$( )` 치환은 이 저장소의 의도된 관용구라
+# (모집단에 22 줄) 금지하지 않는다 — 사고 경로인 백틱만 닫는다.
+#
+# **받는 꼴을 정하고 나머지는 정지시킨다.** 상태는 줄을 넘어 이어진다(이 파일의 awk 프로그램과
+# `"$(printf … \` 꼴이 여러 줄에 걸친다). 줄 끝에서 인용이 닫히지 않은 채 **파일이 끝나면** STOP 이고,
+# heredoc 의 꼴이 `<<'DELIM'`·`<<DELIM` 가 아니어도 STOP 이다 — 조용히 빠지는 가지를 두지 않는다.
+# 인용 heredoc 본문은 **그 자체로 셸 프로그램**이라(이 파일의 heredoc 은 실행되는 가짜를 만든다) 새
+# 상태로 따로 훑는다. 비인용 heredoc 본문은 백틱이 인용과 무관하게 살아 있으므로 글자로 본다.
+#
+# **비공허는 줄 수가 아니라 대조로 잰다**(cr L-2: r1 의 문턱은 `-ge 1` 인데 실값이 216 이었다 — 추출이
+# 99.5% 무너져도 초록이다). 스캐너를 **양성 probe**(미탐 셋을 그대로 심은 fixture)와 **음성 probe**
+# (오탐 셋: 줄 끝 주석 · 단일 인용 · awk 프로그램 안 · `${0##*/}` · 여러 줄 연속)에 돌려 둘 다 잰다.
+cat > "$T/backtick-scan.awk" <<'BTSCAN'
+BEGIN { SQ = "'"; DQ = "\""; BT = sprintf("%c", 96); sp = 0; bsp = 0; hd = ""; hdraw = 0 }
+function ctx(st, n) { return n > 0 ? st[n] : "B" }
+function hit(ln, why) { mark = mark FILENAME ":" ln why " " }
+function walk(s, st, sp, ln,    i, c, n, cx, esc, prev, rest) {
+  esc = 0; prev = ""; n = length(s)
+  for (i = 1; i <= n; i++) {
+    c = substr(s, i, 1); cx = ctx(st, sp)
+    if (esc)                    { esc = 0; prev = c; continue }
+    if (c == "\\" && cx != "S") { esc = 1; prev = c; continue }
+    if (cx == "S")              { if (c == SQ) sp--; prev = c; continue }
+    if (c == BT)                { live++; hit(ln, ""); prev = c; continue }
+    if ((cx == "B" || cx == "C") && c == "#" && (i == 1 || prev == " " || prev == "\t")) return sp
+    if (c == SQ && cx != "D")   { st[++sp] = "S"; prev = c; continue }
+    if (c == "$" && substr(s, i + 1, 1) == "(") { st[++sp] = "C"; i++; prev = "("; continue }
+    if (c == DQ)                { if (cx == "D") sp--; else st[++sp] = "D"; prev = c; continue }
+    if (c == ")" && cx == "C")  { sp--; prev = c; continue }
+    if (c == "<" && substr(s, i + 1, 1) == "<" && (cx == "B" || cx == "C")) {
+      rest = substr(s, i + 2)
+      if (rest ~ /^[<(]/) { i += 2; prev = "<"; continue }
+      if (match(rest, /^-?'[A-Za-z_][A-Za-z0-9_]*'/)) {
+        hd = substr(rest, RSTART, RLENGTH); sub(/^-?'/, "", hd); sub(/'$/, "", hd); hdraw = 0
+      } else if (match(rest, /^-?[A-Za-z_][A-Za-z0-9_]*/)) {
+        hd = substr(rest, RSTART, RLENGTH); sub(/^-?/, "", hd); hdraw = 1
+      } else { stop++; hit(ln, "(heredoc 꼴)"); prev = "<"; continue }
+      i += 1 + RLENGTH; prev = SQ; continue
+    }
+    prev = c
+  }
+  return sp
 }
+hd != "" {
+  t = $0; sub(/^[[:space:]]+/, "", t)
+  if (t == hd) {
+    if (bsp > 0) { stop++; hit(FNR, "(heredoc 본문 인용 미닫힘)") }
+    hd = ""; bsp = 0; next
+  }
+  scanned++
+  if (hdraw) { if (index($0, BT) > 0) { live++; hit(FNR, "(비인용 heredoc)") } ; next }
+  bsp = walk($0, bst, bsp, FNR)
+  next
+}
+{ scanned++; sp = walk($0, st, sp, FNR) }
+END {
+  if (sp > 0)   { stop++; hit("EOF", "(인용 미닫힘)") }
+  if (hd != "") { stop++; hit("EOF", "(heredoc 미닫힘)") }
+  printf "SCANNED %d\n", scanned
+  if (live > 0) printf "LIVE %d %s\n", live, mark
+  if (stop > 0) printf "STOP %d %s\n", stop, mark
+}
+BTSCAN
 BACKTICK_FILES=(tools/prod-collection.sh tools/prod-guards-check.sh)
-msg_total="$(_msg_lines "${BACKTICK_FILES[@]}" | grep -c '' || true)"
-# **탈출한 백틱은 치환이 아니다** — 세기 전에 걷는다(cr 가 권한 처방 가운데 하나가 탈출이다). 그 걷기가
-# 없으면 이 블록의 `_bad` 문면이 자기 래칫에 걸린다(실측).
-_msg_live_backtick() { _msg_lines "${BACKTICK_FILES[@]}" | sed 's/\\`//g'; }
-msg_backtick="$(_msg_live_backtick | grep -c '`' || true)"
-msg_backtick_where="$(_msg_live_backtick | grep '`' | cut -d: -f1,2 | tr '\n' ' ' || true)"
-if [ "$msg_total" -ge 1 ] && [ "$msg_backtick" = 0 ]; then
-  _ok "문면 자리 ${msg_total} 줄에 살아 있는 백틱이 0 이다(큰따옴표 안의 백틱은 명령 치환이다 — 문면을 짜는 자리가 명령을 돌리는 자리가 된다)"
+BACKTICK_FLOOR=2500   # 실값 2805(위 둘의 줄 수 − heredoc 종단자). 줄어들면 그 사유를 적고 함께 내린다.
+_bt_scan() { # <파일…> — 파일마다 새 상태로
+  local _f
+  for _f in "$@"; do awk -f "$T/backtick-scan.awk" "$_f" || true; done
+}
+_bt_num() { printf '%s\n' "$2" | awk -v k="$1" '$1 == k { s += $2 } END { print s + 0 }'; }
+_bt_where() { printf '%s\n' "$2" | awk -v k="$1" '$1 == k { for (i = 3; i <= NF; i++) print $i }' \
+  | LC_ALL=C sort -u | tr '\n' ' '; }
+# 양성 probe — 미탐 셋을 그대로 심는다. 백틱은 **런타임에 끼운다**: 이 파일에 축어로 적으면 스캐너가
+# 자기 fixture 를 집어 영원히 붉다(그 꼴을 예외로 빼면 그 예외가 구멍이다).
+BT_CH="$(printf '\140')"   # 8진 140 = 백틱. `printf %c 96` 은 인자의 첫 글자(9)를 낸다 — 양성 대조가 그 실수를 잡았다.
+{ printf '%s\n' "_expect_text 'p' \"설명 ${BT_CH}sudo -n true${BT_CH} 끝\""
+  printf '%s\n' "echo \"collection: ${BT_CH}sudo -n true${BT_CH} 거절\""
+  printf '%s\n' '[ -n "$x" ] \'
+  printf '%s\n' '  || _die \'
+  printf '%s\n' "    \"root 에 ${BT_CH}sudo -n true${BT_CH} setgid 가 없다\" 3"
+} > "$T/bt-probe-live.sh"
+# 음성 probe — 오탐 꼴 다섯. 여기는 **축어**로 적는다(이 블록 자신이 그 꼴들을 담고도 0 이어야 한다는
+# 진술이고, 가드를 훑을 때 이 본문도 같은 스캐너를 지난다).
+cat > "$T/bt-probe-dead.sh" <<'BTDEAD'
+_die "실행 상태 root 를 읽지 못했다" 3  # `stat` 실패
+x='literal `backtick` in single quotes'
+y="$(awk '/^```$/ {inb = 1} inb {print}' f)"
+z="${0##*/}"
+w="$(printf '%s\n' 'a' \
+  'b' | sort)"
+BTDEAD
+bt_live_probe="$(_bt_scan "$T/bt-probe-live.sh")"
+bt_dead_probe="$(_bt_scan "$T/bt-probe-dead.sh")"
+bt_pos="$(_bt_num LIVE "$bt_live_probe")"
+bt_neg="$(( $(_bt_num LIVE "$bt_dead_probe") + $(_bt_num STOP "$bt_dead_probe") ))"
+if [ "$bt_pos" -ge 3 ] && [ "$bt_neg" = 0 ]; then
+  _ok "백틱 스캐너의 양성·음성 대조가 선다 — 미탐 셋을 심은 probe 에서 ${bt_pos} 자를 집고(둘째 인자·echo 문면·연속 줄), 오탐 꼴 다섯(줄 끝 주석·단일 인용·awk 프로그램 안·매개변수 확장·여러 줄 연속)에서 0 이다"
 else
-  _bad "문면 자리 ${msg_total} 줄 가운데 ${msg_backtick} 줄이 백틱을 담았다: ${msg_backtick_where}— 큰따옴표 안의 백틱은 **실행된다**. 탈출(\\\`)하거나 걷는다. 모집단이 0 이면 추출을 고친다"
+  _bad "백틱 스캐너의 대조가 어긋났다 — 양성 ${bt_pos} 자(3 이상이어야) · 음성 ${bt_neg}(0 이어야). 스캐너가 죽었으면 아래 「0 이다」는 공허하다"
 fi
-unset msg_total msg_backtick msg_backtick_where
+bt_out="$(_bt_scan "${BACKTICK_FILES[@]}")"
+bt_scanned="$(_bt_num SCANNED "$bt_out")"
+if [ "${#BACKTICK_FILES[@]}" = 2 ] && [ "$bt_scanned" -ge "$BACKTICK_FLOOR" ]; then
+  _ok "백틱 스캐너의 모집단이 두 in_scope 스크립트의 ${bt_scanned} 줄이다(하한 ${BACKTICK_FLOOR}) — 주석·문면 자리만이 아니라 **모든 줄**이다"
+else
+  _bad "백틱 스캐너의 모집단이 무너졌다 — 파일 ${#BACKTICK_FILES[@]} 개(2 이어야) · 훑은 줄 ${bt_scanned}(하한 ${BACKTICK_FLOOR}). 파일을 빼거나 크게 줄였으면 열거와 하한을 함께 고친다"
+fi
+bt_live="$(_bt_num LIVE "$bt_out")"
+bt_stop="$(_bt_num STOP "$bt_out")"
+if [ "$bt_live" = 0 ] && [ "$bt_stop" = 0 ]; then
+  _ok "두 스크립트에 살아 있는 백틱이 0 이다(단일 인용·주석·탈출 밖의 백틱은 명령 치환이다 — 문면을 짜는 자리가 명령을 돌리는 자리가 된다)"
+else
+  _bad "살아 있는 백틱 ${bt_live} 자 · 스캐너가 받지 않는 꼴 ${bt_stop} 군데: $(_bt_where LIVE "$bt_out")$(_bt_where STOP "$bt_out")— 백틱은 **실행된다**. 걷거나 탈출한다(걷는 쪽이 읽기에 낫다). STOP 은 인용이 파일 끝까지 닫히지 않았거나 heredoc 꼴이 받는 둘 밖이라는 뜻이다"
+fi
+unset bt_out bt_live bt_stop bt_scanned bt_pos bt_neg bt_live_probe bt_dead_probe BT_CH BACKTICK_FLOOR
 
 echo "== prod-env.sh(M15/15R · S-8) — 데몬 선택 축 셋을 닫는다"
 # `COMPOSE_*`·`GIT_*` 는 접두로 비우면서 `DOCKER_HOST`·`DOCKER_CONTEXT` 는 남아 있었다. 그 둘은 세 래퍼의
@@ -1260,6 +1355,10 @@ _expect_text '갈래 디렉터리에 setgid 가 없다' "수집 — 그 문면�
 # `sudo` 없는 `chmod` 는 아무것도 고치지 못하므로 그 단어가 이 문장의 전부다.
 # **단일 인용의 명령(`'sudo chmod …'`)이 아니라 그 사유 절을 본다** — 백틱을 되살리는 변이에서 명령
 # 쪽은 살아 있고 **사유 절의 그 단어만** 사라졌다(실측: `sudo` 로만 보면 그 변이가 이 단언을 통과한다).
+# **탈출한 꼴(`` \`sudo\` ``)도 이 단언을 붉힌다 — 의도다**(M15/15V r2, vr L-b). 처방은 둘(탈출·걷기)
+# 가운데 **걷기**로 정했고(읽기에 낫다 — cr 가 그 선택을 되짚었다) 이 문면 단언은 그 결정을 문자열로
+# 고정한다. 탈출로 돌아가려면 이 기대도 함께 바꾸는 것이 맞다(fail-closed — 조용히 둘 다 받으면
+# 「어느 꼴이 이 저장소의 꼴인가」가 코드에서 사라진다).
 _expect_text '\*\*sudo 가 필요하다\*\*' "수집 — setgid 처방의 **사유 절**에 sudo 라는 단어가 남아 있다(백틱 치환으로 사라지지 않았다)"
 _col_run_state_reject '갈래에 group 쓰기가 열렸다' 2770 2770
 _expect_text '달 디렉터리를 \*\*바꿔칠 수 있고\*\*' "수집 — 그 문면이 바꿔치기 사고를 가리킨다"
@@ -1806,12 +1905,17 @@ tss_ineq_bad=0 tss_min_gap=""
 # 이 slice 가 앞 라운드에 고친 바로 그 침묵 꼴이 한 자리 남아 있었다. systemd 는 그 둘을 받으므로
 # 도달 경로가 있다.
 _tss_minutes() {
+  # **열거가 아니라 구성**(M15/15V r2, cr M-2). r1 의 거름망은 이물 글자(`*[!0-9smh]*`)와 단위 없음
+  # (`*[0-9]`)만 보아 **단위 글자가 둘인 꼴**을 통과시켰다: `2m30s` 는 `$(( 2m30 / 60 ))` 에서 대입이
+  # 실패해 `set -e` 가 게이트를 **요약 줄도 없이** 죽이고, `1h30m` 은 `1h30` 을 내 뒤의 `[ -lt ]` 가
+  # stderr 로 운다. systemd 는 둘 다 받으므로 도달 경로는 `1min30s` 와 같다(이 slice 에서 같은 침묵
+  # 꼴이 세 번째다). 받는 꼴을 **하나의 정규식**으로 적고 나머지는 빈 값으로 보내 `_bad` 가 받는다 —
+  # 새 꼴이 들어와도 통과하지 않는다. 이 파일은 bash 전용이라 `[[ =~ ]]` 를 쓴다.
+  [[ $1 =~ ^[0-9]+[smh]$ ]] || { printf ''; return 0; }
   case "$1" in
-    *[!0-9smh]* | "" | *[0-9]) printf '' ;;
     *m) printf '%s' "${1%m}" ;;
     *s) printf '%s' "$(( ${1%s} / 60 ))" ;;
     *h) printf '%s' "$(( ${1%h} * 60 ))" ;;
-    *) printf '' ;;
   esac
 }
 for _slot in 07 13; do
@@ -2134,16 +2238,20 @@ COL_LOG=/var/tmp/bidvector-collection-step3.log
 col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
 # 꼬리의 `&& \` 를 받는다(vr L-5 가 `install` 실패를 보게 하려고 그 줄을 `&&` 로 이었다) — 앵커는
 # 명령과 **정확한 경로**에 그대로 둔다.
-col_log_install_n="$(printf '%s\n' "$col_log_lines" | grep -cE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" || true)"
-col_log_tee_n="$(printf '%s\n' "$col_log_lines" | grep -cF "| tee ${COL_LOG}" || true)"
+# **주석 줄은 어느 계수도 세지 않는다**(M15/15V r2, cr L-5 — r1 은 제거 계수만 고쳐 비대칭이 남았다:
+# `tee` 는 앵커가 없어 주석 달린 `# ./tools/… | tee …` 도 셌다). 한 번 걷어 네 자리가 같은 모집단을
+# 본다. `_rb_norm` 이 줄 머리 공백을 걷으므로 첫 글자가 `#` 인지만 보면 된다.
+col_log_code="$(printf '%s\n' "$col_log_lines" | grep -v '^#' || true)"
+col_log_install_n="$(printf '%s\n' "$col_log_code" | grep -cE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" || true)"
+col_log_tee_n="$(printf '%s\n' "$col_log_code" | grep -cF "| tee ${COL_LOG}" || true)"
 # **주석 줄은 세지 않는다**(M15/15V r1, vr L-4) — 앞 판은 그 줄 앞에 `# ` 를 붙여도 초록이었다(실측).
 # `_rb_norm` 이 줄 머리 공백을 걷으므로 첫 글자가 `#` 인지만 보면 된다.
-col_log_rm_n="$(printf '%s\n' "$col_log_lines" | grep -v '^#' | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
+col_log_rm_n="$(printf '%s\n' "$col_log_code" | grep -cE "(shred -u|rm -f) ${COL_LOG}" || true)"
 # 순서: `install` 줄이 `tee` 줄보다 **앞**이어야 한다. 수집 순서가 문서 순서다.
 # `|| true` — 무매치(`grep` exit 1)가 `set -e` 아래에서 **게이트를 죽이지 않게** 한다. 죽은 게이트는
 # 판정이 아니라 침묵이다(이 라운드의 변이가 그 꼴을 드러냈다 — exit 1 · BAD 0 · 요약 줄 없음).
-col_log_install_at="$(printf '%s\n' "$col_log_lines" | grep -nE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" | head -n1 | cut -d: -f1 || true)"
-col_log_tee_at="$(printf '%s\n' "$col_log_lines" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1 || true)"
+col_log_install_at="$(printf '%s\n' "$col_log_code" | grep -nE "^install -m 600 /dev/null ${COL_LOG}( &&.*)?\$" | head -n1 | cut -d: -f1 || true)"
+col_log_tee_at="$(printf '%s\n' "$col_log_code" | grep -nF "| tee ${COL_LOG}" | head -n1 | cut -d: -f1 || true)"
 if [ "$col_log_install_n" = 1 ] && [ "$col_log_tee_n" = 1 ] && [ "$col_log_rm_n" -ge 1 ] \
    && [ -n "$col_log_install_at" ] && [ -n "$col_log_tee_at" ] && [ "$col_log_install_at" -lt "$col_log_tee_at" ]; then
   _ok "runbook 의 ③ 로그 파일은 0600 으로 먼저 만들고(install 1 줄 · tee 보다 앞) 지우는 줄이 있다(${col_log_rm_n})"
@@ -2222,7 +2330,7 @@ else
 fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
 unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
-  COL_LOG col_log_lines col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
+  COL_LOG col_log_lines col_log_code col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
   q_block q_block_n q_block_exec q_block_last q_ok_n q_noname_n q_namenull_n q_useremp_n \
   q_usernull_n q_dbemp_n q_dbnull_n q_blocked q_exec_n q_danger_n q_danger_hit q_bin_got \
   q_bin_want q_unlisted Q_REAL_TOOLS Q_DANGER_TOOLS Q_UNLISTED_TOOLS Q_DANGER_RE QBASH \

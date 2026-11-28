@@ -1735,7 +1735,9 @@ stat -c '%U %a' /var/tmp/bidvector-collection-step3.log   # <운영자> 600 — 
 ```
 
 `$?` 가 아니라 `${PIPESTATUS[0]}` 를 읽는다 — `tee` 를 물렸으므로 `$?` 는 `tee` 의 것이다(래퍼의 종료
-코드가 이 절차의 판정값이다).
+코드가 이 절차의 판정값이다). **`1` 이면 두 가지다**: 위 `install` 이 실패해 래퍼가 **아예 돌지 않았거나**
+(그 자리가 이미 다른 소유자에게 잡혀 있다 — `install` 의 stderr 가 바로 위에 뜬다), 러너가 §14.9 표의
+「예외」로 끝났거나다. 둘은 **같은 코드로 보고되므로** 그 줄 위의 stderr 를 먼저 본다.
 
 마침 줄은 `collection finished slots=… truncatedSlots=… halted=… exit=…` 이고, 슬롯마다
 `collection slot date=… source=… received=… normalized=… duplicate=… dropped=… … pages=… truncated=…`
