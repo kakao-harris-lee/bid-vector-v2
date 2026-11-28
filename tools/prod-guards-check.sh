@@ -1980,34 +1980,155 @@ _rb_set_check "자격 파일(relay.env) 언급" "$relayenv_lines" "$(_rb_expect 
 # 정본 Phase 2.5 (1) 의 「문자열 술어 → 실행 층」으로 옮긴다: runbook 에서 그 토막을 **축어로 뽑아**
 # 가짜 `docker` 앞에서 돌리고 **`docker exec` 가 불린 횟수**를 센다.
 #
-# 가짜 `docker` 는 이 검사의 PATH 앞에 이미 있다. `config` 는 `$SHIM_CONFIG_FILE` 을 그대로 내므로
-# 운영 env 파일을 열지 않는다(블록의 `--env-file` 경로는 가짜가 읽지 않는다 — 운영 자원 접촉 0).
+# ── M15/15V r2(vr H-1 · cr H-2) — **실행하는 것의 범위를 구성으로 묶는다** ─────
+# r1 의 추출은 `_rb_code_lines`(펜스 경계를 버린 전 코드 줄)에서 첫 `^fi$` 까지였고, 그 토막을 이 host 의
+# 평소 PATH·cwd 에서 돌렸다. 종단자가 한 글자 달라지면(`fi  # 주석` · `fi;` · 들여쓴 `fi`) 그 꼴이
+# 스트림에서 **사라져** 추출이 문서 끝까지 간다 — 정적 실측: 세 꼴 모두 **62 줄**이고 그 안에
+# `sudo -e /etc/bidvector-v2/prod.env` · `./tools/prod-health.sh --env-file …` · `shred -u …` ·
+# `sudo systemctl enable --now …` 가 든다. r1 의 비공허 단언은 그 꼴을 **받는다**(62 ≥ 10 · psql 줄은
+# 문서에 하나뿐이라 1). **하한은 상한이 아니다.** 품질 게이트가 운영 타이머를 켜고 운영 자격 파일을
+# 편집기로 여는 길이므로 네 층으로 묶는다.
+#  ⓐ 추출을 **시작 표지가 든 펜스 안**으로 묶는다(펜스를 이 awk 가 직접 센다). 종단자를 보지 못한 채
+#     그 펜스가 닫히면 **아무것도 내지 않는다** → 0 줄 → `_bad`. 줄 수 **상한**과 「마지막 줄이 fi」도
+#     함께 단언한다(하한만으로는 넓어진 꼴이 지나간다 — 그것이 이 지적이다).
+#  ⓑ 실행은 추출이 검증된 **`_ok` 가지 안에서만** 한다(r1 은 판정과 무관하게 무조건 돌았다).
+#  ⓒ 실행은 `env -i` + **열거한 이름만 든 전용 PATH**(`$T/qbin`) · stdin `/dev/null` · cwd `$T/qrun`
+#     (저장소 밖이라 `./tools/*` 가 해석되지 않는다)에서 한다.
+#  ⓓ 위험 이름은 **가짜를 두고 호출 0 회를 센다**. 「PATH 에 없음」 대신 이 쪽을 고른 이유: 없음은 그
+#     순간의 PATH 만 말하고 호출을 **막지는 못하는데**(절대 경로로 부르면 그만이다) 가짜는 넓어진 토막이
+#     그 이름을 실제로 부를 때 **아무것도 하지 않으면서** 같은 계수로 그 사실을 보고한다. 그 계수가
+#     공허하지 않다는 것은 **양성 대조**로 잰다(가짜를 직접 부르는 probe → 다섯 회 기록 · 그 가짜
+#     shred·rm 이 지나간 파일이 그대로 남음). 「없음」은 열거 **밖** 이름으로 따로 잰다(넓어진 토막의
+#     `sed`·`paste`·`bc` 가 서는 자리다).
+#
+# 가짜 `docker` 의 `config` 는 `$SHIM_CONFIG_FILE` 을 그대로 내므로 운영 env 파일을 열지 않는다
+# (블록의 `--env-file` 경로는 가짜가 읽지 않는다 — 운영 자원 접촉 0).
+#
+# 일곱 cfg fixture — ④ 의 **여섯 조건을 하나씩** 받는다(M15/15V r2, cr M-1 · vr L-a). r1 은 둘
+# (이름 빈 값 · 사용자 null)뿐이어서 나머지 넷을 지운 변이가 GREEN 이었다. 꼴은 `jq` 로 만든다
+# (앞 판의 `sed` 치환은 값 모양이 바뀌는 날 조용히 아무것도 바꾸지 않는다).
+jq -e '.services.postgres.environment | has("POSTGRES_USER") and has("POSTGRES_DB")' "$T/cfg.json" \
+  >/dev/null || _die "compose config fixture 에 postgres 자격 키가 없다 — ④ fixture 를 만들 수 없다(판정 불가)" 2
+_q_fixture() { # <꼬리> <jq 식>
+  jq -c "$2" "$T/cfg.json" > "$T/cfg-q-$1.json" \
+    || _die "④ cfg fixture 를 만들지 못했다: $1 — 판정 불가" 2
+}
+_q_fixture ok        '.'
+_q_fixture noname    '.name = ""'
+_q_fixture namenull  '.name = "null"'
+_q_fixture useremp   '.services.postgres.environment.POSTGRES_USER = ""'
+_q_fixture usernull  'del(.services.postgres.environment.POSTGRES_USER)'
+_q_fixture dbemp     '.services.postgres.environment.POSTGRES_DB = ""'
+_q_fixture dbnull    'del(.services.postgres.environment.POSTGRES_DB)'
+# ⓒ 격리 실행 환경 — 열거한 이름만 든 PATH, 빈 환경, 저장소 밖 cwd.
+Q_REAL_TOOLS=(bash cat grep jq)                       # 토막과 가짜 docker 가 쓰는 도구
+Q_DANGER_TOOLS=(sudo systemctl journalctl shred rm)   # 넓어진 토막이 부르는 이름 — 가짜로 둔다
+Q_UNLISTED_TOOLS=(sed awk paste bc)                   # 열거 밖 — 해석되지 않아야 한다
+mkdir -p "$T/qbin" "$T/qrun"
+for _t in "${Q_REAL_TOOLS[@]}"; do
+  _p="$(command -v "$_t" || true)"
+  [ -n "$_p" ] || _die "격리 PATH 에 넣을 ${_t} 를 찾지 못했다 — 판정 불가" 2
+  ln -sf "$_p" "$T/qbin/$_t"
+done
+cp "$T/bin/docker" "$T/qbin/docker"
+chmod +x "$T/qbin/docker"
+for _t in "${Q_DANGER_TOOLS[@]}"; do
+  cat > "$T/qbin/$_t" <<'QFAKE'
+#!/usr/bin/env bash
+# 위험 이름의 가짜 — 부르면 argv 만 적고 **아무것도 하지 않는다**(tools/prod-guards-check.sh 전용).
+printf '%s %s\n' "${0##*/}" "$*" >> "${SHIM_LOG:-/dev/null}"
+exit 0
+QFAKE
+  chmod +x "$T/qbin/$_t"
+done
+unset _t _p
+QBASH="$(command -v bash)"
+Q_DANGER_RE="$(printf '%s|' "${Q_DANGER_TOOLS[@]}")"; Q_DANGER_RE="${Q_DANGER_RE%|}"
+q_danger_n=0
+q_danger_hit=""
+_q_run() { # <돌릴 스크립트> <cfg fixture> → q_exec_n 세우고 위험 호출을 q_danger_n 에 누적
+  : > "$SHIM_LOG"
+  ( cd "$T/qrun" && env -i "PATH=$T/qbin" "SHIM_LOG=$SHIM_LOG" "SHIM_CONFIG_FILE=$2" \
+      "$QBASH" "$1" ) > "$T/qout" 2> "$T/qerr" < /dev/null || true
+  q_exec_n="$(grep -cE '^docker exec ' "$SHIM_LOG" || true)"
+  q_danger_n=$(( q_danger_n + $(grep -cE "^(${Q_DANGER_RE}) " "$SHIM_LOG" || true) ))
+  q_danger_hit="${q_danger_hit}$(grep -E "^(${Q_DANGER_RE}) " "$SHIM_LOG" | tr '\n' ';' || true)"
+}
+q_bin_got="$(ls -1 "$T/qbin" | LC_ALL=C sort | tr '\n' ' ' || true)"
+q_bin_want="$(printf '%s\n' docker "${Q_REAL_TOOLS[@]}" "${Q_DANGER_TOOLS[@]}" | LC_ALL=C sort | tr '\n' ' ')"
+if [ "$q_bin_got" = "$q_bin_want" ]; then
+  _ok "④ 격리 PATH 가 열거한 이름 그대로다(${q_bin_want}) — 그 디렉터리 하나가 PATH 전부이므로 밖의 이름은 해석되지 않는다"
+else
+  _bad "④ 격리 PATH 의 이름 집합이 열거와 다르다: 받은 [${q_bin_got}] · 기대 [${q_bin_want}] — 이름을 더하거나 뺐으면 열거도 함께 바꾼다(그 집합이 토막이 쓸 수 있는 도구 전부다)"
+fi
+q_unlisted="$(env -i "PATH=$T/qbin" "$QBASH" -c 'for _u in "$@"; do command -v "$_u" || true; done' _ \
+  "${Q_UNLISTED_TOOLS[@]}" < /dev/null | tr '\n' ' ' || true)"
+if [ -z "${q_unlisted// /}" ]; then
+  _ok "열거 밖 이름 ${#Q_UNLISTED_TOOLS[@]} 개(${Q_UNLISTED_TOOLS[*]})가 그 PATH 에서 해석되지 않는다 — 넓어진 토막의 sed·paste·bc 줄이 서는 자리다"
+else
+  _bad "열거 밖 이름이 그 PATH 에서 해석된다: ${q_unlisted}— PATH 가 새지 않는지 본다(격리가 열리면 아래 「호출 0」이 아무것도 뜻하지 않는다)"
+fi
+# **양성 대조** — 가짜가 살아 있고 계수가 움직인다는 것을 먼저 잰다. 이것이 없으면 아래 「호출 0」은
+# 「아무도 부르지 않았다」와 「계수가 죽었다」를 구별하지 못한다(이 저장소가 거듭 밟은 꼴이다).
+: > "$T/qrun/probe-target"
+cat > "$T/qprobe.sh" <<'QPROBE'
+sudo -n true
+systemctl is-active bidvector-collection.timer
+journalctl -u bidvector-collection -n 1
+shred -u probe-target
+rm -f probe-target
+QPROBE
+_q_run "$T/qprobe.sh" "$T/cfg-q-ok.json"
+if [ "$q_danger_n" = "${#Q_DANGER_TOOLS[@]}" ] && [ -e "$T/qrun/probe-target" ]; then
+  _ok "위험 이름 가짜가 산다 — 양성 대조에서 ${q_danger_n} 회 기록되고, 그 가짜 shred·rm 이 지나간 파일은 **그대로 있다**(계수가 살아 있고 가짜는 아무것도 하지 않는다)"
+else
+  _bad "위험 이름 가짜의 양성 대조가 어긋났다 — 기록 ${q_danger_n} 회(${#Q_DANGER_TOOLS[@]} 이어야) · probe 대상 파일 잔존 $([ -e "$T/qrun/probe-target" ] && echo 있음 || echo 없음). 계수가 죽었으면 아래 「호출 0」은 공허하다"
+fi
+q_danger_n=0
+q_danger_hit=""
+# ⓐ 펜스 동일성 추출 — 시작 표지가 **든 그 펜스** 안에서, 종단자까지. 종단자 없이 펜스가 닫히면 0 줄.
 q_block="$T/q-block.sh"
-awk '/^CFG="\$\(docker compose/ {inb = 1} inb {print} inb && /^fi$/ {exit}' \
-  <(_rb_code_lines) > "$q_block"
+awk '
+  /^[[:space:]]*```/ {
+    if (fence && collecting && !closed) n = 0
+    if (fence && collecting) exit
+    fence = !fence
+    next
+  }
+  !fence { next }
+  !collecting && /^CFG="\$\(docker compose/ { collecting = 1 }
+  collecting && !closed { buf[++n] = $0 }
+  collecting && !closed && /^fi$/ { closed = 1 }
+  END { if (closed) for (i = 1; i <= n; i++) print buf[i] }
+' "$RB" > "$q_block"
 q_block_n="$(grep -c '' "$q_block" || true)"
 q_block_exec="$(grep -cE '^docker exec -i "\$\{P\}-postgres-1" psql ' "$q_block" || true)"
-if [ "$q_block_n" -ge 10 ] && [ "$q_block_exec" = 1 ]; then
-  _ok "runbook 에서 ④ 토막을 뽑았다(${q_block_n} 줄 · psql 호출 한 줄) — 아래 측정이 공허하지 않다"
+q_block_last="$(tail -n1 "$q_block" 2>/dev/null || true)"
+if [ "$q_block_n" -ge 10 ] && [ "$q_block_n" -le 40 ] && [ "$q_block_exec" = 1 ] \
+   && [ "$q_block_last" = fi ]; then
+  _ok "runbook 에서 ④ 토막을 뽑았다(${q_block_n} 줄 · 상한 40 · psql 호출 한 줄 · 마지막 줄이 닫는 fi) — 아래 측정이 공허하지 않고 그 펜스를 넘지도 않는다"
+  # ⓑ 실행은 여기서만 — 추출이 위 넷을 통과했을 때다.
+  _q_run "$q_block" "$T/cfg-q-ok.json";       q_ok_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-noname.json";   q_noname_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-namenull.json"; q_namenull_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-useremp.json";  q_useremp_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-usernull.json"; q_usernull_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-dbemp.json";    q_dbemp_n="$q_exec_n"
+  _q_run "$q_block" "$T/cfg-q-dbnull.json";   q_dbnull_n="$q_exec_n"
+  q_blocked="${q_noname_n}${q_namenull_n}${q_useremp_n}${q_usernull_n}${q_dbemp_n}${q_dbnull_n}"
+  if [ "$q_ok_n" = 1 ] && [ "$q_blocked" = 000000 ]; then
+    _ok "④ 토막을 일곱 꼴로 돌려 쟀다 — 정상 psql 1 회 · 여섯 결손 꼴(이름 빈 값·이름 null·사용자 빈 값·사용자 null·DB 빈 값·DB null) 모두 0 회"
+  else
+    _bad "④ 토막이 결손 값에서 질의를 막지 못한다 — 정상 ${q_ok_n}(1 이어야) · 이름 빈 값 ${q_noname_n} · 이름 null ${q_namenull_n} · 사용자 빈 값 ${q_useremp_n} · 사용자 null ${q_usernull_n} · DB 빈 값 ${q_dbemp_n} · DB null ${q_dbnull_n}(여섯 다 0 이어야). 질의가 'if …; then' **안**에 있고 세 값 모두 -n 과 != null 로 보는지 확인한다"
+  fi
+  # ⓓ 그 일곱 run 이 위험 이름을 한 번도 부르지 않았는가 — 추출이 ④ 펜스를 넘지 않았다는 **실행 층** 진술.
+  if [ "$q_danger_n" = 0 ]; then
+    _ok "④ 토막을 일곱 꼴로 돌리는 동안 위험 이름 호출 0 회(${Q_DANGER_TOOLS[*]}) — 추출이 ④ 펜스를 넘지 않았다"
+  else
+    _bad "④ 토막 실행이 위험 이름을 ${q_danger_n} 회 불렀다: ${q_danger_hit}— 추출이 §14.5 ④ 의 펜스를 넘었다. 닫는 fi 의 꼴을 확인한다(그 줄이 'fi' 가 아니면 추출이 문서 끝까지 간다). 가짜가 받아 **아무 일도 일어나지 않았다**"
+  fi
 else
-  _bad "④ 토막을 뽑지 못했다(${q_block_n} 줄 · psql 호출 ${q_block_exec}) — 꼴이 바뀌었으면 추출을 고친다(판정 없이 지나가지 않는다)"
-fi
-# 세 cfg fixture: 정상 · `.name` 이 빈 값 · `POSTGRES_USER` 가 없음(`jq -r` 이 `null` 을 낸다).
-printf '%s' "$(cat "$T/cfg.json")" > "$T/cfg-q-ok.json"
-printf '%s' "$(sed "s/\"name\":\"${PROJ}\"/\"name\":\"\"/" "$T/cfg.json")" > "$T/cfg-q-noname.json"
-printf '%s' "$(sed 's/"POSTGRES_USER":"x"/"POSTGRES_NOTUSER":"x"/' "$T/cfg.json")" > "$T/cfg-q-nouser.json"
-_q_exec_count() { # <cfg fixture> → 그 꼴에서 `docker exec` 가 불린 횟수
-  : > "$SHIM_LOG"
-  ( cd "$REPO_ROOT" && SHIM_CONFIG_FILE="$1" bash "$q_block" ) > "$T/out" 2> "$T/err" || true
-  grep -cE '^docker exec ' "$SHIM_LOG" || true
-}
-q_ok_n="$(_q_exec_count "$T/cfg-q-ok.json")"
-q_noname_n="$(_q_exec_count "$T/cfg-q-noname.json")"
-q_nouser_n="$(_q_exec_count "$T/cfg-q-nouser.json")"
-if [ "$q_ok_n" = 1 ] && [ "$q_noname_n" = 0 ] && [ "$q_nouser_n" = 0 ]; then
-  _ok "④ 토막을 돌려 쟀다 — 정상 psql 1 회 · 프로젝트 이름 빈 값 0 회 · DB 사용자 null 0 회(빈 값·null 에서 질의에 닿지 않는다)"
-else
-  _bad "④ 토막이 빈 값·null 에서 질의를 막지 못한다 — 정상 ${q_ok_n}(1 이어야) · 이름 빈 값 ${q_noname_n}(0) · 사용자 null ${q_nouser_n}(0). 질의가 'if …; then' **안**에 있고 세 값 모두 -n 과 != null 로 보는지 확인한다"
+  _bad "④ 토막을 뽑지 못했다(${q_block_n} 줄 · 상한 40 · psql 호출 ${q_block_exec} · 마지막 줄 [${q_block_last}]) — 종단자를 못 본 추출은 **아무것도 내지 않는다**. §14.5 ④ 의 닫는 줄이 'fi' 하나인지 확인한다(판정 없이 지나가지 않고, 실행도 하지 않는다)"
 fi
 COL_LOG=/var/tmp/bidvector-collection-step3.log
 col_log_lines="$(_rb_code_lines | grep -F "$COL_LOG" | _rb_norm || true)"
@@ -2102,7 +2223,9 @@ fi
 # 이 블록들이 쓴 임시값을 걷는다(cr L-8 — 같은 파일의 다른 임시값과 같은 관례).
 unset DIR_EXPECT RELAYENV_EXPECT KONEPSENV_EXPECT dir_lines relayenv_lines konepsenv_lines \
   COL_LOG col_log_lines col_log_install_n col_log_tee_n col_log_rm_n col_log_install_at col_log_tee_at \
-  q_block q_block_n q_block_exec q_ok_n q_noname_n q_nouser_n \
+  q_block q_block_n q_block_exec q_block_last q_ok_n q_noname_n q_namenull_n q_useremp_n \
+  q_usernull_n q_dbemp_n q_dbnull_n q_blocked q_exec_n q_danger_n q_danger_hit q_bin_got \
+  q_bin_want q_unlisted Q_REAL_TOOLS Q_DANGER_TOOLS Q_UNLISTED_TOOLS Q_DANGER_RE QBASH \
   ENVF_DIRECTIVE envf_relay envf_mentions \
   envkey_inline alert_block alert_service limitcore_vals alert_user_n alert_lc_verbatim \
   esp_prefixes SES_WANT_SET ses_pairs AFTER_WANT_SET after_pairs \
